@@ -28,8 +28,10 @@
 </details>
 
 @code {
-    [Parameter] public BotHostSelection? Selection { get; set; }
-    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+    [Parameter, EditorRequired] public AuthenticatedSession Session { get; set; } =
+        AuthenticatedSession.Anonymous;
+
+    private BotHostSelection? Selection => Session.HostSelection;
 
     private string CurrentReturnUrl
     {
@@ -42,42 +44,27 @@
 
     private string ExitImpersonationHref => $"/auth/exit-admin?returnUrl={CurrentReturnUrl}";
 
-    private bool IsAdminEditing =>
-        !string.IsNullOrWhiteSpace(User.FindFirstValue(BotHostClaims.AdminEditingLogin));
+    private bool IsAdminEditing => Session.IsAdminEditing;
 
-    private string Role => IsBotAccount
-        ? AuthRole.Bot
-        : Selection?.Current.Role
-        ?? User.FindFirstValue(AuthClaims.Role)
-        ?? "operator";
-
-    private bool IsBotAccount =>
-        string.Equals(
-            User.FindFirstValue(AuthClaims.IsBotAccount),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+    private string Role => Session.DisplayRole;
 
     private string? AccountImageUrl()
     {
         return IsAdminEditing && !string.IsNullOrWhiteSpace(Selection?.Current.ProfileImageUrl)
             ? Selection.Current.ProfileImageUrl
-            : User.FindFirstValue(AuthClaims.ProfileImageUrl);
+            : Session.ProfileImageUrl;
     }
 
     private string IdentityText()
     {
-        var adminLogin = User.FindFirstValue(BotHostClaims.AdminEditingLogin);
         if (Selection is not null
             && string.Equals(Role, AuthRole.Admin, StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(adminLogin))
+            && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin))
         {
-            return $"{Selection.Current.DisplayName} ({adminLogin})";
+            return $"{Selection.Current.DisplayName} ({Session.AdminEditingLogin})";
         }
 
-        return User.Identity?.Name
-            ?? User.FindFirstValue(AuthClaims.Login)
-            ?? "Twitch user";
+        return Session.DisplayText;
     }
 
     private static string RoleBadgeClass(string role)

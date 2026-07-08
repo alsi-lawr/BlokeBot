@@ -131,8 +131,12 @@ internal static class AuthEndpoints
                             statusCode: StatusCodes.Status403Forbidden
                         );
 
-                    var current = BotHostSelectionAccessor.FromPrincipal(context.User);
-                    await session.SignInAsync(context, result.User, current?.Current.Id);
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    await session.SignInAsync(
+                        context,
+                        result.User,
+                        currentSession.HostSelection?.Current.Id
+                    );
                     if (session.IsConfiguredBotAccount(result.User.Login))
                     {
                         return Results.Redirect(
@@ -161,7 +165,8 @@ internal static class AuthEndpoints
                     HostModAccessService modAccess
                 ) =>
                 {
-                    var current = BotHostSelectionAccessor.FromPrincipal(context.User);
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var current = currentSession.HostSelection;
                     if (current is null)
                         return Results.Redirect("/auth/login");
 
@@ -177,7 +182,7 @@ internal static class AuthEndpoints
                         )
                         && !await modAccess.CanModeratorAccessAsync(
                             selected.Id,
-                            session.Login(context.User),
+                            currentSession.Login,
                             context.RequestAborted
                         )
                     )
@@ -189,8 +194,8 @@ internal static class AuthEndpoints
                         context,
                         current.Available,
                         selected,
-                        session.IsBotAdmin(context.User),
-                        session.AdminEditingLogin(context.User)
+                        currentSession.IsBotAdmin,
+                        currentSession.AdminEditingLogin
                     );
 
                     return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
@@ -208,11 +213,12 @@ internal static class AuthEndpoints
                     AuthSessionService session
                 ) =>
                 {
-                    var current = BotHostSelectionAccessor.FromPrincipal(context.User);
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var current = currentSession.HostSelection;
                     if (current is null)
                         return Results.Redirect("/auth/login");
 
-                    if (session.IsBotAccount(context.User))
+                    if (currentSession.IsBotAccount)
                         return Results.Forbid();
 
                     var selected = await hostedChannels.LoadHostChoiceAsync(
@@ -240,7 +246,7 @@ internal static class AuthEndpoints
                         available,
                         selected,
                         isBotAdmin: true,
-                        adminEditingLogin: session.Login(context.User),
+                        adminEditingLogin: currentSession.Login,
                         adminReturnHost: returnHost
                     );
 
@@ -253,7 +259,8 @@ internal static class AuthEndpoints
                 "/auth/exit-admin",
                 async (HttpContext context, string? returnUrl, AuthSessionService session) =>
                 {
-                    var current = BotHostSelectionAccessor.FromPrincipal(context.User);
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var current = currentSession.HostSelection;
                     if (current is null)
                         return Results.Redirect("/auth/login");
 
@@ -266,14 +273,14 @@ internal static class AuthEndpoints
                             )
                         )
                         .ToArray();
-                    var returnHost = session.AdminReturnHost(context.User);
+                    var returnHost = currentSession.AdminReturnHost;
                     if (
                         returnHost is not null
                         && nonAdminHosts.All(host => host.Id != returnHost.Id)
                     )
                         nonAdminHosts = [.. nonAdminHosts, returnHost];
 
-                    var login = session.Login(context.User);
+                    var login = currentSession.Login;
                     var selected = returnHost is not null
                         ? nonAdminHosts.FirstOrDefault(host => host.Id == returnHost.Id)
                         : null

@@ -183,11 +183,7 @@
     private async Task LoadAsync()
     {
         var authState = await AuthenticationState;
-        isBotAccount = string.Equals(
-            authState.User.FindFirstValue(AuthClaims.IsBotAccount),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+        isBotAccount = AuthenticatedSession.FromPrincipal(authState.User).IsBotAccount;
         state = await SiteAccess.LoadAdminStateAsync(CancellationToken.None);
         hosts = await HostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
         botAccountStatus = await BotAccountAuthorization.GetStatusAsync(CancellationToken.None);

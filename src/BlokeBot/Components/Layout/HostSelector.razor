@@ -36,12 +36,13 @@
 }
 
 @code {
-    [Parameter] public BotHostSelection? Selection { get; set; }
-    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+    [Parameter, EditorRequired] public AuthenticatedSession Session { get; set; } =
+        AuthenticatedSession.Anonymous;
 
     private IDisposable? hostedChannelSubscription;
     private IReadOnlyList<BotHostChoice> visibleHosts = [];
     private int? selectedHostId;
+    private BotHostSelection? Selection => Session.HostSelection;
 
     private string RefreshIconClass => "h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";
 
@@ -55,10 +56,7 @@
         }
     }
 
-    private bool IsAdminEditing()
-    {
-        return !string.IsNullOrWhiteSpace(User.FindFirstValue(BotHostClaims.AdminEditingLogin));
-    }
+    private bool IsAdminEditing() => Session.IsAdminEditing;
 
     protected override async Task OnInitializedAsync()
     {

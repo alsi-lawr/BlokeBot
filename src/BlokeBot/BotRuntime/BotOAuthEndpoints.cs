@@ -1,10 +1,8 @@
 using System.Net;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using Alsi.TwitchBot;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Authorization;
-using BlokeBot.Hosts;
 
 namespace BlokeBot.BotRuntime;
 
@@ -81,12 +79,11 @@ internal static class BotOAuthEndpoints
                     CancellationToken ct
                 ) =>
                 {
-                    if (!IsStreamer(context.User))
+                    var session = AuthenticatedSession.FromPrincipal(context.User);
+                    if (!session.CanAuthorizeSelectedHost)
                         return Results.Forbid();
 
-                    var selectedHost = BotHostSelectionAccessor
-                        .FromPrincipal(context.User)
-                        ?.Current;
+                    var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is not null)
                         await channelBotAuthorization.ClearIfScopesStaleAsync(selectedHost.Id, ct);
 
@@ -125,7 +122,8 @@ internal static class BotOAuthEndpoints
                     CancellationToken ct
                 ) =>
                 {
-                    if (!IsStreamer(context.User))
+                    var session = AuthenticatedSession.FromPrincipal(context.User);
+                    if (!session.CanAuthorizeSelectedHost)
                         return Results.Forbid();
 
                     var storedState = context.Request.Cookies["BlokeBot.ChannelBotState"];
@@ -149,9 +147,7 @@ internal static class BotOAuthEndpoints
                         return Results.BadRequest("Invalid state");
                     }
 
-                    var selectedHost = BotHostSelectionAccessor
-                        .FromPrincipal(context.User)
-                        ?.Current;
+                    var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is null)
                         return Results.BadRequest("Select a hosted channel before authorizing it.");
 
@@ -187,13 +183,6 @@ internal static class BotOAuthEndpoints
             )
             .RequireAuthorization("Operator");
     }
-
-    private static bool IsStreamer(ClaimsPrincipal user) =>
-        string.Equals(
-            user.FindFirstValue(AuthClaims.Role),
-            AuthRole.Streamer,
-            StringComparison.OrdinalIgnoreCase
-        );
 
     private static CookieOptions ChannelBotStateCookieOptions(
         HttpRequest request,

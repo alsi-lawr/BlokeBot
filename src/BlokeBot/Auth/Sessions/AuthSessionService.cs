@@ -14,30 +14,19 @@ internal sealed class AuthSessionService(
 )
 {
     public string? AdminEditingLogin(ClaimsPrincipal user) =>
-        user.FindFirstValue(BotHostClaims.AdminEditingLogin);
+        AuthenticatedSession.FromPrincipal(user).AdminEditingLogin;
 
     public BotHostChoice? AdminReturnHost(ClaimsPrincipal user)
-    {
-        var encoded = user.FindFirstValue(BotHostClaims.AdminReturnHost);
-        return string.IsNullOrWhiteSpace(encoded) ? null : BotHostClaimCodec.Decode(encoded);
-    }
+        => AuthenticatedSession.FromPrincipal(user).AdminReturnHost;
 
     public bool IsBotAdmin(ClaimsPrincipal user) =>
-        string.Equals(
-            user.FindFirstValue(AuthClaims.IsBotAdmin),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+        AuthenticatedSession.FromPrincipal(user).IsBotAdmin;
 
     public bool IsBotAccount(ClaimsPrincipal user) =>
-        string.Equals(
-            user.FindFirstValue(AuthClaims.IsBotAccount),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+        AuthenticatedSession.FromPrincipal(user).IsBotAccount;
 
     public string Login(ClaimsPrincipal user) =>
-        user.FindFirstValue(AuthClaims.Login) ?? string.Empty;
+        AuthenticatedSession.FromPrincipal(user).Login;
 
     public async Task SignInAsync(
         HttpContext context,
@@ -79,18 +68,21 @@ internal sealed class AuthSessionService(
         BotHostChoice? adminReturnHost = null
     )
     {
+        var current = AuthenticatedSession.FromPrincipal(context.User);
         var principal = CreatePrincipal(
-            context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty,
-            context.User.Identity?.Name ?? selectedHost.DisplayName,
-            Login(context.User),
-            context.User.FindFirstValue(AuthClaims.ProfileImageUrl),
+            current.UserId,
+            string.IsNullOrWhiteSpace(current.DisplayName)
+                ? selectedHost.DisplayName
+                : current.DisplayName,
+            current.Login,
+            current.ProfileImageUrl,
             hosts,
             selectedHost,
             isBotAdmin,
-            IsBotAccount(context.User),
+            current.IsBotAccount,
             adminEditingLogin,
             adminReturnHost,
-            CanCreateHost(context.User)
+            current.CanCreateHost
         );
 
         await SignInAsync(context, principal);
@@ -100,11 +92,7 @@ internal sealed class AuthSessionService(
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
     public bool CanCreateHost(ClaimsPrincipal user) =>
-        string.Equals(
-            user.FindFirstValue(AuthClaims.CanCreateHost),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+        AuthenticatedSession.FromPrincipal(user).CanCreateHost;
 
     private static ClaimsPrincipal CreatePrincipal(
         string userId,

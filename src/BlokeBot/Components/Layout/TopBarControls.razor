@@ -1,28 +1,23 @@
 @rendermode InteractiveServer
-@using System.Security.Claims
+@using BlokeBot.Auth.Sessions
 @using BlokeBot.Hosts
 
 <AuthorizeView>
     <Authorized Context="authState">
         @{
-            var selection = BotHostSelectionAccessor.FromPrincipal(authState.User);
-            var isAdminEditing = !string.IsNullOrWhiteSpace(authState.User.FindFirstValue(BotHostClaims.AdminEditingLogin));
-            var isBotAccount = string.Equals(
-                authState.User.FindFirstValue(AuthClaims.IsBotAccount),
-                "true",
-                StringComparison.OrdinalIgnoreCase
-            );
+            var session = AuthenticatedSession.FromPrincipal(authState.User);
+            var selection = session.HostSelection;
         }
-        <div class="@ControlsGridClass(selection, isAdminEditing, isBotAccount)">
-            @if (!isBotAccount)
+        <div class="@ControlsGridClass(selection, session.IsAdminEditing, session.IsBotAccount)">
+            @if (!session.IsBotAccount)
             {
-                <SelectedChannelBotStatus User="authState.User" Selection="selection" />
+                <SelectedChannelBotStatus Session="session" />
             }
-            @if (!isAdminEditing && !isBotAccount)
+            @if (!session.IsAdminEditing && !session.IsBotAccount)
             {
-                <HostSelector User="authState.User" Selection="selection" />
+                <HostSelector Session="session" />
             }
-            <AccountMenu User="authState.User" Selection="selection" />
+            <AccountMenu Session="session" />
         </div>
     </Authorized>
     <NotAuthorized>

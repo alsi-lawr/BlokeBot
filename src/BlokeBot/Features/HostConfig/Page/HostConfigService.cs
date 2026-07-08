@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels.Runtime;
@@ -16,9 +15,12 @@ public sealed class HostConfigService(
     SiteAccessService siteAccess
 )
 {
-    public async Task<HostConfigState?> LoadAsync(ClaimsPrincipal user, CancellationToken ct)
+    public async Task<HostConfigState?> LoadAsync(
+        AuthenticatedSession session,
+        CancellationToken ct
+    )
     {
-        var login = user.FindFirstValue(AuthClaims.Login);
+        var login = session.Login;
         if (string.IsNullOrWhiteSpace(login))
             return null;
 
@@ -30,8 +32,8 @@ public sealed class HostConfigService(
             return new HostConfigState(
                 null,
                 login,
-                user.Identity?.Name ?? login,
-                user.FindFirstValue(AuthClaims.ProfileImageUrl),
+                string.IsNullOrWhiteSpace(session.DisplayName) ? login : session.DisplayName,
+                session.ProfileImageUrl,
                 canCreateHost,
                 false,
                 false,

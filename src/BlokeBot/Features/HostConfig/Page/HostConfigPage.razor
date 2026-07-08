@@ -329,12 +329,9 @@
     private async Task LoadAsync()
     {
         var authState = await AuthenticationState;
-        var selection = BotHostSelectionAccessor.FromPrincipal(authState.User);
-        if (string.Equals(
-                authState.User.FindFirstValue(AuthClaims.IsBotAccount),
-                "true",
-                StringComparison.OrdinalIgnoreCase
-            ))
+        var session = AuthenticatedSession.FromPrincipal(authState.User);
+        var selection = session.HostSelection;
+        if (session.IsBotAccount)
         {
             blockedByMode = true;
             state = null;
@@ -342,14 +339,14 @@
         }
 
         blockedByMode = selection is not null
-            && !string.Equals(selection.Current.Role, AuthRole.Streamer, StringComparison.OrdinalIgnoreCase);
+            && !session.CurrentHostRoleIs(AuthRole.Streamer);
         if (blockedByMode)
         {
             state = null;
             return;
         }
 
-        state = await HostConfig.LoadAsync(authState.User, CancellationToken.None);
+        state = await HostConfig.LoadAsync(session, CancellationToken.None);
     }
 
     private async Task OnHostedChannelChangedAsync(AppEvent _)

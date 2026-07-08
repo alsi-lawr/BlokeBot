@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Web;
 using BlokeBot.Features.SiteAccess;
@@ -21,16 +20,19 @@ internal static class HostConfigEndpoints
                     CancellationToken ct
                 ) =>
                 {
-                    var login = session.Login(context.User);
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var login = currentSession.Login;
                     if (string.IsNullOrWhiteSpace(login))
                         return Results.Redirect("/auth/login");
 
                     if (!await siteAccess.CanCreateHostAsync(login, ct))
                         return Results.Forbid();
 
-                    var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-                    var displayName = context.User.Identity?.Name ?? login;
-                    var profileImageUrl = context.User.FindFirstValue(AuthClaims.ProfileImageUrl);
+                    var userId = currentSession.UserId;
+                    var displayName = string.IsNullOrWhiteSpace(currentSession.DisplayName)
+                        ? login
+                        : currentSession.DisplayName;
+                    var profileImageUrl = currentSession.ProfileImageUrl;
                     var hostId = await provisioning.EnsureHostAsync(
                         login,
                         userId,
@@ -45,7 +47,7 @@ internal static class HostConfigEndpoints
                         AuthRole.Streamer,
                         profileImageUrl
                     );
-                    var current = BotHostSelectionAccessor.FromPrincipal(context.User);
+                    var current = currentSession.HostSelection;
                     var available =
                         current?.Available.Where(x => x.Id != host.Id).Append(host).ToArray()
                         ?? [host];
@@ -54,7 +56,7 @@ internal static class HostConfigEndpoints
                         context,
                         available,
                         host,
-                        session.IsBotAdmin(context.User),
+                        currentSession.IsBotAdmin,
                         adminEditingLogin: null
                     );
 

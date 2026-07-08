@@ -37,6 +37,7 @@ using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Twitch;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -98,6 +99,7 @@ builder.Services.AddTransient<ModeratedChannelLookupService>();
 builder.Services.AddTransient<WebAuthService>();
 builder.Services.AddTransient<WebOAuthClient>();
 builder.Services.AddScoped<AuthSessionService>();
+builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
 builder.Services.AddTransient<UserLookupService>();
 builder.Services.AddTransient<ChannelBotOAuthService>();
 builder.Services.AddScoped<AuthCookieValidator>();
@@ -134,20 +136,23 @@ builder.Services.AddAuthorization(options =>
         policy =>
             policy
                 .RequireAuthenticatedUser()
-                .RequireClaim(
-                    AuthClaims.Role,
-                    AuthRole.Admin,
-                    AuthRole.Streamer,
-                    AuthRole.Moderator
-                )
+                .AddRequirements(new AuthSessionCapabilityRequirement(AuthSessionCapability.Operator))
     );
     options.AddPolicy(
         "HostSelected",
-        policy => policy.RequireAuthenticatedUser().RequireClaim(BotHostClaims.SelectedHostId)
+        policy =>
+            policy
+                .RequireAuthenticatedUser()
+                .AddRequirements(
+                    new AuthSessionCapabilityRequirement(AuthSessionCapability.HostSelected)
+                )
     );
     options.AddPolicy(
         "BotAdmin",
-        policy => policy.RequireAuthenticatedUser().RequireClaim(AuthClaims.IsBotAdmin, "true")
+        policy =>
+            policy
+                .RequireAuthenticatedUser()
+                .AddRequirements(new AuthSessionCapabilityRequirement(AuthSessionCapability.BotAdmin))
     );
 });
 

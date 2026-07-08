@@ -33,8 +33,10 @@
     private IDisposable? hostedChannelSubscription;
     private HostedChannelRuntimeStatus? selectedHostStatus;
 
-    [Parameter] public BotHostSelection? Selection { get; set; }
-    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+    [Parameter, EditorRequired] public AuthenticatedSession Session { get; set; } =
+        AuthenticatedSession.Anonymous;
+
+    private BotHostSelection? Selection => Session.HostSelection;
 
     private bool SelectedHostBotAuthorized =>
         selectedHostStatus?.IsChannelBotAuthorized == true
@@ -109,13 +111,7 @@
 
     private bool CanAuthorizeSelectedHost()
     {
-        return Selection is not null
-            && string.Equals(Selection.Current.Role, AuthRole.Streamer, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(
-                Selection.Current.Login,
-                User.FindFirstValue(AuthClaims.Login),
-                StringComparison.OrdinalIgnoreCase
-            );
+        return Session.CanAuthorizeSelectedHost;
     }
 
     private async Task LoadSelectedHostStatusAsync()

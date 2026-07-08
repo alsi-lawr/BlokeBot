@@ -5,11 +5,9 @@ using BlokeBot.AppEvents;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
-using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
@@ -197,40 +195,6 @@ public sealed class ChannelBotAuthorizationTests
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Hosts.SingleAsync(x => x.Id == hostId);
-    }
-
-    private sealed class SqliteBlokeBotDbFactory
-        : IDbContextFactory<BlokeBotDbContext>,
-            IAsyncDisposable
-    {
-        private readonly SqliteConnection connection;
-        private readonly DbContextOptions<BlokeBotDbContext> options;
-
-        private SqliteBlokeBotDbFactory(SqliteConnection connection)
-        {
-            this.connection = connection;
-            options = new DbContextOptionsBuilder<BlokeBotDbContext>()
-                .UseSqlite(connection)
-                .Options;
-        }
-
-        public static async Task<SqliteBlokeBotDbFactory> CreateAsync()
-        {
-            var connection = new SqliteConnection("Data Source=:memory:");
-            await connection.OpenAsync();
-            var factory = new SqliteBlokeBotDbFactory(connection);
-            await using var db = factory.CreateDbContext();
-            await db.Database.EnsureCreatedAsync();
-            return factory;
-        }
-
-        public BlokeBotDbContext CreateDbContext() => new(options);
-
-        public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
-            CancellationToken cancellationToken = default
-        ) => ValueTask.FromResult(CreateDbContext());
-
-        public async ValueTask DisposeAsync() => await connection.DisposeAsync();
     }
 
     private sealed class TwitchOAuthHttpClientFactory : IHttpClientFactory

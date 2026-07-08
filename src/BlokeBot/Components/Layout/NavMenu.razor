@@ -14,7 +14,7 @@
         <div>
             <AuthorizeView>
                 <Authorized Context="brandAuth">
-                    <a class="block text-base font-bold text-slate-950" href="@(IsBotAccount(brandAuth.User) ? "admin" : "guessing")">BlokeBot</a>
+                    <a class="block text-base font-bold text-slate-950" href="@(AuthenticatedSession.FromPrincipal(brandAuth.User).IsBotAccount ? "admin" : "guessing")">BlokeBot</a>
                 </Authorized>
                 <NotAuthorized>
                     <a class="block text-base font-bold text-slate-950" href="guessing">BlokeBot</a>
@@ -28,22 +28,11 @@
         <AuthorizeView>
             <Authorized Context="authState">
                 @{
-                    var selection = BotHostSelectionAccessor.FromPrincipal(authState.User);
-                    var canCreateHost = string.Equals(
-                        authState.User.FindFirstValue(AuthClaims.CanCreateHost),
-                        "true",
-                        StringComparison.OrdinalIgnoreCase
-                    );
-                    var isBotAccount = string.Equals(
-                        authState.User.FindFirstValue(AuthClaims.IsBotAccount),
-                        "true",
-                        StringComparison.OrdinalIgnoreCase
-                    );
+                    var session = AuthenticatedSession.FromPrincipal(authState.User);
+                    var selection = session.HostSelection;
                     var selectedHostExists = selection is not null && existingHostIds.Contains(selection.Current.Id);
-                    var showHostConfig = !isBotAccount && (selection is null
-                        ? canCreateHost
-                        : selectedHostExists && string.Equals(selection.Current.Role, AuthRole.Streamer, StringComparison.OrdinalIgnoreCase));
-                    var showBotFunctions = !isBotAccount && selectedHostExists;
+                    var showHostConfig = session.CanOpenHostConfig(existingHostIds);
+                    var showBotFunctions = session.CanUseBotFunctions(existingHostIds);
                 }
                 <AuthorizeView Policy="BotAdmin">
                     <Authorized>
@@ -173,13 +162,6 @@
         );
         existingHostIds = await HostedChannels.LoadHostedChannelIdsAsync(CancellationToken.None);
     }
-
-    private static bool IsBotAccount(ClaimsPrincipal user) =>
-        string.Equals(
-            user.FindFirstValue(AuthClaims.IsBotAccount),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
