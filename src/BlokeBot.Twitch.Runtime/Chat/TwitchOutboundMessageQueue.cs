@@ -11,6 +11,7 @@ internal sealed class TwitchOutboundMessageQueue(
     private readonly object gate = new();
     private readonly Dictionary<TwitchOutboundMessageKey, DateTimeOffset> lastSent = [];
     private readonly List<PendingMessage> pending = [];
+    private TaskCompletionSource processorWakeSignal = NewWakeSignal();
     private bool processing;
     private DateTimeOffset lastSendAttemptAt = DateTimeOffset.MinValue;
 
@@ -50,6 +51,10 @@ internal sealed class TwitchOutboundMessageQueue(
                 processing = true;
                 _ = Task.Run(ProcessAsync, CancellationToken.None);
             }
+            else
+            {
+                processorWakeSignal.TrySetResult();
+            }
         }
 
         await item.Task;
@@ -79,11 +84,28 @@ internal sealed class TwitchOutboundMessageQueue(
 
             if (item is null)
             {
-                await Task.Delay(delay);
+                await WaitForDelayOrNewMessageAsync(delay);
                 continue;
             }
 
             await SendPendingAsync(item);
+        }
+    }
+
+    private async Task WaitForDelayOrNewMessageAsync(TimeSpan delay)
+    {
+        Task wakeTask;
+        lock (gate)
+            wakeTask = processorWakeSignal.Task;
+
+        var completed = await Task.WhenAny(Task.Delay(delay), wakeTask);
+        if (completed != wakeTask)
+            return;
+
+        lock (gate)
+        {
+            if (ReferenceEquals(wakeTask, processorWakeSignal.Task))
+                processorWakeSignal = NewWakeSignal();
         }
     }
 
@@ -150,6 +172,9 @@ internal sealed class TwitchOutboundMessageQueue(
 
     private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
         left >= right ? left : right;
+
+    private static TaskCompletionSource NewWakeSignal() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly record struct PendingCandidate(PendingMessage Message, DateTimeOffset SendAt);
 

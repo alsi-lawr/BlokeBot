@@ -120,9 +120,11 @@ internal sealed class TwitchIrcRuntime(
 
             LogServerLine(line);
 
-            if (!TwitchIrcProtocol.TryParsePrivMsg(line, out var message))
+            var parseResult = TwitchIrcProtocol.ParsePrivMsg(line);
+            if (!parseResult.Success)
                 continue;
 
+            var message = parseResult.Message;
             log.LogDebug(
                 "Received Twitch chat message from {Login} in #{Channel}: {Text}",
                 message.Login,

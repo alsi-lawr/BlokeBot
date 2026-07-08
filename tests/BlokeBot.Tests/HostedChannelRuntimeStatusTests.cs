@@ -29,10 +29,7 @@ public sealed class HostedChannelRuntimeStatusTests
             ChannelAuthorizationService(dbFactory, "channel:bot"),
             new HostBotStatusService(
                 services,
-                new TwitchTokenStatusService(
-                    services,
-                    new TwitchOAuthApiClient(httpClientFactory)
-                ),
+                new TwitchTokenStatusService(services, new TwitchOAuthApiClient(httpClientFactory)),
                 new TwitchHelixApiClient(httpClientFactory),
                 Options.Create(
                     new TwitchBotOptions
@@ -48,10 +45,7 @@ public sealed class HostedChannelRuntimeStatusTests
             )
         );
 
-        var summary = await service.LoadHostRuntimeSummaryAsync(
-            hostId,
-            CancellationToken.None
-        );
+        var summary = await service.LoadHostRuntimeSummaryAsync(hostId, CancellationToken.None);
 
         summary.ShouldNotBeNull();
         summary!.IsChannelBotAuthorized.ShouldBeTrue();
@@ -116,8 +110,7 @@ public sealed class HostedChannelRuntimeStatusTests
 
         public int RequestCount => handler.RequestCount;
 
-        public HttpClient CreateClient(string name) =>
-            new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
 
         private sealed class Handler : HttpMessageHandler
         {

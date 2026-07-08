@@ -12,9 +12,11 @@ public sealed class IrcTests
         var line =
             "@badge-info=;display-name=Alice\\sA;color=#fff :alice!alice@alice.tmi.twitch.tv PRIVMSG #channel :!deaths 5";
 
-        var parsed = TwitchIrcProtocol.TryParsePrivMsg(line, out var message);
+        var result = TwitchIrcProtocol.ParsePrivMsg(line);
 
-        parsed.ShouldBeTrue();
+        result.Success.ShouldBeTrue();
+        result.Status.ShouldBe(TwitchIrcPrivMsgParseStatus.Parsed);
+        var message = result.Message;
         message.Login.ShouldBe("alice");
         message.Channel.ShouldBe("channel");
         message.Text.ShouldBe("!deaths 5");
@@ -24,13 +26,27 @@ public sealed class IrcTests
     }
 
     [Test]
-    public void Rejects_malformed_privmsg_lines()
+    public void Rejects_non_privmsg_lines()
     {
-        TwitchIrcProtocol.TryParsePrivMsg("NOTICE #channel :hello", out _).ShouldBeFalse();
+        var result = TwitchIrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
+
+        result.Success.ShouldBeFalse();
+        result.Status.ShouldBe(TwitchIrcPrivMsgParseStatus.NotPrivMsg);
+        result.Message.RawLine.ShouldBe("NOTICE #channel :hello");
+    }
+
+    [Test]
+    public void Rejects_malformed_privmsg_lines_with_typed_status()
+    {
         TwitchIrcProtocol
-            .TryParsePrivMsg(":missing-prefix PRIVMSG #channel :hello", out _)
-            .ShouldBeFalse();
-        TwitchIrcProtocol.TryParsePrivMsg(":a!b@c PRIVMSG channel hello", out _).ShouldBeFalse();
+            .ParsePrivMsg(":missing-prefix PRIVMSG #channel :hello")
+            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MissingUserLogin);
+        TwitchIrcProtocol
+            .ParsePrivMsg(":a!b@c PRIVMSG channel hello")
+            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MalformedCommand);
+        TwitchIrcProtocol
+            .ParsePrivMsg("@ :a!b@c PRIVMSG #channel :hello")
+            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MissingTagTerminator);
     }
 
     [Test]

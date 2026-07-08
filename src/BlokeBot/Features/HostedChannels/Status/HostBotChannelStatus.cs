@@ -33,6 +33,28 @@ public sealed record HostBotChannelStatus(
         )
         && ModeratorState == HostBotModeratorState.IsModerator;
 
+    public static HostBotChannelStatus FromReadiness(HostBotReadinessOutcome outcome) =>
+        outcome.Kind switch
+        {
+            HostBotReadinessKind.NotConfigured => NotConfigured(),
+            HostBotReadinessKind.TokenUnavailable
+            or HostBotReadinessKind.InvalidToken
+            or HostBotReadinessKind.NeedsAuthorization
+            or HostBotReadinessKind.BotAccountMismatch => NeedsAuthorization(outcome.Flags),
+            HostBotReadinessKind.MissingModeratorCheckScope
+            or HostBotReadinessKind.MissingModeratorCheckPermission =>
+                MissingModeratorCheckPermission(outcome.Flags),
+            HostBotReadinessKind.IdentityLookupFailed or HostBotReadinessKind.Unknown => Unknown(
+                outcome.Flags
+            ),
+            HostBotReadinessKind.NotModerator => NotModerator(outcome.Flags),
+            HostBotReadinessKind.MissingFollowerReadScope => MissingFollowerReadPermission(
+                outcome.Flags
+            ),
+            HostBotReadinessKind.Ready => Ready(),
+            _ => Unknown(outcome.Flags),
+        };
+
     public static HostBotChannelStatus NotConfigured() =>
         new(
             HostBotChannelStatusFlags.None,

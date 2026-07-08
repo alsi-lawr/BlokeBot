@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Status;
@@ -14,90 +15,118 @@ public sealed class HostBotStatusService(
     public async Task<HostBotChannelStatus> GetStatusAsync(
         string channelLogin,
         CancellationToken ct
+    ) => HostBotChannelStatus.FromReadiness(await GetReadinessAsync(channelLogin, ct));
+
+    public async Task<HostBotReadinessOutcome> GetReadinessAsync(
+        string channelLogin,
+        CancellationToken ct
     )
     {
-        var flags = ConfiguredFlags();
-        if ((flags & HostBotChannelStatusFlags.ModeratorCheckConfigured) == 0)
-            return HostBotChannelStatus.NotConfigured();
+        var configuredFlags = ConfiguredFlags();
+        if (!HasAll(configuredFlags, HostBotChannelStatusFlags.ModeratorCheckConfigured))
+            return HostBotReadinessOutcome.NotConfigured();
 
         try
         {
-            var tokenStatus = await tokens.GetUserAccessTokenStatusAsync(
-                options.Identity.Scopes,
-                ct
-            );
-            if (tokenStatus.State == TwitchTokenStatusState.Unavailable
-                || tokenStatus.State == TwitchTokenStatusState.Invalid)
-            {
-                return HostBotChannelStatus.NeedsAuthorization(flags);
-            }
-
-            if (tokenStatus.AccessToken is null || tokenStatus.Validation is null)
-                return HostBotChannelStatus.Unknown(flags);
-
-            flags |= HostBotChannelStatusFlags.BotAccountAuthorized;
-            if (tokenStatus.GrantedScopes.Contains(TwitchScopes.UserReadModeratedChannels))
-                flags |= HostBotChannelStatusFlags.ModeratorCheckGranted;
-            if (tokenStatus.GrantedScopes.Contains(TwitchScopes.ModeratorReadFollowers))
-                flags |= HostBotChannelStatusFlags.FollowerReadGranted;
-
-            if ((flags & HostBotChannelStatusFlags.ModeratorCheckGranted) == 0)
-                return HostBotChannelStatus.MissingModeratorCheckPermission(flags);
-
-            var identities = await LookupUsersAsync(
-                tokenStatus.AccessToken,
-                [TwitchLogin.Normalize(channelLogin), TwitchLogin.Normalize(options.Identity.BotUsername)],
-                ct
-            );
-            if (
-                !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
-                || !identities.TryGetValue(
-                    TwitchLogin.Normalize(options.Identity.BotUsername),
-                    out var botId
-                )
-            )
-            {
-                return HostBotChannelStatus.Unknown(flags);
-            }
-
-            if (!string.Equals(tokenStatus.Validation.UserId, botId, StringComparison.Ordinal))
-                return HostBotChannelStatus.NeedsAuthorization(flags);
-
-            var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
-                HelixContext(tokenStatus.AccessToken),
-                botId,
-                channelId,
-                ct
-            );
-            return moderatorCheck switch
-            {
-                TwitchModeratedChannelStatus.IsModerator
-                    when (
-                        flags
-                        & (
-                            HostBotChannelStatusFlags.FollowerReadConfigured
-                            | HostBotChannelStatusFlags.FollowerReadGranted
-                        )
-                    )
-                        == (
-                            HostBotChannelStatusFlags.FollowerReadConfigured
-                            | HostBotChannelStatusFlags.FollowerReadGranted
-                        ) => HostBotChannelStatus.Ready(),
-                TwitchModeratedChannelStatus.IsModerator =>
-                    HostBotChannelStatus.MissingFollowerReadPermission(flags),
-                TwitchModeratedChannelStatus.NotModerator => HostBotChannelStatus.NotModerator(flags),
-                TwitchModeratedChannelStatus.NeedsAuthorization => HostBotChannelStatus.NeedsAuthorization(
-                    flags
-                ),
-                TwitchModeratedChannelStatus.MissingPermission =>
-                    HostBotChannelStatus.MissingModeratorCheckPermission(flags),
-                _ => HostBotChannelStatus.Unknown(flags),
-            };
+            return await EvaluateReadinessAsync(channelLogin, configuredFlags, ct);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            return HostBotChannelStatus.Unknown(flags);
+            throw;
         }
+        catch (HttpRequestException)
+        {
+            return HostBotReadinessOutcome.Unknown(configuredFlags);
+        }
+        catch (JsonException)
+        {
+            return HostBotReadinessOutcome.Unknown(configuredFlags);
+        }
+    }
+
+    private async Task<HostBotReadinessOutcome> EvaluateReadinessAsync(
+        string channelLogin,
+        HostBotChannelStatusFlags configuredFlags,
+        CancellationToken ct
+    )
+    {
+        var tokenStatus = await tokens.GetUserAccessTokenStatusAsync(options.Identity.Scopes, ct);
+        return tokenStatus.State switch
+        {
+            TwitchTokenStatusState.Unavailable => HostBotReadinessOutcome.TokenUnavailable(
+                configuredFlags
+            ),
+            TwitchTokenStatusState.Invalid => HostBotReadinessOutcome.InvalidToken(configuredFlags),
+            TwitchTokenStatusState.Unknown => HostBotReadinessOutcome.Unknown(configuredFlags),
+            _ when tokenStatus.AccessToken is null || tokenStatus.Validation is null =>
+                HostBotReadinessOutcome.Unknown(configuredFlags),
+            _ => await EvaluateAuthorizedReadinessAsync(
+                channelLogin,
+                tokenStatus,
+                configuredFlags,
+                ct
+            ),
+        };
+    }
+
+    private async Task<HostBotReadinessOutcome> EvaluateAuthorizedReadinessAsync(
+        string channelLogin,
+        TwitchTokenStatus tokenStatus,
+        HostBotChannelStatusFlags configuredFlags,
+        CancellationToken ct
+    )
+    {
+        var flags = GrantedFlags(configuredFlags, tokenStatus.GrantedScopes);
+        if (!HasAll(flags, HostBotChannelStatusFlags.ModeratorCheckGranted))
+            return HostBotReadinessOutcome.MissingModeratorCheckScope(flags);
+
+        var identities = await LookupUsersAsync(
+            tokenStatus.AccessToken!,
+            [
+                TwitchLogin.Normalize(channelLogin),
+                TwitchLogin.Normalize(options.Identity.BotUsername),
+            ],
+            ct
+        );
+        if (
+            !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
+            || !identities.TryGetValue(
+                TwitchLogin.Normalize(options.Identity.BotUsername),
+                out var botId
+            )
+        )
+        {
+            return HostBotReadinessOutcome.IdentityLookupFailed(flags);
+        }
+
+        if (!string.Equals(tokenStatus.Validation!.UserId, botId, StringComparison.Ordinal))
+            return HostBotReadinessOutcome.BotAccountMismatch(flags);
+
+        var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
+            HelixContext(tokenStatus.AccessToken!),
+            botId,
+            channelId,
+            ct
+        );
+        return moderatorCheck switch
+        {
+            TwitchModeratedChannelStatus.IsModerator
+                when HasAll(
+                    flags,
+                    HostBotChannelStatusFlags.FollowerReadConfigured
+                        | HostBotChannelStatusFlags.FollowerReadGranted
+                ) => HostBotReadinessOutcome.Ready(),
+            TwitchModeratedChannelStatus.IsModerator =>
+                HostBotReadinessOutcome.MissingFollowerReadScope(flags),
+            TwitchModeratedChannelStatus.NotModerator => HostBotReadinessOutcome.NotModerator(
+                flags
+            ),
+            TwitchModeratedChannelStatus.NeedsAuthorization =>
+                HostBotReadinessOutcome.NeedsAuthorization(flags),
+            TwitchModeratedChannelStatus.MissingPermission =>
+                HostBotReadinessOutcome.MissingModeratorCheckPermission(flags),
+            _ => HostBotReadinessOutcome.Unknown(flags),
+        };
     }
 
     public async Task<bool> IsStreamLiveAsync(string channelLogin, CancellationToken ct)
@@ -129,7 +158,10 @@ public sealed class HostBotStatusService(
         if (
             !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
             || !identities.TryGetValue(TwitchLogin.Normalize(viewerLogin), out var viewerId)
-            || !identities.TryGetValue(TwitchLogin.Normalize(options.Identity.BotUsername), out var botId)
+            || !identities.TryGetValue(
+                TwitchLogin.Normalize(options.Identity.BotUsername),
+                out var botId
+            )
         )
         {
             return FollowerCheckResult.NotEligible;
@@ -151,21 +183,53 @@ public sealed class HostBotStatusService(
 
     private HostBotChannelStatusFlags ConfiguredFlags()
     {
-        var flags = HostBotChannelStatusFlags.None;
-        foreach (var scope in options.Identity.Scopes.Select(TwitchScopeSet.Normalize))
-        {
-            flags |= scope switch
-            {
-                TwitchScopes.UserReadModeratedChannels =>
-                    HostBotChannelStatusFlags.ModeratorCheckConfigured,
-                TwitchScopes.ModeratorReadFollowers =>
-                    HostBotChannelStatusFlags.FollowerReadConfigured,
-                _ => HostBotChannelStatusFlags.None,
-            };
-        }
-
-        return flags;
+        return options
+            .Identity.Scopes.Select(TwitchScopeSet.Normalize)
+            .Aggregate(
+                HostBotChannelStatusFlags.None,
+                (flags, scope) =>
+                    flags
+                    | (
+                        scope switch
+                        {
+                            TwitchScopes.UserReadModeratedChannels =>
+                                HostBotChannelStatusFlags.ModeratorCheckConfigured,
+                            TwitchScopes.ModeratorReadFollowers =>
+                                HostBotChannelStatusFlags.FollowerReadConfigured,
+                            _ => HostBotChannelStatusFlags.None,
+                        }
+                    )
+            );
     }
+
+    private static HostBotChannelStatusFlags GrantedFlags(
+        HostBotChannelStatusFlags configuredFlags,
+        IReadOnlyList<string> grantedScopes
+    )
+    {
+        return grantedScopes
+            .Select(TwitchScopeSet.Normalize)
+            .Aggregate(
+                configuredFlags | HostBotChannelStatusFlags.BotAccountAuthorized,
+                (flags, scope) =>
+                    flags
+                    | (
+                        scope switch
+                        {
+                            TwitchScopes.UserReadModeratedChannels =>
+                                HostBotChannelStatusFlags.ModeratorCheckGranted,
+                            TwitchScopes.ModeratorReadFollowers =>
+                                HostBotChannelStatusFlags.FollowerReadGranted,
+                            _ => HostBotChannelStatusFlags.None,
+                        }
+                    )
+            );
+    }
+
+    private static bool HasAll(
+        HostBotChannelStatusFlags flags,
+        HostBotChannelStatusFlags required
+    ) => (flags & required) == required;
 
     private async Task<string> GetAppTokenAsync(CancellationToken ct)
     {

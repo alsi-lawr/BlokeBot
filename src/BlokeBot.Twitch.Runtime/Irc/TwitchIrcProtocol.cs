@@ -28,17 +28,14 @@ public static class TwitchIrcProtocol
         line.Replace("PING", "PONG", StringComparison.Ordinal);
 
     /// <summary>
-    /// Attempts to parse a Twitch private message line.
+    /// Parses a Twitch private message line and returns the exact parser outcome.
     /// </summary>
     /// <param name="line">The raw IRC line.</param>
-    /// <param name="message">The parsed chat message.</param>
-    /// <returns><see langword="true" /> when the line contains a valid private message.</returns>
-    public static bool TryParsePrivMsg(string line, out TwitchChatMessage message)
+    /// <returns>The typed private message parse result.</returns>
+    public static TwitchIrcPrivMsgParseResult ParsePrivMsg(string line)
     {
-        message = new TwitchChatMessage(string.Empty, string.Empty, string.Empty, line, EmptyTags);
-
         if (!line.Contains(" PRIVMSG ", StringComparison.Ordinal))
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.NotPrivMsg, line);
 
         var rest = line;
         IReadOnlyDictionary<string, string> tags = EmptyTags;
@@ -46,40 +43,49 @@ public static class TwitchIrcProtocol
         {
             var tagEnd = rest.IndexOf(' ');
             if (tagEnd <= 1)
-                return false;
+                return Failure(TwitchIrcPrivMsgParseStatus.MissingTagTerminator, line);
 
             tags = ParseTags(rest[1..tagEnd]);
             rest = rest[(tagEnd + 1)..];
         }
 
         if (!rest.StartsWith(':'))
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.MissingPrefix, line);
 
         var prefixEnd = rest.IndexOf(' ');
         if (prefixEnd <= 1)
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.MalformedPrefix, line);
 
         var prefix = rest[1..prefixEnd];
         var bang = prefix.IndexOf('!');
         if (bang <= 0)
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.MissingUserLogin, line);
 
         var login = prefix[..bang];
         var commandRest = rest[(prefixEnd + 1)..];
         const string marker = "PRIVMSG #";
         if (!commandRest.StartsWith(marker, StringComparison.Ordinal))
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.MalformedCommand, line);
 
         var channelEnd = commandRest.IndexOf(" :", StringComparison.Ordinal);
         if (channelEnd <= marker.Length)
-            return false;
+            return Failure(TwitchIrcPrivMsgParseStatus.MissingChannelOrText, line);
 
         var channel = commandRest[marker.Length..channelEnd];
         var text = commandRest[(channelEnd + 2)..];
+        var message = new TwitchChatMessage(login, channel, text, line, tags);
 
-        message = new TwitchChatMessage(login, channel, text, line, tags);
-        return true;
+        return new TwitchIrcPrivMsgParseResult(TwitchIrcPrivMsgParseStatus.Parsed, message);
     }
+
+    private static TwitchIrcPrivMsgParseResult Failure(
+        TwitchIrcPrivMsgParseStatus status,
+        string line
+    ) =>
+        new(
+            status,
+            new TwitchChatMessage(string.Empty, string.Empty, string.Empty, line, EmptyTags)
+        );
 
     private static IReadOnlyDictionary<string, string> ParseTags(string rawTags)
     {

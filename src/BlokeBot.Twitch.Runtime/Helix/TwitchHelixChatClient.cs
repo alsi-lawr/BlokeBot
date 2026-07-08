@@ -143,5 +143,4 @@ internal sealed class TwitchHelixChatClient(
         request.Headers.Add("Client-Id", opts.ClientId);
         return request;
     }
-
 }

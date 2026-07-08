@@ -88,11 +88,12 @@ internal sealed class TwitchEventSubRuntime(
                 throw new IOException("EventSub WebSocket disconnected.");
 
             var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(json, JsonOptions);
-            var messageType = envelope?.Metadata.MessageType;
+            var rawMessageType = envelope?.Metadata.MessageType;
+            var messageType = TwitchEventSubMessageTypes.Parse(rawMessageType);
 
             switch (messageType)
             {
-                case "session_welcome":
+                case TwitchEventSubMessageType.SessionWelcome:
                     var sessionId = envelope?.Payload.Session?.Id;
                     if (string.IsNullOrWhiteSpace(sessionId))
                         throw new InvalidOperationException(
@@ -107,7 +108,7 @@ internal sealed class TwitchEventSubRuntime(
                     );
                     break;
 
-                case "session_keepalive":
+                case TwitchEventSubMessageType.SessionKeepalive:
                     if (activeSessionId is not null)
                     {
                         await SyncChatSubscriptionsAsync(
@@ -118,7 +119,7 @@ internal sealed class TwitchEventSubRuntime(
                     }
                     break;
 
-                case "session_reconnect":
+                case TwitchEventSubMessageType.SessionReconnect:
                     var reconnect = envelope?.Payload.Session?.ReconnectUrl;
                     if (string.IsNullOrWhiteSpace(reconnect))
                         throw new InvalidOperationException(
@@ -129,21 +130,21 @@ internal sealed class TwitchEventSubRuntime(
                     await RunWebSocketAsync(reconnect, cancellationToken);
                     return;
 
-                case "notification":
+                case TwitchEventSubMessageType.Notification:
                     if (envelope?.Payload.Event is not { } chatEvent)
                         break;
 
                     await DispatchChatMessageAsync(chatEvent, json, cancellationToken);
                     break;
 
-                case "revocation":
+                case TwitchEventSubMessageType.Revocation:
                     log.LogWarning("EventSub subscription was revoked: {Payload}", json);
                     throw new InvalidOperationException("EventSub chat subscription was revoked.");
 
-                default:
+                case TwitchEventSubMessageType.Unknown:
                     log.LogDebug(
                         "Unhandled EventSub message type {MessageType}: {Payload}",
-                        messageType,
+                        rawMessageType,
                         json
                     );
                     break;
