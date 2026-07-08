@@ -8,6 +8,7 @@
 @implements IDisposable
 @inject PointsDashboardService Dashboard
 @inject AppEventBus Events
+@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Points</PageTitle>
 
@@ -206,7 +207,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        pointsSubscription = Events.Subscribe(AppEventKind.PointsChanged, OnPointsChangedAsync);
+        pointsSubscription = Events.SubscribeForComponentRefresh(
+            AppEventKind.PointsChanged,
+            work => InvokeAsync(work),
+            LoadAsync,
+            StateHasChanged
+        );
         await LoadHostAsync();
         await LoadAsync();
     }
@@ -232,10 +238,9 @@
 
     private async Task LoadHostAsync()
     {
-        var authState = await AuthenticationState;
-        var session = AuthenticatedSession.FromPrincipal(authState.User);
-        Host = session.HostSelection?.Current;
-        ActorLogin = session.Login;
+        var pageContext = await PageContext.FromAsync(AuthenticationState);
+        Host = pageContext.SelectedHost;
+        ActorLogin = pageContext.ActorLogin;
     }
 
     private async Task LookupAsync()
@@ -244,15 +249,6 @@
             return;
 
         lookupResult = await Dashboard.LookupAsync(HostId, lookupLogin, CancellationToken.None);
-    }
-
-    private async Task OnPointsChangedAsync(AppEvent _)
-    {
-        await InvokeAsync(async () =>
-        {
-            await LoadAsync();
-            StateHasChanged();
-        });
     }
 
     private async Task RefreshAsync()

@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inject GuessingConfigurationService Configuration
+@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
@@ -73,8 +74,7 @@
 
     private async Task LoadHostAsync()
     {
-        var authState = await AuthenticationState;
-        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
     }
 
     private void AddOption()

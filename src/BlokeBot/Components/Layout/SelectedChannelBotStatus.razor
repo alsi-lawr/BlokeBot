@@ -93,9 +93,11 @@
 
     protected override void OnInitialized()
     {
-        hostedChannelSubscription = Events.Subscribe(
+        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            OnHostedChannelChangedAsync
+            work => InvokeAsync(work),
+            ReloadForEventAsync,
+            StateHasChanged
         );
     }
 
@@ -130,13 +132,9 @@
         selectedHostStatus = await HostedChannels.LoadHostStatusAsync(Selection.Current.Id, CancellationToken.None);
     }
 
-    private async Task OnHostedChannelChangedAsync(AppEvent _)
+    private async Task ReloadForEventAsync()
     {
-        await InvokeAsync(async () =>
-        {
-            loadedStatusHostId = null;
-            await LoadSelectedHostStatusAsync();
-            StateHasChanged();
-        });
+        loadedStatusHostId = null;
+        await LoadSelectedHostStatusAsync();
     }
 }

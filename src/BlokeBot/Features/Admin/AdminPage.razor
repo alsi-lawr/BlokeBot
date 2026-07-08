@@ -22,6 +22,7 @@
 @inject UserLookupService Users
 @inject AppEventBus Events
 @inject NavigationManager Navigation
+@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
@@ -70,7 +71,7 @@
     private BotAccountAuthorizationStatus? botAccountStatus;
     private IReadOnlyList<HostedChannelAdminView> hosts = [];
     private bool isBotAccount;
-    private readonly List<IDisposable> subscriptions = [];
+    private IDisposable? adminStateSubscription;
     private string? hostStatus;
     private int? pendingRuntimeHostId;
     private string newBlacklistLogin = string.Empty;
@@ -79,15 +80,18 @@
 
     protected override async Task OnInitializedAsync()
     {
-        subscriptions.Add(Events.Subscribe(AppEventKind.HostedChannelsChanged, OnAdminStateChangedAsync));
-        subscriptions.Add(Events.Subscribe(AppEventKind.SiteAccessChanged, OnAdminStateChangedAsync));
+        adminStateSubscription = Events.SubscribeForComponentRefresh(
+            [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
+            work => InvokeAsync(work),
+            ReloadForEventAsync,
+            StateHasChanged
+        );
         await LoadAsync();
     }
 
     public void Dispose()
     {
-        foreach (var subscription in subscriptions)
-            subscription.Dispose();
+        adminStateSubscription?.Dispose();
     }
 
     private async Task AddBlacklistAsync()
@@ -182,8 +186,7 @@
 
     private async Task LoadAsync()
     {
-        var authState = await AuthenticationState;
-        isBotAccount = AuthenticatedSession.FromPrincipal(authState.User).IsBotAccount;
+        isBotAccount = (await PageContext.FromAsync(AuthenticationState)).IsBotAccount;
         state = await SiteAccess.LoadAdminStateAsync(CancellationToken.None);
         hosts = await HostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
         botAccountStatus = await BotAccountAuthorization.GetStatusAsync(CancellationToken.None);
@@ -200,22 +203,18 @@
         await LoadAsync();
     }
 
-    private async Task OnAdminStateChangedAsync(AppEvent _)
+    private async Task ReloadForEventAsync()
     {
-        await InvokeAsync(async () =>
+        await LoadAsync();
+        if (
+            pendingRuntimeHostId is { } hostId
+            && hosts.FirstOrDefault(host => host.Id == hostId) is { } host
+        )
         {
-            await LoadAsync();
-            if (
-                pendingRuntimeHostId is { } hostId
-                && hosts.FirstOrDefault(host => host.Id == hostId) is { } host
-            )
-            {
-                hostStatus = RuntimeStatusMessage(host.RuntimeState);
-                if (host.RuntimeState is BotChannelRuntimeState.Started or BotChannelRuntimeState.Stopped)
-                    pendingRuntimeHostId = null;
-            }
-            StateHasChanged();
-        });
+            hostStatus = RuntimeStatusMessage(host.RuntimeState);
+            if (host.RuntimeState is BotChannelRuntimeState.Started or BotChannelRuntimeState.Stopped)
+                pendingRuntimeHostId = null;
+        }
     }
 
     private static string RuntimeStatusMessage(BotChannelRuntimeState? state) =>

@@ -1,19 +1,21 @@
 @rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
 @using BlokeBot.Hosts
+@inject BlokeBotPageContextAccessor PageContext
 
 <AuthorizeView>
     <Authorized Context="authState">
         @{
-            var session = AuthenticatedSession.FromPrincipal(authState.User);
-            var selection = session.HostSelection;
+            var pageContext = PageContext.FromPrincipal(authState.User);
+            var session = pageContext.Session;
+            var selection = pageContext.HostSelection;
         }
-        <div class="@ControlsGridClass(selection, session.IsAdminEditing, session.IsBotAccount)">
-            @if (!session.IsBotAccount)
+        <div class="@ControlsGridClass(selection, session.IsAdminEditing, pageContext.IsBotAccount)">
+            @if (!pageContext.IsBotAccount)
             {
                 <SelectedChannelBotStatus Session="session" />
             }
-            @if (!session.IsAdminEditing && !session.IsBotAccount)
+            @if (!session.IsAdminEditing && !pageContext.IsBotAccount)
             {
                 <HostSelector Session="session" />
             }

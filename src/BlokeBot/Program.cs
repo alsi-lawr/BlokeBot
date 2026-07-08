@@ -101,6 +101,7 @@ builder.Services.AddSingleton<HostModAccessService>();
 builder.Services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
 builder.Services.AddSingleton<ITwitchBotChannelLifecycleNotifier, HostedChannelLifecycleNotifier>();
 builder.Services.AddScoped<BotHostSelectionAccessor>();
+builder.Services.AddScoped<BlokeBotPageContextAccessor>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<WebAuthConfiguration>();
 builder.Services.AddTransient<AuthorizedHostResolver>();

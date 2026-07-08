@@ -13,6 +13,7 @@
 @inject GuessingRoundService Rounds
 @inject AppEventBus Events
 @inject ITwitchChatMessageSender Chat
+@inject BlokeBotPageContextAccessor PageContext
 @implements IDisposable
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
@@ -219,15 +220,19 @@
 
     protected override async Task OnInitializedAsync()
     {
-        guessingSubscription = Events.Subscribe(AppEventKind.GuessingChanged, OnGameChangedAsync);
+        guessingSubscription = Events.SubscribeForComponentRefresh(
+            AppEventKind.GuessingChanged,
+            work => InvokeAsync(work),
+            ReloadForEventAsync,
+            StateHasChanged
+        );
         await LoadHostAsync();
         await LoadAsync(null);
     }
 
     private async Task LoadHostAsync()
     {
-        var authState = await AuthenticationState;
-        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
     }
 
     private async Task ActivateTabAsync(DashboardTab tab)
@@ -244,17 +249,12 @@
         guessingSubscription?.Dispose();
     }
 
-    private async Task OnGameChangedAsync(AppEvent _)
+    private async Task ReloadForEventAsync()
     {
-        await InvokeAsync(async () =>
-        {
-            if (activeTab == DashboardTab.History)
-                await LoadHistoryAsync();
-            else
-                await LoadAsync(statusMessage);
-
-            StateHasChanged();
-        });
+        if (activeTab == DashboardTab.History)
+            await LoadHistoryAsync();
+        else
+            await LoadAsync(statusMessage);
     }
 
     private async Task ResetAndLoadHistoryAsync()

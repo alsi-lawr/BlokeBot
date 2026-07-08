@@ -7,6 +7,7 @@
 @attribute [Authorize(Policy = "HostSelected")]
 @inject PointsConfigurationService Configuration
 @inject HostBotStatusService HostBotStatus
+@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 
@@ -141,8 +142,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthenticationState;
-        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
         if (HostId != 0)
         {
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);

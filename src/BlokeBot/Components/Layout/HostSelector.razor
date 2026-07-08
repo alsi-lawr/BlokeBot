@@ -60,9 +60,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        hostedChannelSubscription = Events.Subscribe(
+        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            OnHostedChannelsChangedAsync
+            work => InvokeAsync(work),
+            LoadVisibleHostsAsync,
+            StateHasChanged
         );
         await LoadVisibleHostsAsync();
     }
@@ -92,12 +94,4 @@
             : visibleHosts.FirstOrDefault()?.Id;
     }
 
-    private async Task OnHostedChannelsChangedAsync(AppEvent _)
-    {
-        await InvokeAsync(async () =>
-        {
-            await LoadVisibleHostsAsync();
-            StateHasChanged();
-        });
-    }
 }

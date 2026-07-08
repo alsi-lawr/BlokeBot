@@ -6,6 +6,7 @@
 @inject AppEventBus Events
 @inject HostedChannelDirectoryService HostedChannels
 @inject IJSRuntime Js
+@inject BlokeBotPageContextAccessor PageContext
 @implements IAsyncDisposable
 
 <div class="flex h-full flex-col bg-gradient-to-b from-slate-50 via-white to-slate-100">
@@ -14,7 +15,7 @@
         <div>
             <AuthorizeView>
                 <Authorized Context="brandAuth">
-                    <a class="block text-base font-bold text-slate-950" href="@(AuthenticatedSession.FromPrincipal(brandAuth.User).IsBotAccount ? "admin" : "guessing")">BlokeBot</a>
+                    <a class="block text-base font-bold text-slate-950" href="@(PageContext.FromPrincipal(brandAuth.User).IsBotAccount ? "admin" : "guessing")">BlokeBot</a>
                 </Authorized>
                 <NotAuthorized>
                     <a class="block text-base font-bold text-slate-950" href="guessing">BlokeBot</a>
@@ -26,11 +27,11 @@
 
     <nav class="flex flex-1 flex-col gap-3 px-3 py-4">
         <AuthorizeView>
-            <Authorized Context="authState">
+            <Authorized Context="navAuth">
                 @{
-                    var session = AuthenticatedSession.FromPrincipal(authState.User);
-                    var selection = session.HostSelection;
-                    var selectedHostExists = selection is not null && existingHostIds.Contains(selection.Current.Id);
+                    var navContext = PageContext.FromPrincipal(navAuth.User);
+                    var session = navContext.Session;
+                    var selection = navContext.HostSelection;
                     var showHostConfig = session.CanOpenHostConfig(existingHostIds);
                     var showBotFunctions = session.CanUseBotFunctions(existingHostIds);
                 }
@@ -156,11 +157,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        hostedChannelSubscription = Events.Subscribe(
+        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            OnHostedChannelsChangedAsync
+            work => InvokeAsync(work),
+            LoadHostedChannelIdsAsync,
+            StateHasChanged
         );
-        existingHostIds = await HostedChannels.LoadHostedChannelIdsAsync(CancellationToken.None);
+        await LoadHostedChannelIdsAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -227,12 +230,8 @@
             await module.InvokeVoidAsync("writeBoolean", PointsOpenStorageKey, pointsOpen);
     }
 
-    private async Task OnHostedChannelsChangedAsync(AppEvent _)
+    private async Task LoadHostedChannelIdsAsync()
     {
-        await InvokeAsync(async () =>
-        {
-            existingHostIds = await HostedChannels.LoadHostedChannelIdsAsync(CancellationToken.None);
-            StateHasChanged();
-        });
+        existingHostIds = await HostedChannels.LoadHostedChannelIdsAsync(CancellationToken.None);
     }
 }

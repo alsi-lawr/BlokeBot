@@ -1,9 +1,19 @@
+using Microsoft.Extensions.Logging;
+
 namespace BlokeBot.AppEvents;
 
 public sealed class AppEventBus
 {
     private readonly object gate = new();
     private readonly Dictionary<AppEventKind, List<Func<AppEvent, Task>>> subscriptions = [];
+    private readonly ILogger<AppEventBus>? log;
+
+    public AppEventBus() { }
+
+    public AppEventBus(ILogger<AppEventBus> log)
+    {
+        this.log = log;
+    }
 
     public IDisposable Subscribe(AppEventKind kind, Func<AppEvent, Task> handler)
     {
@@ -31,7 +41,16 @@ public sealed class AppEventBus
 
         var evt = new AppEvent(kind);
         foreach (var handler in handlers)
-            await handler(evt);
+        {
+            try
+            {
+                await handler(evt);
+            }
+            catch (Exception ex)
+            {
+                log?.LogError(ex, "App event subscriber failed for {EventKind}.", kind);
+            }
+        }
     }
 
     private void Unsubscribe(AppEventKind kind, Func<AppEvent, Task> handler)

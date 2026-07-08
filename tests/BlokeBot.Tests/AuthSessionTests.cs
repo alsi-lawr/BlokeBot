@@ -24,7 +24,7 @@ public sealed class AuthSessionTests
     public void Session_distinguishes_bot_account_from_operator()
     {
         var session = AuthenticatedSession.FromPrincipal(
-            Principal(
+            TestPrincipals.BlokeBotUser(
                 login: "botaccount",
                 role: AuthRole.Bot,
                 isBotAdmin: true,
@@ -50,7 +50,7 @@ public sealed class AuthSessionTests
         };
 
         var session = AuthenticatedSession.FromPrincipal(
-            Principal(
+            TestPrincipals.BlokeBotUser(
                 login: "streamer",
                 role: AuthRole.Streamer,
                 availableHosts: available,
@@ -71,7 +71,7 @@ public sealed class AuthSessionTests
         await SeedHostAsync(dbFactory, "streamer");
         var validator = CreateValidator(dbFactory);
         var context = CookieContext(
-            Principal(
+            TestPrincipals.BlokeBotUser(
                 login: "streamer",
                 role: AuthRole.Streamer,
                 canCreateHost: false,
@@ -99,7 +99,7 @@ public sealed class AuthSessionTests
         );
         var validator = CreateValidator(dbFactory, modAccess);
         var context = CookieContext(
-            Principal(
+            TestPrincipals.BlokeBotUser(
                 login: "moderator",
                 role: AuthRole.Moderator,
                 availableHosts:
@@ -185,42 +185,4 @@ public sealed class AuthSessionTests
         );
     }
 
-    private static ClaimsPrincipal Principal(
-        string login,
-        string role,
-        bool canCreateHost = false,
-        bool isBotAdmin = false,
-        bool isBotAccount = false,
-        IReadOnlyList<BotHostChoice>? availableHosts = null,
-        string? selectedHostId = null
-    )
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, $"{login}-id"),
-            new(ClaimTypes.Name, login),
-            new(AuthClaims.CanCreateHost, canCreateHost ? "true" : "false"),
-            new(AuthClaims.Login, login),
-            new(AuthClaims.IsBotAdmin, isBotAdmin ? "true" : "false"),
-            new(AuthClaims.IsBotAccount, isBotAccount ? "true" : "false"),
-            new(AuthClaims.Role, role),
-        };
-
-        if (availableHosts is not null)
-        {
-            claims.AddRange(
-                availableHosts.Select(host => new Claim(
-                    BotHostClaims.AvailableHost,
-                    BotHostClaimCodec.Encode(host)
-                ))
-            );
-        }
-
-        if (selectedHostId is not null)
-            claims.Add(new Claim(BotHostClaims.SelectedHostId, selectedHostId));
-
-        return new ClaimsPrincipal(
-            new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)
-        );
-    }
 }

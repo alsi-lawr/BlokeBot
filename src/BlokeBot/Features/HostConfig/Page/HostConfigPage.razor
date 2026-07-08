@@ -17,6 +17,7 @@
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
 @inject AppEventBus Events
 @inject NavigationManager Navigation
+@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Host config</PageTitle>
 
@@ -303,9 +304,11 @@
 
     protected override async Task OnInitializedAsync()
     {
-        hostedChannelSubscription = Events.Subscribe(
+        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            OnHostedChannelChangedAsync
+            work => InvokeAsync(work),
+            ReloadForEventAsync,
+            StateHasChanged
         );
         await LoadAsync();
     }
@@ -328,10 +331,10 @@
 
     private async Task LoadAsync()
     {
-        var authState = await AuthenticationState;
-        var session = AuthenticatedSession.FromPrincipal(authState.User);
-        var selection = session.HostSelection;
-        if (session.IsBotAccount)
+        var pageContext = await PageContext.FromAsync(AuthenticationState);
+        var session = pageContext.Session;
+        var selection = pageContext.HostSelection;
+        if (pageContext.IsBotAccount)
         {
             blockedByMode = true;
             state = null;
@@ -349,15 +352,11 @@
         state = await HostConfig.LoadAsync(session, CancellationToken.None);
     }
 
-    private async Task OnHostedChannelChangedAsync(AppEvent _)
+    private async Task ReloadForEventAsync()
     {
-        await InvokeAsync(async () =>
-        {
-            await LoadAsync();
-            if (state?.IsHostCreated == true)
-                statusMessage = RuntimeStatusMessage;
-            StateHasChanged();
-        });
+        await LoadAsync();
+        if (state?.IsHostCreated == true)
+            statusMessage = RuntimeStatusMessage;
     }
 
     private async Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
