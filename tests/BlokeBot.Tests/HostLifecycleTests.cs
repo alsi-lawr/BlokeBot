@@ -1,4 +1,5 @@
 using BlokeBot.Eventing;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,7 @@ public sealed class HostLifecycleTests
                 return Task.CompletedTask;
             }
         );
-        var service = new BotHostRemovalService(dbFactory, events);
+        var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
 
         var removed = await service.RemoveAsync(hostId, CancellationToken.None);
 
@@ -63,12 +64,44 @@ public sealed class HostLifecycleTests
                 return Task.CompletedTask;
             }
         );
-        var service = new BotHostRemovalService(dbFactory, events);
+        var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
 
         var removed = await service.RemoveAsync(123, CancellationToken.None);
 
         removed.ShouldBeFalse();
         eventCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Provisioning_host_notifies_hosted_channel_changes()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var events = new EventBus<AppEventKind>();
+        var eventCount = 0;
+        events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            _ =>
+            {
+                eventCount++;
+                return Task.CompletedTask;
+            }
+        );
+        var service = new BotHostProvisioningService(
+            dbFactory,
+            new HostedChannelChangeNotifier(events),
+            []
+        );
+
+        var hostId = await service.EnsureHostAsync(
+            "streamer",
+            twitchUserId: "123",
+            displayName: "Streamer",
+            profileImageUrl: null,
+            CancellationToken.None
+        );
+
+        hostId.ShouldBeGreaterThan(0);
+        eventCount.ShouldBe(1);
     }
 
     private static async Task<int> SeedHostedChannelGraphAsync(SqliteBlokeBotDbFactory dbFactory)

@@ -1,4 +1,4 @@
-using BlokeBot.Eventing;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,7 +6,7 @@ namespace BlokeBot.Hosts;
 
 public sealed class BotHostRemovalService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    EventBus<AppEventKind> events
+    HostedChannelChangeNotifier changes
 )
 {
     public async Task<bool> RemoveAsync(int hostId, CancellationToken ct)
@@ -19,7 +19,7 @@ public sealed class BotHostRemovalService(
             return false;
 
         await transaction.CommitAsync(ct);
-        await events.PublishAsync(AppEventKind.HostedChannelsChanged);
+        await changes.NotifyChangedAsync();
         return true;
     }
 }

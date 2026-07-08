@@ -1,4 +1,4 @@
-using BlokeBot.Eventing;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -8,7 +8,7 @@ namespace BlokeBot.Hosts;
 
 public sealed class BotHostProvisioningService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    EventBus<AppEventKind> events,
+    HostedChannelChangeNotifier changes,
     IEnumerable<IBotHostSeeder> seeders
 )
 {
@@ -64,7 +64,7 @@ public sealed class BotHostProvisioningService(
         foreach (var seeder in seeders)
             await seeder.SeedAsync(host.Id, ct);
 
-        await events.PublishAsync(AppEventKind.HostedChannelsChanged);
+        await changes.NotifyChangedAsync();
         return host.Id;
     }
 }

@@ -92,6 +92,29 @@ public sealed class EventBusTests
     }
 
     [Test]
+    public async Task Multi_key_subscription_receives_each_key_until_disposed()
+    {
+        var events = new EventBus<string>();
+        var received = new List<string>();
+        var subscription = events.Subscribe(
+            ["first", "second"],
+            notification =>
+            {
+                received.Add(notification.Key);
+                return Task.CompletedTask;
+            }
+        );
+
+        await events.PublishAsync("first");
+        await events.PublishAsync("second");
+        await events.PublishAsync("third");
+        subscription.Dispose();
+        await events.PublishAsync("first");
+
+        received.ShouldBe(["first", "second"]);
+    }
+
+    [Test]
     public async Task Event_notifier_publishes_configured_key()
     {
         var events = new EventBus<string>();

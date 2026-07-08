@@ -1,6 +1,7 @@
 using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -82,7 +83,10 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
 
         (await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None))
             .ShouldBeTrue();
@@ -98,7 +102,10 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
 
         await service.AddEntryAsync(
             hostId,
@@ -126,7 +133,10 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
 
         await service.AddEntryAsync(
             hostId,
@@ -151,7 +161,10 @@ public sealed class AccessListPolicyTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var firstHostId = await SeedHostAsync(dbFactory, "first");
         var secondHostId = await SeedHostAsync(dbFactory, "second");
-        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
 
         await service.AddEntryAsync(
             firstHostId,
@@ -164,6 +177,43 @@ public sealed class AccessListPolicyTests
             .ShouldBeFalse();
         (await service.CanModeratorAccessAsync(secondHostId, "moderator", CancellationToken.None))
             .ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task Host_moderator_access_changes_notify_hosted_channel_changes()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var events = new EventBus<AppEventKind>();
+        var eventCount = 0;
+        events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            _ =>
+            {
+                eventCount++;
+                return Task.CompletedTask;
+            }
+        );
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(events)
+        );
+
+        await service.AddEntryAsync(
+            hostId,
+            AccessListEntryKind.Blacklist,
+            "moderator",
+            CancellationToken.None
+        );
+        await service.RemoveEntryAsync(
+            hostId,
+            AccessListEntryKind.Blacklist,
+            "moderator",
+            CancellationToken.None
+        );
+        await service.SetModsEnabledAsync(hostId, false, CancellationToken.None);
+
+        eventCount.ShouldBe(3);
     }
 
     private static SiteAccessService CreateSiteAccessService(

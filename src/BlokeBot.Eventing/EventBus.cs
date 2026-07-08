@@ -32,6 +32,17 @@ public sealed class EventBus<TKey>
         return new Subscription(this, key, handler);
     }
 
+    public EventSubscriptionSet Subscribe(
+        IEnumerable<TKey> keys,
+        Func<EventNotification<TKey>, Task> handler
+    )
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        ArgumentNullException.ThrowIfNull(handler);
+
+        return new EventSubscriptionSet(keys.Select(key => Subscribe(key, handler)));
+    }
+
     public async Task PublishAsync(TKey key)
     {
         Func<EventNotification<TKey>, Task>[] handlers;

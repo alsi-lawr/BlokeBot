@@ -4,6 +4,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
@@ -89,7 +90,10 @@ public sealed class AuthSessionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var modAccess = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
+        var modAccess = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
         await modAccess.AddEntryAsync(
             hostId,
             AccessListEntryKind.Blacklist,
@@ -127,7 +131,10 @@ public sealed class AuthSessionTests
         );
         return new AuthCookieValidator(
             dbFactory,
-            modAccess ?? new HostModAccessService(dbFactory, appEvents),
+            modAccess ?? new HostModAccessService(
+                dbFactory,
+                new HostedChannelChangeNotifier(appEvents)
+            ),
             new SiteAccessService(dbFactory, admins, new SiteAccessChangeNotifier(appEvents)),
             admins,
             new AuthSessionService(

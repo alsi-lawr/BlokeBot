@@ -7,6 +7,7 @@ using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
@@ -27,7 +28,10 @@ public sealed class AuthorizedHostResolverTests
         await SeedHostAsync(dbFactory, "allowed", "Allowed");
         var blockedHostId = await SeedHostAsync(dbFactory, "blocked", "Blocked");
         var events = new EventBus<AppEventKind>();
-        var modAccess = new HostModAccessService(dbFactory, events);
+        var modAccess = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(events)
+        );
         await modAccess.AddEntryAsync(
             blockedHostId,
             AccessListEntryKind.Blacklist,

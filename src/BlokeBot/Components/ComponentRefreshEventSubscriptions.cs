@@ -2,7 +2,7 @@ using BlokeBot.Eventing;
 
 namespace BlokeBot.Components;
 
-public static class EventComponentSubscriptions
+public static class ComponentRefreshEventSubscriptions
 {
     public static IDisposable SubscribeForComponentRefresh<TKey>(
         this EventBus<TKey> events,
@@ -22,17 +22,21 @@ public static class EventComponentSubscriptions
                 })
         );
 
-    public static IDisposable SubscribeForComponentRefresh<TKey>(
+    public static EventSubscriptionSet SubscribeForComponentRefresh<TKey>(
         this EventBus<TKey> events,
-        IReadOnlyCollection<TKey> keys,
+        IEnumerable<TKey> keys,
         Func<Func<Task>, Task> invokeAsync,
         Func<Task> reloadAsync,
         Action stateHasChanged
     )
         where TKey : notnull =>
-        new EventSubscriptionSet(
-            keys.Select(key =>
-                events.SubscribeForComponentRefresh(key, invokeAsync, reloadAsync, stateHasChanged)
-            )
+        events.Subscribe(
+            keys,
+            _ =>
+                invokeAsync(async () =>
+                {
+                    await reloadAsync();
+                    stateHasChanged();
+                })
         );
 }

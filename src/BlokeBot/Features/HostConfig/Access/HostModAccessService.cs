@@ -1,5 +1,5 @@
-using BlokeBot.Eventing;
 using BlokeBot.Features.AccessLists;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +8,7 @@ namespace BlokeBot.Features.HostConfig.Access;
 
 public sealed class HostModAccessService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    EventBus<AppEventKind> events
+    HostedChannelChangeNotifier changes
 )
 {
     public async Task AddEntryAsync(
@@ -42,7 +42,7 @@ public sealed class HostModAccessService(
             return;
 
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.HostedChannelsChanged);
+        await changes.NotifyChangedAsync();
     }
 
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
@@ -96,7 +96,7 @@ public sealed class HostModAccessService(
             ct
         );
         if (deleted > 0)
-            await events.PublishAsync(AppEventKind.HostedChannelsChanged);
+            await changes.NotifyChangedAsync();
     }
 
     public async Task SetModsEnabledAsync(int hostId, bool enabled, CancellationToken ct)
@@ -105,7 +105,7 @@ public sealed class HostModAccessService(
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         settings.ModsEnabled = enabled;
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.HostedChannelsChanged);
+        await changes.NotifyChangedAsync();
     }
 
     public static async Task<HostModAccessSettings> EnsureSettingsAsync(
