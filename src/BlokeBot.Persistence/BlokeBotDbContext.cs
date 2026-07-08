@@ -340,6 +340,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         "Active",
         "Cancelled",
         "Completed",
+        "Expired",
     ];
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>

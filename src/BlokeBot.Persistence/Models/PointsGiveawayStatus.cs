@@ -5,4 +5,5 @@ public enum PointsGiveawayStatus
     Active,
     Completed,
     Cancelled,
+    Expired,
 }

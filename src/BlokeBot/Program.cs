@@ -49,6 +49,7 @@ builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddOptions<BlokeBotOptions>().BindConfiguration("BlokeBot").ValidateOnStart();
 builder.Services.AddOptions<WebAuthOptions>().BindConfiguration("TwitchWebAuth").ValidateOnStart();
+builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
 builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
@@ -67,6 +68,11 @@ builder.Services.AddSingleton<PointsCommandService>();
 builder.Services.AddSingleton<PointBalanceService>();
 builder.Services.AddSingleton<PointsConfigurationService>();
 builder.Services.AddSingleton<PointsDashboardService>();
+builder.Services.AddSingleton<PointsGiveawayScheduler>();
+builder.Services.AddSingleton<IPointsGiveawayScheduler>(sp =>
+    sp.GetRequiredService<PointsGiveawayScheduler>()
+);
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PointsGiveawayScheduler>());
 builder.Services.AddSingleton<PointsGiveawayService>();
 builder.Services.AddSingleton<IPointsRandom, PointsRandom>();
 builder.Services.AddSingleton<PointsChangeNotifier>();

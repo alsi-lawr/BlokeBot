@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
@@ -15,13 +14,10 @@ public sealed class PointsGiveawayService(
     PointBalanceService balances,
     HostBotStatusService botStatus,
     IPointsRandom random,
-    IServiceProvider services,
+    IPointsGiveawayScheduler scheduler,
     PointsChangeNotifier changes
 )
 {
-    private readonly object scheduleGate = new();
-    private readonly Dictionary<int, CancellationTokenSource> schedules = [];
-
     public async Task<PointsGiveawayView?> GetActiveGiveawayAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -102,12 +98,15 @@ public sealed class PointsGiveawayService(
         };
         db.PointsGiveaways.Add(giveaway);
         await db.SaveChangesAsync(ct);
-        Schedule(
-            giveaway.Id,
-            hostLogin,
-            giveaway.EndsAtUtc,
-            settings.GiveawayDurationSeconds,
-            reply
+        scheduler.Schedule(
+            new PointsGiveawaySchedule(
+                giveaway.Id,
+                hostId,
+                hostLogin,
+                giveaway.StartedAtUtc,
+                giveaway.EndsAtUtc,
+                reply
+            )
         );
         await changes.NotifyChangedAsync();
         return Reply(true, settings.GiveawayStartedReply, settings);
@@ -173,9 +172,7 @@ public sealed class PointsGiveawayService(
         CancellationToken ct
     )
     {
-        var result = await DrawActiveAsync(hostId, hostLogin, ct);
-        await changes.NotifyChangedAsync();
-        return result;
+        return await DrawActiveAsync(hostId, hostLogin, ct);
     }
 
     public async Task<PointOperationResult> CancelAsync(int hostId, CancellationToken ct)
@@ -194,7 +191,7 @@ public sealed class PointsGiveawayService(
         giveaway.Status = PointsGiveawayStatus.Cancelled;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        CancelSchedule(giveaway.Id);
+        scheduler.Cancel(giveaway.Id);
         await changes.NotifyChangedAsync();
         return Reply(true, settings.GiveawayCancelledReply, settings);
     }
@@ -206,28 +203,66 @@ public sealed class PointsGiveawayService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var settings = await LoadSettingsAsync(db, hostId, ct);
+        var giveawayId = await db
+            .PointsGiveaways.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
+            .OrderByDescending(x => x.StartedAtUtc)
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(ct);
+        if (giveawayId is null)
+            return Reply(false, settings.GiveawayNotActiveReply, settings);
+
+        var result = await DrawAsync(giveawayId.Value, ct);
+        if (result.Success)
+            scheduler.Cancel(giveawayId.Value);
+
+        return result;
+    }
+
+    internal async Task<PointOperationResult> DrawAsync(int giveawayId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var giveawayHeader = await db
+            .PointsGiveaways.AsNoTracking()
+            .Where(x => x.Id == giveawayId)
+            .Select(x => new { x.HostId, x.Status })
+            .SingleOrDefaultAsync(ct);
+        if (giveawayHeader is null)
+            return new PointOperationResult(false, string.Empty);
+
+        var settings = await LoadSettingsAsync(db, giveawayHeader.HostId, ct);
+        if (giveawayHeader.Status != PointsGiveawayStatus.Active)
+            return Reply(false, settings.GiveawayNotActiveReply, settings);
+
+        var now = DateTime.UtcNow;
+        var claimed = await db
+            .PointsGiveaways.Where(x =>
+                x.Id == giveawayId && x.Status == PointsGiveawayStatus.Active
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(x => x.Status, PointsGiveawayStatus.Completed)
+                        .SetProperty(x => x.CompletedAtUtc, now),
+                ct
+            );
+        if (claimed == 0)
+            return Reply(false, settings.GiveawayNotActiveReply, settings);
+
         var giveaway = await db
             .PointsGiveaways.Include(x => x.Entrants)
             .Include(x => x.Winners)
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
-            .OrderByDescending(x => x.StartedAtUtc)
-            .FirstOrDefaultAsync(ct);
-        if (giveaway is null)
-            return Reply(false, settings.GiveawayNotActiveReply, settings);
-
-        giveaway.Status = PointsGiveawayStatus.Completed;
-        giveaway.CompletedAtUtc = DateTime.UtcNow;
+            .SingleAsync(x => x.Id == giveawayId, ct);
         var entrants = giveaway
             .Entrants.Select(x => x.Login)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         if (entrants.Count == 0)
         {
-            await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
-            CancelSchedule(giveaway.Id);
+            await changes.NotifyChangedAsync();
             return Reply(true, settings.GiveawayNoEntrantsReply, settings);
         }
 
@@ -249,18 +284,18 @@ public sealed class PointsGiveawayService(
             );
             await balances.AwardGiveawayAsync(
                 db,
-                hostId,
+                giveaway.HostId,
                 giveaway.Id,
                 winner,
                 payout,
-                DateTime.UtcNow,
+                now,
                 ct
             );
         }
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        CancelSchedule(giveaway.Id);
+        await changes.NotifyChangedAsync();
         var winnerText = string.Join(
             ", ",
             giveaway.Winners.Select(x =>
@@ -274,9 +309,30 @@ public sealed class PointsGiveawayService(
         );
     }
 
-    private async Task SendUpdateAsync(
+    internal async Task<bool> ExpireAsync(int giveawayId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var expired = await db
+            .PointsGiveaways.Where(x =>
+                x.Id == giveawayId && x.Status == PointsGiveawayStatus.Active
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(x => x.Status, PointsGiveawayStatus.Expired)
+                        .SetProperty(x => x.CompletedAtUtc, DateTime.UtcNow),
+                ct
+            );
+
+        if (expired == 0)
+            return false;
+
+        await changes.NotifyChangedAsync();
+        return true;
+    }
+
+    internal async Task<string?> BuildUpdateMessageAsync(
         int giveawayId,
-        string hostLogin,
         DateTime endsAtUtc,
         CancellationToken ct
     )
@@ -286,7 +342,7 @@ public sealed class PointsGiveawayService(
             .PointsGiveaways.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == giveawayId, ct);
         if (giveaway is null || giveaway.Status != PointsGiveawayStatus.Active)
-            return;
+            return null;
 
         var settings = await LoadSettingsAsync(db, giveaway.HostId, ct);
         var message = Format(
@@ -294,84 +350,7 @@ public sealed class PointsGiveawayService(
             settings,
             timeLeft: FormatTimeLeft(endsAtUtc - DateTime.UtcNow)
         );
-        await SendChatAsync(hostLogin, message, ct);
-    }
-
-    private void Schedule(
-        int giveawayId,
-        string hostLogin,
-        DateTime endsAtUtc,
-        int durationSeconds,
-        Func<string, CancellationToken, ValueTask>? reply
-    )
-    {
-        var cts = new CancellationTokenSource();
-        lock (scheduleGate)
-        {
-            CancelSchedule(giveawayId);
-            schedules[giveawayId] = cts;
-        }
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var scheduledAtUtc = DateTime.UtcNow;
-                foreach (var elapsedFactor in new[] { 0.25, 0.5, 0.75 })
-                {
-                    var targetUtc = scheduledAtUtc.AddSeconds(durationSeconds * elapsedFactor);
-                    var delay = targetUtc - DateTime.UtcNow;
-                    if (delay > TimeSpan.Zero)
-                        await Task.Delay(delay, cts.Token);
-
-                    await SendUpdateAsync(giveawayId, hostLogin, endsAtUtc, cts.Token);
-                }
-
-                var remaining = endsAtUtc - DateTime.UtcNow;
-                if (remaining > TimeSpan.Zero)
-                    await Task.Delay(remaining, cts.Token);
-
-                await using var db = await dbFactory.CreateDbContextAsync(cts.Token);
-                var hostId = await db
-                    .PointsGiveaways.AsNoTracking()
-                    .Where(x => x.Id == giveawayId)
-                    .Select(x => (int?)x.HostId)
-                    .SingleOrDefaultAsync(cts.Token);
-                if (hostId is null)
-                    return;
-
-                var result = await DrawActiveAsync(hostId.Value, hostLogin, cts.Token);
-                if (!string.IsNullOrWhiteSpace(result.Message))
-                {
-                    if (reply is not null)
-                        await reply(result.Message, cts.Token);
-                    else
-                        await SendChatAsync(hostLogin, result.Message, cts.Token);
-                }
-
-                await changes.NotifyChangedAsync();
-            }
-            catch (OperationCanceledException) { }
-        });
-    }
-
-    private void CancelSchedule(int giveawayId)
-    {
-        lock (scheduleGate)
-        {
-            if (!schedules.Remove(giveawayId, out var cts))
-                return;
-
-            cts.Cancel();
-            cts.Dispose();
-        }
-    }
-
-    private async Task SendChatAsync(string hostLogin, string message, CancellationToken ct)
-    {
-        var sender = services.GetService<ITwitchChatMessageSender>();
-        if (sender is not null)
-            await sender.SendAsync(hostLogin, message, ct);
+        return message;
     }
 
     private async Task<FollowerCheckResult> CheckEligibilityAsync(
