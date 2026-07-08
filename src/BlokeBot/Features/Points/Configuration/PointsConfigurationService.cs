@@ -124,7 +124,7 @@ public sealed class PointsConfigurationService(
     }
 
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
-        CommandAliasRegistry.JoinAliases(aliases, AppCommandCatalog.FromPointsKind(kind));
+        CommandAliasRegistry.JoinAliases(aliases, PointsAppCommandKindMap.ToAppKind(kind));
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,
@@ -136,10 +136,7 @@ public sealed class PointsConfigurationService(
         await aliasRegistry.ReplaceAliasesAsync(
             db,
             hostId,
-            AppCommandCatalog
-                .ForFeature(AppCommandFeature.Points)
-                .Select(x => x.Kind)
-                .ToHashSet(),
+            PointsAppCommandKindMap.AppKinds,
             [
                 new CommandAliasDraft(AppCommandKind.Points, aliases.PointsAliases),
                 new CommandAliasDraft(AppCommandKind.GivePoints, aliases.GivePointsAliases),

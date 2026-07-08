@@ -1,12 +1,10 @@
 @page "/points/settings"
 @rendermode InteractiveServer
-@using BlokeBot.Hosts
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
 @inject PointsConfigurationService Configuration
-@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 
@@ -21,7 +19,7 @@
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">@statusMessage</div>
+        <div class="status-message px-4 py-3 text-sm font-semibold">@statusMessage</div>
     }
 
     @if (Host is null)
@@ -127,13 +125,10 @@
 @code {
     private PointsConfiguration? config;
     private string? statusMessage;
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
-    private BotHostChoice? Host { get; set; }
-    private int HostId => Host?.Id ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
-        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
+        await LoadPageContextAsync();
         if (HostId != 0)
         {
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);

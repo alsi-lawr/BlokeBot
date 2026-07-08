@@ -1,4 +1,5 @@
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.Points.Commands;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -6,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Points.HostSetup;
 
-public sealed class PointsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFactory)
-    : IBotHostSeeder
+public sealed class PointsHostSeeder(
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState> commands
+) : IBotHostSeeder
 {
     public async Task SeedAsync(int hostId, CancellationToken ct)
     {
@@ -18,14 +21,10 @@ public sealed class PointsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFact
         if (!await db.PointsSettings.AnyAsync(x => x.HostId == hostId, ct))
             db.PointsSettings.Add(new PointsSettings { HostId = hostId });
 
-        foreach (var command in AppCommandCatalog.ForFeature(AppCommandFeature.Points))
+        foreach (var command in commands.Descriptors)
         {
-            if (
-                await db.CommandAliases.AnyAsync(
-                    x => x.HostId == hostId && x.Kind == command.Kind,
-                    ct
-                )
-            )
+            var appKind = PointsAppCommandKindMap.ToAppKind(command.Kind);
+            if (await db.CommandAliases.AnyAsync(x => x.HostId == hostId && x.Kind == appKind, ct))
                 continue;
 
             foreach (var alias in command.DefaultAliases)
@@ -33,7 +32,7 @@ public sealed class PointsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFact
                     new CommandAlias
                     {
                         HostId = hostId,
-                        Kind = command.Kind,
+                        Kind = appKind,
                         Alias = alias,
                     }
                 );

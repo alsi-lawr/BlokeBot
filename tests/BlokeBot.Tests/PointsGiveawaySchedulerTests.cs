@@ -88,15 +88,14 @@ public sealed class PointsGiveawaySchedulerTests
 
         await scheduler.RehydrateAsync(CancellationToken.None);
 
-        logger
-            .Entries.ShouldContain(entry =>
-                entry.Level == LogLevel.Error
-                && entry.Message.Contains(
-                    $"Failed to expire overdue points giveaway {giveawayId}",
-                    StringComparison.Ordinal
-                )
-                && entry.Exception is InvalidOperationException
-            );
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Error
+            && entry.Message.Contains(
+                $"Failed to expire overdue points giveaway {giveawayId}",
+                StringComparison.Ordinal
+            )
+            && entry.Exception is InvalidOperationException
+        );
     }
 
     [Test]
@@ -124,6 +123,19 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
+    public async Task Cancel_outcome_reports_cancelled()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.CancelOutcomeAsync(hostId, CancellationToken.None);
+
+        outcome.Kind.ShouldBe(PointsGiveawayCancelOutcomeKind.Cancelled);
+    }
+
+    [Test]
     public async Task Manual_end_cancels_scheduled_giveaway()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -145,6 +157,161 @@ public sealed class PointsGiveawaySchedulerTests
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Completed);
         giveaway.CompletedAtUtc.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task Start_outcome_reports_active_giveaway()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.AlreadyActive);
+    }
+
+    [Test]
+    public async Task Start_outcome_reports_cooldown()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(
+            dbFactory,
+            hostId,
+            settings => settings.GiveawayCooldownSeconds = 120
+        );
+        await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow.AddSeconds(-30),
+            DateTime.UtcNow.AddSeconds(-10),
+            status: PointsGiveawayStatus.Completed
+        );
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.Cooldown);
+        outcome.TimeLeft.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task Start_outcome_reports_offline_stream()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamOffline);
+    }
+
+    [Test]
+    public async Task Join_outcome_reports_duplicate_join()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5),
+            "entrant"
+        );
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.JoinOutcomeAsync(
+            hostId,
+            "streamer",
+            "entrant",
+            new Dictionary<string, string>(),
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayJoinOutcomeKind.DuplicateJoin);
+    }
+
+    [Test]
+    public async Task Join_outcome_reports_ineligible_user()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(
+            dbFactory,
+            hostId,
+            settings => settings.GiveawayEligibility = PointsEligibilityMode.Subscribers
+        );
+        await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.JoinOutcomeAsync(
+            hostId,
+            "streamer",
+            "viewer",
+            new Dictionary<string, string>(),
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayJoinOutcomeKind.NotEligible);
+    }
+
+    [Test]
+    public async Task Draw_outcome_reports_no_entrants()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var giveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5)
+        );
+        await SeedSettingsAsync(dbFactory, hostId);
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
+
+        outcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.NoEntrants);
+    }
+
+    [Test]
+    public async Task Draw_outcome_reports_winners()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var giveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5),
+            "entrant"
+        );
+        await SeedSettingsAsync(dbFactory, hostId);
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
+
+        outcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.Winners);
+        outcome.Winners.Single().Login.ShouldBe("entrant");
+        outcome.Winners.Single().Payout.ShouldBe(PointAmount.ParseAbsolute("10"));
     }
 
     [Test]
@@ -206,18 +373,21 @@ public sealed class PointsGiveawaySchedulerTests
         );
         return new PointsGiveawayService(
             dbFactory,
-            new PointBalanceService(dbFactory),
-            status,
-            new FixedPointsRandom(),
+            new PointsGiveawayDrawService(
+                dbFactory,
+                new PointBalanceService(dbFactory),
+                new FixedPointsRandom(),
+                new PointsGiveawayMessageFormatter(),
+                new PointsChangeNotifier(new EventBus<AppEventKind>())
+            ),
+            new PointsGiveawayEligibilityPolicy(status),
+            new PointsGiveawayMessageFormatter(),
             scheduler,
             new PointsChangeNotifier(new EventBus<AppEventKind>())
         );
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
@@ -233,19 +403,20 @@ public sealed class PointsGiveawaySchedulerTests
 
     private static async Task SeedSettingsAsync(
         SqliteBlokeBotDbFactory dbFactory,
-        int hostId
+        int hostId,
+        Action<PointsSettings>? configure = null
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.PointsSettings.Add(
-            new PointsSettings
-            {
-                HostId = hostId,
-                GiveawayMinimumPayout = "10",
-                GiveawayMaximumPayout = "10",
-                GiveawayWinnerCount = 1,
-            }
-        );
+        var settings = new PointsSettings
+        {
+            HostId = hostId,
+            GiveawayMinimumPayout = "10",
+            GiveawayMaximumPayout = "10",
+            GiveawayWinnerCount = 1,
+        };
+        configure?.Invoke(settings);
+        db.PointsSettings.Add(settings);
         await db.SaveChangesAsync();
     }
 
@@ -254,14 +425,15 @@ public sealed class PointsGiveawaySchedulerTests
         int hostId,
         DateTime startedAtUtc,
         DateTime endsAtUtc,
-        string? entrant = null
+        string? entrant = null,
+        PointsGiveawayStatus status = PointsGiveawayStatus.Active
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = new PointsGiveaway
         {
             HostId = hostId,
-            Status = PointsGiveawayStatus.Active,
+            Status = status,
             StartedAtUtc = startedAtUtc,
             EndsAtUtc = endsAtUtc,
             MinimumPayout = "10",
@@ -272,11 +444,7 @@ public sealed class PointsGiveawaySchedulerTests
         if (entrant is not null)
         {
             giveaway.Entrants.Add(
-                new PointsGiveawayEntrant
-                {
-                    Login = entrant,
-                    JoinedAtUtc = DateTime.UtcNow,
-                }
+                new PointsGiveawayEntrant { Login = entrant, JoinedAtUtc = DateTime.UtcNow }
             );
         }
 

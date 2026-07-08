@@ -151,11 +151,8 @@ internal sealed class PointsGiveawayScheduler(
                     continue;
 
                 await DelayUntilAsync(reminderAtUtc, token);
-                var message = await Giveaways().BuildUpdateMessageAsync(
-                    schedule.GiveawayId,
-                    schedule.EndsAtUtc,
-                    token
-                );
+                var message = await Giveaways()
+                    .BuildUpdateMessageAsync(schedule.GiveawayId, schedule.EndsAtUtc, token);
                 if (!string.IsNullOrWhiteSpace(message))
                     await SendMessageAsync(schedule, message, token);
             }
@@ -264,7 +261,8 @@ internal sealed class PointsGiveawayScheduler(
         }
     }
 
-    private PointsGiveawayService Giveaways() => services.GetRequiredService<PointsGiveawayService>();
+    private PointsGiveawayService Giveaways() =>
+        services.GetRequiredService<PointsGiveawayService>();
 
     private DateTime GetUtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
