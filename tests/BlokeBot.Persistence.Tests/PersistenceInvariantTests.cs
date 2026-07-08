@@ -74,7 +74,9 @@ public sealed class PersistenceInvariantTests
                 INSERT INTO points_giveaways
                     (HostId, Status, StartedAtUtc, EndsAtUtc, MinimumPayout, MaximumPayout, WinnerCount, Eligibility)
                 VALUES
-                    ({hostId}, 'Bogus', {DateTime.UtcNow}, {DateTime.UtcNow.AddMinutes(5)}, '10', '100', 1, 'everyone')
+                    ({hostId}, 'Bogus', {DateTime.UtcNow}, {DateTime.UtcNow.AddMinutes(
+                    5
+                )}, '10', '100', 1, 'everyone')
                 """
             )
         );

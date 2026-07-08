@@ -64,26 +64,24 @@ public sealed class EventBusTests
     {
         var events = new EventBus<string>();
         var received = 0;
-        using var subscriptions = new EventSubscriptionSet(
-            [
-                events.Subscribe(
-                    "changed",
-                    _ =>
-                    {
-                        received++;
-                        return Task.CompletedTask;
-                    }
-                ),
-                events.Subscribe(
-                    "changed",
-                    _ =>
-                    {
-                        received++;
-                        return Task.CompletedTask;
-                    }
-                ),
-            ]
-        );
+        using var subscriptions = new EventSubscriptionSet([
+            events.Subscribe(
+                "changed",
+                _ =>
+                {
+                    received++;
+                    return Task.CompletedTask;
+                }
+            ),
+            events.Subscribe(
+                "changed",
+                _ =>
+                {
+                    received++;
+                    return Task.CompletedTask;
+                }
+            ),
+        ]);
 
         subscriptions.Dispose();
         await events.PublishAsync("changed");

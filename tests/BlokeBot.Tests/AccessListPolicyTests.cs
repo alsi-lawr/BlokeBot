@@ -69,11 +69,7 @@ public sealed class AccessListPolicyTests
         var service = CreateSiteAccessService(dbFactory, botAdmins: ["admin"]);
 
         await service.SetWhitelistEnabledAsync(true, CancellationToken.None);
-        await service.AddEntryAsync(
-            AccessListEntryKind.Blacklist,
-            "admin",
-            CancellationToken.None
-        );
+        await service.AddEntryAsync(AccessListEntryKind.Blacklist, "admin", CancellationToken.None);
 
         (await service.CanCreateHostAsync("admin", CancellationToken.None)).ShouldBeTrue();
     }
@@ -88,13 +84,15 @@ public sealed class AccessListPolicyTests
             new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
         );
 
-        (await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None))
-            .ShouldBeTrue();
+        (
+            await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
+        ).ShouldBeTrue();
 
         await service.SetModsEnabledAsync(hostId, false, CancellationToken.None);
 
-        (await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None))
-            .ShouldBeFalse();
+        (
+            await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
+        ).ShouldBeFalse();
     }
 
     [Test]
@@ -120,10 +118,12 @@ public sealed class AccessListPolicyTests
             CancellationToken.None
         );
 
-        (await service.CanModeratorAccessAsync(hostId, "allowedmod", CancellationToken.None))
-            .ShouldBeTrue();
-        (await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None))
-            .ShouldBeFalse();
+        (
+            await service.CanModeratorAccessAsync(hostId, "allowedmod", CancellationToken.None)
+        ).ShouldBeTrue();
+        (
+            await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None)
+        ).ShouldBeFalse();
         var state = await service.LoadAsync(hostId, CancellationToken.None);
         state.Whitelist.ShouldBe(["allowedmod"]);
     }
@@ -151,8 +151,9 @@ public sealed class AccessListPolicyTests
             CancellationToken.None
         );
 
-        (await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None))
-            .ShouldBeFalse();
+        (
+            await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
+        ).ShouldBeFalse();
     }
 
     [Test]
@@ -173,10 +174,12 @@ public sealed class AccessListPolicyTests
             CancellationToken.None
         );
 
-        (await service.CanModeratorAccessAsync(firstHostId, "moderator", CancellationToken.None))
-            .ShouldBeFalse();
-        (await service.CanModeratorAccessAsync(secondHostId, "moderator", CancellationToken.None))
-            .ShouldBeTrue();
+        (
+            await service.CanModeratorAccessAsync(firstHostId, "moderator", CancellationToken.None)
+        ).ShouldBeFalse();
+        (
+            await service.CanModeratorAccessAsync(secondHostId, "moderator", CancellationToken.None)
+        ).ShouldBeTrue();
     }
 
     [Test]
@@ -194,10 +197,7 @@ public sealed class AccessListPolicyTests
                 return Task.CompletedTask;
             }
         );
-        var service = new HostModAccessService(
-            dbFactory,
-            new HostedChannelChangeNotifier(events)
-        );
+        var service = new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(events));
 
         await service.AddEntryAsync(
             hostId,
@@ -224,15 +224,14 @@ public sealed class AccessListPolicyTests
         var events = new EventBus<AppEventKind>();
         return new SiteAccessService(
             dbFactory,
-            new BotAdminService(Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })),
+            new BotAdminService(
+                Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
+            ),
             new SiteAccessChangeNotifier(events)
         );
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost

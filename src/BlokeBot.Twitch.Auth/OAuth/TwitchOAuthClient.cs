@@ -12,12 +12,7 @@ internal sealed class TwitchOAuthClient(
     public Uri BuildAuthorizeUri(string state)
     {
         return twitch.CreateAuthorizationUri(
-            new TwitchAuthorizationUriRequest(
-                opts.ClientId,
-                opts.RedirectUri,
-                opts.Scopes,
-                state
-            )
+            new TwitchAuthorizationUriRequest(opts.ClientId, opts.RedirectUri, opts.Scopes, state)
         );
     }
 
@@ -53,8 +48,10 @@ internal sealed class TwitchOAuthClient(
         );
     }
 
-    public async Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken) =>
-        await twitch.ValidateTokenAsync(accessToken, cancellationToken) is not null;
+    public async Task<bool> ValidateAsync(
+        string accessToken,
+        CancellationToken cancellationToken
+    ) => await twitch.ValidateTokenAsync(accessToken, cancellationToken) is not null;
 
     private static TwitchTokenSet ToTokenSet(TwitchOAuthTokenResponse payload)
     {

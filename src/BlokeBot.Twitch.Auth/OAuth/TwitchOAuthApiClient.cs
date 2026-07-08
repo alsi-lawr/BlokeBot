@@ -89,7 +89,10 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
             )
         );
         return string.IsNullOrWhiteSpace(refreshed.RefreshToken)
-            ? refreshed with { RefreshToken = refreshToken }
+            ? refreshed with
+            {
+                RefreshToken = refreshToken,
+            }
             : refreshed;
     }
 

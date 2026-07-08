@@ -1,4 +1,3 @@
-
 namespace BlokeBot.Identity;
 
 public readonly record struct LoginName
@@ -12,8 +11,7 @@ public readonly record struct LoginName
 
     public bool IsEmpty => Value.Length == 0;
 
-    public static LoginName Parse(string? value) =>
-        new(TwitchLogin.Normalize(value));
+    public static LoginName Parse(string? value) => new(TwitchLogin.Normalize(value));
 
     public override string ToString() => Value;
 

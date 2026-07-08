@@ -2,10 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace BlokeBot.Twitch.Auth;
 
-public sealed class TwitchTokenStatusService(
-    IServiceProvider services,
-    TwitchOAuthApiClient oauth
-)
+public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOAuthApiClient oauth)
 {
     public async Task<TwitchTokenStatus> GetUserAccessTokenStatusAsync(
         IEnumerable<string?> requiredScopes,
@@ -43,9 +40,10 @@ public sealed class TwitchTokenStatusService(
 
             var granted = TwitchScopeSet.NormalizeMany(validation.Scopes);
             var missing = TwitchScopeSet.Missing(granted, required);
-            var state = missing.Length == 0
-                ? TwitchTokenStatusState.Ready
-                : TwitchTokenStatusState.MissingScopes;
+            var state =
+                missing.Length == 0
+                    ? TwitchTokenStatusState.Ready
+                    : TwitchTokenStatusState.MissingScopes;
 
             return new TwitchTokenStatus(
                 state,

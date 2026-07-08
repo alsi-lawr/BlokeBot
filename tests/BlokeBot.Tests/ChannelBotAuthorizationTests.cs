@@ -90,7 +90,8 @@ public sealed class ChannelBotAuthorizationTests
         var host = await LoadHostAsync(dbFactory, hostId);
         host.ChannelBotAuthorizedAtUtc.ShouldNotBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBe("bits:read channel:bot");
-        service.IsCurrent(host.ChannelBotAuthorizedAtUtc, host.ChannelBotAuthorizedScopes)
+        service
+            .IsCurrent(host.ChannelBotAuthorizedAtUtc, host.ChannelBotAuthorizedScopes)
             .ShouldBeTrue();
     }
 
@@ -133,13 +134,11 @@ public sealed class ChannelBotAuthorizationTests
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
         var httpClientFactory = new EmptyHttpClientFactory();
-        return new(
-            ConfigurationWithScopes(scopes),
-            new TwitchOAuthApiClient(httpClientFactory)
-        );
+        return new(ConfigurationWithScopes(scopes), new TwitchOAuthApiClient(httpClientFactory));
     }
 
-    private static HostedChannelChangeNotifier ChangeNotifier() => new(new EventBus<AppEventKind>());
+    private static HostedChannelChangeNotifier ChangeNotifier() =>
+        new(new EventBus<AppEventKind>());
 
     private static IConfiguration ConfigurationWithScopes(params string[] scopes)
     {
@@ -185,10 +184,7 @@ public sealed class ChannelBotAuthorizationTests
         return host.Id;
     }
 
-    private static async Task<BotHost> LoadHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        int hostId
-    )
+    private static async Task<BotHost> LoadHostAsync(SqliteBlokeBotDbFactory dbFactory, int hostId)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         return await db.Hosts.SingleAsync(x => x.Id == hostId);
@@ -213,9 +209,7 @@ public sealed class ChannelBotAuthorizationTests
             {
                 if (request.RequestUri?.AbsolutePath == "/oauth2/token")
                 {
-                    return Task.FromResult(
-                        JsonResponse("""{"access_token":"grant-token"}""")
-                    );
+                    return Task.FromResult(JsonResponse("""{"access_token":"grant-token"}"""));
                 }
 
                 if (request.RequestUri?.AbsolutePath == "/oauth2/validate")

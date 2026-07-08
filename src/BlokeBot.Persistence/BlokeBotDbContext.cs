@@ -51,7 +51,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         {
             b.ToTable(
                 "site_access_entries",
-                t => t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", AccessKinds))
+                t =>
+                    t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", AccessKinds))
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
@@ -94,11 +95,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new
-            {
-                x.HostId,
-                x.Kind,
-                x.Login,
-            })
+                {
+                    x.HostId,
+                    x.Kind,
+                    x.Login,
+                })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -226,9 +227,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     value => PointsEligibilityModeStore.Parse(value)
                 )
                 .HasMaxLength(32);
-            b.HasIndex(x => x.HostId)
-                .IsUnique()
-                .HasFilter("\"Status\" = 'Active'");
+            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
@@ -289,14 +288,16 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         {
             b.ToTable(
                 "guess_rounds",
-                t => t.HasCheckConstraint("CK_guess_rounds_Status", KindIn("Status", GuessRoundStatusKinds))
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_guess_rounds_Status",
+                        KindIn("Status", GuessRoundStatusKinds)
+                    )
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             b.Property(x => x.WinningName).HasMaxLength(128);
-            b.HasIndex(x => x.HostId)
-                .IsUnique()
-                .HasFilter("\"Status\" IN ('Open', 'Closed')");
+            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" IN ('Open', 'Closed')");
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)

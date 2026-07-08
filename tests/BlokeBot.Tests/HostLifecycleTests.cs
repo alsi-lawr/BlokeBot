@@ -173,11 +173,7 @@ public sealed class HostLifecycleTests
                 CompletedAtUtc = DateTime.UtcNow,
                 Entrants =
                 [
-                    new PointsGiveawayEntrant
-                    {
-                        Login = "viewer",
-                        JoinedAtUtc = DateTime.UtcNow,
-                    },
+                    new PointsGiveawayEntrant { Login = "viewer", JoinedAtUtc = DateTime.UtcNow },
                 ],
                 Winners = [new PointsGiveawayWinner { Login = "viewer", Payout = "10" }],
             }

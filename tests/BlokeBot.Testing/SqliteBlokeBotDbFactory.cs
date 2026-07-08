@@ -4,9 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Testing;
 
-public sealed class SqliteBlokeBotDbFactory
-    : IDbContextFactory<BlokeBotDbContext>,
-        IAsyncDisposable
+public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContext>, IAsyncDisposable
 {
     private readonly SqliteConnection connection;
     private readonly DbContextOptions<BlokeBotDbContext> options;

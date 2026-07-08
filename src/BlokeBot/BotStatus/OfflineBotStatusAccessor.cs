@@ -1,4 +1,3 @@
-
 namespace BlokeBot.BotStatus;
 
 internal sealed class OfflineBotStatusAccessor : ITwitchBotRuntimeStatusAccessor

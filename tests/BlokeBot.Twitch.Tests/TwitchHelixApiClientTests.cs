@@ -71,9 +71,8 @@ public sealed class TwitchHelixApiClientTests
         public HttpClient CreateClient(string name) =>
             new(new Handler(responses), disposeHandler: false);
 
-        private sealed class Handler(
-            Queue<Func<HttpRequestMessage, HttpResponseMessage>> responses
-        ) : HttpMessageHandler
+        private sealed class Handler(Queue<Func<HttpRequestMessage, HttpResponseMessage>> responses)
+            : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,

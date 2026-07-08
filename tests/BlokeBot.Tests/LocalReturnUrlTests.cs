@@ -11,7 +11,8 @@ public sealed class LocalReturnUrlTests
     {
         LocalReturnUrl.OrFallback("/", "/fallback").ShouldBe("/");
         LocalReturnUrl.OrFallback("/guessing", "/fallback").ShouldBe("/guessing");
-        LocalReturnUrl.OrFallback("/host/create?tab=auth#bot", "/fallback")
+        LocalReturnUrl
+            .OrFallback("/host/create?tab=auth#bot", "/fallback")
             .ShouldBe("/host/create?tab=auth#bot");
     }
 

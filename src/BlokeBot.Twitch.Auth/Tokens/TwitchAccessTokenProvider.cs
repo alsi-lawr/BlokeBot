@@ -55,10 +55,7 @@ internal sealed class TwitchAccessTokenProvider(
 
     private async Task LoadTokenAsync(CancellationToken cancellationToken)
     {
-        state = await tokenStore.LoadAsync(
-            options.Value.TokenCachePath,
-            cancellationToken
-        );
+        state = await tokenStore.LoadAsync(options.Value.TokenCachePath, cancellationToken);
         loaded = true;
     }
 
@@ -86,11 +83,7 @@ internal sealed class TwitchAccessTokenProvider(
                     RefreshToken = refreshable.RefreshToken,
                 }
                 : refreshed;
-            await tokenStore.SaveAsync(
-                options.Value.TokenCachePath,
-                state,
-                cancellationToken
-            );
+            await tokenStore.SaveAsync(options.Value.TokenCachePath, state, cancellationToken);
             return state.AccessToken;
         }
 

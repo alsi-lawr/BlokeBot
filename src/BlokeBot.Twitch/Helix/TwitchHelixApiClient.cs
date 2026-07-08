@@ -45,7 +45,9 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
 
         var uri =
             $"{UsersEndpoint}?"
-            + TwitchQueryString.Create(normalized.Select(login => new KeyValuePair<string, string?>("login", login)));
+            + TwitchQueryString.Create(
+                normalized.Select(login => new KeyValuePair<string, string?>("login", login))
+            );
         using var request = CreateRequest(HttpMethod.Get, uri, context);
         using var response = await http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -140,9 +142,12 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
     {
         var uri =
             $"{StreamsEndpoint}?"
-            + TwitchQueryString.Create(
-                [new KeyValuePair<string, string?>("user_login", TwitchLogin.Normalize(channelLogin))]
-            );
+            + TwitchQueryString.Create([
+                new KeyValuePair<string, string?>(
+                    "user_login",
+                    TwitchLogin.Normalize(channelLogin)
+                ),
+            ]);
         using var request = CreateRequest(HttpMethod.Get, uri, context);
         using var response = await http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -204,7 +209,10 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
     )
     {
         var request = new HttpRequestMessage(method, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            context.AccessToken
+        );
         request.Headers.Add("Client-Id", context.ClientId);
         return request;
     }
