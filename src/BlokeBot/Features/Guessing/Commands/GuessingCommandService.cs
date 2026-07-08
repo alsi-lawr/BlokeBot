@@ -4,7 +4,6 @@ using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
-using BlokeBot.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Commands;
@@ -19,7 +18,8 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             return NotConfigured().Message;
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
-        var profileId = round?.GuessRoundProfileId
+        var profileId =
+            round?.GuessRoundProfileId
             ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId.Value, ct);
         var profile = await GuessingProfileQueries.LoadProfileWithSettingsAsync(
             db,
@@ -28,13 +28,13 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             ct,
             includeOptions: true
         );
-        var settings = profile?.ReplySettings
-            ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
+        var settings =
+            profile?.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
         var template = string.IsNullOrWhiteSpace(settings.AvailableGuessesReply)
             ? GuessingDefaults.Replies().AvailableGuessesReply
             : settings.AvailableGuessesReply;
 
-        return TemplateFormatter.Format(
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -84,7 +84,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             GuessCommandKind.Start => "Usage: !{command} [round]",
             _ => settings.GuessUsageReply,
         };
-        return TemplateFormatter.Format(
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -101,5 +101,4 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         var values = options.Order(StringComparer.OrdinalIgnoreCase).ToArray();
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
-
 }

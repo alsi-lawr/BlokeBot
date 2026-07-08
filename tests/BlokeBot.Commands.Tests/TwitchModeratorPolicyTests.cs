@@ -16,7 +16,9 @@ public sealed class TwitchModeratorPolicyTests
     public void Mod_tag_marks_moderator()
     {
         TwitchModeratorPolicy
-            .IsModerator(Message("viewer", "streamer", new Dictionary<string, string> { ["mod"] = "1" }))
+            .IsModerator(
+                Message("viewer", "streamer", new Dictionary<string, string> { ["mod"] = "1" })
+            )
             .ShouldBeTrue();
     }
 

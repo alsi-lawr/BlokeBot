@@ -14,6 +14,13 @@ public interface ITwitchCommandBuilder
     ITwitchCommandBuilder Map(string route, TwitchCommandHandler handler);
 
     /// <summary>
+    /// Registers a dynamic command handler for routes resolved at dispatch time.
+    /// </summary>
+    /// <param name="handler">The handler to invoke for unmatched static routes.</param>
+    /// <returns>The same builder for chained registration.</returns>
+    ITwitchCommandBuilder MapDynamic(TwitchDynamicCommandHandler handler);
+
+    /// <summary>
     /// Registers a command handler for unmatched command routes.
     /// </summary>
     /// <param name="handler">The handler to invoke when no mapped route is matched.</param>

@@ -12,3 +12,13 @@ public delegate ValueTask TwitchCommandHandler(
     IReadOnlyList<string> args,
     CancellationToken cancellationToken
 );
+
+/// <summary>
+/// Handles a command route that is resolved dynamically at dispatch time.
+/// </summary>
+/// <returns><see langword="true" /> when the dynamic route was handled.</returns>
+public delegate ValueTask<bool> TwitchDynamicCommandHandler(
+    TwitchCommandContext context,
+    IReadOnlyList<string> args,
+    CancellationToken cancellationToken
+);

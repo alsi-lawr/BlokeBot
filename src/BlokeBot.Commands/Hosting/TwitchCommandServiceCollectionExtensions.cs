@@ -18,9 +18,10 @@ public static class TwitchCommandServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<TwitchCommandRegistry>();
-        services.TryAddSingleton<TwitchCommandDispatcher>(sp =>
-            new TwitchCommandDispatcher(sp.GetRequiredService<TwitchCommandRegistry>(), sp)
-        );
+        services.TryAddSingleton<TwitchCommandDispatcher>(sp => new TwitchCommandDispatcher(
+            sp.GetRequiredService<TwitchCommandRegistry>(),
+            sp
+        ));
 
         return new TwitchBotBuilder(services);
     }

@@ -8,6 +8,7 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
     private readonly ConcurrentDictionary<string, TwitchCommandHandler> routes = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly List<TwitchDynamicCommandHandler> dynamicHandlers = [];
     private readonly List<Type> filters = [];
     private TwitchCommandHandler? fallbackHandler;
 
@@ -17,6 +18,14 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
         ArgumentNullException.ThrowIfNull(handler);
 
         routes[route.TrimStart('!')] = handler;
+        return this;
+    }
+
+    public ITwitchCommandBuilder MapDynamic(TwitchDynamicCommandHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+
+        dynamicHandlers.Add(handler);
         return this;
     }
 
@@ -40,6 +49,7 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
             new ReadOnlyDictionary<string, TwitchCommandHandler>(
                 routes.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
             ),
+            Array.AsReadOnly<TwitchDynamicCommandHandler>([.. dynamicHandlers]),
             Array.AsReadOnly<Type>([.. filters]),
             fallbackHandler
         );

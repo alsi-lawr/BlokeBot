@@ -16,9 +16,7 @@ public sealed class PointsCommandService(IDbContextFactory<BlokeBotDbContext> db
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings =
-            await db
-                .PointsSettings.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.HostId == hostId, ct)
+            await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
             ?? new PointsSettings { HostId = hostId };
         return new PointsCommandResolution(hostId, kind, settings);
     }

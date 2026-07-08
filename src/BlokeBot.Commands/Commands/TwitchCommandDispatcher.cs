@@ -37,10 +37,20 @@ public sealed class TwitchCommandDispatcher
         }
 
         var matched = commandPlan.Routes.TryGetValue(route, out var handler);
-        handler ??= commandPlan.FallbackHandler;
-
-        if ((matched || commandPlan.FallbackHandler is not null) && handler is not null)
+        if (matched && handler is not null)
+        {
             await handler(context, args, cancellationToken);
+            return;
+        }
+
+        foreach (var dynamicHandler in commandPlan.DynamicHandlers)
+        {
+            if (await dynamicHandler(context, args, cancellationToken))
+                return;
+        }
+
+        if (commandPlan.FallbackHandler is not null)
+            await commandPlan.FallbackHandler(context, args, cancellationToken);
     }
 
     private TwitchCommandPlan GetPlan()

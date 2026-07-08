@@ -1,6 +1,9 @@
-namespace BlokeBot.Text;
+namespace BlokeBot.Commands;
 
-public static class TemplateFormatter
+/// <summary>
+/// Applies simple case-insensitive token replacement to bot reply templates.
+/// </summary>
+public static class MessageTemplateFormatter
 {
     public static string Format(string template, IReadOnlyDictionary<string, string> values)
     {
