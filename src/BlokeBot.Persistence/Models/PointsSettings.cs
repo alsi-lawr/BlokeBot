@@ -18,7 +18,7 @@ public sealed class PointsSettings
 
     public int GiveawayWinnerCount { get; set; } = 1;
 
-    public string GiveawayEligibility { get; set; } = "everyone";
+    public PointsEligibilityMode GiveawayEligibility { get; set; } = PointsEligibilityMode.Everyone;
 
     public int GiveawayCooldownSeconds { get; set; } = 300;
 

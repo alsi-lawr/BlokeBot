@@ -1,5 +1,5 @@
 using BlokeBot.Features.Points.Commands;
-using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Configuration;
 

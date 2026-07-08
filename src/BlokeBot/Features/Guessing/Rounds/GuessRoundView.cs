@@ -1,3 +1,5 @@
+using BlokeBot.Persistence.Models;
+
 namespace BlokeBot.Features.Guessing.Rounds;
 
 public sealed record GuessRoundView(

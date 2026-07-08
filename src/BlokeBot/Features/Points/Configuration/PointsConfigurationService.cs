@@ -49,7 +49,7 @@ public sealed class PointsConfigurationService(
             GiveawayMinimumPayout = settings.GiveawayMinimumPayout,
             GiveawayMaximumPayout = settings.GiveawayMaximumPayout,
             GiveawayWinnerCount = settings.GiveawayWinnerCount,
-            GiveawayEligibility = ParseEligibility(settings.GiveawayEligibility),
+            GiveawayEligibility = settings.GiveawayEligibility,
             GiveawayCooldownSeconds = settings.GiveawayCooldownSeconds,
         };
     }
@@ -110,7 +110,7 @@ public sealed class PointsConfigurationService(
             .ParseAbsolute(config.GiveawayMaximumPayout)
             .ToString();
         settings.GiveawayWinnerCount = Math.Max(1, config.GiveawayWinnerCount);
-        settings.GiveawayEligibility = FormatEligibility(config.GiveawayEligibility);
+        settings.GiveawayEligibility = config.GiveawayEligibility;
         settings.GiveawayCooldownSeconds = Math.Max(
             MinimumGiveawayCooldownSeconds,
             config.GiveawayCooldownSeconds
@@ -142,24 +142,8 @@ public sealed class PointsConfigurationService(
             config.Replies.FollowerEligibilityUnavailableReply.Trim();
     }
 
-    private static string FormatEligibility(PointsEligibilityMode mode) =>
-        mode switch
-        {
-            PointsEligibilityMode.Subscribers => "subscribers",
-            PointsEligibilityMode.Followers => "followers",
-            _ => "everyone",
-        };
-
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
         string.Join(", ", aliases.Where(x => x.Kind == Store(kind)).Select(x => x.Alias).Order());
-
-    private static PointsEligibilityMode ParseEligibility(string value) =>
-        value.ToLowerInvariant() switch
-        {
-            "subscribers" => PointsEligibilityMode.Subscribers,
-            "followers" => PointsEligibilityMode.Followers,
-            _ => PointsEligibilityMode.Everyone,
-        };
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,

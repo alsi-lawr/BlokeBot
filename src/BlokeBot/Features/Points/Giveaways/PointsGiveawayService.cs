@@ -29,7 +29,7 @@ public sealed class PointsGiveawayService(
             .PointsGiveaways.AsNoTracking()
             .Include(x => x.Entrants)
             .Include(x => x.Winners)
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active.ToString())
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
             .OrderByDescending(x => x.StartedAtUtc)
             .Select(x => ToView(x))
             .FirstOrDefaultAsync(ct);
@@ -82,7 +82,7 @@ public sealed class PointsGiveawayService(
         if (!live)
             return Reply(false, settings.StreamOfflineReply, settings);
 
-        if (settings.GiveawayEligibility.Equals("followers", StringComparison.OrdinalIgnoreCase))
+        if (settings.GiveawayEligibility == PointsEligibilityMode.Followers)
         {
             var status = await botStatus.GetStatusAsync(hostLogin, ct);
             if (status.ModeratorState != HostBotModeratorState.IsModerator)
@@ -92,7 +92,7 @@ public sealed class PointsGiveawayService(
         var giveaway = new PointsGiveaway
         {
             HostId = hostId,
-            Status = PointsGiveawayStatus.Active.ToString(),
+            Status = PointsGiveawayStatus.Active,
             StartedAtUtc = now,
             EndsAtUtc = now.AddSeconds(Math.Max(1, settings.GiveawayDurationSeconds)),
             MinimumPayout = settings.GiveawayMinimumPayout,
@@ -125,7 +125,7 @@ public sealed class PointsGiveawayService(
         var settings = await LoadSettingsAsync(db, hostId, ct);
         var giveaway = await db
             .PointsGiveaways.Include(x => x.Entrants)
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active.ToString())
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstOrDefaultAsync(ct);
         if (giveaway is null)
@@ -184,14 +184,14 @@ public sealed class PointsGiveawayService(
         var settings = await LoadSettingsAsync(db, hostId, ct);
         var giveaway = await db
             .PointsGiveaways.Where(x =>
-                x.HostId == hostId && x.Status == PointsGiveawayStatus.Active.ToString()
+                x.HostId == hostId && x.Status == PointsGiveawayStatus.Active
             )
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstOrDefaultAsync(ct);
         if (giveaway is null)
             return Reply(false, settings.GiveawayNotActiveReply, settings);
 
-        giveaway.Status = PointsGiveawayStatus.Cancelled.ToString();
+        giveaway.Status = PointsGiveawayStatus.Cancelled;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         CancelSchedule(giveaway.Id);
@@ -211,13 +211,13 @@ public sealed class PointsGiveawayService(
         var giveaway = await db
             .PointsGiveaways.Include(x => x.Entrants)
             .Include(x => x.Winners)
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active.ToString())
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstOrDefaultAsync(ct);
         if (giveaway is null)
             return Reply(false, settings.GiveawayNotActiveReply, settings);
 
-        giveaway.Status = PointsGiveawayStatus.Completed.ToString();
+        giveaway.Status = PointsGiveawayStatus.Completed;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         var entrants = giveaway
             .Entrants.Select(x => x.Login)
@@ -285,7 +285,7 @@ public sealed class PointsGiveawayService(
         var giveaway = await db
             .PointsGiveaways.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == giveawayId, ct);
-        if (giveaway is null || giveaway.Status != PointsGiveawayStatus.Active.ToString())
+        if (giveaway is null || giveaway.Status != PointsGiveawayStatus.Active)
             return;
 
         var settings = await LoadSettingsAsync(db, giveaway.HostId, ct);
@@ -382,16 +382,15 @@ public sealed class PointsGiveawayService(
         CancellationToken ct
     )
     {
-        var mode = settings.GiveawayEligibility.ToLowerInvariant();
-        if (mode == "subscribers")
-            return HasSubscriberBadge(tags)
-                ? FollowerCheckResult.Eligible
-                : FollowerCheckResult.NotEligible;
-
-        if (mode == "followers")
-            return await botStatus.IsFollowerAsync(hostLogin, login, ct);
-
-        return FollowerCheckResult.Eligible;
+        return settings.GiveawayEligibility switch
+        {
+            PointsEligibilityMode.Subscribers =>
+                HasSubscriberBadge(tags)
+                    ? FollowerCheckResult.Eligible
+                    : FollowerCheckResult.NotEligible,
+            PointsEligibilityMode.Followers => await botStatus.IsFollowerAsync(hostLogin, login, ct),
+            _ => FollowerCheckResult.Eligible,
+        };
     }
 
     private static string Format(
@@ -434,7 +433,7 @@ public sealed class PointsGiveawayService(
         CancellationToken ct
     ) =>
         await db.PointsGiveaways.AnyAsync(
-            x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active.ToString(),
+            x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active,
             ct
         );
 
@@ -465,9 +464,7 @@ public sealed class PointsGiveawayService(
     private static PointsGiveawayView ToView(PointsGiveaway giveaway) =>
         new(
             giveaway.Id,
-            Enum.TryParse<PointsGiveawayStatus>(giveaway.Status, out var status)
-                ? status
-                : PointsGiveawayStatus.Active,
+            giveaway.Status,
             giveaway.StartedAtUtc,
             giveaway.EndsAtUtc,
             giveaway.Entrants.OrderBy(x => x.JoinedAtUtc).Select(x => x.Login).ToArray(),

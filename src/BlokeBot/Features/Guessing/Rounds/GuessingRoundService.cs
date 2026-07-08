@@ -47,7 +47,7 @@ public sealed class GuessingRoundService(
             .Select(x => x.Login)
             .ToListAsync(ct);
 
-        round.Status = Store(GuessRoundStatus.Completed);
+        round.Status = GuessRoundStatus.Completed;
         round.ClosedAtUtc ??= DateTime.UtcNow;
         round.WinningName = normalizedName;
         await db.SaveChangesAsync(ct);
@@ -90,14 +90,15 @@ public sealed class GuessingRoundService(
             return new GuessingOperationResult(false, "Round profile not found.");
 
         var settings = profile.ReplySettings!;
-        if (await OpenRoundQuery(db, hostId).AnyAsync(ct))
+        if (await UnresolvedRoundQuery(db, hostId).AnyAsync(ct))
             return new GuessingOperationResult(false, settings.RoundAlreadyOpenReply);
 
         db.Rounds.Add(
             new GuessRound
             {
+                HostId = hostId,
                 GuessRoundProfileId = profile.Id,
-                Status = Store(GuessRoundStatus.Open),
+                Status = GuessRoundStatus.Open,
                 StartedAtUtc = DateTime.UtcNow,
             }
         );
@@ -148,7 +149,7 @@ public sealed class GuessingRoundService(
         if (round is null)
             return new GuessingOperationResult(false, settings.NoOpenRoundReply);
 
-        round.Status = Store(GuessRoundStatus.Closed);
+        round.Status = GuessRoundStatus.Closed;
         round.ClosedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
@@ -257,8 +258,8 @@ public sealed class GuessingRoundService(
 
     private static IQueryable<GuessRound> OpenRoundQuery(BlokeBotDbContext db, int hostId) =>
         db
-            .Rounds.Where(x => x.GuessRoundProfile != null && x.GuessRoundProfile.HostId == hostId)
-            .Where(x => x.Status == Store(GuessRoundStatus.Open))
+            .Rounds.Where(x => x.HostId == hostId)
+            .Where(x => x.Status == GuessRoundStatus.Open)
             .OrderByDescending(x => x.StartedAtUtc);
 
     private static async Task<BotReplySettings> SettingsForRoundOrDefaultAsync(
@@ -272,8 +273,6 @@ public sealed class GuessingRoundService(
         var profile = await LoadProfileWithSettingsAsync(db, hostId, profileId, ct);
         return profile?.ReplySettings ?? ToEntity(GuessingDefaults.Replies());
     }
-
-    private static string Store(GuessRoundStatus status) => status.ToString();
 
     private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
         new()
@@ -295,10 +294,7 @@ public sealed class GuessingRoundService(
 
     private static IQueryable<GuessRound> UnresolvedRoundQuery(BlokeBotDbContext db, int hostId) =>
         db
-            .Rounds.Where(x => x.GuessRoundProfile != null && x.GuessRoundProfile.HostId == hostId)
-            .Where(x =>
-                x.Status == Store(GuessRoundStatus.Open)
-                || x.Status == Store(GuessRoundStatus.Closed)
-            )
+            .Rounds.Where(x => x.HostId == hostId)
+            .Where(x => x.Status == GuessRoundStatus.Open || x.Status == GuessRoundStatus.Closed)
             .OrderByDescending(x => x.StartedAtUtc);
 }

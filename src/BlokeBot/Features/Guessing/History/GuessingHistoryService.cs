@@ -43,7 +43,7 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
         var shapedVotes = votes.Select(x => new
         {
             x.GuessedAtUtc,
-            IsCorrect = x.GuessRound!.Status == Store(GuessRoundStatus.Completed)
+            IsCorrect = x.GuessRound!.Status == GuessRoundStatus.Completed
                 && x.GuessRound.WinningName != null
                 && x.GuessName == x.GuessRound.WinningName,
             x.Login,
@@ -85,5 +85,4 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
         };
     }
 
-    private static string Store(GuessRoundStatus status) => status.ToString();
 }

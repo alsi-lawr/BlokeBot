@@ -6,7 +6,7 @@ public sealed class PointsGiveaway
 
     public int HostId { get; set; }
 
-    public string Status { get; set; } = "Active";
+    public PointsGiveawayStatus Status { get; set; } = PointsGiveawayStatus.Active;
 
     public DateTime StartedAtUtc { get; set; }
 
@@ -20,7 +20,7 @@ public sealed class PointsGiveaway
 
     public int WinnerCount { get; set; } = 1;
 
-    public string Eligibility { get; set; } = "everyone";
+    public PointsEligibilityMode Eligibility { get; set; } = PointsEligibilityMode.Everyone;
 
     public ICollection<PointsGiveawayEntrant> Entrants { get; set; } = [];
 

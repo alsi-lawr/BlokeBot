@@ -41,7 +41,7 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
                     round.Id,
                     round.GuessRoundProfileId,
                     round.GuessRoundProfile?.Name ?? string.Empty,
-                    ParseRoundStatus(round.Status),
+                    round.Status,
                     round.StartedAtUtc,
                     round.ClosedAtUtc,
                     round.WinningName
@@ -75,19 +75,9 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
             .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
             .ToListAsync(ct);
 
-    private static GuessRoundStatus ParseRoundStatus(string value) =>
-        Enum.TryParse<GuessRoundStatus>(value, ignoreCase: true, out var parsed)
-            ? parsed
-            : GuessRoundStatus.Closed;
-
-    private static string Store(GuessRoundStatus status) => status.ToString();
-
     private static IQueryable<GuessRound> UnresolvedRoundQuery(BlokeBotDbContext db, int hostId) =>
         db
-            .Rounds.Where(x => x.GuessRoundProfile != null && x.GuessRoundProfile.HostId == hostId)
-            .Where(x =>
-                x.Status == Store(GuessRoundStatus.Open)
-                || x.Status == Store(GuessRoundStatus.Closed)
-            )
+            .Rounds.Where(x => x.HostId == hostId)
+            .Where(x => x.Status == GuessRoundStatus.Open || x.Status == GuessRoundStatus.Closed)
             .OrderByDescending(x => x.StartedAtUtc);
 }

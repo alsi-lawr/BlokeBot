@@ -1,4 +1,4 @@
-namespace BlokeBot.Features.Points.Giveaways;
+namespace BlokeBot.Persistence.Models;
 
 public enum PointsGiveawayStatus
 {

@@ -1,4 +1,4 @@
-namespace BlokeBot.Features.Guessing.Rounds;
+namespace BlokeBot.Persistence.Models;
 
 public enum GuessRoundStatus
 {

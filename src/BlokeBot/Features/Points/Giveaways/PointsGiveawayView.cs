@@ -1,4 +1,5 @@
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Giveaways;
 

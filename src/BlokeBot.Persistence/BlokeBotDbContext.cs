@@ -49,7 +49,10 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<SiteAccessEntry>(b =>
         {
-            b.ToTable("site_access_entries");
+            b.ToTable(
+                "site_access_entries",
+                t => t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", AccessKinds))
+            );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Kind).HasMaxLength(32);
@@ -69,7 +72,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<HostModAccessEntry>(b =>
         {
-            b.ToTable("host_mod_access_entries");
+            b.ToTable(
+                "host_mod_access_entries",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_host_mod_access_entries_Kind",
+                        KindIn("Kind", AccessKinds)
+                    )
+            );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Kind).HasMaxLength(32);
@@ -98,8 +108,16 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<CommandAlias>(b =>
         {
-            b.ToTable("command_aliases");
+            b.ToTable(
+                "command_aliases",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_command_aliases_Kind",
+                        KindIn("Kind", CommandAliasKinds)
+                    )
+            );
             b.HasKey(x => x.Id);
+            b.Property(x => x.Kind).HasMaxLength(64);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
             b.HasOne<BotHost>()
@@ -110,12 +128,24 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<PointsSettings>(b =>
         {
-            b.ToTable("points_settings");
+            b.ToTable(
+                "points_settings",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_points_settings_GiveawayEligibility",
+                        KindIn("GiveawayEligibility", PointsEligibilityKinds)
+                    )
+            );
             b.HasKey(x => x.Id);
             b.Property(x => x.PointLabel).HasMaxLength(64);
             b.Property(x => x.GiveawayMinimumPayout).HasMaxLength(128);
             b.Property(x => x.GiveawayMaximumPayout).HasMaxLength(128);
-            b.Property(x => x.GiveawayEligibility).HasMaxLength(32);
+            b.Property(x => x.GiveawayEligibility)
+                .HasConversion(
+                    mode => PointsEligibilityModeStore.Format(mode),
+                    value => PointsEligibilityModeStore.Parse(value)
+                )
+                .HasMaxLength(32);
             b.Property(x => x.FollowerEligibilityUnavailableReply)
                 .HasColumnName("FollowerChecksUnavailableReply");
             b.HasIndex(x => x.HostId).IsUnique();
@@ -157,13 +187,33 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<PointsGiveaway>(b =>
         {
-            b.ToTable("points_giveaways");
+            b.ToTable(
+                "points_giveaways",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_points_giveaways_Status",
+                        KindIn("Status", PointsGiveawayStatusKinds)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_points_giveaways_Eligibility",
+                        KindIn("Eligibility", PointsEligibilityKinds)
+                    );
+                }
+            );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Status).HasMaxLength(32);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             b.Property(x => x.MinimumPayout).HasMaxLength(128);
             b.Property(x => x.MaximumPayout).HasMaxLength(128);
-            b.Property(x => x.Eligibility).HasMaxLength(32);
-            b.HasIndex(x => new { x.HostId, x.Status });
+            b.Property(x => x.Eligibility)
+                .HasConversion(
+                    mode => PointsEligibilityModeStore.Format(mode),
+                    value => PointsEligibilityModeStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => x.HostId)
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Active'");
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
@@ -213,6 +263,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.Slug).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.Slug }).IsUnique();
+            b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
@@ -221,9 +272,20 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<GuessRound>(b =>
         {
-            b.ToTable("guess_rounds");
+            b.ToTable(
+                "guess_rounds",
+                t => t.HasCheckConstraint("CK_guess_rounds_Status", KindIn("Status", GuessRoundStatusKinds))
+            );
             b.HasKey(x => x.Id);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             b.Property(x => x.WinningName).HasMaxLength(128);
+            b.HasIndex(x => x.HostId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN ('Open', 'Closed')");
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
             b.HasOne(x => x.GuessRoundProfile)
                 .WithMany(x => x.Rounds)
                 .HasForeignKey(x => x.GuessRoundProfileId)
@@ -243,4 +305,43 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasIndex(x => new { x.GuessRoundId, x.Login }).IsUnique();
         });
     }
+
+    private static readonly string[] AccessKinds = ["blacklist", "whitelist"];
+
+    private static readonly string[] CommandAliasKinds =
+    [
+        "AddPoints",
+        "CancelGiveaway",
+        "EndGiveaway",
+        "Gamble",
+        "Giveaway",
+        "GivePoints",
+        "Guess",
+        "Guesses",
+        "Join",
+        "Points",
+        "RemovePoints",
+        "Start",
+        "Stop",
+        "Win",
+    ];
+
+    private static readonly string[] GuessRoundStatusKinds = ["Closed", "Completed", "Open"];
+
+    private static readonly string[] PointsEligibilityKinds =
+    [
+        "everyone",
+        "followers",
+        "subscribers",
+    ];
+
+    private static readonly string[] PointsGiveawayStatusKinds =
+    [
+        "Active",
+        "Cancelled",
+        "Completed",
+    ];
+
+    private static string KindIn(string columnName, IEnumerable<string> values) =>
+        $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
 }

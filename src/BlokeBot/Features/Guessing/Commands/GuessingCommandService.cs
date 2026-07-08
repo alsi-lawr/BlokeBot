@@ -165,8 +165,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         return profile?.ReplySettings ?? ToEntity(GuessingDefaults.Replies());
     }
 
-    private static string Store(GuessRoundStatus status) => status.ToString();
-
     private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
         new()
         {
@@ -187,10 +185,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 
     private static IQueryable<GuessRound> UnresolvedRoundQuery(BlokeBotDbContext db, int hostId) =>
         db
-            .Rounds.Where(x => x.GuessRoundProfile != null && x.GuessRoundProfile.HostId == hostId)
-            .Where(x =>
-                x.Status == Store(GuessRoundStatus.Open)
-                || x.Status == Store(GuessRoundStatus.Closed)
-            )
+            .Rounds.Where(x => x.HostId == hostId)
+            .Where(x => x.Status == GuessRoundStatus.Open || x.Status == GuessRoundStatus.Closed)
             .OrderByDescending(x => x.StartedAtUtc);
 }
