@@ -1,5 +1,5 @@
 using BlokeBot.Features.Admin.Authorization;
-using BlokeBot.Identity;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -12,30 +12,30 @@ public sealed class SiteAccessService(
     SiteAccessChangeNotifier changes
 )
 {
-    public async Task AddEntryAsync(string kind, string login, CancellationToken ct)
+    public async Task AddEntryAsync(AccessListEntryKind kind, string login, CancellationToken ct)
     {
-        var normalized = LoginName.Parse(login);
-        if (normalized.IsEmpty)
+        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
             return;
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, ct);
-        if (
-            await db.SiteAccessEntries.AnyAsync(
-                x => x.Kind == kind && x.Login == normalized.Value,
-                ct
-            )
-        )
+        var added = await AccessListStore.AddNormalizedAsync(
+            db.SiteAccessEntries,
+            db.SiteAccessEntries,
+            kind,
+            normalized,
+            normalizedLogin =>
+                new SiteAccessEntry
+                {
+                    CreatedAtUtc = DateTime.UtcNow,
+                    Kind = kind,
+                    Login = normalizedLogin,
+                },
+            ct
+        );
+        if (!added)
             return;
 
-        db.SiteAccessEntries.Add(
-            new SiteAccessEntry
-            {
-                CreatedAtUtc = DateTime.UtcNow,
-                Kind = kind,
-                Login = normalized.Value,
-            }
-        );
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
     }
@@ -45,54 +45,41 @@ public sealed class SiteAccessService(
         if (admins.IsAdmin(login))
             return true;
 
-        var normalized = LoginName.Parse(login);
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await EnsureSettingsAsync(db, ct);
-
-        if (
-            await db.SiteAccessEntries.AnyAsync(
-                x => x.Kind == SiteAccessEntryKind.Blacklist && x.Login == normalized.Value,
-                ct
-            )
-        )
+        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
             return false;
 
-        return !settings.WhitelistEnabled
-            || await db.SiteAccessEntries.AnyAsync(
-                x => x.Kind == SiteAccessEntryKind.Whitelist && x.Login == normalized.Value,
-                ct
-            );
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await EnsureSettingsAsync(db, ct);
+        var accessList = await AccessListStore.LoadAsync(db.SiteAccessEntries, ct);
+
+        return accessList.Allows(
+            normalized,
+            new AccessListPolicy(
+                Enabled: true,
+                WhitelistMode: settings.WhitelistEnabled
+                    ? AccessListWhitelistMode.Required
+                    : AccessListWhitelistMode.Disabled
+            )
+        );
     }
 
     public async Task<SiteAccessAdminState> LoadAdminStateAsync(CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, ct);
-        var entries = await db
-            .SiteAccessEntries.AsNoTracking()
-            .OrderBy(x => x.Login)
-            .ToListAsync(ct);
+        var accessList = await AccessListStore.LoadAsync(db.SiteAccessEntries, ct);
 
         return new SiteAccessAdminState(
             settings.WhitelistEnabled,
-            entries
-                .Where(x => x.Kind == SiteAccessEntryKind.Whitelist)
-                .Select(x => x.Login)
-                .ToArray(),
-            entries
-                .Where(x => x.Kind == SiteAccessEntryKind.Blacklist)
-                .Select(x => x.Login)
-                .ToArray()
+            accessList.Whitelist,
+            accessList.Blacklist
         );
     }
 
-    public async Task RemoveEntryAsync(string kind, string login, CancellationToken ct)
+    public async Task RemoveEntryAsync(AccessListEntryKind kind, string login, CancellationToken ct)
     {
-        var normalized = LoginName.Parse(login);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await db
-            .SiteAccessEntries.Where(x => x.Kind == kind && x.Login == normalized.Value)
-            .ExecuteDeleteAsync(ct);
+        await AccessListStore.RemoveAsync(db.SiteAccessEntries, kind, login, ct);
         await changes.NotifyChangedAsync();
     }
 

@@ -1,5 +1,5 @@
 using BlokeBot.AppEvents;
-using BlokeBot.Identity;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,98 +11,90 @@ public sealed class HostModAccessService(
     AppEventBus events
 )
 {
-    public async Task AddEntryAsync(int hostId, string kind, string login, CancellationToken ct)
+    public async Task AddEntryAsync(
+        int hostId,
+        AccessListEntryKind kind,
+        string login,
+        CancellationToken ct
+    )
     {
-        var normalized = LoginName.Parse(login);
-        if (normalized.IsEmpty)
+        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
             return;
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, hostId, ct);
-        if (
-            await db.HostModAccessEntries.AnyAsync(
-                x => x.HostId == hostId && x.Kind == kind && x.Login == normalized.Value,
-                ct
-            )
-        )
+        var added = await AccessListStore.AddNormalizedAsync(
+            db.HostModAccessEntries,
+            db.HostModAccessEntries.Where(x => x.HostId == hostId),
+            kind,
+            normalized,
+            normalizedLogin =>
+                new HostModAccessEntry
+                {
+                    CreatedAtUtc = DateTime.UtcNow,
+                    HostId = hostId,
+                    Kind = kind,
+                    Login = normalizedLogin,
+                },
+            ct
+        );
+        if (!added)
             return;
 
-        db.HostModAccessEntries.Add(
-            new HostModAccessEntry
-            {
-                CreatedAtUtc = DateTime.UtcNow,
-                HostId = hostId,
-                Kind = kind,
-                Login = normalized.Value,
-            }
-        );
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.HostedChannelsChanged);
     }
 
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
     {
-        var normalized = LoginName.Parse(login);
-        if (normalized.IsEmpty)
+        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
             return false;
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
-        if (!settings.ModsEnabled)
-            return false;
-
-        if (
-            await db.HostModAccessEntries.AnyAsync(
-                x =>
-                    x.HostId == hostId
-                    && x.Kind == HostModAccessEntryKind.Blacklist
-                    && x.Login == normalized.Value,
-                ct
-            )
-        )
-        {
-            return false;
-        }
-
-        var whitelist = db.HostModAccessEntries.Where(x =>
-            x.HostId == hostId && x.Kind == HostModAccessEntryKind.Whitelist
+        var accessList = await AccessListStore.LoadAsync(
+            db.HostModAccessEntries.Where(x => x.HostId == hostId),
+            ct
         );
-        return !await whitelist.AnyAsync(ct)
-            || await whitelist.AnyAsync(x => x.Login == normalized.Value, ct);
+        return accessList.Allows(
+            normalized,
+            new AccessListPolicy(
+                settings.ModsEnabled,
+                AccessListWhitelistMode.RequiredWhenEntriesExist
+            )
+        );
     }
 
     public async Task<HostModAccessState> LoadAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
-        var entries = await db
-            .HostModAccessEntries.AsNoTracking()
-            .Where(x => x.HostId == hostId)
-            .OrderBy(x => x.Login)
-            .ToListAsync(ct);
+        var accessList = await AccessListStore.LoadAsync(
+            db.HostModAccessEntries.Where(x => x.HostId == hostId),
+            ct
+        );
 
         return new HostModAccessState(
             settings.ModsEnabled,
-            entries
-                .Where(x => x.Kind == HostModAccessEntryKind.Whitelist)
-                .Select(x => x.Login)
-                .ToArray(),
-            entries
-                .Where(x => x.Kind == HostModAccessEntryKind.Blacklist)
-                .Select(x => x.Login)
-                .ToArray()
+            accessList.Whitelist,
+            accessList.Blacklist
         );
     }
 
-    public async Task RemoveEntryAsync(int hostId, string kind, string login, CancellationToken ct)
+    public async Task RemoveEntryAsync(
+        int hostId,
+        AccessListEntryKind kind,
+        string login,
+        CancellationToken ct
+    )
     {
-        var normalized = LoginName.Parse(login);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var deleted = await db
-            .HostModAccessEntries.Where(x =>
-                x.HostId == hostId && x.Kind == kind && x.Login == normalized.Value
-            )
-            .ExecuteDeleteAsync(ct);
+        var deleted = await AccessListStore.RemoveAsync(
+            db.HostModAccessEntries.Where(x => x.HostId == hostId),
+            kind,
+            login,
+            ct
+        );
         if (deleted > 0)
             await events.PublishAsync(AppEventKind.HostedChannelsChanged);
     }

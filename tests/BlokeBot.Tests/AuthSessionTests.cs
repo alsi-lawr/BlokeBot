@@ -93,7 +93,7 @@ public sealed class AuthSessionTests
         var modAccess = new HostModAccessService(dbFactory, new AppEventBus());
         await modAccess.AddEntryAsync(
             hostId,
-            HostModAccessEntryKind.Blacklist,
+            AccessListEntryKind.Blacklist,
             "moderator",
             CancellationToken.None
         );

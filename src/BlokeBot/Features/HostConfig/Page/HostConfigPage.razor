@@ -161,15 +161,15 @@
                                     Entries="state.ModAccess.Whitelist"
                                     NewLogin="@newWhitelistLogin"
                                     NewLoginChanged="value => newWhitelistLogin = value"
-                                    Add="() => AddAccessAsync(hostId, HostModAccessEntryKind.Whitelist)"
-                                    Remove="login => RemoveAccessAsync(hostId, HostModAccessEntryKind.Whitelist, login)" />
+                                    Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
+                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)" />
 
                     <HostAccessList Title="Blocked moderators"
                                     Entries="state.ModAccess.Blacklist"
                                     NewLogin="@newBlacklistLogin"
                                     NewLoginChanged="value => newBlacklistLogin = value"
-                                    Add="() => AddAccessAsync(hostId, HostModAccessEntryKind.Blacklist)"
-                                    Remove="login => RemoveAccessAsync(hostId, HostModAccessEntryKind.Blacklist, login)" />
+                                    Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"
+                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Blacklist, login)" />
                 </div>
             </div>
         </section>
@@ -315,11 +315,11 @@
         hostedChannelSubscription?.Dispose();
     }
 
-    private async Task AddAccessAsync(int hostId, string kind)
+    private async Task AddAccessAsync(int hostId, AccessListEntryKind kind)
     {
-        var login = kind == HostModAccessEntryKind.Whitelist ? newWhitelistLogin : newBlacklistLogin;
+        var login = kind == AccessListEntryKind.Whitelist ? newWhitelistLogin : newBlacklistLogin;
         await ModAccess.AddEntryAsync(hostId, kind, login, CancellationToken.None);
-        if (kind == HostModAccessEntryKind.Whitelist)
+        if (kind == AccessListEntryKind.Whitelist)
             newWhitelistLogin = string.Empty;
         else
             newBlacklistLogin = string.Empty;
@@ -360,7 +360,7 @@
         });
     }
 
-    private async Task RemoveAccessAsync(int hostId, string kind, string login)
+    private async Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
     {
         await ModAccess.RemoveEntryAsync(hostId, kind, login, CancellationToken.None);
         await LoadAsync();

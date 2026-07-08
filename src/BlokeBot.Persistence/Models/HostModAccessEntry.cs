@@ -1,6 +1,6 @@
 namespace BlokeBot.Persistence.Models;
 
-public sealed class HostModAccessEntry
+public sealed class HostModAccessEntry : IAccessListEntry
 {
     public int Id { get; set; }
 
@@ -8,7 +8,7 @@ public sealed class HostModAccessEntry
 
     public string Login { get; set; } = string.Empty;
 
-    public string Kind { get; set; } = string.Empty;
+    public AccessListEntryKind Kind { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 }

@@ -27,22 +27,60 @@ internal sealed class AuthorizedHostResolver(
     )
     {
         var choices = new List<BotHostChoice>();
-        var canCreateHost = await siteAccess.CanCreateHostAsync(userLogin, ct);
+        var canCreateHost = await CanCreateHostAsync(userLogin, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+        var selfHost = await LoadSelfHostChoiceAsync(db, userLogin, ct);
+        if (selfHost is not null)
+            choices.Add(selfHost);
+
+        choices.AddRange(
+            await LoadModeratedHostChoicesAsync(
+                db,
+                options,
+                accessToken,
+                userId,
+                userLogin,
+                ct
+            )
+        );
+
+        return new AuthorizedHostSet(Sort(choices), canCreateHost);
+    }
+
+    private async Task<bool> CanCreateHostAsync(string userLogin, CancellationToken ct) =>
+        await siteAccess.CanCreateHostAsync(userLogin, ct);
+
+    private static async Task<BotHostChoice?> LoadSelfHostChoiceAsync(
+        BlokeBotDbContext db,
+        string userLogin,
+        CancellationToken ct
+    )
+    {
         var selfHost = await db
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Login == userLogin, ct);
-        if (selfHost is not null)
-            choices.Add(
-                new BotHostChoice(
-                    selfHost.Id,
-                    selfHost.Login,
-                    selfHost.DisplayName,
-                    AuthRole.Streamer,
-                    selfHost.ProfileImageUrl
-                )
-            );
+        if (selfHost is null)
+            return null;
 
+        return new BotHostChoice(
+            selfHost.Id,
+            selfHost.Login,
+            selfHost.DisplayName,
+            AuthRole.Streamer,
+            selfHost.ProfileImageUrl
+        );
+    }
+
+    private async Task<IReadOnlyList<BotHostChoice>> LoadModeratedHostChoicesAsync(
+        BlokeBotDbContext db,
+        WebAuthOptions options,
+        string accessToken,
+        string userId,
+        string userLogin,
+        CancellationToken ct
+    )
+    {
         var moderatedLogins = await moderatedChannels.LoadModeratedLoginsAsync(
             options,
             accessToken,
@@ -52,7 +90,7 @@ internal sealed class AuthorizedHostResolver(
         );
 
         if (moderatedLogins.Count == 0)
-            return new AuthorizedHostSet(Sort(choices), canCreateHost);
+            return [];
 
         var configuredHosts = await db
             .Hosts.AsNoTracking()
@@ -67,13 +105,14 @@ internal sealed class AuthorizedHostResolver(
             ))
             .ToListAsync(ct);
 
+        var choices = new List<BotHostChoice>();
         foreach (var host in configuredHosts)
         {
             if (await modAccess.CanModeratorAccessAsync(host.Id, userLogin, ct))
                 choices.Add(host);
         }
 
-        return new AuthorizedHostSet(Sort(choices), canCreateHost);
+        return choices;
     }
 
     private static BotHostChoice[] Sort(IEnumerable<BotHostChoice> choices)

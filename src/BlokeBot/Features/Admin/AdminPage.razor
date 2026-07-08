@@ -92,14 +92,14 @@
 
     private async Task AddBlacklistAsync()
     {
-        await SiteAccess.AddEntryAsync(SiteAccessEntryKind.Blacklist, newBlacklistLogin, CancellationToken.None);
+        await SiteAccess.AddEntryAsync(AccessListEntryKind.Blacklist, newBlacklistLogin, CancellationToken.None);
         newBlacklistLogin = string.Empty;
         await LoadAsync();
     }
 
     private async Task AddWhitelistAsync()
     {
-        await SiteAccess.AddEntryAsync(SiteAccessEntryKind.Whitelist, newWhitelistLogin, CancellationToken.None);
+        await SiteAccess.AddEntryAsync(AccessListEntryKind.Whitelist, newWhitelistLogin, CancellationToken.None);
         newWhitelistLogin = string.Empty;
         await LoadAsync();
     }
@@ -235,13 +235,13 @@
 
     private async Task RemoveBlacklistAsync(string login)
     {
-        await SiteAccess.RemoveEntryAsync(SiteAccessEntryKind.Blacklist, login, CancellationToken.None);
+        await SiteAccess.RemoveEntryAsync(AccessListEntryKind.Blacklist, login, CancellationToken.None);
         await LoadAsync();
     }
 
     private async Task RemoveWhitelistAsync(string login)
     {
-        await SiteAccess.RemoveEntryAsync(SiteAccessEntryKind.Whitelist, login, CancellationToken.None);
+        await SiteAccess.RemoveEntryAsync(AccessListEntryKind.Whitelist, login, CancellationToken.None);
         await LoadAsync();
     }
 

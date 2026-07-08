@@ -55,7 +55,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Kind).HasMaxLength(32);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    kind => AccessListEntryKindStore.Format(kind),
+                    value => AccessListEntryKindStore.Parse(value)
+                )
+                .HasMaxLength(32);
             b.HasIndex(x => new { x.Kind, x.Login }).IsUnique();
         });
 
@@ -82,7 +87,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
-            b.Property(x => x.Kind).HasMaxLength(32);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    kind => AccessListEntryKindStore.Format(kind),
+                    value => AccessListEntryKindStore.Parse(value)
+                )
+                .HasMaxLength(32);
             b.HasIndex(x => new
             {
                 x.HostId,
@@ -306,7 +316,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         });
     }
 
-    private static readonly string[] AccessKinds = ["blacklist", "whitelist"];
+    private static readonly string[] AccessKinds = AccessListEntryKindStore.Values.ToArray();
 
     private static readonly string[] CommandAliasKinds =
     [
