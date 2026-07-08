@@ -1,5 +1,4 @@
 using Alsi.TwitchBot;
-using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
@@ -11,33 +10,25 @@ using BlokeBot.Persistence.Models;
 namespace BlokeBot.Features.Points.Commands;
 
 public sealed class PointsCommandModule(
-    PointsCommandService commands,
     PointBalanceService balances,
     PointsGiveawayService giveaways,
     IPointsRandom random
-) : AppChatCommandHandler
+)
 {
-    public async Task<bool> TryHandleAsync(
+    public async Task HandleAsync(
         TwitchCommandContext context,
         IReadOnlyList<string> args,
+        PointsCommandResolution resolution,
         CancellationToken ct
     )
     {
-        var resolution = await commands.ResolveCommandAsync(
-            context.Message.Channel,
-            context.CommandName,
-            ct
-        );
-        if (resolution is null)
-            return false;
-
         if (RequiresModerator(resolution.Kind) && !ModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync(
                 Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings),
                 ct
             );
-            return true;
+            return;
         }
 
         var result = resolution.Kind switch
@@ -90,8 +81,6 @@ public sealed class PointsCommandModule(
 
         if (result is not null && !string.IsNullOrWhiteSpace(result.Message))
             await context.ReplyAsync(result.Message, ct);
-
-        return true;
     }
 
     private async Task<PointOperationResult> HandleAddPointsAsync(
@@ -154,7 +143,7 @@ public sealed class PointsCommandModule(
             ct
         );
         if (!result.Success)
-            return result.Message == "insufficient balance"
+            return result.FailureReason == PointOperationFailureReason.InsufficientBalance
                 ? Insufficient(resolution.Settings)
                 : Invalid(resolution.Settings);
 
@@ -193,7 +182,7 @@ public sealed class PointsCommandModule(
             ct
         );
         if (!result.Success)
-            return result.Message == "insufficient balance"
+            return result.FailureReason == PointOperationFailureReason.InsufficientBalance
                 ? Insufficient(resolution.Settings)
                 : Invalid(resolution.Settings);
 
@@ -268,7 +257,7 @@ public sealed class PointsCommandModule(
             ct
         );
         if (!result.Success)
-            return result.Message == "insufficient balance"
+            return result.FailureReason == PointOperationFailureReason.InsufficientBalance
                 ? Insufficient(resolution.Settings)
                 : Invalid(resolution.Settings);
 
@@ -307,10 +296,16 @@ public sealed class PointsCommandModule(
         );
 
     private static PointOperationResult Insufficient(PointsSettings settings) =>
-        new(false, Format(settings.InsufficientBalanceReply, settings));
+        PointOperationResult.Failure(
+            PointOperationFailureReason.InsufficientBalance,
+            Format(settings.InsufficientBalanceReply, settings)
+        );
 
     private static PointOperationResult Invalid(PointsSettings settings) =>
-        new(false, Format(settings.InvalidAmountReply, settings));
+        PointOperationResult.Failure(
+            PointOperationFailureReason.InvalidAmount,
+            Format(settings.InvalidAmountReply, settings)
+        );
 
     private static bool RequiresModerator(PointsCommandKind kind) =>
         kind

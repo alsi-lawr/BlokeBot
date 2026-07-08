@@ -32,7 +32,10 @@ public sealed class PointsDashboardService(
     )
     {
         if (!PointAmount.TryParseAbsolute(amountText, out var amount) || amount.IsZero)
-            return new PointOperationResult(false, "Invalid amount.");
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InvalidAmount,
+                "Invalid amount."
+            );
 
         var result = await balances.AddAsync(
             hostId,
@@ -64,7 +67,10 @@ public sealed class PointsDashboardService(
     {
         var source = await balances.GetBalanceAsync(hostId, fromLogin, ct);
         if (!TryParseSpend(amountText, source.Balance, out var amount))
-            return new PointOperationResult(false, "Invalid amount.");
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InvalidAmount,
+                "Invalid amount."
+            );
 
         var result = await balances.TransferAsync(hostId, fromLogin, toLogin, amount, ct);
         await changes.NotifyChangedAsync();
@@ -89,7 +95,10 @@ public sealed class PointsDashboardService(
     {
         var target = await balances.GetBalanceAsync(hostId, targetLogin, ct);
         if (!TryParseSpend(amountText, target.Balance, out var amount))
-            return new PointOperationResult(false, "Invalid amount.");
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InvalidAmount,
+                "Invalid amount."
+            );
 
         var result = await balances.RemoveAsync(
             hostId,

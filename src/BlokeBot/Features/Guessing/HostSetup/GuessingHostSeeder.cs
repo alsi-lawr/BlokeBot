@@ -1,4 +1,5 @@
 using BlokeBot.Features.Guessing.Replies;
+using BlokeBot.Features.Commands;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -23,7 +24,7 @@ public sealed class GuessingHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
                         new CommandAlias
                         {
                             HostId = hostId,
-                            Kind = kind.ToString(),
+                            Kind = AppCommandCatalog.FromGuessingKind(kind),
                             Alias = alias,
                         }
                     );

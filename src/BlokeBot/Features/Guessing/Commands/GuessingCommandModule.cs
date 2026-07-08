@@ -1,5 +1,4 @@
 using Alsi.TwitchBot;
-using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Rounds;
@@ -10,25 +9,22 @@ public sealed class GuessingCommandModule(
     GuessingCommandService commands,
     GuessingRoundService rounds,
     GuessingVoteService votes
-) : AppChatCommandHandler
+)
 {
-    public async Task<bool> TryHandleAsync(
+    public async Task HandleAsync(
         TwitchCommandContext context,
         IReadOnlyList<string> args,
+        GuessCommandKind kind,
         CancellationToken ct
     )
     {
         var hostLogin = context.Message.Channel;
-        var kind = await commands.ResolveCommandAsync(hostLogin, context.CommandName, ct);
-        if (kind is null)
-            return false;
-
         if (kind is GuessCommandKind.Start or GuessCommandKind.Stop or GuessCommandKind.Win)
         {
             if (!ModeratorPolicy.IsModerator(context.Message))
             {
                 await context.ReplyAsync(await commands.ModeratorOnlyReplyAsync(hostLogin, ct), ct);
-                return true;
+                return;
             }
         }
 
@@ -77,7 +73,5 @@ public sealed class GuessingCommandModule(
 
         if (result is not null && !string.IsNullOrWhiteSpace(result.Message))
             await context.ReplyAsync(result.Message, ct);
-
-        return true;
     }
 }

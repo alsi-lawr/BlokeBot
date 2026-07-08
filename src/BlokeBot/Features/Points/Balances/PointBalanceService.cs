@@ -85,7 +85,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     )
     {
         if (amount.IsZero)
-            return new PointOperationResult(false, "invalid amount");
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -93,7 +93,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var target = await LoadBalanceForUpdateAsync(db, hostId, targetLogin, now, ct);
         var current = PointAmount.ParseAbsolute(target.Amount);
         if (current.Value + amount.Value > PointAmount.MaximumValue)
-            return new PointOperationResult(false, "cap exceeded");
+            return PointOperationResult.Failure(PointOperationFailureReason.CapExceeded);
 
         var next = current.Add(amount).RoundForPersistence();
         target.Amount = next.ToString();
@@ -113,7 +113,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new PointOperationResult(true, string.Empty, next, amount);
+        return PointOperationResult.Successful(balance: next, amount: amount);
     }
 
     public async Task<PointOperationResult> RemoveAsync(
@@ -126,7 +126,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     )
     {
         if (amount.IsZero)
-            return new PointOperationResult(false, "invalid amount");
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -134,7 +134,11 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var target = await LoadBalanceForUpdateAsync(db, hostId, targetLogin, now, ct);
         var current = PointAmount.ParseAbsolute(target.Amount);
         if (current.Value < amount.Value)
-            return new PointOperationResult(false, "insufficient balance", current, amount);
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InsufficientBalance,
+                balance: current,
+                amount: amount
+            );
 
         var next = current.Subtract(amount).RoundForPersistence();
         target.Amount = next.ToString();
@@ -154,7 +158,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new PointOperationResult(true, string.Empty, next, amount);
+        return PointOperationResult.Successful(balance: next, amount: amount);
     }
 
     public async Task<PointOperationResult> TransferAsync(
@@ -166,12 +170,12 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     )
     {
         if (amount.IsZero)
-            return new PointOperationResult(false, "invalid amount");
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
 
         var from = LoginName.Parse(fromLogin).Value;
         var to = LoginName.Parse(toLogin).Value;
         if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
-            return new PointOperationResult(false, "invalid amount");
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -181,10 +185,18 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var sourceCurrent = PointAmount.ParseAbsolute(source.Amount);
         var targetCurrent = PointAmount.ParseAbsolute(target.Amount);
         if (sourceCurrent.Value < amount.Value)
-            return new PointOperationResult(false, "insufficient balance", sourceCurrent, amount);
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InsufficientBalance,
+                balance: sourceCurrent,
+                amount: amount
+            );
 
         if (targetCurrent.Value + amount.Value > PointAmount.MaximumValue)
-            return new PointOperationResult(false, "cap exceeded", targetCurrent, amount);
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.CapExceeded,
+                balance: targetCurrent,
+                amount: amount
+            );
 
         var sourceNext = sourceCurrent.Subtract(amount).RoundForPersistence();
         var targetNext = targetCurrent.Add(amount).RoundForPersistence();
@@ -220,7 +232,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new PointOperationResult(true, string.Empty, sourceNext, amount);
+        return PointOperationResult.Successful(balance: sourceNext, amount: amount);
     }
 
     public async Task<PointOperationResult> ApplyGambleAsync(
@@ -232,7 +244,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     )
     {
         if (stake.IsZero)
-            return new PointOperationResult(false, "invalid amount");
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
@@ -240,14 +252,22 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
         var current = PointAmount.ParseAbsolute(row.Amount);
         if (current.Value < stake.Value)
-            return new PointOperationResult(false, "insufficient balance", current, stake);
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.InsufficientBalance,
+                balance: current,
+                amount: stake
+            );
 
         PointAmount next;
         BigInteger delta;
         if (won)
         {
             if (current.Value + stake.Value > PointAmount.MaximumValue)
-                return new PointOperationResult(false, "cap exceeded", current, stake);
+                return PointOperationResult.Failure(
+                    PointOperationFailureReason.CapExceeded,
+                    balance: current,
+                    amount: stake
+                );
 
             next = current.Add(stake).RoundForPersistence();
             delta = stake.Value;
@@ -275,7 +295,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new PointOperationResult(true, string.Empty, next, stake);
+        return PointOperationResult.Successful(balance: next, amount: stake);
     }
 
     public async Task<PointOperationResult> AwardGiveawayAsync(
@@ -291,7 +311,11 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
         var current = PointAmount.ParseAbsolute(row.Amount);
         if (current.Value + amount.Value > PointAmount.MaximumValue)
-            return new PointOperationResult(false, "cap exceeded", current, amount);
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.CapExceeded,
+                balance: current,
+                amount: amount
+            );
 
         var next = current.Add(amount).RoundForPersistence();
         row.Amount = next.ToString();
@@ -309,7 +333,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
             string.Empty,
             now
         );
-        return new PointOperationResult(true, string.Empty, next, amount);
+        return PointOperationResult.Successful(balance: next, amount: amount);
     }
 
     private static void AddLedger(

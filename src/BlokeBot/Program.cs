@@ -55,6 +55,9 @@ builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
         ?? new BlokeBotOptions().DatabasePath
 );
+builder.Services.AddSingleton<CommandAliasRegistry>();
+builder.Services.AddSingleton<AppCommandCatalog>();
+builder.Services.AddSingleton<AppCommandDispatcher>();
 builder.Services.AddSingleton<GuessingCommandService>();
 builder.Services.AddSingleton<GuessingConfigurationService>();
 builder.Services.AddSingleton<GuessingDashboardService>();
@@ -63,7 +66,7 @@ builder.Services.AddSingleton<GuessingRoundService>();
 builder.Services.AddSingleton<GuessingVoteService>();
 builder.Services.AddSingleton<GuessingHistoryService>();
 builder.Services.AddSingleton<IBotHostSeeder, GuessingHostSeeder>();
-builder.Services.AddSingleton<AppChatCommandHandler, GuessingCommandModule>();
+builder.Services.AddSingleton<GuessingCommandModule>();
 builder.Services.AddSingleton<PointsCommandService>();
 builder.Services.AddSingleton<PointBalanceService>();
 builder.Services.AddSingleton<PointsConfigurationService>();
@@ -76,7 +79,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<PointsGiveawaySche
 builder.Services.AddSingleton<PointsGiveawayService>();
 builder.Services.AddSingleton<IPointsRandom, PointsRandom>();
 builder.Services.AddSingleton<PointsChangeNotifier>();
-builder.Services.AddSingleton<AppChatCommandHandler, PointsCommandModule>();
+builder.Services.AddSingleton<PointsCommandModule>();
 builder.Services.AddSingleton<IBotHostSeeder, PointsHostSeeder>();
 builder.Services.AddSingleton<BotAdminService>();
 builder.Services.AddSingleton<SiteAccessChangeNotifier>();

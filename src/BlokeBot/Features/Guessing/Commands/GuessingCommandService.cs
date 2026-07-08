@@ -1,4 +1,3 @@
-using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
@@ -51,26 +50,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             ct
         );
         return settings.ModeratorOnlyReply;
-    }
-
-    public async Task<GuessCommandKind?> ResolveCommandAsync(
-        string hostLogin,
-        string alias,
-        CancellationToken ct
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await FindHostIdAsync(db, hostLogin, ct);
-        if (hostId is null)
-            return null;
-
-        var normalized = CommandAliasNormalizer.Normalize(alias);
-        var storedKind = await db
-            .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId.Value && x.Alias == normalized)
-            .Select(x => x.Kind)
-            .FirstOrDefaultAsync(ct);
-        return ParseCommandKind(storedKind);
     }
 
     public async Task<string> UsageReplyAsync(
@@ -143,9 +122,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 
     private static GuessingOperationResult NotConfigured() =>
         new(false, "This channel is not configured.");
-
-    private static GuessCommandKind? ParseCommandKind(string? value) =>
-        Enum.TryParse<GuessCommandKind>(value, ignoreCase: true, out var parsed) ? parsed : null;
 
     private static string FormatOptions(IEnumerable<string> options)
     {

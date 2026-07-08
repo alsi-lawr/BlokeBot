@@ -127,7 +127,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     )
             );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Kind).HasMaxLength(64);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    kind => AppCommandKindStore.Format(kind),
+                    value => AppCommandKindStore.Parse(value)
+                )
+                .HasMaxLength(64);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
             b.HasOne<BotHost>()
@@ -318,23 +323,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
     private static readonly string[] AccessKinds = AccessListEntryKindStore.Values.ToArray();
 
-    private static readonly string[] CommandAliasKinds =
-    [
-        "AddPoints",
-        "CancelGiveaway",
-        "EndGiveaway",
-        "Gamble",
-        "Giveaway",
-        "GivePoints",
-        "Guess",
-        "Guesses",
-        "Join",
-        "Points",
-        "RemovePoints",
-        "Start",
-        "Stop",
-        "Win",
-    ];
+    private static readonly string[] CommandAliasKinds = AppCommandKindStore.Values.ToArray();
 
     private static readonly string[] GuessRoundStatusKinds = ["Closed", "Completed", "Open"];
 

@@ -2,8 +2,7 @@ using Alsi.TwitchBot;
 
 namespace BlokeBot.Features.Commands;
 
-public sealed class AppCommandRouterModule(IEnumerable<AppChatCommandHandler> handlers)
-    : ITwitchCommandModule
+public sealed class AppCommandRouterModule(AppCommandDispatcher dispatcher) : ITwitchCommandModule
 {
     public void AddCommands(ITwitchCommandBuilder commands)
     {
@@ -16,10 +15,6 @@ public sealed class AppCommandRouterModule(IEnumerable<AppChatCommandHandler> ha
         CancellationToken ct
     )
     {
-        foreach (var handler in handlers)
-        {
-            if (await handler.TryHandleAsync(context, args, ct))
-                return;
-        }
+        _ = await dispatcher.DispatchAsync(context, args, ct);
     }
 }

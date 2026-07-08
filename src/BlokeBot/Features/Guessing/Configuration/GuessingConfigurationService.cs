@@ -12,6 +12,7 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public sealed class GuessingConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
+    CommandAliasRegistry aliasRegistry,
     GuessingChangeNotifier changes
 )
 {
@@ -194,24 +195,6 @@ public sealed class GuessingConfigurationService(
         await changes.NotifyChangedAsync();
     }
 
-    private static void AddAliases(
-        List<CommandAlias> rows,
-        int hostId,
-        GuessCommandKind kind,
-        string aliases
-    )
-    {
-        foreach (var alias in SplitAliases(aliases))
-            rows.Add(
-                new CommandAlias
-                {
-                    HostId = hostId,
-                    Kind = Store(kind),
-                    Alias = alias,
-                }
-            );
-    }
-
     private static void Apply(BotReplySettings settings, ReplySettingsEditor editor)
     {
         settings.RoundStartedReply = editor.RoundStartedReply.Trim();
@@ -230,7 +213,7 @@ public sealed class GuessingConfigurationService(
     }
 
     private static string JoinAliases(List<CommandAlias> aliases, GuessCommandKind kind) =>
-        string.Join(", ", aliases.Where(x => x.Kind == Store(kind)).Select(x => x.Alias).Order());
+        CommandAliasRegistry.JoinAliases(aliases, AppCommandCatalog.FromGuessingKind(kind));
 
     private static async Task<GuessRoundProfileEditor> LoadProfileEditorAsync(
         BlokeBotDbContext db,
@@ -282,42 +265,23 @@ public sealed class GuessingConfigurationService(
         CancellationToken ct
     )
     {
-        var rows = new List<CommandAlias>();
-        AddAliases(rows, hostId, GuessCommandKind.Start, aliases.StartAliases);
-        AddAliases(rows, hostId, GuessCommandKind.Stop, aliases.StopAliases);
-        AddAliases(rows, hostId, GuessCommandKind.Win, aliases.WinAliases);
-        AddAliases(rows, hostId, GuessCommandKind.Guess, aliases.GuessAliases);
-        AddAliases(rows, hostId, GuessCommandKind.Guesses, aliases.GuessesAliases);
-
-        var duplicate = rows.GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(x => x.Count() > 1);
-        if (duplicate is not null)
-            throw new InvalidOperationException($"Alias !{duplicate.Key} is used more than once.");
-
-        var guessKinds = Enum.GetValues<GuessCommandKind>().Select(Store).ToArray();
-        var existingAliases = rows.Select(x => x.Alias).ToArray();
-        var existingCollision = await db
-            .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId && !guessKinds.Contains(x.Kind))
-            .Where(x => existingAliases.Contains(x.Alias))
-            .Select(x => x.Alias)
-            .FirstOrDefaultAsync(ct);
-        if (!string.IsNullOrWhiteSpace(existingCollision))
-            throw new InvalidOperationException(
-                $"Alias !{existingCollision} is already used by another bot function."
-            );
-
-        db.CommandAliases.RemoveRange(
-            db.CommandAliases.Where(x => x.HostId == hostId && guessKinds.Contains(x.Kind))
+        await aliasRegistry.ReplaceAliasesAsync(
+            db,
+            hostId,
+            Enum.GetValues<GuessCommandKind>()
+                .Select(AppCommandCatalog.FromGuessingKind)
+                .ToHashSet(),
+            [
+                new CommandAliasDraft(AppCommandKind.Start, aliases.StartAliases),
+                new CommandAliasDraft(AppCommandKind.Stop, aliases.StopAliases),
+                new CommandAliasDraft(AppCommandKind.Win, aliases.WinAliases),
+                new CommandAliasDraft(AppCommandKind.Guess, aliases.GuessAliases),
+                new CommandAliasDraft(AppCommandKind.Guesses, aliases.GuessesAliases),
+            ],
+            ct
         );
-        db.CommandAliases.AddRange(rows);
         await db.SaveChangesAsync(ct);
     }
-
-    private static IEnumerable<string> SplitAliases(string aliases) =>
-        CommandAliasNormalizer.Split(aliases);
-
-    private static string Store(GuessCommandKind kind) => kind.ToString();
 
     private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
         new()

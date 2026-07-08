@@ -12,6 +12,7 @@ namespace BlokeBot.Features.Points.Configuration;
 
 public sealed class PointsConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
+    CommandAliasRegistry aliasRegistry,
     PointsChangeNotifier changes
 )
 {
@@ -76,26 +77,6 @@ public sealed class PointsConfigurationService(
         await changes.NotifyChangedAsync();
     }
 
-    internal static string Store(PointsCommandKind kind) => kind.ToString();
-
-    private static void AddAliases(
-        List<CommandAlias> rows,
-        int hostId,
-        PointsCommandKind kind,
-        string aliases
-    )
-    {
-        foreach (var alias in CommandAliasNormalizer.Split(aliases))
-            rows.Add(
-                new CommandAlias
-                {
-                    HostId = hostId,
-                    Kind = Store(kind),
-                    Alias = alias,
-                }
-            );
-    }
-
     private static void Apply(PointsSettings settings, PointsConfiguration config)
     {
         settings.PointLabel = string.IsNullOrWhiteSpace(config.PointLabel)
@@ -143,7 +124,7 @@ public sealed class PointsConfigurationService(
     }
 
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
-        string.Join(", ", aliases.Where(x => x.Kind == Store(kind)).Select(x => x.Alias).Order());
+        CommandAliasRegistry.JoinAliases(aliases, AppCommandCatalog.FromPointsKind(kind));
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,
@@ -152,39 +133,25 @@ public sealed class PointsConfigurationService(
         CancellationToken ct
     )
     {
-        var rows = new List<CommandAlias>();
-        AddAliases(rows, hostId, PointsCommandKind.Points, aliases.PointsAliases);
-        AddAliases(rows, hostId, PointsCommandKind.GivePoints, aliases.GivePointsAliases);
-        AddAliases(rows, hostId, PointsCommandKind.AddPoints, aliases.AddPointsAliases);
-        AddAliases(rows, hostId, PointsCommandKind.RemovePoints, aliases.RemovePointsAliases);
-        AddAliases(rows, hostId, PointsCommandKind.Gamble, aliases.GambleAliases);
-        AddAliases(rows, hostId, PointsCommandKind.Giveaway, aliases.GiveawayAliases);
-        AddAliases(rows, hostId, PointsCommandKind.Join, aliases.JoinAliases);
-        AddAliases(rows, hostId, PointsCommandKind.EndGiveaway, aliases.EndGiveawayAliases);
-        AddAliases(rows, hostId, PointsCommandKind.CancelGiveaway, aliases.CancelGiveawayAliases);
-
-        var duplicate = rows.GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(x => x.Count() > 1);
-        if (duplicate is not null)
-            throw new InvalidOperationException($"Alias !{duplicate.Key} is used more than once.");
-
-        var pointsKinds = Enum.GetValues<PointsCommandKind>().Select(Store).ToArray();
-        var existingAliases = rows.Select(x => x.Alias).ToArray();
-        var existingCollision = await db
-            .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId && !pointsKinds.Contains(x.Kind))
-            .Where(x => existingAliases.Contains(x.Alias))
-            .Select(x => x.Alias)
-            .FirstOrDefaultAsync(ct);
-        if (!string.IsNullOrWhiteSpace(existingCollision))
-            throw new InvalidOperationException(
-                $"Alias !{existingCollision} is already used by another bot function."
-            );
-
-        db.CommandAliases.RemoveRange(
-            db.CommandAliases.Where(x => x.HostId == hostId && pointsKinds.Contains(x.Kind))
+        await aliasRegistry.ReplaceAliasesAsync(
+            db,
+            hostId,
+            Enum.GetValues<PointsCommandKind>()
+                .Select(AppCommandCatalog.FromPointsKind)
+                .ToHashSet(),
+            [
+                new CommandAliasDraft(AppCommandKind.Points, aliases.PointsAliases),
+                new CommandAliasDraft(AppCommandKind.GivePoints, aliases.GivePointsAliases),
+                new CommandAliasDraft(AppCommandKind.AddPoints, aliases.AddPointsAliases),
+                new CommandAliasDraft(AppCommandKind.RemovePoints, aliases.RemovePointsAliases),
+                new CommandAliasDraft(AppCommandKind.Gamble, aliases.GambleAliases),
+                new CommandAliasDraft(AppCommandKind.Giveaway, aliases.GiveawayAliases),
+                new CommandAliasDraft(AppCommandKind.Join, aliases.JoinAliases),
+                new CommandAliasDraft(AppCommandKind.EndGiveaway, aliases.EndGiveawayAliases),
+                new CommandAliasDraft(AppCommandKind.CancelGiveaway, aliases.CancelGiveawayAliases),
+            ],
+            ct
         );
-        db.CommandAliases.AddRange(rows);
     }
 
     private static void Validate(PointsConfiguration config)
