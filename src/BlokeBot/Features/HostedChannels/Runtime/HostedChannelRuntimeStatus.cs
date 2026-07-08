@@ -9,3 +9,9 @@ public sealed record HostedChannelRuntimeStatus(
     HostBotChannelStatus BotChannelStatus,
     BotChannelRuntimeState RuntimeState
 );
+
+public sealed record HostedChannelRuntimeSummary(
+    bool IsChannelBotAuthorized,
+    bool ChannelBotAuthorizationScopesCurrent,
+    BotChannelRuntimeState RuntimeState
+);

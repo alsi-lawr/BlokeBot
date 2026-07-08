@@ -49,18 +49,7 @@ public sealed class HostedChannelRuntimeStatusService(
         CancellationToken ct
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Id == hostId)
-            .Select(x => new
-            {
-                x.ChannelBotAuthorizedAtUtc,
-                x.ChannelBotAuthorizedScopes,
-                x.BotRuntimeState,
-                x.Login,
-            })
-            .SingleOrDefaultAsync(ct);
+        var host = await LoadHostRuntimeFieldsAsync(hostId, ct);
         if (host is null)
             return null;
 
@@ -74,4 +63,45 @@ public sealed class HostedChannelRuntimeStatusService(
             host.BotRuntimeState
         );
     }
+
+    public async Task<HostedChannelRuntimeSummary?> LoadHostRuntimeSummaryAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        var host = await LoadHostRuntimeFieldsAsync(hostId, ct);
+        if (host is null)
+            return null;
+
+        return new HostedChannelRuntimeSummary(
+            host.ChannelBotAuthorizedAtUtc != null,
+            channelBotAuthorization.IsCurrent(
+                host.ChannelBotAuthorizedAtUtc,
+                host.ChannelBotAuthorizedScopes
+            ),
+            host.BotRuntimeState
+        );
+    }
+
+    private async Task<HostRuntimeFields?> LoadHostRuntimeFieldsAsync(int hostId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db
+            .Hosts.AsNoTracking()
+            .Where(x => x.Id == hostId)
+            .Select(x => new HostRuntimeFields(
+                x.ChannelBotAuthorizedAtUtc,
+                x.ChannelBotAuthorizedScopes,
+                x.BotRuntimeState,
+                x.Login
+            ))
+            .SingleOrDefaultAsync(ct);
+    }
+
+    private sealed record HostRuntimeFields(
+        DateTime? ChannelBotAuthorizedAtUtc,
+        string? ChannelBotAuthorizedScopes,
+        BotChannelRuntimeState BotRuntimeState,
+        string Login
+    );
 }

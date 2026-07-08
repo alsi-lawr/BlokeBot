@@ -6,7 +6,6 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inject PointsConfigurationService Configuration
-@inject HostBotStatusService HostBotStatus
 @inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
@@ -83,14 +82,7 @@
                     <label class="label" for="winnerCount">Winner count</label>
                     <input id="winnerCount" class="input" type="number" min="1" @bind="config.GiveawayWinnerCount" />
                 </div>
-                <div class="space-y-2">
-                    <label class="label" for="eligibility">Eligibility</label>
-                    <select id="eligibility" class="input" title="@FollowerEligibilityTitle" @bind="config.GiveawayEligibility">
-                        <option value="@PointsEligibilityMode.Everyone">Everyone</option>
-                        <option value="@PointsEligibilityMode.Subscribers">Subscribers</option>
-                        <option value="@PointsEligibilityMode.Followers" disabled="@(!FollowerEligibilityAvailable)" title="@FollowerEligibilityTitle">Followers</option>
-                    </select>
-                </div>
+                <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="config.GiveawayEligibility" />
                 <div class="space-y-2">
                     <label class="label" for="cooldown">Cooldown seconds</label>
                     <input id="cooldown" class="input" type="number" min="@PointsConfigurationService.MinimumGiveawayCooldownSeconds" @bind="config.GiveawayCooldownSeconds" />
@@ -134,7 +126,6 @@
 
 @code {
     private PointsConfiguration? config;
-    private HostBotChannelStatus? moderatorStatus;
     private string? statusMessage;
     [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
     private BotHostChoice? Host { get; set; }
@@ -146,18 +137,8 @@
         if (HostId != 0)
         {
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            moderatorStatus = await HostBotStatus.GetStatusAsync(Host?.Login ?? string.Empty, CancellationToken.None);
         }
     }
-
-    private bool FollowerEligibilityAvailable =>
-        moderatorStatus?.ModeratorState == HostBotModeratorState.IsModerator;
-
-    private string FollowerEligibilityTitle =>
-        FollowerEligibilityAvailable
-            ? "Followers"
-            : moderatorStatus?.ModeratorStatusMessage
-                ?? "Moderator status is not ready for this channel.";
 
     private async Task SaveAsync()
     {
@@ -166,16 +147,8 @@
 
         try
         {
-            if (config.GiveawayEligibility == PointsEligibilityMode.Followers && !FollowerEligibilityAvailable)
-            {
-                statusMessage = moderatorStatus?.ModeratorStatusMessage
-                    ?? "Moderator status is not ready for this channel.";
-                return;
-            }
-
             await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            moderatorStatus = await HostBotStatus.GetStatusAsync(Host?.Login ?? string.Empty, CancellationToken.None);
             statusMessage = "Settings saved.";
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)

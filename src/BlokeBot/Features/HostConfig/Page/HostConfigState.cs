@@ -11,7 +11,7 @@ public sealed record HostConfigState(
     bool CanCreateHost,
     bool IsHostCreated,
     bool IsChannelBotAuthorized,
-    HostedChannelRuntimeStatus? RuntimeStatus,
+    HostedChannelRuntimeSummary? RuntimeStatus,
     DateTime? LastRuntimeChangeAtUtc,
     HostModAccessState ModAccess
 );

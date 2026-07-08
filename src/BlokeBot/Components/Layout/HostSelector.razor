@@ -41,6 +41,7 @@
     private IDisposable? hostedChannelSubscription;
     private IReadOnlyList<BotHostChoice> visibleHosts = [];
     private int? selectedHostId;
+    private string? loadedVisibleHostsKey;
     private BotHostSelection? Selection => Session.HostSelection;
 
     private string RefreshIconClass => "h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";
@@ -57,25 +58,41 @@
 
     private bool IsAdminEditing() => Session.IsAdminEditing;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             work => InvokeAsync(work),
-            LoadVisibleHostsAsync,
+            ReloadForEventAsync,
             StateHasChanged
         );
-        await LoadVisibleHostsAsync();
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        await LoadVisibleHostsAsync();
+        await LoadVisibleHostsIfChangedAsync();
     }
 
     public void Dispose()
     {
         hostedChannelSubscription?.Dispose();
+    }
+
+    private async Task LoadVisibleHostsIfChangedAsync()
+    {
+        var key = VisibleHostsKey();
+        if (string.Equals(key, loadedVisibleHostsKey, StringComparison.Ordinal))
+            return;
+
+        await LoadVisibleHostsAsync();
+        loadedVisibleHostsKey = key;
+    }
+
+    private async Task ReloadForEventAsync()
+    {
+        loadedVisibleHostsKey = null;
+        await LoadVisibleHostsAsync();
+        loadedVisibleHostsKey = VisibleHostsKey();
     }
 
     private async Task LoadVisibleHostsAsync()
@@ -91,6 +108,19 @@
         selectedHostId = visibleHosts.Any(host => host.Id == Selection?.Current.Id)
             ? Selection?.Current.Id
             : visibleHosts.FirstOrDefault()?.Id;
+    }
+
+    private string VisibleHostsKey()
+    {
+        if (Selection is null)
+            return "none";
+
+        var hosts = string.Join(
+            "|",
+            Selection.Available.Select(host => $"{host.Id}:{host.Role}")
+        );
+
+        return $"{Selection.Current.Id}:{hosts}";
     }
 
 }

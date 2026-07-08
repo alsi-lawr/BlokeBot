@@ -30,7 +30,7 @@
 @code {
     private int? loadedStatusHostId;
     private IDisposable? hostedChannelSubscription;
-    private HostedChannelRuntimeStatus? selectedHostStatus;
+    private HostedChannelRuntimeSummary? selectedHostStatus;
 
     [Parameter, EditorRequired] public AuthenticatedSession Session { get; set; } =
         AuthenticatedSession.Anonymous;
@@ -128,7 +128,10 @@
             return;
 
         loadedStatusHostId = Selection.Current.Id;
-        selectedHostStatus = await HostedChannels.LoadHostStatusAsync(Selection.Current.Id, CancellationToken.None);
+        selectedHostStatus = await HostedChannels.LoadHostRuntimeSummaryAsync(
+            Selection.Current.Id,
+            CancellationToken.None
+        );
     }
 
     private async Task ReloadForEventAsync()

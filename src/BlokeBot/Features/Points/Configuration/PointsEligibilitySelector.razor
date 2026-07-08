@@ -1,0 +1,56 @@
+@inherits BackgroundLoadComponent<HostBotChannelStatus>
+@using BlokeBot.Persistence.Models
+@inject HostBotStatusService HostBotStatus
+
+<div class="space-y-2">
+    <label class="label" for="eligibility">Eligibility</label>
+    <select id="eligibility" class="input" title="@FollowerEligibilityTitle" value="@Value" @onchange="OnEligibilityChangedAsync">
+        <option value="@PointsEligibilityMode.Everyone">Everyone</option>
+        <option value="@PointsEligibilityMode.Subscribers">Subscribers</option>
+        <option value="@PointsEligibilityMode.Followers" disabled="@(!FollowerEligibilityAvailable)" title="@FollowerEligibilityTitle">Followers</option>
+    </select>
+    <p class="text-xs font-medium text-slate-500">@FollowerEligibilityTitle</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string HostLogin { get; set; } = string.Empty;
+    [Parameter] public PointsEligibilityMode Value { get; set; }
+    [Parameter] public EventCallback<PointsEligibilityMode> ValueChanged { get; set; }
+
+    private HostBotChannelStatus? Status => BackgroundValue;
+
+    protected override object? BackgroundLoadKey =>
+        string.IsNullOrWhiteSpace(HostLogin) ? null : HostLogin.Trim().ToLowerInvariant();
+
+    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct) =>
+        HostBotStatus.GetStatusAsync(HostLogin, ct);
+
+    private bool FollowerEligibilityAvailable =>
+        Status?.ModeratorState == HostBotModeratorState.IsModerator;
+
+    private string FollowerEligibilityTitle =>
+        IsBackgroundLoading ? "Checking moderator status for follower-only giveaways."
+        : FollowerEligibilityAvailable ? "Followers"
+        : BackgroundError is not null ? "Moderator status could not be checked."
+        : Status?.ModeratorStatusMessage
+            ?? "Moderator status is not ready for this channel.";
+
+    private async Task OnEligibilityChangedAsync(ChangeEventArgs args)
+    {
+        if (
+            !Enum.TryParse<PointsEligibilityMode>(
+                args.Value?.ToString(),
+                ignoreCase: true,
+                out var mode
+            )
+        )
+        {
+            return;
+        }
+
+        if (mode == PointsEligibilityMode.Followers && !FollowerEligibilityAvailable)
+            return;
+
+        await ValueChanged.InvokeAsync(mode);
+    }
+}

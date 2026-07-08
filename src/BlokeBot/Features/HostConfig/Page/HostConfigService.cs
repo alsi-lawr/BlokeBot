@@ -43,7 +43,7 @@ public sealed class HostConfigService(
             );
         }
 
-        var status = await runtimeStatus.LoadHostStatusAsync(host.Id, ct);
+        var status = await runtimeStatus.LoadHostRuntimeSummaryAsync(host.Id, ct);
         return new HostConfigState(
             host.Id,
             host.Login,
