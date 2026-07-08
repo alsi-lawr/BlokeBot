@@ -41,7 +41,7 @@ internal static class AuthEndpoints
                     );
                     context.Response.Cookies.Append(
                         "BlokeBot.AuthReturnUrl",
-                        SafeReturnUrl(returnUrl),
+                        LocalReturnUrl.OrFallback(returnUrl, "/guessing"),
                         new CookieOptions
                         {
                             HttpOnly = true,
@@ -138,12 +138,14 @@ internal static class AuthEndpoints
                         return Results.Redirect(
                             string.IsNullOrWhiteSpace(returnUrl)
                                 ? "/admin"
-                                : SafeReturnUrl(returnUrl)
+                                : LocalReturnUrl.OrFallback(returnUrl, "/guessing")
                         );
                     }
 
                     return Results.Redirect(
-                        result.User.Hosts.Count == 0 ? "/host" : SafeReturnUrl(returnUrl)
+                        result.User.Hosts.Count == 0
+                            ? "/host"
+                            : LocalReturnUrl.OrFallback(returnUrl, "/guessing")
                     );
                 }
             )
@@ -191,7 +193,7 @@ internal static class AuthEndpoints
                         session.AdminEditingLogin(context.User)
                     );
 
-                    return Results.Redirect(SafeReturnUrl(returnUrl));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
                 }
             )
             .RequireAuthorization("Operator");
@@ -242,7 +244,7 @@ internal static class AuthEndpoints
                         adminReturnHost: returnHost
                     );
 
-                    return Results.Redirect(SafeReturnUrl(returnUrl));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
                 }
             )
             .RequireAuthorization("BotAdmin");
@@ -293,7 +295,7 @@ internal static class AuthEndpoints
                         adminEditingLogin: null
                     );
 
-                    return Results.Redirect(SafeReturnUrl(returnUrl));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
                 }
             )
             .RequireAuthorization("BotAdmin");
@@ -307,14 +309,5 @@ internal static class AuthEndpoints
                 }
             )
             .AllowAnonymous();
-    }
-
-    private static string SafeReturnUrl(string? returnUrl)
-    {
-        return
-            string.IsNullOrWhiteSpace(returnUrl)
-            || !returnUrl.StartsWith("/", StringComparison.Ordinal)
-            ? "/guessing"
-            : returnUrl;
     }
 }

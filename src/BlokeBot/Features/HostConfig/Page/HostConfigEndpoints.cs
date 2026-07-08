@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BlokeBot.Auth.Sessions;
+using BlokeBot.Auth.Web;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 
@@ -57,18 +58,9 @@ internal static class HostConfigEndpoints
                         adminEditingLogin: null
                     );
 
-                    return Results.Redirect(SafeReturnUrl(returnUrl));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/host"));
                 }
             )
             .RequireAuthorization();
-    }
-
-    private static string SafeReturnUrl(string? returnUrl)
-    {
-        return
-            string.IsNullOrWhiteSpace(returnUrl)
-            || !returnUrl.StartsWith("/", StringComparison.Ordinal)
-            ? "/host"
-            : returnUrl;
     }
 }
