@@ -1,9 +1,10 @@
 using BlokeBot.Features.Guessing.Game;
+using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
-using BlokeBot.Identity;
+using BlokeBot.Hosts;
 using BlokeBot.Persistence;
-using BlokeBot.Persistence.Models;
+using BlokeBot.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Commands;
@@ -13,15 +14,22 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     public async Task<string> AvailableGuessesReplyAsync(string hostLogin, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await FindHostIdAsync(db, hostLogin, ct);
+        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
             return NotConfigured().Message;
 
-        var round = await UnresolvedRoundQuery(db, hostId.Value).FirstOrDefaultAsync(ct);
-        var profileId =
-            round?.GuessRoundProfileId ?? await DefaultProfileIdAsync(db, hostId.Value, ct);
-        var profile = await LoadProfileWithSettingsAsync(db, hostId.Value, profileId, ct);
-        var settings = profile?.ReplySettings ?? ToEntity(GuessingDefaults.Replies());
+        var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
+        var profileId = round?.GuessRoundProfileId
+            ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId.Value, ct);
+        var profile = await GuessingProfileQueries.LoadProfileWithSettingsAsync(
+            db,
+            hostId.Value,
+            profileId,
+            ct,
+            includeOptions: true
+        );
+        var settings = profile?.ReplySettings
+            ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
         var template = string.IsNullOrWhiteSpace(settings.AvailableGuessesReply)
             ? GuessingDefaults.Replies().AvailableGuessesReply
             : settings.AvailableGuessesReply;
@@ -39,14 +47,14 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     public async Task<string> ModeratorOnlyReplyAsync(string hostLogin, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await FindHostIdAsync(db, hostLogin, ct);
+        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
             return NotConfigured().Message;
 
-        var settings = await SettingsForRoundOrDefaultAsync(
+        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
             db,
             hostId.Value,
-            await UnresolvedRoundQuery(db, hostId.Value).FirstOrDefaultAsync(ct),
+            await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
             ct
         );
         return settings.ModeratorOnlyReply;
@@ -60,14 +68,14 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await FindHostIdAsync(db, hostLogin, ct);
+        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
             return NotConfigured().Message;
 
-        var settings = await SettingsForRoundOrDefaultAsync(
+        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
             db,
             hostId.Value,
-            await UnresolvedRoundQuery(db, hostId.Value).FirstOrDefaultAsync(ct),
+            await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
             ct
         );
         var template = kind switch
@@ -85,41 +93,6 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         );
     }
 
-    private static async Task<int> DefaultProfileIdAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        CancellationToken ct
-    ) =>
-        await db
-            .Profiles.Where(x => x.HostId == hostId && x.IsDefault)
-            .Select(x => x.Id)
-            .FirstAsync(ct);
-
-    private static async Task<int?> FindHostIdAsync(
-        BlokeBotDbContext db,
-        string login,
-        CancellationToken ct
-    )
-    {
-        var normalized = LoginName.Parse(login);
-        return await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Login == normalized.Value)
-            .Select(x => (int?)x.Id)
-            .SingleOrDefaultAsync(ct);
-    }
-
-    private static async Task<GuessRoundProfile?> LoadProfileWithSettingsAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        int profileId,
-        CancellationToken ct
-    ) =>
-        await db
-            .Profiles.Include(x => x.ReplySettings)
-            .Include(x => x.Options)
-            .SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct);
-
     private static GuessingOperationResult NotConfigured() =>
         new(false, "This channel is not configured.");
 
@@ -129,39 +102,4 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
 
-    private static async Task<BotReplySettings> SettingsForRoundOrDefaultAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        GuessRound? round,
-        CancellationToken ct
-    )
-    {
-        var profileId = round?.GuessRoundProfileId ?? await DefaultProfileIdAsync(db, hostId, ct);
-        var profile = await LoadProfileWithSettingsAsync(db, hostId, profileId, ct);
-        return profile?.ReplySettings ?? ToEntity(GuessingDefaults.Replies());
-    }
-
-    private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
-        new()
-        {
-            RoundStartedReply = editor.RoundStartedReply,
-            RoundAlreadyOpenReply = editor.RoundAlreadyOpenReply,
-            NoOpenRoundReply = editor.NoOpenRoundReply,
-            GuessingStoppedReply = editor.GuessingStoppedReply,
-            GuessingAlreadyStoppedReply = editor.GuessingAlreadyStoppedReply,
-            GuessingClosedReply = editor.GuessingClosedReply,
-            InvalidGuessReply = editor.InvalidGuessReply,
-            GuessUsageReply = editor.GuessUsageReply,
-            AvailableGuessesReply = editor.AvailableGuessesReply,
-            WinUsageReply = editor.WinUsageReply,
-            ModeratorOnlyReply = editor.ModeratorOnlyReply,
-            WinnerReply = editor.WinnerReply,
-            NoWinnersReply = editor.NoWinnersReply,
-        };
-
-    private static IQueryable<GuessRound> UnresolvedRoundQuery(BlokeBotDbContext db, int hostId) =>
-        db
-            .Rounds.Where(x => x.HostId == hostId)
-            .Where(x => x.Status == GuessRoundStatus.Open || x.Status == GuessRoundStatus.Closed)
-            .OrderByDescending(x => x.StartedAtUtc);
 }

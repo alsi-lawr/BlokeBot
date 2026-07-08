@@ -39,7 +39,7 @@ public sealed class GuessingConfigurationService(
                 Slug = slug.Value,
                 HostId = hostId,
                 IsDefault = false,
-                ReplySettings = ToEntity(GuessingDefaults.Replies()),
+                ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
             }
         );
         await db.SaveChangesAsync(ct);
@@ -168,7 +168,7 @@ public sealed class GuessingConfigurationService(
             profile.IsDefault = true;
         }
 
-        profile.ReplySettings ??= ToEntity(GuessingDefaults.Replies());
+        profile.ReplySettings ??= ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
         Apply(profile.ReplySettings, config.Profile.Replies);
 
         db.GuessOptions.RemoveRange(profile.Options);
@@ -235,7 +235,9 @@ public sealed class GuessingConfigurationService(
             Id = profile.Id,
             Name = profile.Name,
             IsDefault = profile.IsDefault,
-            Replies = ToEditor(profile.ReplySettings ?? ToEntity(GuessingDefaults.Replies())),
+            Replies = ReplySettingsMapper.ToEditor(
+                profile.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies())
+            ),
             Options = profile
                 .Options.OrderBy(x => x.Name)
                 .Select(x => new GuessOptionEditor { Name = x.Name, ReplyText = x.ReplyText })
@@ -283,41 +285,4 @@ public sealed class GuessingConfigurationService(
         await db.SaveChangesAsync(ct);
     }
 
-    private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
-        new()
-        {
-            RoundStartedReply = editor.RoundStartedReply,
-            RoundAlreadyOpenReply = editor.RoundAlreadyOpenReply,
-            NoOpenRoundReply = editor.NoOpenRoundReply,
-            GuessingStoppedReply = editor.GuessingStoppedReply,
-            GuessingAlreadyStoppedReply = editor.GuessingAlreadyStoppedReply,
-            GuessingClosedReply = editor.GuessingClosedReply,
-            InvalidGuessReply = editor.InvalidGuessReply,
-            GuessUsageReply = editor.GuessUsageReply,
-            AvailableGuessesReply = editor.AvailableGuessesReply,
-            WinUsageReply = editor.WinUsageReply,
-            ModeratorOnlyReply = editor.ModeratorOnlyReply,
-            WinnerReply = editor.WinnerReply,
-            NoWinnersReply = editor.NoWinnersReply,
-        };
-
-    private static ReplySettingsEditor ToEditor(BotReplySettings settings) =>
-        new()
-        {
-            RoundStartedReply = settings.RoundStartedReply,
-            RoundAlreadyOpenReply = settings.RoundAlreadyOpenReply,
-            NoOpenRoundReply = settings.NoOpenRoundReply,
-            GuessingStoppedReply = settings.GuessingStoppedReply,
-            GuessingAlreadyStoppedReply = settings.GuessingAlreadyStoppedReply,
-            GuessingClosedReply = settings.GuessingClosedReply,
-            InvalidGuessReply = settings.InvalidGuessReply,
-            GuessUsageReply = settings.GuessUsageReply,
-            AvailableGuessesReply = string.IsNullOrWhiteSpace(settings.AvailableGuessesReply)
-                ? GuessingDefaults.Replies().AvailableGuessesReply
-                : settings.AvailableGuessesReply,
-            WinUsageReply = settings.WinUsageReply,
-            ModeratorOnlyReply = settings.ModeratorOnlyReply,
-            WinnerReply = settings.WinnerReply,
-            NoWinnersReply = settings.NoWinnersReply,
-        };
 }

@@ -16,7 +16,7 @@
 @implements IDisposable
 @inject SiteAccessService SiteAccess
 @inject BotHostProvisioningService HostProvisioning
-@inject HostedChannelRemovalService HostedChannelRemoval
+@inject BotHostRemovalService HostRemoval
 @inject HostedChannelRuntimeControlService HostedChannelRuntime
 @inject HostedChannelDirectoryService HostedChannels
 @inject BotAccountAuthorizationService BotAccountAuthorization
@@ -154,7 +154,7 @@
     {
         pendingRuntimeHostId = null;
         await HostedChannelRuntime.StopAsync(hostId, CancellationToken.None);
-        var removed = await HostedChannelRemoval.RemoveAsync(hostId, CancellationToken.None);
+        var removed = await HostRemoval.RemoveAsync(hostId, CancellationToken.None);
         hostStatus = removed
             ? "Hosted channel removed."
             : "Hosted channel was already removed.";

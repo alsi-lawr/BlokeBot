@@ -1,10 +1,10 @@
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
-using BlokeBot.Features.Points.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Points.Giveaways;
@@ -379,7 +379,7 @@ public sealed class PointsGiveawayService(
         string? winners = null,
         string? timeLeft = null
     ) =>
-        PointsTemplateFormatter.Format(
+        TemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {

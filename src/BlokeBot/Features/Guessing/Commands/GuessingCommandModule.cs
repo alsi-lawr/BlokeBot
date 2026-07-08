@@ -21,7 +21,7 @@ public sealed class GuessingCommandModule(
         var hostLogin = context.Message.Channel;
         if (kind is GuessCommandKind.Start or GuessCommandKind.Stop or GuessCommandKind.Win)
         {
-            if (!ModeratorPolicy.IsModerator(context.Message))
+            if (!TwitchModeratorPolicy.IsModerator(context.Message))
             {
                 await context.ReplyAsync(await commands.ModeratorOnlyReplyAsync(hostLogin, ct), ct);
                 return;

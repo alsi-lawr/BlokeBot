@@ -1,11 +1,10 @@
 using Alsi.TwitchBot;
-using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
-using BlokeBot.Features.Points.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Text;
 
 namespace BlokeBot.Features.Points.Commands;
 
@@ -22,7 +21,7 @@ public sealed class PointsCommandModule(
         CancellationToken ct
     )
     {
-        if (RequiresModerator(resolution.Kind) && !ModeratorPolicy.IsModerator(context.Message))
+        if (RequiresModerator(resolution.Kind) && !TwitchModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync(
                 Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings),
@@ -209,7 +208,7 @@ public sealed class PointsCommandModule(
         if (args.Count > 1)
             return Invalid(resolution.Settings);
 
-        if (args.Count == 1 && !ModeratorPolicy.IsModerator(context.Message))
+        if (args.Count == 1 && !TwitchModeratorPolicy.IsModerator(context.Message))
             return new PointOperationResult(
                 false,
                 Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings)
@@ -282,7 +281,7 @@ public sealed class PointsCommandModule(
         string? amount = null,
         string? balance = null
     ) =>
-        PointsTemplateFormatter.Format(
+        TemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {

@@ -1,4 +1,4 @@
-namespace BlokeBot.Features.Guessing.Replies;
+namespace BlokeBot.Text;
 
 public static class TemplateFormatter
 {

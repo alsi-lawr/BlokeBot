@@ -1,8 +1,6 @@
-using Alsi.TwitchBot;
+namespace Alsi.TwitchBot;
 
-namespace BlokeBot.Features.Guessing.Commands;
-
-public static class ModeratorPolicy
+public static class TwitchModeratorPolicy
 {
     public static bool IsModerator(TwitchChatMessage message)
     {

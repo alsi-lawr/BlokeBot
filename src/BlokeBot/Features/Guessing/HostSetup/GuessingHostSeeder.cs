@@ -39,29 +39,11 @@ public sealed class GuessingHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
                     Name = "Default",
                     Slug = "default",
                     IsDefault = true,
-                    ReplySettings = ToEntity(GuessingDefaults.Replies()),
+                    ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
                 }
             );
         }
 
         await db.SaveChangesAsync(ct);
     }
-
-    private static BotReplySettings ToEntity(ReplySettingsEditor editor) =>
-        new()
-        {
-            RoundStartedReply = editor.RoundStartedReply,
-            RoundAlreadyOpenReply = editor.RoundAlreadyOpenReply,
-            NoOpenRoundReply = editor.NoOpenRoundReply,
-            GuessingStoppedReply = editor.GuessingStoppedReply,
-            GuessingAlreadyStoppedReply = editor.GuessingAlreadyStoppedReply,
-            GuessingClosedReply = editor.GuessingClosedReply,
-            InvalidGuessReply = editor.InvalidGuessReply,
-            GuessUsageReply = editor.GuessUsageReply,
-            AvailableGuessesReply = editor.AvailableGuessesReply,
-            WinUsageReply = editor.WinUsageReply,
-            ModeratorOnlyReply = editor.ModeratorOnlyReply,
-            WinnerReply = editor.WinnerReply,
-            NoWinnersReply = editor.NoWinnersReply,
-        };
 }
