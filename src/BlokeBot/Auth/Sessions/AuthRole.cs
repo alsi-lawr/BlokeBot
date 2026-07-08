@@ -1,9 +1,41 @@
 namespace BlokeBot.Auth.Sessions;
 
-internal static class AuthRole
+public enum AuthRole
 {
-    public const string Admin = "admin";
-    public const string Bot = "bot";
-    public const string Moderator = "moderator";
-    public const string Streamer = "streamer";
+    Admin,
+    Bot,
+    Moderator,
+    Streamer,
+}
+
+internal static class AuthRoleCodec
+{
+    public static string Encode(AuthRole role) =>
+        role switch
+        {
+            AuthRole.Admin => "admin",
+            AuthRole.Bot => "bot",
+            AuthRole.Moderator => "moderator",
+            AuthRole.Streamer => "streamer",
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
+        };
+
+    public static bool TryDecode(string? value, out AuthRole role)
+    {
+        role = default;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim().ToLowerInvariant();
+        role = normalized switch
+        {
+            "admin" => AuthRole.Admin,
+            "bot" => AuthRole.Bot,
+            "moderator" => AuthRole.Moderator,
+            "streamer" => AuthRole.Streamer,
+            _ => default,
+        };
+
+        return normalized is "admin" or "bot" or "moderator" or "streamer";
+    }
 }

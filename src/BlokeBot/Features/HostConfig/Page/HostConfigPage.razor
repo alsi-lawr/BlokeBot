@@ -8,22 +8,20 @@
 @using BlokeBot.Hosts
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize]
-@implements IDisposable
+@inherits AuthenticatedPageComponent
 @inject HostConfigService HostConfig
 @inject HostModAccessService ModAccess
 @inject HostedChannelRuntimeControlService Runtime
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
-@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Host config</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
     <div class="space-y-2">
-        <div class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+        <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
             Host config
         </div>
         <h1 class="text-3xl font-bold tracking-tight text-slate-950">Host config</h1>
@@ -32,7 +30,7 @@
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">@statusMessage</div>
+        <div class="status-message px-4 py-3 text-sm font-semibold">@statusMessage</div>
     }
 
     @if (blockedByMode)
@@ -74,7 +72,7 @@
                 <p class="mt-1 text-sm text-muted-foreground">Bot access and connection controls for your channel.</p>
             </div>
             <div class="grid gap-3 p-4 lg:grid-cols-3">
-                <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Authorization</p>
                         <span class="@AuthorizationBadgeClass">
@@ -86,8 +84,8 @@
                     {
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization is current.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <a class="inline-flex h-7 items-center rounded-full border border-[#9146ff]/30 bg-white px-3 text-xs font-bold text-[#6f2bdc] shadow-sm transition hover:bg-[#f5f0ff]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Reauthorize channel</a>
-                            <button class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
+                            <a class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold text-[#6f2bdc] transition" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Reauthorize channel</a>
+                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
                         </div>
                     }
                     else if (state.IsChannelBotAuthorized)
@@ -95,7 +93,7 @@
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization needs to be updated.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <a class="inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Reauthorize channel</a>
-                            <button class="inline-flex h-7 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
+                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
                         </div>
                     }
                     else
@@ -104,7 +102,7 @@
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@state.Login" />
-                <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Runtime</p>
                         <span class="@RuntimeBadgeClass">
@@ -113,8 +111,8 @@
                         </span>
                     </div>
                     <div class="mt-3 flex gap-2">
-                        <button class="inline-flex h-8 items-center justify-center rounded-md bg-slate-950 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50" disabled="@(!CanStart)" @onclick="() => StartAsync(hostId)">Start</button>
-                        <button class="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50" disabled="@(!CanStop)" @onclick="() => StopAsync(hostId)">Stop</button>
+                        <button class="primary-control inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50" disabled="@(!CanStart)" @onclick="() => StartAsync(hostId)">Start</button>
+                        <button class="control-surface inline-flex h-8 items-center justify-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50" disabled="@(!CanStop)" @onclick="() => StopAsync(hostId)">Stop</button>
                     </div>
                 </div>
             </div>
@@ -152,12 +150,9 @@
 </div>
 
 @code {
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
-
     private string newBlacklistLogin = string.Empty;
     private string newWhitelistLogin = string.Empty;
     private bool blockedByMode;
-    private IDisposable? hostedChannelSubscription;
     private HostConfigState? state;
     private string? statusMessage;
 
@@ -225,18 +220,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
-            AppEventKind.HostedChannelsChanged,
-            work => InvokeAsync(work),
-            ReloadForEventAsync,
-            StateHasChanged
+        TrackSubscription(
+            Events.SubscribeForComponentRefresh(
+                AppEventKind.HostedChannelsChanged,
+                work => InvokeAsync(work),
+                ReloadForEventAsync,
+                StateHasChanged
+            )
         );
         await LoadAsync();
-    }
-
-    public void Dispose()
-    {
-        hostedChannelSubscription?.Dispose();
     }
 
     private async Task AddAccessAsync(int hostId, AccessListEntryKind kind)
@@ -252,7 +244,7 @@
 
     private async Task LoadAsync()
     {
-        var pageContext = await PageContext.FromAsync(AuthenticationState);
+        var pageContext = await LoadPageContextAsync();
         var session = pageContext.Session;
         var selection = pageContext.HostSelection;
         if (pageContext.IsBotAccount)
@@ -262,15 +254,16 @@
             return;
         }
 
+        state = await HostConfig.LoadAsync(session, CancellationToken.None);
+
         blockedByMode = selection is not null
-            && !session.CurrentHostRoleIs(AuthRole.Streamer);
+            && !session.CurrentHostRoleIs(AuthRole.Streamer)
+            && state?.IsHostCreated == true;
         if (blockedByMode)
         {
             state = null;
             return;
         }
-
-        state = await HostConfig.LoadAsync(session, CancellationToken.None);
     }
 
     private async Task ReloadForEventAsync()

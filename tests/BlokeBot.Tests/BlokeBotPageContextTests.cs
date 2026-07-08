@@ -16,11 +16,12 @@ public sealed class BlokeBotPageContextTests
             login: "streamer",
             role: AuthRole.Streamer,
             availableHosts: [selectedHost],
-            selectedHostId: selectedHost.Id.ToString()
+            selectedHost: selectedHost
         );
 
-        var context = await new BlokeBotPageContextAccessor()
-            .FromAsync(Task.FromResult(new AuthenticationState(principal)));
+        var context = await new BlokeBotPageContextAccessor().FromAsync(
+            Task.FromResult(new AuthenticationState(principal))
+        );
 
         context.Session.IsAuthenticated.ShouldBeTrue();
         context.ActorLogin.ShouldBe("streamer");

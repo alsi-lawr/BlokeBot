@@ -15,18 +15,21 @@ public sealed record AuthenticatedSession
     public bool CanCreateHost { get; init; }
     public bool IsBotAdmin { get; init; }
     public bool IsBotAccount { get; init; }
-    public string Role { get; init; } = string.Empty;
+    public AuthRole? Role { get; init; }
+    public IReadOnlyList<BotHostChoice> AvailableHosts { get; init; } = [];
     public BotHostSelection? HostSelection { get; init; }
     public AuthSessionHostSelectionState HostSelectionState { get; init; }
+    public bool ClaimsValid { get; init; } = true;
     public string? AdminEditingLogin { get; init; }
     public BotHostChoice? AdminReturnHost { get; init; }
 
     public bool IsAdminEditing => !string.IsNullOrWhiteSpace(AdminEditingLogin);
 
     public string DisplayRole =>
-        IsBotAccount ? AuthRole.Bot
-        : HostSelection?.Current.Role
-        ?? (string.IsNullOrWhiteSpace(Role) ? "operator" : Role);
+        IsBotAccount ? AuthRoleCodec.Encode(AuthRole.Bot)
+        : HostSelection?.Current.Role is { } hostRole ? AuthRoleCodec.Encode(hostRole)
+        : Role is { } role ? AuthRoleCodec.Encode(role)
+        : "operator";
 
     public string DisplayText =>
         !string.IsNullOrWhiteSpace(DisplayName) ? DisplayName
@@ -38,8 +41,7 @@ public sealed record AuthenticatedSession
         {
             AuthSessionCapability.BotAdmin => IsBotAdmin,
             AuthSessionCapability.HostSelected => HostSelection is not null,
-            AuthSessionCapability.Operator =>
-                HostSelection is not null
+            AuthSessionCapability.Operator => HostSelection is not null
                 && !IsBotAccount
                 && (
                     CurrentHostRoleIs(AuthRole.Admin)
@@ -54,10 +56,12 @@ public sealed record AuthenticatedSession
         if (IsBotAccount)
             return false;
 
-        return HostSelection is null
-            ? CanCreateHost
-            : existingHostIds.Contains(HostSelection.Current.Id)
-                && CurrentHostRoleIs(AuthRole.Streamer);
+        return CanCreateHost
+            || (
+                HostSelection is not null
+                && existingHostIds.Contains(HostSelection.Current.Id)
+                && CurrentHostRoleIs(AuthRole.Streamer)
+            );
     }
 
     public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds) =>
@@ -68,33 +72,25 @@ public sealed record AuthenticatedSession
     public bool CanAuthorizeSelectedHost =>
         HostSelection is not null
         && CurrentHostRoleIs(AuthRole.Streamer)
-        && string.Equals(
-            HostSelection.Current.Login,
-            Login,
-            StringComparison.OrdinalIgnoreCase
-        );
+        && string.Equals(HostSelection.Current.Login, Login, StringComparison.OrdinalIgnoreCase);
 
-    public bool CurrentHostRoleIs(string role) =>
-        HostSelection is not null
-        && string.Equals(HostSelection.Current.Role, role, StringComparison.OrdinalIgnoreCase);
+    public bool CurrentHostRoleIs(AuthRole role) =>
+        HostSelection is not null && HostSelection.Current.Role == role;
 
     public static AuthenticatedSession FromPrincipal(ClaimsPrincipal? user)
     {
         if (user?.Identity?.IsAuthenticated != true)
             return Anonymous;
 
-        var availableHosts = user
-            .FindAll(BotHostClaims.AvailableHost)
-            .Select(claim => BotHostClaimCodec.Decode(claim.Value))
-            .OfType<BotHostChoice>()
-            .OrderBy(host => host.DisplayName)
-            .ToArray();
+        var claimsValid = true;
+        var availableHosts = DecodeHostClaims(user, ref claimsValid);
+        var role = DecodeOptionalRole(user.FindFirstValue(AuthClaims.Role), ref claimsValid);
 
         var hostSelection = ParseHostSelection(user, availableHosts, out var hostSelectionState);
-        var adminReturnHost = user.FindFirstValue(BotHostClaims.AdminReturnHost) is { } encoded
-            && !string.IsNullOrWhiteSpace(encoded)
-            ? BotHostClaimCodec.Decode(encoded)
-            : null;
+        var adminReturnHost = DecodeOptionalHost(
+            user.FindFirstValue(BotHostClaims.AdminReturnHost),
+            ref claimsValid
+        );
 
         return new AuthenticatedSession
         {
@@ -106,9 +102,11 @@ public sealed record AuthenticatedSession
             CanCreateHost = BooleanClaim(user, AuthClaims.CanCreateHost),
             IsBotAdmin = BooleanClaim(user, AuthClaims.IsBotAdmin),
             IsBotAccount = BooleanClaim(user, AuthClaims.IsBotAccount),
-            Role = user.FindFirstValue(AuthClaims.Role) ?? string.Empty,
+            Role = role,
+            AvailableHosts = availableHosts,
             HostSelection = hostSelection,
             HostSelectionState = hostSelectionState,
+            ClaimsValid = claimsValid,
             AdminEditingLogin = user.FindFirstValue(BotHostClaims.AdminEditingLogin),
             AdminReturnHost = adminReturnHost,
         };
@@ -120,19 +118,29 @@ public sealed record AuthenticatedSession
         out AuthSessionHostSelectionState state
     )
     {
-        if (availableHosts.Count == 0)
+        var selectedValue = user.FindFirstValue(BotHostClaims.SelectedHost);
+        if (string.IsNullOrWhiteSpace(selectedValue))
         {
             state = AuthSessionHostSelectionState.None;
             return null;
         }
 
-        if (!int.TryParse(user.FindFirstValue(BotHostClaims.SelectedHostId), out var selectedId))
+        if (availableHosts.Count == 0)
         {
             state = AuthSessionHostSelectionState.Invalid;
             return null;
         }
 
-        var current = availableHosts.FirstOrDefault(host => host.Id == selectedId);
+        var selectedHost = BotHostClaimCodec.Decode(selectedValue);
+        if (selectedHost is null)
+        {
+            state = AuthSessionHostSelectionState.Invalid;
+            return null;
+        }
+
+        var current = availableHosts.FirstOrDefault(host =>
+            BotHostClaimCodec.Equivalent(host, selectedHost)
+        );
         if (current is null)
         {
             state = AuthSessionHostSelectionState.Invalid;
@@ -143,10 +151,47 @@ public sealed record AuthenticatedSession
         return new BotHostSelection(current, availableHosts);
     }
 
+    private static BotHostChoice[] DecodeHostClaims(ClaimsPrincipal user, ref bool claimsValid)
+    {
+        var hosts = new List<BotHostChoice>();
+        foreach (var claim in user.FindAll(BotHostClaims.AvailableHost))
+        {
+            if (BotHostClaimCodec.Decode(claim.Value) is { } host)
+            {
+                hosts.Add(host);
+                continue;
+            }
+
+            claimsValid = false;
+        }
+
+        return hosts.OrderBy(host => host.DisplayName).ToArray();
+    }
+
+    private static AuthRole? DecodeOptionalRole(string? value, ref bool claimsValid)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (AuthRoleCodec.TryDecode(value, out var role))
+            return role;
+
+        claimsValid = false;
+        return null;
+    }
+
+    private static BotHostChoice? DecodeOptionalHost(string? value, ref bool claimsValid)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        if (BotHostClaimCodec.Decode(value) is { } host)
+            return host;
+
+        claimsValid = false;
+        return null;
+    }
+
     private static bool BooleanClaim(ClaimsPrincipal user, string claimType) =>
-        string.Equals(
-            user.FindFirstValue(claimType),
-            "true",
-            StringComparison.OrdinalIgnoreCase
-        );
+        string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);
 }

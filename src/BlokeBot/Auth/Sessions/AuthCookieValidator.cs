@@ -36,7 +36,10 @@ internal sealed class AuthCookieValidator(
             return;
         }
 
-        if (session.HostSelectionState == AuthSessionHostSelectionState.Invalid)
+        if (
+            !session.ClaimsValid
+            || session.HostSelectionState == AuthSessionHostSelectionState.Invalid
+        )
         {
             await RejectAsync(context);
             return;

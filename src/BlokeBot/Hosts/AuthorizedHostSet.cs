@@ -1,5 +1,3 @@
-using BlokeBot.Hosts;
-
-namespace BlokeBot.Auth.Hosts;
+namespace BlokeBot.Hosts;
 
 internal sealed record AuthorizedHostSet(IReadOnlyList<BotHostChoice> Choices, bool CanCreateHost);

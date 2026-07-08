@@ -1,40 +1,78 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using BlokeBot.Auth.Sessions;
+
 namespace BlokeBot.Hosts;
 
 internal static class BotHostClaimCodec
 {
-    private const char Separator = '|';
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static string Encode(BotHostChoice host) =>
-        string.Join(
-            Separator,
-            host.Id.ToString(),
-            Escape(host.Login),
-            Escape(host.DisplayName),
-            Escape(host.Role),
-            Escape(host.ProfileImageUrl ?? string.Empty)
+        JsonSerializer.Serialize(
+            new Payload
+            {
+                Id = host.Id,
+                Login = host.Login,
+                DisplayName = host.DisplayName,
+                Role = AuthRoleCodec.Encode(host.Role),
+                ProfileImageUrl = host.ProfileImageUrl,
+            },
+            JsonOptions
         );
 
     public static BotHostChoice? Decode(string value)
     {
-        var parts = value.Split(Separator);
-        return parts.Length is 4 or 5 && int.TryParse(parts[0], out var id)
-            ? new BotHostChoice(
-                id,
-                Unescape(parts[1]),
-                Unescape(parts[2]),
-                Unescape(parts[3]),
-                parts.Length == 5 ? Unescape(parts[4]) : null
+        try
+        {
+            var payload = JsonSerializer.Deserialize<Payload>(value, JsonOptions);
+            if (
+                payload is null
+                || payload.Id <= 0
+                || string.IsNullOrWhiteSpace(payload.Login)
+                || string.IsNullOrWhiteSpace(payload.DisplayName)
+                || !AuthRoleCodec.TryDecode(payload.Role, out var role)
             )
-            : null;
+            {
+                return null;
+            }
+
+            return new BotHostChoice(
+                payload.Id,
+                payload.Login,
+                payload.DisplayName,
+                role,
+                string.IsNullOrWhiteSpace(payload.ProfileImageUrl) ? null : payload.ProfileImageUrl
+            );
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
-    private static string Escape(string value) =>
-        value
-            .Replace("%", "%25", StringComparison.Ordinal)
-            .Replace(Separator.ToString(), "%7C", StringComparison.Ordinal);
+    public static bool Equivalent(BotHostChoice left, BotHostChoice right) =>
+        left.Id == right.Id
+        && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
+        && left.Role == right.Role
+        && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
 
-    private static string Unescape(string value) =>
-        value
-            .Replace("%7C", Separator.ToString(), StringComparison.Ordinal)
-            .Replace("%25", "%", StringComparison.Ordinal);
+    private sealed record Payload
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; init; }
+
+        [JsonPropertyName("login")]
+        public string Login { get; init; } = string.Empty;
+
+        [JsonPropertyName("displayName")]
+        public string DisplayName { get; init; } = string.Empty;
+
+        [JsonPropertyName("role")]
+        public string Role { get; init; } = string.Empty;
+
+        [JsonPropertyName("profileImageUrl")]
+        public string? ProfileImageUrl { get; init; }
+    }
 }

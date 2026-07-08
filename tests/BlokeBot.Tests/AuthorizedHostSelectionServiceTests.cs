@@ -1,10 +1,9 @@
 using System.Net;
 using System.Text;
-using BlokeBot.Eventing;
-using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
+using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels.Runtime;
@@ -18,10 +17,10 @@ using TUnit.Core;
 
 namespace BlokeBot.Tests;
 
-public sealed class AuthorizedHostResolverTests
+public sealed class AuthorizedHostSelectionServiceTests
 {
     [Test]
-    public async Task Resolver_returns_self_host_and_host_mod_filtered_moderated_hosts()
+    public async Task Selection_returns_self_host_and_host_mod_filtered_moderated_hosts()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer", "Streamer");
@@ -38,7 +37,7 @@ public sealed class AuthorizedHostResolverTests
             "streamer",
             CancellationToken.None
         );
-        var resolver = new AuthorizedHostResolver(
+        var service = new AuthorizedHostSelectionService(
             dbFactory,
             new SiteAccessService(
                 dbFactory,
@@ -64,13 +63,11 @@ public sealed class AuthorizedHostResolverTests
             )
         );
 
-        var result = await resolver.LoadAuthorizedHostsAsync(
+        var result = await service.LoadAuthorizedHostsAsync(
             new WebAuthOptions { ClientId = "client" },
             "token",
             "user-id",
             "streamer",
-            "Streamer",
-            null,
             CancellationToken.None
         );
 

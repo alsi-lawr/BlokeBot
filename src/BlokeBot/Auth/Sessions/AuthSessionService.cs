@@ -12,21 +12,6 @@ internal sealed class AuthSessionService(
     IOptions<TwitchBotOptions> botOptions
 )
 {
-    public string? AdminEditingLogin(ClaimsPrincipal user) =>
-        AuthenticatedSession.FromPrincipal(user).AdminEditingLogin;
-
-    public BotHostChoice? AdminReturnHost(ClaimsPrincipal user)
-        => AuthenticatedSession.FromPrincipal(user).AdminReturnHost;
-
-    public bool IsBotAdmin(ClaimsPrincipal user) =>
-        AuthenticatedSession.FromPrincipal(user).IsBotAdmin;
-
-    public bool IsBotAccount(ClaimsPrincipal user) =>
-        AuthenticatedSession.FromPrincipal(user).IsBotAccount;
-
-    public string Login(ClaimsPrincipal user) =>
-        AuthenticatedSession.FromPrincipal(user).Login;
-
     public async Task SignInAsync(
         HttpContext context,
         AuthenticatedUser user,
@@ -35,11 +20,12 @@ internal sealed class AuthSessionService(
     {
         var isBotAccount = IsConfiguredBotAccount(user.Login);
         var hosts = isBotAccount ? [] : user.Hosts;
-        var selectedHost =
-            hosts.Count == 0 ? null
-            : preferredHostId is { } hostId
-                ? hosts.FirstOrDefault(host => host.Id == hostId) ?? hosts[0]
-            : hosts[0];
+        var selectedHost = SelectInitialHost(
+            hosts,
+            preferredHostId,
+            user.Login,
+            user.CanCreateHost
+        );
         var isBotAdmin = isBotAccount || admins.IsAdmin(user.Login);
         var principal = CreatePrincipal(
             user.Id,
@@ -58,10 +44,10 @@ internal sealed class AuthSessionService(
         await SignInAsync(context, principal);
     }
 
-    public async Task SignInHostAsync(
+    public async Task SignInHostSelectionAsync(
         HttpContext context,
         IReadOnlyList<BotHostChoice> hosts,
-        BotHostChoice selectedHost,
+        BotHostChoice? selectedHost,
         bool isBotAdmin,
         string? adminEditingLogin,
         BotHostChoice? adminReturnHost = null
@@ -71,7 +57,7 @@ internal sealed class AuthSessionService(
         var principal = CreatePrincipal(
             current.UserId,
             string.IsNullOrWhiteSpace(current.DisplayName)
-                ? selectedHost.DisplayName
+                ? selectedHost?.DisplayName ?? current.Login
                 : current.DisplayName,
             current.Login,
             current.ProfileImageUrl,
@@ -87,11 +73,27 @@ internal sealed class AuthSessionService(
         await SignInAsync(context, principal);
     }
 
+    public async Task SignInHostAsync(
+        HttpContext context,
+        IReadOnlyList<BotHostChoice> hosts,
+        BotHostChoice selectedHost,
+        bool isBotAdmin,
+        string? adminEditingLogin,
+        BotHostChoice? adminReturnHost = null
+    )
+    {
+        await SignInHostSelectionAsync(
+            context,
+            hosts,
+            selectedHost,
+            isBotAdmin,
+            adminEditingLogin,
+            adminReturnHost
+        );
+    }
+
     public async Task SignOutAsync(HttpContext context) =>
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
-    public bool CanCreateHost(ClaimsPrincipal user) =>
-        AuthenticatedSession.FromPrincipal(user).CanCreateHost;
 
     private static ClaimsPrincipal CreatePrincipal(
         string userId,
@@ -118,15 +120,13 @@ internal sealed class AuthSessionService(
         };
 
         if (isBotAccount)
-            claims.Add(new(AuthClaims.Role, AuthRole.Bot));
+            claims.Add(new(AuthClaims.Role, AuthRoleCodec.Encode(AuthRole.Bot)));
 
         if (selectedHost is not null)
         {
             claims.AddRange([
-                new(AuthClaims.Role, selectedHost.Role),
-                new(BotHostClaims.SelectedHostId, selectedHost.Id.ToString()),
-                new(BotHostClaims.SelectedHostLogin, selectedHost.Login),
-                new(BotHostClaims.SelectedHostRole, selectedHost.Role),
+                new(AuthClaims.Role, AuthRoleCodec.Encode(selectedHost.Role)),
+                new(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(selectedHost)),
             ]);
         }
 
@@ -159,6 +159,33 @@ internal sealed class AuthSessionService(
             TwitchLogin.Normalize(botOptions.Value.Identity.BotUsername),
             StringComparison.Ordinal
         );
+
+    private static BotHostChoice? SelectInitialHost(
+        IReadOnlyList<BotHostChoice> hosts,
+        int? preferredHostId,
+        string login,
+        bool canCreateHost
+    )
+    {
+        if (hosts.Count == 0)
+            return null;
+
+        if (preferredHostId is { } hostId)
+        {
+            var preferred = hosts.FirstOrDefault(host => host.Id == hostId);
+            if (preferred is not null)
+                return preferred;
+        }
+
+        var ownHost = hosts.FirstOrDefault(host =>
+            host.Role == AuthRole.Streamer
+            && string.Equals(host.Login, login, StringComparison.OrdinalIgnoreCase)
+        );
+        if (ownHost is not null)
+            return ownHost;
+
+        return canCreateHost ? null : hosts[0];
+    }
 
     private static async Task SignInAsync(HttpContext context, ClaimsPrincipal principal)
     {

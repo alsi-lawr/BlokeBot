@@ -1,4 +1,3 @@
-
 namespace BlokeBot.Auth.OAuth;
 
 internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)

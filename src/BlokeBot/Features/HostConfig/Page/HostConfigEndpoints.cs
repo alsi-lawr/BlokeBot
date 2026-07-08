@@ -47,10 +47,10 @@ internal static class HostConfigEndpoints
                         AuthRole.Streamer,
                         profileImageUrl
                     );
-                    var current = currentSession.HostSelection;
-                    var available =
-                        current?.Available.Where(x => x.Id != host.Id).Append(host).ToArray()
-                        ?? [host];
+                    var available = currentSession
+                        .AvailableHosts.Where(x => x.Id != host.Id)
+                        .Append(host)
+                        .ToArray();
 
                     await session.SignInHostAsync(
                         context,

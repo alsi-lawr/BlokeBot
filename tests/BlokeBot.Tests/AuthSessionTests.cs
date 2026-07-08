@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using BlokeBot;
-using BlokeBot.Eventing;
 using BlokeBot.Auth.Sessions;
+using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels.Runtime;
@@ -54,7 +54,7 @@ public sealed class AuthSessionTests
                 login: "streamer",
                 role: AuthRole.Streamer,
                 availableHosts: available,
-                selectedHostId: "not-a-host-id"
+                selectedHostClaim: "not-json"
             )
         );
 
@@ -62,6 +62,127 @@ public sealed class AuthSessionTests
         session.HostSelection.ShouldBeNull();
         session.HasCapability(AuthSessionCapability.Operator).ShouldBeFalse();
         session.HasCapability(AuthSessionCapability.HostSelected).ShouldBeFalse();
+    }
+
+    [Test]
+    public void Malformed_role_claim_marks_session_claims_invalid()
+    {
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(login: "streamer", roleClaim: "owner")
+        );
+
+        session.ClaimsValid.ShouldBeFalse();
+        session.Role.ShouldBeNull();
+    }
+
+    [Test]
+    public void Malformed_available_host_payload_marks_session_claims_invalid()
+    {
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(
+                login: "streamer",
+                role: AuthRole.Streamer,
+                availableHostClaims: ["1|streamer|Streamer|streamer|"]
+            )
+        );
+
+        session.ClaimsValid.ShouldBeFalse();
+        session.HostSelection.ShouldBeNull();
+    }
+
+    [Test]
+    public void Conflicting_selected_host_claim_is_invalid()
+    {
+        var available = new BotHostChoice(1, "streamer", "Streamer", AuthRole.Streamer);
+        var selected = available with { Role = AuthRole.Moderator };
+
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(
+                login: "streamer",
+                role: AuthRole.Streamer,
+                availableHosts: [available],
+                selectedHost: selected
+            )
+        );
+
+        session.HostSelectionState.ShouldBe(AuthSessionHostSelectionState.Invalid);
+        session.HostSelection.ShouldBeNull();
+    }
+
+    [Test]
+    public void Host_payload_codec_round_trips_structured_payload()
+    {
+        var host = new BotHostChoice(
+            42,
+            "streamer",
+            "Streamer",
+            AuthRole.Streamer,
+            "https://example.test/profile.png"
+        );
+
+        var decoded = BotHostClaimCodec.Decode(BotHostClaimCodec.Encode(host));
+
+        decoded.ShouldBe(host);
+    }
+
+    [Test]
+    public void Host_payload_codec_rejects_old_pipe_payload()
+    {
+        BotHostClaimCodec.Decode("42|streamer|Streamer|streamer|").ShouldBeNull();
+    }
+
+    [Test]
+    public void Host_config_can_open_for_create_allowed_user_with_moderator_selection()
+    {
+        var selectedHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator);
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(
+                login: "streamer",
+                role: AuthRole.Moderator,
+                canCreateHost: true,
+                availableHosts: [selectedHost],
+                selectedHost: selectedHost
+            )
+        );
+
+        session.CanOpenHostConfig(new HashSet<int> { selectedHost.Id }).ShouldBeTrue();
+    }
+
+    [Test]
+    public void Available_hosts_do_not_require_selected_host_for_create_allowed_user()
+    {
+        var alternateHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator);
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(
+                login: "streamer",
+                canCreateHost: true,
+                availableHosts: [alternateHost]
+            )
+        );
+
+        session.HostSelectionState.ShouldBe(AuthSessionHostSelectionState.None);
+        session.HostSelection.ShouldBeNull();
+        session.AvailableHosts.Single().ShouldBe(alternateHost);
+        session.CanOpenHostConfig(new HashSet<int> { alternateHost.Id }).ShouldBeTrue();
+        session.CanUseBotFunctions(new HashSet<int> { alternateHost.Id }).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task Cookie_validator_allows_create_authorized_user_without_selected_host()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var validator = CreateValidator(dbFactory);
+        var context = CookieContext(
+            TestPrincipals.BlokeBotUser(
+                login: "streamer",
+                canCreateHost: true,
+                availableHosts: [new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator)]
+            )
+        );
+
+        await validator.ValidateAsync(context);
+
+        context.Principal.ShouldNotBeNull();
     }
 
     [Test]
@@ -76,7 +197,7 @@ public sealed class AuthSessionTests
                 role: AuthRole.Streamer,
                 canCreateHost: false,
                 availableHosts: [new BotHostChoice(1, "streamer", "Streamer", AuthRole.Streamer)],
-                selectedHostId: "not-a-host-id"
+                selectedHostClaim: "not-json"
             )
         );
 
@@ -101,15 +222,13 @@ public sealed class AuthSessionTests
             CancellationToken.None
         );
         var validator = CreateValidator(dbFactory, modAccess);
+        var selectedHost = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
         var context = CookieContext(
             TestPrincipals.BlokeBotUser(
                 login: "moderator",
                 role: AuthRole.Moderator,
-                availableHosts:
-                [
-                    new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator),
-                ],
-                selectedHostId: hostId.ToString()
+                availableHosts: [selectedHost],
+                selectedHost: selectedHost
             )
         );
 
@@ -131,10 +250,8 @@ public sealed class AuthSessionTests
         );
         return new AuthCookieValidator(
             dbFactory,
-            modAccess ?? new HostModAccessService(
-                dbFactory,
-                new HostedChannelChangeNotifier(appEvents)
-            ),
+            modAccess
+                ?? new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(appEvents)),
             new SiteAccessService(dbFactory, admins, new SiteAccessChangeNotifier(appEvents)),
             admins,
             new AuthSessionService(
@@ -149,10 +266,7 @@ public sealed class AuthSessionTests
         );
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
@@ -190,5 +304,4 @@ public sealed class AuthSessionTests
             ticket
         );
     }
-
 }

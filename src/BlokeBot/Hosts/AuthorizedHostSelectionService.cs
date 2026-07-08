@@ -3,13 +3,12 @@ using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.SiteAccess;
-using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace BlokeBot.Auth.Hosts;
+namespace BlokeBot.Hosts;
 
-internal sealed class AuthorizedHostResolver(
+internal sealed class AuthorizedHostSelectionService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     SiteAccessService siteAccess,
     HostModAccessService modAccess,
@@ -21,13 +20,11 @@ internal sealed class AuthorizedHostResolver(
         string accessToken,
         string userId,
         string userLogin,
-        string displayName,
-        string? profileImageUrl,
         CancellationToken ct
     )
     {
         var choices = new List<BotHostChoice>();
-        var canCreateHost = await CanCreateHostAsync(userLogin, ct);
+        var canCreateHost = await siteAccess.CanCreateHostAsync(userLogin, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
         var selfHost = await LoadSelfHostChoiceAsync(db, userLogin, ct);
@@ -35,21 +32,11 @@ internal sealed class AuthorizedHostResolver(
             choices.Add(selfHost);
 
         choices.AddRange(
-            await LoadModeratedHostChoicesAsync(
-                db,
-                options,
-                accessToken,
-                userId,
-                userLogin,
-                ct
-            )
+            await LoadModeratedHostChoicesAsync(db, options, accessToken, userId, userLogin, ct)
         );
 
         return new AuthorizedHostSet(Sort(choices), canCreateHost);
     }
-
-    private async Task<bool> CanCreateHostAsync(string userLogin, CancellationToken ct) =>
-        await siteAccess.CanCreateHostAsync(userLogin, ct);
 
     private static async Task<BotHostChoice?> LoadSelfHostChoiceAsync(
         BlokeBotDbContext db,

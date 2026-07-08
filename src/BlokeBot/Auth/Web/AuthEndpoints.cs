@@ -3,7 +3,6 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Hosts;
-using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace BlokeBot.Auth.Web;
 
@@ -39,18 +38,25 @@ internal static class AuthEndpoints
                             Secure = context.Request.IsHttps,
                         }
                     );
-                    context.Response.Cookies.Append(
-                        "BlokeBot.AuthReturnUrl",
-                        LocalReturnUrl.OrFallback(returnUrl, "/guessing"),
-                        new CookieOptions
-                        {
-                            HttpOnly = true,
-                            IsEssential = true,
-                            MaxAge = TimeSpan.FromMinutes(10),
-                            SameSite = SameSiteMode.Lax,
-                            Secure = context.Request.IsHttps,
-                        }
-                    );
+                    if (LocalReturnUrl.IsSafe(returnUrl))
+                    {
+                        context.Response.Cookies.Append(
+                            "BlokeBot.AuthReturnUrl",
+                            returnUrl!,
+                            new CookieOptions
+                            {
+                                HttpOnly = true,
+                                IsEssential = true,
+                                MaxAge = TimeSpan.FromMinutes(10),
+                                SameSite = SameSiteMode.Lax,
+                                Secure = context.Request.IsHttps,
+                            }
+                        );
+                    }
+                    else
+                    {
+                        context.Response.Cookies.Delete("BlokeBot.AuthReturnUrl");
+                    }
 
                     return Results.Redirect(
                         auth.CreateAuthorizationUri(context.Request, state).ToString()
@@ -142,14 +148,12 @@ internal static class AuthEndpoints
                         return Results.Redirect(
                             string.IsNullOrWhiteSpace(returnUrl)
                                 ? "/admin"
-                                : LocalReturnUrl.OrFallback(returnUrl, "/guessing")
+                                : LocalReturnUrl.OrFallback(returnUrl, "/admin")
                         );
                     }
 
                     return Results.Redirect(
-                        result.User.Hosts.Count == 0
-                            ? "/host"
-                            : LocalReturnUrl.OrFallback(returnUrl, "/guessing")
+                        LocalReturnUrl.OrFallback(returnUrl, DefaultReturnUrl(result.User))
                     );
                 }
             )
@@ -166,20 +170,16 @@ internal static class AuthEndpoints
                 ) =>
                 {
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
-                    var current = currentSession.HostSelection;
-                    if (current is null)
+                    var available = currentSession.AvailableHosts;
+                    if (available.Count == 0)
                         return Results.Redirect("/auth/login");
 
-                    var selected = current.Available.FirstOrDefault(host => host.Id == hostId);
+                    var selected = available.FirstOrDefault(host => host.Id == hostId);
                     if (selected is null)
                         return Results.Forbid();
 
                     if (
-                        string.Equals(
-                            selected.Role,
-                            AuthRole.Moderator,
-                            StringComparison.OrdinalIgnoreCase
-                        )
+                        selected.Role == AuthRole.Moderator
                         && !await modAccess.CanModeratorAccessAsync(
                             selected.Id,
                             currentSession.Login,
@@ -192,7 +192,7 @@ internal static class AuthEndpoints
 
                     await session.SignInHostAsync(
                         context,
-                        current.Available,
+                        available,
                         selected,
                         currentSession.IsBotAdmin,
                         currentSession.AdminEditingLogin
@@ -201,7 +201,53 @@ internal static class AuthEndpoints
                     return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
                 }
             )
-            .RequireAuthorization("Operator");
+            .RequireAuthorization();
+
+        app.MapGet(
+                "/auth/select-own-host",
+                async (HttpContext context, string? returnUrl, AuthSessionService session) =>
+                {
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    if (currentSession.IsBotAccount)
+                        return Results.Forbid();
+
+                    var ownHost = currentSession.AvailableHosts.FirstOrDefault(host =>
+                        host.Role == AuthRole.Streamer
+                        && string.Equals(
+                            host.Login,
+                            currentSession.Login,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    );
+
+                    if (ownHost is not null)
+                    {
+                        await session.SignInHostAsync(
+                            context,
+                            currentSession.AvailableHosts,
+                            ownHost,
+                            currentSession.IsBotAdmin,
+                            currentSession.AdminEditingLogin
+                        );
+
+                        return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
+                    }
+
+                    if (!currentSession.CanCreateHost)
+                        return Results.Forbid();
+
+                    await session.SignInHostSelectionAsync(
+                        context,
+                        currentSession.AvailableHosts,
+                        selectedHost: null,
+                        currentSession.IsBotAdmin,
+                        currentSession.AdminEditingLogin
+                    );
+
+                    return Results.Redirect("/host");
+                }
+            )
+            .RequireAuthorization();
 
         app.MapGet(
                 "/admin/select-host",
@@ -214,9 +260,6 @@ internal static class AuthEndpoints
                 ) =>
                 {
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
-                    var current = currentSession.HostSelection;
-                    if (current is null)
-                        return Results.Redirect("/auth/login");
 
                     if (currentSession.IsBotAccount)
                         return Results.Forbid();
@@ -229,17 +272,12 @@ internal static class AuthEndpoints
                     if (selected is null)
                         return Results.NotFound();
 
-                    var available = current
-                        .Available.Where(x => x.Id != selected.Id)
+                    var available = currentSession
+                        .AvailableHosts.Where(x => x.Id != selected.Id)
                         .Append(selected)
                         .ToArray();
-                    var returnHost = current.Available.FirstOrDefault(host =>
-                        host.Id == selected.Id
-                        && !string.Equals(
-                            host.Role,
-                            AuthRole.Admin,
-                            StringComparison.OrdinalIgnoreCase
-                        )
+                    var returnHost = currentSession.AvailableHosts.FirstOrDefault(host =>
+                        host.Id == selected.Id && host.Role != AuthRole.Admin
                     );
                     await session.SignInHostAsync(
                         context,
@@ -260,18 +298,8 @@ internal static class AuthEndpoints
                 async (HttpContext context, string? returnUrl, AuthSessionService session) =>
                 {
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
-                    var current = currentSession.HostSelection;
-                    if (current is null)
-                        return Results.Redirect("/auth/login");
-
-                    var nonAdminHosts = current
-                        .Available.Where(host =>
-                            !string.Equals(
-                                host.Role,
-                                AuthRole.Admin,
-                                StringComparison.OrdinalIgnoreCase
-                            )
-                        )
+                    var nonAdminHosts = currentSession
+                        .AvailableHosts.Where(host => host.Role != AuthRole.Admin)
                         .ToArray();
                     var returnHost = currentSession.AdminReturnHost;
                     if (
@@ -285,16 +313,23 @@ internal static class AuthEndpoints
                         ? nonAdminHosts.FirstOrDefault(host => host.Id == returnHost.Id)
                         : null
                             ?? nonAdminHosts.FirstOrDefault(host =>
-                                string.Equals(host.Login, login, StringComparison.OrdinalIgnoreCase)
+                                host.Role == AuthRole.Streamer
+                                && string.Equals(
+                                    host.Login,
+                                    login,
+                                    StringComparison.OrdinalIgnoreCase
+                                )
                             )
-                            ?? nonAdminHosts.FirstOrDefault();
-                    if (selected is null)
+                            ?? (
+                                currentSession.CanCreateHost ? null : nonAdminHosts.FirstOrDefault()
+                            );
+                    if (selected is null && !currentSession.CanCreateHost)
                     {
                         await session.SignOutAsync(context);
                         return Results.Redirect("/auth/login");
                     }
 
-                    await session.SignInHostAsync(
+                    await session.SignInHostSelectionAsync(
                         context,
                         nonAdminHosts,
                         selected,
@@ -302,7 +337,12 @@ internal static class AuthEndpoints
                         adminEditingLogin: null
                     );
 
-                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
+                    return Results.Redirect(
+                        LocalReturnUrl.OrFallback(
+                            returnUrl,
+                            selected is null ? "/host" : "/guessing"
+                        )
+                    );
                 }
             )
             .RequireAuthorization("BotAdmin");
@@ -317,4 +357,18 @@ internal static class AuthEndpoints
             )
             .AllowAnonymous();
     }
+
+    private static string DefaultReturnUrl(AuthenticatedUser user)
+    {
+        if (user.CanCreateHost && !HasOwnHostedChannel(user))
+            return "/host";
+
+        return user.Hosts.Count == 0 ? "/host" : "/guessing";
+    }
+
+    private static bool HasOwnHostedChannel(AuthenticatedUser user) =>
+        user.Hosts.Any(host =>
+            host.Role == AuthRole.Streamer
+            && string.Equals(host.Login, user.Login, StringComparison.OrdinalIgnoreCase)
+        );
 }

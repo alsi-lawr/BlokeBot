@@ -1,8 +1,8 @@
-using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Features.Admin.Authorization;
+using BlokeBot.Hosts;
 using BlokeBot.Identity;
 using Microsoft.Extensions.Options;
 
@@ -14,7 +14,7 @@ internal sealed class WebAuthService(
     UserLookupService users,
     BotAdminService admins,
     IOptions<TwitchBotOptions> botOptions,
-    AuthorizedHostResolver hosts
+    AuthorizedHostSelectionService hosts
 )
 {
     public WebAuthOptions CurrentOptions => configuration.CurrentOptions;
@@ -73,8 +73,6 @@ internal sealed class WebAuthService(
             accessToken,
             twitchUserId,
             userLogin,
-            displayName,
-            twitchUser.ProfileImageUrl,
             cancellationToken
         );
 
