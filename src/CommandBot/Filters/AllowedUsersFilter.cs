@@ -1,4 +1,5 @@
-using Alsi.TwitchBot;
+using BlokeBot.Commands;
+using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Options;
 
 public sealed class AllowedUsersFilter(IOptions<AllowedLoginOptions> options) : ITwitchCommandFilter

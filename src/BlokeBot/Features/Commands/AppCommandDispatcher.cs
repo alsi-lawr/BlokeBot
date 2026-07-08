@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Points.Commands;
 using BlokeBot.Persistence.Models;

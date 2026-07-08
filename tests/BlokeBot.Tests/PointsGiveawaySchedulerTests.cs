@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points;

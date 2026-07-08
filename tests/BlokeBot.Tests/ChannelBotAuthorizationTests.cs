@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using Alsi.TwitchBot;
 using BlokeBot;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;

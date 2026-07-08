@@ -1,5 +1,6 @@
 using System.Net;
-using Alsi.TwitchBot;
+using BlokeBot.Commands;
+using BlokeBot.Twitch.Runtime;
 using CommandBot.Store;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Data.Sqlite;

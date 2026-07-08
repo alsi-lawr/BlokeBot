@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;

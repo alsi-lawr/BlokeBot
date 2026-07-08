@@ -1,5 +1,4 @@
 using System.Numerics;
-using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.Points.Balances;
 using Microsoft.Extensions.Configuration;

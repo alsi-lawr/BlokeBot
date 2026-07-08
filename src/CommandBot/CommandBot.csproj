@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Alsi.TwitchBot\Alsi.TwitchBot.csproj" />
+    <ProjectReference Include="..\BlokeBot.Commands\BlokeBot.Commands.csproj" />
+    <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
   </ItemGroup>
 </Project>

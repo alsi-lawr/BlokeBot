@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 
 namespace BlokeBot.BotStatus;
 

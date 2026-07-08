@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Identity;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;

@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;

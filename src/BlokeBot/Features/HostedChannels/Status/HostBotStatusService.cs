@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Status;

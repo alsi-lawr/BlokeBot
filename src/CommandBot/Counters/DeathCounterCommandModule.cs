@@ -1,4 +1,5 @@
-using Alsi.TwitchBot;
+using BlokeBot.Commands;
+using BlokeBot.Twitch.Runtime;
 
 public sealed class DeathCounterCommandModule(ICounterStore store) : ITwitchCommandModule
 {

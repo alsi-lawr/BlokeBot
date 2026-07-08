@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Alsi.TwitchBot;
 using BlokeBot;
 using BlokeBot.Eventing;
 using BlokeBot.Auth.Sessions;

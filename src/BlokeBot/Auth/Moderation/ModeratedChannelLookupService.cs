@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Auth.OAuth;
 
 namespace BlokeBot.Auth.Moderation;

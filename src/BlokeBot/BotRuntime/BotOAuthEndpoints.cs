@@ -1,6 +1,5 @@
 using System.Net;
 using System.Security.Cryptography;
-using Alsi.TwitchBot;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Authorization;
 

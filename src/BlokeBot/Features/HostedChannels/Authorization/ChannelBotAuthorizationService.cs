@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;

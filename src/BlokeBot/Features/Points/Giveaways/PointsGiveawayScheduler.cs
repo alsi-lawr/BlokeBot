@@ -1,4 +1,3 @@
-using Alsi.TwitchBot;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;

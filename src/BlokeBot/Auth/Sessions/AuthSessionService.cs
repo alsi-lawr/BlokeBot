@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Alsi.TwitchBot;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Hosts;
 using Microsoft.AspNetCore.Authentication;

@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text;
-using Alsi.TwitchBot;
 using BlokeBot.Eventing;
 using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
