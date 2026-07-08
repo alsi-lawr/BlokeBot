@@ -4,7 +4,6 @@
 @using BlokeBot.Twitch
 @using BlokeBot.Twitch.Auth
 @using BlokeBot.Twitch.Runtime
-@using BlokeBot.Auth.Users
 @using BlokeBot.Features.Admin.Authorization
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Features.Admin.SiteAccess
@@ -16,17 +15,13 @@
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "BotAdmin")]
-@implements IDisposable
+@inherits AuthenticatedPageComponent
 @inject SiteAccessService SiteAccess
-@inject BotHostProvisioningService HostProvisioning
-@inject BotHostRemovalService HostRemoval
-@inject HostedChannelRuntimeControlService HostedChannelRuntime
+@inject AdminHostManagementService HostManagement
 @inject HostedChannelDirectoryService HostedChannels
 @inject BotAccountAuthorizationService BotAccountAuthorization
-@inject UserLookupService Users
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
-@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
@@ -69,13 +64,10 @@
 </div>
 
 @code {
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
-
     private SiteAccessAdminState? state;
     private BotAccountAuthorizationStatus? botAccountStatus;
     private IReadOnlyList<HostedChannelAdminView> hosts = [];
     private bool isBotAccount;
-    private IDisposable? adminStateSubscription;
     private string? hostStatus;
     private int? pendingRuntimeHostId;
     private string newBlacklistLogin = string.Empty;
@@ -84,18 +76,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        adminStateSubscription = Events.SubscribeForComponentRefresh(
-            [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
-            work => InvokeAsync(work),
-            ReloadForEventAsync,
-            StateHasChanged
+        TrackSubscription(
+            Events.SubscribeForComponentRefresh(
+                [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
+                work => InvokeAsync(work),
+                ReloadForEventAsync,
+                StateHasChanged
+            )
         );
         await LoadAsync();
-    }
-
-    public void Dispose()
-    {
-        adminStateSubscription?.Dispose();
     }
 
     private async Task AddBlacklistAsync()
@@ -114,83 +103,40 @@
 
     private async Task CreateHostAsync()
     {
-        pendingRuntimeHostId = null;
-        hostStatus = null;
-        TwitchHelixUser? user;
-        try
-        {
-            user = await Users.FindByLoginAsync(newHostLogin, CancellationToken.None);
-        }
-        catch (InvalidOperationException)
-        {
-            hostStatus = "Authorize the bot account before creating hosted channels.";
-            return;
-        }
-        catch (HttpRequestException)
-        {
-            hostStatus = "Twitch user lookup failed.";
-            return;
-        }
-
-        if (user is null || string.IsNullOrWhiteSpace(user.Login))
-        {
-            hostStatus = "Twitch user not found.";
-            return;
-        }
-
-        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
-            ? user.Login
-            : user.DisplayName;
-        await HostProvisioning.EnsureHostAsync(
-            user.Login,
-            user.Id,
-            displayName,
-            user.ProfileImageUrl,
-            CancellationToken.None
+        await ApplyHostOperationAsync(
+            await HostManagement.CreateHostAsync(newHostLogin, CancellationToken.None),
+            clearNewHostLogin: true
         );
-        hostStatus = $"Created hosted channel for {displayName}.";
-        newHostLogin = string.Empty;
         await LoadAsync();
     }
 
     private async Task RemoveHostAsync(int hostId)
     {
-        pendingRuntimeHostId = null;
-        await HostedChannelRuntime.StopAsync(hostId, CancellationToken.None);
-        var removed = await HostRemoval.RemoveAsync(hostId, CancellationToken.None);
-        hostStatus = removed
-            ? "Hosted channel removed."
-            : "Hosted channel was already removed.";
+        await ApplyHostOperationAsync(
+            await HostManagement.RemoveHostAsync(hostId, CancellationToken.None)
+        );
         await LoadAsync();
     }
 
     private async Task StartBotAsync(int hostId)
     {
-        pendingRuntimeHostId = hostId;
-        var result = await HostedChannelRuntime.StartAsync(hostId, CancellationToken.None);
+        await ApplyHostOperationAsync(
+            await HostManagement.StartBotAsync(hostId, CancellationToken.None)
+        );
         await LoadAsync();
-        var currentState = hosts.FirstOrDefault(host => host.Id == hostId)?.RuntimeState;
-        hostStatus = result.Succeeded
-            ? RuntimeStatusMessage(currentState)
-            : result.Message;
-        pendingRuntimeHostId = IsRuntimeTransitionPending(result, currentState) ? hostId : null;
     }
 
     private async Task StopBotAsync(int hostId)
     {
-        pendingRuntimeHostId = hostId;
-        var result = await HostedChannelRuntime.StopAsync(hostId, CancellationToken.None);
+        await ApplyHostOperationAsync(
+            await HostManagement.StopBotAsync(hostId, CancellationToken.None)
+        );
         await LoadAsync();
-        var currentState = hosts.FirstOrDefault(host => host.Id == hostId)?.RuntimeState;
-        hostStatus = result.Succeeded
-            ? RuntimeStatusMessage(currentState)
-            : result.Message;
-        pendingRuntimeHostId = IsRuntimeTransitionPending(result, currentState) ? hostId : null;
     }
 
     private async Task LoadAsync()
     {
-        isBotAccount = (await PageContext.FromAsync(AuthenticationState)).IsBotAccount;
+        isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
         state = await SiteAccess.LoadAdminStateAsync(CancellationToken.None);
         hosts = await HostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
         botAccountStatus = await BotAccountAuthorization.GetStatusAsync(CancellationToken.None);
@@ -212,29 +158,28 @@
         await LoadAsync();
         if (
             pendingRuntimeHostId is { } hostId
-            && hosts.FirstOrDefault(host => host.Id == hostId) is { } host
         )
         {
-            hostStatus = RuntimeStatusMessage(host.RuntimeState);
-            if (host.RuntimeState is BotChannelRuntimeState.Started or BotChannelRuntimeState.Stopped)
-                pendingRuntimeHostId = null;
+            ApplyHostOperation(HostManagement.RefreshPendingRuntime(hostId, hosts));
         }
     }
 
-    private static string RuntimeStatusMessage(BotChannelRuntimeState? state) =>
-        state switch
-        {
-            BotChannelRuntimeState.Starting => "Bot starting.",
-            BotChannelRuntimeState.Started => "Bot started.",
-            BotChannelRuntimeState.Stopping => "Bot stopping.",
-            _ => "Bot stopped.",
-        };
+    private Task ApplyHostOperationAsync(
+        AdminHostOperationResult result,
+        bool clearNewHostLogin = false
+    )
+    {
+        ApplyHostOperation(result);
+        if (clearNewHostLogin && result.Succeeded)
+            newHostLogin = string.Empty;
+        return Task.CompletedTask;
+    }
 
-    private static bool IsRuntimeTransitionPending(
-        HostedChannelRuntimeControlResult result,
-        BotChannelRuntimeState? state
-    ) =>
-        result.Succeeded && state is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+    private void ApplyHostOperation(AdminHostOperationResult result)
+    {
+        hostStatus = result.Message;
+        pendingRuntimeHostId = result.PendingRuntimeHostId;
+    }
 
     private async Task RemoveBlacklistAsync(string login)
     {

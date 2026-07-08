@@ -4,7 +4,6 @@ using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Guesses;
@@ -80,7 +79,7 @@ public sealed class GuessingVoteService(
     }
 
     private static string Format(string template, string name, string login) =>
-        TemplateFormatter.Format(
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {

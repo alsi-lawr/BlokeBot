@@ -1,5 +1,6 @@
-using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.Guessing.Commands;
+using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -7,8 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.HostSetup;
 
-public sealed class GuessingHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFactory)
-    : IBotHostSeeder
+public sealed class GuessingHostSeeder(
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    CommandStrategyCatalog<GuessCommandKind, AppCommandRouteState> commands
+) : IBotHostSeeder
 {
     public async Task SeedAsync(int hostId, CancellationToken ct)
     {
@@ -18,16 +21,16 @@ public sealed class GuessingHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
 
         if (!await db.CommandAliases.AnyAsync(x => x.HostId == hostId, ct))
         {
-            foreach (var command in AppCommandCatalog.ForFeature(AppCommandFeature.Guessing))
-                foreach (var alias in command.DefaultAliases)
-                    db.CommandAliases.Add(
-                        new CommandAlias
-                        {
-                            HostId = hostId,
-                            Kind = command.Kind,
-                            Alias = alias,
-                        }
-                    );
+            foreach (var command in commands.Descriptors)
+            foreach (var alias in command.DefaultAliases)
+                db.CommandAliases.Add(
+                    new CommandAlias
+                    {
+                        HostId = hostId,
+                        Kind = GuessingAppCommandKindMap.ToAppKind(command.Kind),
+                        Alias = alias,
+                    }
+                );
         }
 
         if (!await db.Profiles.AnyAsync(x => x.HostId == hostId, ct))

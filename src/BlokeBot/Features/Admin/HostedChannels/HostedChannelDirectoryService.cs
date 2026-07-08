@@ -1,3 +1,4 @@
+using BlokeBot.Auth.Sessions;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -34,7 +35,7 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
 
     public async Task<BotHostChoice?> LoadHostChoiceAsync(
         int hostId,
-        string role,
+        AuthRole role,
         CancellationToken ct
     )
     {

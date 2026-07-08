@@ -1,9 +1,9 @@
 #blazor-error-ui {
-    background: #fef3c7;
-    border-top: 1px solid #f59e0b;
+    background: var(--app-warning-bg);
+    border-top: 1px solid var(--app-warning-border);
     bottom: 0;
     box-sizing: border-box;
-    color: #78350f;
+    color: var(--app-warning-text);
     display: none;
     left: 0;
     padding: 0.75rem 1rem;

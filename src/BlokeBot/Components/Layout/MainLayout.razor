@@ -1,13 +1,13 @@
 ﻿@inherits LayoutComponentBase
 @using BlokeBot.Hosts
 
-<div class="min-h-screen bg-background text-foreground">
-    <div class="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white/90 backdrop-blur-xl lg:block">
+<div class="app-shell min-h-screen bg-background text-foreground">
+    <div class="app-shell__sidebar fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white/90 backdrop-blur-xl lg:block">
         <NavMenu />
     </div>
 
     <main class="lg:pl-72">
-        <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/75 backdrop-blur-xl">
+        <header class="app-shell__topbar sticky top-0 z-20 border-b border-slate-200 bg-white/75 backdrop-blur-xl">
             <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
                 <div class="min-w-0">
                     <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Twitch operations</p>
@@ -15,12 +15,13 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <TopBarControls />
+                    <ThemeToggle />
                     <PageHelpButton />
                 </div>
             </div>
         </header>
 
-        <div class="border-b border-slate-200 bg-white lg:hidden">
+        <div class="app-shell__mobile-nav border-b border-slate-200 bg-white lg:hidden">
             <NavMenu />
         </div>
 

@@ -5,6 +5,95 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <script>
+        (() => {
+            const storageKey = "blokebot.theme";
+            const media = window.matchMedia("(prefers-color-scheme: dark)");
+            const valid = value => value === "dark" || value === "light";
+
+            const storedTheme = () => {
+                try {
+                    const value = window.localStorage.getItem(storageKey);
+                    return valid(value) ? value : null;
+                } catch {
+                    return null;
+                }
+            };
+
+            const systemTheme = () => media.matches ? "dark" : "light";
+            const selectedTheme = () => storedTheme() ?? systemTheme();
+            const applyTheme = (theme, persist) => {
+                if (document.documentElement.dataset.theme !== theme)
+                    document.documentElement.dataset.theme = theme;
+
+                if (document.documentElement.style.colorScheme !== theme)
+                    document.documentElement.style.colorScheme = theme;
+
+                if (!persist)
+                    return;
+
+                try {
+                    window.localStorage.setItem(storageKey, theme);
+                } catch {
+                }
+            };
+            const syncTheme = () => applyTheme(selectedTheme(), false);
+
+            syncTheme();
+
+            const mediaChanged = () => {
+                if (storedTheme() === null)
+                    syncTheme();
+            };
+
+            if (media.addEventListener)
+                media.addEventListener("change", mediaChanged);
+            else if (media.addListener)
+                media.addListener(mediaChanged);
+
+            new MutationObserver(syncTheme).observe(document.documentElement, {
+                attributeFilter: ["data-theme", "style"],
+                attributes: true,
+            });
+            window.addEventListener("pageshow", syncTheme);
+
+            window.blokeBotTheme = {
+                current: () => selectedTheme(),
+                sync: syncTheme,
+                toggle: () => {
+                    const next = window.blokeBotTheme.current() === "dark" ? "light" : "dark";
+                    applyTheme(next, true);
+                    return next;
+                },
+            };
+        })();
+    </script>
+    <script>
+        (() => {
+            const states = [
+                ["blokebot.sidebar.guessing.open", "navGuessingOpen"],
+                ["blokebot.sidebar.points.open", "navPointsOpen"],
+            ];
+
+            const readBoolean = key => {
+                try {
+                    const value = window.localStorage.getItem(key);
+                    return value === null ? true : value === "true";
+                } catch {
+                    return true;
+                }
+            };
+
+            const sync = () => {
+                for (const [key, datasetName] of states)
+                    document.documentElement.dataset[datasetName] = readBoolean(key) ? "true" : "false";
+            };
+
+            sync();
+            window.addEventListener("pageshow", sync);
+            window.blokeBotNavigation = { sync };
+        })();
+    </script>
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["BlokeBot.styles.css"]" />
@@ -17,6 +106,23 @@
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script>
+        (() => {
+            const register = () => {
+                if (!window.Blazor || !window.blokeBotTheme) {
+                    window.setTimeout(register, 0);
+                    return;
+                }
+
+                window.Blazor.addEventListener("enhancedload", window.blokeBotTheme.sync);
+                window.Blazor.addEventListener("enhancednavigationend", window.blokeBotTheme.sync);
+                window.Blazor.addEventListener("enhancedload", window.blokeBotNavigation.sync);
+                window.Blazor.addEventListener("enhancednavigationend", window.blokeBotNavigation.sync);
+            };
+
+            register();
+        })();
+    </script>
 </body>
 
 </html>

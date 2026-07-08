@@ -5,7 +5,7 @@
         @for (var i = 0; i < Options.Count; i++)
         {
             var option = Options[i];
-            <div class="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[0.45fr_1fr_auto]">
+            <div class="surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]">
                 <input class="input" placeholder="name" @bind="option.Name" />
                 <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
                 <button class="btn-secondary" @onclick="() => RemoveOption.InvokeAsync(option)">Remove</button>

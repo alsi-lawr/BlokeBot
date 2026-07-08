@@ -9,17 +9,17 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize signed-in account</a>
-                <button class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="Refresh">Refresh</button>
-                <button class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="Clear">Clear authorization</button>
+                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition" @onclick="Refresh">Refresh</button>
+                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition" @onclick="Clear">Clear authorization</button>
             </div>
         </div>
     </div>
     <div class="grid gap-4 p-5 lg:grid-cols-3">
-        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+        <div class="surface-muted rounded-lg px-3 py-2.5">
             <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Configured account</p>
             <p class="mt-2 text-sm font-semibold text-slate-900">@Status?.ConfiguredBotLogin</p>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+        <div class="surface-muted rounded-lg px-3 py-2.5">
             <div class="flex items-center justify-between gap-3">
                 <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Saved authorization</p>
                 <span class="@StatusBadgeClass">
@@ -30,7 +30,7 @@
             <p class="mt-2 text-sm font-semibold text-slate-900">@(Status?.AuthorizedLogin ?? "not authorized")</p>
             <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+        <div class="surface-muted rounded-lg px-3 py-2.5">
             <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Permissions</p>
             <p class="mt-2 text-xs font-medium text-slate-500">Required: @FormatScopes(Status?.RequiredScopes)</p>
             <p class="mt-1 text-xs font-medium text-slate-500">Granted: @FormatScopes(Status?.GrantedScopes)</p>

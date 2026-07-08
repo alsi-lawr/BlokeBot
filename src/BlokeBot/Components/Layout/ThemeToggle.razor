@@ -1,0 +1,55 @@
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+
+<button class="@ButtonClass"
+        type="button"
+        title="@Label"
+        aria-label="@Label"
+        aria-pressed="@isDark"
+        @onclick="ToggleAsync">
+    <span class="theme-toggle__glow" aria-hidden="true"></span>
+    <span class="theme-toggle__icons" aria-hidden="true">
+        <svg class="theme-toggle__icon theme-toggle__sun" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4.2" />
+            <path d="M12 2.8v2.4" />
+            <path d="M12 18.8v2.4" />
+            <path d="M4.2 4.2l1.7 1.7" />
+            <path d="M18.1 18.1l1.7 1.7" />
+            <path d="M2.8 12h2.4" />
+            <path d="M18.8 12h2.4" />
+            <path d="M4.2 19.8l1.7-1.7" />
+            <path d="M18.1 5.9l1.7-1.7" />
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__moon" viewBox="0 0 24 24">
+            <path d="M20.3 14.7A7.6 7.6 0 0 1 9.3 3.7a8.7 8.7 0 1 0 11 11Z" />
+        </svg>
+    </span>
+</button>
+
+@code {
+    private bool isDark;
+    private bool isReady;
+
+    private string ButtonClass =>
+        $"theme-toggle {(isDark ? "theme-toggle--dark" : "theme-toggle--light")} {(isReady ? "theme-toggle--ready" : string.Empty)}";
+
+    private string Label => isDark ? "Switch to light mode" : "Switch to dark mode";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var theme = await JS.InvokeAsync<string>("blokeBotTheme.current");
+        isDark = string.Equals(theme, "dark", StringComparison.Ordinal);
+        isReady = true;
+        StateHasChanged();
+    }
+
+    private async Task ToggleAsync()
+    {
+        var theme = await JS.InvokeAsync<string>("blokeBotTheme.toggle");
+        isDark = string.Equals(theme, "dark", StringComparison.Ordinal);
+        isReady = true;
+    }
+}

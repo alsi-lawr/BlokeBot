@@ -9,22 +9,20 @@
 @using BlokeBot.Eventing
 @using BlokeBot.Hosts
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
 @inject GuessingDashboardService Dashboard
 @inject GuessingHistoryService History
 @inject GuessingRoundService Rounds
 @inject EventBus<AppEventKind> Events
 @inject ITwitchChatMessageSender Chat
-@inject BlokeBotPageContextAccessor PageContext
-@implements IDisposable
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="space-y-2">
-            <div class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+            <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
                 Dashboard
             </div>
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Guessing game</h1>
@@ -40,14 +38,14 @@
     else
     {
 
-    <div id="live" class="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+    <div id="live" class="control-surface inline-flex rounded-lg p-1">
         <button class="@TabClass(DashboardTab.Live)" @onclick="() => ActivateTabAsync(DashboardTab.Live)">Live</button>
         <button class="@TabClass(DashboardTab.History)" @onclick="() => ActivateTabAsync(DashboardTab.History)">History</button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+        <div class="status-message px-4 py-3 text-sm">
             @statusMessage
         </div>
     }
@@ -81,7 +79,7 @@
                 <h2 class="text-lg font-semibold text-slate-950">Historical leaderboard</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Rank players by correct guesses across saved rounds.</p>
             </div>
-            <div class="grid gap-4 border-b border-slate-200 bg-slate-50 p-5 lg:grid-cols-4">
+            <div class="surface-band grid gap-4 border-b p-5 lg:grid-cols-4">
                 <div>
                     <label class="label" for="historyFrom">From</label>
                     <input id="historyFrom" class="input mt-2" type="date" @bind="historyFromDate" @bind:after="ResetAndLoadHistoryAsync" />
@@ -113,19 +111,19 @@
             else
             {
                 <div class="grid gap-4 border-b border-slate-200 p-5 md:grid-cols-2 xl:grid-cols-4">
-                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="surface-row rounded-lg p-4">
                         <p class="text-sm font-medium text-muted-foreground">Players</p>
                         <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalPlayers</p>
                     </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="surface-row rounded-lg p-4">
                         <p class="text-sm font-medium text-muted-foreground">Guesses</p>
                         <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalGuesses</p>
                     </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="surface-row rounded-lg p-4">
                         <p class="text-sm font-medium text-muted-foreground">Correct</p>
                         <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.CorrectGuesses</p>
                     </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                    <div class="surface-row rounded-lg p-4">
                         <p class="text-sm font-medium text-muted-foreground">Page</p>
                         <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.Page / @leaderboard.PageCount</p>
                     </div>
@@ -139,7 +137,7 @@
                     else
                     {
                         <table class="w-full text-left text-sm">
-                            <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+                            <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
                                     <th class="px-5 py-3 font-semibold">Rank</th>
                                     <th class="px-5 py-3 font-semibold">Player</th>
@@ -169,7 +167,7 @@
                 <div class="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-center gap-3">
                         <label class="label" for="historyPageSize">Rows</label>
-                        <select id="historyPageSize" class="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 shadow-sm" @bind="historyPageSize" @bind:after="ResetAndLoadHistoryAsync">
+                        <select id="historyPageSize" class="control-surface h-9 rounded-md px-2 text-sm font-medium" @bind="historyPageSize" @bind:after="ResetAndLoadHistoryAsync">
                             <option value="10">10</option>
                             <option value="25">25</option>
                             <option value="50">50</option>
@@ -195,7 +193,6 @@
     }
 
     private DashboardTab activeTab;
-    private IDisposable? guessingSubscription;
     private GuessLeaderboardPage? leaderboard;
     private int historyPage = 1;
     private int historyPageSize = 25;
@@ -207,9 +204,6 @@
     private GuessingDashboardState? state;
     private string? statusMessage;
     private string winnerName = string.Empty;
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
-    private BotHostChoice? Host { get; set; }
-    private int HostId => Host?.Id ?? 0;
 
     private string RoundStartedText =>
         state?.CurrentRound is null
@@ -223,19 +217,16 @@
 
     protected override async Task OnInitializedAsync()
     {
-        guessingSubscription = Events.SubscribeForComponentRefresh(
-            AppEventKind.GuessingChanged,
-            work => InvokeAsync(work),
-            ReloadForEventAsync,
-            StateHasChanged
+        TrackSubscription(
+            Events.SubscribeForComponentRefresh(
+                AppEventKind.GuessingChanged,
+                work => InvokeAsync(work),
+                ReloadForEventAsync,
+                StateHasChanged
+            )
         );
-        await LoadHostAsync();
+        await LoadPageContextAsync();
         await LoadAsync(null);
-    }
-
-    private async Task LoadHostAsync()
-    {
-        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
     }
 
     private async Task ActivateTabAsync(DashboardTab tab)
@@ -245,11 +236,6 @@
 
         if (tab == DashboardTab.History && leaderboard is null)
             await LoadHistoryAsync();
-    }
-
-    public void Dispose()
-    {
-        guessingSubscription?.Dispose();
     }
 
     private async Task ReloadForEventAsync()
@@ -360,8 +346,8 @@
     private string TabClass(DashboardTab tab)
     {
         return activeTab == tab
-            ? "h-9 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm"
-            : "h-9 rounded-md px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950";
+            ? "segmented-tab-active h-9 rounded-md px-4 text-sm font-semibold"
+            : "segmented-tab h-9 rounded-md px-4 text-sm font-semibold transition";
     }
 
     private async Task RunAsync(Func<Task<GuessingOperationResult>> operation)

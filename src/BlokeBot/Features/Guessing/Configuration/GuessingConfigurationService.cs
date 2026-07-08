@@ -213,7 +213,7 @@ public sealed class GuessingConfigurationService(
     }
 
     private static string JoinAliases(List<CommandAlias> aliases, GuessCommandKind kind) =>
-        CommandAliasRegistry.JoinAliases(aliases, AppCommandCatalog.FromGuessingKind(kind));
+        CommandAliasRegistry.JoinAliases(aliases, GuessingAppCommandKindMap.ToAppKind(kind));
 
     private static async Task<GuessRoundProfileEditor> LoadProfileEditorAsync(
         BlokeBotDbContext db,
@@ -270,10 +270,7 @@ public sealed class GuessingConfigurationService(
         await aliasRegistry.ReplaceAliasesAsync(
             db,
             hostId,
-            AppCommandCatalog
-                .ForFeature(AppCommandFeature.Guessing)
-                .Select(x => x.Kind)
-                .ToHashSet(),
+            GuessingAppCommandKindMap.AppKinds,
             [
                 new CommandAliasDraft(AppCommandKind.Start, aliases.StartAliases),
                 new CommandAliasDraft(AppCommandKind.Stop, aliases.StopAliases),
@@ -285,5 +282,4 @@ public sealed class GuessingConfigurationService(
         );
         await db.SaveChangesAsync(ct);
     }
-
 }

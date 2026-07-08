@@ -11,7 +11,8 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var round = await GuessingRoundQueries.Unresolved(db, hostId)
+        var round = await GuessingRoundQueries
+            .Unresolved(db, hostId)
             .Include(x => x.GuessRoundProfile)
             .AsNoTracking()
             .FirstOrDefaultAsync(ct);
@@ -24,7 +25,8 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
                 .Select(x => new GuessVoteView(x.Login, x.GuessName, x.GuessedAtUtc))
                 .ToListAsync(ct);
 
-        var profileId = round?.GuessRoundProfileId
+        var profileId =
+            round?.GuessRoundProfileId
             ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId, ct);
         var options = await db
             .GuessOptions.AsNoTracking()

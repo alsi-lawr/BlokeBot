@@ -1,12 +1,9 @@
-using BlokeBot.Identity;
 using BlokeBot.Auth.OAuth;
+using BlokeBot.Identity;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
-public sealed class ChannelBotOAuthService(
-    IConfiguration configuration,
-    TwitchOAuthApiClient oauth
-)
+public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchOAuthApiClient oauth)
 {
     private const string CallbackPath = "/oauth/channel-bot/callback";
 
@@ -49,7 +46,9 @@ public sealed class ChannelBotOAuthService(
         );
         var validation = await oauth.ValidateTokenAsync(token.AccessToken, ct);
         if (validation is null)
-            throw new InvalidOperationException("Twitch did not validate the channel authorization grant.");
+            throw new InvalidOperationException(
+                "Twitch did not validate the channel authorization grant."
+            );
 
         return new ChannelBotAuthorizationGrant(
             validation.UserId,
@@ -59,10 +58,8 @@ public sealed class ChannelBotOAuthService(
     }
 
     public string[] RequestedScopes() =>
-        configuration
-            .GetSection("TwitchBot:ChannelAuthorization:Scopes")
-            .Get<string[]>()
-        is { } scopes
+        configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>()
+            is { } scopes
             ? TwitchScopeSet.NormalizeMany(scopes)
             : [];
 

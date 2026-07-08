@@ -8,13 +8,13 @@
 @inject BlokeBotPageContextAccessor PageContext
 @implements IAsyncDisposable
 
-<div class="flex h-full flex-col bg-gradient-to-b from-slate-50 via-white to-slate-100">
-    <div class="flex items-center gap-3 border-b border-slate-200/80 px-5 py-5">
-        <img class="h-11 w-11 rounded-xl border border-slate-200 bg-white p-1 shadow-soft" src="/blokedroid.svg" alt="" />
+<div class="nav-menu flex h-full flex-col">
+    <div class="nav-menu__brand flex items-center gap-3 border-b px-5 py-5">
+        <img class="h-11 w-11 rounded-xl border p-1 shadow-soft" src="/blokedroid.svg" alt="" />
         <div>
             <AuthorizeView>
                 <Authorized Context="brandAuth">
-                    <a class="block text-base font-bold text-slate-950" href="@(PageContext.FromPrincipal(brandAuth.User).IsBotAccount ? "admin" : "guessing")">BlokeBot</a>
+                    <a class="block text-base font-bold text-slate-950" href="@BrandHref(PageContext.FromPrincipal(brandAuth.User))">BlokeBot</a>
                 </Authorized>
                 <NotAuthorized>
                     <a class="block text-base font-bold text-slate-950" href="guessing">BlokeBot</a>
@@ -36,11 +36,11 @@
                 }
                 <AuthorizeView Policy="BotAdmin">
                     <Authorized>
-                <div class="rounded-xl border border-red-200/60 bg-gradient-to-br from-white to-red-50/70 p-1.5 shadow-sm">
-                    <NavLink class="flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-200 hover:bg-white hover:text-slate-950"
-                             ActiveClass="!bg-gradient-to-br !from-slate-950 !to-blue-900 !text-white shadow-lg shadow-slate-300/70"
+                <div class="nav-menu__panel nav-menu__panel--admin rounded-xl p-1.5">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
                              href="admin">
-                        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-blue-600">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                             <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
                             <path d="m9.5 12 1.7 1.7 3.6-4" />
@@ -54,11 +54,11 @@
 
                 @if (showHostConfig)
                 {
-                    <div class="rounded-xl border border-slate-200/90 bg-white/75 p-1.5 shadow-sm">
-                        <NavLink class="flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
-                                 ActiveClass="!bg-gradient-to-br !from-slate-950 !to-blue-900 !text-white shadow-lg shadow-slate-300/70"
+                    <div class="nav-menu__panel rounded-xl p-1.5">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
                                  href="host">
-                            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-blue-600">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                                 <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M4 10.5 12 4l8 6.5V20H4Z" />
                                     <path d="M9 20v-6h6v6" />
@@ -72,9 +72,9 @@
                 @if (showBotFunctions)
                 {
         <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Bot functions</div>
-        <details class="group rounded-xl border border-slate-200/90 bg-white/75 p-1.5 shadow-sm" open="@guessingOpen">
-            <summary class="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold text-slate-800 transition marker:hidden hover:bg-slate-50 hover:text-slate-950" @onclick="ToggleGuessingAsync">
-                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-blue-600">
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@guessingOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleGuessingAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
                         <path d="M9 9h.01" />
@@ -85,46 +85,46 @@
                     </svg>
                 </span>
                 <span class="min-w-0 flex-1">Guessing game</span>
-                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                 </svg>
             </summary>
-            <div class="mt-1 grid gap-1 border-t border-slate-100 pt-1">
-                <NavLink class="flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-                         ActiveClass="!bg-blue-50 !text-blue-700"
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
                          Match="NavLinkMatch.All"
                          href="guessing">
                     Dashboard
                 </NavLink>
-                <NavLink class="flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-                         ActiveClass="!bg-blue-50 !text-blue-700"
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
                          href="guessing/settings">
                     Configuration
                 </NavLink>
             </div>
         </details>
-        <details class="group rounded-xl border border-slate-200/90 bg-white/75 p-1.5 shadow-sm" open="@pointsOpen">
-            <summary class="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold text-slate-800 transition marker:hidden hover:bg-slate-50 hover:text-slate-950" @onclick="TogglePointsAsync">
-                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-emerald-600">
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="points" open="@pointsOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="TogglePointsAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M12 3v18" />
                         <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
                     </svg>
                 </span>
                 <span class="min-w-0 flex-1">Points</span>
-                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                 </svg>
             </summary>
-            <div class="mt-1 grid gap-1 border-t border-slate-100 pt-1">
-                <NavLink class="flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-                         ActiveClass="!bg-blue-50 !text-blue-700"
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
                          Match="NavLinkMatch.All"
                          href="points">
                     Dashboard
                 </NavLink>
-                <NavLink class="flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-                         ActiveClass="!bg-blue-50 !text-blue-700"
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
                          href="points/settings">
                     Configuration
                 </NavLink>
@@ -134,7 +134,7 @@
 
                 @if (selection is not null)
                 {
-                    <div class="mt-auto rounded-xl border border-slate-200/80 bg-gradient-to-br from-white/80 to-teal-50/70 p-3 shadow-sm">
+                    <div class="nav-menu__active-channel mt-auto rounded-xl p-3">
                         <p class="text-sm font-bold text-slate-950">Active channel</p>
                         <p class="mt-1 text-xs leading-5 text-slate-500">Choose a channel from the top bar when you manage more than one.</p>
                     </div>
@@ -153,6 +153,16 @@
     private IDisposable? hostedChannelSubscription;
     private IReadOnlySet<int> existingHostIds = new HashSet<int>();
     private IJSObjectReference? module;
+
+    private static string BrandHref(BlokeBotPageContext context)
+    {
+        if (context.IsBotAccount)
+            return "admin";
+
+        return context.Session.CanCreateHost && context.HostSelection is null
+            ? "host"
+            : "guessing";
+    }
 
     protected override async Task OnInitializedAsync()
     {

@@ -70,8 +70,7 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
     {
         try
         {
-            var value = await Task
-                .Run(() => LoadBackgroundValueAsync(cts.Token), cts.Token)
+            var value = await Task.Run(() => LoadBackgroundValueAsync(cts.Token), cts.Token)
                 .ConfigureAwait(false);
             await ApplyBackgroundLoadAsync(
                     loadVersion,

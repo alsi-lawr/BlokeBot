@@ -9,8 +9,9 @@
             var pageContext = PageContext.FromPrincipal(authState.User);
             var session = pageContext.Session;
             var selection = pageContext.HostSelection;
+            var showHostSelector = ShowsHostSelector(session);
         }
-        <div class="@ControlsGridClass(selection, session.IsAdminEditing, pageContext.IsBotAccount)">
+        <div class="@ControlsGridClass(selection, session.IsAdminEditing, pageContext.IsBotAccount, showHostSelector)">
             @if (!pageContext.IsBotAccount)
             {
                 <SelectedChannelBotStatus Session="session" />
@@ -30,13 +31,35 @@
 </AuthorizeView>
 
 @code {
-    private static string ControlsGridClass(BotHostSelection? selection, bool isAdminEditing, bool isBotAccount)
+    private static bool ShowsHostSelector(AuthenticatedSession session) =>
+        !session.IsAdminEditing
+        && !session.IsBotAccount
+        && session.AvailableHosts.Any(host =>
+            host.Role != AuthRole.Admin
+            && host.Role != AuthRole.Streamer
+            && !string.Equals(host.Login, session.Login, StringComparison.OrdinalIgnoreCase)
+        );
+
+    private static string ControlsGridClass(
+        BotHostSelection? selection,
+        bool isAdminEditing,
+        bool isBotAccount,
+        bool showHostSelector
+    )
     {
-        if (isBotAccount || selection is null)
+        if (isBotAccount)
             return "grid items-center gap-3 md:grid-cols-[minmax(18rem,auto)]";
 
-        return isAdminEditing
-            ? "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]"
-            : "grid items-center gap-3 md:grid-cols-[auto_auto_minmax(18rem,auto)]";
+        if (selection is null)
+        {
+            return showHostSelector
+                ? "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]"
+                : "grid items-center gap-3 md:grid-cols-[minmax(18rem,auto)]";
+        }
+
+        if (isAdminEditing || !showHostSelector)
+            return "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]";
+
+        return "grid items-center gap-3 md:grid-cols-[auto_auto_minmax(18rem,auto)]";
     }
 }

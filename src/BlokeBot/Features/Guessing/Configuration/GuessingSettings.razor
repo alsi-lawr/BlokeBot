@@ -1,11 +1,9 @@
 @page "/guessing/settings"
 @rendermode InteractiveServer
-@using BlokeBot.Hosts
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
 @inject GuessingConfigurationService Configuration
-@inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
@@ -20,7 +18,7 @@
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
     {
-        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">@statusMessage</div>
+        <div class="status-message px-4 py-3 text-sm">@statusMessage</div>
     }
 
     @if (Host is null)
@@ -61,20 +59,12 @@
     private GuessingConfiguration? config;
     private string newProfileName = string.Empty;
     private string? statusMessage;
-    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
-    private BotHostChoice? Host { get; set; }
-    private int HostId => Host?.Id ?? 0;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadHostAsync();
+        await LoadPageContextAsync();
         if (HostId != 0)
             config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
-    }
-
-    private async Task LoadHostAsync()
-    {
-        Host = (await PageContext.FromAsync(AuthenticationState)).SelectedHost;
     }
 
     private void AddOption()

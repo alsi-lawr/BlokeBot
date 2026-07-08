@@ -3,7 +3,7 @@
 @inject NavigationManager Navigation
 
 <details class="group relative mr-2 min-w-0">
-    <summary class="grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(8rem,1fr)_5.75rem_1.25rem] items-center gap-2 rounded-md border border-slate-200 bg-white pl-3 pr-4 shadow-sm marker:hidden">
+    <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(8rem,1fr)_5.75rem_1.25rem] items-center gap-2 rounded-md pl-3 pr-4 marker:hidden">
         @if (AccountImageUrl() is { Length: > 0 } imageUrl)
         {
             <img class="h-7 w-7 rounded-full border border-slate-200 object-cover" src="@imageUrl" alt="" />
@@ -14,14 +14,14 @@
             <path d="m6 9 6 6 6-6" />
         </svg>
     </summary>
-    <div class="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-xl shadow-slate-200/70">
+    <div class="surface absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
         @if (IsAdminEditing)
         {
-            <a class="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50" href="@ExitImpersonationHref" data-enhance-nav="false">
+            <a class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" href="@ExitImpersonationHref" data-enhance-nav="false">
                 Exit impersonation
             </a>
         }
-        <a class="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50" href="/auth/logout" data-enhance-nav="false">
+        <a class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" href="/auth/logout" data-enhance-nav="false">
             Sign out
         </a>
     </div>
@@ -57,9 +57,10 @@
 
     private string IdentityText()
     {
-        if (Selection is not null
-            && string.Equals(Role, AuthRole.Admin, StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin))
+        if (
+            Selection?.Current.Role == AuthRole.Admin
+            && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
+        )
         {
             return $"{Selection.Current.DisplayName} ({Session.AdminEditingLogin})";
         }
@@ -71,9 +72,9 @@
     {
         var color = role.ToLowerInvariant() switch
         {
-            AuthRole.Streamer => "bg-emerald-50 text-emerald-700 ring-emerald-200",
-            AuthRole.Admin => "bg-red-50 text-red-700 ring-red-200",
-            AuthRole.Bot => "bg-purple-50 text-purple-700 ring-purple-200",
+            "streamer" => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+            "admin" => "bg-red-50 text-red-700 ring-red-200",
+            "bot" => "bg-purple-50 text-purple-700 ring-purple-200",
             _ => "bg-sky-50 text-sky-700 ring-sky-200",
         };
 

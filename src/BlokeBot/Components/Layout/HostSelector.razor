@@ -6,22 +6,65 @@
 @inject HostedChannelDirectoryService HostedChannels
 @inject NavigationManager Navigation
 
-@if (Selection is not null && !IsAdminEditing() && visibleHosts.Count > 0)
+@if (!IsAdminEditing() && visibleHosts.Count > 0)
 {
-    <div class="hidden grid-cols-[18rem_2.25rem] items-center gap-2 md:grid">
-        <form class="relative" method="get" action="/auth/select-host" data-enhance="false">
-            <input type="hidden" name="returnUrl" value="@CurrentPath" />
-            <select class="h-9 w-full appearance-none truncate rounded-md border border-slate-200 bg-white py-0 pl-3 pr-11 text-sm font-semibold text-slate-800 shadow-sm" name="hostId" onchange="this.form.submit()">
+    var showMyChannel = ShowMyChannelControl();
+
+    <div class="hidden items-center gap-2 md:grid" style="@SelectorGridStyle(showMyChannel)">
+        @if (showMyChannel)
+        {
+            <a class="control-surface inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+               href="@MyChannelHref"
+               data-enhance-nav="false">
+                <svg class="h-4 w-4 shrink-0 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 10.5 12 4l8 6.5V20H4Z" />
+                    <path d="M9 20v-6h6v6" />
+                </svg>
+                <span class="truncate">My channel</span>
+            </a>
+        }
+        <details class="group relative min-w-0">
+            <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
+                @if (SelectedVisibleHost() is { } selected)
+                {
+                    @ChannelImage(selected)
+                    <span class="truncate text-sm font-semibold text-slate-900">@selected.DisplayName</span>
+                }
+                else
+                {
+                    <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500 ring-1 ring-slate-200">
+                        <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 8h12" />
+                            <path d="m15 5 3 3-3 3" />
+                            <path d="M18 16H6" />
+                            <path d="m9 13-3 3 3 3" />
+                        </svg>
+                    </span>
+                    <span class="truncate text-sm font-semibold text-slate-900">Other channels</span>
+                }
+                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="surface absolute left-0 z-50 mt-2 w-full overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
                 @foreach (var host in visibleHosts)
                 {
-                    <option value="@host.Id" selected="@(host.Id == selectedHostId)">@host.DisplayName</option>
+                    <a class="@HostItemClass(host)"
+                       href="@SelectHostHref(host.Id)"
+                       data-enhance-nav="false">
+                        @ChannelImage(host)
+                        <span class="min-w-0 truncate">@host.DisplayName</span>
+                        @if (host.Id == selectedHostId)
+                        {
+                            <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m5 12 4 4 10-10" />
+                            </svg>
+                        }
+                    </a>
                 }
-            </select>
-            <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-none stroke-current text-slate-400 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m6 9 6 6 6-6" />
-            </svg>
-        </form>
-        <a class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            </div>
+        </details>
+        <a class="control-surface inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
            title="Refresh channel access"
            aria-label="Refresh channel access"
            href="/auth/login?start=true&returnUrl=@CurrentReturnUrl"
@@ -97,9 +140,7 @@
 
     private async Task LoadVisibleHostsAsync()
     {
-        var selectable = Selection?.Available
-            .Where(host => !string.Equals(host.Role, AuthRole.Admin, StringComparison.OrdinalIgnoreCase))
-            .ToArray() ?? [];
+        var selectable = Session.AvailableHosts.Where(IsAlternateHost).ToArray();
 
         visibleHosts = await HostedChannels.LoadExistingHostChoicesAsync(
             selectable,
@@ -107,20 +148,90 @@
         );
         selectedHostId = visibleHosts.Any(host => host.Id == Selection?.Current.Id)
             ? Selection?.Current.Id
-            : visibleHosts.FirstOrDefault()?.Id;
+            : null;
     }
 
     private string VisibleHostsKey()
     {
-        if (Selection is null)
-            return "none";
-
         var hosts = string.Join(
             "|",
-            Selection.Available.Select(host => $"{host.Id}:{host.Role}")
+            Session.AvailableHosts.Select(host => $"{host.Id}:{host.Login}:{host.Role}")
         );
 
-        return $"{Selection.Current.Id}:{hosts}";
+        return $"{Selection?.Current.Id}:{Session.Login}:{hosts}";
     }
 
+    private bool IsAlternateHost(BotHostChoice host) =>
+        host.Role != AuthRole.Admin
+        && host.Role != AuthRole.Streamer
+        && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+
+    private BotHostChoice? SelectedVisibleHost() =>
+        selectedHostId is { } hostId
+            ? visibleHosts.FirstOrDefault(host => host.Id == hostId)
+            : null;
+
+    private string SelectHostHref(int hostId) =>
+        $"/auth/select-host?hostId={hostId}&returnUrl={CurrentReturnUrl}";
+
+    private string MyChannelHref => $"/auth/select-own-host?returnUrl={CurrentReturnUrl}";
+
+    private string SelectorGridStyle(bool showMyChannel) =>
+        showMyChannel
+            ? "grid-template-columns: 7.5rem 18rem 2.25rem"
+            : "grid-template-columns: 18rem 2.25rem";
+
+    private bool ShowMyChannelControl()
+    {
+        if (Selection is null)
+            return false;
+
+        return !IsOwnHost(Selection.Current)
+            && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
+    }
+
+    private bool IsOwnHost(BotHostChoice host) =>
+        host.Role == AuthRole.Streamer
+        && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+
+    private string HostItemClass(BotHostChoice host)
+    {
+        var selected = host.Id == selectedHostId
+            ? "bg-purple-50 text-[#6f2bdc]"
+            : "text-slate-800";
+
+        return $"menu-item grid grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 px-2.5 py-2 text-sm font-semibold {selected}";
+    }
+
+    private static string ChannelInitial(BotHostChoice host)
+    {
+        var text = !string.IsNullOrWhiteSpace(host.DisplayName)
+            ? host.DisplayName
+            : host.Login;
+
+        return string.IsNullOrWhiteSpace(text)
+            ? "?"
+            : text[..1].ToUpperInvariant();
+    }
+
+    private RenderFragment ChannelImage(BotHostChoice host)
+    {
+        return builder =>
+        {
+            if (!string.IsNullOrWhiteSpace(host.ProfileImageUrl))
+            {
+                builder.OpenElement(0, "img");
+                builder.AddAttribute(1, "class", "h-7 w-7 rounded-full border border-slate-200 object-cover");
+                builder.AddAttribute(2, "src", host.ProfileImageUrl);
+                builder.AddAttribute(3, "alt", string.Empty);
+                builder.CloseElement();
+                return;
+            }
+
+            builder.OpenElement(4, "span");
+            builder.AddAttribute(5, "class", "grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200");
+            builder.AddContent(6, ChannelInitial(host));
+            builder.CloseElement();
+        };
+    }
 }

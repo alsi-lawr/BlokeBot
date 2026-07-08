@@ -1,5 +1,5 @@
-using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.AccessLists;
+using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -24,13 +24,12 @@ public sealed class SiteAccessService(
             db.SiteAccessEntries,
             kind,
             normalized,
-            normalizedLogin =>
-                new SiteAccessEntry
-                {
-                    CreatedAtUtc = DateTime.UtcNow,
-                    Kind = kind,
-                    Login = normalizedLogin,
-                },
+            normalizedLogin => new SiteAccessEntry
+            {
+                CreatedAtUtc = DateTime.UtcNow,
+                Kind = kind,
+                Login = normalizedLogin,
+            },
             ct
         );
         if (!added)

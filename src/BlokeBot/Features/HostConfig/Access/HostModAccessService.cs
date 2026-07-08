@@ -28,14 +28,13 @@ public sealed class HostModAccessService(
             db.HostModAccessEntries.Where(x => x.HostId == hostId),
             kind,
             normalized,
-            normalizedLogin =>
-                new HostModAccessEntry
-                {
-                    CreatedAtUtc = DateTime.UtcNow,
-                    HostId = hostId,
-                    Kind = kind,
-                    Login = normalizedLogin,
-                },
+            normalizedLogin => new HostModAccessEntry
+            {
+                CreatedAtUtc = DateTime.UtcNow,
+                HostId = hostId,
+                Kind = kind,
+                Login = normalizedLogin,
+            },
             ct
         );
         if (!added)

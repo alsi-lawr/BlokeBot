@@ -1,6 +1,4 @@
 using BlokeBot;
-using BlokeBot.Eventing;
-using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
@@ -9,6 +7,7 @@ using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
 using BlokeBot.BotStatus;
 using BlokeBot.Components;
+using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Commands;
@@ -33,10 +32,11 @@ using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.HostSetup;
 using BlokeBot.Features.SiteAccess;
+using BlokeBot.Hosting;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,65 +53,19 @@ builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
         ?? new BlokeBotOptions().DatabasePath
 );
-builder.Services.AddSingleton<CommandAliasRegistry>();
-builder.Services.AddSingleton<AppCommandCatalog>();
-builder.Services.AddSingleton<AppCommandDispatcher>();
-builder.Services.AddSingleton<GuessingCommandService>();
-builder.Services.AddSingleton<GuessingConfigurationService>();
-builder.Services.AddSingleton<GuessingDashboardService>();
-builder.Services.AddSingleton<GuessingChangeNotifier>();
-builder.Services.AddSingleton<GuessingRoundService>();
-builder.Services.AddSingleton<GuessingVoteService>();
-builder.Services.AddSingleton<GuessingHistoryService>();
-builder.Services.AddSingleton<IBotHostSeeder, GuessingHostSeeder>();
-builder.Services.AddSingleton<GuessingCommandModule>();
-builder.Services.AddSingleton<PointsCommandService>();
-builder.Services.AddSingleton<PointBalanceService>();
-builder.Services.AddSingleton<PointsConfigurationService>();
-builder.Services.AddSingleton<PointsDashboardService>();
-builder.Services.AddSingleton<PointsGiveawayScheduler>();
-builder.Services.AddSingleton<IPointsGiveawayScheduler>(sp =>
-    sp.GetRequiredService<PointsGiveawayScheduler>()
-);
-builder.Services.AddHostedService(sp => sp.GetRequiredService<PointsGiveawayScheduler>());
-builder.Services.AddSingleton<PointsGiveawayService>();
-builder.Services.AddSingleton<IPointsRandom, PointsRandom>();
-builder.Services.AddSingleton<PointsChangeNotifier>();
-builder.Services.AddSingleton<PointsCommandModule>();
-builder.Services.AddSingleton<IBotHostSeeder, PointsHostSeeder>();
-builder.Services.AddSingleton<BotAdminService>();
-builder.Services.AddSingleton<SiteAccessChangeNotifier>();
-builder.Services.AddScoped<SiteAccessService>();
-builder.Services.AddSingleton<BotHostProvisioningService>();
-builder.Services.AddSingleton<BotHostRemovalService>();
 builder.Services.AddSingleton<EventBus<AppEventKind>>();
+builder
+    .Services.AddBlokeBotAppCommands()
+    .AddBlokeBotSiteAccess()
+    .AddBlokeBotAdmin()
+    .AddBlokeBotHostedChannels()
+    .AddBlokeBotHosts()
+    .AddBlokeBotGuessing()
+    .AddBlokeBotPoints()
+    .AddBlokeBotAuth();
 builder.Services.AddTwitchOAuthApi();
 builder.Services.AddTwitchHelix();
-builder.Services.AddSingleton<ChannelBotAuthorizationService>();
-builder.Services.AddSingleton<BotAccountAuthorizationService>();
-builder.Services.AddSingleton<HostedChannelChangeNotifier>();
-builder.Services.AddSingleton<HostedChannelDirectoryService>();
-builder.Services.AddSingleton<HostedChannelRuntimeControlService>();
-builder.Services.AddSingleton<HostedChannelRuntimeLifecycleService>();
-builder.Services.AddSingleton<HostedChannelRuntimeStatusService>();
-builder.Services.AddSingleton<HostBotStatusService>();
-builder.Services.AddScoped<HostConfigService>();
-builder.Services.AddSingleton<HostModAccessService>();
-builder.Services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
-builder.Services.AddSingleton<ITwitchBotChannelLifecycleNotifier, HostedChannelLifecycleNotifier>();
-builder.Services.AddScoped<BotHostSelectionAccessor>();
-builder.Services.AddScoped<BlokeBotPageContextAccessor>();
 builder.Services.AddHttpClient();
-builder.Services.AddSingleton<WebAuthConfiguration>();
-builder.Services.AddTransient<AuthorizedHostResolver>();
-builder.Services.AddTransient<ModeratedChannelLookupService>();
-builder.Services.AddTransient<WebAuthService>();
-builder.Services.AddTransient<WebOAuthClient>();
-builder.Services.AddScoped<AuthSessionService>();
-builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-builder.Services.AddTransient<UserLookupService>();
-builder.Services.AddTransient<ChannelBotOAuthService>();
-builder.Services.AddScoped<AuthCookieValidator>();
 builder
     .Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -145,7 +99,9 @@ builder.Services.AddAuthorization(options =>
         policy =>
             policy
                 .RequireAuthenticatedUser()
-                .AddRequirements(new AuthSessionCapabilityRequirement(AuthSessionCapability.Operator))
+                .AddRequirements(
+                    new AuthSessionCapabilityRequirement(AuthSessionCapability.Operator)
+                )
     );
     options.AddPolicy(
         "HostSelected",
@@ -161,7 +117,9 @@ builder.Services.AddAuthorization(options =>
         policy =>
             policy
                 .RequireAuthenticatedUser()
-                .AddRequirements(new AuthSessionCapabilityRequirement(AuthSessionCapability.BotAdmin))
+                .AddRequirements(
+                    new AuthSessionCapabilityRequirement(AuthSessionCapability.BotAdmin)
+                )
     );
 });
 
@@ -170,7 +128,10 @@ builder.Services.AddOptions<TwitchBotOptions>().Bind(botSection);
 var botRuntimeConfigured = IsBotRuntimeConfigured(botSection);
 if (botRuntimeConfigured)
 {
-    builder.Services.AddTwitchBot(botSection).AddCommandModule<AppCommandRouterModule>();
+    builder
+        .Services.AddTwitchBot(botSection)
+        .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
+        .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>();
 }
 builder.Services.TryAddSingleton<ITwitchBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
 

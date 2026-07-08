@@ -4,7 +4,6 @@ using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Rounds;
@@ -59,7 +58,7 @@ public sealed class GuessingRoundService(
         await changes.NotifyChangedAsync();
 
         var template = winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply;
-        var message = TemplateFormatter.Format(
+        var message = MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -136,15 +135,14 @@ public sealed class GuessingRoundService(
         if (hostId is null)
             return NotConfigured();
 
-        var profile =
-            string.IsNullOrWhiteSpace(profileName)
-                ? await GuessingProfileQueries.DefaultProfileWithSettingsAsync(db, hostId.Value, ct)
-                : await GuessingProfileQueries.LoadProfileByNameAsync(
-                    db,
-                    hostId.Value,
-                    profileName,
-                    ct
-                );
+        var profile = string.IsNullOrWhiteSpace(profileName)
+            ? await GuessingProfileQueries.DefaultProfileWithSettingsAsync(db, hostId.Value, ct)
+            : await GuessingProfileQueries.LoadProfileByNameAsync(
+                db,
+                hostId.Value,
+                profileName,
+                ct
+            );
 
         if (profile is null)
             return new GuessingOperationResult(false, $"Unknown round profile: {profileName}.");
@@ -184,7 +182,7 @@ public sealed class GuessingRoundService(
     }
 
     private static string Format(string template, string name, string login) =>
-        TemplateFormatter.Format(
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -194,7 +192,7 @@ public sealed class GuessingRoundService(
         );
 
     private static string FormatRoundStarted(string template, string round, string options) =>
-        TemplateFormatter.Format(
+        MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {

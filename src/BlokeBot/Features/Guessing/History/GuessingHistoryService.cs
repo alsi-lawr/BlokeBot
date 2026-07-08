@@ -84,5 +84,4 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
             TotalPlayers = totalEntries,
         };
     }
-
 }

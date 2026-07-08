@@ -83,7 +83,10 @@ public sealed class HostedChannelRuntimeStatusService(
         );
     }
 
-    private async Task<HostRuntimeFields?> LoadHostRuntimeFieldsAsync(int hostId, CancellationToken ct)
+    private async Task<HostRuntimeFields?> LoadHostRuntimeFieldsAsync(
+        int hostId,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db

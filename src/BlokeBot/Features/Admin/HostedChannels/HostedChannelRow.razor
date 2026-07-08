@@ -8,7 +8,7 @@
         }
         else
         {
-            <div class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-500">
+            <div class="surface-muted flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-slate-500">
                 @Initials(Host.DisplayName)
             </div>
         }
@@ -43,7 +43,7 @@
         {
             <a class="btn-secondary" href="@EditHostHref" data-enhance-nav="false">Edit as admin</a>
         }
-        <button class="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50" @onclick="() => RemoveHost(Host.Id)">Remove</button>
+        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700" @onclick="() => RemoveHost(Host.Id)">Remove</button>
     </div>
 </div>
 

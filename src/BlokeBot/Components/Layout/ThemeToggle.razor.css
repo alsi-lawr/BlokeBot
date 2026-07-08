@@ -1,0 +1,120 @@
+.theme-toggle {
+    align-items: center;
+    background: var(--app-control-bg);
+    border: 1px solid var(--app-control-border);
+    border-radius: 999px;
+    box-shadow: var(--app-shadow-sm);
+    color: var(--app-text-medium);
+    display: inline-flex;
+    height: 2.25rem;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    transition:
+        background-color 180ms ease,
+        border-color 180ms ease,
+        box-shadow 180ms ease,
+        color 180ms ease;
+    width: 2.25rem;
+}
+
+.theme-toggle:hover {
+    background: var(--app-control-hover);
+    border-color: var(--app-control-hover-border);
+    box-shadow: 0 8px 24px -18px rgb(15 23 42 / 0.45);
+    color: var(--app-text-strong);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--app-focus-border);
+    outline-offset: 2px;
+}
+
+.theme-toggle__glow {
+    background:
+        radial-gradient(circle, rgb(250 204 21 / 0.95) 0 34%, transparent 36%),
+        radial-gradient(circle, rgb(111 107 97 / 0.18), transparent 64%);
+    border-radius: 999px;
+    height: 1.35rem;
+    inset: auto;
+    opacity: 0.9;
+    position: absolute;
+    transform: translateX(-0.18rem) scale(1);
+    transition:
+        background 260ms ease,
+        opacity 260ms ease,
+        transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 1.35rem;
+}
+
+.theme-toggle__icons {
+    display: grid;
+    height: 1.15rem;
+    place-items: center;
+    position: relative;
+    width: 1.15rem;
+}
+
+.theme-toggle__icon {
+    fill: none;
+    grid-area: 1 / 1;
+    height: 1.15rem;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+    transition:
+        opacity 220ms ease,
+        rotate 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        scale 220ms ease,
+        transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 1.15rem;
+}
+
+.theme-toggle__sun {
+    opacity: 1;
+    rotate: 0deg;
+    scale: 1;
+}
+
+.theme-toggle__moon {
+    opacity: 0;
+    rotate: -85deg;
+    scale: 0.45;
+    transform: translateX(0.25rem);
+}
+
+.theme-toggle--dark {
+    background: var(--app-control-bg);
+    border-color: var(--app-control-border);
+    color: var(--app-text-medium);
+}
+
+.theme-toggle--dark:hover {
+    border-color: var(--app-control-hover-border);
+    color: var(--app-text-strong);
+}
+
+.theme-toggle--dark .theme-toggle__glow {
+    background: transparent;
+    opacity: 0;
+    transform: translateX(0.2rem) scale(0.72);
+}
+
+.theme-toggle--dark .theme-toggle__sun {
+    opacity: 0;
+    rotate: 95deg;
+    scale: 0.4;
+}
+
+.theme-toggle--dark .theme-toggle__moon {
+    opacity: 1;
+    rotate: 0deg;
+    scale: 1;
+    transform: translateX(0);
+}
+
+.theme-toggle:not(.theme-toggle--ready) .theme-toggle__icon,
+.theme-toggle:not(.theme-toggle--ready) .theme-toggle__glow {
+    transition-duration: 0ms;
+}

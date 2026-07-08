@@ -17,7 +17,7 @@
     <div class="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[1.2fr_auto] lg:items-end">
         <Field Label="Profile name" @bind-Value="Configuration.Profile.Name" Placeholder="Round type name" />
         <div class="flex gap-2">
-            <label class="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700">
+            <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                 <input type="checkbox" class="h-4 w-4" @bind="Configuration.Profile.IsDefault" />
                 Default
             </label>

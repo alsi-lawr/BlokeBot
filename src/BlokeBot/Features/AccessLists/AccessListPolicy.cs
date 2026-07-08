@@ -11,10 +11,7 @@ internal enum AccessListWhitelistMode
     RequiredWhenEntriesExist,
 }
 
-internal sealed record AccessListPolicy(
-    bool Enabled,
-    AccessListWhitelistMode WhitelistMode
-);
+internal sealed record AccessListPolicy(bool Enabled, AccessListWhitelistMode WhitelistMode);
 
 internal sealed record AccessListEntryValue(AccessListEntryKind Kind, string Login);
 
@@ -35,8 +32,7 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
                 normalizedLogin,
                 StringComparer.OrdinalIgnoreCase
             ),
-            AccessListWhitelistMode.RequiredWhenEntriesExist =>
-                Whitelist.Length == 0
+            AccessListWhitelistMode.RequiredWhenEntriesExist => Whitelist.Length == 0
                 || Whitelist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase),
             _ => throw new ArgumentOutOfRangeException(nameof(policy), policy.WhitelistMode, null),
         };

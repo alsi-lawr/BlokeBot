@@ -8,7 +8,7 @@
             <button class="btn-primary" @onclick="InvokeStartRoundAsync">Start round</button>
             <button class="btn-secondary" @onclick="InvokeStopGuessingAsync">Stop guessing</button>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div class="surface-muted rounded-lg p-4">
             <label class="label" for="profile">Round type</label>
             <select id="profile" class="input mt-2" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
                 @foreach (var profile in State.Profiles)
@@ -17,7 +17,7 @@
                 }
             </select>
         </div>
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div class="surface-muted rounded-lg p-4">
             <label class="label" for="winner">Winner name</label>
             <div class="mt-2 flex flex-col gap-2 sm:flex-row">
                 <input id="winner" class="input" placeholder="configured name" value="@WinnerName" @oninput="OnWinnerNameChanged" />
