@@ -1,3 +1,4 @@
+using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,7 @@ namespace BlokeBot.Features.HostedChannels.Runtime;
 public sealed class HostedChannelRuntimeControlService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
+    ChannelBotAuthorizationService channelBotAuthorization,
     IOptions<BlokeBotOptions> options
 )
 {
@@ -21,10 +23,20 @@ public sealed class HostedChannelRuntimeControlService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
-        if (host?.ChannelBotAuthorizedAtUtc is null)
+        if (host is null)
+            return HostedChannelRuntimeControlResult.Failure("Hosted channel was not found.");
+
+        if (
+            !channelBotAuthorization.IsCurrent(
+                host.ChannelBotAuthorizedAtUtc,
+                host.ChannelBotAuthorizedScopes
+            )
+        )
+        {
             return HostedChannelRuntimeControlResult.Failure(
-                "Authorize the bot on that channel before starting it."
+                "Authorize or reauthorize the bot on that channel before starting it."
             );
+        }
 
         if (CooldownMessage(host) is { } cooldown)
             return cooldown;

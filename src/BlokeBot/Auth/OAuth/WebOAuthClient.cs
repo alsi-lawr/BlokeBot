@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Twitch;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace BlokeBot.Auth.OAuth;
@@ -47,7 +48,10 @@ internal sealed class WebOAuthClient(IHttpClientFactory httpClientFactory)
             .PostAsync(TokenEndpoint, new FormUrlEncodedContent(form), ct);
 
         response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TokenResponse>(JsonOptions, ct);
+        var payload = await response.Content.ReadFromJsonAsync<TwitchAccessTokenResponse>(
+            JsonOptions,
+            ct
+        );
 
         return string.IsNullOrWhiteSpace(payload?.AccessToken)
             ? throw new InvalidOperationException("Twitch did not return an access token.")

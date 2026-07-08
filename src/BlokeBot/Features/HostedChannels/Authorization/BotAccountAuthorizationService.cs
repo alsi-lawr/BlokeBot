@@ -1,5 +1,6 @@
 using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Identity;
 using BlokeBot.Twitch;
 using Microsoft.Extensions.Options;
 
@@ -33,8 +34,8 @@ public sealed class BotAccountAuthorizationService(
 {
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct)
     {
-        var configuredBotLogin = NormalizeLogin(options.Value.Identity.BotUsername);
-        var requiredScopes = NormalizeScopes(options.Value.Identity.Scopes);
+        var configuredBotLogin = LoginName.Parse(options.Value.Identity.BotUsername).Value;
+        var requiredScopes = TwitchScopeSet.NormalizeMany(options.Value.Identity.Scopes);
 
         string token;
         try
@@ -71,10 +72,8 @@ public sealed class BotAccountAuthorizationService(
             }
 
             var grantedScopes = validation.Scopes.Order(StringComparer.Ordinal).ToArray();
-            var missingScopes = requiredScopes
-                .Except(grantedScopes, StringComparer.Ordinal)
-                .ToArray();
-            var authorizedLogin = NormalizeLogin(validation.Login);
+            var missingScopes = TwitchScopeSet.Missing(grantedScopes, requiredScopes);
+            var authorizedLogin = LoginName.Parse(validation.Login).Value;
             if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
             {
                 return new(
@@ -146,15 +145,4 @@ public sealed class BotAccountAuthorizationService(
 
         return await userToken.GetAccessTokenAsync(ct);
     }
-
-    private static string NormalizeLogin(string value) =>
-        value.Trim().TrimStart('#').ToLowerInvariant();
-
-    private static string[] NormalizeScopes(IEnumerable<string> scopes) =>
-        scopes
-            .Select(TwitchTokenValidationClient.NormalizeScope)
-            .Where(x => x.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
 }

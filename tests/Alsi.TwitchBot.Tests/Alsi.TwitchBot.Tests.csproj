@@ -9,6 +9,7 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
   </ItemGroup>
 
   <PropertyGroup>

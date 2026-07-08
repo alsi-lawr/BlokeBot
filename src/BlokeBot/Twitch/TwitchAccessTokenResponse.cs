@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace BlokeBot.Auth.OAuth;
+namespace BlokeBot.Twitch;
 
-internal sealed class TokenResponse
+internal sealed class TwitchAccessTokenResponse
 {
     [JsonPropertyName("access_token")]
     public string? AccessToken { get; init; }

@@ -149,20 +149,35 @@ internal static class BotOAuthEndpoints
                         return Results.BadRequest("Invalid state");
                     }
 
+                    var selectedHost = BotHostSelectionAccessor
+                        .FromPrincipal(context.User)
+                        ?.Current;
+                    if (selectedHost is null)
+                        return Results.BadRequest("Select a hosted channel before authorizing it.");
+
                     try
                     {
-                        await oauth.CompleteAsync(context.Request, code, ct);
+                        var grant = await oauth.CompleteAsync(context.Request, code, ct);
+                        var authorization = await channelBotAuthorization.AuthorizeAsync(
+                            selectedHost.Id,
+                            grant,
+                            ct
+                        );
+                        if (!authorization.Succeeded)
+                            return Results.BadRequest(authorization.Message);
                     }
                     catch (InvalidOperationException ex)
                     {
                         return Results.BadRequest(ex.Message);
                     }
-
-                    var selectedHost = BotHostSelectionAccessor
-                        .FromPrincipal(context.User)
-                        ?.Current;
-                    if (selectedHost is not null)
-                        await channelBotAuthorization.MarkAuthorizedAsync(selectedHost.Id, ct);
+                    catch (HttpRequestException)
+                    {
+                        return Results.Problem(
+                            "Twitch rejected the channel bot authorization request.",
+                            statusCode: StatusCodes.Status502BadGateway,
+                            title: "Channel bot authorization failed"
+                        );
+                    }
 
                     return Results.Content(
                         "OK. Channel bot authorization granted. You can close this window.",

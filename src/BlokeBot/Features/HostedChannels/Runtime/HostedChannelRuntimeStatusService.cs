@@ -1,3 +1,4 @@
+using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -7,14 +8,14 @@ namespace BlokeBot.Features.HostedChannels.Runtime;
 
 public sealed class HostedChannelRuntimeStatusService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IConfiguration configuration,
+    ChannelBotAuthorizationService channelBotAuthorization,
     HostBotStatusService botStatus
 )
 {
     public async Task<IReadOnlyList<string>> LoadConnectableChannelLoginsAsync(CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
+        var hosts = await db
             .Hosts.AsNoTracking()
             .Where(host =>
                 host.ChannelBotAuthorizedAtUtc != null
@@ -24,8 +25,23 @@ public sealed class HostedChannelRuntimeStatusService(
                 )
             )
             .OrderBy(host => host.Login)
-            .Select(host => host.Login)
+            .Select(host => new
+            {
+                host.Login,
+                host.ChannelBotAuthorizedAtUtc,
+                host.ChannelBotAuthorizedScopes,
+            })
             .ToArrayAsync(ct);
+
+        return hosts
+            .Where(host =>
+                channelBotAuthorization.IsCurrent(
+                    host.ChannelBotAuthorizedAtUtc,
+                    host.ChannelBotAuthorizedScopes
+                )
+            )
+            .Select(host => host.Login)
+            .ToArray();
     }
 
     public async Task<HostedChannelRuntimeStatus?> LoadHostStatusAsync(
@@ -34,9 +50,6 @@ public sealed class HostedChannelRuntimeStatusService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var requiredChannelScopes = FormatScopes(
-            configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>() ?? []
-        );
         var host = await db
             .Hosts.AsNoTracking()
             .Where(x => x.Id == hostId)
@@ -53,20 +66,12 @@ public sealed class HostedChannelRuntimeStatusService(
 
         return new HostedChannelRuntimeStatus(
             host.ChannelBotAuthorizedAtUtc != null,
-            host.ChannelBotAuthorizedAtUtc != null
-                && (host.ChannelBotAuthorizedScopes ?? string.Empty) == requiredChannelScopes,
+            channelBotAuthorization.IsCurrent(
+                host.ChannelBotAuthorizedAtUtc,
+                host.ChannelBotAuthorizedScopes
+            ),
             await botStatus.GetStatusAsync(host.Login, ct),
             host.BotRuntimeState
         );
     }
-
-    private static string FormatScopes(IEnumerable<string> scopes) =>
-        string.Join(
-            ' ',
-            scopes
-                .Select(x => x.Trim().ToLowerInvariant())
-                .Where(x => x.Length > 0)
-                .Distinct(StringComparer.Ordinal)
-                .Order(StringComparer.Ordinal)
-        );
 }

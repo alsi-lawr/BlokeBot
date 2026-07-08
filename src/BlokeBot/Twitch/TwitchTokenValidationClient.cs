@@ -27,13 +27,11 @@ public sealed class TwitchTokenValidationClient(IHttpClientFactory httpClientFac
             payload.UserId,
             payload.Login,
             payload
-                .Scopes.Select(NormalizeScope)
+                .Scopes.Select(TwitchScopeSet.Normalize)
                 .Where(x => x.Length > 0)
                 .ToHashSet(StringComparer.Ordinal)
         );
     }
-
-    public static string NormalizeScope(string value) => value.Trim().ToLowerInvariant();
 
     private sealed record TwitchTokenValidationResponse
     {

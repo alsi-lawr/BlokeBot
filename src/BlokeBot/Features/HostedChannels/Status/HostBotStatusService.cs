@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Alsi.TwitchBot;
+using BlokeBot.Identity;
 using BlokeBot.Twitch;
 using Microsoft.Extensions.Options;
 
@@ -165,9 +166,7 @@ public sealed class HostBotStatusService(
     private HostBotChannelStatusFlags ConfiguredFlags()
     {
         var flags = HostBotChannelStatusFlags.None;
-        foreach (
-            var scope in options.Identity.Scopes.Select(TwitchTokenValidationClient.NormalizeScope)
-        )
+        foreach (var scope in options.Identity.Scopes.Select(TwitchScopeSet.Normalize))
         {
             flags |= scope switch
             {
@@ -271,8 +270,7 @@ public sealed class HostBotStatusService(
         return request;
     }
 
-    private static string NormalizeLogin(string value) =>
-        value.Trim().TrimStart('#').ToLowerInvariant();
+    private static string NormalizeLogin(string value) => LoginName.Parse(value).Value;
 
     private sealed record TwitchStreamResponse(
         [property: JsonPropertyName("data")] IReadOnlyList<object> Data

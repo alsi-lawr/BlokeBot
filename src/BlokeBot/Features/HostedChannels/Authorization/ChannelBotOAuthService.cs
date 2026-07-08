@@ -1,10 +1,14 @@
+using System.Net.Http.Json;
+using BlokeBot.Identity;
+using BlokeBot.Twitch;
 using Microsoft.AspNetCore.WebUtilities;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public sealed class ChannelBotOAuthService(
     IConfiguration configuration,
-    IHttpClientFactory httpClientFactory
+    IHttpClientFactory httpClientFactory,
+    TwitchTokenValidationClient tokenValidation
 )
 {
     public Uri CreateAuthorizationUri(HttpRequest request, string state)
@@ -30,7 +34,11 @@ public sealed class ChannelBotOAuthService(
         return new Uri(uri);
     }
 
-    public async Task CompleteAsync(HttpRequest request, string code, CancellationToken ct)
+    public async Task<ChannelBotAuthorizationGrant> CompleteAsync(
+        HttpRequest request,
+        string code,
+        CancellationToken ct
+    )
     {
         var clientId = ClientId();
         var clientSecret = ClientSecret();
@@ -55,31 +63,33 @@ public sealed class ChannelBotOAuthService(
             );
 
         response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<TwitchAccessTokenResponse>(ct);
+        if (string.IsNullOrWhiteSpace(payload?.AccessToken))
+            throw new InvalidOperationException("Twitch did not return an access token.");
+
+        var validation = await tokenValidation.ValidateAsync(payload.AccessToken, ct);
+        if (validation is null)
+            throw new InvalidOperationException("Twitch did not validate the channel authorization grant.");
+
+        return new ChannelBotAuthorizationGrant(
+            validation.UserId,
+            LoginName.Parse(validation.Login),
+            validation.Scopes
+        );
     }
 
     public string[] RequestedScopes() =>
         configuration
             .GetSection("TwitchBot:ChannelAuthorization:Scopes")
             .Get<string[]>()
-            ?.Select(NormalizeScope)
-            .Where(x => x.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray()
-        ?? [];
+        is { } scopes
+            ? TwitchScopeSet.NormalizeMany(scopes)
+            : [];
 
     private string? ClientId() => configuration.GetSection("TwitchBot:Identity")["ClientId"];
 
     private string? ClientSecret() =>
         configuration.GetSection("TwitchBot:Identity")["ClientSecret"];
-
-    public static string FormatScopes(IEnumerable<string> scopes) =>
-        string.Join(
-            ' ',
-            scopes.Select(NormalizeScope).Where(x => x.Length > 0).Order(StringComparer.Ordinal)
-        );
-
-    private static string NormalizeScope(string value) => value.Trim().ToLowerInvariant();
 
     private static string CreateLocalUri(HttpRequest request, string path)
     {
