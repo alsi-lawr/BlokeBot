@@ -197,7 +197,10 @@ public sealed class PointsGiveawaySchedulerTests
         var httpClientFactory = new FakeHttpClientFactory();
         var status = new HostBotStatusService(
             new ServiceCollection().BuildServiceProvider(),
-            new TwitchOAuthApiClient(httpClientFactory),
+            new TwitchTokenStatusService(
+                new ServiceCollection().BuildServiceProvider(),
+                new TwitchOAuthApiClient(httpClientFactory)
+            ),
             new TwitchHelixApiClient(httpClientFactory),
             Options.Create(new TwitchBotOptions())
         );

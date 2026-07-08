@@ -1,4 +1,5 @@
 using BlokeBot.Identity;
+using BlokeBot.Auth.OAuth;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
@@ -7,6 +8,8 @@ public sealed class ChannelBotOAuthService(
     TwitchOAuthApiClient oauth
 )
 {
+    private const string CallbackPath = "/oauth/channel-bot/callback";
+
     public Uri CreateAuthorizationUri(HttpRequest request, string state)
     {
         var clientId = ClientId();
@@ -17,7 +20,7 @@ public sealed class ChannelBotOAuthService(
         return oauth.CreateAuthorizationUri(
             new TwitchAuthorizationUriRequest(
                 clientId,
-                CreateLocalUri(request, "/oauth/channel-bot/callback"),
+                OAuthRequestUri.CreateCallbackUri(request, CallbackPath),
                 scopes,
                 state
             )
@@ -39,7 +42,7 @@ public sealed class ChannelBotOAuthService(
             new TwitchAuthorizationCodeExchange(
                 clientId,
                 clientSecret,
-                CreateLocalUri(request, "/oauth/channel-bot/callback"),
+                OAuthRequestUri.CreateCallbackUri(request, CallbackPath),
                 code
             ),
             ct
@@ -67,10 +70,4 @@ public sealed class ChannelBotOAuthService(
 
     private string? ClientSecret() =>
         configuration.GetSection("TwitchBot:Identity")["ClientSecret"];
-
-    private static string CreateLocalUri(HttpRequest request, string path)
-    {
-        var pathBase = request.PathBase.HasValue ? request.PathBase.Value : string.Empty;
-        return $"{request.Scheme}://{request.Host}{pathBase}{path}";
-    }
 }

@@ -4,7 +4,7 @@ namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed class HostBotStatusService(
     IServiceProvider services,
-    TwitchOAuthApiClient oauth,
+    TwitchTokenStatusService tokens,
     TwitchHelixApiClient helix,
     IOptions<TwitchBotOptions> options
 )
@@ -20,33 +20,32 @@ public sealed class HostBotStatusService(
         if ((flags & HostBotChannelStatusFlags.ModeratorCheckConfigured) == 0)
             return HostBotChannelStatus.NotConfigured();
 
-        string token;
         try
         {
-            token = await GetUserAccessTokenAsync(ct);
-        }
-        catch (InvalidOperationException)
-        {
-            return HostBotChannelStatus.NeedsAuthorization(flags);
-        }
-
-        try
-        {
-            var validation = await oauth.ValidateTokenAsync(token, ct);
-            if (validation is null)
+            var tokenStatus = await tokens.GetUserAccessTokenStatusAsync(
+                options.Identity.Scopes,
+                ct
+            );
+            if (tokenStatus.State == TwitchTokenStatusState.Unavailable
+                || tokenStatus.State == TwitchTokenStatusState.Invalid)
+            {
                 return HostBotChannelStatus.NeedsAuthorization(flags);
+            }
+
+            if (tokenStatus.AccessToken is null || tokenStatus.Validation is null)
+                return HostBotChannelStatus.Unknown(flags);
 
             flags |= HostBotChannelStatusFlags.BotAccountAuthorized;
-            if (validation.Scopes.Contains(TwitchScopes.UserReadModeratedChannels))
+            if (tokenStatus.GrantedScopes.Contains(TwitchScopes.UserReadModeratedChannels))
                 flags |= HostBotChannelStatusFlags.ModeratorCheckGranted;
-            if (validation.Scopes.Contains(TwitchScopes.ModeratorReadFollowers))
+            if (tokenStatus.GrantedScopes.Contains(TwitchScopes.ModeratorReadFollowers))
                 flags |= HostBotChannelStatusFlags.FollowerReadGranted;
 
             if ((flags & HostBotChannelStatusFlags.ModeratorCheckGranted) == 0)
                 return HostBotChannelStatus.MissingModeratorCheckPermission(flags);
 
             var identities = await LookupUsersAsync(
-                token,
+                tokenStatus.AccessToken,
                 [TwitchLogin.Normalize(channelLogin), TwitchLogin.Normalize(options.Identity.BotUsername)],
                 ct
             );
@@ -61,11 +60,11 @@ public sealed class HostBotStatusService(
                 return HostBotChannelStatus.Unknown(flags);
             }
 
-            if (!string.Equals(validation.UserId, botId, StringComparison.Ordinal))
+            if (!string.Equals(tokenStatus.Validation.UserId, botId, StringComparison.Ordinal))
                 return HostBotChannelStatus.NeedsAuthorization(flags);
 
             var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
-                HelixContext(token),
+                HelixContext(tokenStatus.AccessToken),
                 botId,
                 channelId,
                 ct
@@ -117,7 +116,7 @@ public sealed class HostBotStatusService(
         if (status.ModeratorState != HostBotModeratorState.IsModerator)
             return FollowerCheckResult.Unavailable;
 
-        var token = await GetUserAccessTokenAsync(ct);
+        var token = await GetValidatedUserAccessTokenAsync(ct);
         var identities = await LookupUsersAsync(
             token,
             [
@@ -177,13 +176,13 @@ public sealed class HostBotStatusService(
         return await appTokens.GetAccessTokenAsync(ct);
     }
 
-    private async Task<string> GetUserAccessTokenAsync(CancellationToken ct)
+    private async Task<string> GetValidatedUserAccessTokenAsync(CancellationToken ct)
     {
-        var userToken = services.GetService<ITwitchAccessTokenProvider>();
-        if (userToken is null)
-            throw new InvalidOperationException("Twitch bot runtime is not configured.");
+        var status = await tokens.GetUserAccessTokenStatusAsync(options.Identity.Scopes, ct);
+        if (status.AccessToken is not null && status.Validation is not null)
+            return status.AccessToken;
 
-        return await userToken.GetAccessTokenAsync(ct);
+        throw new InvalidOperationException("Twitch bot runtime is not authorized.");
     }
 
     private async Task<Dictionary<string, string>> LookupUsersAsync(

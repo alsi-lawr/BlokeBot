@@ -10,7 +10,7 @@ internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)
         return oauth.CreateAuthorizationUri(
             new TwitchAuthorizationUriRequest(
                 options.ClientId,
-                CreateRedirectUri(request, options),
+                OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 Scopes,
                 state
             )
@@ -28,17 +28,11 @@ internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)
             new TwitchAuthorizationCodeExchange(
                 options.ClientId,
                 options.ClientSecret,
-                CreateRedirectUri(request, options),
+                OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 code
             ),
             ct
         );
         return token.AccessToken;
-    }
-
-    private static string CreateRedirectUri(HttpRequest request, WebAuthOptions options)
-    {
-        var pathBase = request.PathBase.HasValue ? request.PathBase.Value : string.Empty;
-        return $"{request.Scheme}://{request.Host}{pathBase}{options.CallbackPath}";
     }
 }
