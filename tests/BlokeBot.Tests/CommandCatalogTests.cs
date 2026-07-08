@@ -1,4 +1,6 @@
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.Guessing.Commands;
+using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -85,6 +87,56 @@ public sealed class CommandCatalogTests
                 CancellationToken.None
             )
         );
+    }
+
+    [Test]
+    public void Catalog_describes_every_command_kind_once()
+    {
+        AppCommandCatalog
+            .Descriptors.Select(x => x.Kind)
+            .ShouldBe(Enum.GetValues<AppCommandKind>(), ignoreOrder: true);
+    }
+
+    [Test]
+    public void Catalog_declares_feature_mappings_and_default_aliases()
+    {
+        var guessing = AppCommandCatalog.ForFeature(AppCommandFeature.Guessing);
+        var points = AppCommandCatalog.ForFeature(AppCommandFeature.Points);
+
+        guessing.Select(x => x.Kind)
+            .ShouldBe(
+                [
+                    AppCommandKind.Start,
+                    AppCommandKind.Stop,
+                    AppCommandKind.Win,
+                    AppCommandKind.Guess,
+                    AppCommandKind.Guesses,
+                ],
+                ignoreOrder: true
+            );
+        points.Select(x => x.Kind)
+            .ShouldBe(
+                [
+                    AppCommandKind.Points,
+                    AppCommandKind.GivePoints,
+                    AppCommandKind.AddPoints,
+                    AppCommandKind.RemovePoints,
+                    AppCommandKind.Gamble,
+                    AppCommandKind.Giveaway,
+                    AppCommandKind.Join,
+                    AppCommandKind.EndGiveaway,
+                    AppCommandKind.CancelGiveaway,
+                ],
+                ignoreOrder: true
+            );
+
+        AppCommandCatalog.Describe(AppCommandKind.Start).DefaultAliases.ShouldBe(["startguessing"]);
+        AppCommandCatalog.Describe(AppCommandKind.Points).DefaultAliases.ShouldBe(["points"]);
+        AppCommandCatalog.ToGuessingKind(AppCommandKind.Guess).ShouldBe(GuessCommandKind.Guess);
+        AppCommandCatalog.FromGuessingKind(GuessCommandKind.Win).ShouldBe(AppCommandKind.Win);
+        AppCommandCatalog.ToPointsKind(AppCommandKind.Gamble).ShouldBe(PointsCommandKind.Gamble);
+        AppCommandCatalog.FromPointsKind(PointsCommandKind.Giveaway)
+            .ShouldBe(AppCommandKind.Giveaway);
     }
 
     [Test]

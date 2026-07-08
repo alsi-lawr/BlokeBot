@@ -1,3 +1,4 @@
+using BlokeBot.Features.Commands;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
@@ -20,7 +21,10 @@ public sealed class PointsCommandModule(
         CancellationToken ct
     )
     {
-        if (RequiresModerator(resolution.Kind) && !TwitchModeratorPolicy.IsModerator(context.Message))
+        if (
+            AppCommandCatalog.RequiresModerator(AppCommandCatalog.FromPointsKind(resolution.Kind))
+            && !TwitchModeratorPolicy.IsModerator(context.Message)
+        )
         {
             await context.ReplyAsync(
                 Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings),
@@ -304,14 +308,6 @@ public sealed class PointsCommandModule(
             PointOperationFailureReason.InvalidAmount,
             Format(settings.InvalidAmountReply, settings)
         );
-
-    private static bool RequiresModerator(PointsCommandKind kind) =>
-        kind
-            is PointsCommandKind.AddPoints
-                or PointsCommandKind.RemovePoints
-                or PointsCommandKind.Giveaway
-                or PointsCommandKind.EndGiveaway
-                or PointsCommandKind.CancelGiveaway;
 
     private static bool TryParseSpend(
         string value,

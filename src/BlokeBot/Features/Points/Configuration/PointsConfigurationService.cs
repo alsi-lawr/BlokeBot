@@ -136,8 +136,9 @@ public sealed class PointsConfigurationService(
         await aliasRegistry.ReplaceAliasesAsync(
             db,
             hostId,
-            Enum.GetValues<PointsCommandKind>()
-                .Select(AppCommandCatalog.FromPointsKind)
+            AppCommandCatalog
+                .ForFeature(AppCommandFeature.Points)
+                .Select(x => x.Kind)
                 .ToHashSet(),
             [
                 new CommandAliasDraft(AppCommandKind.Points, aliases.PointsAliases),

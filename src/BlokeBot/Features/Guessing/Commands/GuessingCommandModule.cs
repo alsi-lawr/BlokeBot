@@ -1,6 +1,7 @@
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Features.Commands;
 
 namespace BlokeBot.Features.Guessing.Commands;
 
@@ -18,7 +19,7 @@ public sealed class GuessingCommandModule(
     )
     {
         var hostLogin = context.Message.Channel;
-        if (kind is GuessCommandKind.Start or GuessCommandKind.Stop or GuessCommandKind.Win)
+        if (AppCommandCatalog.RequiresModerator(AppCommandCatalog.FromGuessingKind(kind)))
         {
             if (!TwitchModeratorPolicy.IsModerator(context.Message))
             {

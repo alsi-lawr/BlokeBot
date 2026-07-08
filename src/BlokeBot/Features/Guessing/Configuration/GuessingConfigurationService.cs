@@ -270,8 +270,9 @@ public sealed class GuessingConfigurationService(
         await aliasRegistry.ReplaceAliasesAsync(
             db,
             hostId,
-            Enum.GetValues<GuessCommandKind>()
-                .Select(AppCommandCatalog.FromGuessingKind)
+            AppCommandCatalog
+                .ForFeature(AppCommandFeature.Guessing)
+                .Select(x => x.Kind)
                 .ToHashSet(),
             [
                 new CommandAliasDraft(AppCommandKind.Start, aliases.StartAliases),

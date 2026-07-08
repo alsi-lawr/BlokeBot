@@ -18,13 +18,13 @@ public sealed class GuessingHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFa
 
         if (!await db.CommandAliases.AnyAsync(x => x.HostId == hostId, ct))
         {
-            foreach (var (kind, aliases) in GuessingDefaults.Aliases)
-                foreach (var alias in aliases)
+            foreach (var command in AppCommandCatalog.ForFeature(AppCommandFeature.Guessing))
+                foreach (var alias in command.DefaultAliases)
                     db.CommandAliases.Add(
                         new CommandAlias
                         {
                             HostId = hostId,
-                            Kind = AppCommandCatalog.FromGuessingKind(kind),
+                            Kind = command.Kind,
                             Alias = alias,
                         }
                     );

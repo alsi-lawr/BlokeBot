@@ -25,22 +25,23 @@ public sealed class AppCommandDispatcher(
         if (resolution is null)
             return AppCommandDispatchResult.Unknown();
 
-        if (AppCommandCatalog.IsGuessing(resolution.Kind))
+        var descriptor = AppCommandCatalog.Describe(resolution.Kind);
+        if (descriptor.GuessingKind is { } guessingKind)
         {
             await guessing.HandleAsync(
                 context,
                 args,
-                AppCommandCatalog.ToGuessingKind(resolution.Kind),
+                guessingKind,
                 ct
             );
             return AppCommandDispatchResult.Handled(resolution.Kind);
         }
 
-        if (AppCommandCatalog.IsPoints(resolution.Kind))
+        if (descriptor.PointsKind is { } pointsKind)
         {
             var pointsResolution = await pointCommands.CreateResolutionAsync(
                 resolution.HostId,
-                AppCommandCatalog.ToPointsKind(resolution.Kind),
+                pointsKind,
                 ct
             );
             await points.HandleAsync(context, args, pointsResolution, ct);

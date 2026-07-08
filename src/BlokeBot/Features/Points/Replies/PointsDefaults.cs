@@ -1,4 +1,3 @@
-using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Persistence.Models;
 
@@ -6,20 +5,6 @@ namespace BlokeBot.Features.Points.Replies;
 
 public static class PointsDefaults
 {
-    public static readonly IReadOnlyDictionary<PointsCommandKind, string[]> Aliases =
-        new Dictionary<PointsCommandKind, string[]>
-        {
-            [PointsCommandKind.Points] = ["points"],
-            [PointsCommandKind.GivePoints] = ["givepoints"],
-            [PointsCommandKind.AddPoints] = ["addpoints"],
-            [PointsCommandKind.RemovePoints] = ["removepoints"],
-            [PointsCommandKind.Gamble] = ["gamble"],
-            [PointsCommandKind.Giveaway] = ["giveaway"],
-            [PointsCommandKind.Join] = ["join"],
-            [PointsCommandKind.EndGiveaway] = ["endgiveaway"],
-            [PointsCommandKind.CancelGiveaway] = ["cancelgiveaway"],
-        };
-
     public static PointsSettings Settings() => new();
 
     public static PointsReplySettingsEditor Replies(PointsSettings settings) =>

@@ -1,21 +1,7 @@
-using BlokeBot.Features.Guessing.Commands;
-
 namespace BlokeBot.Features.Guessing.Replies;
 
 public static class GuessingDefaults
 {
-    public static readonly IReadOnlyDictionary<GuessCommandKind, string[]> Aliases = new Dictionary<
-        GuessCommandKind,
-        string[]
-    >
-    {
-        [GuessCommandKind.Start] = ["startguessing"],
-        [GuessCommandKind.Stop] = ["stopguessing"],
-        [GuessCommandKind.Win] = ["win"],
-        [GuessCommandKind.Guess] = ["guess"],
-        [GuessCommandKind.Guesses] = ["guesses"],
-    };
-
     public static ReplySettingsEditor Replies() =>
         new()
         {

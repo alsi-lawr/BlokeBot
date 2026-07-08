@@ -1,5 +1,4 @@
 using BlokeBot.Features.Commands;
-using BlokeBot.Features.Points.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -19,22 +18,22 @@ public sealed class PointsHostSeeder(IDbContextFactory<BlokeBotDbContext> dbFact
         if (!await db.PointsSettings.AnyAsync(x => x.HostId == hostId, ct))
             db.PointsSettings.Add(new PointsSettings { HostId = hostId });
 
-        foreach (var (kind, aliases) in PointsDefaults.Aliases)
+        foreach (var command in AppCommandCatalog.ForFeature(AppCommandFeature.Points))
         {
             if (
                 await db.CommandAliases.AnyAsync(
-                    x => x.HostId == hostId && x.Kind == AppCommandCatalog.FromPointsKind(kind),
+                    x => x.HostId == hostId && x.Kind == command.Kind,
                     ct
                 )
             )
                 continue;
 
-            foreach (var alias in aliases)
+            foreach (var alias in command.DefaultAliases)
                 db.CommandAliases.Add(
                     new CommandAlias
                     {
                         HostId = hostId,
-                        Kind = AppCommandCatalog.FromPointsKind(kind),
+                        Kind = command.Kind,
                         Alias = alias,
                     }
                 );
