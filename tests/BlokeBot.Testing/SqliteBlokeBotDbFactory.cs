@@ -2,9 +2,9 @@ using BlokeBot.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-namespace BlokeBot.Tests;
+namespace BlokeBot.Testing;
 
-internal sealed class SqliteBlokeBotDbFactory
+public sealed class SqliteBlokeBotDbFactory
     : IDbContextFactory<BlokeBotDbContext>,
         IAsyncDisposable
 {

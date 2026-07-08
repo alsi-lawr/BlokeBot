@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using TUnit.Core;
 
-namespace BlokeBot.Tests;
+namespace BlokeBot.Persistence.Tests;
 
 public sealed class PersistenceInvariantTests
 {

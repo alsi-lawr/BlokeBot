@@ -8,6 +8,8 @@
   <Folder Name="/tests/">
     <Project Path="tests/Alsi.TwitchBot.Tests/Alsi.TwitchBot.Tests.csproj" />
     <Project Path="tests/BlokeBot.Eventing.Tests/BlokeBot.Eventing.Tests.csproj" />
+    <Project Path="tests/BlokeBot.Persistence.Tests/BlokeBot.Persistence.Tests.csproj" />
+    <Project Path="tests/BlokeBot.Testing/BlokeBot.Testing.csproj" />
     <Project Path="tests/BlokeBot.Tests/BlokeBot.Tests.csproj" />
   </Folder>
 </Solution>
