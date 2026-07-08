@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Shouldly;
 using TUnit.Core;
 
-namespace Alsi.TwitchBot.Tests;
+namespace BlokeBot.Tests;
 
 public sealed class PointsTests
 {

@@ -2,7 +2,7 @@ using BlokeBot.Auth.Web;
 using Shouldly;
 using TUnit.Core;
 
-namespace Alsi.TwitchBot.Tests;
+namespace BlokeBot.Tests;
 
 public sealed class LocalReturnUrlTests
 {

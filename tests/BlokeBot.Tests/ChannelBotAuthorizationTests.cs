@@ -16,7 +16,7 @@ using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
-namespace Alsi.TwitchBot.Tests;
+namespace BlokeBot.Tests;
 
 public sealed class ChannelBotAuthorizationTests
 {
