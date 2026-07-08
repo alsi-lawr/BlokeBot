@@ -47,8 +47,8 @@ internal sealed class WebAuthService(
         if (twitchUser is null)
             return new AuthResult(false, null, "Twitch did not return the signed-in user.");
 
-        var twitchUserId = twitchUser.Id!;
-        var twitchLogin = twitchUser.Login!;
+        var twitchUserId = twitchUser.Id;
+        var twitchLogin = twitchUser.Login;
         var userLogin = LoginName.Parse(twitchLogin).Value;
         var displayName = string.IsNullOrWhiteSpace(twitchUser.DisplayName)
             ? twitchLogin
@@ -112,11 +112,8 @@ internal sealed class WebAuthService(
     private bool IsConfiguredBotAccount(string login) =>
         !string.IsNullOrWhiteSpace(botOptions.Value.Identity.BotUsername)
         && string.Equals(
-            NormalizeLogin(login),
-            NormalizeLogin(botOptions.Value.Identity.BotUsername),
+            TwitchLogin.Normalize(login),
+            TwitchLogin.Normalize(botOptions.Value.Identity.BotUsername),
             StringComparison.Ordinal
         );
-
-    private static string NormalizeLogin(string value) =>
-        value.Trim().TrimStart('#').ToLowerInvariant();
 }

@@ -1,7 +1,7 @@
 using System.Numerics;
+using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.Points.Balances;
-using BlokeBot.Twitch;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
 using TUnit.Core;
@@ -65,8 +65,7 @@ public sealed class PointsTests
         var httpClientFactory = new FakeHttpClientFactory();
         var service = new ChannelBotOAuthService(
             configuration,
-            httpClientFactory,
-            new TwitchTokenValidationClient(httpClientFactory)
+            new TwitchOAuthApiClient(httpClientFactory)
         );
         var scopes = service.RequestedScopes();
 

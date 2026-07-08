@@ -1,0 +1,18 @@
+using System.Text.Json.Serialization;
+
+namespace Alsi.TwitchBot;
+
+public sealed record TwitchHelixUser
+{
+    [JsonPropertyName("id")]
+    public string Id { get; init; } = string.Empty;
+
+    [JsonPropertyName("login")]
+    public string Login { get; init; } = string.Empty;
+
+    [JsonPropertyName("display_name")]
+    public string DisplayName { get; init; } = string.Empty;
+
+    [JsonPropertyName("profile_image_url")]
+    public string ProfileImageUrl { get; init; } = string.Empty;
+}

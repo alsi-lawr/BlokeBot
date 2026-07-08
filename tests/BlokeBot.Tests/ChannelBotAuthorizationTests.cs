@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text;
+using Alsi.TwitchBot;
 using BlokeBot;
 using BlokeBot.AppEvents;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -24,8 +24,7 @@ public sealed class ChannelBotAuthorizationTests
         var httpClientFactory = new TwitchOAuthHttpClientFactory();
         var service = new ChannelBotOAuthService(
             ConfigurationWithScopes("channel:bot"),
-            httpClientFactory,
-            new TwitchTokenValidationClient(httpClientFactory)
+            new TwitchOAuthApiClient(httpClientFactory)
         );
 
         var grant = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
@@ -137,8 +136,7 @@ public sealed class ChannelBotAuthorizationTests
         var httpClientFactory = new EmptyHttpClientFactory();
         return new(
             ConfigurationWithScopes(scopes),
-            httpClientFactory,
-            new TwitchTokenValidationClient(httpClientFactory)
+            new TwitchOAuthApiClient(httpClientFactory)
         );
     }
 

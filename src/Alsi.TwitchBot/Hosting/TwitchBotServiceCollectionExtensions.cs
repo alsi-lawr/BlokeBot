@@ -63,6 +63,8 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<TwitchCommandDispatcher>();
         services.TryAddSingleton<TwitchAppAccessTokenProvider>();
         services.TryAddSingleton<TwitchOutboundMessageQueue>();
+        services.TryAddSingleton<TwitchOAuthApiClient>();
+        services.TryAddSingleton<TwitchHelixApiClient>();
         services.TryAddSingleton<
             ITwitchBotChannelLifecycleNotifier,
             NoOpTwitchBotChannelLifecycleNotifier

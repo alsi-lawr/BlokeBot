@@ -7,7 +7,6 @@ using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Twitch;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -198,9 +197,9 @@ public sealed class PointsGiveawaySchedulerTests
     {
         var httpClientFactory = new FakeHttpClientFactory();
         var status = new HostBotStatusService(
-            httpClientFactory,
             new ServiceCollection().BuildServiceProvider(),
-            new TwitchTokenValidationClient(httpClientFactory),
+            new TwitchOAuthApiClient(httpClientFactory),
+            new TwitchHelixApiClient(httpClientFactory),
             Options.Create(new TwitchBotOptions())
         );
         return new PointsGiveawayService(

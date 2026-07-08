@@ -1,5 +1,6 @@
 @page "/admin"
 @rendermode InteractiveServer
+@using Alsi.TwitchBot
 @using BlokeBot.Auth.Users
 @using BlokeBot.AppEvents
 @using BlokeBot.Features.Admin.Authorization
@@ -112,7 +113,7 @@
     {
         pendingRuntimeHostId = null;
         hostStatus = null;
-        UserData? user;
+        TwitchHelixUser? user;
         try
         {
             user = await Users.FindByLoginAsync(newHostLogin, CancellationToken.None);

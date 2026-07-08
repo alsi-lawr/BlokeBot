@@ -1,23 +1,22 @@
-namespace BlokeBot.Twitch;
+namespace Alsi.TwitchBot;
 
 public static class TwitchScopeSet
 {
-    public static string Normalize(string value) => value.Trim().ToLowerInvariant();
+    public static string Normalize(string? value) => (value ?? string.Empty).Trim().ToLowerInvariant();
 
-    public static string[] NormalizeMany(IEnumerable<string> scopes) =>
+    public static string[] NormalizeMany(IEnumerable<string?> scopes) =>
         scopes
             .Select(Normalize)
-            .Where(x => x.Length > 0)
+            .Where(scope => scope.Length > 0)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-    public static string Format(IEnumerable<string> scopes) =>
-        string.Join(' ', NormalizeMany(scopes));
+    public static string Format(IEnumerable<string?> scopes) => string.Join(' ', NormalizeMany(scopes));
 
     public static string[] Missing(
-        IEnumerable<string> grantedScopes,
-        IEnumerable<string> requiredScopes
+        IEnumerable<string?> grantedScopes,
+        IEnumerable<string?> requiredScopes
     )
     {
         var granted = NormalizeMany(grantedScopes).ToHashSet(StringComparer.Ordinal);

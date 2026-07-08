@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Alsi.TwitchBot;
 using BlokeBot.AppEvents;
 using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
@@ -43,17 +44,19 @@ public sealed class AuthorizedHostResolverTests
             ),
             modAccess,
             new ModeratedChannelLookupService(
-                new JsonHttpClientFactory(
-                    """
-                    {
-                      "data": [
-                        { "broadcaster_login": "allowed" },
-                        { "broadcaster_login": "blocked" },
-                        { "broadcaster_login": "streamer" }
-                      ],
-                      "pagination": {}
-                    }
-                    """
+                new TwitchHelixApiClient(
+                    new JsonHttpClientFactory(
+                        """
+                        {
+                          "data": [
+                            { "broadcaster_login": "allowed" },
+                            { "broadcaster_login": "blocked" },
+                            { "broadcaster_login": "streamer" }
+                          ],
+                          "pagination": {}
+                        }
+                        """
+                    )
                 )
             )
         );

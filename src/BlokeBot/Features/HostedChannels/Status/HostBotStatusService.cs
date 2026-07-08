@@ -1,22 +1,15 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using Alsi.TwitchBot;
-using BlokeBot.Identity;
-using BlokeBot.Twitch;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed class HostBotStatusService(
-    IHttpClientFactory httpClientFactory,
     IServiceProvider services,
-    TwitchTokenValidationClient tokenValidation,
+    TwitchOAuthApiClient oauth,
+    TwitchHelixApiClient helix,
     IOptions<TwitchBotOptions> options
 )
 {
-    private readonly HttpClient http = httpClientFactory.CreateClient("twitch-helix");
     private readonly TwitchBotOptions options = options.Value;
 
     public async Task<HostBotChannelStatus> GetStatusAsync(
@@ -40,7 +33,7 @@ public sealed class HostBotStatusService(
 
         try
         {
-            var validation = await tokenValidation.ValidateAsync(token, ct);
+            var validation = await oauth.ValidateTokenAsync(token, ct);
             if (validation is null)
                 return HostBotChannelStatus.NeedsAuthorization(flags);
 
@@ -55,13 +48,13 @@ public sealed class HostBotStatusService(
 
             var identities = await LookupUsersAsync(
                 token,
-                [NormalizeLogin(channelLogin), NormalizeLogin(options.Identity.BotUsername)],
+                [TwitchLogin.Normalize(channelLogin), TwitchLogin.Normalize(options.Identity.BotUsername)],
                 ct
             );
             if (
-                !identities.TryGetValue(NormalizeLogin(channelLogin), out var channelId)
+                !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
                 || !identities.TryGetValue(
-                    NormalizeLogin(options.Identity.BotUsername),
+                    TwitchLogin.Normalize(options.Identity.BotUsername),
                     out var botId
                 )
             )
@@ -72,10 +65,15 @@ public sealed class HostBotStatusService(
             if (!string.Equals(validation.UserId, botId, StringComparison.Ordinal))
                 return HostBotChannelStatus.NeedsAuthorization(flags);
 
-            var moderatorCheck = await BotModeratesChannelAsync(token, botId, channelId, ct);
+            var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
+                HelixContext(token),
+                botId,
+                channelId,
+                ct
+            );
             return moderatorCheck switch
             {
-                ModeratorCheckResult.IsModerator
+                TwitchModeratedChannelStatus.IsModerator
                     when (
                         flags
                         & (
@@ -87,13 +85,13 @@ public sealed class HostBotStatusService(
                             HostBotChannelStatusFlags.FollowerReadConfigured
                             | HostBotChannelStatusFlags.FollowerReadGranted
                         ) => HostBotChannelStatus.Ready(),
-                ModeratorCheckResult.IsModerator =>
+                TwitchModeratedChannelStatus.IsModerator =>
                     HostBotChannelStatus.MissingFollowerReadPermission(flags),
-                ModeratorCheckResult.NotModerator => HostBotChannelStatus.NotModerator(flags),
-                ModeratorCheckResult.NeedsAuthorization => HostBotChannelStatus.NeedsAuthorization(
+                TwitchModeratedChannelStatus.NotModerator => HostBotChannelStatus.NotModerator(flags),
+                TwitchModeratedChannelStatus.NeedsAuthorization => HostBotChannelStatus.NeedsAuthorization(
                     flags
                 ),
-                ModeratorCheckResult.MissingPermission =>
+                TwitchModeratedChannelStatus.MissingPermission =>
                     HostBotChannelStatus.MissingModeratorCheckPermission(flags),
                 _ => HostBotChannelStatus.Unknown(flags),
             };
@@ -107,14 +105,7 @@ public sealed class HostBotStatusService(
     public async Task<bool> IsStreamLiveAsync(string channelLogin, CancellationToken ct)
     {
         var token = await GetAppTokenAsync(ct);
-        var uri =
-            "https://api.twitch.tv/helix/streams?user_login="
-            + Uri.EscapeDataString(NormalizeLogin(channelLogin));
-        using var request = CreateRequest(HttpMethod.Get, uri, token);
-        using var response = await http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TwitchStreamResponse>(ct);
-        return payload?.Data.Count > 0;
+        return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct);
     }
 
     public async Task<FollowerCheckResult> IsFollowerAsync(
@@ -131,36 +122,33 @@ public sealed class HostBotStatusService(
         var identities = await LookupUsersAsync(
             token,
             [
-                NormalizeLogin(channelLogin),
-                NormalizeLogin(viewerLogin),
-                NormalizeLogin(options.Identity.BotUsername),
+                TwitchLogin.Normalize(channelLogin),
+                TwitchLogin.Normalize(viewerLogin),
+                TwitchLogin.Normalize(options.Identity.BotUsername),
             ],
             ct
         );
         if (
-            !identities.TryGetValue(NormalizeLogin(channelLogin), out var channelId)
-            || !identities.TryGetValue(NormalizeLogin(viewerLogin), out var viewerId)
-            || !identities.TryGetValue(NormalizeLogin(options.Identity.BotUsername), out var botId)
+            !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
+            || !identities.TryGetValue(TwitchLogin.Normalize(viewerLogin), out var viewerId)
+            || !identities.TryGetValue(TwitchLogin.Normalize(options.Identity.BotUsername), out var botId)
         )
         {
             return FollowerCheckResult.NotEligible;
         }
 
-        var uri =
-            "https://api.twitch.tv/helix/channels/followers"
-            + $"?broadcaster_id={Uri.EscapeDataString(channelId)}"
-            + $"&user_id={Uri.EscapeDataString(viewerId)}"
-            + $"&moderator_id={Uri.EscapeDataString(botId)}";
-        using var request = CreateRequest(HttpMethod.Get, uri, token);
-        using var response = await http.SendAsync(request, ct);
-        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
-            return FollowerCheckResult.Unavailable;
-
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TwitchFollowerResponse>(ct);
-        return payload?.Data.Count > 0
-            ? FollowerCheckResult.Eligible
-            : FollowerCheckResult.NotEligible;
+        return await helix.GetFollowerStatusAsync(
+            HelixContext(token),
+            channelId,
+            viewerId,
+            botId,
+            ct
+        ) switch
+        {
+            TwitchFollowerStatus.Follows => FollowerCheckResult.Eligible,
+            TwitchFollowerStatus.DoesNotFollow => FollowerCheckResult.NotEligible,
+            _ => FollowerCheckResult.Unavailable,
+        };
     }
 
     private HostBotChannelStatusFlags ConfiguredFlags()
@@ -179,52 +167,6 @@ public sealed class HostBotStatusService(
         }
 
         return flags;
-    }
-
-    private async Task<ModeratorCheckResult> BotModeratesChannelAsync(
-        string token,
-        string botId,
-        string channelId,
-        CancellationToken ct
-    )
-    {
-        string? cursor = null;
-        do
-        {
-            var uri =
-                "https://api.twitch.tv/helix/moderation/channels"
-                + $"?user_id={Uri.EscapeDataString(botId)}"
-                + "&first=100"
-                + (
-                    string.IsNullOrWhiteSpace(cursor)
-                        ? string.Empty
-                        : $"&after={Uri.EscapeDataString(cursor)}"
-                );
-            using var request = CreateRequest(HttpMethod.Get, uri, token);
-            using var response = await http.SendAsync(request, ct);
-            if (response.StatusCode == HttpStatusCode.Unauthorized)
-                return ModeratorCheckResult.NeedsAuthorization;
-
-            if (response.StatusCode == HttpStatusCode.Forbidden)
-                return ModeratorCheckResult.MissingPermission;
-
-            if (!response.IsSuccessStatusCode)
-                return ModeratorCheckResult.Unknown;
-
-            var payload = await response.Content.ReadFromJsonAsync<TwitchModeratedChannelsResponse>(
-                ct
-            );
-            if (
-                payload?.Data.Any(x =>
-                    string.Equals(x.BroadcasterId, channelId, StringComparison.Ordinal)
-                ) == true
-            )
-                return ModeratorCheckResult.IsModerator;
-
-            cursor = payload?.Pagination.Cursor;
-        } while (!string.IsNullOrWhiteSpace(cursor));
-
-        return ModeratorCheckResult.NotModerator;
     }
 
     private async Task<string> GetAppTokenAsync(CancellationToken ct)
@@ -251,61 +193,14 @@ public sealed class HostBotStatusService(
         CancellationToken ct
     )
     {
-        var uri =
-            "https://api.twitch.tv/helix/users?"
-            + string.Join('&', logins.Distinct().Select(x => $"login={Uri.EscapeDataString(x)}"));
-        using var request = CreateRequest(HttpMethod.Get, uri, token);
-        using var response = await http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TwitchUsersResponse>(ct);
-        return payload?.Data.ToDictionary(x => x.Login, x => x.Id, StringComparer.OrdinalIgnoreCase)
-            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var users = await helix.GetUsersByLoginAsync(HelixContext(token), logins, ct);
+        return users.ToDictionary(
+            x => TwitchLogin.Normalize(x.Login),
+            x => x.Id,
+            StringComparer.OrdinalIgnoreCase
+        );
     }
 
-    private HttpRequestMessage CreateRequest(HttpMethod method, string uri, string accessToken)
-    {
-        var request = new HttpRequestMessage(method, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("Client-Id", options.Identity.ClientId);
-        return request;
-    }
-
-    private static string NormalizeLogin(string value) => LoginName.Parse(value).Value;
-
-    private sealed record TwitchStreamResponse(
-        [property: JsonPropertyName("data")] IReadOnlyList<object> Data
-    );
-
-    private sealed record TwitchFollowerResponse(
-        [property: JsonPropertyName("data")] IReadOnlyList<object> Data
-    );
-
-    private sealed record TwitchUsersResponse(
-        [property: JsonPropertyName("data")] IReadOnlyList<TwitchUser> Data
-    );
-
-    private sealed record TwitchUser(
-        [property: JsonPropertyName("id")] string Id,
-        [property: JsonPropertyName("login")] string Login
-    );
-
-    private sealed record TwitchModeratedChannelsResponse(
-        [property: JsonPropertyName("data")] IReadOnlyList<TwitchModeratedChannel> Data,
-        [property: JsonPropertyName("pagination")] TwitchPagination Pagination
-    );
-
-    private sealed record TwitchModeratedChannel(
-        [property: JsonPropertyName("broadcaster_id")] string BroadcasterId
-    );
-
-    private sealed record TwitchPagination([property: JsonPropertyName("cursor")] string? Cursor);
-
-    private enum ModeratorCheckResult
-    {
-        Unknown,
-        NeedsAuthorization,
-        MissingPermission,
-        IsModerator,
-        NotModerator,
-    }
+    private TwitchHelixRequestContext HelixContext(string token) =>
+        new(options.Identity.ClientId, token);
 }

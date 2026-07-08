@@ -1,21 +1,18 @@
-using System.Net.Http.Headers;
-using System.Text.Json;
 using Alsi.TwitchBot;
 using BlokeBot.Auth.OAuth;
-using BlokeBot.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace BlokeBot.Auth.Users;
 
 internal sealed class UserLookupService(
-    IHttpClientFactory httpClientFactory,
     WebAuthConfiguration configuration,
-    ITwitchAccessTokenProvider tokens
+    ITwitchAccessTokenProvider tokens,
+    TwitchHelixApiClient helix
 )
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    public async Task<UserData?> FindByLoginAsync(string login, CancellationToken cancellationToken)
+    public async Task<TwitchHelixUser?> FindByLoginAsync(
+        string login,
+        CancellationToken cancellationToken
+    )
     {
         return await FindByLoginAsync(
             CreateCurrentOptions(),
@@ -25,74 +22,39 @@ internal sealed class UserLookupService(
         );
     }
 
-    public async Task<UserData?> FindByLoginAsync(
+    public async Task<TwitchHelixUser?> FindByLoginAsync(
         WebAuthOptions options,
         string accessToken,
         string login,
         CancellationToken cancellationToken
     )
     {
-        var normalized = LoginName.Parse(login);
-        if (normalized.IsEmpty)
+        var normalized = TwitchLogin.Normalize(login);
+        if (normalized.Length == 0)
             return null;
 
-        var uri = QueryHelpers.AddQueryString(
-            "https://api.twitch.tv/helix/users",
-            new Dictionary<string, string?> { ["login"] = normalized.Value }
-        );
-        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("Client-Id", options.ClientId);
-
-        using var response = await httpClientFactory
-            .CreateClient()
-            .SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var payload = await response.Content.ReadFromJsonAsync<UserResponse>(
-            JsonOptions,
+        var users = await helix.GetUsersByLoginAsync(
+            new TwitchHelixRequestContext(options.ClientId, accessToken),
+            [normalized],
             cancellationToken
         );
-        return payload?.Data.FirstOrDefault();
+        return users.FirstOrDefault();
     }
 
-    public async Task<UserData?> GetCurrentUserAsync(
+    public async Task<TwitchHelixUser?> GetCurrentUserAsync(
         WebAuthOptions options,
         string accessToken,
         CancellationToken cancellationToken
     )
     {
-        using var request = CreateRequest(
-            "https://api.twitch.tv/helix/users",
-            options,
-            accessToken
-        );
-        using var response = await httpClientFactory
-            .CreateClient()
-            .SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var payload = await response.Content.ReadFromJsonAsync<UserResponse>(
-            JsonOptions,
+        var user = await helix.GetCurrentUserAsync(
+            new TwitchHelixRequestContext(options.ClientId, accessToken),
             cancellationToken
         );
-        var user = payload?.Data.FirstOrDefault();
 
         return string.IsNullOrWhiteSpace(user?.Id) || string.IsNullOrWhiteSpace(user.Login)
             ? null
             : user;
-    }
-
-    private static HttpRequestMessage CreateRequest(
-        string uri,
-        WebAuthOptions options,
-        string accessToken
-    )
-    {
-        var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("Client-Id", options.ClientId);
-        return request;
     }
 
     private WebAuthOptions CreateCurrentOptions() => configuration.CurrentOptions;

@@ -8,7 +8,8 @@ namespace Alsi.TwitchBot;
 
 internal sealed class TwitchHelixChatClient(
     IHttpClientFactory factory,
-    IOptions<TwitchBotOptions> options
+    IOptions<TwitchBotOptions> options,
+    TwitchHelixApiClient helix
 )
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -75,25 +76,17 @@ internal sealed class TwitchHelixChatClient(
         CancellationToken cancellationToken
     )
     {
-        var channel = NormalizeLogin(channelLogin);
-        var bot = NormalizeLogin(opts.Identity.BotUsername);
-        var uri =
-            "https://api.twitch.tv/helix/users"
-            + $"?login={Uri.EscapeDataString(channel)}"
-            + $"&login={Uri.EscapeDataString(bot)}";
-
-        using var request = CreateRequest(HttpMethod.Get, uri, accessToken);
-        using var response = await http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var payload = await response.Content.ReadFromJsonAsync<TwitchUserLookupResponse>(
-            JsonOptions,
+        var channel = TwitchLogin.Normalize(channelLogin);
+        var bot = TwitchLogin.Normalize(opts.Identity.BotUsername);
+        var users = await helix.GetUsersByLoginAsync(
+            new TwitchHelixRequestContext(opts.Identity.ClientId, accessToken),
+            [channel, bot],
             cancellationToken
         );
-        var broadcaster = payload?.Data.FirstOrDefault(user =>
+        var broadcaster = users.FirstOrDefault(user =>
             user.Login.Equals(channel, StringComparison.OrdinalIgnoreCase)
         );
-        var botUser = payload?.Data.FirstOrDefault(user =>
+        var botUser = users.FirstOrDefault(user =>
             user.Login.Equals(bot, StringComparison.OrdinalIgnoreCase)
         );
 
@@ -151,6 +144,4 @@ internal sealed class TwitchHelixChatClient(
         return request;
     }
 
-    private static string NormalizeLogin(string value) =>
-        value.Trim().TrimStart('#').ToLowerInvariant();
 }

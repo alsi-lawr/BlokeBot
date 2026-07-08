@@ -1,7 +1,7 @@
+using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
-using BlokeBot.Twitch;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;

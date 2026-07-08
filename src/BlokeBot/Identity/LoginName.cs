@@ -1,3 +1,5 @@
+using Alsi.TwitchBot;
+
 namespace BlokeBot.Identity;
 
 public readonly record struct LoginName
@@ -12,7 +14,7 @@ public readonly record struct LoginName
     public bool IsEmpty => Value.Length == 0;
 
     public static LoginName Parse(string? value) =>
-        new((value ?? string.Empty).Trim().TrimStart('#').ToLowerInvariant());
+        new(TwitchLogin.Normalize(value));
 
     public override string ToString() => Value;
 

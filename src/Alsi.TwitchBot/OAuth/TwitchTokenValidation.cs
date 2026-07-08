@@ -1,4 +1,4 @@
-namespace BlokeBot.Twitch;
+namespace Alsi.TwitchBot;
 
 public sealed record TwitchTokenValidation(
     string UserId,

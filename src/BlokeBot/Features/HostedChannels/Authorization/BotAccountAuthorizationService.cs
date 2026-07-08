@@ -1,7 +1,6 @@
 using Alsi.TwitchBot;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
-using BlokeBot.Twitch;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
@@ -28,7 +27,7 @@ public sealed record BotAccountAuthorizationStatus(
 public sealed class BotAccountAuthorizationService(
     IOptions<TwitchBotOptions> options,
     IServiceProvider services,
-    TwitchTokenValidationClient tokenValidation,
+    TwitchOAuthApiClient oauth,
     HostedChannelChangeNotifier changes
 )
 {
@@ -57,7 +56,7 @@ public sealed class BotAccountAuthorizationService(
 
         try
         {
-            var validation = await tokenValidation.ValidateAsync(token, ct);
+            var validation = await oauth.ValidateTokenAsync(token, ct);
             if (validation is null)
             {
                 return new(

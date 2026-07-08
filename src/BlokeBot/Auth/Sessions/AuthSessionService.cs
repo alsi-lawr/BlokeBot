@@ -156,13 +156,10 @@ internal sealed class AuthSessionService(
     public bool IsConfiguredBotAccount(string login) =>
         !string.IsNullOrWhiteSpace(botOptions.Value.Identity.BotUsername)
         && string.Equals(
-            NormalizeLogin(login),
-            NormalizeLogin(botOptions.Value.Identity.BotUsername),
+            TwitchLogin.Normalize(login),
+            TwitchLogin.Normalize(botOptions.Value.Identity.BotUsername),
             StringComparison.Ordinal
         );
-
-    private static string NormalizeLogin(string value) =>
-        value.Trim().TrimStart('#').ToLowerInvariant();
 
     private static async Task SignInAsync(HttpContext context, ClaimsPrincipal principal)
     {
