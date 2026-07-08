@@ -74,11 +74,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Kind).HasMaxLength(32);
             b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.Kind,
-                    x.Login,
-                })
+            {
+                x.HostId,
+                x.Kind,
+                x.Login,
+            })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
