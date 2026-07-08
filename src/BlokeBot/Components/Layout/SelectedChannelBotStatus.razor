@@ -1,10 +1,9 @@
 @using BlokeBot.Auth.Sessions
-@using BlokeBot.AppEvents
 @using BlokeBot.Features.HostedChannels.Runtime
 @using BlokeBot.Hosts
 @using BlokeBot.Persistence.Models
 @implements IDisposable
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject HostedChannelRuntimeStatusService HostedChannels
 
 @if (Selection is not null && selectedHostStatus is not null)

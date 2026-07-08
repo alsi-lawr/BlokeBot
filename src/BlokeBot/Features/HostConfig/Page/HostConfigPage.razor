@@ -1,7 +1,7 @@
 @page "/host"
 @rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
-@using BlokeBot.AppEvents
+@using BlokeBot.Eventing
 @using BlokeBot.Features.HostConfig.Access
 @using BlokeBot.Features.HostedChannels.Authorization
 @using BlokeBot.Features.HostedChannels.Runtime
@@ -15,7 +15,7 @@
 @inject HostModAccessService ModAccess
 @inject HostedChannelRuntimeControlService Runtime
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
 @inject BlokeBotPageContextAccessor PageContext
 

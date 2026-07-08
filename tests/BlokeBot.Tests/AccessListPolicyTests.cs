@@ -1,4 +1,4 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.SiteAccess;
@@ -82,7 +82,7 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new AppEventBus());
+        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
 
         (await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None))
             .ShouldBeTrue();
@@ -98,7 +98,7 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new AppEventBus());
+        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
 
         await service.AddEntryAsync(
             hostId,
@@ -126,7 +126,7 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = new HostModAccessService(dbFactory, new AppEventBus());
+        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
 
         await service.AddEntryAsync(
             hostId,
@@ -151,7 +151,7 @@ public sealed class AccessListPolicyTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var firstHostId = await SeedHostAsync(dbFactory, "first");
         var secondHostId = await SeedHostAsync(dbFactory, "second");
-        var service = new HostModAccessService(dbFactory, new AppEventBus());
+        var service = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
 
         await service.AddEntryAsync(
             firstHostId,
@@ -171,7 +171,7 @@ public sealed class AccessListPolicyTests
         string[]? botAdmins = null
     )
     {
-        var events = new AppEventBus();
+        var events = new EventBus<AppEventKind>();
         return new SiteAccessService(
             dbFactory,
             new BotAdminService(Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })),

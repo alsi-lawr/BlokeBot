@@ -1,8 +1,8 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 
 namespace BlokeBot.Features.SiteAccess;
 
-public sealed class SiteAccessChangeNotifier(AppEventBus events)
-    : AppEventNotifier(events, AppEventKind.SiteAccessChanged)
+public sealed class SiteAccessChangeNotifier(EventBus<AppEventKind> events)
+    : EventNotifier<AppEventKind>(events, AppEventKind.SiteAccessChanged)
 {
 }

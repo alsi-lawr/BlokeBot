@@ -1,9 +1,8 @@
 ﻿@rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
-@using BlokeBot.AppEvents
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Hosts
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject HostedChannelDirectoryService HostedChannels
 @inject IJSRuntime Js
 @inject BlokeBotPageContextAccessor PageContext

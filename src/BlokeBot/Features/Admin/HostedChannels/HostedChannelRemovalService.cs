@@ -1,4 +1,4 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,7 +6,7 @@ namespace BlokeBot.Features.Admin.HostedChannels;
 
 public sealed class HostedChannelRemovalService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    AppEventBus events
+    EventBus<AppEventKind> events
 )
 {
     public async Task<bool> RemoveAsync(int hostId, CancellationToken ct)

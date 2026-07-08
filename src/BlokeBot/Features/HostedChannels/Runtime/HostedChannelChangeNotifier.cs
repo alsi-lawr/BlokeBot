@@ -1,8 +1,8 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 
 namespace BlokeBot.Features.HostedChannels.Runtime;
 
-public sealed class HostedChannelChangeNotifier(AppEventBus events)
-    : AppEventNotifier(events, AppEventKind.HostedChannelsChanged)
+public sealed class HostedChannelChangeNotifier(EventBus<AppEventKind> events)
+    : EventNotifier<AppEventKind>(events, AppEventKind.HostedChannelsChanged)
 {
 }

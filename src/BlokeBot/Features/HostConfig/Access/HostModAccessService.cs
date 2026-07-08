@@ -1,4 +1,4 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -8,7 +8,7 @@ namespace BlokeBot.Features.HostConfig.Access;
 
 public sealed class HostModAccessService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    AppEventBus events
+    EventBus<AppEventKind> events
 )
 {
     public async Task AddEntryAsync(

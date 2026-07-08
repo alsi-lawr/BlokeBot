@@ -1,4 +1,4 @@
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -8,7 +8,7 @@ namespace BlokeBot.Hosts;
 
 public sealed class BotHostProvisioningService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    AppEventBus events,
+    EventBus<AppEventKind> events,
     IEnumerable<IBotHostSeeder> seeders
 )
 {

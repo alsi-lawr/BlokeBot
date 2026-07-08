@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using Alsi.TwitchBot;
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
 using BlokeBot.Auth.OAuth;
@@ -27,7 +27,7 @@ public sealed class AuthorizedHostResolverTests
         await SeedHostAsync(dbFactory, "streamer", "Streamer");
         await SeedHostAsync(dbFactory, "allowed", "Allowed");
         var blockedHostId = await SeedHostAsync(dbFactory, "blocked", "Blocked");
-        var events = new AppEventBus();
+        var events = new EventBus<AppEventKind>();
         var modAccess = new HostModAccessService(dbFactory, events);
         await modAccess.AddEntryAsync(
             blockedHostId,

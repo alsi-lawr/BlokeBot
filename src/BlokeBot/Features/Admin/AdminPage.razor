@@ -2,10 +2,10 @@
 @rendermode InteractiveServer
 @using Alsi.TwitchBot
 @using BlokeBot.Auth.Users
-@using BlokeBot.AppEvents
 @using BlokeBot.Features.Admin.Authorization
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Features.Admin.SiteAccess
+@using BlokeBot.Eventing
 @using BlokeBot.Features.HostedChannels.Authorization
 @using BlokeBot.Features.HostedChannels.Runtime
 @using BlokeBot.Features.SiteAccess
@@ -21,7 +21,7 @@
 @inject HostedChannelDirectoryService HostedChannels
 @inject BotAccountAuthorizationService BotAccountAuthorization
 @inject UserLookupService Users
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
 @inject BlokeBotPageContextAccessor PageContext
 

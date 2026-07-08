@@ -1,4 +1,4 @@
-namespace BlokeBot.AppEvents;
+namespace BlokeBot;
 
 public enum AppEventKind
 {

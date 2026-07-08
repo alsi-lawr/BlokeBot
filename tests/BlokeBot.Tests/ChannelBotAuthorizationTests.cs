@@ -2,7 +2,7 @@ using System.Net;
 using System.Text;
 using Alsi.TwitchBot;
 using BlokeBot;
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
@@ -140,7 +140,7 @@ public sealed class ChannelBotAuthorizationTests
         );
     }
 
-    private static HostedChannelChangeNotifier ChangeNotifier() => new(new AppEventBus());
+    private static HostedChannelChangeNotifier ChangeNotifier() => new(new EventBus<AppEventKind>());
 
     private static IConfiguration ConfigurationWithScopes(params string[] scopes)
     {

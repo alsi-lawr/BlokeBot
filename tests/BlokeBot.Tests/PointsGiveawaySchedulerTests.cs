@@ -1,5 +1,5 @@
 using Alsi.TwitchBot;
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
@@ -208,7 +208,7 @@ public sealed class PointsGiveawaySchedulerTests
             status,
             new FixedPointsRandom(),
             scheduler,
-            new PointsChangeNotifier(new AppEventBus())
+            new PointsChangeNotifier(new EventBus<AppEventKind>())
         );
     }
 

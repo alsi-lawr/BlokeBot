@@ -1,9 +1,8 @@
 @using BlokeBot.Auth.Sessions
-@using BlokeBot.AppEvents
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Hosts
 @implements IDisposable
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject HostedChannelDirectoryService HostedChannels
 @inject NavigationManager Navigation
 

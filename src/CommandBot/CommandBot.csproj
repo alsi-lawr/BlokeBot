@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-CommandBot-6c961022-afeb-4c0b-acda-d2a926423d36</UserSecretsId>
   </PropertyGroup>
 
@@ -13,6 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Alsi.TwitchBot\Alsi.TwitchBot.csproj" SetTargetFramework="TargetFramework=net10.0" />
+    <ProjectReference Include="..\Alsi.TwitchBot\Alsi.TwitchBot.csproj" />
   </ItemGroup>
 </Project>

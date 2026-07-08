@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Alsi.TwitchBot;
 using BlokeBot;
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.HostConfig.Access;
@@ -90,7 +90,7 @@ public sealed class AuthSessionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var modAccess = new HostModAccessService(dbFactory, new AppEventBus());
+        var modAccess = new HostModAccessService(dbFactory, new EventBus<AppEventKind>());
         await modAccess.AddEntryAsync(
             hostId,
             AccessListEntryKind.Blacklist,
@@ -122,7 +122,7 @@ public sealed class AuthSessionTests
         string botUsername = "botaccount"
     )
     {
-        var appEvents = new AppEventBus();
+        var appEvents = new EventBus<AppEventKind>();
         var admins = new BotAdminService(
             Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
         );

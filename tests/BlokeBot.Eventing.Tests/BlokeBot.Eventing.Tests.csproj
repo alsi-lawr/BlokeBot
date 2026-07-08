@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Alsi.TwitchBot\Alsi.TwitchBot.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Eventing\BlokeBot.Eventing.csproj" />
   </ItemGroup>
 
   <ItemGroup>

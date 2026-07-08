@@ -1,6 +1,6 @@
 using Alsi.TwitchBot;
 using BlokeBot;
-using BlokeBot.AppEvents;
+using BlokeBot.Eventing;
 using BlokeBot.Auth.Hosts;
 using BlokeBot.Auth.Moderation;
 using BlokeBot.Auth.OAuth;
@@ -84,7 +84,7 @@ builder.Services.AddSingleton<BotAdminService>();
 builder.Services.AddSingleton<SiteAccessChangeNotifier>();
 builder.Services.AddScoped<SiteAccessService>();
 builder.Services.AddSingleton<BotHostProvisioningService>();
-builder.Services.AddSingleton<AppEventBus>();
+builder.Services.AddSingleton<EventBus<AppEventKind>>();
 builder.Services.TryAddSingleton<TwitchOAuthApiClient>();
 builder.Services.TryAddSingleton<TwitchHelixApiClient>();
 builder.Services.AddSingleton<ChannelBotAuthorizationService>();

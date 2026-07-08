@@ -3,7 +3,7 @@
 @rendermode InteractiveServer
 @using System.Globalization
 @using Alsi.TwitchBot
-@using BlokeBot.AppEvents
+@using BlokeBot.Eventing
 @using BlokeBot.Hosts
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
@@ -11,7 +11,7 @@
 @inject GuessingDashboardService Dashboard
 @inject GuessingHistoryService History
 @inject GuessingRoundService Rounds
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject ITwitchChatMessageSender Chat
 @inject BlokeBotPageContextAccessor PageContext
 @implements IDisposable

@@ -1,13 +1,13 @@
 @page "/points"
 @rendermode InteractiveServer
-@using BlokeBot.AppEvents
+@using BlokeBot.Eventing
 @using BlokeBot.Hosts
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @implements IDisposable
 @inject PointsDashboardService Dashboard
-@inject AppEventBus Events
+@inject EventBus<AppEventKind> Events
 @inject BlokeBotPageContextAccessor PageContext
 
 <PageTitle>BlokeBot | Points</PageTitle>
