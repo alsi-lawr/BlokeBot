@@ -1,0 +1,185 @@
+@page "/points/settings"
+@rendermode InteractiveServer
+@using BlokeBot.Hosts
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inject PointsConfigurationService Configuration
+@inject HostBotStatusService HostBotStatus
+
+<PageTitle>BlokeBot | Points Settings</PageTitle>
+
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Points settings</h1>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Point label, command aliases, gambling, giveaways, and replies.</p>
+        </div>
+        <button class="btn-primary" @onclick="SaveAsync">Save changes</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">@statusMessage</div>
+    }
+
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else if (config is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading points settings...</div>
+    }
+    else
+    {
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">General</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Set the name shown beside balances and configure gambling odds.</p>
+            </div>
+            <div class="grid gap-4 p-5 md:grid-cols-2">
+                <Field Label="Point label" @bind-Value="config.PointLabel" Placeholder="points" />
+                <div class="space-y-2">
+                    <label class="label" for="winRate">Gambling win rate</label>
+                    <input id="winRate" class="input" type="number" min="0" max="100" @bind="config.GamblingWinRatePercent" />
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Command aliases</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Comma-separated command names. Aliases must be unique across all bot functions for this channel.</p>
+            </div>
+            <div class="grid gap-4 p-5 md:grid-cols-2">
+                <Field Label="Balance" @bind-Value="config.Aliases.PointsAliases" Placeholder="points" />
+                <Field Label="Give" @bind-Value="config.Aliases.GivePointsAliases" Placeholder="givepoints" />
+                <Field Label="Add" @bind-Value="config.Aliases.AddPointsAliases" Placeholder="addpoints" />
+                <Field Label="Remove" @bind-Value="config.Aliases.RemovePointsAliases" Placeholder="removepoints" />
+                <Field Label="Gamble" @bind-Value="config.Aliases.GambleAliases" Placeholder="gamble" />
+                <Field Label="Start giveaway" @bind-Value="config.Aliases.GiveawayAliases" Placeholder="giveaway" />
+                <Field Label="Join giveaway" @bind-Value="config.Aliases.JoinAliases" Placeholder="join" />
+                <Field Label="End giveaway" @bind-Value="config.Aliases.EndGiveawayAliases" Placeholder="endgiveaway" />
+                <Field Label="Cancel giveaway" @bind-Value="config.Aliases.CancelGiveawayAliases" Placeholder="cancelgiveaway" />
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Giveaways</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Chat commands start the configured giveaway; payout and timing come from this page.</p>
+            </div>
+            <div class="grid gap-4 p-5 md:grid-cols-3">
+                <div class="space-y-2">
+                    <label class="label" for="duration">Duration seconds</label>
+                    <input id="duration" class="input" type="number" min="1" @bind="config.GiveawayDurationSeconds" />
+                </div>
+                <Field Label="Minimum payout" @bind-Value="config.GiveawayMinimumPayout" Placeholder="10" />
+                <Field Label="Maximum payout" @bind-Value="config.GiveawayMaximumPayout" Placeholder="100" />
+                <div class="space-y-2">
+                    <label class="label" for="winnerCount">Winner count</label>
+                    <input id="winnerCount" class="input" type="number" min="1" @bind="config.GiveawayWinnerCount" />
+                </div>
+                <div class="space-y-2">
+                    <label class="label" for="eligibility">Eligibility</label>
+                    <select id="eligibility" class="input" title="@FollowerEligibilityTitle" @bind="config.GiveawayEligibility">
+                        <option value="@PointsEligibilityMode.Everyone">Everyone</option>
+                        <option value="@PointsEligibilityMode.Subscribers">Subscribers</option>
+                        <option value="@PointsEligibilityMode.Followers" disabled="@(!FollowerEligibilityAvailable)" title="@FollowerEligibilityTitle">Followers</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="label" for="cooldown">Cooldown seconds</label>
+                    <input id="cooldown" class="input" type="number" min="@PointsConfigurationService.MinimumGiveawayCooldownSeconds" @bind="config.GiveawayCooldownSeconds" />
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Replies</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Chat response templates for points commands and giveaways.</p>
+            </div>
+            <div class="grid gap-4 p-5 md:grid-cols-2">
+                <TextAreaField Label="Balance" @bind-Value="config.Replies.BalanceReply" />
+                <TextAreaField Label="Other balance" @bind-Value="config.Replies.OtherBalanceReply" />
+                <TextAreaField Label="Transfer" @bind-Value="config.Replies.TransferReply" />
+                <TextAreaField Label="Add" @bind-Value="config.Replies.AddReply" />
+                <TextAreaField Label="Remove" @bind-Value="config.Replies.RemoveReply" />
+                <TextAreaField Label="Invalid amount" @bind-Value="config.Replies.InvalidAmountReply" />
+                <TextAreaField Label="Insufficient balance" @bind-Value="config.Replies.InsufficientBalanceReply" />
+                <TextAreaField Label="Moderator only" @bind-Value="config.Replies.ModeratorOnlyReply" />
+                <TextAreaField Label="Gamble win" @bind-Value="config.Replies.GamblingWinReply" />
+                <TextAreaField Label="Gamble loss" @bind-Value="config.Replies.GamblingLoseReply" />
+                <TextAreaField Label="Giveaway started" @bind-Value="config.Replies.GiveawayStartedReply" />
+                <TextAreaField Label="Giveaway update" @bind-Value="config.Replies.GiveawayUpdateReply" />
+                <TextAreaField Label="Giveaway joined" @bind-Value="config.Replies.GiveawayJoinedReply" />
+                <TextAreaField Label="Already joined" @bind-Value="config.Replies.GiveawayAlreadyJoinedReply" />
+                <TextAreaField Label="Giveaway ended" @bind-Value="config.Replies.GiveawayEndedReply" />
+                <TextAreaField Label="No entrants" @bind-Value="config.Replies.GiveawayNoEntrantsReply" />
+                <TextAreaField Label="Cancelled" @bind-Value="config.Replies.GiveawayCancelledReply" />
+                <TextAreaField Label="Already active" @bind-Value="config.Replies.GiveawayAlreadyActiveReply" />
+                <TextAreaField Label="Not active" @bind-Value="config.Replies.GiveawayNotActiveReply" />
+                <TextAreaField Label="Cooldown" @bind-Value="config.Replies.GiveawayCooldownReply" />
+                <TextAreaField Label="Stream offline" @bind-Value="config.Replies.StreamOfflineReply" />
+                <TextAreaField Label="Not eligible" @bind-Value="config.Replies.NotEligibleReply" />
+                <TextAreaField Label="Follower eligibility unavailable" @bind-Value="config.Replies.FollowerEligibilityUnavailableReply" />
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private PointsConfiguration? config;
+    private HostBotChannelStatus? moderatorStatus;
+    private string? statusMessage;
+    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
+    private BotHostChoice? Host { get; set; }
+    private int HostId => Host?.Id ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationState;
+        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+        if (HostId != 0)
+        {
+            config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
+            moderatorStatus = await HostBotStatus.GetStatusAsync(Host?.Login ?? string.Empty, CancellationToken.None);
+        }
+    }
+
+    private bool FollowerEligibilityAvailable =>
+        moderatorStatus?.ModeratorState == HostBotModeratorState.IsModerator;
+
+    private string FollowerEligibilityTitle =>
+        FollowerEligibilityAvailable
+            ? "Followers"
+            : moderatorStatus?.ModeratorStatusMessage
+                ?? "Moderator status is not ready for this channel.";
+
+    private async Task SaveAsync()
+    {
+        if (config is null || HostId == 0)
+            return;
+
+        try
+        {
+            if (config.GiveawayEligibility == PointsEligibilityMode.Followers && !FollowerEligibilityAvailable)
+            {
+                statusMessage = moderatorStatus?.ModeratorStatusMessage
+                    ?? "Moderator status is not ready for this channel.";
+                return;
+            }
+
+            await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
+            config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
+            moderatorStatus = await HostBotStatus.GetStatusAsync(Host?.Login ?? string.Empty, CancellationToken.None);
+            statusMessage = "Settings saved.";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
+        {
+            statusMessage = ex.Message;
+        }
+    }
+}

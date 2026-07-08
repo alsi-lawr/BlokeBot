@@ -1,0 +1,37 @@
+﻿@inherits LayoutComponentBase
+@using BlokeBot.Hosts
+
+<div class="min-h-screen bg-background text-foreground">
+    <div class="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white/90 backdrop-blur-xl lg:block">
+        <NavMenu />
+    </div>
+
+    <main class="lg:pl-72">
+        <header class="sticky top-0 z-20 border-b border-slate-200 bg-white/75 backdrop-blur-xl">
+            <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+                <div class="min-w-0">
+                    <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Twitch operations</p>
+                    <p class="truncate text-sm font-semibold text-slate-900">BlokeBot control room</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <TopBarControls />
+                    <PageHelpButton />
+                </div>
+            </div>
+        </header>
+
+        <div class="border-b border-slate-200 bg-white lg:hidden">
+            <NavMenu />
+        </div>
+
+        <article class="px-4 py-6 sm:px-6 lg:px-8">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">x</span>
+</div>

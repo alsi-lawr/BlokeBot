@@ -1,0 +1,54 @@
+@using BlokeBot.Features.Admin.Monitoring
+
+<section id="hosts" class="card">
+    <div class="border-b border-slate-200 p-5">
+        <h2 class="text-lg font-semibold text-slate-950">Hosted channels</h2>
+        <ConnectedChannelsSummary />
+    </div>
+    <div class="border-b border-slate-200 bg-slate-50 p-5">
+        <label class="label" for="newHostLogin">Create hosted channel</label>
+        <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
+            <button class="btn-primary sm:w-40" @onclick="CreateHost">Create</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Status))
+        {
+            <p class="mt-3 text-sm font-medium text-slate-700">@Status</p>
+        }
+    </div>
+    <div class="divide-y divide-slate-100">
+        @if (Hosts.Count == 0)
+        {
+            <div class="p-8 text-sm text-muted-foreground">No hosted channels are available.</div>
+        }
+        else
+        {
+            @foreach (var host in Hosts)
+            {
+                <HostedChannelRow Host="@host"
+                                  CanEditHost="@CanEditHosts"
+                                  RemoveHost="@RemoveHost"
+                                  StartBot="@StartBot"
+                                  StopBot="@StopBot" />
+            }
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Func<Task> CreateHost { get; set; } = () => Task.CompletedTask;
+    [Parameter] public bool CanEditHosts { get; set; } = true;
+    [Parameter, EditorRequired] public IReadOnlyList<HostedChannelAdminView> Hosts { get; set; } = [];
+    [Parameter] public string NewHostLogin { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewHostLoginChanged { get; set; }
+    [Parameter, EditorRequired] public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<int, Task> StartBot { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public string? Status { get; set; }
+    [Parameter, EditorRequired] public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
+
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        NewHostLogin = args.Value?.ToString() ?? string.Empty;
+        await NewHostLoginChanged.InvokeAsync(NewHostLogin);
+    }
+}

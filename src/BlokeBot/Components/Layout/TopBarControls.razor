@@ -1,0 +1,45 @@
+@rendermode InteractiveServer
+@using System.Security.Claims
+@using BlokeBot.Hosts
+
+<AuthorizeView>
+    <Authorized Context="authState">
+        @{
+            var selection = BotHostSelectionAccessor.FromPrincipal(authState.User);
+            var isAdminEditing = !string.IsNullOrWhiteSpace(authState.User.FindFirstValue(BotHostClaims.AdminEditingLogin));
+            var isBotAccount = string.Equals(
+                authState.User.FindFirstValue(AuthClaims.IsBotAccount),
+                "true",
+                StringComparison.OrdinalIgnoreCase
+            );
+        }
+        <div class="@ControlsGridClass(selection, isAdminEditing, isBotAccount)">
+            @if (!isBotAccount)
+            {
+                <SelectedChannelBotStatus User="authState.User" Selection="selection" />
+            }
+            @if (!isAdminEditing && !isBotAccount)
+            {
+                <HostSelector User="authState.User" Selection="selection" />
+            }
+            <AccountMenu User="authState.User" Selection="selection" />
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <a class="inline-flex h-9 items-center rounded-md bg-[#9146ff] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/auth/login">
+            Authenticate with Twitch
+        </a>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static string ControlsGridClass(BotHostSelection? selection, bool isAdminEditing, bool isBotAccount)
+    {
+        if (isBotAccount || selection is null)
+            return "grid items-center gap-3 md:grid-cols-[minmax(18rem,auto)]";
+
+        return isAdminEditing
+            ? "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]"
+            : "grid items-center gap-3 md:grid-cols-[auto_auto_minmax(18rem,auto)]";
+    }
+}

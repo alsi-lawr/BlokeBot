@@ -1,0 +1,224 @@
+using BlokeBot.Features.Commands;
+using BlokeBot.Features.Points;
+using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Commands;
+using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Points.Replies;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace BlokeBot.Features.Points.Configuration;
+
+public sealed class PointsConfigurationService(
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    PointsChangeNotifier changes
+)
+{
+    public const int MinimumGiveawayCooldownSeconds = 300;
+
+    public async Task<PointsConfiguration> LoadConfigurationAsync(int hostId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings =
+            await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
+            ?? new PointsSettings { HostId = hostId };
+        var aliases = await db
+            .CommandAliases.AsNoTracking()
+            .Where(x => x.HostId == hostId)
+            .ToListAsync(ct);
+
+        return new PointsConfiguration
+        {
+            PointLabel = settings.PointLabel,
+            Aliases = new PointsCommandAliasEditor
+            {
+                PointsAliases = JoinAliases(aliases, PointsCommandKind.Points),
+                GivePointsAliases = JoinAliases(aliases, PointsCommandKind.GivePoints),
+                AddPointsAliases = JoinAliases(aliases, PointsCommandKind.AddPoints),
+                RemovePointsAliases = JoinAliases(aliases, PointsCommandKind.RemovePoints),
+                GambleAliases = JoinAliases(aliases, PointsCommandKind.Gamble),
+                GiveawayAliases = JoinAliases(aliases, PointsCommandKind.Giveaway),
+                JoinAliases = JoinAliases(aliases, PointsCommandKind.Join),
+                EndGiveawayAliases = JoinAliases(aliases, PointsCommandKind.EndGiveaway),
+                CancelGiveawayAliases = JoinAliases(aliases, PointsCommandKind.CancelGiveaway),
+            },
+            Replies = PointsDefaults.Replies(settings),
+            GamblingWinRatePercent = settings.GamblingWinRatePercent,
+            GiveawayDurationSeconds = settings.GiveawayDurationSeconds,
+            GiveawayMinimumPayout = settings.GiveawayMinimumPayout,
+            GiveawayMaximumPayout = settings.GiveawayMaximumPayout,
+            GiveawayWinnerCount = settings.GiveawayWinnerCount,
+            GiveawayEligibility = ParseEligibility(settings.GiveawayEligibility),
+            GiveawayCooldownSeconds = settings.GiveawayCooldownSeconds,
+        };
+    }
+
+    public async Task SaveConfigurationAsync(
+        int hostId,
+        PointsConfiguration config,
+        CancellationToken ct
+    )
+    {
+        Validate(config);
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await db.PointsSettings.SingleOrDefaultAsync(x => x.HostId == hostId, ct);
+        if (settings is null)
+        {
+            settings = new PointsSettings { HostId = hostId };
+            db.PointsSettings.Add(settings);
+        }
+
+        Apply(settings, config);
+        await SaveAliasesAsync(db, hostId, config.Aliases, ct);
+        await db.SaveChangesAsync(ct);
+        await changes.NotifyChangedAsync();
+    }
+
+    internal static string Store(PointsCommandKind kind) => kind.ToString();
+
+    private static void AddAliases(
+        List<CommandAlias> rows,
+        int hostId,
+        PointsCommandKind kind,
+        string aliases
+    )
+    {
+        foreach (var alias in CommandAliasNormalizer.Split(aliases))
+            rows.Add(
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    Kind = Store(kind),
+                    Alias = alias,
+                }
+            );
+    }
+
+    private static void Apply(PointsSettings settings, PointsConfiguration config)
+    {
+        settings.PointLabel = string.IsNullOrWhiteSpace(config.PointLabel)
+            ? "points"
+            : config.PointLabel.Trim();
+        settings.GamblingWinRatePercent = Math.Clamp(config.GamblingWinRatePercent, 0, 100);
+        settings.GiveawayDurationSeconds = Math.Max(1, config.GiveawayDurationSeconds);
+        settings.GiveawayMinimumPayout = PointAmount
+            .ParseAbsolute(config.GiveawayMinimumPayout)
+            .ToString();
+        settings.GiveawayMaximumPayout = PointAmount
+            .ParseAbsolute(config.GiveawayMaximumPayout)
+            .ToString();
+        settings.GiveawayWinnerCount = Math.Max(1, config.GiveawayWinnerCount);
+        settings.GiveawayEligibility = FormatEligibility(config.GiveawayEligibility);
+        settings.GiveawayCooldownSeconds = Math.Max(
+            MinimumGiveawayCooldownSeconds,
+            config.GiveawayCooldownSeconds
+        );
+
+        settings.BalanceReply = config.Replies.BalanceReply.Trim();
+        settings.OtherBalanceReply = config.Replies.OtherBalanceReply.Trim();
+        settings.TransferReply = config.Replies.TransferReply.Trim();
+        settings.AddReply = config.Replies.AddReply.Trim();
+        settings.RemoveReply = config.Replies.RemoveReply.Trim();
+        settings.InvalidAmountReply = config.Replies.InvalidAmountReply.Trim();
+        settings.InsufficientBalanceReply = config.Replies.InsufficientBalanceReply.Trim();
+        settings.ModeratorOnlyReply = config.Replies.ModeratorOnlyReply.Trim();
+        settings.GamblingWinReply = config.Replies.GamblingWinReply.Trim();
+        settings.GamblingLoseReply = config.Replies.GamblingLoseReply.Trim();
+        settings.GiveawayStartedReply = config.Replies.GiveawayStartedReply.Trim();
+        settings.GiveawayUpdateReply = config.Replies.GiveawayUpdateReply.Trim();
+        settings.GiveawayJoinedReply = config.Replies.GiveawayJoinedReply.Trim();
+        settings.GiveawayAlreadyJoinedReply = config.Replies.GiveawayAlreadyJoinedReply.Trim();
+        settings.GiveawayEndedReply = config.Replies.GiveawayEndedReply.Trim();
+        settings.GiveawayNoEntrantsReply = config.Replies.GiveawayNoEntrantsReply.Trim();
+        settings.GiveawayCancelledReply = config.Replies.GiveawayCancelledReply.Trim();
+        settings.GiveawayAlreadyActiveReply = config.Replies.GiveawayAlreadyActiveReply.Trim();
+        settings.GiveawayNotActiveReply = config.Replies.GiveawayNotActiveReply.Trim();
+        settings.GiveawayCooldownReply = config.Replies.GiveawayCooldownReply.Trim();
+        settings.StreamOfflineReply = config.Replies.StreamOfflineReply.Trim();
+        settings.NotEligibleReply = config.Replies.NotEligibleReply.Trim();
+        settings.FollowerEligibilityUnavailableReply =
+            config.Replies.FollowerEligibilityUnavailableReply.Trim();
+    }
+
+    private static string FormatEligibility(PointsEligibilityMode mode) =>
+        mode switch
+        {
+            PointsEligibilityMode.Subscribers => "subscribers",
+            PointsEligibilityMode.Followers => "followers",
+            _ => "everyone",
+        };
+
+    private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
+        string.Join(", ", aliases.Where(x => x.Kind == Store(kind)).Select(x => x.Alias).Order());
+
+    private static PointsEligibilityMode ParseEligibility(string value) =>
+        value.ToLowerInvariant() switch
+        {
+            "subscribers" => PointsEligibilityMode.Subscribers,
+            "followers" => PointsEligibilityMode.Followers,
+            _ => PointsEligibilityMode.Everyone,
+        };
+
+    private async Task SaveAliasesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        PointsCommandAliasEditor aliases,
+        CancellationToken ct
+    )
+    {
+        var rows = new List<CommandAlias>();
+        AddAliases(rows, hostId, PointsCommandKind.Points, aliases.PointsAliases);
+        AddAliases(rows, hostId, PointsCommandKind.GivePoints, aliases.GivePointsAliases);
+        AddAliases(rows, hostId, PointsCommandKind.AddPoints, aliases.AddPointsAliases);
+        AddAliases(rows, hostId, PointsCommandKind.RemovePoints, aliases.RemovePointsAliases);
+        AddAliases(rows, hostId, PointsCommandKind.Gamble, aliases.GambleAliases);
+        AddAliases(rows, hostId, PointsCommandKind.Giveaway, aliases.GiveawayAliases);
+        AddAliases(rows, hostId, PointsCommandKind.Join, aliases.JoinAliases);
+        AddAliases(rows, hostId, PointsCommandKind.EndGiveaway, aliases.EndGiveawayAliases);
+        AddAliases(rows, hostId, PointsCommandKind.CancelGiveaway, aliases.CancelGiveawayAliases);
+
+        var duplicate = rows.GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicate is not null)
+            throw new InvalidOperationException($"Alias !{duplicate.Key} is used more than once.");
+
+        var pointsKinds = Enum.GetValues<PointsCommandKind>().Select(Store).ToArray();
+        var existingAliases = rows.Select(x => x.Alias).ToArray();
+        var existingCollision = await db
+            .CommandAliases.AsNoTracking()
+            .Where(x => x.HostId == hostId && !pointsKinds.Contains(x.Kind))
+            .Where(x => existingAliases.Contains(x.Alias))
+            .Select(x => x.Alias)
+            .FirstOrDefaultAsync(ct);
+        if (!string.IsNullOrWhiteSpace(existingCollision))
+            throw new InvalidOperationException(
+                $"Alias !{existingCollision} is already used by another bot function."
+            );
+
+        db.CommandAliases.RemoveRange(
+            db.CommandAliases.Where(x => x.HostId == hostId && pointsKinds.Contains(x.Kind))
+        );
+        db.CommandAliases.AddRange(rows);
+    }
+
+    private static void Validate(PointsConfiguration config)
+    {
+        var min = PointAmount.ParseAbsolute(config.GiveawayMinimumPayout);
+        var max = PointAmount.ParseAbsolute(config.GiveawayMaximumPayout);
+        if (min.Value > max.Value)
+            throw new InvalidOperationException(
+                "Minimum giveaway payout cannot exceed maximum payout."
+            );
+
+        if (min.Value % 10 != 0 || max.Value % 10 != 0)
+            throw new InvalidOperationException("Giveaway payouts must be multiples of 10.");
+
+        if (config.GamblingWinRatePercent is < 0 or > 100)
+            throw new InvalidOperationException("Gambling win rate must be between 0 and 100.");
+
+        if (config.GiveawayCooldownSeconds < MinimumGiveawayCooldownSeconds)
+            config.GiveawayCooldownSeconds = MinimumGiveawayCooldownSeconds;
+    }
+}

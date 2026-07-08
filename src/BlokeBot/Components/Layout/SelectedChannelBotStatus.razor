@@ -1,0 +1,146 @@
+@using BlokeBot.Auth.Sessions
+@using BlokeBot.AppEvents
+@using BlokeBot.Features.HostedChannels.Runtime
+@using BlokeBot.Hosts
+@using BlokeBot.Persistence.Models
+@implements IDisposable
+@inject AppEventBus Events
+@inject HostedChannelRuntimeStatusService HostedChannels
+
+@if (Selection is not null && selectedHostStatus is not null)
+{
+    <div class="@SelectedBotStatusShellClass">
+        @if (SelectedHostBotAuthorized)
+        {
+            <span class="@SelectedBotStatusDotClass"></span>
+            <span>@SelectedBotStatusText</span>
+        }
+        else if (CanAuthorizeSelectedHost())
+        {
+            <span class="@SelectedBotStatusDotClass"></span>
+            <a class="font-bold text-[#9146ff] transition hover:text-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize bot</a>
+        }
+        else
+        {
+            <span class="@SelectedBotStatusDotClass"></span>
+            <span>@SelectedBotStatusText</span>
+        }
+    </div>
+}
+
+@code {
+    private int? loadedStatusHostId;
+    private IDisposable? hostedChannelSubscription;
+    private HostedChannelRuntimeStatus? selectedHostStatus;
+
+    [Parameter] public BotHostSelection? Selection { get; set; }
+    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+
+    private bool SelectedHostBotAuthorized =>
+        selectedHostStatus?.IsChannelBotAuthorized == true
+        && selectedHostStatus.ChannelBotAuthorizationScopesCurrent;
+
+    private string SelectedBotStatusShellClass
+    {
+        get
+        {
+            var color = selectedHostStatus switch
+            {
+                { IsChannelBotAuthorized: false } => "border-amber-200 bg-amber-50 text-amber-700",
+                { ChannelBotAuthorizationScopesCurrent: false } => "border-amber-200 bg-amber-50 text-amber-700",
+                { RuntimeState: BotChannelRuntimeState.Starting } => "border-orange-200 bg-orange-50 text-orange-700",
+                { RuntimeState: BotChannelRuntimeState.Stopping } => "border-purple-200 bg-purple-50 text-purple-700",
+                { RuntimeState: BotChannelRuntimeState.Started } => "border-emerald-200 bg-emerald-50 text-emerald-700",
+                { IsChannelBotAuthorized: true } => "border-sky-200 bg-sky-50 text-sky-700",
+                _ => "border-slate-200 bg-slate-100 text-slate-600",
+            };
+
+            return $"hidden h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold shadow-sm sm:flex {color}";
+        }
+    }
+
+    private string SelectedBotStatusDotClass
+    {
+        get
+        {
+            var color = selectedHostStatus switch
+            {
+                { IsChannelBotAuthorized: false } => "bg-amber-500",
+                { ChannelBotAuthorizationScopesCurrent: false } => "bg-amber-500",
+                { RuntimeState: BotChannelRuntimeState.Starting } => "bg-orange-500",
+                { RuntimeState: BotChannelRuntimeState.Stopping } => "bg-purple-500",
+                { RuntimeState: BotChannelRuntimeState.Started } => "bg-emerald-500",
+                { IsChannelBotAuthorized: true } => "bg-sky-500",
+                _ => "bg-slate-400",
+            };
+
+            return $"h-1.5 w-1.5 rounded-full {color}";
+        }
+    }
+
+    private string SelectedBotStatusText =>
+        selectedHostStatus switch
+        {
+            { RuntimeState: BotChannelRuntimeState.Starting } => "bot starting",
+            { RuntimeState: BotChannelRuntimeState.Stopping } => "bot stopping",
+            { RuntimeState: BotChannelRuntimeState.Started } => "bot started",
+            { IsChannelBotAuthorized: true, ChannelBotAuthorizationScopesCurrent: false } => "reauthorize bot",
+            { IsChannelBotAuthorized: true } => "bot authorized",
+            _ => "bot not authorized",
+        };
+
+    protected override void OnInitialized()
+    {
+        hostedChannelSubscription = Events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            OnHostedChannelChangedAsync
+        );
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadSelectedHostStatusAsync();
+    }
+
+    public void Dispose()
+    {
+        hostedChannelSubscription?.Dispose();
+    }
+
+    private bool CanAuthorizeSelectedHost()
+    {
+        return Selection is not null
+            && string.Equals(Selection.Current.Role, AuthRole.Streamer, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                Selection.Current.Login,
+                User.FindFirstValue(AuthClaims.Login),
+                StringComparison.OrdinalIgnoreCase
+            );
+    }
+
+    private async Task LoadSelectedHostStatusAsync()
+    {
+        if (Selection is null)
+        {
+            loadedStatusHostId = null;
+            selectedHostStatus = null;
+            return;
+        }
+
+        if (loadedStatusHostId == Selection.Current.Id)
+            return;
+
+        loadedStatusHostId = Selection.Current.Id;
+        selectedHostStatus = await HostedChannels.LoadHostStatusAsync(Selection.Current.Id, CancellationToken.None);
+    }
+
+    private async Task OnHostedChannelChangedAsync(AppEvent _)
+    {
+        await InvokeAsync(async () =>
+        {
+            loadedStatusHostId = null;
+            await LoadSelectedHostStatusAsync();
+            StateHasChanged();
+        });
+    }
+}

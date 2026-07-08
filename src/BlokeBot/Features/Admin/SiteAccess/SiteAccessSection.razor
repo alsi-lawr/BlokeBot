@@ -1,0 +1,43 @@
+@using BlokeBot.Features.SiteAccess
+
+<section id="host-access" class="card">
+    <div class="border-b border-slate-200 p-5">
+        <h2 class="text-lg font-semibold text-slate-950">Host access</h2>
+    </div>
+    <div class="space-y-5 p-5">
+        <label class="inline-flex items-center gap-3 text-sm font-semibold text-slate-800">
+            <input class="h-4 w-4" type="checkbox" checked="@State.WhitelistEnabled" @onchange="ToggleWhitelist" />
+            Require whitelist for new hosted sites
+        </label>
+
+        <div class="grid gap-5 lg:grid-cols-2">
+            <AccessList Title="Whitelist" Entries="@State.Whitelist" Placeholder="twitch login" Add="@AddWhitelist" Remove="@RemoveWhitelist" NewLogin="@NewWhitelistLogin" NewLoginChanged="@OnWhitelistInput" />
+            <AccessList Title="Blacklist" Entries="@State.Blacklist" Placeholder="twitch login" Add="@AddBlacklist" Remove="@RemoveBlacklist" NewLogin="@NewBlacklistLogin" NewLoginChanged="@OnBlacklistInput" />
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Func<Task> AddBlacklist { get; set; } = () => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<Task> AddWhitelist { get; set; } = () => Task.CompletedTask;
+    [Parameter] public string NewBlacklistLogin { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewBlacklistLoginChanged { get; set; }
+    [Parameter] public string NewWhitelistLogin { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewWhitelistLoginChanged { get; set; }
+    [Parameter, EditorRequired] public Func<string, Task> RemoveBlacklist { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<string, Task> RemoveWhitelist { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public SiteAccessAdminState State { get; set; } = new(false, [], []);
+    [Parameter, EditorRequired] public Func<ChangeEventArgs, Task> ToggleWhitelist { get; set; } = _ => Task.CompletedTask;
+
+    private async Task OnBlacklistInput(string value)
+    {
+        NewBlacklistLogin = value;
+        await NewBlacklistLoginChanged.InvokeAsync(value);
+    }
+
+    private async Task OnWhitelistInput(string value)
+    {
+        NewWhitelistLogin = value;
+        await NewWhitelistLoginChanged.InvokeAsync(value);
+    }
+}

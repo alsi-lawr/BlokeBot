@@ -1,0 +1,27 @@
+@using Alsi.TwitchBot
+@implements IDisposable
+@inject ITwitchBotRuntimeStatusAccessor BotStatus
+
+<p class="mt-1 text-sm text-muted-foreground">@ConnectedChannelsText</p>
+
+@code {
+    private string ConnectedChannelsText =>
+        BotStatus.Current.ConnectedChannels.Count == 0
+            ? "No channels connected."
+            : $"Connected: {string.Join(", ", BotStatus.Current.ConnectedChannels.Select(channel => $"#{channel}"))}";
+
+    protected override void OnInitialized()
+    {
+        BotStatus.Changed += OnBotStatusChanged;
+    }
+
+    public void Dispose()
+    {
+        BotStatus.Changed -= OnBotStatusChanged;
+    }
+
+    private void OnBotStatusChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+}

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Alsi.TwitchBot\Alsi.TwitchBot.csproj" SetTargetFramework="TargetFramework=net10.0" />
+    <ProjectReference Include="..\..\src\BlokeBot\BlokeBot.csproj" SetTargetFramework="TargetFramework=net10.0" />
+    <ProjectReference Include="..\..\src\BlokeBot.Persistence\BlokeBot.Persistence.csproj" SetTargetFramework="TargetFramework=net10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>

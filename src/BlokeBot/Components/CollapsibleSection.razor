@@ -1,0 +1,53 @@
+<section class="disclosure-panel">
+    <button
+        type="button"
+        class="disclosure-trigger"
+        aria-expanded="@isOpen"
+        @onclick="Toggle">
+        <span class="disclosure-copy">
+            <span class="disclosure-title">@Title</span>
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <span class="disclosure-description">@Description</span>
+            }
+        </span>
+        <span class="disclosure-chevron @(isOpen ? "open" : "")" aria-hidden="true">
+            <svg viewBox="0 0 20 20" focusable="false">
+                <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </span>
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="disclosure-content">
+            @ChildContent
+        </div>
+    }
+</section>
+
+@code {
+    private bool isOpen;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public bool InitiallyOpen { get; set; } = true;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        isOpen = InitiallyOpen;
+    }
+
+    private void Toggle()
+    {
+        isOpen = !isOpen;
+    }
+}

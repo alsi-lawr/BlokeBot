@@ -1,0 +1,39 @@
+<div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <h3 class="text-sm font-semibold text-slate-950">@Title</h3>
+    <div class="mt-3 flex gap-2">
+        <input class="input" placeholder="@Placeholder" value="@NewLogin" @oninput="OnInput" />
+        <button class="btn-secondary" @onclick="Add">Add</button>
+    </div>
+    <div class="mt-4 space-y-2">
+        @if (Entries.Count == 0)
+        {
+            <p class="text-sm text-muted-foreground">No entries.</p>
+        }
+        else
+        {
+            @foreach (var entry in Entries)
+            {
+                <div class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <span class="text-sm font-medium text-slate-800">@entry</span>
+                    <button class="text-sm font-semibold text-red-600 hover:text-red-700" @onclick="() => Remove(entry)">Remove</button>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Func<Task> Add { get; set; } = () => Task.CompletedTask;
+    [Parameter] public IReadOnlyList<string> Entries { get; set; } = [];
+    [Parameter] public string NewLogin { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewLoginChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = string.Empty;
+    [Parameter] public Func<string, Task> Remove { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public string Title { get; set; } = string.Empty;
+
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        NewLogin = args.Value?.ToString() ?? string.Empty;
+        await NewLoginChanged.InvokeAsync(NewLogin);
+    }
+}

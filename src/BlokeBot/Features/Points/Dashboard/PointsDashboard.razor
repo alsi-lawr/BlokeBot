@@ -1,0 +1,272 @@
+@page "/points"
+@rendermode InteractiveServer
+@using BlokeBot.AppEvents
+@using BlokeBot.Hosts
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@implements IDisposable
+@inject PointsDashboardService Dashboard
+@inject AppEventBus Events
+
+<PageTitle>BlokeBot | Points</PageTitle>
+
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-2">
+            <div class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">Dashboard</div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Points</h1>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Balances, ledger entries, user controls, and the active giveaway.</p>
+        </div>
+        <button class="btn-primary" @onclick="RefreshAsync">Refresh</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">@statusMessage</div>
+    }
+
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else if (state is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
+    }
+    else
+    {
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <section class="card">
+                <div class="border-b border-slate-200 p-5">
+                    <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
+                </div>
+                <div class="overflow-hidden">
+                    <table class="w-full text-left text-sm">
+                        <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Rank</th>
+                                <th class="px-5 py-3 font-semibold">User</th>
+                                <th class="px-5 py-3 font-semibold">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @for (var i = 0; i < state.Leaderboard.Count; i++)
+                            {
+                                var entry = state.Leaderboard[i];
+                                <tr>
+                                    <td class="px-5 py-3 font-semibold text-slate-900">#@(i + 1)</td>
+                                    <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                    <td class="px-5 py-3 text-slate-700">@entry.Balance.ToDisplayString()</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (state.Leaderboard.Count == 0)
+                    {
+                        <div class="p-8 text-sm text-muted-foreground">No balances yet.</div>
+                    }
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="border-b border-slate-200 p-5">
+                    <h2 class="text-lg font-semibold text-slate-950">User controls</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Look up a balance or adjust points.</p>
+                </div>
+                <div class="grid gap-4 p-5 md:grid-cols-2">
+                    <Field Label="Lookup user" @bind-Value="lookupLogin" Placeholder="login" />
+                    <div class="flex items-end">
+                        <button class="btn-secondary" @onclick="LookupAsync">Lookup</button>
+                    </div>
+                    @if (lookupResult is not null)
+                    {
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+                            <p class="text-sm font-bold text-slate-950">@lookupResult.Login</p>
+                            <p class="mt-1 text-sm text-muted-foreground">@lookupResult.Balance.ToDisplayString() points</p>
+                        </div>
+                    }
+                </div>
+                <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-bold text-slate-950">Give</h3>
+                        <Field Label="From" @bind-Value="giveFrom" Placeholder="source login" />
+                        <Field Label="To" @bind-Value="giveTo" Placeholder="target login" />
+                        <Field Label="Amount" @bind-Value="giveAmount" Placeholder="100, 50%, all" />
+                        <button class="btn-secondary" @onclick="GiveAsync">Give</button>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-bold text-slate-950">Add</h3>
+                        <Field Label="User" @bind-Value="addLogin" Placeholder="target login" />
+                        <Field Label="Amount" @bind-Value="addAmount" Placeholder="100" />
+                        <button class="btn-secondary" @onclick="AddAsync">Add</button>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="text-sm font-bold text-slate-950">Remove</h3>
+                        <Field Label="User" @bind-Value="removeLogin" Placeholder="target login" />
+                        <Field Label="Amount" @bind-Value="removeAmount" Placeholder="100, 50%, all" />
+                        <button class="btn-secondary" @onclick="RemoveAsync">Remove</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="card">
+            <div class="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">@GiveawaySummary</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn-primary" @onclick="StartGiveawayAsync">Start</button>
+                    <button class="btn-secondary" disabled="@(state.ActiveGiveaway is null)" @onclick="EndGiveawayAsync">End</button>
+                    <button class="btn-secondary" disabled="@(state.ActiveGiveaway is null)" @onclick="CancelGiveawayAsync">Cancel</button>
+                </div>
+            </div>
+            <div class="grid gap-5 p-5 lg:grid-cols-2">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-950">Entrants</h3>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach (var entrant in state.ActiveGiveaway?.Entrants ?? [])
+                        {
+                            <span class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">@entrant</span>
+                        }
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-950">Winners</h3>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach (var winner in state.ActiveGiveaway?.Winners ?? [])
+                        {
+                            <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">@winner.Login: @winner.Payout.ToDisplayString()</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Recent ledger</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Latest balance-changing entries.</p>
+            </div>
+            <div class="overflow-hidden">
+                <table class="w-full text-left text-sm">
+                    <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+                        <tr>
+                            <th class="px-5 py-3 font-semibold">Time</th>
+                            <th class="px-5 py-3 font-semibold">Kind</th>
+                            <th class="px-5 py-3 font-semibold">User</th>
+                            <th class="px-5 py-3 font-semibold">Delta</th>
+                            <th class="px-5 py-3 font-semibold">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach (var entry in state.RecentLedger)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                <td class="px-5 py-3 font-medium text-slate-900">@entry.Kind</td>
+                                <td class="px-5 py-3 text-slate-700">@entry.Login</td>
+                                <td class="px-5 py-3 text-slate-700">@entry.Delta</td>
+                                <td class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    private PointsDashboardState? state;
+    private IDisposable? pointsSubscription;
+    private PointBalanceEntry? lookupResult;
+    private string? statusMessage;
+    private string lookupLogin = string.Empty;
+    private string giveFrom = string.Empty;
+    private string giveTo = string.Empty;
+    private string giveAmount = string.Empty;
+    private string addLogin = string.Empty;
+    private string addAmount = string.Empty;
+    private string removeLogin = string.Empty;
+    private string removeAmount = string.Empty;
+    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
+    private BotHostChoice? Host { get; set; }
+    private int HostId => Host?.Id ?? 0;
+    private string HostLogin => Host?.Login ?? string.Empty;
+    private string ActorLogin { get; set; } = string.Empty;
+
+    private string GiveawaySummary =>
+        state?.ActiveGiveaway is null
+            ? "No active giveaway."
+            : $"Active until {state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm} with {state.ActiveGiveaway.Entrants.Count} entrants.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        pointsSubscription = Events.Subscribe(AppEventKind.PointsChanged, OnPointsChangedAsync);
+        await LoadHostAsync();
+        await LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        pointsSubscription?.Dispose();
+    }
+
+    private async Task AddAsync() => await RunAsync(await Dashboard.AddAsync(HostId, addLogin, addAmount, ActorLogin, CancellationToken.None));
+
+    private async Task CancelGiveawayAsync() => await RunAsync(await Dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
+
+    private async Task EndGiveawayAsync() => await RunAsync(await Dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+
+    private async Task GiveAsync() => await RunAsync(await Dashboard.GiveAsync(HostId, giveFrom, giveTo, giveAmount, CancellationToken.None));
+
+    private async Task LoadAsync()
+    {
+        if (HostId != 0)
+            state = await Dashboard.LoadAsync(HostId, CancellationToken.None);
+    }
+
+    private async Task LoadHostAsync()
+    {
+        var authState = await AuthenticationState;
+        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+        ActorLogin = authState.User.FindFirstValue(AuthClaims.Login) ?? string.Empty;
+    }
+
+    private async Task LookupAsync()
+    {
+        if (HostId == 0 || string.IsNullOrWhiteSpace(lookupLogin))
+            return;
+
+        lookupResult = await Dashboard.LookupAsync(HostId, lookupLogin, CancellationToken.None);
+    }
+
+    private async Task OnPointsChangedAsync(AppEvent _)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync();
+        statusMessage = null;
+    }
+
+    private async Task RemoveAsync() => await RunAsync(await Dashboard.RemoveAsync(HostId, removeLogin, removeAmount, ActorLogin, CancellationToken.None));
+
+    private async Task RunAsync(PointOperationResult result)
+    {
+        statusMessage = result.Message;
+        await LoadAsync();
+    }
+
+    private async Task StartGiveawayAsync() => await RunAsync(await Dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+}

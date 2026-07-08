@@ -1,0 +1,105 @@
+@using BlokeBot.Auth.Sessions
+@using BlokeBot.AppEvents
+@using BlokeBot.Features.Admin.HostedChannels
+@using BlokeBot.Hosts
+@implements IDisposable
+@inject AppEventBus Events
+@inject HostedChannelDirectoryService HostedChannels
+@inject NavigationManager Navigation
+
+@if (Selection is not null && !IsAdminEditing() && visibleHosts.Count > 0)
+{
+    <div class="hidden grid-cols-[18rem_2.25rem] items-center gap-2 md:grid">
+        <form class="relative" method="get" action="/auth/select-host" data-enhance="false">
+            <input type="hidden" name="returnUrl" value="@CurrentPath" />
+            <select class="h-9 w-full appearance-none truncate rounded-md border border-slate-200 bg-white py-0 pl-3 pr-11 text-sm font-semibold text-slate-800 shadow-sm" name="hostId" onchange="this.form.submit()">
+                @foreach (var host in visibleHosts)
+                {
+                    <option value="@host.Id" selected="@(host.Id == selectedHostId)">@host.DisplayName</option>
+                }
+            </select>
+            <svg class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-none stroke-current text-slate-400 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+            </svg>
+        </form>
+        <a class="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+           title="Refresh channel access"
+           aria-label="Refresh channel access"
+           href="/auth/login?start=true&returnUrl=@CurrentReturnUrl"
+           data-enhance-nav="false">
+            <svg class="@RefreshIconClass" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+            </svg>
+        </a>
+    </div>
+}
+
+@code {
+    [Parameter] public BotHostSelection? Selection { get; set; }
+    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+
+    private IDisposable? hostedChannelSubscription;
+    private IReadOnlyList<BotHostChoice> visibleHosts = [];
+    private int? selectedHostId;
+
+    private string RefreshIconClass => "h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";
+
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+
+    private string CurrentReturnUrl
+    {
+        get
+        {
+            return Uri.EscapeDataString(CurrentPath);
+        }
+    }
+
+    private bool IsAdminEditing()
+    {
+        return !string.IsNullOrWhiteSpace(User.FindFirstValue(BotHostClaims.AdminEditingLogin));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        hostedChannelSubscription = Events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            OnHostedChannelsChangedAsync
+        );
+        await LoadVisibleHostsAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadVisibleHostsAsync();
+    }
+
+    public void Dispose()
+    {
+        hostedChannelSubscription?.Dispose();
+    }
+
+    private async Task LoadVisibleHostsAsync()
+    {
+        var selectable = Selection?.Available
+            .Where(host => !string.Equals(host.Role, AuthRole.Admin, StringComparison.OrdinalIgnoreCase))
+            .ToArray() ?? [];
+
+        visibleHosts = await HostedChannels.LoadExistingHostChoicesAsync(
+            selectable,
+            CancellationToken.None
+        );
+        selectedHostId = visibleHosts.Any(host => host.Id == Selection?.Current.Id)
+            ? Selection?.Current.Id
+            : visibleHosts.FirstOrDefault()?.Id;
+    }
+
+    private async Task OnHostedChannelsChangedAsync(AppEvent _)
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadVisibleHostsAsync();
+            StateHasChanged();
+        });
+    }
+}

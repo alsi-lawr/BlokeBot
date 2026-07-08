@@ -1,0 +1,118 @@
+@using BlokeBot.Persistence.Models
+
+<div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex min-w-0 items-center gap-3">
+        @if (!string.IsNullOrWhiteSpace(Host.ProfileImageUrl))
+        {
+            <img class="h-11 w-11 rounded-full border border-slate-200 object-cover" src="@Host.ProfileImageUrl" alt="" />
+        }
+        else
+        {
+            <div class="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-sm font-bold text-slate-500">
+                @Initials(Host.DisplayName)
+            </div>
+        }
+        <div class="min-w-0">
+            <p class="font-semibold text-slate-950">@Host.DisplayName</p>
+            <div class="mt-1 flex flex-wrap gap-2">
+                <span class="@StatusBadgeClass(Host.IsChannelBotAuthorized)">
+                    <span class="@StatusDotClass(Host.IsChannelBotAuthorized)"></span>
+                    @(Host.IsChannelBotAuthorized ? "bot authorized" : "bot needs auth")
+                </span>
+                <span class="@BotStartedBadgeClass">
+                    <span class="@BotStartedDotClass"></span>
+                    @BotStartedText
+                </span>
+            </div>
+        </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        @if (Host.RuntimeState is BotChannelRuntimeState.Stopping)
+        {
+            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled>Stop bot</button>
+        }
+        else if (Host.RuntimeState is BotChannelRuntimeState.Started or BotChannelRuntimeState.Starting)
+        {
+            <button class="btn-secondary" @onclick="() => StopBot(Host.Id)">Stop bot</button>
+        }
+        else
+        {
+            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(!Host.IsChannelBotAuthorized)" @onclick="() => StartBot(Host.Id)">Start bot</button>
+        }
+        @if (CanEditHost)
+        {
+            <a class="btn-secondary" href="@EditHostHref" data-enhance-nav="false">Edit as admin</a>
+        }
+        <button class="inline-flex h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50" @onclick="() => RemoveHost(Host.Id)">Remove</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public HostedChannelAdminView Host { get; set; } = new(0, string.Empty, string.Empty, null, false, BotChannelRuntimeState.Stopped);
+    [Parameter] public bool CanEditHost { get; set; } = true;
+    [Parameter, EditorRequired] public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<int, Task> StartBot { get; set; } = _ => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
+
+    private string EditHostHref =>
+        $"/admin/select-host?hostId={Host.Id}&returnUrl={Uri.EscapeDataString("/admin")}";
+
+    private string BotStartedBadgeClass
+    {
+        get
+        {
+            var color = Host.RuntimeState switch
+            {
+                BotChannelRuntimeState.Starting => "bg-orange-50 text-orange-700 ring-orange-200",
+                BotChannelRuntimeState.Started => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                BotChannelRuntimeState.Stopping => "bg-purple-50 text-purple-700 ring-purple-200",
+                _ => "bg-slate-100 text-slate-600 ring-slate-200",
+            };
+
+            return $"inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold ring-1 {color}";
+        }
+    }
+
+    private string BotStartedDotClass =>
+        Host.RuntimeState switch
+        {
+            BotChannelRuntimeState.Starting => "h-1.5 w-1.5 rounded-full bg-orange-500",
+            BotChannelRuntimeState.Started => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            BotChannelRuntimeState.Stopping => "h-1.5 w-1.5 rounded-full bg-purple-500",
+            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+        };
+
+    private string BotStartedText
+    {
+        get
+        {
+            return Host.RuntimeState switch
+            {
+                BotChannelRuntimeState.Starting => "bot starting",
+                BotChannelRuntimeState.Started => "bot started",
+                BotChannelRuntimeState.Stopping => "bot stopping",
+                _ => "bot stopped",
+            };
+        }
+    }
+
+    private static string Initials(string value)
+    {
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 ? "?" : trimmed[..1].ToUpperInvariant();
+    }
+
+    private static string StatusBadgeClass(bool active)
+    {
+        return active
+            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
+            : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
+    }
+
+    private static string StatusDotClass(bool active)
+    {
+        return active
+            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+            : "h-1.5 w-1.5 rounded-full bg-amber-500";
+    }
+}

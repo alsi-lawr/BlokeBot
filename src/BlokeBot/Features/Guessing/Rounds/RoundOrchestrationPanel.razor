@@ -1,0 +1,60 @@
+<section class="card">
+    <div class="border-b border-slate-200 p-5">
+        <h2 class="text-lg font-semibold text-slate-950">Round orchestration</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Start, stop, or resolve a round outside chat.</p>
+    </div>
+    <div class="space-y-4 p-5">
+        <div class="grid gap-3 sm:grid-cols-2">
+            <button class="btn-primary" @onclick="InvokeStartRoundAsync">Start round</button>
+            <button class="btn-secondary" @onclick="InvokeStopGuessingAsync">Stop guessing</button>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <label class="label" for="profile">Round type</label>
+            <select id="profile" class="input mt-2" value="@SelectedProfileId" @onchange="OnSelectedProfileChanged">
+                @foreach (var profile in State.Profiles)
+                {
+                    <option value="@profile.Id">@profile.Name@(profile.IsDefault ? " (default)" : "")</option>
+                }
+            </select>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <label class="label" for="winner">Winner name</label>
+            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input id="winner" class="input" placeholder="configured name" value="@WinnerName" @oninput="OnWinnerNameChanged" />
+                <button class="btn-primary sm:w-40" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public EventCallback DeclareWinner { get; set; }
+    [Parameter, EditorRequired] public int SelectedProfileId { get; set; }
+    [Parameter] public EventCallback<int> SelectedProfileIdChanged { get; set; }
+    [Parameter, EditorRequired] public EventCallback StartRound { get; set; }
+    [Parameter, EditorRequired] public GuessingDashboardState State { get; set; } = new();
+    [Parameter, EditorRequired] public EventCallback StopGuessing { get; set; }
+    [Parameter] public string WinnerName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> WinnerNameChanged { get; set; }
+
+    private async Task OnSelectedProfileChanged(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var profileId))
+            return;
+
+        SelectedProfileId = profileId;
+        await SelectedProfileIdChanged.InvokeAsync(profileId);
+    }
+
+    private async Task OnWinnerNameChanged(ChangeEventArgs args)
+    {
+        WinnerName = args.Value?.ToString() ?? string.Empty;
+        await WinnerNameChanged.InvokeAsync(WinnerName);
+    }
+
+    private async Task InvokeDeclareWinnerAsync() => await DeclareWinner.InvokeAsync();
+
+    private async Task InvokeStartRoundAsync() => await StartRound.InvokeAsync();
+
+    private async Task InvokeStopGuessingAsync() => await StopGuessing.InvokeAsync();
+}

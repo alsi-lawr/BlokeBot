@@ -6,11 +6,17 @@
 # dotenv files
 .env
 
+# Local app configuration
+**/appsettings.Development.json
+
 # Local bot state
-twitch.tokens.json
+*.tokens.json
 *.db
 *.db-shm
 *.db-wal
+
+# Agent scratch state
+.agent-workspace/
 
 # User-specific files
 *.rsuser
@@ -70,6 +76,9 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+
+# Node
+node_modules/
 
 # Tye
 .tye/

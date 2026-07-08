@@ -1,0 +1,28 @@
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div class="card p-5">
+        <p class="text-sm font-medium text-muted-foreground">Round status</p>
+        <p class="mt-2 text-2xl font-bold text-slate-950">@RoundStatusText</p>
+        <p class="mt-1 text-xs text-muted-foreground">@RoundStartedText</p>
+    </div>
+    <div class="card p-5">
+        <p class="text-sm font-medium text-muted-foreground">Votes</p>
+        <p class="mt-2 text-2xl font-bold text-slate-950">@State.Votes.Count</p>
+        <p class="mt-1 text-xs text-muted-foreground">Unique player guesses in the active round</p>
+    </div>
+    <div class="card p-5">
+        <p class="text-sm font-medium text-muted-foreground">Valid names</p>
+        <p class="mt-2 text-2xl font-bold text-slate-950">@State.Options.Count</p>
+        <p class="mt-1 text-xs text-muted-foreground">Configured choices accepted by chat</p>
+    </div>
+    <div class="card p-5">
+        <p class="text-sm font-medium text-muted-foreground">Winner</p>
+        <p class="mt-2 text-2xl font-bold text-slate-950">@(State.CurrentRound?.WinningName ?? "None")</p>
+        <p class="mt-1 text-xs text-muted-foreground">Set with the web action or win command</p>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string RoundStartedText { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string RoundStatusText { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public GuessingDashboardState State { get; set; } = new();
+}

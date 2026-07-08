@@ -1,0 +1,95 @@
+@using BlokeBot.Auth.Sessions
+@using BlokeBot.Hosts
+@inject NavigationManager Navigation
+
+<details class="group relative mr-2 min-w-0">
+    <summary class="grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(8rem,1fr)_5.75rem_1.25rem] items-center gap-2 rounded-md border border-slate-200 bg-white pl-3 pr-4 shadow-sm marker:hidden">
+        @if (AccountImageUrl() is { Length: > 0 } imageUrl)
+        {
+            <img class="h-7 w-7 rounded-full border border-slate-200 object-cover" src="@imageUrl" alt="" />
+        }
+        <span class="truncate text-sm font-semibold text-slate-900">@IdentityText()</span>
+        <span class="@RoleBadgeClass(Role)">@Role</span>
+        <svg class="h-5 w-5 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+        </svg>
+    </summary>
+    <div class="absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-xl shadow-slate-200/70">
+        @if (IsAdminEditing)
+        {
+            <a class="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50" href="@ExitImpersonationHref" data-enhance-nav="false">
+                Exit impersonation
+            </a>
+        }
+        <a class="block w-full px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50" href="/auth/logout" data-enhance-nav="false">
+            Sign out
+        </a>
+    </div>
+</details>
+
+@code {
+    [Parameter] public BotHostSelection? Selection { get; set; }
+    [Parameter, EditorRequired] public ClaimsPrincipal User { get; set; } = new();
+
+    private string CurrentReturnUrl
+    {
+        get
+        {
+            var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+            return Uri.EscapeDataString(path);
+        }
+    }
+
+    private string ExitImpersonationHref => $"/auth/exit-admin?returnUrl={CurrentReturnUrl}";
+
+    private bool IsAdminEditing =>
+        !string.IsNullOrWhiteSpace(User.FindFirstValue(BotHostClaims.AdminEditingLogin));
+
+    private string Role => IsBotAccount
+        ? AuthRole.Bot
+        : Selection?.Current.Role
+        ?? User.FindFirstValue(AuthClaims.Role)
+        ?? "operator";
+
+    private bool IsBotAccount =>
+        string.Equals(
+            User.FindFirstValue(AuthClaims.IsBotAccount),
+            "true",
+            StringComparison.OrdinalIgnoreCase
+        );
+
+    private string? AccountImageUrl()
+    {
+        return IsAdminEditing && !string.IsNullOrWhiteSpace(Selection?.Current.ProfileImageUrl)
+            ? Selection.Current.ProfileImageUrl
+            : User.FindFirstValue(AuthClaims.ProfileImageUrl);
+    }
+
+    private string IdentityText()
+    {
+        var adminLogin = User.FindFirstValue(BotHostClaims.AdminEditingLogin);
+        if (Selection is not null
+            && string.Equals(Role, AuthRole.Admin, StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(adminLogin))
+        {
+            return $"{Selection.Current.DisplayName} ({adminLogin})";
+        }
+
+        return User.Identity?.Name
+            ?? User.FindFirstValue(AuthClaims.Login)
+            ?? "Twitch user";
+    }
+
+    private static string RoleBadgeClass(string role)
+    {
+        var color = role.ToLowerInvariant() switch
+        {
+            AuthRole.Streamer => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+            AuthRole.Admin => "bg-red-50 text-red-700 ring-red-200",
+            AuthRole.Bot => "bg-purple-50 text-purple-700 ring-purple-200",
+            _ => "bg-sky-50 text-sky-700 ring-sky-200",
+        };
+
+        return $"inline-flex h-6 w-[5.75rem] items-center justify-center rounded-full px-2 text-center text-xs font-semibold ring-1 {color}";
+    }
+}

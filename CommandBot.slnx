@@ -1,5 +1,10 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/CommandBot.csproj" />
+    <Project Path="src/Alsi.TwitchBot/Alsi.TwitchBot.csproj" />
+    <Project Path="src/BlokeBot.Persistence/BlokeBot.Persistence.csproj" />
+    <Project Path="src/BlokeBot/BlokeBot.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Alsi.TwitchBot.Tests/Alsi.TwitchBot.Tests.csproj" />
   </Folder>
 </Solution>

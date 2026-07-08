@@ -1,0 +1,237 @@
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Routing
+@implements IDisposable
+@inject NavigationManager Navigation
+
+@if (CurrentHelp is { } help)
+{
+    <div class="relative z-50">
+        <button class="relative z-50 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-black text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                type="button"
+                title="Page help"
+                aria-label="Page help"
+                aria-expanded="@isOpen"
+                @onclick:stopPropagation="true"
+                @onclick="Toggle">
+            ?
+        </button>
+
+        @if (isOpen)
+        {
+            <section class="absolute right-0 top-11 z-50 max-h-[calc(100vh-5rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 text-left shadow-xl shadow-slate-300/40">
+                <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">Help</p>
+                        <h2 class="mt-1 text-base font-bold text-slate-950">@help.Title</h2>
+                    </div>
+                    <button class="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                            type="button"
+                            aria-label="Close help"
+                            @onclick="Close">
+                        x
+                    </button>
+                </div>
+
+                <div class="mt-3 space-y-4">
+                    @foreach (var section in help.Sections)
+                    {
+                        <section>
+                            <h3 class="text-sm font-bold text-slate-900">@section.Title</h3>
+                            @if (!string.IsNullOrWhiteSpace(section.Body))
+                            {
+                                <p class="mt-1 text-sm leading-6 text-slate-600">@section.Body</p>
+                            }
+                            @if (section.Items.Count > 0)
+                            {
+                                <ul class="mt-2 space-y-1.5 text-sm leading-6 text-slate-600">
+                                    @foreach (var item in section.Items)
+                                    {
+                                        <li class="flex gap-2">
+                                            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500"></span>
+                                            <span>@((MarkupString)item)</span>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </section>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private bool isOpen;
+
+    private HelpPage? CurrentHelp => HelpForPath(CurrentPath);
+
+    private string CurrentPath
+    {
+        get
+        {
+            var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var path = relative.Split('?', '#')[0].Trim('/');
+            return string.IsNullOrWhiteSpace(path) ? "/" : "/" + path;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    private void Close() => isOpen = false;
+
+    private void Toggle() => isOpen = !isOpen;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            isOpen = false;
+            StateHasChanged();
+        });
+    }
+
+    private static HelpPage? HelpForPath(string path) =>
+        path switch
+        {
+            "/" or "/guessing" => GuessingDashboardHelp,
+            "/guessing/settings" => GuessingSettingsHelp,
+            "/points" => PointsDashboardHelp,
+            "/points/settings" => PointsSettingsHelp,
+            "/host" => HostConfigHelp,
+            _ => null,
+        };
+
+    private static readonly string[] TemplateVariableItems =
+    [
+        "<strong>Start reply</strong>: <code>{round}</code>, <code>{options}</code>",
+        "<strong>Guess option reply</strong>: <code>{name}</code>, <code>{login}</code>",
+        "<strong>Invalid guess reply</strong>: <code>{name}</code>, <code>{login}</code>",
+        "<strong>Guess usage reply</strong>: <code>{command}</code>",
+        "<strong>Available guesses reply</strong>: <code>{round}</code>, <code>{options}</code>",
+        "<strong>Win usage reply</strong>: <code>{command}</code>",
+        "<strong>Winner and no-winners replies</strong>: <code>{name}</code>, <code>{winners}</code>, <code>{count}</code>",
+        "<strong>Stop, closed, no-open-round, already-open, and moderator-only replies</strong>: no variables",
+    ];
+
+    private static readonly HelpPage HostConfigHelp = new(
+        "Host config",
+        [
+            new(
+                "Channel setup",
+                "Create your hosted channel, authorize the bot for chat, and start or stop the bot on your stream.",
+                []
+            ),
+            new(
+                "Moderator access",
+                "Moderator access is enabled by default. Use the allow list to limit access to named moderators, or the block list to deny specific moderators.",
+                []
+            ),
+        ]
+    );
+
+    private static readonly HelpPage GuessingDashboardHelp = new(
+        "Guessing game dashboard",
+        [
+            new(
+                "Live rounds",
+                "Start a round type, stop new guesses, then declare the winning name. Players can only keep their first valid guess in a round.",
+                [
+                    "<code>!guess &lt;name&gt;</code> records a player guess.",
+                    "<code>!guesses</code> lists the available guesses for the current round type.",
+                    "<code>!win &lt;name&gt;</code> closes the round and announces winners.",
+                    "Start, stop, win, guess, and guesses command words can be changed in Configuration.",
+                ]
+            ),
+            new(
+                "History",
+                "Use the History tab to filter previous results by date range, round type, and username.",
+                []
+            ),
+        ]
+    );
+
+    private static readonly HelpPage GuessingSettingsHelp = new(
+        "Guessing game configuration",
+        [
+            new(
+                "Round types",
+                "Create one or more round types. Each round type has its own valid guesses and reply text.",
+                []
+            ),
+            new(
+                "Commands",
+                "Aliases control the chat commands players and moderators type. Moderator commands are start, stop, and win.",
+                []
+            ),
+            new(
+                "Template variables",
+                "Use these placeholders in reply templates.",
+                TemplateVariableItems
+            ),
+        ]
+    );
+
+    private static readonly HelpPage PointsDashboardHelp = new(
+        "Points dashboard",
+        [
+            new(
+                "Balances",
+                "Use the leaderboard and lookup controls to inspect stored BlokeBot point balances for the selected channel.",
+                [
+                    "Give and remove accept whole numbers, percentages such as <code>50%</code>, or <code>all</code>.",
+                    "Add creates new points and accepts whole numbers only.",
+                ]
+            ),
+            new(
+                "Giveaways",
+                "Start, end, or cancel the configured giveaway. Giveaways only start while the selected channel is live.",
+                [
+                    "Entrants can join once.",
+                    "Winners are drawn from eligible entrants and receive a random multiple of 10 within the configured payout range.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage PointsSettingsHelp = new(
+        "Points configuration",
+        [
+            new(
+                "Commands",
+                "Aliases are the command words used in chat. Each alias must be unique across bot functions for this channel.",
+                [
+                    "<code>points</code> shows the caller's balance. With a login, it is moderator-only.",
+                    "<code>givepoints</code>, <code>gamble</code>, and <code>removepoints</code> accept whole numbers, percentages, or <code>all</code>.",
+                    "<code>addpoints</code> creates points and accepts whole numbers only.",
+                ]
+            ),
+            new(
+                "Reply variables",
+                "Use placeholders to include live command values in chat replies.",
+                [
+                    "Balance and gambling replies: <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, <code>{label}</code>.",
+                    "Transfer replies: <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, <code>{label}</code>.",
+                    "Giveaway replies: <code>{user}</code>, <code>{winners}</code>, <code>{time_left}</code>, <code>{label}</code>.",
+                ]
+            ),
+            new(
+                "Follower eligibility",
+                "Follower-only giveaways require the bot account to have the follower-read scope and to be a moderator for the channel.",
+                []
+            ),
+        ]
+    );
+
+    private sealed record HelpPage(string Title, IReadOnlyList<HelpSection> Sections);
+
+    private sealed record HelpSection(string Title, string Body, IReadOnlyList<string> Items);
+}

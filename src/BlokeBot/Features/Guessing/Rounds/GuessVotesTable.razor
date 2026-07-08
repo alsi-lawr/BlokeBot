@@ -1,0 +1,40 @@
+@using BlokeBot.Features.Guessing.Guesses
+
+<section class="card">
+    <div class="border-b border-slate-200 p-5">
+        <h2 class="text-lg font-semibold text-slate-950">Votes</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Latest guesses for the current unresolved round.</p>
+    </div>
+    <div class="overflow-hidden">
+        @if (Votes.Count == 0)
+        {
+            <div class="p-8 text-sm text-muted-foreground">No guesses recorded for the current round.</div>
+        }
+        else
+        {
+            <table class="w-full text-left text-sm">
+                <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                        <th class="px-5 py-3 font-semibold">Player</th>
+                        <th class="px-5 py-3 font-semibold">Guess</th>
+                        <th class="px-5 py-3 font-semibold">Time</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @foreach (var vote in Votes)
+                    {
+                        <tr>
+                            <td class="px-5 py-3 font-medium text-slate-900">@vote.Login</td>
+                            <td class="px-5 py-3 text-slate-700">@vote.GuessName</td>
+                            <td class="px-5 py-3 text-muted-foreground">@vote.GuessedAtUtc.ToLocalTime().ToString("HH:mm:ss")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<GuessVoteView> Votes { get; set; } = [];
+}

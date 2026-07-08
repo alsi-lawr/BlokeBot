@@ -1,0 +1,23 @@
+@using BlokeBot.Features.Guessing.Replies
+
+<CollapsibleSection Title="Replies" Description="Chat response templates." InitiallyOpen="false">
+    <div class="grid gap-4 p-4 md:grid-cols-2">
+        <TextAreaField Label="Round started" @bind-Value="Replies.RoundStartedReply" />
+        <TextAreaField Label="Round already open" @bind-Value="Replies.RoundAlreadyOpenReply" />
+        <TextAreaField Label="No open round" @bind-Value="Replies.NoOpenRoundReply" />
+        <TextAreaField Label="Guessing stopped" @bind-Value="Replies.GuessingStoppedReply" />
+        <TextAreaField Label="Guessing already stopped" @bind-Value="Replies.GuessingAlreadyStoppedReply" />
+        <TextAreaField Label="Guessing closed" @bind-Value="Replies.GuessingClosedReply" />
+        <TextAreaField Label="Invalid guess" @bind-Value="Replies.InvalidGuessReply" />
+        <TextAreaField Label="Guess usage" @bind-Value="Replies.GuessUsageReply" />
+        <TextAreaField Label="Available guesses" @bind-Value="Replies.AvailableGuessesReply" />
+        <TextAreaField Label="Win usage" @bind-Value="Replies.WinUsageReply" />
+        <TextAreaField Label="Moderator only" @bind-Value="Replies.ModeratorOnlyReply" />
+        <TextAreaField Label="Winner reply" @bind-Value="Replies.WinnerReply" />
+        <TextAreaField Label="No winners reply" @bind-Value="Replies.NoWinnersReply" />
+    </div>
+</CollapsibleSection>
+
+@code {
+    [Parameter, EditorRequired] public ReplySettingsEditor Replies { get; set; } = new();
+}

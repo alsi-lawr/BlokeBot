@@ -1,0 +1,378 @@
+﻿@page "/"
+@page "/guessing"
+@rendermode InteractiveServer
+@using System.Globalization
+@using Alsi.TwitchBot
+@using BlokeBot.AppEvents
+@using BlokeBot.Hosts
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inject GuessingDashboardService Dashboard
+@inject GuessingHistoryService History
+@inject GuessingRoundService Rounds
+@inject AppEventBus Events
+@inject ITwitchChatMessageSender Chat
+@implements IDisposable
+
+<PageTitle>BlokeBot | Guessing</PageTitle>
+
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-2">
+            <div class="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+                Dashboard
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Guessing game</h1>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Run live rounds and inspect player results.</p>
+        </div>
+        <button class="btn-primary" @onclick="RefreshAsync">Refresh</button>
+    </div>
+
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else
+    {
+
+    <div id="live" class="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+        <button class="@TabClass(DashboardTab.Live)" @onclick="() => ActivateTabAsync(DashboardTab.Live)">Live</button>
+        <button class="@TabClass(DashboardTab.History)" @onclick="() => ActivateTabAsync(DashboardTab.History)">History</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+            @statusMessage
+        </div>
+    }
+
+    @if (activeTab == DashboardTab.Live)
+    {
+        @if (state is null)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Loading dashboard...</div>
+        }
+        else
+        {
+            <LiveRoundSummary State="state" RoundStartedText="@RoundStartedText" RoundStatusText="@RoundStatusText" />
+
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <RoundOrchestrationPanel State="state"
+                                         StartRound="StartRoundAsync"
+                                         StopGuessing="StopGuessingAsync"
+                                         DeclareWinner="DeclareWinnerAsync"
+                                         @bind-SelectedProfileId="selectedProfileId"
+                                         @bind-WinnerName="winnerName" />
+
+                <GuessVotesTable Votes="state.Votes" />
+            </div>
+        }
+    }
+    else
+    {
+        <section id="history" class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Historical leaderboard</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Rank players by correct guesses across saved rounds.</p>
+            </div>
+            <div class="grid gap-4 border-b border-slate-200 bg-slate-50 p-5 lg:grid-cols-4">
+                <div>
+                    <label class="label" for="historyFrom">From</label>
+                    <input id="historyFrom" class="input mt-2" type="date" @bind="historyFromDate" @bind:after="ResetAndLoadHistoryAsync" />
+                </div>
+                <div>
+                    <label class="label" for="historyTo">To</label>
+                    <input id="historyTo" class="input mt-2" type="date" @bind="historyToDate" @bind:after="ResetAndLoadHistoryAsync" />
+                </div>
+                <div>
+                    <label class="label" for="historyProfile">Round type</label>
+                    <select id="historyProfile" class="input mt-2" @bind="historyProfileId" @bind:after="ResetAndLoadHistoryAsync">
+                        <option value="0">All round types</option>
+                        @foreach (var profile in state?.Profiles ?? [])
+                        {
+                            <option value="@profile.Id">@profile.Name</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="label" for="historyUsername">Username</label>
+                    <input id="historyUsername" class="input mt-2" placeholder="any player" @bind="historyUsername" @bind:event="oninput" @bind:after="ResetAndLoadHistoryAsync" />
+                </div>
+            </div>
+
+            @if (leaderboard is null)
+            {
+                <div class="p-8 text-sm text-muted-foreground">Loading historical data...</div>
+            }
+            else
+            {
+                <div class="grid gap-4 border-b border-slate-200 p-5 md:grid-cols-2 xl:grid-cols-4">
+                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                        <p class="text-sm font-medium text-muted-foreground">Players</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalPlayers</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                        <p class="text-sm font-medium text-muted-foreground">Guesses</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalGuesses</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                        <p class="text-sm font-medium text-muted-foreground">Correct</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.CorrectGuesses</p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4">
+                        <p class="text-sm font-medium text-muted-foreground">Page</p>
+                        <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.Page / @leaderboard.PageCount</p>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden">
+                    @if (leaderboard.Entries.Count == 0)
+                    {
+                        <div class="p-8 text-sm text-muted-foreground">No historical guesses match the selected filters.</div>
+                    }
+                    else
+                    {
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
+                                <tr>
+                                    <th class="px-5 py-3 font-semibold">Rank</th>
+                                    <th class="px-5 py-3 font-semibold">Player</th>
+                                    <th class="px-5 py-3 font-semibold">Correct</th>
+                                    <th class="px-5 py-3 font-semibold">Rounds</th>
+                                    <th class="px-5 py-3 font-semibold">Hit rate</th>
+                                    <th class="px-5 py-3 font-semibold">Latest</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach (var entry in leaderboard.Entries)
+                                {
+                                    <tr>
+                                        <td class="px-5 py-3 font-semibold text-slate-900">#@entry.Rank</td>
+                                        <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                        <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
+                                        <td class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
+                                        <td class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
+                                        <td class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+
+                <div class="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex items-center gap-3">
+                        <label class="label" for="historyPageSize">Rows</label>
+                        <select id="historyPageSize" class="h-9 rounded-md border border-slate-200 bg-white px-2 text-sm font-medium text-slate-700 shadow-sm" @bind="historyPageSize" @bind:after="ResetAndLoadHistoryAsync">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(leaderboard.Page <= 1)" @onclick="PreviousHistoryPageAsync">Previous</button>
+                        <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(leaderboard.Page >= leaderboard.PageCount)" @onclick="NextHistoryPageAsync">Next</button>
+                    </div>
+                </div>
+            }
+        </section>
+    }
+    }
+</div>
+
+@code {
+    private enum DashboardTab
+    {
+        Live,
+        History,
+    }
+
+    private DashboardTab activeTab;
+    private IDisposable? guessingSubscription;
+    private GuessLeaderboardPage? leaderboard;
+    private int historyPage = 1;
+    private int historyPageSize = 25;
+    private int historyProfileId;
+    private DateTime? historyFromDate = DateTime.Today.AddDays(-30);
+    private DateTime? historyToDate = DateTime.Today;
+    private string historyUsername = string.Empty;
+    private int selectedProfileId;
+    private GuessingDashboardState? state;
+    private string? statusMessage;
+    private string winnerName = string.Empty;
+    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
+    private BotHostChoice? Host { get; set; }
+    private int HostId => Host?.Id ?? 0;
+
+    private string RoundStartedText =>
+        state?.CurrentRound is null
+            ? "No active or stopped round"
+            : state.CurrentRound.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
+
+    private string RoundStatusText =>
+        state?.CurrentRound is null
+            ? "Idle"
+            : $"{state.CurrentRound.ProfileName}: {state.CurrentRound.Status}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        guessingSubscription = Events.Subscribe(AppEventKind.GuessingChanged, OnGameChangedAsync);
+        await LoadHostAsync();
+        await LoadAsync(null);
+    }
+
+    private async Task LoadHostAsync()
+    {
+        var authState = await AuthenticationState;
+        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+    }
+
+    private async Task ActivateTabAsync(DashboardTab tab)
+    {
+        activeTab = tab;
+        statusMessage = null;
+
+        if (tab == DashboardTab.History && leaderboard is null)
+            await LoadHistoryAsync();
+    }
+
+    public void Dispose()
+    {
+        guessingSubscription?.Dispose();
+    }
+
+    private async Task OnGameChangedAsync(AppEvent _)
+    {
+        await InvokeAsync(async () =>
+        {
+            if (activeTab == DashboardTab.History)
+                await LoadHistoryAsync();
+            else
+                await LoadAsync(statusMessage);
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task ResetAndLoadHistoryAsync()
+    {
+        historyPage = 1;
+        await LoadHistoryAsync();
+    }
+
+    private async Task DeclareWinnerAsync()
+    {
+        if (string.IsNullOrWhiteSpace(winnerName))
+        {
+            statusMessage = "Choose a configured winner name first.";
+            return;
+        }
+
+        await RunAsync(() => Rounds.DeclareWinnerAsync(HostId, winnerName, CancellationToken.None));
+        winnerName = string.Empty;
+    }
+
+    private async Task LoadAsync(string? message)
+    {
+        if (HostId == 0)
+            return;
+
+        state = await Dashboard.LoadStateAsync(HostId, CancellationToken.None);
+        if (selectedProfileId == 0)
+            selectedProfileId = state.CurrentRound?.ProfileId
+                ?? state.Profiles.FirstOrDefault(x => x.IsDefault)?.Id
+                ?? state.Profiles.FirstOrDefault()?.Id
+                ?? 0;
+        statusMessage = message;
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        if (HostId == 0)
+            return;
+
+        state = await Dashboard.LoadStateAsync(HostId, CancellationToken.None);
+        leaderboard = await History.LoadLeaderboardAsync(
+            HostId,
+            new GuessHistoryQuery
+            {
+                FromUtc = StartOfLocalDateUtc(historyFromDate),
+                Page = historyPage,
+                PageSize = historyPageSize,
+                ProfileId = historyProfileId == 0 ? null : historyProfileId,
+                ToUtc = EndOfLocalDateUtc(historyToDate),
+                Username = historyUsername,
+            },
+            CancellationToken.None
+        );
+
+        historyPage = leaderboard.Page;
+    }
+
+    private async Task NextHistoryPageAsync()
+    {
+        if (leaderboard is null || leaderboard.Page >= leaderboard.PageCount)
+            return;
+
+        historyPage++;
+        await LoadHistoryAsync();
+    }
+
+    private async Task PreviousHistoryPageAsync()
+    {
+        if (leaderboard is null || leaderboard.Page <= 1)
+            return;
+
+        historyPage--;
+        await LoadHistoryAsync();
+    }
+
+    private Task RefreshAsync() =>
+        activeTab == DashboardTab.History
+            ? LoadHistoryAsync()
+            : LoadAsync(null);
+
+    private Task StartRoundAsync() =>
+        RunAsync(() => Rounds.StartRoundAsync(HostId, selectedProfileId, CancellationToken.None));
+
+    private static DateTime? StartOfLocalDateUtc(DateTime? value)
+    {
+        return value is { } date
+            ? DateTime.SpecifyKind(date.Date, DateTimeKind.Local).ToUniversalTime()
+            : null;
+    }
+
+    private static DateTime? EndOfLocalDateUtc(DateTime? value)
+    {
+        return value is { } date
+            ? DateTime.SpecifyKind(date.Date.AddDays(1), DateTimeKind.Local).ToUniversalTime()
+            : null;
+    }
+
+    private Task StopGuessingAsync() => RunAsync(() => Rounds.StopGuessingAsync(HostId, CancellationToken.None));
+
+    private string TabClass(DashboardTab tab)
+    {
+        return activeTab == tab
+            ? "h-9 rounded-md bg-slate-950 px-4 text-sm font-semibold text-white shadow-sm"
+            : "h-9 rounded-md px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950";
+    }
+
+    private async Task RunAsync(Func<Task<GuessingOperationResult>> operation)
+    {
+        if (HostId == 0)
+            return;
+
+        var result = await operation();
+        if (result.Succeeded)
+            await Chat.SendAsync(Host!.Login, result.Message, CancellationToken.None);
+
+        await LoadAsync(result.Message);
+
+        if (leaderboard is not null)
+            await LoadHistoryAsync();
+    }
+}

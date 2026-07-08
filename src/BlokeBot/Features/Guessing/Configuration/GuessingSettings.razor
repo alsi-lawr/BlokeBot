@@ -1,0 +1,134 @@
+@page "/guessing/settings"
+@rendermode InteractiveServer
+@using BlokeBot.Hosts
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inject GuessingConfigurationService Configuration
+
+<PageTitle>BlokeBot | Guessing Settings</PageTitle>
+
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="space-y-2">
+            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Round settings</h1>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Round types, aliases, valid guesses, and replies.</p>
+        </div>
+        <button class="btn-primary" @onclick="SaveAsync">Save changes</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">@statusMessage</div>
+    }
+
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else if (config is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading configuration...</div>
+    }
+    else
+    {
+        <div id="profiles">
+            <ProfileSettingsSection Configuration="config"
+                                    CreateProfile="CreateProfileAsync"
+                                    DeleteProfile="DeleteProfileAsync"
+                                    SelectProfile="SelectProfileAsync"
+                                    @bind-NewProfileName="newProfileName" />
+        </div>
+
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div id="aliases">
+                <CommandAliasSettingsSection Aliases="config.Aliases" />
+            </div>
+
+            <GuessOptionsSettingsSection Options="config.Profile.Options"
+                                         AddOption="AddOption"
+                                         RemoveOption="RemoveOption" />
+        </div>
+
+        <div id="replies">
+            <ReplySettingsSection Replies="config.Profile.Replies" />
+        </div>
+    }
+</div>
+
+@code {
+    private GuessingConfiguration? config;
+    private string newProfileName = string.Empty;
+    private string? statusMessage;
+    [CascadingParameter] private Task<AuthenticationState> AuthenticationState { get; set; } = Task.FromResult(new AuthenticationState(new()));
+    private BotHostChoice? Host { get; set; }
+    private int HostId => Host?.Id ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHostAsync();
+        if (HostId != 0)
+            config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+    }
+
+    private async Task LoadHostAsync()
+    {
+        var authState = await AuthenticationState;
+        Host = BotHostSelectionAccessor.FromPrincipal(authState.User)?.Current;
+    }
+
+    private void AddOption()
+    {
+        config?.Profile.Options.Add(new GuessOptionEditor());
+    }
+
+    private void RemoveOption(GuessOptionEditor option)
+    {
+        config?.Profile.Options.Remove(option);
+    }
+
+    private async Task CreateProfileAsync()
+    {
+        var result = await Configuration.CreateProfileAsync(HostId, newProfileName, CancellationToken.None);
+        statusMessage = result.Message;
+        newProfileName = string.Empty;
+        config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+    }
+
+    private async Task DeleteProfileAsync()
+    {
+        if (config is null)
+            return;
+
+        var result = await Configuration.DeleteProfileAsync(HostId, config.Profile.Id, CancellationToken.None);
+        statusMessage = result.Message;
+        config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+    }
+
+    private async Task SaveAsync()
+    {
+        if (config is null)
+            return;
+
+        try
+        {
+            await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
+            var selectedId = config.Profile.Id;
+            config = await Configuration.LoadConfigurationAsync(HostId, selectedId, CancellationToken.None);
+            statusMessage = "Settings saved.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            statusMessage = ex.Message;
+        }
+    }
+
+    private async Task SelectProfileAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var profileId))
+            return;
+
+        config = await Configuration.LoadConfigurationAsync(HostId, profileId, CancellationToken.None);
+        statusMessage = null;
+    }
+}

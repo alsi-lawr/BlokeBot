@@ -1,0 +1,78 @@
+@using BlokeBot.Features.HostedChannels.Authorization
+
+<section class="card">
+    <div class="border-b border-slate-200 p-5">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-950">Bot account authorization</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Authorize the Twitch account BlokeBot uses for chat and API checks.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize signed-in account</a>
+                <button class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="Refresh">Refresh</button>
+                <button class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50" @onclick="Clear">Clear authorization</button>
+            </div>
+        </div>
+    </div>
+    <div class="grid gap-4 p-5 lg:grid-cols-3">
+        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Configured account</p>
+            <p class="mt-2 text-sm font-semibold text-slate-900">@Status?.ConfiguredBotLogin</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+            <div class="flex items-center justify-between gap-3">
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Saved authorization</p>
+                <span class="@StatusBadgeClass">
+                    <span class="@StatusDotClass"></span>
+                    @StatusText
+                </span>
+            </div>
+            <p class="mt-2 text-sm font-semibold text-slate-900">@(Status?.AuthorizedLogin ?? "not authorized")</p>
+            <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
+        </div>
+        <div class="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Permissions</p>
+            <p class="mt-2 text-xs font-medium text-slate-500">Required: @FormatScopes(Status?.RequiredScopes)</p>
+            <p class="mt-1 text-xs font-medium text-slate-500">Granted: @FormatScopes(Status?.GrantedScopes)</p>
+            @if (Status?.MissingScopes.Count > 0)
+            {
+                <p class="mt-1 text-xs font-bold text-amber-700">Missing: @FormatScopes(Status.MissingScopes)</p>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter] public BotAccountAuthorizationStatus? Status { get; set; }
+    [Parameter, EditorRequired] public Func<Task> Clear { get; set; } = () => Task.CompletedTask;
+    [Parameter, EditorRequired] public Func<Task> Refresh { get; set; } = () => Task.CompletedTask;
+
+    private string StatusBadgeClass =>
+        Status?.State switch
+        {
+            BotAccountAuthorizationState.Ready => "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
+            BotAccountAuthorizationState.WrongAccount or BotAccountAuthorizationState.MissingScopes => "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
+            _ => "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
+        };
+
+    private string StatusDotClass =>
+        Status?.State switch
+        {
+            BotAccountAuthorizationState.Ready => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            BotAccountAuthorizationState.WrongAccount or BotAccountAuthorizationState.MissingScopes => "h-1.5 w-1.5 rounded-full bg-amber-500",
+            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+        };
+
+    private string StatusText =>
+        Status?.State switch
+        {
+            BotAccountAuthorizationState.Ready => "current",
+            BotAccountAuthorizationState.WrongAccount => "wrong account",
+            BotAccountAuthorizationState.MissingScopes => "missing permissions",
+            BotAccountAuthorizationState.NotAuthorized => "not authorized",
+            _ => "unknown",
+        };
+
+    private static string FormatScopes(IReadOnlyList<string>? scopes) =>
+        scopes is { Count: > 0 } ? string.Join(", ", scopes) : "none";
+}
