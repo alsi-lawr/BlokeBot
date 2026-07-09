@@ -137,6 +137,38 @@ public sealed class HostBotStatusTests
         httpClientFactory.LastModerationUserId.ShouldBe("custom-id");
     }
 
+    [Test]
+    public async Task Readiness_treats_custom_bot_override_broadcaster_as_channel_authority()
+    {
+        var httpClientFactory = new HostBotStatusHttpClientFactory
+        {
+            GrantedScopes =
+            [
+                TwitchScopes.UserReadModeratedChannels,
+                TwitchScopes.ModeratorReadFollowers,
+            ],
+            BotIsModerator = false,
+            CustomTokenLogin = "streamer",
+            CustomTokenUserId = "channel-id",
+        };
+        await using var fixture = await CreateFixtureAsync(httpClientFactory);
+        var hostId = await SeedHostAsync(fixture.DbFactory, "streamer");
+        await SeedHostBotOverrideAsync(
+            fixture.DbFactory,
+            hostId,
+            login: "streamer",
+            userId: "channel-id",
+            displayName: "Streamer"
+        );
+
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var status = await fixture.Service.GetStatusAsync("streamer", CancellationToken.None);
+
+        outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
+        status.CanReadFollowers.ShouldBeTrue();
+        httpClientFactory.LastModerationUserId.ShouldBeNull();
+    }
+
     private static async Task<HostBotStatusFixture> CreateFixtureAsync(
         HostBotStatusHttpClientFactory httpClientFactory,
         bool includeTokenProvider = true
@@ -214,7 +246,10 @@ public sealed class HostBotStatusTests
 
     private static async Task SeedHostBotOverrideAsync(
         SqliteBlokeBotDbFactory dbFactory,
-        int hostId
+        int hostId,
+        string login = "custombot",
+        string userId = "custom-id",
+        string displayName = "CustomBot"
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -228,13 +263,13 @@ public sealed class HostBotStatusTests
                     TwitchScopes.UserReadModeratedChannels,
                     TwitchScopes.ModeratorReadFollowers
                 ),
-                DisplayName = "CustomBot",
+                DisplayName = displayName,
                 ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
                 HostId = hostId,
-                Login = "custombot",
+                Login = login,
                 OverrideEnabled = true,
                 RefreshToken = "custom-refresh",
-                TwitchUserId = "custom-id",
+                TwitchUserId = userId,
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );
@@ -269,6 +304,18 @@ public sealed class HostBotStatusTests
             init => handler.BotIsModerator = value;
         }
 
+        public string CustomTokenLogin
+        {
+            get => handler.CustomTokenLogin;
+            init => handler.CustomTokenLogin = value;
+        }
+
+        public string CustomTokenUserId
+        {
+            get => handler.CustomTokenUserId;
+            init => handler.CustomTokenUserId = value;
+        }
+
         public string? LastModerationUserId => handler.LastModerationUserId;
 
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
@@ -281,6 +328,10 @@ public sealed class HostBotStatusTests
             [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
 
             public bool BotIsModerator { get; set; } = true;
+
+            public string CustomTokenLogin { get; set; } = "custombot";
+
+            public string CustomTokenUserId { get; set; } = "custom-id";
 
             public string? LastModerationUserId { get; private set; }
 
@@ -311,7 +362,7 @@ public sealed class HostBotStatusTests
                 return request.Headers.Authorization?.Parameter == "custom-token"
                     ? JsonResponse(
                         $$"""
-                        {"user_id":"custom-id","login":"custombot","scopes":[{{FormatScopes()}}]}
+                        {"user_id":"{{CustomTokenUserId}}","login":"{{CustomTokenLogin}}","scopes":[{{FormatScopes()}}]}
                         """
                     )
                     : JsonResponse(

@@ -107,6 +107,9 @@ public sealed class HostBotStatusService(
             return HostBotReadinessOutcome.IdentityLookupFailed(flags);
         }
 
+        if (string.Equals(tokenStatus.Validation!.UserId, channelId, StringComparison.Ordinal))
+            return ChannelAuthorityReadyOutcome(flags);
+
         var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
             HelixContext(tokenStatus.AccessToken!),
             tokenStatus.Validation!.UserId,
@@ -133,6 +136,17 @@ public sealed class HostBotStatusService(
             _ => HostBotReadinessOutcome.Unknown(flags),
         };
     }
+
+    private static HostBotReadinessOutcome ChannelAuthorityReadyOutcome(
+        HostBotChannelStatusFlags flags
+    ) =>
+        HasAll(
+            flags,
+            HostBotChannelStatusFlags.FollowerReadConfigured
+                | HostBotChannelStatusFlags.FollowerReadGranted
+        )
+            ? HostBotReadinessOutcome.Ready()
+            : HostBotReadinessOutcome.MissingFollowerReadScope(flags);
 
     public async Task<bool> IsStreamLiveAsync(string channelLogin, CancellationToken ct)
     {

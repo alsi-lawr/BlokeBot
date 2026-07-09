@@ -88,6 +88,7 @@ public partial class AccountMenu
         var color = role.ToLowerInvariant() switch
         {
             "streamer" => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+            "moderator" => "bg-blue-600 text-white ring-blue-600",
             "admin" => "bg-red-50 text-red-700 ring-red-200",
             "bot" => "bg-purple-50 text-purple-700 ring-purple-200",
             _ => "bg-sky-50 text-sky-700 ring-sky-200",
