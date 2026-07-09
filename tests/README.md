@@ -3,8 +3,8 @@
 Run the active test set with:
 
 ```bash
-dotnet restore CommandBot.slnx
-dotnet test CommandBot.slnx --no-restore -v:minimal
+dotnet restore BlokeBot.slnx
+dotnet test BlokeBot.slnx --no-restore -v:minimal
 ```
 
 Projects:
