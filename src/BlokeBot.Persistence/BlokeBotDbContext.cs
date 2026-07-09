@@ -72,6 +72,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         {
             b.ToTable("host_mod_access_settings");
             b.HasKey(x => x.Id);
+            b.Property(x => x.AllowModsByDefault).HasDefaultValue(true);
             b.HasIndex(x => x.HostId).IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()

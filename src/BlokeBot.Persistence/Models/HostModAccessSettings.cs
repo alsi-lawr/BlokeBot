@@ -7,4 +7,6 @@ public sealed class HostModAccessSettings
     public int HostId { get; set; }
 
     public bool ModsEnabled { get; set; } = true;
+
+    public bool AllowModsByDefault { get; set; } = true;
 }

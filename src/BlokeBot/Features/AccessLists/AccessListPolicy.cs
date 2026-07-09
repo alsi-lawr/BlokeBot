@@ -8,7 +8,6 @@ internal enum AccessListWhitelistMode
 {
     Disabled,
     Required,
-    RequiredWhenEntriesExist,
 }
 
 internal sealed record AccessListPolicy(bool Enabled, AccessListWhitelistMode WhitelistMode);
@@ -22,18 +21,16 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
         if (!policy.Enabled)
             return false;
 
-        if (Blacklist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase))
-            return false;
-
         return policy.WhitelistMode switch
         {
-            AccessListWhitelistMode.Disabled => true,
+            AccessListWhitelistMode.Disabled => !Blacklist.Contains(
+                normalizedLogin,
+                StringComparer.OrdinalIgnoreCase
+            ),
             AccessListWhitelistMode.Required => Whitelist.Contains(
                 normalizedLogin,
                 StringComparer.OrdinalIgnoreCase
             ),
-            AccessListWhitelistMode.RequiredWhenEntriesExist => Whitelist.Length == 0
-                || Whitelist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase),
             _ => throw new ArgumentOutOfRangeException(nameof(policy), policy.WhitelistMode, null),
         };
     }

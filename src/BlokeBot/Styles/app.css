@@ -136,6 +136,10 @@ a {
         transform: translateX(100%);
     }
 
+    .segmented-motion--second .segmented-motion__indicator {
+        transform: translateX(100%);
+    }
+
     .segmented-motion__tab {
         background: transparent;
         border-radius: 0.375rem;

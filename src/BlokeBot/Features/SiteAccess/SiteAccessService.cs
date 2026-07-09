@@ -19,7 +19,7 @@ public sealed class SiteAccessService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, ct);
-        var added = await AccessListStore.AddNormalizedAsync(
+        var changed = await AccessListStore.AddNormalizedAsync(
             db.SiteAccessEntries,
             db.SiteAccessEntries,
             kind,
@@ -32,7 +32,7 @@ public sealed class SiteAccessService(
             },
             ct
         );
-        if (!added)
+        if (!changed)
             return;
 
         await db.SaveChangesAsync(ct);

@@ -10,6 +10,8 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- SDK 10.0.301 Razor source generation misparses component tags as the first markup inside code blocks. -->
+    <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
   </PropertyGroup>
 
   <Target

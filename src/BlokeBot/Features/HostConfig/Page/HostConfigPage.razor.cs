@@ -125,6 +125,14 @@ public partial class HostConfigPage
             _ => "Bot stopped.",
         };
 
+    private string AccessModeSegmentClass =>
+        state?.ModAccess.AllowModsByDefault == false
+            ? "segmented-motion segmented-motion--second"
+            : "segmented-motion";
+
+    private static string AccessModeTabClass(bool active) =>
+        active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
+
     private static string FeatureBadgeClass(HostFeatureCardState feature) =>
         feature.Enabled
             ? "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 text-[0.68rem] font-bold text-emerald-700 ring-1 ring-emerald-200"
@@ -255,6 +263,12 @@ public partial class HostConfigPage
     private async Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
     {
         await ModAccess.SetModsEnabledAsync(hostId, args.Value is true, CancellationToken.None);
+        await LoadAsync();
+    }
+
+    private async Task SetAllowModsByDefaultAsync(int hostId, bool allowByDefault)
+    {
+        await ModAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, CancellationToken.None);
         await LoadAsync();
     }
 

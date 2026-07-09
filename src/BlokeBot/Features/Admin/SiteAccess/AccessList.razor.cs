@@ -50,6 +50,9 @@ public partial class AccessList
     public Func<Task> Add { get; set; } = () => Task.CompletedTask;
 
     [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
     public IReadOnlyList<AccessListEntryProfile> Entries { get; set; } = [];
 
     [Parameter]
@@ -66,6 +69,9 @@ public partial class AccessList
 
     [Parameter]
     public string Title { get; set; } = string.Empty;
+
+    private string ContainerClass =>
+        Disabled ? "surface-muted rounded-lg p-4 opacity-50" : "surface-muted rounded-lg p-4";
 
     private async Task OnInput(ChangeEventArgs args)
     {

@@ -1,5 +1,4 @@
 @page "/host"
-@rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
 @using BlokeBot.Eventing
 @using BlokeBot.Features.AccessLists
@@ -124,10 +123,37 @@
                 <p class="mt-1 text-sm text-muted-foreground">Choose which moderators can view and edit this channel.</p>
             </div>
             <div class="space-y-5 p-5">
-                <label class="flex items-center gap-3 text-sm font-semibold text-slate-800">
-                    <input class="h-4 w-4" type="checkbox" checked="@state.ModAccess.ModsEnabled" @onchange="args => SetModsEnabledAsync(hostId, args)" />
-                    Allow moderators to view and edit this channel
-                </label>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
+                        <input class="h-4 w-4" type="checkbox" checked="@state.ModAccess.ModsEnabled" @onchange="args => SetModsEnabledAsync(hostId, args)" />
+                        Allow moderators to view and edit this channel
+                    </label>
+                    <p class="text-sm text-muted-foreground">When this is off, moderator access is disabled but your saved allow and block lists are kept.</p>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-foreground">Allow moderators by default</p>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            @(state.ModAccess.AllowModsByDefault ? "Moderators can access unless they are on the blocked list." : "Only moderators on the allowed list can access.")
+                        </p>
+                    </div>
+                    <div class="@AccessModeSegmentClass" role="group" aria-label="Moderator access mode">
+                        <span class="segmented-motion__indicator" aria-hidden="true"></span>
+                        <button class="@AccessModeTabClass(state.ModAccess.AllowModsByDefault)"
+                                type="button"
+                                aria-pressed="@state.ModAccess.AllowModsByDefault"
+                                @onclick="() => SetAllowModsByDefaultAsync(hostId, true)">
+                            Allow by default
+                        </button>
+                        <button class="@AccessModeTabClass(!state.ModAccess.AllowModsByDefault)"
+                                type="button"
+                                aria-pressed="@(!state.ModAccess.AllowModsByDefault)"
+                                @onclick="() => SetAllowModsByDefaultAsync(hostId, false)">
+                            Require allow list
+                        </button>
+                    </div>
+                </div>
 
                 <div class="grid gap-5 lg:grid-cols-2">
                     <HostAccessList Title="Allowed moderators"
@@ -135,14 +161,16 @@
                                     NewLogin="@newWhitelistLogin"
                                     NewLoginChanged="value => newWhitelistLogin = value"
                                     Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
-                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)" />
+                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)"
+                                    Disabled="@(!state.ModAccess.ModsEnabled || state.ModAccess.AllowModsByDefault)" />
 
                     <HostAccessList Title="Blocked moderators"
                                     Entries="blacklistEntries"
                                     NewLogin="@newBlacklistLogin"
                                     NewLoginChanged="value => newBlacklistLogin = value"
                                     Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"
-                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Blacklist, login)" />
+                                    Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Blacklist, login)"
+                                    Disabled="@(!state.ModAccess.ModsEnabled || !state.ModAccess.AllowModsByDefault)" />
                 </div>
             </div>
         </section>

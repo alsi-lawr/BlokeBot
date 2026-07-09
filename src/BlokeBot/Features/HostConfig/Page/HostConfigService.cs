@@ -41,7 +41,7 @@ public sealed class HostConfigService(
                 null,
                 null,
                 [],
-                new HostModAccessState(true, [], [])
+                new HostModAccessState(true, true, [], [])
             );
         }
 

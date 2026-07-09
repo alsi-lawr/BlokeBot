@@ -59,7 +59,34 @@ public sealed class AccessListPolicyTests
             "viewer",
             CancellationToken.None
         );
+        (await service.CanCreateHostAsync("viewer", CancellationToken.None)).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task Site_access_mode_selects_active_list_without_removing_inactive_entries()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var service = CreateSiteAccessService(dbFactory);
+
+        await service.AddEntryAsync(
+            AccessListEntryKind.Whitelist,
+            "viewer",
+            CancellationToken.None
+        );
+        await service.AddEntryAsync(
+            AccessListEntryKind.Blacklist,
+            "viewer",
+            CancellationToken.None
+        );
+
         (await service.CanCreateHostAsync("viewer", CancellationToken.None)).ShouldBeFalse();
+
+        await service.SetWhitelistEnabledAsync(true, CancellationToken.None);
+
+        (await service.CanCreateHostAsync("viewer", CancellationToken.None)).ShouldBeTrue();
+        var state = await service.LoadAdminStateAsync(CancellationToken.None);
+        state.Whitelist.ShouldBe(["viewer"]);
+        state.Blacklist.ShouldBe(["viewer"]);
     }
 
     [Test]
@@ -96,7 +123,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_whitelist_entries_switch_to_allow_list()
+    public async Task Host_moderator_restrictive_mode_requires_allow_entry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -105,6 +132,7 @@ public sealed class AccessListPolicyTests
             new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
         );
 
+        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
         await service.AddEntryAsync(
             hostId,
             AccessListEntryKind.Whitelist,
@@ -129,7 +157,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_blacklist_precedes_whitelist()
+    public async Task Host_moderator_mode_selects_active_list_without_removing_inactive_entries()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -154,6 +182,46 @@ public sealed class AccessListPolicyTests
         (
             await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
         ).ShouldBeFalse();
+
+        var state = await service.LoadAsync(hostId, CancellationToken.None);
+        state.AllowModsByDefault.ShouldBeTrue();
+        state.Whitelist.ShouldBe(["moderator"]);
+        state.Blacklist.ShouldBe(["moderator"]);
+
+        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
+
+        (
+            await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
+        ).ShouldBeTrue();
+        (
+            await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None)
+        ).ShouldBeFalse();
+        state = await service.LoadAsync(hostId, CancellationToken.None);
+        state.AllowModsByDefault.ShouldBeFalse();
+        state.Whitelist.ShouldBe(["moderator"]);
+        state.Blacklist.ShouldBe(["moderator"]);
+    }
+
+    [Test]
+    public async Task Host_moderator_default_allow_ignores_whitelist_entries()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
+
+        await service.AddEntryAsync(
+            hostId,
+            AccessListEntryKind.Whitelist,
+            "moderator",
+            CancellationToken.None
+        );
+
+        (
+            await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None)
+        ).ShouldBeTrue();
     }
 
     [Test]
@@ -212,8 +280,9 @@ public sealed class AccessListPolicyTests
             CancellationToken.None
         );
         await service.SetModsEnabledAsync(hostId, false, CancellationToken.None);
+        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
 
-        eventCount.ShouldBe(3);
+        eventCount.ShouldBe(4);
     }
 
     private static SiteAccessService CreateSiteAccessService(

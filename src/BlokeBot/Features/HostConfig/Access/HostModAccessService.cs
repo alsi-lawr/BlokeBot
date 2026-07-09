@@ -23,7 +23,7 @@ public sealed class HostModAccessService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, hostId, ct);
-        var added = await AccessListStore.AddNormalizedAsync(
+        var changed = await AccessListStore.AddNormalizedAsync(
             db.HostModAccessEntries,
             db.HostModAccessEntries.Where(x => x.HostId == hostId),
             kind,
@@ -37,7 +37,7 @@ public sealed class HostModAccessService(
             },
             ct
         );
-        if (!added)
+        if (!changed)
             return;
 
         await db.SaveChangesAsync(ct);
@@ -59,7 +59,9 @@ public sealed class HostModAccessService(
             normalized,
             new AccessListPolicy(
                 settings.ModsEnabled,
-                AccessListWhitelistMode.RequiredWhenEntriesExist
+                settings.AllowModsByDefault
+                    ? AccessListWhitelistMode.Disabled
+                    : AccessListWhitelistMode.Required
             )
         );
     }
@@ -75,6 +77,7 @@ public sealed class HostModAccessService(
 
         return new HostModAccessState(
             settings.ModsEnabled,
+            settings.AllowModsByDefault,
             accessList.Whitelist,
             accessList.Blacklist
         );
@@ -107,6 +110,19 @@ public sealed class HostModAccessService(
         await changes.NotifyChangedAsync();
     }
 
+    public async Task SetAllowModsByDefaultAsync(
+        int hostId,
+        bool allowByDefault,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await EnsureSettingsAsync(db, hostId, ct);
+        settings.AllowModsByDefault = allowByDefault;
+        await db.SaveChangesAsync(ct);
+        await changes.NotifyChangedAsync();
+    }
+
     public static async Task<HostModAccessSettings> EnsureSettingsAsync(
         BlokeBotDbContext db,
         int hostId,
@@ -120,7 +136,12 @@ public sealed class HostModAccessService(
         if (settings is not null)
             return settings;
 
-        settings = new HostModAccessSettings { HostId = hostId, ModsEnabled = true };
+        settings = new HostModAccessSettings
+        {
+            HostId = hostId,
+            ModsEnabled = true,
+            AllowModsByDefault = true,
+        };
         db.HostModAccessSettings.Add(settings);
         await db.SaveChangesAsync(ct);
         return settings;

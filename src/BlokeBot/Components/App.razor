@@ -99,11 +99,11 @@
     <link rel="stylesheet" href="@Assets["BlokeBot.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/svg+xml" href="blokedroid.svg" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>

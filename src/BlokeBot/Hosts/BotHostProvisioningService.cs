@@ -56,7 +56,12 @@ public sealed class BotHostProvisioningService(
         if (!await db.HostModAccessSettings.AnyAsync(x => x.HostId == host.Id, ct))
         {
             db.HostModAccessSettings.Add(
-                new HostModAccessSettings { HostId = host.Id, ModsEnabled = true }
+                new HostModAccessSettings
+                {
+                    HostId = host.Id,
+                    ModsEnabled = true,
+                    AllowModsByDefault = true,
+                }
             );
             await db.SaveChangesAsync(ct);
         }
