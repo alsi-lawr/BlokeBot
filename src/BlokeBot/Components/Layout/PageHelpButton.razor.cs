@@ -107,13 +107,13 @@ public partial class PageHelpButton
         "Home",
         [
             new(
-                "Application home",
-                "Home is the top-level entry point for BlokeBot operations and links to the available application areas.",
+                "What this page is for",
+                "Home gives you the short version of what BlokeBot can do for your Twitch channel.",
                 []
             ),
             new(
-                "Channel access",
-                "Application areas appear when the current authorization can access the related hosted channel or admin capability.",
+                "Where to go next",
+                "Use the menu to set up your channel, start chat games, manage points, or change bot settings.",
                 []
             ),
         ]
@@ -124,12 +124,12 @@ public partial class PageHelpButton
         [
             new(
                 "Channel setup",
-                "Create your hosted channel, authorize the bot for chat, and start or stop the bot on your stream.",
+                "Create your channel setup, let the bot chat in your stream, and start or stop it when you need.",
                 []
             ),
             new(
                 "Moderator access",
-                "Moderator access is enabled by default. Use the allow list to limit access to named moderators, or the block list to deny specific moderators.",
+                "You can let all of your Twitch mods help by default, limit access to named mods, or block specific mods from changing this channel.",
                 []
             ),
         ]
@@ -140,17 +140,17 @@ public partial class PageHelpButton
         [
             new(
                 "Live rounds",
-                "Start a round type, stop new guesses, then declare the winning name. Players can only keep their first valid guess in a round.",
+                "Start a round, close it when guesses are done, then pick the winning answer. Each viewer keeps their first valid guess for that round.",
                 [
                     "<code>!guess &lt;name&gt;</code> records a player guess.",
-                    "<code>!guesses</code> lists the available guesses for the current round type.",
+                    "<code>!guesses</code> lists the answers viewers can choose from.",
                     "<code>!win &lt;name&gt;</code> closes the round and announces winners.",
-                    "Start, stop, win, guess, and guesses command words can be changed in Configuration.",
+                    "You can change the chat command words in Settings.",
                 ]
             ),
             new(
                 "History",
-                "Use the History tab to filter previous results by date range, round type, and username.",
+                "Use History to look back at past rounds by date, round type, or viewer name.",
                 []
             ),
         ]
@@ -161,12 +161,12 @@ public partial class PageHelpButton
         [
             new(
                 "Round types",
-                "Create one or more round types. Each round type has its own valid guesses and reply text.",
+                "Create one or more kinds of guessing game. Each one can have its own answer list and chat replies.",
                 []
             ),
             new(
                 "Commands",
-                "Aliases control the chat commands players and moderators type. Moderator commands are start, stop, and win.",
+                "Command names are what viewers and mods type in chat. Start, stop, and win are mod-only commands.",
                 []
             ),
             new(
@@ -182,18 +182,18 @@ public partial class PageHelpButton
         [
             new(
                 "Balances",
-                "Use the leaderboard and lookup controls to inspect stored BlokeBot point balances for the selected channel.",
+                "Use the leaderboard and search controls to check point balances for this channel.",
                 [
                     "Give and remove accept whole numbers, percentages such as <code>50%</code>, or <code>all</code>.",
-                    "Add creates new points and accepts whole numbers only.",
+                    "Add gives points to an existing Twitch user and accepts whole numbers only.",
                 ]
             ),
             new(
                 "Giveaways",
-                "Start, end, or cancel the configured giveaway. Giveaways only start while the selected channel is live.",
+                "Start, end, or cancel a giveaway. Giveaways only start while the channel is live.",
                 [
-                    "Entrants can join once.",
-                    "Winners are drawn from eligible entrants and receive a random multiple of 10 within the configured payout range.",
+                    "Each viewer can join once.",
+                    "Winners are picked from eligible viewers and receive a random points prize.",
                 ]
             ),
         ]
@@ -204,16 +204,16 @@ public partial class PageHelpButton
         [
             new(
                 "Commands",
-                "Aliases are the command words used in chat. Each alias must be unique across bot functions for this channel.",
+                "Command names are the words viewers and mods type in chat. Each name must be unique for this channel.",
                 [
                     "<code>points</code> shows the caller's balance. With a login, it is moderator-only.",
                     "<code>givepoints</code>, <code>gamble</code>, and <code>removepoints</code> accept whole numbers, percentages, or <code>all</code>.",
-                    "<code>addpoints</code> creates points and accepts whole numbers only.",
+                    "<code>addpoints</code> gives points to an existing Twitch user and accepts whole numbers only.",
                 ]
             ),
             new(
                 "Reply variables",
-                "Use placeholders to include live command values in chat replies.",
+                "Use these placeholders when you want chat replies to include live values.",
                 [
                     "Balance and gambling replies: <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, <code>{label}</code>.",
                     "Transfer replies: <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, <code>{label}</code>.",
@@ -222,7 +222,7 @@ public partial class PageHelpButton
             ),
             new(
                 "Follower eligibility",
-                "Follower-only giveaways require the bot account to have the follower-read scope and to be a moderator for the channel.",
+                "Follower-only giveaways need the bot account to be allowed to check followers, and the bot must be a moderator in the channel.",
                 []
             ),
         ]
