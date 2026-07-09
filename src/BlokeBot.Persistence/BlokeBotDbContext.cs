@@ -159,9 +159,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .HasMaxLength(64);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
+            b.HasIndex(x => x.GuessRoundProfileId);
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.GuessRoundProfile)
+                .WithMany(x => x.CommandAliases)
+                .HasForeignKey(x => x.GuessRoundProfileId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

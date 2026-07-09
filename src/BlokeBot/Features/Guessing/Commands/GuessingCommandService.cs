@@ -10,7 +10,11 @@ namespace BlokeBot.Features.Guessing.Commands;
 
 public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
-    public async Task<string> AvailableGuessesReplyAsync(string hostLogin, CancellationToken ct)
+    public async Task<string> AvailableGuessesReplyAsync(
+        string hostLogin,
+        int? profileId,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
@@ -18,13 +22,14 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             return NotConfigured().Message;
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
-        var profileId =
+        var selectedProfileId =
             round?.GuessRoundProfileId
+            ?? profileId
             ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId.Value, ct);
         var profile = await GuessingProfileQueries.LoadProfileWithSettingsAsync(
             db,
             hostId.Value,
-            profileId,
+            selectedProfileId,
             ct,
             includeOptions: true
         );
@@ -44,17 +49,22 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         );
     }
 
-    public async Task<string> ModeratorOnlyReplyAsync(string hostLogin, CancellationToken ct)
+    public async Task<string> ModeratorOnlyReplyAsync(
+        string hostLogin,
+        int? profileId,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
             return NotConfigured().Message;
 
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
+        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrProfileOrDefaultAsync(
             db,
             hostId.Value,
             await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
+            profileId,
             ct
         );
         return settings.ModeratorOnlyReply;
@@ -64,6 +74,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         GuessCommandKind kind,
         string command,
+        int? profileId,
         CancellationToken ct
     )
     {
@@ -72,10 +83,11 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         if (hostId is null)
             return NotConfigured().Message;
 
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
+        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrProfileOrDefaultAsync(
             db,
             hostId.Value,
             await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
+            profileId,
             ct
         );
         var template = kind switch

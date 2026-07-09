@@ -12,10 +12,12 @@ public sealed class CommandAliasRegistry
         int hostId,
         IReadOnlySet<AppCommandKind> ownedKinds,
         IEnumerable<CommandAliasDraft> drafts,
-        CancellationToken ct
+        CancellationToken ct,
+        int? guessRoundProfileId = null
     )
     {
         var draftArray = drafts.ToArray();
+        var owned = ownedKinds.ToArray();
         var rows = draftArray
             .SelectMany(draft =>
                 CommandAliasNormalizer
@@ -23,6 +25,7 @@ public sealed class CommandAliasRegistry
                     .Select(alias => new CommandAlias
                     {
                         HostId = hostId,
+                        GuessRoundProfileId = guessRoundProfileId,
                         Kind = draft.Kind,
                         Alias = alias,
                     })
@@ -36,32 +39,43 @@ public sealed class CommandAliasRegistry
         if (duplicate is not null)
             throw new InvalidOperationException($"Alias !{duplicate} is used more than once.");
 
-        var owned = ownedKinds.ToArray();
         var requestedAliases = rows.Select(x => x.Alias).ToArray();
-        var existingAliases = await db
+        var existingCollision = await db
             .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId && !owned.Contains(x.Kind))
             .Where(x => requestedAliases.Contains(x.Alias))
-            .Select(x => new CommandAliasOwnership<AppCommandKind>(x.Kind, x.Alias))
-            .ToListAsync(ct);
-        var existingCollision = CommandAliasPolicy.FindCollision(
-            genericDrafts,
-            ownedKinds,
-            existingAliases
-        );
+            .Where(x =>
+                x.HostId == hostId
+                && (!owned.Contains(x.Kind) || x.GuessRoundProfileId != guessRoundProfileId)
+            )
+            .Select(x => x.Alias)
+            .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(existingCollision))
             throw new InvalidOperationException(
                 $"Alias !{existingCollision} is already used by another bot function."
             );
 
         db.CommandAliases.RemoveRange(
-            db.CommandAliases.Where(x => x.HostId == hostId && owned.Contains(x.Kind))
+            db.CommandAliases.Where(x =>
+                x.HostId == hostId
+                && owned.Contains(x.Kind)
+                && x.GuessRoundProfileId == guessRoundProfileId
+            )
         );
         db.CommandAliases.AddRange(rows);
     }
 
-    public static string JoinAliases(IEnumerable<CommandAlias> aliases, AppCommandKind kind) =>
-        string.Join(", ", aliases.Where(x => x.Kind == kind).Select(x => x.Alias).Order());
+    public static string JoinAliases(
+        IEnumerable<CommandAlias> aliases,
+        AppCommandKind kind,
+        int? guessRoundProfileId = null
+    ) =>
+        string.Join(
+            ", ",
+            aliases
+                .Where(x => x.Kind == kind && x.GuessRoundProfileId == guessRoundProfileId)
+                .Select(x => x.Alias)
+                .Order()
+        );
 }
 
 public sealed record CommandAliasDraft(AppCommandKind Kind, string Aliases);

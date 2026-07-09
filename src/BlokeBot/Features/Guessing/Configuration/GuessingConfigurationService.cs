@@ -97,25 +97,29 @@ public sealed class GuessingConfigurationService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var aliases = await db
-            .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId)
-            .ToListAsync(ct);
         var profiles = await LoadProfileSummariesAsync(db, hostId, ct);
         var selectedProfileId =
             profileId is { } id && profiles.Any(x => x.Id == id)
                 ? id
                 : profiles.First(x => x.IsDefault).Id;
+        var aliases = await db
+            .CommandAliases.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.GuessRoundProfileId == selectedProfileId)
+            .ToListAsync(ct);
 
         return new GuessingConfiguration
         {
             Aliases = new CommandAliasEditor
             {
-                StartAliases = JoinAliases(aliases, GuessCommandKind.Start),
-                StopAliases = JoinAliases(aliases, GuessCommandKind.Stop),
-                WinAliases = JoinAliases(aliases, GuessCommandKind.Win),
-                GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess),
-                GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses),
+                StartAliases = JoinAliases(aliases, GuessCommandKind.Start, selectedProfileId),
+                StopAliases = JoinAliases(aliases, GuessCommandKind.Stop, selectedProfileId),
+                WinAliases = JoinAliases(aliases, GuessCommandKind.Win, selectedProfileId),
+                GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
+                GuessesAliases = JoinAliases(
+                    aliases,
+                    GuessCommandKind.Guesses,
+                    selectedProfileId
+                ),
             },
             Profiles = profiles,
             Profile = await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct),
@@ -130,12 +134,13 @@ public sealed class GuessingConfigurationService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        await SaveAliasesAsync(db, hostId, config.Aliases, ct);
-
         var profile = await db
             .Profiles.Include(x => x.ReplySettings)
             .Include(x => x.Options)
             .SingleAsync(x => x.Id == config.Profile.Id && x.HostId == hostId, ct);
+
+        await SaveAliasesAsync(db, hostId, profile.Id, config.Aliases, ct);
+
         var profileName = NormalizeDisplayName(config.Profile.Name);
         if (string.IsNullOrWhiteSpace(profileName))
             profileName = profile.Name;
@@ -212,8 +217,16 @@ public sealed class GuessingConfigurationService(
         settings.NoWinnersReply = editor.NoWinnersReply.Trim();
     }
 
-    private static string JoinAliases(List<CommandAlias> aliases, GuessCommandKind kind) =>
-        CommandAliasRegistry.JoinAliases(aliases, GuessingAppCommandKindMap.ToAppKind(kind));
+    private static string JoinAliases(
+        List<CommandAlias> aliases,
+        GuessCommandKind kind,
+        int profileId
+    ) =>
+        CommandAliasRegistry.JoinAliases(
+            aliases,
+            GuessingAppCommandKindMap.ToAppKind(kind),
+            profileId
+        );
 
     private static async Task<GuessRoundProfileEditor> LoadProfileEditorAsync(
         BlokeBotDbContext db,
@@ -263,6 +276,7 @@ public sealed class GuessingConfigurationService(
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,
         int hostId,
+        int profileId,
         CommandAliasEditor aliases,
         CancellationToken ct
     )
@@ -278,8 +292,8 @@ public sealed class GuessingConfigurationService(
                 new CommandAliasDraft(AppCommandKind.Guess, aliases.GuessAliases),
                 new CommandAliasDraft(AppCommandKind.Guesses, aliases.GuessesAliases),
             ],
-            ct
+            ct,
+            profileId
         );
-        await db.SaveChangesAsync(ct);
     }
 }

@@ -25,14 +25,24 @@ public sealed class AppCommandAliasResolver(IDbContextFactory<BlokeBotDbContext>
             return null;
 
         var normalizedAlias = CommandAliasNormalizer.Normalize(alias);
-        var kind = await db
+        var resolution = await db
             .CommandAliases.AsNoTracking()
             .Where(x => x.HostId == hostId.Value && x.Alias == normalizedAlias)
-            .Select(x => (AppCommandKind?)x.Kind)
+            .Select(x => new { x.Kind, x.GuessRoundProfileId })
             .FirstOrDefaultAsync(ct);
 
-        return kind is null ? null : new AppCommandAliasResolution(hostId.Value, kind.Value);
+        return resolution is null
+            ? null
+            : new AppCommandAliasResolution(
+                hostId.Value,
+                resolution.Kind,
+                resolution.GuessRoundProfileId
+            );
     }
 }
 
-public sealed record AppCommandAliasResolution(int HostId, AppCommandKind Kind);
+public sealed record AppCommandAliasResolution(
+    int HostId,
+    AppCommandKind Kind,
+    int? GuessRoundProfileId
+);

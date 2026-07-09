@@ -40,7 +40,7 @@ public sealed class GuessingCommandRouteResolver(
 
         return new CommandRoute<GuessCommandKind, AppCommandRouteState>(
             kind,
-            new AppCommandRouteState(resolution.HostId)
+            new AppCommandRouteState(resolution.HostId, resolution.GuessRoundProfileId)
         );
     }
 }

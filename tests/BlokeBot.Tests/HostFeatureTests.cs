@@ -6,6 +6,7 @@ using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.Points.Commands;
 using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using TUnit.Core;
 
@@ -106,6 +107,55 @@ public sealed class HostFeatureTests
         enabledGuessing.ShouldNotBeNull();
         enabledGuessing.Kind.ShouldBe(GuessCommandKind.Start);
         disabledPoints.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Guessing_route_resolver_preserves_alias_profile_ownership()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var profile = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "Score",
+                Slug = "score",
+                IsDefault = true,
+                ReplySettings = new BotReplySettings(),
+            };
+            db.Profiles.Add(profile);
+            await db.SaveChangesAsync();
+            db.CommandAliases.Add(
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    GuessRoundProfileId = profile.Id,
+                    Kind = AppCommandKind.Start,
+                    Alias = "score",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var features = new HostFeatureService(
+            dbFactory,
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+        );
+        var resolver = new GuessingCommandRouteResolver(
+            new AppCommandAliasResolver(dbFactory),
+            features
+        );
+
+        var route = await resolver.ResolveAsync(
+            CommandContext("streamer", "score"),
+            CancellationToken.None
+        );
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
+        route.ShouldNotBeNull();
+        route.Kind.ShouldBe(GuessCommandKind.Start);
+        route.State.GuessRoundProfileId.ShouldBe(profileId);
     }
 
     private static TwitchCommandContext CommandContext(string channel, string commandName)

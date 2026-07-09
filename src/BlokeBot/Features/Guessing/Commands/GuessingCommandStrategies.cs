@@ -19,7 +19,12 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     public async ValueTask<string> ModeratorOnlyReplyAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) => await Commands.ModeratorOnlyReplyAsync(context.Command.Message.Channel, cancellationToken);
+    ) =>
+        await Commands.ModeratorOnlyReplyAsync(
+            context.Command.Message.Channel,
+            context.State.GuessRoundProfileId,
+            cancellationToken
+        );
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -46,6 +51,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
                 context.Command.Message.Channel,
                 Kind,
                 context.Command.CommandName,
+                context.State.GuessRoundProfileId,
                 cancellationToken
             )
         );
@@ -67,14 +73,27 @@ public sealed class StartGuessingCommandStrategy(
         CancellationToken cancellationToken
     )
     {
-        var result =
-            context.Args.Count <= 1
-                ? await rounds.StartRoundAsync(
-                    context.Command.Message.Channel,
-                    context.Args.Count == 0 ? null : context.Args[0],
-                    cancellationToken
-                )
-                : await UsageAsync(context, cancellationToken);
+        GuessingOperationResult result;
+        if (context.Args.Count == 0 && context.State.GuessRoundProfileId is { } profileId)
+        {
+            result = await rounds.StartRoundAsync(
+                context.State.HostId,
+                profileId,
+                cancellationToken
+            );
+        }
+        else if (context.Args.Count <= 1)
+        {
+            result = await rounds.StartRoundAsync(
+                context.Command.Message.Channel,
+                context.Args.Count == 0 ? null : context.Args[0],
+                cancellationToken
+            );
+        }
+        else
+        {
+            result = await UsageAsync(context, cancellationToken);
+        }
 
         await ReplyAsync(context, result, cancellationToken);
     }
@@ -177,6 +196,7 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
     {
         var reply = await Commands.AvailableGuessesReplyAsync(
             context.Command.Message.Channel,
+            context.State.GuessRoundProfileId,
             cancellationToken
         );
         if (!string.IsNullOrWhiteSpace(reply))

@@ -66,10 +66,19 @@ internal static class GuessingProfileQueries
         int hostId,
         GuessRound? round,
         CancellationToken ct
+    ) => await ReplySettingsForRoundOrProfileOrDefaultAsync(db, hostId, round, null, ct);
+
+    public static async Task<BotReplySettings> ReplySettingsForRoundOrProfileOrDefaultAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        GuessRound? round,
+        int? profileId,
+        CancellationToken ct
     )
     {
-        var profileId = round?.GuessRoundProfileId ?? await DefaultProfileIdAsync(db, hostId, ct);
-        var profile = await LoadProfileWithSettingsAsync(db, hostId, profileId, ct);
+        var selectedProfileId =
+            round?.GuessRoundProfileId ?? profileId ?? await DefaultProfileIdAsync(db, hostId, ct);
+        var profile = await LoadProfileWithSettingsAsync(db, hostId, selectedProfileId, ct);
         return profile?.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
     }
 }

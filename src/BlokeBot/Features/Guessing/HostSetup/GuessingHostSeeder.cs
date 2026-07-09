@@ -19,32 +19,52 @@ public sealed class GuessingHostSeeder(
         if (!await db.Hosts.AnyAsync(x => x.Id == hostId, ct))
             return;
 
-        if (!await db.CommandAliases.AnyAsync(x => x.HostId == hostId, ct))
+        var defaultProfile = await db.Profiles.SingleOrDefaultAsync(
+            x => x.HostId == hostId && x.IsDefault,
+            ct
+        );
+        if (defaultProfile is null)
         {
-            foreach (var command in commands.Descriptors)
+            defaultProfile = new GuessRoundProfile
+            {
+                HostId = hostId,
+                Name = "Default",
+                Slug = "default",
+                IsDefault = true,
+                ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
+            };
+            db.Profiles.Add(defaultProfile);
+            await db.SaveChangesAsync(ct);
+        }
+
+        foreach (var command in commands.Descriptors)
+        {
+            var appKind = GuessingAppCommandKindMap.ToAppKind(command.Kind);
+            if (
+                await db.CommandAliases.AnyAsync(
+                    x =>
+                        x.HostId == hostId
+                        && x.GuessRoundProfileId == defaultProfile.Id
+                        && x.Kind == appKind,
+                    ct
+                )
+            )
+            {
+                continue;
+            }
+
             foreach (var alias in command.DefaultAliases)
+            {
                 db.CommandAliases.Add(
                     new CommandAlias
                     {
                         HostId = hostId,
-                        Kind = GuessingAppCommandKindMap.ToAppKind(command.Kind),
+                        GuessRoundProfileId = defaultProfile.Id,
+                        Kind = appKind,
                         Alias = alias,
                     }
                 );
-        }
-
-        if (!await db.Profiles.AnyAsync(x => x.HostId == hostId, ct))
-        {
-            db.Profiles.Add(
-                new GuessRoundProfile
-                {
-                    HostId = hostId,
-                    Name = "Default",
-                    Slug = "default",
-                    IsDefault = true,
-                    ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
-                }
-            );
+            }
         }
 
         await db.SaveChangesAsync(ct);
