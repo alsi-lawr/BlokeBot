@@ -16,15 +16,20 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
 
     public abstract bool RequiresModerator { get; }
 
-    public async ValueTask<string> ModeratorOnlyReplyAsync(
+    public async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     ) =>
-        await Commands.ModeratorOnlyReplyAsync(
+        await Commands.ModeratorOnlyResponseAsync(
             context.Command.Message.Channel,
             context.State.GuessRoundProfileId,
             cancellationToken
         );
+
+    public async ValueTask<string> ModeratorOnlyReplyAsync(
+        CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
+        CancellationToken cancellationToken
+    ) => (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -38,23 +43,26 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     )
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
-            await context.Command.ReplyAsync(result.Message, cancellationToken);
+            await context.Command.RespondAsync(
+                new TwitchCommandResponse(result.Target, result.Message),
+                cancellationToken
+            );
     }
 
     protected async Task<GuessingOperationResult> UsageAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) =>
-        new(
-            false,
-            await Commands.UsageReplyAsync(
-                context.Command.Message.Channel,
-                Kind,
-                context.Command.CommandName,
-                context.State.GuessRoundProfileId,
-                cancellationToken
-            )
+    )
+    {
+        var response = await Commands.UsageResponseAsync(
+            context.Command.Message.Channel,
+            Kind,
+            context.Command.CommandName,
+            context.State.GuessRoundProfileId,
+            cancellationToken
         );
+        return new GuessingOperationResult(false, response.Message, response.Target);
+    }
 }
 
 public sealed class StartGuessingCommandStrategy(
@@ -194,12 +202,12 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
         CancellationToken cancellationToken
     )
     {
-        var reply = await Commands.AvailableGuessesReplyAsync(
+        var response = await Commands.AvailableGuessesResponseAsync(
             context.Command.Message.Channel,
             context.State.GuessRoundProfileId,
             cancellationToken
         );
-        if (!string.IsNullOrWhiteSpace(reply))
-            await context.Command.ReplyAsync(reply, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(response.Message))
+            await context.Command.RespondAsync(response, cancellationToken);
     }
 }

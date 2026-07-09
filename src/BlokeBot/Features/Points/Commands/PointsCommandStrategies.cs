@@ -2,6 +2,8 @@ using BlokeBot.Features.Commands;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Points.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 
@@ -18,7 +20,7 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
 
     public abstract bool RequiresModerator { get; }
 
-    public async ValueTask<string> ModeratorOnlyReplyAsync(
+    public async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -28,8 +30,14 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
             Kind,
             cancellationToken
         );
-        return Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings);
+        var message = Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings);
+        return Response(message, resolution.ReplyDelivery.TargetFor(PointsReplyKeys.ModeratorOnly));
     }
+
+    public async ValueTask<string> ModeratorOnlyReplyAsync(
+        CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
+        CancellationToken cancellationToken
+    ) => (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -48,8 +56,16 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     )
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
-            await context.Command.ReplyAsync(result.Message, cancellationToken);
+            await context.Command.RespondAsync(
+                new TwitchCommandResponse(result.Target, result.Message),
+                cancellationToken
+            );
     }
+
+    protected static TwitchCommandResponse Response(
+        string message,
+        TwitchCommandResponseTarget target
+    ) => new(target, message);
 
     protected static string Format(
         string template,
@@ -73,16 +89,24 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
             }
         );
 
-    protected static PointOperationResult Insufficient(PointsSettings settings) =>
+    protected static PointOperationResult Insufficient(
+        PointsSettings settings,
+        ReplyDeliveryMap delivery
+    ) =>
         PointOperationResult.Failure(
             PointOperationFailureReason.InsufficientBalance,
-            Format(settings.InsufficientBalanceReply, settings)
+            Format(settings.InsufficientBalanceReply, settings),
+            target: delivery.TargetFor(PointsReplyKeys.InsufficientBalance)
         );
 
-    protected static PointOperationResult Invalid(PointsSettings settings) =>
+    protected static PointOperationResult Invalid(
+        PointsSettings settings,
+        ReplyDeliveryMap delivery
+    ) =>
         PointOperationResult.Failure(
             PointOperationFailureReason.InvalidAmount,
-            Format(settings.InvalidAmountReply, settings)
+            Format(settings.InvalidAmountReply, settings),
+            target: delivery.TargetFor(PointsReplyKeys.InvalidAmount)
         );
 
     protected static PointOperationResult UnknownUser(string login) =>
@@ -130,7 +154,7 @@ public sealed class PointsBalanceCommandStrategy(
         PointOperationResult result;
         if (context.Args.Count > 1)
         {
-            result = Invalid(resolution.Settings);
+            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else if (
             context.Args.Count == 1
@@ -139,7 +163,8 @@ public sealed class PointsBalanceCommandStrategy(
         {
             result = new PointOperationResult(
                 false,
-                Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings)
+                Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings),
+                Target: resolution.ReplyDelivery.TargetFor(PointsReplyKeys.ModeratorOnly)
             );
         }
         else
@@ -154,6 +179,8 @@ public sealed class PointsBalanceCommandStrategy(
                 context.Args.Count == 0
                     ? resolution.Settings.BalanceReply
                     : resolution.Settings.OtherBalanceReply;
+            var replyKey =
+                context.Args.Count == 0 ? PointsReplyKeys.Balance : PointsReplyKeys.OtherBalance;
             result = new PointOperationResult(
                 true,
                 Format(
@@ -162,7 +189,8 @@ public sealed class PointsBalanceCommandStrategy(
                     user: balance.Login,
                     balance: balance.Balance.ToDisplayString()
                 ),
-                balance.Balance
+                balance.Balance,
+                Target: resolution.ReplyDelivery.TargetFor(replyKey)
             );
         }
 
@@ -191,7 +219,7 @@ public sealed class GivePointsCommandStrategy(
         PointOperationResult result;
         if (context.Args.Count != 2)
         {
-            result = Invalid(resolution.Settings);
+            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else
         {
@@ -202,7 +230,7 @@ public sealed class GivePointsCommandStrategy(
             );
             if (!TryParseSpend(context.Args[1], source.Balance, out var amount))
             {
-                result = Invalid(resolution.Settings);
+                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
             else
             {
@@ -232,10 +260,13 @@ public sealed class GivePointsCommandStrategy(
                                     amount: amount.ToDisplayString(),
                                     balance: result.Balance?.ToDisplayString()
                                 ),
+                                Target = resolution.ReplyDelivery.TargetFor(
+                                    PointsReplyKeys.Transfer
+                                ),
                             }
                         : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                            ? Insufficient(resolution.Settings)
-                        : Invalid(resolution.Settings);
+                            ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
+                        : Invalid(resolution.Settings, resolution.ReplyDelivery);
                 }
             }
         }
@@ -269,7 +300,7 @@ public sealed class AddPointsCommandStrategy(
             || amount.IsZero
         )
         {
-            result = Invalid(resolution.Settings);
+            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else
         {
@@ -298,8 +329,9 @@ public sealed class AddPointsCommandStrategy(
                             amount: amount.ToDisplayString(),
                             balance: result.Balance?.ToDisplayString()
                         ),
+                        Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Add),
                     }
-                    : Invalid(resolution.Settings);
+                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -327,7 +359,7 @@ public sealed class RemovePointsCommandStrategy(
         PointOperationResult result;
         if (context.Args.Count != 2)
         {
-            result = Invalid(resolution.Settings);
+            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else
         {
@@ -339,7 +371,7 @@ public sealed class RemovePointsCommandStrategy(
             );
             if (!TryParseSpend(context.Args[1], source.Balance, out var amount))
             {
-                result = Invalid(resolution.Settings);
+                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
             else
             {
@@ -362,10 +394,11 @@ public sealed class RemovePointsCommandStrategy(
                                 amount: amount.ToDisplayString(),
                                 balance: result.Balance?.ToDisplayString()
                             ),
+                            Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Remove),
                         }
                     : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings)
-                    : Invalid(resolution.Settings);
+                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
+                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -394,7 +427,7 @@ public sealed class GambleCommandStrategy(
         PointOperationResult result;
         if (context.Args.Count != 1)
         {
-            result = Invalid(resolution.Settings);
+            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else
         {
@@ -405,7 +438,7 @@ public sealed class GambleCommandStrategy(
             );
             if (!TryParseSpend(context.Args[0], source.Balance, out var stake))
             {
-                result = Invalid(resolution.Settings);
+                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
             else
             {
@@ -421,6 +454,9 @@ public sealed class GambleCommandStrategy(
                     result.Success
                         ? result with
                         {
+                            Target = resolution.ReplyDelivery.TargetFor(
+                                won ? PointsReplyKeys.GamblingWin : PointsReplyKeys.GamblingLose
+                            ),
                             Message = Format(
                                 won
                                     ? resolution.Settings.GamblingWinReply
@@ -432,8 +468,8 @@ public sealed class GambleCommandStrategy(
                             ),
                         }
                     : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings)
-                    : Invalid(resolution.Settings);
+                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
+                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -463,10 +499,10 @@ public sealed class StartGiveawayCommandStrategy(
                 ? await giveaways.StartAsync(
                     resolution.HostId,
                     context.Command.Message.Channel,
-                    context.Command.ReplyAsync,
+                    null,
                     cancellationToken
                 )
-                : Invalid(resolution.Settings);
+                : Invalid(resolution.Settings, resolution.ReplyDelivery);
         await ReplyAsync(context, result, cancellationToken);
     }
 }
@@ -497,7 +533,7 @@ public sealed class JoinGiveawayCommandStrategy(
                     context.Command.Message.Tags,
                     cancellationToken
                 )
-                : Invalid(resolution.Settings);
+                : Invalid(resolution.Settings, resolution.ReplyDelivery);
         await ReplyAsync(context, result, cancellationToken);
     }
 }
@@ -526,7 +562,7 @@ public sealed class EndGiveawayCommandStrategy(
                     context.Command.Message.Channel,
                     cancellationToken
                 )
-                : Invalid(resolution.Settings);
+                : Invalid(resolution.Settings, resolution.ReplyDelivery);
         await ReplyAsync(context, result, cancellationToken);
     }
 }
@@ -551,7 +587,7 @@ public sealed class CancelGiveawayCommandStrategy(
         var result =
             context.Args.Count == 0
                 ? await giveaways.CancelAsync(resolution.HostId, cancellationToken)
-                : Invalid(resolution.Settings);
+                : Invalid(resolution.Settings, resolution.ReplyDelivery);
         await ReplyAsync(context, result, cancellationToken);
     }
 }

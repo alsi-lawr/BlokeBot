@@ -10,6 +10,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<HostBotAccountSettings> HostBotAccountSettings => Set<HostBotAccountSettings>();
     public DbSet<WhisperQuotaBucket> WhisperQuotaBuckets => Set<WhisperQuotaBucket>();
     public DbSet<WhisperQuotaRecipient> WhisperQuotaRecipients => Set<WhisperQuotaRecipient>();
+    public DbSet<ReplyDeliverySetting> ReplyDeliverySettings => Set<ReplyDeliverySetting>();
     public DbSet<BotReplySettings> ReplySettings => Set<BotReplySettings>();
     public DbSet<CommandAlias> CommandAliases => Set<CommandAlias>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
@@ -94,6 +95,27 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.RecipientLogin).HasMaxLength(128);
             b.Property(x => x.RecipientTwitchUserId).HasMaxLength(64);
             b.HasIndex(x => new { x.WhisperQuotaBucketId, x.RecipientTwitchUserId }).IsUnique();
+        });
+
+        modelBuilder.Entity<ReplyDeliverySetting>(b =>
+        {
+            b.ToTable("reply_delivery_settings");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Feature).HasMaxLength(64);
+            b.Property(x => x.ReplyKey).HasMaxLength(128);
+            b.Property(x => x.Target).HasMaxLength(32);
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.Feature,
+                    x.ScopeId,
+                    x.ReplyKey,
+                })
+                .IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SiteAccessSettings>(b =>
@@ -324,6 +346,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.ToTable("guess_options");
             b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.ReplyTarget).HasMaxLength(32).HasDefaultValue("chat");
             b.HasIndex(x => new { x.GuessRoundProfileId, x.Name }).IsUnique();
             b.HasOne(x => x.GuessRoundProfile)
                 .WithMany(x => x.Options)

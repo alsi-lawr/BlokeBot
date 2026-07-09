@@ -46,12 +46,15 @@
             </div>
 
             <GuessOptionsSettingsSection Options="config.Profile.Options"
+                                         WhisperResponsesEnabled="config.WhisperResponsesEnabled"
                                          AddOption="AddOption"
                                          RemoveOption="RemoveOption" />
         </div>
 
         <div id="replies">
-            <ReplySettingsSection Replies="config.Profile.Replies" />
+            <ReplySettingsSection Replies="config.Profile.Replies"
+                                  Delivery="config.ReplyDelivery"
+                                  WhisperResponsesEnabled="config.WhisperResponsesEnabled" />
         </div>
     }
 </div>

@@ -4,6 +4,7 @@ using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +73,14 @@ public sealed class GuessingConfigurationService(
             );
 
         var wasDefault = profile.IsDefault;
+        var deliverySettings = await db
+            .ReplyDeliverySettings.Where(x =>
+                x.HostId == hostId
+                && x.Feature == ReplyDeliveryFeature.Guessing
+                && x.ScopeId == profileId
+            )
+            .ToListAsync(ct);
+        db.ReplyDeliverySettings.RemoveRange(deliverySettings);
         db.Profiles.Remove(profile);
         await db.SaveChangesAsync(ct);
 
@@ -106,6 +115,14 @@ public sealed class GuessingConfigurationService(
             .CommandAliases.AsNoTracking()
             .Where(x => x.HostId == hostId && x.GuessRoundProfileId == selectedProfileId)
             .ToListAsync(ct);
+        var replyDelivery = await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Guessing,
+            selectedProfileId,
+            ct
+        );
+        var whisperResponsesEnabled = await WhisperResponsesEnabledAsync(db, hostId, ct);
 
         return new GuessingConfiguration
         {
@@ -117,6 +134,8 @@ public sealed class GuessingConfigurationService(
                 GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
                 GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, selectedProfileId),
             },
+            ReplyDelivery = replyDelivery,
+            WhisperResponsesEnabled = whisperResponsesEnabled,
             Profiles = profiles,
             Profile = await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct),
         };
@@ -171,6 +190,14 @@ public sealed class GuessingConfigurationService(
 
         profile.ReplySettings ??= ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
         Apply(profile.ReplySettings, config.Profile.Replies);
+        await ReplyDeliverySettingWriter.ReplaceAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Guessing,
+            profile.Id,
+            config.ReplyDelivery,
+            ct
+        );
 
         db.GuessOptions.RemoveRange(profile.Options);
         foreach (
@@ -188,6 +215,9 @@ public sealed class GuessingConfigurationService(
                     ReplyText = string.IsNullOrWhiteSpace(option.ReplyText)
                         ? option.Name.Trim()
                         : option.ReplyText.Trim(),
+                    ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+                        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+                    ),
                 }
             );
         }
@@ -249,10 +279,28 @@ public sealed class GuessingConfigurationService(
             ),
             Options = profile
                 .Options.OrderBy(x => x.Name)
-                .Select(x => new GuessOptionEditor { Name = x.Name, ReplyText = x.ReplyText })
+                .Select(x => new GuessOptionEditor
+                {
+                    Name = x.Name,
+                    ReplyText = x.ReplyText,
+                    ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+                        ReplyDeliveryTargets.ToCommandTarget(x.ReplyTarget)
+                    ),
+                })
                 .ToList(),
         };
     }
+
+    private static async Task<bool> WhisperResponsesEnabledAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    ) =>
+        await db
+            .HostBotAccountSettings.AsNoTracking()
+            .Where(x => x.HostId == hostId)
+            .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
+            .SingleOrDefaultAsync(ct);
 
     private async Task<List<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
         BlokeBotDbContext db,

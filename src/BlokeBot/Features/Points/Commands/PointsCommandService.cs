@@ -1,4 +1,6 @@
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.Points.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -18,6 +20,13 @@ public sealed class PointsCommandService(IDbContextFactory<BlokeBotDbContext> db
         var settings =
             await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
             ?? new PointsSettings { HostId = hostId };
-        return new PointsCommandResolution(hostId, kind, settings);
+        var delivery = await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Points,
+            ReplyDeliverySettingWriter.HostScopeId,
+            ct
+        );
+        return new PointsCommandResolution(hostId, kind, settings, delivery);
     }
 }

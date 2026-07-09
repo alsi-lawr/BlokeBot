@@ -44,8 +44,13 @@ namespace BlokeBot.Features.Points.Configuration;
 
 public partial class PointsConfigurationPage
 {
+    private const string WhisperDisabledTooltip =
+        "Enable whisper responses in Channel setup before using whisper replies.";
+
     private PointsConfiguration? config;
     private bool featureEnabled;
+
+    private bool WhisperDisabled => config?.WhisperResponsesEnabled != true;
 
     protected override async Task OnInitializedAsync()
     {

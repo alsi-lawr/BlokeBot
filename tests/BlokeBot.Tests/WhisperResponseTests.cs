@@ -1,5 +1,4 @@
 using System.Net;
-using System.Reflection;
 using System.Text;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
@@ -96,32 +95,6 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task Target_resolver_uses_whisper_when_host_setting_is_enabled()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            db.HostBotAccountSettings.Add(
-                new HostBotAccountSettings
-                {
-                    HostId = hostId,
-                    OverrideEnabled = true,
-                    WhisperResponsesEnabled = true,
-                    UpdatedAtUtc = DateTime.UtcNow,
-                }
-            );
-            await db.SaveChangesAsync();
-        }
-        var resolver = new HostWhisperResponseTargetResolver(dbFactory);
-        var context = CommandContext("streamer", "!points");
-
-        var target = await resolver.ResolveAsync(context, CancellationToken.None);
-
-        target.ShouldBe(TwitchCommandResponseTarget.Whisper);
-    }
-
-    [Test]
     public async Task Sender_marks_quota_exhausted_and_falls_back_to_chat_when_twitch_rate_limits()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -178,27 +151,6 @@ public sealed class WhisperResponseTests
         status.Exhausted.ShouldBeTrue();
         status.RecipientCount.ShouldBe(1);
         httpClientFactory.WhisperRequestCount.ShouldBe(1);
-    }
-
-    private static TwitchCommandContext CommandContext(string channel, string text)
-    {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(x => x.GetParameters().Length == 4);
-        var message = new TwitchChatMessage(
-            "viewer",
-            channel,
-            text,
-            text,
-            new Dictionary<string, string>()
-        );
-        return (TwitchCommandContext)
-            constructor.Invoke([
-                message,
-                text.TrimStart('!'),
-                new ServiceCollection().BuildServiceProvider(),
-                new Func<string, CancellationToken, ValueTask>((_, _) => ValueTask.CompletedTask),
-            ]);
     }
 
     private static IOptions<TwitchBotOptions> BotOptions() =>

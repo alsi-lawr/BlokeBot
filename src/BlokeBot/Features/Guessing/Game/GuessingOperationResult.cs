@@ -1,3 +1,7 @@
 namespace BlokeBot.Features.Guessing.Game;
 
-public sealed record GuessingOperationResult(bool Succeeded, string Message);
+public sealed record GuessingOperationResult(
+    bool Succeeded,
+    string Message,
+    TwitchCommandResponseTarget Target = TwitchCommandResponseTarget.Chat
+);

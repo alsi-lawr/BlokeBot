@@ -1,6 +1,8 @@
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Profiles;
+using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Features.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -26,19 +28,31 @@ public sealed class GuessingVoteService(
             return NotConfigured();
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
-            db,
-            hostId.Value,
-            round,
-            ct
-        );
+        var resolution =
+            await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
+                db,
+                hostId.Value,
+                round,
+                null,
+                ct
+            );
+        var settings = resolution.Settings;
+        var delivery = resolution.ReplyDelivery;
         var normalizedName = GuessName.Parse(name).Value;
 
         if (round is null)
-            return new GuessingOperationResult(false, settings.NoOpenRoundReply);
+            return new GuessingOperationResult(
+                false,
+                settings.NoOpenRoundReply,
+                delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
+            );
 
         if (round.Status != GuessRoundStatus.Open)
-            return new GuessingOperationResult(false, settings.GuessingClosedReply);
+            return new GuessingOperationResult(
+                false,
+                settings.GuessingClosedReply,
+                delivery.TargetFor(GuessingReplyKeys.GuessingClosed)
+            );
 
         var option = await db
             .GuessOptions.AsNoTracking()
@@ -51,7 +65,8 @@ public sealed class GuessingVoteService(
         {
             return new GuessingOperationResult(
                 false,
-                Format(settings.InvalidGuessReply, normalizedName, login)
+                Format(settings.InvalidGuessReply, normalizedName, login),
+                delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
             );
         }
 
@@ -75,7 +90,11 @@ public sealed class GuessingVoteService(
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
-        return new GuessingOperationResult(true, Format(option.ReplyText, normalizedName, login));
+        return new GuessingOperationResult(
+            true,
+            Format(option.ReplyText, normalizedName, login),
+            ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+        );
     }
 
     private static string Format(string template, string name, string login) =>

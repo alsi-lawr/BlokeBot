@@ -1,5 +1,6 @@
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -34,7 +35,11 @@ public sealed class PointsGiveawayService(
         string hostLogin,
         Func<string, CancellationToken, ValueTask>? reply,
         CancellationToken ct
-    ) => formatter.Reply(await StartOutcomeAsync(hostId, hostLogin, reply, ct));
+    )
+    {
+        var outcome = await StartOutcomeAsync(hostId, hostLogin, reply, ct);
+        return formatter.Reply(outcome, await LoadReplyDeliveryAsync(hostId, ct));
+    }
 
     internal async Task<PointsGiveawayStartOutcome> StartOutcomeAsync(
         int hostId,
@@ -114,7 +119,11 @@ public sealed class PointsGiveawayService(
         string login,
         IReadOnlyDictionary<string, string> tags,
         CancellationToken ct
-    ) => formatter.Reply(await JoinOutcomeAsync(hostId, hostLogin, login, tags, ct));
+    )
+    {
+        var outcome = await JoinOutcomeAsync(hostId, hostLogin, login, tags, ct);
+        return formatter.Reply(outcome, await LoadReplyDeliveryAsync(hostId, ct));
+    }
 
     internal async Task<PointsGiveawayJoinOutcome> JoinOutcomeAsync(
         int hostId,
@@ -190,11 +199,15 @@ public sealed class PointsGiveawayService(
         CancellationToken ct
     )
     {
-        return formatter.Reply(await DrawActiveOutcomeAsync(hostId, hostLogin, ct));
+        var outcome = await DrawActiveOutcomeAsync(hostId, hostLogin, ct);
+        return formatter.Reply(outcome, await LoadReplyDeliveryAsync(hostId, ct));
     }
 
-    public async Task<PointOperationResult> CancelAsync(int hostId, CancellationToken ct) =>
-        formatter.Reply(await CancelOutcomeAsync(hostId, ct));
+    public async Task<PointOperationResult> CancelAsync(int hostId, CancellationToken ct)
+    {
+        var outcome = await CancelOutcomeAsync(hostId, ct);
+        return formatter.Reply(outcome, await LoadReplyDeliveryAsync(hostId, ct));
+    }
 
     internal async Task<PointsGiveawayCancelOutcome> CancelOutcomeAsync(
         int hostId,
@@ -242,8 +255,14 @@ public sealed class PointsGiveawayService(
         return result;
     }
 
-    internal async Task<PointOperationResult> DrawAsync(int giveawayId, CancellationToken ct) =>
-        formatter.Reply(await draws.DrawOutcomeAsync(giveawayId, ct));
+    internal async Task<PointOperationResult> DrawAsync(int giveawayId, CancellationToken ct)
+    {
+        var outcome = await draws.DrawOutcomeAsync(giveawayId, ct);
+        var delivery = outcome.Settings is { } settings
+            ? await LoadReplyDeliveryAsync(settings.HostId, ct)
+            : new ReplyDeliveryMap();
+        return formatter.Reply(outcome, delivery);
+    }
 
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
@@ -270,6 +289,12 @@ public sealed class PointsGiveawayService(
 
         await changes.NotifyChangedAsync();
         return true;
+    }
+
+    private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await PointsGiveawayQueries.LoadReplyDeliveryAsync(db, hostId, ct);
     }
 
     internal async Task<string?> BuildUpdateMessageAsync(

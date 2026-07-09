@@ -17,6 +17,15 @@ public interface ICommandStrategy<TKind, TState>
         CancellationToken cancellationToken
     );
 
+    async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
+        CommandStrategyContext<TKind, TState> context,
+        CancellationToken cancellationToken
+    )
+    {
+        var reply = await ModeratorOnlyReplyAsync(context, cancellationToken);
+        return string.IsNullOrWhiteSpace(reply) ? null : TwitchCommandResponse.Chat(reply);
+    }
+
     ValueTask ExecuteAsync(
         CommandStrategyContext<TKind, TState> context,
         CancellationToken cancellationToken

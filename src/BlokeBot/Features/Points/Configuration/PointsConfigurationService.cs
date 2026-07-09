@@ -4,6 +4,7 @@ using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,14 @@ public sealed class PointsConfigurationService(
             .CommandAliases.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
+        var replyDelivery = await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Points,
+            ReplyDeliverySettingWriter.HostScopeId,
+            ct
+        );
+        var whisperResponsesEnabled = await WhisperResponsesEnabledAsync(db, hostId, ct);
 
         return new PointsConfiguration
         {
@@ -45,6 +54,8 @@ public sealed class PointsConfigurationService(
                 CancelGiveawayAliases = JoinAliases(aliases, PointsCommandKind.CancelGiveaway),
             },
             Replies = PointsDefaults.Replies(settings),
+            ReplyDelivery = replyDelivery,
+            WhisperResponsesEnabled = whisperResponsesEnabled,
             GamblingWinRatePercent = settings.GamblingWinRatePercent,
             GiveawayDurationSeconds = settings.GiveawayDurationSeconds,
             GiveawayMinimumPayout = settings.GiveawayMinimumPayout,
@@ -72,6 +83,14 @@ public sealed class PointsConfigurationService(
         }
 
         Apply(settings, config);
+        await ReplyDeliverySettingWriter.ReplaceAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Points,
+            ReplyDeliverySettingWriter.HostScopeId,
+            config.ReplyDelivery,
+            ct
+        );
         await SaveAliasesAsync(db, hostId, config.Aliases, ct);
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
@@ -125,6 +144,17 @@ public sealed class PointsConfigurationService(
 
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
         CommandAliasRegistry.JoinAliases(aliases, PointsAppCommandKindMap.ToAppKind(kind));
+
+    private static async Task<bool> WhisperResponsesEnabledAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    ) =>
+        await db
+            .HostBotAccountSettings.AsNoTracking()
+            .Where(x => x.HostId == hostId)
+            .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
+            .SingleOrDefaultAsync(ct);
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,

@@ -8,6 +8,8 @@ using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Dashboard;
+using BlokeBot.Features.Points.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -306,6 +308,50 @@ public sealed class PointsTests
         balance.Amount.ShouldBe("10");
     }
 
+    [Test]
+    public async Task Points_balance_command_uses_configured_reply_delivery()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.PointsSettings.Add(new PointsSettings { HostId = hostId });
+            db.ReplyDeliverySettings.Add(
+                new ReplyDeliverySetting
+                {
+                    HostId = hostId,
+                    Feature = ReplyDeliveryFeature.Points,
+                    ScopeId = ReplyDeliverySettingWriter.HostScopeId,
+                    ReplyKey = PointsReplyKeys.Balance,
+                    Target = ReplyDeliveryTargets.Whisper,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        List<TwitchCommandResponse> responses = [];
+        var strategy = new PointsBalanceCommandStrategy(
+            new PointsCommandService(dbFactory),
+            new PointBalanceService(dbFactory)
+        );
+
+        await strategy.ExecuteAsync(
+            TypedCommandContext(
+                hostId,
+                "viewer",
+                "streamer",
+                "points",
+                [],
+                responses,
+                PointsCommandKind.Points
+            ),
+            CancellationToken.None
+        );
+
+        var response = responses.Single();
+        response.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        response.Message.ShouldContain("viewer");
+    }
+
     private static CommandStrategyContext<PointsCommandKind, AppCommandRouteState> CommandContext(
         int hostId,
         string login,
@@ -341,6 +387,52 @@ public sealed class PointsTests
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
             PointsCommandKind.AddPoints,
+            new AppCommandRouteState(hostId),
+            command,
+            args
+        );
+    }
+
+    private static CommandStrategyContext<
+        PointsCommandKind,
+        AppCommandRouteState
+    > TypedCommandContext(
+        int hostId,
+        string login,
+        string channel,
+        string commandName,
+        IReadOnlyList<string> args,
+        List<TwitchCommandResponse> responses,
+        PointsCommandKind kind
+    )
+    {
+        var constructor = typeof(TwitchCommandContext)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(constructor => constructor.GetParameters().Length == 5);
+        var text = $"!{commandName} {string.Join(' ', args)}";
+        var command = (TwitchCommandContext)
+            constructor.Invoke([
+                new TwitchChatMessage(
+                    login,
+                    channel,
+                    text,
+                    $":{login}!u@h PRIVMSG #{channel} :{text}",
+                    new Dictionary<string, string>()
+                ),
+                commandName,
+                new EmptyServiceProvider(),
+                new Func<TwitchCommandResponse, CancellationToken, ValueTask>(
+                    (response, _) =>
+                    {
+                        responses.Add(response);
+                        return ValueTask.CompletedTask;
+                    }
+                ),
+                false,
+            ]);
+
+        return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
+            kind,
             new AppCommandRouteState(hostId),
             command,
             args

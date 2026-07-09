@@ -5,7 +5,9 @@ using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Configuration;
 using BlokeBot.Features.Guessing.Game;
+using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -81,6 +83,50 @@ public sealed class GuessingAliasTests
         replies.ShouldBe(["Started Special: blue"]);
     }
 
+    [Test]
+    public async Task Profile_reply_delivery_controls_start_response_target()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.ReplyDeliverySettings.Add(
+                new ReplyDeliverySetting
+                {
+                    HostId = seed.Host.Id,
+                    Feature = ReplyDeliveryFeature.Guessing,
+                    ScopeId = seed.SpecialProfile.Id,
+                    ReplyKey = GuessingReplyKeys.RoundStarted,
+                    Target = ReplyDeliveryTargets.Whisper,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        List<TwitchCommandResponse> responses = [];
+        var strategy = new StartGuessingCommandStrategy(
+            new GuessingCommandService(dbFactory),
+            new GuessingRoundService(
+                dbFactory,
+                new GuessingChangeNotifier(new EventBus<AppEventKind>())
+            )
+        );
+
+        await strategy.ExecuteAsync(
+            TypedCommandContext(
+                seed.Host.Login,
+                "special",
+                new AppCommandRouteState(seed.Host.Id, seed.SpecialProfile.Id),
+                [],
+                responses
+            ),
+            CancellationToken.None
+        );
+
+        var response = responses.Single();
+        response.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        response.Message.ShouldBe("Started Special: blue");
+    }
+
     private static GuessingConfigurationService ConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
     ) =>
@@ -120,6 +166,50 @@ public sealed class GuessingAliasTests
                         return ValueTask.CompletedTask;
                     }
                 ),
+            ]);
+
+        return new CommandStrategyContext<GuessCommandKind, AppCommandRouteState>(
+            GuessCommandKind.Start,
+            routeState,
+            command,
+            args
+        );
+    }
+
+    private static CommandStrategyContext<
+        GuessCommandKind,
+        AppCommandRouteState
+    > TypedCommandContext(
+        string channel,
+        string commandName,
+        AppCommandRouteState routeState,
+        IReadOnlyList<string> args,
+        List<TwitchCommandResponse> responses
+    )
+    {
+        var constructor = typeof(TwitchCommandContext)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Single(constructor => constructor.GetParameters().Length == 5);
+        var text = $"!{commandName}";
+        var command = (TwitchCommandContext)
+            constructor.Invoke([
+                new TwitchChatMessage(
+                    "moderator",
+                    channel,
+                    text,
+                    $":moderator!u@h PRIVMSG #{channel} :{text}",
+                    new Dictionary<string, string>()
+                ),
+                commandName,
+                new EmptyServiceProvider(),
+                new Func<TwitchCommandResponse, CancellationToken, ValueTask>(
+                    (response, _) =>
+                    {
+                        responses.Add(response);
+                        return ValueTask.CompletedTask;
+                    }
+                ),
+                false,
             ]);
 
         return new CommandStrategyContext<GuessCommandKind, AppCommandRouteState>(

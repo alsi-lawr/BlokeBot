@@ -43,10 +43,6 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<CommandAliasRegistry>();
         services.AddSingleton<AppCommandAliasResolver>();
-        services.AddSingleton<
-            ITwitchCommandResponseTargetResolver,
-            HostWhisperResponseTargetResolver
-        >();
         return services;
     }
 

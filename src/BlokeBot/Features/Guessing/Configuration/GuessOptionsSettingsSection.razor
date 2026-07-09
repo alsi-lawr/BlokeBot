@@ -15,6 +15,12 @@
                     <div @key="option" class="@OptionRowClass(option)">
                         <input class="input" placeholder="answer" @bind="option.Name" />
                         <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
+                        <span class="self-center" title="@WhisperTitle">
+                            <label class="@WhisperLabelClass">
+                                <input class="h-4 w-4" type="checkbox" checked="@IsWhisper(option)" disabled="@WhisperDisabled" @onchange="args => SetOptionWhisper(option, args)" />
+                                <span>Whisper</span>
+                            </label>
+                        </span>
                         <button class="btn-secondary" disabled="@pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                     </div>
                 }

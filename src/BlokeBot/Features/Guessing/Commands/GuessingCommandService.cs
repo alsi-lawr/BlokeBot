@@ -2,6 +2,7 @@ using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Features.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace BlokeBot.Features.Guessing.Commands;
 
 public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
-    public async Task<string> AvailableGuessesReplyAsync(
+    public async Task<TwitchCommandResponse> AvailableGuessesResponseAsync(
         string hostLogin,
         int? profileId,
         CancellationToken ct
@@ -19,7 +20,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
-            return NotConfigured().Message;
+            return NotConfiguredResponse();
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
         var selectedProfileId =
@@ -33,23 +34,39 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             ct,
             includeOptions: true
         );
+        var delivery = await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId.Value,
+            ReplyDeliveryFeature.Guessing,
+            selectedProfileId,
+            ct
+        );
         var settings =
             profile?.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
         var template = string.IsNullOrWhiteSpace(settings.AvailableGuessesReply)
             ? GuessingDefaults.Replies().AvailableGuessesReply
             : settings.AvailableGuessesReply;
 
-        return MessageTemplateFormatter.Format(
-            template,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["round"] = profile?.Name ?? string.Empty,
-                ["options"] = FormatOptions(profile?.Options.Select(x => x.Name) ?? []),
-            }
+        return new TwitchCommandResponse(
+            delivery.TargetFor(GuessingReplyKeys.AvailableGuesses),
+            MessageTemplateFormatter.Format(
+                template,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["round"] = profile?.Name ?? string.Empty,
+                    ["options"] = FormatOptions(profile?.Options.Select(x => x.Name) ?? []),
+                }
+            )
         );
     }
 
-    public async Task<string> ModeratorOnlyReplyAsync(
+    public async Task<string> AvailableGuessesReplyAsync(
+        string hostLogin,
+        int? profileId,
+        CancellationToken ct
+    ) => (await AvailableGuessesResponseAsync(hostLogin, profileId, ct)).Message;
+
+    public async Task<TwitchCommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
         int? profileId,
         CancellationToken ct
@@ -58,19 +75,29 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
-            return NotConfigured().Message;
+            return NotConfiguredResponse();
 
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrProfileOrDefaultAsync(
-            db,
-            hostId.Value,
-            await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
-            profileId,
-            ct
+        var resolution =
+            await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
+                db,
+                hostId.Value,
+                await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
+                profileId,
+                ct
+            );
+        return new TwitchCommandResponse(
+            resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.ModeratorOnly),
+            resolution.Settings.ModeratorOnlyReply
         );
-        return settings.ModeratorOnlyReply;
     }
 
-    public async Task<string> UsageReplyAsync(
+    public async Task<string> ModeratorOnlyReplyAsync(
+        string hostLogin,
+        int? profileId,
+        CancellationToken ct
+    ) => (await ModeratorOnlyResponseAsync(hostLogin, profileId, ct)).Message;
+
+    public async Task<TwitchCommandResponse> UsageResponseAsync(
         string hostLogin,
         GuessCommandKind kind,
         string command,
@@ -81,32 +108,52 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
-            return NotConfigured().Message;
+            return NotConfiguredResponse();
 
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrProfileOrDefaultAsync(
-            db,
-            hostId.Value,
-            await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
-            profileId,
-            ct
-        );
+        var resolution =
+            await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
+                db,
+                hostId.Value,
+                await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct),
+                profileId,
+                ct
+            );
         var template = kind switch
         {
-            GuessCommandKind.Win => settings.WinUsageReply,
+            GuessCommandKind.Win => resolution.Settings.WinUsageReply,
             GuessCommandKind.Start => "Usage: !{command} [round]",
-            _ => settings.GuessUsageReply,
+            _ => resolution.Settings.GuessUsageReply,
         };
-        return MessageTemplateFormatter.Format(
-            template,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["command"] = command,
-            }
+        var target =
+            kind == GuessCommandKind.Win
+                ? resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.WinUsage)
+            : kind == GuessCommandKind.Start ? TwitchCommandResponseTarget.Chat
+            : resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.GuessUsage);
+        return new TwitchCommandResponse(
+            target,
+            MessageTemplateFormatter.Format(
+                template,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["command"] = command,
+                }
+            )
         );
     }
 
+    public async Task<string> UsageReplyAsync(
+        string hostLogin,
+        GuessCommandKind kind,
+        string command,
+        int? profileId,
+        CancellationToken ct
+    ) => (await UsageResponseAsync(hostLogin, kind, command, profileId, ct)).Message;
+
     private static GuessingOperationResult NotConfigured() =>
         new(false, "This channel is not set up.");
+
+    private static TwitchCommandResponse NotConfiguredResponse() =>
+        TwitchCommandResponse.Chat(NotConfigured().Message);
 
     private static string FormatOptions(IEnumerable<string> options)
     {

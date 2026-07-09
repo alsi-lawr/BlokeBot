@@ -1,4 +1,5 @@
 using BlokeBot.Features.Points.Commands;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Configuration;
@@ -8,6 +9,8 @@ public sealed class PointsConfiguration
     public string PointLabel { get; set; } = "points";
     public PointsCommandAliasEditor Aliases { get; set; } = new();
     public PointsReplySettingsEditor Replies { get; set; } = new();
+    public ReplyDeliveryMap ReplyDelivery { get; set; } = new();
+    public bool WhisperResponsesEnabled { get; set; }
     public int GamblingWinRatePercent { get; set; } = 50;
     public int GiveawayDurationSeconds { get; set; } = 300;
     public string GiveawayMinimumPayout { get; set; } = "10";

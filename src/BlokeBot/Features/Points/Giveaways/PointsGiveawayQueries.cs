@@ -1,4 +1,5 @@
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +15,19 @@ internal static class PointsGiveawayQueries
     ) =>
         await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
         ?? new PointsSettings { HostId = hostId };
+
+    public static async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    ) =>
+        await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Points,
+            ReplyDeliverySettingWriter.HostScopeId,
+            ct
+        );
 
     public static async Task<bool> HasActiveGiveawayAsync(
         BlokeBotDbContext db,

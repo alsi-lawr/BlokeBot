@@ -1,5 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Commands;
 
 /// <summary>
@@ -7,7 +5,6 @@ namespace BlokeBot.Commands;
 /// </summary>
 public sealed record TwitchCommandContext
 {
-    private readonly bool resolveReplyTarget;
     private readonly Func<TwitchCommandResponse, CancellationToken, ValueTask> respond;
 
     internal TwitchCommandContext(
@@ -36,7 +33,6 @@ public sealed record TwitchCommandContext
         CommandName = commandName;
         Services = services;
         this.respond = respond;
-        this.resolveReplyTarget = resolveReplyTarget;
     }
 
     /// <summary>
@@ -60,19 +56,8 @@ public sealed record TwitchCommandContext
     /// <param name="message">The reply text.</param>
     /// <param name="cancellationToken">A token that cancels the reply operation.</param>
     /// <returns>A task that completes when the reply is sent.</returns>
-    public async ValueTask ReplyAsync(string message, CancellationToken cancellationToken)
-    {
-        var target = TwitchCommandResponseTarget.Chat;
-        if (
-            resolveReplyTarget
-            && Services.GetService<ITwitchCommandResponseTargetResolver>() is { } resolver
-        )
-        {
-            target = await resolver.ResolveAsync(this, cancellationToken);
-        }
-
-        await respond(new TwitchCommandResponse(target, message), cancellationToken);
-    }
+    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken) =>
+        respond(TwitchCommandResponse.Chat(message), cancellationToken);
 
     public ValueTask RespondAsync(
         TwitchCommandResponse response,

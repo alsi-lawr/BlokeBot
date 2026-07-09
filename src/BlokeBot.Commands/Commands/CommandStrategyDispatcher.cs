@@ -27,9 +27,9 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
         );
         if (strategy.RequiresModerator && !TwitchModeratorPolicy.IsModerator(command.Message))
         {
-            var reply = await strategy.ModeratorOnlyReplyAsync(context, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(reply))
-                await command.ReplyAsync(reply, cancellationToken);
+            var response = await strategy.ModeratorOnlyResponseAsync(context, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(response?.Message))
+                await command.RespondAsync(response, cancellationToken);
 
             return CommandStrategyDispatchResult<TKind>.Handled(route.Kind);
         }

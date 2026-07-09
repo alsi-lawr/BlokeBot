@@ -26,6 +26,7 @@ using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Replies;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -43,6 +44,8 @@ namespace BlokeBot.Features.Guessing.Configuration;
 public partial class GuessOptionsSettingsSection
 {
     private const int RemovalAnimationDelayMs = 150;
+    private const string WhisperDisabledTooltip =
+        "Enable whisper responses in Channel setup before using whisper replies.";
     private readonly HashSet<GuessOptionEditor> pendingRemovals = [];
 
     [Parameter, EditorRequired]
@@ -51,15 +54,42 @@ public partial class GuessOptionsSettingsSection
     [Parameter, EditorRequired]
     public List<GuessOptionEditor> Options { get; set; } = [];
 
+    [Parameter]
+    public bool WhisperResponsesEnabled { get; set; }
+
     [Parameter, EditorRequired]
     public EventCallback<GuessOptionEditor> RemoveOption { get; set; }
 
+    private bool WhisperDisabled => !WhisperResponsesEnabled;
+
+    private string WhisperTitle => WhisperDisabled ? WhisperDisabledTooltip : string.Empty;
+
+    private string WhisperLabelClass =>
+        WhisperDisabled
+            ? "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground opacity-60"
+            : "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground";
+
     private async Task InvokeAddOptionAsync() => await AddOption.InvokeAsync();
+
+    private static bool IsWhisper(GuessOptionEditor option) =>
+        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+        == TwitchCommandResponseTarget.Whisper;
+
+    private void SetOptionWhisper(GuessOptionEditor option, ChangeEventArgs args)
+    {
+        if (WhisperDisabled)
+            return;
+
+        var whisper = args.Value is true || args.Value?.ToString() == "true";
+        option.ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+            whisper ? TwitchCommandResponseTarget.Whisper : TwitchCommandResponseTarget.Chat
+        );
+    }
 
     private string OptionRowClass(GuessOptionEditor option)
     {
         const string baseClass =
-            "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]";
+            "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto_auto]";
         return pendingRemovals.Contains(option)
             ? $"{baseClass} motion-list__item--removing"
             : baseClass;

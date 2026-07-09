@@ -1,9 +1,16 @@
 using BlokeBot.Features.Guessing.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Profiles;
+
+internal sealed record GuessingReplySettingsResolution(
+    int ProfileId,
+    BotReplySettings Settings,
+    ReplyDeliveryMap ReplyDelivery
+);
 
 internal static class GuessingProfileQueries
 {
@@ -66,9 +73,35 @@ internal static class GuessingProfileQueries
         int hostId,
         GuessRound? round,
         CancellationToken ct
-    ) => await ReplySettingsForRoundOrProfileOrDefaultAsync(db, hostId, round, null, ct);
+    ) =>
+        (
+            await ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
+                db,
+                hostId,
+                round,
+                null,
+                ct
+            )
+        ).Settings;
 
     public static async Task<BotReplySettings> ReplySettingsForRoundOrProfileOrDefaultAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        GuessRound? round,
+        int? profileId,
+        CancellationToken ct
+    ) =>
+        (
+            await ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
+                db,
+                hostId,
+                round,
+                profileId,
+                ct
+            )
+        ).Settings;
+
+    public static async Task<GuessingReplySettingsResolution> ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
         BlokeBotDbContext db,
         int hostId,
         GuessRound? round,
@@ -79,6 +112,15 @@ internal static class GuessingProfileQueries
         var selectedProfileId =
             round?.GuessRoundProfileId ?? profileId ?? await DefaultProfileIdAsync(db, hostId, ct);
         var profile = await LoadProfileWithSettingsAsync(db, hostId, selectedProfileId, ct);
-        return profile?.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
+        var settings =
+            profile?.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
+        var delivery = await ReplyDeliverySettingWriter.LoadAsync(
+            db,
+            hostId,
+            ReplyDeliveryFeature.Guessing,
+            selectedProfileId,
+            ct
+        );
+        return new GuessingReplySettingsResolution(selectedProfileId, settings, delivery);
     }
 }

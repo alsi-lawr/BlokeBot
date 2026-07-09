@@ -26,6 +26,7 @@ using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Replies;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -42,6 +43,17 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public partial class ReplySettingsSection
 {
+    private const string WhisperDisabledTooltip =
+        "Enable whisper responses in Channel setup before using whisper replies.";
+
     [Parameter, EditorRequired]
     public ReplySettingsEditor Replies { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public ReplyDeliveryMap Delivery { get; set; } = new();
+
+    [Parameter]
+    public bool WhisperResponsesEnabled { get; set; }
+
+    private bool WhisperDisabled => !WhisperResponsesEnabled;
 }
