@@ -34,14 +34,34 @@ internal static class BotOAuthEndpoints
             .MapGet(
                 "/callback",
                 async (
+                    HttpContext context,
                     string? code,
                     string? state,
                     string? error,
                     ITwitchOAuthFlow oauth,
+                    HostBotAccountOAuthService hostBotOAuth,
+                    HostBotAccountAuthorizationService hostBotAuthorization,
                     HostedChannelChangeNotifier changes,
                     CancellationToken ct
                 ) =>
                 {
+                    if (context.Request.Cookies["BlokeBot.HostBotState"] is { Length: > 0 })
+                    {
+                        return await CompleteHostBotAuthorizationAsync(
+                            context,
+                            code,
+                            state,
+                            error,
+                            hostBotOAuth,
+                            hostBotAuthorization,
+                            ct
+                        );
+                    }
+
+                    var session = AuthenticatedSession.FromPrincipal(context.User);
+                    if (!session.IsBotAdmin)
+                        return Results.Forbid();
+
                     if (!string.IsNullOrWhiteSpace(error))
                         return Results.Content(
                             $"OAuth error: {WebUtility.HtmlEncode(error)}",
@@ -83,7 +103,7 @@ internal static class BotOAuthEndpoints
                     }
                 }
             )
-            .RequireAuthorization("BotAdmin");
+            .RequireAuthorization();
 
         botOAuth
             .MapGet(
@@ -232,9 +252,7 @@ internal static class BotOAuthEndpoints
 
                     try
                     {
-                        return Results.Redirect(
-                            oauth.CreateAuthorizationUri(context.Request, state).ToString()
-                        );
+                        return Results.Redirect(oauth.CreateAuthorizationUri(state).ToString());
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -243,96 +261,86 @@ internal static class BotOAuthEndpoints
                 }
             )
             .RequireAuthorization("Operator");
+    }
 
-        botOAuth
-            .MapGet(
-                "/host-bot/callback",
-                async (
-                    HttpContext context,
-                    string? code,
-                    string? state,
-                    string? error,
-                    HostBotAccountOAuthService oauth,
-                    HostBotAccountAuthorizationService hostBotAuthorization,
-                    CancellationToken ct
-                ) =>
-                {
-                    var session = AuthenticatedSession.FromPrincipal(context.User);
-                    if (!session.CanAuthorizeSelectedHost)
-                        return Results.Forbid();
+    private static async Task<IResult> CompleteHostBotAuthorizationAsync(
+        HttpContext context,
+        string? code,
+        string? state,
+        string? error,
+        HostBotAccountOAuthService oauth,
+        HostBotAccountAuthorizationService hostBotAuthorization,
+        CancellationToken ct
+    )
+    {
+        var session = AuthenticatedSession.FromPrincipal(context.User);
+        if (!session.CanAuthorizeSelectedHost)
+            return Results.Forbid();
 
-                    var storedState = context.Request.Cookies["BlokeBot.HostBotState"];
-                    DeleteHostBotStateCookie(context);
+        var storedState = context.Request.Cookies["BlokeBot.HostBotState"];
+        DeleteHostBotStateCookie(context);
 
-                    if (!string.IsNullOrWhiteSpace(error))
-                        return Results.Content(
-                            $"OAuth error: {WebUtility.HtmlEncode(error)}",
-                            "text/plain"
-                        );
+        if (!string.IsNullOrWhiteSpace(error))
+            return Results.Content($"OAuth error: {WebUtility.HtmlEncode(error)}", "text/plain");
 
-                    if (string.IsNullOrWhiteSpace(code))
-                        return Results.BadRequest("Missing code");
+        if (string.IsNullOrWhiteSpace(code))
+            return Results.BadRequest("Missing code");
 
-                    if (
-                        string.IsNullOrWhiteSpace(state)
-                        || string.IsNullOrWhiteSpace(storedState)
-                        || !string.Equals(state, storedState, StringComparison.Ordinal)
-                    )
-                    {
-                        return Results.BadRequest("Invalid state");
-                    }
+        if (
+            string.IsNullOrWhiteSpace(state)
+            || string.IsNullOrWhiteSpace(storedState)
+            || !string.Equals(state, storedState, StringComparison.Ordinal)
+        )
+        {
+            return Results.BadRequest("Invalid state");
+        }
 
-                    var selectedHost = session.HostSelection?.Current;
-                    if (selectedHost is null)
-                        return Results.BadRequest(
-                            "Select your hosted channel before authorizing it."
-                        );
+        var selectedHost = session.HostSelection?.Current;
+        if (selectedHost is null)
+            return Results.BadRequest("Select your hosted channel before authorizing it.");
 
-                    try
-                    {
-                        var grant = await oauth.CompleteAsync(context.Request, code, ct);
-                        var authorization = await hostBotAuthorization.AuthorizeAsync(
-                            selectedHost.Id,
-                            grant,
-                            ct
-                        );
-                        if (!authorization.Succeeded)
-                            return Results.BadRequest(authorization.Message);
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        return Results.BadRequest(ex.Message);
-                    }
-                    catch (HttpRequestException)
-                    {
-                        return Results.Problem(
-                            "Twitch rejected the host bot authorization request.",
-                            statusCode: StatusCodes.Status502BadGateway,
-                            title: "Host bot authorization failed"
-                        );
-                    }
+        try
+        {
+            var grant = await oauth.CompleteAsync(code, ct);
+            var authorization = await hostBotAuthorization.AuthorizeAsync(
+                selectedHost.Id,
+                grant,
+                ct
+            );
+            if (!authorization.Succeeded)
+                return Results.BadRequest(authorization.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ex.Message);
+        }
+        catch (HttpRequestException)
+        {
+            return Results.Problem(
+                "Twitch rejected the host bot authorization request.",
+                statusCode: StatusCodes.Status502BadGateway,
+                title: "Host bot authorization failed"
+            );
+        }
 
-                    return Results.Content(
-                        """
-                        <!doctype html>
-                        <html lang="en">
-                        <head>
-                            <meta charset="utf-8">
-                            <title>BlokeBot authorization complete</title>
-                        </head>
-                        <body>
-                            <p>Bot account authorization is complete. You can close this window.</p>
-                            <script>
-                                window.close();
-                            </script>
-                        </body>
-                        </html>
-                        """,
-                        "text/html"
-                    );
-                }
-            )
-            .RequireAuthorization("Operator");
+        return Results.Content(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <title>BlokeBot authorization complete</title>
+            </head>
+            <body>
+                <p>Bot account authorization is complete. You can close this window.</p>
+                <script>
+                    window.close();
+                </script>
+            </body>
+            </html>
+            """,
+            "text/html"
+        );
     }
 
     private static CookieOptions ChannelBotStateCookieOptions(
@@ -367,7 +375,7 @@ internal static class BotOAuthEndpoints
             HttpOnly = true,
             IsEssential = true,
             MaxAge = maxAge,
-            Path = "/oauth/host-bot",
+            Path = "/oauth",
             SameSite = SameSiteMode.Lax,
             Secure = request.IsHttps,
         };
@@ -381,6 +389,10 @@ internal static class BotOAuthEndpoints
         context.Response.Cookies.Delete(
             "BlokeBot.HostBotState",
             new CookieOptions { Path = "/", Secure = context.Request.IsHttps }
+        );
+        context.Response.Cookies.Delete(
+            "BlokeBot.HostBotState",
+            new CookieOptions { Path = "/oauth/host-bot", Secure = context.Request.IsHttps }
         );
     }
 }

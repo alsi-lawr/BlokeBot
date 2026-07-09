@@ -15,6 +15,30 @@ namespace BlokeBot.Tests;
 public sealed class HostBotAccountAuthorizationTests
 {
     [Test]
+    public void Host_bot_oauth_uses_configured_bot_redirect_uri()
+    {
+        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        var oauth = new HostBotAccountOAuthService(
+            Options.Create(
+                new TwitchBotOptions
+                {
+                    Identity = new TwitchBotIdentityOptions
+                    {
+                        ClientId = "client",
+                        RedirectUri = "https://localhost:7107/oauth/callback",
+                    },
+                }
+            ),
+            new TwitchOAuthApiClient(httpClientFactory),
+            new TwitchHelixApiClient(httpClientFactory)
+        );
+
+        var uri = oauth.CreateAuthorizationUri("state");
+
+        uri.Query.ShouldContain("redirect_uri=https%3A%2F%2Flocalhost%3A7107%2Foauth%2Fcallback");
+    }
+
+    [Test]
     public async Task Disabled_override_resolves_global_bot_account()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -95,6 +119,7 @@ public sealed class HostBotAccountAuthorizationTests
                     BotUsername = "bot",
                     ClientId = "client",
                     ClientSecret = "secret",
+                    RedirectUri = "https://localhost:7107/oauth/callback",
                     Scopes = ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels],
                 },
             }

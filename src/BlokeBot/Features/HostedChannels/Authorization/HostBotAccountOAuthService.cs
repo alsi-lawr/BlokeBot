@@ -1,4 +1,3 @@
-using BlokeBot.Auth.OAuth;
 using BlokeBot.Identity;
 using Microsoft.Extensions.Options;
 
@@ -10,19 +9,17 @@ public sealed class HostBotAccountOAuthService(
     TwitchHelixApiClient helix
 )
 {
-    private const string CallbackPath = "/oauth/host-bot/callback";
     private readonly TwitchBotOptions options = options.Value;
 
-    public Uri CreateAuthorizationUri(HttpRequest request, string state)
+    public Uri CreateAuthorizationUri(string state)
     {
         var identity = options.Identity;
-        if (string.IsNullOrWhiteSpace(identity.ClientId))
-            throw new InvalidOperationException("TwitchBot client ID is missing.");
+        ValidateConfiguredIdentity(identity, requireSecret: false);
 
         return oauth.CreateAuthorizationUri(
             new TwitchAuthorizationUriRequest(
                 identity.ClientId,
-                OAuthRequestUri.CreateCallbackUri(request, CallbackPath),
+                identity.RedirectUri,
                 RequestedScopes(),
                 state
             )
@@ -30,25 +27,18 @@ public sealed class HostBotAccountOAuthService(
     }
 
     public async Task<HostBotAccountAuthorizationGrant> CompleteAsync(
-        HttpRequest request,
         string code,
         CancellationToken ct
     )
     {
         var identity = options.Identity;
-        if (
-            string.IsNullOrWhiteSpace(identity.ClientId)
-            || string.IsNullOrWhiteSpace(identity.ClientSecret)
-        )
-        {
-            throw new InvalidOperationException("TwitchBot client credentials are missing.");
-        }
+        ValidateConfiguredIdentity(identity, requireSecret: true);
 
         var token = await oauth.ExchangeCodeAsync(
             new TwitchAuthorizationCodeExchange(
                 identity.ClientId,
                 identity.ClientSecret,
-                OAuthRequestUri.CreateCallbackUri(request, CallbackPath),
+                identity.RedirectUri,
                 code
             ),
             ct
@@ -77,4 +67,19 @@ public sealed class HostBotAccountOAuthService(
     }
 
     public string[] RequestedScopes() => TwitchScopeSet.NormalizeMany(options.Identity.Scopes);
+
+    private static void ValidateConfiguredIdentity(
+        TwitchBotIdentityOptions identity,
+        bool requireSecret
+    )
+    {
+        if (
+            string.IsNullOrWhiteSpace(identity.ClientId)
+            || string.IsNullOrWhiteSpace(identity.RedirectUri)
+            || (requireSecret && string.IsNullOrWhiteSpace(identity.ClientSecret))
+        )
+        {
+            throw new InvalidOperationException("TwitchBot identity configuration is incomplete.");
+        }
+    }
 }
