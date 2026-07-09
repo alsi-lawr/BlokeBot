@@ -21,6 +21,7 @@ using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Features.HostedChannels.Whispers;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
@@ -42,6 +43,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<CommandAliasRegistry>();
         services.AddSingleton<AppCommandAliasResolver>();
+        services.AddSingleton<
+            ITwitchCommandResponseTargetResolver,
+            HostWhisperResponseTargetResolver
+        >();
         return services;
     }
 
@@ -190,6 +195,8 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostedChannelRuntimeStatusService>();
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
+        services.AddSingleton<HostWhisperQuotaService>();
+        services.AddSingleton<ITwitchCommandResponseSender, HostWhisperCommandResponseSender>();
         services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<ITwitchBotChannelLifecycleNotifier, HostedChannelLifecycleNotifier>();
         return services;

@@ -14,6 +14,7 @@ internal sealed class TwitchEventSubRuntime(
     TwitchCommandDispatcher dispatcher,
     TwitchHelixChatClient helix,
     ITwitchChatMessageSender sender,
+    ITwitchCommandResponseSender responses,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
     TwitchBotRuntimeStatusStore status,
     ILogger<TwitchEventSubRuntime> log
@@ -331,9 +332,9 @@ internal sealed class TwitchEventSubRuntime(
             CreateTags(chatEvent)
         );
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             message,
-            async (reply, ct) => await sender.SendAsync(message.Channel, reply, ct),
+            async (response, ct) => await responses.SendAsync(message, response, ct),
             cancellationToken
         );
     }
@@ -345,6 +346,7 @@ internal sealed class TwitchEventSubRuntime(
         var tags = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["id"] = chatEvent.MessageId,
+            ["user-id"] = chatEvent.ChatterUserId,
             ["badges"] = string.Join(
                 ',',
                 chatEvent.Badges.Select(badge => $"{badge.SetId}/{badge.Id}")

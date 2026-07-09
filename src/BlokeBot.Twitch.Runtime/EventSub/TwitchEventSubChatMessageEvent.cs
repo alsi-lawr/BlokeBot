@@ -13,6 +13,9 @@ internal sealed record TwitchEventSubChatMessageEvent
     [JsonPropertyName("chatter_user_login")]
     public string ChatterUserLogin { get; init; } = string.Empty;
 
+    [JsonPropertyName("chatter_user_id")]
+    public string ChatterUserId { get; init; } = string.Empty;
+
     [JsonPropertyName("message")]
     public TwitchEventSubChatMessage? Message { get; init; }
 

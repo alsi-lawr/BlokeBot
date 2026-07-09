@@ -2,6 +2,7 @@ using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Features.HostedChannels.Whispers;
 
 namespace BlokeBot.Features.HostConfig.Page;
 
@@ -22,5 +23,7 @@ public sealed record HostConfigState(
 
 public sealed record HostBotAccountOverrideState(
     bool Enabled,
-    BotAccountAuthorizationStatus Status
+    BotAccountAuthorizationStatus Status,
+    bool WhisperResponsesEnabled,
+    WhisperQuotaStatus WhisperQuota
 );

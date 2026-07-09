@@ -3,6 +3,7 @@ using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Features.HostedChannels.Whispers;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
@@ -14,6 +15,7 @@ public sealed class HostConfigService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostModAccessService modAccess,
     HostBotAccountAuthorizationService botAccounts,
+    HostWhisperQuotaService whisperQuota,
     HostedChannelRuntimeStatusService runtimeStatus,
     SiteAccessService siteAccess
 )
@@ -42,7 +44,12 @@ public sealed class HostConfigService(
                 false,
                 null,
                 null,
-                new HostBotAccountOverrideState(false, DisabledBotOverrideStatus()),
+                new HostBotAccountOverrideState(
+                    false,
+                    DisabledBotOverrideStatus(),
+                    false,
+                    new WhisperQuotaStatus(0, HostWhisperQuotaService.UniqueRecipientLimit, false)
+                ),
                 [],
                 new HostModAccessState(true, true, [], [])
             );
@@ -50,6 +57,21 @@ public sealed class HostConfigService(
 
         var status = await runtimeStatus.LoadHostRuntimeSummaryAsync(host.Id, ct);
         var botOverrideStatus = await botAccounts.GetStatusAsync(host.Id, ct);
+        var botOverrideSettings = await db
+            .HostBotAccountSettings.AsNoTracking()
+            .Where(x => x.HostId == host.Id)
+            .Select(x => new
+            {
+                x.OverrideEnabled,
+                x.WhisperResponsesEnabled,
+                x.TwitchUserId,
+            })
+            .SingleOrDefaultAsync(ct);
+        var whisperQuotaStatus = await whisperQuota.GetStatusAsync(
+            host.Id,
+            botOverrideSettings?.TwitchUserId,
+            ct
+        );
         return new HostConfigState(
             host.Id,
             host.Login,
@@ -62,7 +84,10 @@ public sealed class HostConfigService(
             host.BotRuntimeStateChangedAtUtc,
             new HostBotAccountOverrideState(
                 botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
-                botOverrideStatus
+                botOverrideStatus,
+                botOverrideSettings?.OverrideEnabled == true
+                    && botOverrideSettings.WhisperResponsesEnabled,
+                whisperQuotaStatus
             ),
             HostFeatureCatalog.Cards(host.EnabledFeatures),
             await modAccess.LoadAsync(host.Id, ct)

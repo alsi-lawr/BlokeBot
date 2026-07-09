@@ -117,6 +117,70 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
+    public async Task Whisper_responses_cannot_be_enabled_without_custom_bot_override()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+
+        var saved = await service.SetWhisperResponsesEnabledAsync(
+            hostId,
+            true,
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        saved.ShouldBeFalse();
+        (await db.HostBotAccountSettings.SingleOrDefaultAsync(
+            x => x.HostId == hostId,
+            CancellationToken.None
+        )).ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Whisper_responses_require_whisper_scope_for_custom_bot_authorization()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        (await service.SetWhisperResponsesEnabledAsync(
+            hostId,
+            true,
+            CancellationToken.None
+        )).ShouldBeTrue();
+
+        var missing = await service.AuthorizeAsync(
+            hostId,
+            CreateCustomBotGrant(
+                "override-token",
+                ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
+            ),
+            CancellationToken.None
+        );
+        var authorized = await service.AuthorizeAsync(
+            hostId,
+            CreateCustomBotGrant(
+                "override-whisper-token",
+                [
+                    "chat:read",
+                    "chat:edit",
+                    TwitchScopes.UserReadModeratedChannels,
+                    TwitchScopes.UserManageWhispers,
+                ]
+            ),
+            CancellationToken.None
+        );
+        var status = await service.GetStatusAsync(hostId, CancellationToken.None);
+
+        missing.Succeeded.ShouldBeFalse();
+        missing.MissingScopes.ShouldContain(TwitchScopes.UserManageWhispers);
+        authorized.Succeeded.ShouldBeTrue();
+        status.State.ShouldBe(BotAccountAuthorizationState.Ready);
+        status.RequiredScopes.ShouldContain(TwitchScopes.UserManageWhispers);
+    }
+
+    [Test]
     public async Task Disabling_override_restarts_running_host_with_global_bot_account()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -219,16 +283,8 @@ public sealed class HostBotAccountAuthorizationTests
     {
         var result = await service.AuthorizeAsync(
             hostId,
-            new HostBotAccountAuthorizationGrant(
-                new TwitchTokenSet(
-                    "override-token",
-                    "override-refresh",
-                    DateTimeOffset.UtcNow.AddHours(1)
-                ),
-                "custom-id",
-                LoginName.Parse("custombot"),
-                "CustomBot",
-                "https://static-cdn.jtvnw.net/custombot.png",
+            CreateCustomBotGrant(
+                "override-token",
                 ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
             ),
             CancellationToken.None
@@ -236,6 +292,23 @@ public sealed class HostBotAccountAuthorizationTests
 
         result.Succeeded.ShouldBeTrue();
     }
+
+    private static HostBotAccountAuthorizationGrant CreateCustomBotGrant(
+        string accessToken,
+        IReadOnlyList<string> scopes
+    ) =>
+        new(
+            new TwitchTokenSet(
+                accessToken,
+                "override-refresh",
+                DateTimeOffset.UtcNow.AddHours(1)
+            ),
+            "custom-id",
+            LoginName.Parse("custombot"),
+            "CustomBot",
+            "https://static-cdn.jtvnw.net/custombot.png",
+            scopes
+        );
 
     private static async Task SetRuntimeStateAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -295,6 +368,11 @@ public sealed class HostBotAccountAuthorizationTests
                     "override-token" => JsonResponse(
                         """
                         {"user_id":"custom-id","login":"custombot","scopes":["chat:read","chat:edit","user:read:moderated_channels"]}
+                        """
+                    ),
+                    "override-whisper-token" => JsonResponse(
+                        """
+                        {"user_id":"custom-id","login":"custombot","scopes":["chat:read","chat:edit","user:read:moderated_channels","user:manage:whispers"]}
                         """
                     ),
                     _ => new HttpResponseMessage(HttpStatusCode.Unauthorized),

@@ -146,6 +146,40 @@
                                         Collapsible="true"
                                         InitiallyOpen="true" />
 
+        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="true">
+            <div class="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
+                <div class="surface-muted rounded-lg px-3 py-2.5 @(!state.BotOverride.Enabled ? "opacity-60" : null)">
+                    <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
+                        <input class="h-4 w-4"
+                               type="checkbox"
+                               checked="@state.BotOverride.WhisperResponsesEnabled"
+                               disabled="@(!state.BotOverride.Enabled)"
+                               @onchange="args => SetWhisperResponsesEnabledAsync(hostId, args.Value is true)" />
+                        Reply with whispers from the custom bot
+                    </label>
+                    <p class="mt-2 text-xs font-medium text-slate-500">
+                        @(state.BotOverride.Enabled
+                            ? "Reconnect the custom bot if Twitch asks for more access."
+                            : "Turn on custom bot before enabling whisper responses.")
+                    </p>
+                </div>
+                <div class="surface-muted rounded-lg px-3 py-2.5">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Whisper recipients today</p>
+                        <span class="@WhisperQuotaBadgeClass">
+                            <span class="@WhisperQuotaDotClass"></span>
+                            @WhisperQuotaText
+                        </span>
+                    </div>
+                    <p class="mt-2 text-xs font-medium text-slate-500">
+                        @(state.BotOverride.WhisperQuota.Exhausted
+                            ? "Twitch whisper quota is unavailable for new recipients today."
+                            : $"{state.BotOverride.WhisperQuota.Remaining} new recipients remain today.")
+                    </p>
+                </div>
+            </div>
+        </CollapsibleSection>
+
         <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="true">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">

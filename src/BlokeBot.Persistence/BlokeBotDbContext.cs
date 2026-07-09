@@ -8,6 +8,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 {
     public DbSet<BotHost> Hosts => Set<BotHost>();
     public DbSet<HostBotAccountSettings> HostBotAccountSettings => Set<HostBotAccountSettings>();
+    public DbSet<WhisperQuotaBucket> WhisperQuotaBuckets => Set<WhisperQuotaBucket>();
+    public DbSet<WhisperQuotaRecipient> WhisperQuotaRecipients => Set<WhisperQuotaRecipient>();
     public DbSet<BotReplySettings> ReplySettings => Set<BotReplySettings>();
     public DbSet<CommandAlias> CommandAliases => Set<CommandAlias>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
@@ -61,6 +63,38 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WhisperQuotaBucket>(b =>
+        {
+            b.ToTable("whisper_quota_buckets");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.BotTwitchUserId).HasMaxLength(64);
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.BotTwitchUserId,
+                    x.DayUtc,
+                })
+                .IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(x => x.Recipients)
+                .WithOne(x => x.WhisperQuotaBucket)
+                .HasForeignKey(x => x.WhisperQuotaBucketId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WhisperQuotaRecipient>(b =>
+        {
+            b.ToTable("whisper_quota_recipients");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.RecipientLogin).HasMaxLength(128);
+            b.Property(x => x.RecipientTwitchUserId).HasMaxLength(64);
+            b.HasIndex(x => new { x.WhisperQuotaBucketId, x.RecipientTwitchUserId })
+                .IsUnique();
         });
 
         modelBuilder.Entity<SiteAccessSettings>(b =>

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchHelixChatClient(
+public sealed class TwitchHelixChatClient(
     IHttpClientFactory factory,
     IOptions<TwitchBotIdentityOptions> options,
     TwitchHelixApiClient helix
@@ -133,6 +133,40 @@ internal sealed class TwitchHelixChatClient(
 
         return result?.Data.FirstOrDefault()
             ?? throw new InvalidOperationException("Twitch did not return a chat send result.");
+    }
+
+    public async Task<TwitchWhisperSendResult> SendWhisperAsync(
+        string accessToken,
+        string senderUserId,
+        string recipientUserId,
+        string message,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            "https://api.twitch.tv/helix/whispers?"
+            + TwitchQueryString.Create(
+                new Dictionary<string, string?>
+                {
+                    ["from_user_id"] = senderUserId,
+                    ["to_user_id"] = recipientUserId,
+                }
+            );
+        using var request = CreateRequest(HttpMethod.Post, uri, accessToken);
+        request.Content = JsonContent.Create(new { message });
+        using var response = await http.SendAsync(request, cancellationToken);
+        return response.StatusCode switch
+        {
+            HttpStatusCode.NoContent => new(
+                TwitchWhisperSendStatus.Accepted,
+                response.StatusCode
+            ),
+            HttpStatusCode.TooManyRequests => new(
+                TwitchWhisperSendStatus.RateLimited,
+                response.StatusCode
+            ),
+            _ => new(TwitchWhisperSendStatus.Rejected, response.StatusCode),
+        };
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string uri, string accessToken)

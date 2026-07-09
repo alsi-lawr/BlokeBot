@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace BlokeBot.Commands;
 
 /// <summary>
@@ -5,7 +7,8 @@ namespace BlokeBot.Commands;
 /// </summary>
 public sealed record TwitchCommandContext
 {
-    private readonly Func<string, CancellationToken, ValueTask> reply;
+    private readonly bool resolveReplyTarget;
+    private readonly Func<TwitchCommandResponse, CancellationToken, ValueTask> respond;
 
     internal TwitchCommandContext(
         TwitchChatMessage message,
@@ -13,11 +16,27 @@ public sealed record TwitchCommandContext
         IServiceProvider services,
         Func<string, CancellationToken, ValueTask> reply
     )
+        : this(
+            message,
+            commandName,
+            services,
+            (response, cancellationToken) => reply(response.Message, cancellationToken),
+            false
+        ) { }
+
+    internal TwitchCommandContext(
+        TwitchChatMessage message,
+        string commandName,
+        IServiceProvider services,
+        Func<TwitchCommandResponse, CancellationToken, ValueTask> respond,
+        bool resolveReplyTarget
+    )
     {
         Message = message;
         CommandName = commandName;
         Services = services;
-        this.reply = reply;
+        this.respond = respond;
+        this.resolveReplyTarget = resolveReplyTarget;
     }
 
     /// <summary>
@@ -41,6 +60,22 @@ public sealed record TwitchCommandContext
     /// <param name="message">The reply text.</param>
     /// <param name="cancellationToken">A token that cancels the reply operation.</param>
     /// <returns>A task that completes when the reply is sent.</returns>
-    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken) =>
-        reply(message, cancellationToken);
+    public async ValueTask ReplyAsync(string message, CancellationToken cancellationToken)
+    {
+        var target = TwitchCommandResponseTarget.Chat;
+        if (
+            resolveReplyTarget
+            && Services.GetService<ITwitchCommandResponseTargetResolver>() is { } resolver
+        )
+        {
+            target = await resolver.ResolveAsync(this, cancellationToken);
+        }
+
+        await respond(new TwitchCommandResponse(target, message), cancellationToken);
+    }
+
+    public ValueTask RespondAsync(
+        TwitchCommandResponse response,
+        CancellationToken cancellationToken
+    ) => respond(response, cancellationToken);
 }

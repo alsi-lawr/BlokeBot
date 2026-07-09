@@ -24,12 +24,12 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = hostBotOAuth.RequestedScopes();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
             ct
         );
+        var required = RequiredScopes(settings);
 
         if (settings is null || !settings.OverrideEnabled)
         {
@@ -50,6 +50,16 @@ public sealed class HostBotAccountAuthorizationService(
             await RefreshProfileMetadataAsync(db, settings, accessToken, ct);
 
         return ToAuthorizationStatus(settings, tokenStatus);
+    }
+
+    public async Task<string[]> GetRequiredScopesAsync(int hostId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await db.HostBotAccountSettings.AsNoTracking().SingleOrDefaultAsync(
+            x => x.HostId == hostId,
+            ct
+        );
+        return RequiredScopes(settings);
     }
 
     public async Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
@@ -86,6 +96,40 @@ public sealed class HostBotAccountAuthorizationService(
         var configuredBotLogin = TwitchLogin.Normalize(options.Identity.BotUsername);
         var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);
         return ActiveBotAccountTokenStatus.FromStatus(configuredBotLogin, null, globalStatus);
+    }
+
+    public async Task<ActiveBotAccountTokenStatus> GetCustomBotTokenStatusAsync(
+        int hostId,
+        IEnumerable<string?> requiredScopes,
+        CancellationToken ct
+    )
+    {
+        var required = TwitchScopeSet.NormalizeMany(requiredScopes);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
+            x => x.HostId == hostId,
+            ct
+        );
+        if (settings?.OverrideEnabled != true)
+        {
+            return new(
+                string.Empty,
+                settings?.ProfileImageUrl,
+                TwitchTokenStatusState.Unavailable,
+                null,
+                null,
+                required,
+                SplitStoredScopes(settings?.AuthorizedScopes).ToArray(),
+                required
+            );
+        }
+
+        var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
+        return ActiveBotAccountTokenStatus.FromStatus(
+            status.Validation?.Login ?? settings.Login ?? string.Empty,
+            settings.ProfileImageUrl,
+            status
+        );
     }
 
     public async ValueTask<TwitchBotAccount> GetBotAccountAsync(
@@ -147,6 +191,9 @@ public sealed class HostBotAccountAuthorizationService(
             is BotChannelRuntimeState.Starting
                 or BotChannelRuntimeState.Started;
         settings.OverrideEnabled = enabled;
+        if (!enabled)
+            settings.WhisperResponsesEnabled = false;
+
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
         if (restartRuntime)
@@ -166,21 +213,36 @@ public sealed class HostBotAccountAuthorizationService(
         await changes.NotifyChangedAsync();
     }
 
+    public async Task<bool> SetWhisperResponsesEnabledAsync(
+        int hostId,
+        bool enabled,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var settings = await EnsureSettingsAsync(db, hostId, ct);
+        if (settings is null)
+            return false;
+
+        if (enabled && !settings.OverrideEnabled)
+            return false;
+
+        if (settings.WhisperResponsesEnabled == enabled)
+            return true;
+
+        settings.WhisperResponsesEnabled = enabled;
+        settings.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await changes.NotifyChangedAsync();
+        return true;
+    }
+
     public async Task<BotAccountAuthorizationResult> AuthorizeAsync(
         int hostId,
         HostBotAccountAuthorizationGrant grant,
         CancellationToken ct
     )
     {
-        var missingScopes = TwitchScopeSet.Missing(grant.Scopes, hostBotOAuth.RequestedScopes());
-        if (missingScopes.Length > 0)
-        {
-            return BotAccountAuthorizationResult.Failure(
-                "The bot account needs more Twitch access.",
-                missingScopes
-            );
-        }
-
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
@@ -190,6 +252,15 @@ public sealed class HostBotAccountAuthorizationService(
             return BotAccountAuthorizationResult.Failure(
                 "Turn on custom bot before connecting it."
             );
+
+        var missingScopes = TwitchScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
+        if (missingScopes.Length > 0)
+        {
+            return BotAccountAuthorizationResult.Failure(
+                "The bot account needs more Twitch access.",
+                missingScopes
+            );
+        }
 
         settings.AccessToken = grant.Token.AccessToken;
         settings.AuthorizedAtUtc = DateTime.UtcNow;
@@ -376,8 +447,16 @@ public sealed class HostBotAccountAuthorizationService(
             return globalStatus.State == TwitchTokenStatusState.Ready;
         }
 
-        var customStatus = await GetStoredTokenStatusAsync(db, settings, required, ct);
+        var customStatus = await GetStoredTokenStatusAsync(db, settings, RequiredScopes(settings), ct);
         return customStatus.State == TwitchTokenStatusState.Ready;
+    }
+
+    private string[] RequiredScopes(HostBotAccountSettings? settings)
+    {
+        var scopes = hostBotOAuth.RequestedScopes();
+        return settings?.WhisperResponsesEnabled == true
+            ? TwitchScopeSet.NormalizeMany(scopes.Append(TwitchScopes.UserManageWhispers))
+            : scopes;
     }
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(

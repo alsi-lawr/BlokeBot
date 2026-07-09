@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed record TwitchChatMessageSendResult
+public sealed record TwitchChatMessageSendResult
 {
     [JsonPropertyName("drop_reason")]
     public TwitchChatMessageDropReason? DropReason { get; init; }

@@ -11,7 +11,7 @@ public sealed class HostBotAccountOAuthService(
 {
     private readonly TwitchBotOptions options = options.Value;
 
-    public Uri CreateAuthorizationUri(string state)
+    public Uri CreateAuthorizationUri(string state, IEnumerable<string?>? scopes = null)
     {
         var identity = options.Identity;
         ValidateConfiguredIdentity(identity, requireSecret: false);
@@ -20,7 +20,7 @@ public sealed class HostBotAccountOAuthService(
             new TwitchAuthorizationUriRequest(
                 identity.ClientId,
                 identity.RedirectUri,
-                RequestedScopes(),
+                scopes is null ? RequestedScopes() : TwitchScopeSet.NormalizeMany(scopes),
                 state
             )
         );

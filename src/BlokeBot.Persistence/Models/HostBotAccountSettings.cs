@@ -8,6 +8,8 @@ public sealed class HostBotAccountSettings
 
     public bool OverrideEnabled { get; set; }
 
+    public bool WhisperResponsesEnabled { get; set; }
+
     public string? TwitchUserId { get; set; }
 
     public string? Login { get; set; }

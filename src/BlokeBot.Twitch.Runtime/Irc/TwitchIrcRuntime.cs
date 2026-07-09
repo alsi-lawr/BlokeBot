@@ -14,6 +14,7 @@ internal sealed class TwitchIrcRuntime(
     TwitchCommandDispatcher dispatcher,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
     ITwitchChatMessageSender sender,
+    ITwitchCommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
     ILogger<TwitchIrcRuntime> log
 )
@@ -132,16 +133,17 @@ internal sealed class TwitchIrcRuntime(
                 message.Text
             );
 
-            await dispatcher.DispatchAsync(
+            await dispatcher.DispatchResponsesAsync(
                 message,
-                async (reply, ct) =>
+                async (response, ct) =>
                 {
                     log.LogInformation(
-                        "Queueing Twitch chat reply to #{Channel}: {Reply}",
+                        "Queueing Twitch {Target} response to #{Channel}: {Reply}",
+                        response.Target,
                         message.Channel,
-                        reply
+                        response.Message
                     );
-                    await sender.SendAsync(message.Channel, reply, ct);
+                    await responses.SendAsync(message, response, ct);
                 },
                 cancellationToken
             );

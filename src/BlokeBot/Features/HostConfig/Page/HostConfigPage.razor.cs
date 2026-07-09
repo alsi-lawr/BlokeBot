@@ -146,6 +146,23 @@ public partial class HostConfigPage
                 string.Join(",", state.BotOverride.Status.GrantedScopes)
             );
 
+    private string WhisperQuotaBadgeClass =>
+        state?.BotOverride.WhisperQuota.Exhausted == true
+        || state?.BotOverride.WhisperQuota.Remaining == 0
+            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200"
+            : "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200";
+
+    private string WhisperQuotaDotClass =>
+        state?.BotOverride.WhisperQuota.Exhausted == true
+        || state?.BotOverride.WhisperQuota.Remaining == 0
+            ? "h-1.5 w-1.5 rounded-full bg-amber-500"
+            : "h-1.5 w-1.5 rounded-full bg-emerald-500";
+
+    private string WhisperQuotaText =>
+        state?.BotOverride.WhisperQuota is { } quota
+            ? $"{quota.RecipientCount}/{quota.Limit}"
+            : "0/40";
+
     private string AccessModeSegmentClass =>
         state?.ModAccess.AllowModsByDefault == false
             ? "segmented-motion segmented-motion--second"
@@ -380,6 +397,33 @@ public partial class HostConfigPage
                 ? "Custom bot is turned on for this channel. Connect the account before starting the bot."
                 : "Custom bot is turned off. This channel will use the main bot account.",
             enabled ? "Custom bot on" : "Custom bot off",
+            enabled ? ToastTone.Positive : ToastTone.Caution
+        );
+    }
+
+    private async Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
+    {
+        var saved = await HostBotAccounts.SetWhisperResponsesEnabledAsync(
+            hostId,
+            enabled,
+            CancellationToken.None
+        );
+        await LoadAsync();
+
+        if (!saved && enabled)
+        {
+            Toasts.Error(
+                "Turn on custom bot before enabling whisper responses.",
+                "Whisper responses not saved"
+            );
+            return;
+        }
+
+        Toasts.Status(
+            enabled
+                ? "Command replies will use custom-bot whispers when available."
+                : "Command replies will use public chat.",
+            enabled ? "Whisper responses on" : "Whisper responses off",
             enabled ? ToastTone.Positive : ToastTone.Caution
         );
     }

@@ -264,7 +264,13 @@ internal static class BotOAuthEndpoints
 
                     try
                     {
-                        return Results.Redirect(oauth.CreateAuthorizationUri(state).ToString());
+                        var requiredScopes = await hostBotAuthorization.GetRequiredScopesAsync(
+                            selectedHost.Id,
+                            ct
+                        );
+                        return Results.Redirect(
+                            oauth.CreateAuthorizationUri(state, requiredScopes).ToString()
+                        );
                     }
                     catch (InvalidOperationException ex)
                     {

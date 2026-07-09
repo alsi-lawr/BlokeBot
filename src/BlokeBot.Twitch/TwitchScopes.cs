@@ -6,5 +6,6 @@ namespace BlokeBot.Twitch;
 public static class TwitchScopes
 {
     public const string ModeratorReadFollowers = "moderator:read:followers";
+    public const string UserManageWhispers = "user:manage:whispers";
     public const string UserReadModeratedChannels = "user:read:moderated_channels";
 }

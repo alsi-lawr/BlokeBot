@@ -19,13 +19,24 @@ public sealed class TwitchCommandDispatcher
         TwitchChatMessage message,
         Func<string, CancellationToken, ValueTask> reply,
         CancellationToken cancellationToken
+    ) =>
+        await DispatchResponsesAsync(
+            message,
+            (response, ct) => reply(response.Message, ct),
+            cancellationToken
+        );
+
+    public async ValueTask DispatchResponsesAsync(
+        TwitchChatMessage message,
+        Func<TwitchCommandResponse, CancellationToken, ValueTask> respond,
+        CancellationToken cancellationToken
     )
     {
         var commandPlan = GetPlan();
         if (!TryParseCommand(message.Text, out var route, out var args))
             return;
 
-        var context = new TwitchCommandContext(message, route, services, reply);
+        var context = new TwitchCommandContext(message, route, services, respond, true);
 
         foreach (var filterType in commandPlan.Filters)
         {
