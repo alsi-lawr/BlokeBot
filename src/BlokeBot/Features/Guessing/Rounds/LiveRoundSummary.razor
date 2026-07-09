@@ -1,22 +1,22 @@
-<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-    <div class="card p-5">
-        <p class="text-sm font-medium text-muted-foreground">Round status</p>
-        <p class="mt-2 text-2xl font-bold text-slate-950">@RoundStatusText</p>
-        <p class="mt-1 text-xs text-muted-foreground">@RoundStartedText</p>
+<div class="live-round-summary scroll-panel" aria-label="Live round summary">
+    <div class="live-round-summary__metric live-round-summary__metric--wide">
+        <p class="live-round-summary__label">Round status</p>
+        <p class="live-round-summary__value">@RoundStatusText</p>
+        <p class="live-round-summary__detail">@RoundStartedText</p>
     </div>
-    <div class="card p-5">
-        <p class="text-sm font-medium text-muted-foreground">Votes</p>
-        <p class="mt-2 text-2xl font-bold text-slate-950">@State.Votes.Count</p>
-        <p class="mt-1 text-xs text-muted-foreground">Unique player guesses in the active round</p>
+    <div class="live-round-summary__metric">
+        <p class="live-round-summary__label">Votes</p>
+        <p class="live-round-summary__value">@State.Votes.Count</p>
+        <p class="live-round-summary__detail">Unique players</p>
     </div>
-    <div class="card p-5">
-        <p class="text-sm font-medium text-muted-foreground">Valid names</p>
-        <p class="mt-2 text-2xl font-bold text-slate-950">@State.Options.Count</p>
-        <p class="mt-1 text-xs text-muted-foreground">Answers viewers can choose in chat</p>
+    <div class="live-round-summary__metric">
+        <p class="live-round-summary__label">Valid names</p>
+        <p class="live-round-summary__value">@State.Options.Count</p>
+        <p class="live-round-summary__detail">Chat answers</p>
     </div>
-    <div class="card p-5">
-        <p class="text-sm font-medium text-muted-foreground">Winner</p>
-        <p class="mt-2 text-2xl font-bold text-slate-950">@(State.CurrentRound?.WinningName ?? "None")</p>
-        <p class="mt-1 text-xs text-muted-foreground">Set here or with the win chat command</p>
+    <div class="live-round-summary__metric">
+        <p class="live-round-summary__label">Winner</p>
+        <p class="live-round-summary__value">@(State.CurrentRound?.WinningName ?? "None")</p>
+        <p class="live-round-summary__detail">Manual or chat</p>
     </div>
 </div>
