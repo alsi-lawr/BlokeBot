@@ -7,6 +7,31 @@ namespace BlokeBot.Features.Guessing.History;
 
 public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
+    public async Task<IReadOnlyList<GuessRoundHistoryEntry>> LoadRecentCompletedRoundsAsync(
+        int hostId,
+        int count,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await db
+            .Rounds.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.Status == GuessRoundStatus.Completed)
+            .OrderByDescending(x => x.ClosedAtUtc ?? x.StartedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .Take(Math.Clamp(count, 1, 100))
+            .Select(x => new GuessRoundHistoryEntry(
+                x.Id,
+                x.GuessRoundProfile == null ? string.Empty : x.GuessRoundProfile.Name,
+                x.StartedAtUtc,
+                x.ClosedAtUtc,
+                x.WinningName,
+                x.Votes.Count,
+                x.WinningName == null ? 0 : x.Votes.Count(vote => vote.GuessName == x.WinningName)
+            ))
+            .ToListAsync(ct);
+    }
+
     public async Task<GuessLeaderboardPage> LoadLeaderboardAsync(
         int hostId,
         GuessHistoryQuery query,

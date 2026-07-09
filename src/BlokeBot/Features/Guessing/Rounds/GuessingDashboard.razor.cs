@@ -54,17 +54,20 @@ public partial class GuessingDashboard
     {
         Live,
         History,
+        Leaderboard,
     }
 
+    private const int RecentRoundCount = 20;
     private DashboardTab activeTab;
     private bool featureEnabled;
     private GuessLeaderboardPage? leaderboard;
-    private int historyPage = 1;
-    private int historyPageSize = 25;
-    private int historyProfileId;
-    private DateTime? historyFromDate = DateTime.Today.AddDays(-30);
-    private DateTime? historyToDate = DateTime.Today;
-    private string historyUsername = string.Empty;
+    private int leaderboardPage = 1;
+    private int leaderboardPageSize = 25;
+    private int leaderboardProfileId;
+    private DateTime? leaderboardFromDate = DateTime.Today.AddDays(-30);
+    private DateTime? leaderboardToDate = DateTime.Today;
+    private string leaderboardUsername = string.Empty;
+    private IReadOnlyList<GuessRoundHistoryEntry>? recentRounds;
     private int selectedProfileId;
     private GuessingDashboardState? state;
     private string winnerName = string.Empty;
@@ -80,9 +83,13 @@ public partial class GuessingDashboard
             : $"{state.CurrentRound.ProfileName}: {state.CurrentRound.Status}";
 
     private string SegmentedControlClass =>
-        activeTab == DashboardTab.History
-            ? "segmented-motion segmented-motion--history"
-            : "segmented-motion";
+        activeTab switch
+        {
+            DashboardTab.History => "segmented-motion segmented-motion--three segmented-motion--second",
+            DashboardTab.Leaderboard =>
+                "segmented-motion segmented-motion--three segmented-motion--third",
+            _ => "segmented-motion segmented-motion--three",
+        };
 
     protected override async Task OnInitializedAsync()
     {
@@ -103,8 +110,11 @@ public partial class GuessingDashboard
     {
         activeTab = tab;
 
-        if (tab == DashboardTab.History && leaderboard is null)
-            await LoadHistoryAsync();
+        if (tab == DashboardTab.History && recentRounds is null)
+            await LoadRecentRoundsAsync();
+
+        if (tab == DashboardTab.Leaderboard && leaderboard is null)
+            await LoadLeaderboardAsync();
     }
 
     private async Task ReloadForEventAsync()
@@ -114,19 +124,24 @@ public partial class GuessingDashboard
         {
             state = null;
             leaderboard = null;
+            recentRounds = null;
             return;
         }
 
-        if (activeTab == DashboardTab.History)
-            await LoadHistoryAsync();
-        else
-            await LoadAsync();
+        await (
+            activeTab switch
+            {
+                DashboardTab.History => LoadRecentRoundsAsync(),
+                DashboardTab.Leaderboard => LoadLeaderboardAsync(),
+                _ => LoadAsync(),
+            }
+        );
     }
 
-    private async Task ResetAndLoadHistoryAsync()
+    private async Task ResetAndLoadLeaderboardAsync()
     {
-        historyPage = 1;
-        await LoadHistoryAsync();
+        leaderboardPage = 1;
+        await LoadLeaderboardAsync();
     }
 
     private async Task DeclareWinnerAsync()
@@ -162,7 +177,7 @@ public partial class GuessingDashboard
                 ?? 0;
     }
 
-    private async Task LoadHistoryAsync()
+    private async Task LoadLeaderboardAsync()
     {
         if (HostId == 0)
             return;
@@ -180,39 +195,64 @@ public partial class GuessingDashboard
             HostId,
             new GuessHistoryQuery
             {
-                FromUtc = StartOfLocalDateUtc(historyFromDate),
-                Page = historyPage,
-                PageSize = historyPageSize,
-                ProfileId = historyProfileId == 0 ? null : historyProfileId,
-                ToUtc = EndOfLocalDateUtc(historyToDate),
-                Username = historyUsername,
+                FromUtc = StartOfLocalDateUtc(leaderboardFromDate),
+                Page = leaderboardPage,
+                PageSize = leaderboardPageSize,
+                ProfileId = leaderboardProfileId == 0 ? null : leaderboardProfileId,
+                ToUtc = EndOfLocalDateUtc(leaderboardToDate),
+                Username = leaderboardUsername,
             },
             CancellationToken.None
         );
 
-        historyPage = leaderboard.Page;
+        leaderboardPage = leaderboard.Page;
     }
 
-    private async Task NextHistoryPageAsync()
+    private async Task LoadRecentRoundsAsync()
+    {
+        if (HostId == 0)
+            return;
+
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
+        {
+            state = null;
+            recentRounds = null;
+            return;
+        }
+
+        recentRounds = await History.LoadRecentCompletedRoundsAsync(
+            HostId,
+            RecentRoundCount,
+            CancellationToken.None
+        );
+    }
+
+    private async Task NextLeaderboardPageAsync()
     {
         if (leaderboard is null || leaderboard.Page >= leaderboard.PageCount)
             return;
 
-        historyPage++;
-        await LoadHistoryAsync();
+        leaderboardPage++;
+        await LoadLeaderboardAsync();
     }
 
-    private async Task PreviousHistoryPageAsync()
+    private async Task PreviousLeaderboardPageAsync()
     {
         if (leaderboard is null || leaderboard.Page <= 1)
             return;
 
-        historyPage--;
-        await LoadHistoryAsync();
+        leaderboardPage--;
+        await LoadLeaderboardAsync();
     }
 
     private Task RefreshAsync() =>
-        activeTab == DashboardTab.History ? LoadHistoryAsync() : LoadAsync();
+        activeTab switch
+        {
+            DashboardTab.History => LoadRecentRoundsAsync(),
+            DashboardTab.Leaderboard => LoadLeaderboardAsync(),
+            _ => LoadAsync(),
+        };
 
     private async Task LoadFeatureStateAsync()
     {
@@ -242,6 +282,9 @@ public partial class GuessingDashboard
             : null;
     }
 
+    private static string FormatEndedAt(GuessRoundHistoryEntry round) =>
+        round.ClosedAtUtc?.ToLocalTime().ToString("MMM d, HH:mm") ?? "Unknown";
+
     private Task StopGuessingAsync() =>
         RunAsync(() => Rounds.StopGuessingAsync(HostId, CancellationToken.None));
 
@@ -269,7 +312,10 @@ public partial class GuessingDashboard
         await LoadAsync();
 
         if (leaderboard is not null)
-            await LoadHistoryAsync();
+            await LoadLeaderboardAsync();
+
+        if (recentRounds is not null)
+            await LoadRecentRoundsAsync();
     }
 
     private void PublishResult(GuessingOperationResult result)
