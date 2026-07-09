@@ -431,21 +431,32 @@ a {
         color: var(--home-card-accent);
         display: inline-flex;
         flex: 0 0 auto;
-        height: 2.5rem;
+        height: 2.625rem;
         justify-content: center;
-        overflow: hidden;
+        isolation: isolate;
+        overflow: visible;
         transition:
             background-color 150ms ease,
             border-color 150ms ease,
             box-shadow 150ms ease,
             transform 150ms ease;
-        width: 2.5rem;
+        transform: translateZ(0);
+        width: 2.625rem;
     }
 
     .home-info-card:hover .home-info-card__icon {
+        animation: home-icon-pulse 900ms ease-out;
         border-color: color-mix(in srgb, var(--home-card-accent) 36%, var(--app-border));
         box-shadow: 0 10px 26px -18px var(--home-card-accent);
-        transform: scale(1.04);
+        transform: translate3d(0, -0.0625rem, 0);
+    }
+
+    .home-info-card__svg {
+        display: block;
+        height: 1.375rem;
+        overflow: visible;
+        shape-rendering: geometricPrecision;
+        width: 1.375rem;
     }
 
     .home-info-card__svg * {
@@ -454,6 +465,8 @@ a {
         transition:
             opacity 150ms ease,
             transform 180ms ease;
+        vector-effect: non-scaling-stroke;
+        will-change: opacity, transform;
     }
 
     .home-info-card__house-door,
@@ -463,7 +476,7 @@ a {
 
     .home-info-card--channel:hover .home-info-card__house-door,
     .home-info-card--channel:hover .home-info-card__house-door-knob {
-        transform: perspective(3rem) rotateY(-48deg) translateX(-0.05rem);
+        transform: perspective(3rem) rotateY(-42deg) translateX(-0.04rem);
     }
 
     .home-info-card--points:hover .home-info-card__dollar {
@@ -479,16 +492,12 @@ a {
         animation: home-spark 520ms ease-out;
     }
 
-    .home-info-card--moderators:hover .home-info-card__icon {
-        animation: home-lock-pulse 900ms ease-out;
-    }
-
     .home-info-card__lock-shackle {
         transform-origin: left bottom;
     }
 
     .home-info-card--moderators:hover .home-info-card__lock-shackle {
-        transform: translateY(-0.12rem) rotate(-22deg);
+        transform: translate(-0.04rem, -0.1rem) rotate(-18deg);
     }
 
     .home-info-card--bot:hover .home-info-card__bot-head {
@@ -1257,7 +1266,7 @@ html[data-theme="dark"] .focus\:ring-offset-2:focus {
     }
 }
 
-@keyframes home-lock-pulse {
+@keyframes home-icon-pulse {
     0%,
     100% {
         box-shadow: 0 10px 26px -18px var(--home-card-accent);
