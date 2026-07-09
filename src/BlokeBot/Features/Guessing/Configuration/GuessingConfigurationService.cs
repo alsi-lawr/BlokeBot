@@ -200,6 +200,11 @@ public sealed class GuessingConfigurationService(
         );
 
         db.GuessOptions.RemoveRange(profile.Options);
+        var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+            config.Profile.WhisperAnswerReplies
+                ? TwitchCommandResponseTarget.Whisper
+                : TwitchCommandResponseTarget.Chat
+        );
         foreach (
             var option in config
                 .Profile.Options.Where(x => !string.IsNullOrWhiteSpace(x.Name))
@@ -215,9 +220,7 @@ public sealed class GuessingConfigurationService(
                     ReplyText = string.IsNullOrWhiteSpace(option.ReplyText)
                         ? option.Name.Trim()
                         : option.ReplyText.Trim(),
-                    ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-                        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
-                    ),
+                    ReplyTarget = answerReplyTarget,
                 }
             );
         }
@@ -269,27 +272,42 @@ public sealed class GuessingConfigurationService(
                 .SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct)
             ?? throw new InvalidOperationException("Round profile not found.");
 
+        var options = profile
+            .Options.OrderBy(x => x.Name)
+            .Select(x => new GuessOptionEditor
+            {
+                Name = x.Name,
+                ReplyText = x.ReplyText,
+                ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+                    ReplyDeliveryTargets.ToCommandTarget(x.ReplyTarget)
+                ),
+            })
+            .ToList();
+        var whisperAnswerReplies = options.Any(IsWhisperTarget);
+        var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+            whisperAnswerReplies
+                ? TwitchCommandResponseTarget.Whisper
+                : TwitchCommandResponseTarget.Chat
+        );
+        foreach (var option in options)
+            option.ReplyTarget = answerReplyTarget;
+
         return new GuessRoundProfileEditor
         {
             Id = profile.Id,
             Name = profile.Name,
             IsDefault = profile.IsDefault,
+            WhisperAnswerReplies = whisperAnswerReplies,
             Replies = ReplySettingsMapper.ToEditor(
                 profile.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies())
             ),
-            Options = profile
-                .Options.OrderBy(x => x.Name)
-                .Select(x => new GuessOptionEditor
-                {
-                    Name = x.Name,
-                    ReplyText = x.ReplyText,
-                    ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-                        ReplyDeliveryTargets.ToCommandTarget(x.ReplyTarget)
-                    ),
-                })
-                .ToList(),
+            Options = options,
         };
     }
+
+    private static bool IsWhisperTarget(GuessOptionEditor option) =>
+        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+        == TwitchCommandResponseTarget.Whisper;
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
         BlokeBotDbContext db,

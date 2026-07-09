@@ -92,7 +92,19 @@ public partial class GuessingSettings
 
     private void AddOption()
     {
-        config?.Profile.Options.Add(new GuessOptionEditor());
+        if (config is null)
+            return;
+
+        config.Profile.Options.Add(
+            new GuessOptionEditor
+            {
+                ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+                    config.Profile.WhisperAnswerReplies
+                        ? TwitchCommandResponseTarget.Whisper
+                        : TwitchCommandResponseTarget.Chat
+                ),
+            }
+        );
     }
 
     private void RemoveOption(GuessOptionEditor option)

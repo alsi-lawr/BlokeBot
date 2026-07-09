@@ -90,12 +90,29 @@ public sealed class GuessingVoteService(
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
+        var answerReplyTarget = await AnswerReplyTargetAsync(db, round.GuessRoundProfileId, ct);
         return new GuessingOperationResult(
             true,
             Format(option.ReplyText, normalizedName, login),
-            ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+            answerReplyTarget
         );
     }
+
+    private static async Task<TwitchCommandResponseTarget> AnswerReplyTargetAsync(
+        BlokeBotDbContext db,
+        int profileId,
+        CancellationToken ct
+    ) =>
+        await db
+            .GuessOptions.AsNoTracking()
+            .AnyAsync(
+                x =>
+                    x.GuessRoundProfileId == profileId
+                    && x.ReplyTarget == ReplyDeliveryTargets.Whisper,
+                ct
+            )
+            ? TwitchCommandResponseTarget.Whisper
+            : TwitchCommandResponseTarget.Chat;
 
     private static string Format(string template, string name, string login) =>
         MessageTemplateFormatter.Format(

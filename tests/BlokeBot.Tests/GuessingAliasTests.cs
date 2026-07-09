@@ -5,6 +5,8 @@ using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Configuration;
 using BlokeBot.Features.Guessing.Game;
+using BlokeBot.Features.Guessing.Guesses;
+using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Replies;
@@ -178,6 +180,81 @@ public sealed class GuessingAliasTests
         var response = responses.Single();
         response.Target.ShouldBe(TwitchCommandResponseTarget.Chat);
         response.Message.ShouldBe("Started Special: blue");
+    }
+
+    [Test]
+    public async Task Configuration_save_applies_answer_reply_delivery_to_every_option()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        var service = ConfigurationService(dbFactory);
+        var config = await service.LoadConfigurationAsync(
+            seed.Host.Id,
+            seed.SpecialProfile.Id,
+            CancellationToken.None
+        );
+        config.Profile.WhisperAnswerReplies = true;
+        config.Profile.Options.Add(
+            new GuessOptionEditor
+            {
+                Name = "green",
+                ReplyText = "Green",
+                ReplyTarget = ReplyDeliveryTargets.Chat,
+            }
+        );
+
+        await service.SaveConfigurationAsync(seed.Host.Id, config, CancellationToken.None);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var targets = await db
+            .GuessOptions.Where(x => x.GuessRoundProfileId == seed.SpecialProfile.Id)
+            .Select(x => x.ReplyTarget)
+            .ToListAsync(CancellationToken.None);
+        targets.Count.ShouldBe(2);
+        targets.ShouldAllBe(x => x == ReplyDeliveryTargets.Whisper);
+    }
+
+    [Test]
+    public async Task Guess_answer_replies_use_profile_wide_delivery_for_mixed_legacy_options()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Rounds.Add(
+                new GuessRound
+                {
+                    HostId = seed.Host.Id,
+                    GuessRoundProfileId = seed.SpecialProfile.Id,
+                    Status = GuessRoundStatus.Open,
+                    StartedAtUtc = DateTime.UtcNow,
+                }
+            );
+            db.GuessOptions.Add(
+                new GuessOption
+                {
+                    GuessRoundProfileId = seed.SpecialProfile.Id,
+                    Name = "green",
+                    ReplyText = "Green",
+                    ReplyTarget = ReplyDeliveryTargets.Whisper,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var service = new GuessingVoteService(
+            dbFactory,
+            new GuessingChangeNotifier(new EventBus<AppEventKind>())
+        );
+
+        var result = await service.RecordGuessAsync(
+            seed.Host.Login,
+            "viewer",
+            "blue",
+            CancellationToken.None
+        );
+
+        result.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        result.Message.ShouldBe("Blue");
     }
 
     private static GuessingConfigurationService ConfigurationService(

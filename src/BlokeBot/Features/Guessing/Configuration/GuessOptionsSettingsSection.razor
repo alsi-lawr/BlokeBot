@@ -2,6 +2,13 @@
 
 <CollapsibleSection Title="Accepted answers" Description="Answers viewers can choose, with optional replies for each one." InitiallyOpen="true">
     <div class="space-y-3 p-4">
+        <div class="surface-muted flex flex-wrap items-center justify-between gap-3 rounded-lg p-3" title="@WhisperTitle">
+            <span class="text-sm font-semibold text-slate-900">Answer replies</span>
+            <label class="@WhisperLabelClass">
+                <input class="h-4 w-4" type="checkbox" checked="@WhisperAnswerReplies" disabled="@WhisperDisabled" @onchange="SetAnswerWhispersAsync" />
+                <span>Whisper</span>
+            </label>
+        </div>
         <div class="motion-list scroll-panel scroll-panel--valid-guesses pr-2">
             @if (Options.Count == 0)
             {
@@ -15,12 +22,6 @@
                     <div @key="option" class="@OptionRowClass(option)">
                         <input class="input" placeholder="answer" @bind="option.Name" />
                         <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
-                        <span class="self-center" title="@WhisperTitle">
-                            <label class="@WhisperLabelClass">
-                                <input class="h-4 w-4" type="checkbox" checked="@IsWhisper(option)" disabled="@WhisperDisabled" @onchange="args => SetOptionWhisper(option, args)" />
-                                <span>Whisper</span>
-                            </label>
-                        </span>
                         <button class="btn-secondary" disabled="@pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                     </div>
                 }

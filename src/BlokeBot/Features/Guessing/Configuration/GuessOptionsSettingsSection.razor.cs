@@ -57,6 +57,12 @@ public partial class GuessOptionsSettingsSection
     [Parameter]
     public bool WhisperResponsesEnabled { get; set; }
 
+    [Parameter]
+    public bool WhisperAnswerReplies { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> WhisperAnswerRepliesChanged { get; set; }
+
     [Parameter, EditorRequired]
     public EventCallback<GuessOptionEditor> RemoveOption { get; set; }
 
@@ -71,25 +77,31 @@ public partial class GuessOptionsSettingsSection
 
     private async Task InvokeAddOptionAsync() => await AddOption.InvokeAsync();
 
-    private static bool IsWhisper(GuessOptionEditor option) =>
-        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
-        == TwitchCommandResponseTarget.Whisper;
-
-    private void SetOptionWhisper(GuessOptionEditor option, ChangeEventArgs args)
+    private async Task SetAnswerWhispersAsync(ChangeEventArgs args)
     {
         if (WhisperDisabled)
             return;
 
         var whisper = args.Value is true || args.Value?.ToString() == "true";
-        option.ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
+        WhisperAnswerReplies = whisper;
+        ApplyAnswerTarget(whisper);
+        await WhisperAnswerRepliesChanged.InvokeAsync(whisper);
+    }
+
+    private void ApplyAnswerTarget(bool whisper)
+    {
+        var target = ReplyDeliveryTargets.FromCommandTarget(
             whisper ? TwitchCommandResponseTarget.Whisper : TwitchCommandResponseTarget.Chat
         );
+
+        foreach (var option in Options)
+            option.ReplyTarget = target;
     }
 
     private string OptionRowClass(GuessOptionEditor option)
     {
         const string baseClass =
-            "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto_auto]";
+            "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]";
         return pendingRemovals.Contains(option)
             ? $"{baseClass} motion-list__item--removing"
             : baseClass;
