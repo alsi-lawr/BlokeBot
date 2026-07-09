@@ -85,31 +85,31 @@ public sealed class HostBotStatusService(
         if (!HasAll(flags, HostBotChannelStatusFlags.ModeratorCheckGranted))
             return HostBotReadinessOutcome.MissingModeratorCheckScope(flags);
 
-        var identities = await LookupUsersAsync(
-            tokenStatus.AccessToken!,
-            [
-                TwitchLogin.Normalize(channelLogin),
-                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
-            ],
-            ct
-        );
         if (
-            !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
-            || !identities.TryGetValue(
+            !string.IsNullOrWhiteSpace(tokenStatus.BotLogin)
+            && !string.Equals(
+                TwitchLogin.Normalize(tokenStatus.BotLogin),
                 TwitchLogin.Normalize(tokenStatus.Validation!.Login),
-                out var botId
+                StringComparison.OrdinalIgnoreCase
             )
         )
+        {
+            return HostBotReadinessOutcome.BotAccountMismatch(flags);
+        }
+
+        var identities = await LookupUsersAsync(
+            tokenStatus.AccessToken!,
+            [TwitchLogin.Normalize(channelLogin)],
+            ct
+        );
+        if (!identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId))
         {
             return HostBotReadinessOutcome.IdentityLookupFailed(flags);
         }
 
-        if (!string.Equals(tokenStatus.Validation!.UserId, botId, StringComparison.Ordinal))
-            return HostBotReadinessOutcome.BotAccountMismatch(flags);
-
         var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
             HelixContext(tokenStatus.AccessToken!),
-            botId,
+            tokenStatus.Validation!.UserId,
             channelId,
             ct
         );
@@ -154,20 +154,12 @@ public sealed class HostBotStatusService(
         var token = tokenStatus.AccessToken!;
         var identities = await LookupUsersAsync(
             token,
-            [
-                TwitchLogin.Normalize(channelLogin),
-                TwitchLogin.Normalize(viewerLogin),
-                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
-            ],
+            [TwitchLogin.Normalize(channelLogin), TwitchLogin.Normalize(viewerLogin)],
             ct
         );
         if (
             !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
             || !identities.TryGetValue(TwitchLogin.Normalize(viewerLogin), out var viewerId)
-            || !identities.TryGetValue(
-                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
-                out var botId
-            )
         )
         {
             return FollowerCheckResult.NotEligible;
@@ -177,7 +169,7 @@ public sealed class HostBotStatusService(
             HelixContext(token),
             channelId,
             viewerId,
-            botId,
+            tokenStatus.Validation!.UserId,
             ct
         ) switch
         {

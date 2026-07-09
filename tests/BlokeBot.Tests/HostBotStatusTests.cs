@@ -4,6 +4,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -114,6 +115,28 @@ public sealed class HostBotStatusTests
         status.CanReadFollowers.ShouldBeTrue();
     }
 
+    [Test]
+    public async Task Readiness_checks_custom_bot_override_moderator_status()
+    {
+        var httpClientFactory = new HostBotStatusHttpClientFactory
+        {
+            GrantedScopes =
+            [
+                TwitchScopes.UserReadModeratedChannels,
+                TwitchScopes.ModeratorReadFollowers,
+            ],
+            BotIsModerator = true,
+        };
+        await using var fixture = await CreateFixtureAsync(httpClientFactory);
+        var hostId = await SeedHostAsync(fixture.DbFactory, "streamer");
+        await SeedHostBotOverrideAsync(fixture.DbFactory, hostId);
+
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+
+        outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
+        httpClientFactory.LastModerationUserId.ShouldBe("custom-id");
+    }
+
     private static async Task<HostBotStatusFixture> CreateFixtureAsync(
         HostBotStatusHttpClientFactory httpClientFactory,
         bool includeTokenProvider = true
@@ -160,14 +183,62 @@ public sealed class HostBotStatusTests
         );
     }
 
-    private sealed class HostBotStatusFixture(
-        HostBotStatusService service,
-        SqliteBlokeBotDbFactory dbFactory
-    ) : IAsyncDisposable
+    private sealed class HostBotStatusFixture : IAsyncDisposable
     {
-        public HostBotStatusService Service { get; } = service;
+        public HostBotStatusFixture(HostBotStatusService service, SqliteBlokeBotDbFactory dbFactory)
+        {
+            Service = service;
+            DbFactory = dbFactory;
+        }
 
-        public async ValueTask DisposeAsync() => await dbFactory.DisposeAsync();
+        public SqliteBlokeBotDbFactory DbFactory { get; }
+
+        public HostBotStatusService Service { get; }
+
+        public async ValueTask DisposeAsync() => await DbFactory.DisposeAsync();
+    }
+
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            CreatedAtUtc = DateTime.UtcNow,
+            DisplayName = login,
+            Login = login,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        return host.Id;
+    }
+
+    private static async Task SeedHostBotOverrideAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.HostBotAccountSettings.Add(
+            new HostBotAccountSettings
+            {
+                AccessToken = "custom-token",
+                AuthorizedAtUtc = DateTime.UtcNow,
+                AuthorizedScopes = string.Join(
+                    ' ',
+                    TwitchScopes.UserReadModeratedChannels,
+                    TwitchScopes.ModeratorReadFollowers
+                ),
+                DisplayName = "CustomBot",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
+                HostId = hostId,
+                Login = "custombot",
+                OverrideEnabled = true,
+                RefreshToken = "custom-refresh",
+                TwitchUserId = "custom-id",
+                UpdatedAtUtc = DateTime.UtcNow,
+            }
+        );
+        await db.SaveChangesAsync();
     }
 
     private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
@@ -198,6 +269,8 @@ public sealed class HostBotStatusTests
             init => handler.BotIsModerator = value;
         }
 
+        public string? LastModerationUserId => handler.LastModerationUserId;
+
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
 
         private sealed class Handler : HttpMessageHandler
@@ -209,40 +282,56 @@ public sealed class HostBotStatusTests
 
             public bool BotIsModerator { get; set; } = true;
 
+            public string? LastModerationUserId { get; private set; }
+
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
             )
             {
-                return Task.FromResult(
-                    request.RequestUri?.AbsolutePath switch
-                    {
-                        "/oauth2/validate" => ValidationResponse(),
-                        "/helix/users" => JsonResponse(
-                            """
-                            {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"},{"id":"bot-id","login":"bot","display_name":"Bot"}]}
-                            """
-                        ),
-                        "/helix/moderation/channels" => JsonResponse(
-                            BotIsModerator
-                                ? """
-                                {"data":[{"broadcaster_id":"channel-id","broadcaster_login":"streamer","broadcaster_name":"Streamer"}],"pagination":{}}
-                                """
-                                : """{"data":[],"pagination":{}}"""
-                        ),
-                        _ => new HttpResponseMessage(HttpStatusCode.NotFound),
-                    }
-                );
+                var response = request.RequestUri?.AbsolutePath switch
+                {
+                    "/oauth2/validate" => ValidationResponse(request),
+                    "/helix/users" => JsonResponse(
+                        """
+                        {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"},{"id":"bot-id","login":"bot","display_name":"Bot"}]}
+                        """
+                    ),
+                    "/helix/moderation/channels" => ModerationChannelsResponse(request),
+                    _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+                };
+                return Task.FromResult(response);
             }
 
-            private HttpResponseMessage ValidationResponse() =>
-                ValidationStatusCode == HttpStatusCode.OK
+            private HttpResponseMessage ValidationResponse(HttpRequestMessage request)
+            {
+                if (ValidationStatusCode != HttpStatusCode.OK)
+                    return new HttpResponseMessage(ValidationStatusCode);
+
+                return request.Headers.Authorization?.Parameter == "custom-token"
                     ? JsonResponse(
+                        $$"""
+                        {"user_id":"custom-id","login":"custombot","scopes":[{{FormatScopes()}}]}
+                        """
+                    )
+                    : JsonResponse(
                         $$"""
                         {"user_id":"bot-id","login":"bot","scopes":[{{FormatScopes()}}]}
                         """
-                    )
-                    : new HttpResponseMessage(ValidationStatusCode);
+                    );
+            }
+
+            private HttpResponseMessage ModerationChannelsResponse(HttpRequestMessage request)
+            {
+                LastModerationUserId = QueryValue(request.RequestUri, "user_id");
+                return JsonResponse(
+                    BotIsModerator
+                        ? """
+                        {"data":[{"broadcaster_id":"channel-id","broadcaster_login":"streamer","broadcaster_name":"Streamer"}],"pagination":{}}
+                        """
+                        : """{"data":[],"pagination":{}}"""
+                );
+            }
 
             private string FormatScopes() =>
                 string.Join(',', GrantedScopes.Select(scope => $"\"{scope}\""));
@@ -252,6 +341,34 @@ public sealed class HostBotStatusTests
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+
+            private static string? QueryValue(Uri? uri, string key)
+            {
+                if (string.IsNullOrWhiteSpace(uri?.Query))
+                    return null;
+
+                foreach (
+                    var part in uri
+                        .Query.TrimStart('?')
+                        .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                )
+                {
+                    var pieces = part.Split('=', 2);
+                    if (
+                        pieces.Length == 2
+                        && string.Equals(
+                            Uri.UnescapeDataString(pieces[0]),
+                            key,
+                            StringComparison.Ordinal
+                        )
+                    )
+                    {
+                        return Uri.UnescapeDataString(pieces[1]);
+                    }
+                }
+
+                return null;
+            }
         }
     }
 }

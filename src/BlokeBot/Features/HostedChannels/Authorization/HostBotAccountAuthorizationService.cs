@@ -74,10 +74,11 @@ public sealed class HostBotAccountAuthorizationService(
             );
             if (settings?.OverrideEnabled == true)
             {
+                var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
                 return ActiveBotAccountTokenStatus.FromStatus(
-                    settings.Login ?? string.Empty,
+                    status.Validation?.Login ?? settings.Login ?? string.Empty,
                     settings.ProfileImageUrl,
-                    await GetStoredTokenStatusAsync(db, settings, required, ct)
+                    status
                 );
             }
         }
