@@ -153,6 +153,90 @@ public sealed class WhisperResponseTests
         httpClientFactory.WhisperRequestCount.ShouldBe(1);
     }
 
+    [Test]
+    public async Task Sender_falls_back_to_chat_without_twitch_request_for_self_whisper()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCustomBotAsync(dbFactory, hostId);
+        var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.NoContent);
+        var options = BotOptions();
+        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var helixUsers = new TwitchHelixApiClient(httpClientFactory);
+        var hostBotAccounts = new HostBotAccountAuthorizationService(
+            dbFactory,
+            new HostBotAccountOAuthService(options, oauth, helixUsers),
+            oauth,
+            helixUsers,
+            new TwitchTokenStatusService(new ServiceCollection().BuildServiceProvider(), oauth),
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            options
+        );
+        var chat = new RecordingChatSender();
+        var quota = new HostWhisperQuotaService(
+            dbFactory,
+            new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
+        );
+        var sender = new HostWhisperCommandResponseSender(
+            chat,
+            hostBotAccounts,
+            quota,
+            helixUsers,
+            new TwitchHelixChatClient(
+                httpClientFactory,
+                Options.Create(options.Value.Identity),
+                helixUsers
+            ),
+            dbFactory,
+            Options.Create(options.Value.Identity),
+            NullLogger<HostWhisperCommandResponseSender>.Instance
+        );
+        var source = new TwitchChatMessage(
+            "custombot",
+            "streamer",
+            "!points",
+            "raw",
+            new Dictionary<string, string> { ["user-id"] = "custom-id" }
+        );
+
+        await sender.SendAsync(
+            source,
+            TwitchCommandResponse.Whisper("your balance is 10"),
+            CancellationToken.None
+        );
+        var status = await quota.GetStatusAsync(hostId, "custom-id", CancellationToken.None);
+
+        chat.Messages.ShouldBe([new SentChatMessage("streamer", "your balance is 10")]);
+        status.RecipientCount.ShouldBe(0);
+        httpClientFactory.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Helix_whisper_send_result_keeps_rejection_body()
+    {
+        var body = """{"status":400,"message":"cannot whisper yourself"}""";
+        var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.BadRequest, body);
+        var options = BotOptions();
+        var helixUsers = new TwitchHelixApiClient(httpClientFactory);
+        var helix = new TwitchHelixChatClient(
+            httpClientFactory,
+            Options.Create(options.Value.Identity),
+            helixUsers
+        );
+
+        var result = await helix.SendWhisperAsync(
+            "override-whisper-token",
+            "custom-id",
+            "custom-id",
+            "message",
+            CancellationToken.None
+        );
+
+        result.Status.ShouldBe(TwitchWhisperSendStatus.Rejected);
+        result.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        result.ResponseBody.ShouldBe(body);
+    }
+
     private static IOptions<TwitchBotOptions> BotOptions() =>
         Options.Create(
             new TwitchBotOptions
@@ -221,15 +305,19 @@ public sealed class WhisperResponseTests
         }
     }
 
-    private sealed class WhisperHttpClientFactory(HttpStatusCode whisperStatus) : IHttpClientFactory
+    private sealed class WhisperHttpClientFactory(
+        HttpStatusCode whisperStatus,
+        string? whisperBody = null
+    ) : IHttpClientFactory
     {
-        private readonly Handler handler = new(whisperStatus);
+        private readonly Handler handler = new(whisperStatus, whisperBody);
 
         public int WhisperRequestCount => handler.WhisperRequestCount;
 
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
 
-        private sealed class Handler(HttpStatusCode whisperStatus) : HttpMessageHandler
+        private sealed class Handler(HttpStatusCode whisperStatus, string? whisperBody)
+            : HttpMessageHandler
         {
             public int WhisperRequestCount { get; private set; }
 
@@ -255,7 +343,15 @@ public sealed class WhisperResponseTests
             private HttpResponseMessage WhisperResponse()
             {
                 WhisperRequestCount++;
-                return new HttpResponseMessage(whisperStatus);
+                var response = new HttpResponseMessage(whisperStatus);
+                if (whisperBody is not null)
+                    response.Content = new StringContent(
+                        whisperBody,
+                        Encoding.UTF8,
+                        "application/json"
+                    );
+
+                return response;
             }
 
             private static HttpResponseMessage ValidationResponse(HttpRequestMessage request)

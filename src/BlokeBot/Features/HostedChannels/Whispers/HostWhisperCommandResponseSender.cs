@@ -1,3 +1,4 @@
+using System.Net;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -31,20 +32,22 @@ public sealed class HostWhisperCommandResponseSender(
             return;
         }
 
-        var outcome = await TrySendWhisperAsync(sourceMessage, response.Message, cancellationToken);
-        if (outcome == HostWhisperSendOutcome.Sent)
+        var result = await TrySendWhisperAsync(sourceMessage, response.Message, cancellationToken);
+        if (result.Outcome == HostWhisperSendOutcome.Sent)
             return;
 
         log.LogInformation(
-            "Falling back to public chat response for {Login} in #{Channel}. Whisper outcome: {Outcome}.",
+            "Falling back to public chat response for {Login} in #{Channel}. Whisper outcome: {Outcome}; StatusCode: {StatusCode}; Detail: {Detail}.",
             sourceMessage.Login,
             sourceMessage.Channel,
-            outcome
+            result.Outcome,
+            result.StatusCode?.ToString() ?? "n/a",
+            result.Detail ?? "n/a"
         );
         await chat.SendAsync(sourceMessage.Channel, response.Message, cancellationToken);
     }
 
-    private async Task<HostWhisperSendOutcome> TrySendWhisperAsync(
+    private async Task<HostWhisperSendResult> TrySendWhisperAsync(
         TwitchChatMessage sourceMessage,
         string message,
         CancellationToken cancellationToken
@@ -54,7 +57,7 @@ public sealed class HostWhisperCommandResponseSender(
         {
             var host = await ResolveHostAsync(sourceMessage.Channel, cancellationToken);
             if (host is null)
-                return HostWhisperSendOutcome.Disabled;
+                return new HostWhisperSendResult(HostWhisperSendOutcome.Disabled);
 
             var tokenStatus = await botAccounts.GetCustomBotTokenStatusAsync(
                 host.Id,
@@ -67,7 +70,7 @@ public sealed class HostWhisperCommandResponseSender(
                 || tokenStatus.Validation is null
             )
             {
-                return HostWhisperSendOutcome.CustomBotUnavailable;
+                return new HostWhisperSendResult(HostWhisperSendOutcome.CustomBotUnavailable);
             }
 
             var recipientUserId = await ResolveRecipientUserIdAsync(
@@ -76,9 +79,17 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (string.IsNullOrWhiteSpace(recipientUserId))
-                return HostWhisperSendOutcome.RecipientUnavailable;
+                return new HostWhisperSendResult(HostWhisperSendOutcome.RecipientUnavailable);
 
             var senderUserId = tokenStatus.Validation.UserId;
+            if (string.Equals(senderUserId, recipientUserId, StringComparison.Ordinal))
+            {
+                return new HostWhisperSendResult(
+                    HostWhisperSendOutcome.SelfRecipient,
+                    Detail: "sender and recipient user IDs match"
+                );
+            }
+
             var reservation = await quota.ReserveRecipientAsync(
                 host.Id,
                 senderUserId,
@@ -87,7 +98,7 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (!reservation.Allowed)
-                return HostWhisperSendOutcome.QuotaExceeded;
+                return new HostWhisperSendResult(HostWhisperSendOutcome.QuotaExceeded);
 
             var result = await helix.SendWhisperAsync(
                 tokenStatus.AccessToken,
@@ -97,15 +108,23 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (result.IsAccepted)
-                return HostWhisperSendOutcome.Sent;
+                return new HostWhisperSendResult(HostWhisperSendOutcome.Sent);
 
             if (result.Status == TwitchWhisperSendStatus.RateLimited)
             {
                 await quota.MarkExhaustedAsync(host.Id, senderUserId, cancellationToken);
-                return HostWhisperSendOutcome.RateLimited;
+                return new HostWhisperSendResult(
+                    HostWhisperSendOutcome.RateLimited,
+                    result.StatusCode,
+                    result.ResponseBody
+                );
             }
 
-            return HostWhisperSendOutcome.Rejected;
+            return new HostWhisperSendResult(
+                HostWhisperSendOutcome.Rejected,
+                result.StatusCode,
+                result.ResponseBody
+            );
         }
         catch (OperationCanceledException)
         {
@@ -119,7 +138,7 @@ public sealed class HostWhisperCommandResponseSender(
                 sourceMessage.Login,
                 sourceMessage.Channel
             );
-            return HostWhisperSendOutcome.Rejected;
+            return new HostWhisperSendResult(HostWhisperSendOutcome.Rejected, Detail: ex.Message);
         }
     }
 
@@ -180,12 +199,19 @@ public sealed class HostWhisperCommandResponseSender(
 
     private sealed record WhisperHost(int Id);
 
+    private sealed record HostWhisperSendResult(
+        HostWhisperSendOutcome Outcome,
+        HttpStatusCode? StatusCode = null,
+        string? Detail = null
+    );
+
     private enum HostWhisperSendOutcome
     {
         Sent,
         Disabled,
         CustomBotUnavailable,
         RecipientUnavailable,
+        SelfRecipient,
         QuotaExceeded,
         RateLimited,
         Rejected,

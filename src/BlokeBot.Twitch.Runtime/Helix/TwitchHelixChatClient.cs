@@ -155,15 +155,36 @@ public sealed class TwitchHelixChatClient(
         using var request = CreateRequest(HttpMethod.Post, uri, accessToken);
         request.Content = JsonContent.Create(new { message });
         using var response = await http.SendAsync(request, cancellationToken);
+        var responseBody =
+            response.StatusCode == HttpStatusCode.NoContent
+                ? null
+                : await ReadResponseBodyAsync(response, cancellationToken);
         return response.StatusCode switch
         {
             HttpStatusCode.NoContent => new(TwitchWhisperSendStatus.Accepted, response.StatusCode),
             HttpStatusCode.TooManyRequests => new(
                 TwitchWhisperSendStatus.RateLimited,
-                response.StatusCode
+                response.StatusCode,
+                responseBody
             ),
-            _ => new(TwitchWhisperSendStatus.Rejected, response.StatusCode),
+            _ => new(TwitchWhisperSendStatus.Rejected, response.StatusCode, responseBody),
         };
+    }
+
+    private static async Task<string?> ReadResponseBodyAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken
+    )
+    {
+        if (response.Content is null)
+            return null;
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+
+        const int maxLoggedBodyLength = 1000;
+        return body.Length <= maxLoggedBodyLength ? body : body[..maxLoggedBodyLength];
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string uri, string accessToken)

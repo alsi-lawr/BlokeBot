@@ -11,7 +11,8 @@ public enum TwitchWhisperSendStatus
 
 public sealed record TwitchWhisperSendResult(
     TwitchWhisperSendStatus Status,
-    HttpStatusCode StatusCode
+    HttpStatusCode StatusCode,
+    string? ResponseBody = null
 )
 {
     public bool IsAccepted => Status == TwitchWhisperSendStatus.Accepted;
