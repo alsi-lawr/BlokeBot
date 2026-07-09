@@ -85,7 +85,8 @@ public partial class GuessingDashboard
     private string SegmentedControlClass =>
         activeTab switch
         {
-            DashboardTab.History => "segmented-motion segmented-motion--three segmented-motion--second",
+            DashboardTab.History =>
+                "segmented-motion segmented-motion--three segmented-motion--second",
             DashboardTab.Leaderboard =>
                 "segmented-motion segmented-motion--three segmented-motion--third",
             _ => "segmented-motion segmented-motion--three",

@@ -42,14 +42,8 @@ public sealed class HostWhisperQuotaService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var bucket = await db
             .WhisperQuotaBuckets.AsNoTracking()
-            .Where(x =>
-                x.HostId == hostId && x.BotTwitchUserId == botUserId && x.DayUtc == day
-            )
-            .Select(x => new
-            {
-                x.Exhausted,
-                RecipientCount = x.Recipients.Count,
-            })
+            .Where(x => x.HostId == hostId && x.BotTwitchUserId == botUserId && x.DayUtc == day)
+            .Select(x => new { x.Exhausted, RecipientCount = x.Recipients.Count })
             .SingleOrDefaultAsync(ct);
 
         return bucket is null
@@ -119,11 +113,7 @@ public sealed class HostWhisperQuotaService(
         return Allowed(bucket, countedNewRecipient: true);
     }
 
-    public async Task MarkExhaustedAsync(
-        int hostId,
-        string botTwitchUserId,
-        CancellationToken ct
-    )
+    public async Task MarkExhaustedAsync(int hostId, string botTwitchUserId, CancellationToken ct)
     {
         var botUserId = NormalizeId(botTwitchUserId);
         if (string.IsNullOrWhiteSpace(botUserId))

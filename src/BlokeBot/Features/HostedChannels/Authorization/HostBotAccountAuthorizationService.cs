@@ -55,10 +55,9 @@ public sealed class HostBotAccountAuthorizationService(
     public async Task<string[]> GetRequiredScopesAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await db.HostBotAccountSettings.AsNoTracking().SingleOrDefaultAsync(
-            x => x.HostId == hostId,
-            ct
-        );
+        var settings = await db
+            .HostBotAccountSettings.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.HostId == hostId, ct);
         return RequiredScopes(settings);
     }
 
@@ -447,7 +446,12 @@ public sealed class HostBotAccountAuthorizationService(
             return globalStatus.State == TwitchTokenStatusState.Ready;
         }
 
-        var customStatus = await GetStoredTokenStatusAsync(db, settings, RequiredScopes(settings), ct);
+        var customStatus = await GetStoredTokenStatusAsync(
+            db,
+            settings,
+            RequiredScopes(settings),
+            ct
+        );
         return customStatus.State == TwitchTokenStatusState.Ready;
     }
 

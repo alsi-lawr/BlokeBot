@@ -150,7 +150,11 @@ public sealed class WhisperResponseTests
             hostBotAccounts,
             quota,
             helixUsers,
-            new TwitchHelixChatClient(httpClientFactory, Options.Create(options.Value.Identity), helixUsers),
+            new TwitchHelixChatClient(
+                httpClientFactory,
+                Options.Create(options.Value.Identity),
+                helixUsers
+            ),
             dbFactory,
             Options.Create(options.Value.Identity),
             NullLogger<HostWhisperCommandResponseSender>.Instance
@@ -181,18 +185,20 @@ public sealed class WhisperResponseTests
         var constructor = typeof(TwitchCommandContext)
             .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
             .Single(x => x.GetParameters().Length == 4);
-        var message = new TwitchChatMessage("viewer", channel, text, text, new Dictionary<string, string>());
+        var message = new TwitchChatMessage(
+            "viewer",
+            channel,
+            text,
+            text,
+            new Dictionary<string, string>()
+        );
         return (TwitchCommandContext)
-            constructor.Invoke(
-                [
-                    message,
-                    text.TrimStart('!'),
-                    new ServiceCollection().BuildServiceProvider(),
-                    new Func<string, CancellationToken, ValueTask>(
-                        (_, _) => ValueTask.CompletedTask
-                    ),
-                ]
-            );
+            constructor.Invoke([
+                message,
+                text.TrimStart('!'),
+                new ServiceCollection().BuildServiceProvider(),
+                new Func<string, CancellationToken, ValueTask>((_, _) => ValueTask.CompletedTask),
+            ]);
     }
 
     private static IOptions<TwitchBotOptions> BotOptions() =>
@@ -256,19 +262,14 @@ public sealed class WhisperResponseTests
     {
         public List<SentChatMessage> Messages { get; } = [];
 
-        public Task SendAsync(
-            string channel,
-            string message,
-            CancellationToken cancellationToken
-        )
+        public Task SendAsync(string channel, string message, CancellationToken cancellationToken)
         {
             Messages.Add(new SentChatMessage(channel, message));
             return Task.CompletedTask;
         }
     }
 
-    private sealed class WhisperHttpClientFactory(HttpStatusCode whisperStatus)
-        : IHttpClientFactory
+    private sealed class WhisperHttpClientFactory(HttpStatusCode whisperStatus) : IHttpClientFactory
     {
         private readonly Handler handler = new(whisperStatus);
 

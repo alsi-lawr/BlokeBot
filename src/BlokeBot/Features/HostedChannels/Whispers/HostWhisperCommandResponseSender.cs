@@ -31,11 +31,7 @@ public sealed class HostWhisperCommandResponseSender(
             return;
         }
 
-        var outcome = await TrySendWhisperAsync(
-            sourceMessage,
-            response.Message,
-            cancellationToken
-        );
+        var outcome = await TrySendWhisperAsync(sourceMessage, response.Message, cancellationToken);
         if (outcome == HostWhisperSendOutcome.Sent)
             return;
 

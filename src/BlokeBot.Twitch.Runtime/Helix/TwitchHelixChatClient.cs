@@ -157,10 +157,7 @@ public sealed class TwitchHelixChatClient(
         using var response = await http.SendAsync(request, cancellationToken);
         return response.StatusCode switch
         {
-            HttpStatusCode.NoContent => new(
-                TwitchWhisperSendStatus.Accepted,
-                response.StatusCode
-            ),
+            HttpStatusCode.NoContent => new(TwitchWhisperSendStatus.Accepted, response.StatusCode),
             HttpStatusCode.TooManyRequests => new(
                 TwitchWhisperSendStatus.RateLimited,
                 response.StatusCode

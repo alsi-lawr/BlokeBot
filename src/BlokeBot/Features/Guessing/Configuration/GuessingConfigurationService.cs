@@ -115,11 +115,7 @@ public sealed class GuessingConfigurationService(
                 StopAliases = JoinAliases(aliases, GuessCommandKind.Stop, selectedProfileId),
                 WinAliases = JoinAliases(aliases, GuessCommandKind.Win, selectedProfileId),
                 GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
-                GuessesAliases = JoinAliases(
-                    aliases,
-                    GuessCommandKind.Guesses,
-                    selectedProfileId
-                ),
+                GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, selectedProfileId),
             },
             Profiles = profiles,
             Profile = await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct),

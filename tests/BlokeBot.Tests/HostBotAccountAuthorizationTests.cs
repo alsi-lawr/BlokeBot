@@ -131,10 +131,12 @@ public sealed class HostBotAccountAuthorizationTests
 
         await using var db = await dbFactory.CreateDbContextAsync();
         saved.ShouldBeFalse();
-        (await db.HostBotAccountSettings.SingleOrDefaultAsync(
-            x => x.HostId == hostId,
-            CancellationToken.None
-        )).ShouldBeNull();
+        (
+            await db.HostBotAccountSettings.SingleOrDefaultAsync(
+                x => x.HostId == hostId,
+                CancellationToken.None
+            )
+        ).ShouldBeNull();
     }
 
     [Test]
@@ -144,11 +146,9 @@ public sealed class HostBotAccountAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
-        (await service.SetWhisperResponsesEnabledAsync(
-            hostId,
-            true,
-            CancellationToken.None
-        )).ShouldBeTrue();
+        (
+            await service.SetWhisperResponsesEnabledAsync(hostId, true, CancellationToken.None)
+        ).ShouldBeTrue();
 
         var missing = await service.AuthorizeAsync(
             hostId,
@@ -298,11 +298,7 @@ public sealed class HostBotAccountAuthorizationTests
         IReadOnlyList<string> scopes
     ) =>
         new(
-            new TwitchTokenSet(
-                accessToken,
-                "override-refresh",
-                DateTimeOffset.UtcNow.AddHours(1)
-            ),
+            new TwitchTokenSet(accessToken, "override-refresh", DateTimeOffset.UtcNow.AddHours(1)),
             "custom-id",
             LoginName.Parse("custombot"),
             "CustomBot",

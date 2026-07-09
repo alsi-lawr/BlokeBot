@@ -93,8 +93,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.RecipientLogin).HasMaxLength(128);
             b.Property(x => x.RecipientTwitchUserId).HasMaxLength(64);
-            b.HasIndex(x => new { x.WhisperQuotaBucketId, x.RecipientTwitchUserId })
-                .IsUnique();
+            b.HasIndex(x => new { x.WhisperQuotaBucketId, x.RecipientTwitchUserId }).IsUnique();
         });
 
         modelBuilder.Entity<SiteAccessSettings>(b =>
