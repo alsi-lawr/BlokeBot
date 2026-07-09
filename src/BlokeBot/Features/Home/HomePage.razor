@@ -12,52 +12,21 @@
     </section>
 
     <section class="grid gap-4 md:grid-cols-2">
-        <article class="home-info-card rounded-lg p-5">
-            <span class="home-info-card__icon text-blue-600">
-                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 10.5 12 4l8 6.5V20H4Z" />
-                    <path d="M9 20v-6h6v6" />
-                </svg>
-            </span>
-            <h2 class="mt-4 text-base font-bold text-slate-950">Set up your channel</h2>
-            <p class="mt-2 text-sm leading-6 text-muted-foreground">Connect the bot to your Twitch channel and keep your stream settings separate from everyone else's.</p>
-        </article>
+        <HomeInfoCard Title="Set up your channel" Icon="@HomeInfoCardIcon.Channel">
+            Connect the bot to your Twitch channel and keep your stream settings separate from everyone else's.
+        </HomeInfoCard>
 
-        <article class="home-info-card rounded-lg p-5">
-            <span class="home-info-card__icon text-emerald-600">
-                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 3v18" />
-                    <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
-                </svg>
-            </span>
-            <h2 class="mt-4 text-base font-bold text-slate-950">Choose your chat tools</h2>
-            <p class="mt-2 text-sm leading-6 text-muted-foreground">Turn on guessing rounds, points, giveaways, or only the features that make sense for your stream.</p>
-        </article>
+        <HomeInfoCard Title="Choose your chat tools" Icon="@HomeInfoCardIcon.Points">
+            Turn on guessing rounds, points, giveaways, or only the features that make sense for your stream.
+        </HomeInfoCard>
 
-        <article class="home-info-card rounded-lg p-5">
-            <span class="home-info-card__icon text-teal-700">
-                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6 11V8a6 6 0 0 1 12 0v3" />
-                    <path d="M5 11h14v9H5Z" />
-                    <path d="M12 15v2" />
-                </svg>
-            </span>
-            <h2 class="mt-4 text-base font-bold text-slate-950">Let trusted mods help</h2>
-            <p class="mt-2 text-sm leading-6 text-muted-foreground">Give moderators access to help run the channel tools, then change that access whenever you need.</p>
-        </article>
+        <HomeInfoCard Title="Let trusted mods help" Icon="@HomeInfoCardIcon.Moderators">
+            Let the mods you trust help run your channel tools, then change who can help whenever you need.
+        </HomeInfoCard>
 
-        <article class="home-info-card rounded-lg p-5">
-            <span class="home-info-card__icon text-slate-600">
-                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M5 12a7 7 0 0 1 14 0" />
-                    <path d="M7 12h10" />
-                    <path d="M12 7v5l3 3" />
-                    <path d="M6 17h12" />
-                </svg>
-            </span>
-            <h2 class="mt-4 text-base font-bold text-slate-950">Keep the bot ready</h2>
-            <p class="mt-2 text-sm leading-6 text-muted-foreground">Check whether the bot is connected, refresh its channel access, and start or stop it from your channel page.</p>
-        </article>
+        <HomeInfoCard Title="Keep the bot ready" Icon="@HomeInfoCardIcon.Bot">
+            Check whether the bot can chat in your stream, then start or stop it from your channel page.
+        </HomeInfoCard>
     </section>
 
     <section class="home-note rounded-lg p-5">

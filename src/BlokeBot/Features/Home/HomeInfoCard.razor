@@ -1,0 +1,43 @@
+<article class="@CardClass">
+    <div class="home-info-card__header">
+        <span class="home-info-card__icon" aria-hidden="true">
+            @switch (Icon)
+            {
+                case HomeInfoCardIcon.Channel:
+                    <svg class="home-info-card__svg h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24">
+                        <path d="M4 10.5 12 4l8 6.5V20H4Z" />
+                        <path class="home-info-card__house-door" d="M9.5 20v-6h5v6" />
+                        <path class="home-info-card__house-door-knob" d="M13.2 17h.01" />
+                    </svg>
+                    break;
+                case HomeInfoCardIcon.Points:
+                    <svg class="home-info-card__svg h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24">
+                        <path class="home-info-card__dollar" d="M12 3v18" />
+                        <path class="home-info-card__dollar" d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
+                        <path class="home-info-card__coin-spark home-info-card__coin-spark--left" d="M4.5 6.5 3.5 5" />
+                        <path class="home-info-card__coin-spark home-info-card__coin-spark--right" d="M19.5 6.5 20.5 5" />
+                    </svg>
+                    break;
+                case HomeInfoCardIcon.Moderators:
+                    <svg class="home-info-card__svg h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24">
+                        <path class="home-info-card__lock-shackle" d="M7.5 11V8a4.5 4.5 0 0 1 9 0v3" />
+                        <path d="M5 11h14v9H5Z" />
+                        <path d="M12 15v2" />
+                    </svg>
+                    break;
+                case HomeInfoCardIcon.Bot:
+                    <svg class="home-info-card__svg h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24">
+                        <path class="home-info-card__bot-antenna" d="M12 6V3.8" />
+                        <path class="home-info-card__bot-signal" d="M8.5 4.8a5 5 0 0 1 7 0" />
+                        <path class="home-info-card__bot-head" d="M6 9h12v8.5A2.5 2.5 0 0 1 15.5 20h-7A2.5 2.5 0 0 1 6 17.5Z" />
+                        <path class="home-info-card__bot-eye" d="M9.5 13h.01" />
+                        <path class="home-info-card__bot-eye" d="M14.5 13h.01" />
+                        <path d="M10 16h4" />
+                    </svg>
+                    break;
+            }
+        </span>
+        <h2 class="text-base font-bold text-slate-950">@Title</h2>
+    </div>
+    <p class="mt-3 text-sm leading-6 text-muted-foreground">@ChildContent</p>
+</article>
