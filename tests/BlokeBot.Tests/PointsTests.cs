@@ -32,12 +32,20 @@ public sealed class PointsTests
     }
 
     [Test]
-    public void Point_amount_rounds_large_persisted_balances_to_four_significant_figures()
+    public void Point_amount_displays_with_four_significant_figures_without_rounding_value()
     {
-        var rounded = PointAmount.ParseAbsolute("123456789012").RoundForPersistence();
+        var amount = PointAmount.ParseAbsolute("123456789012");
 
-        rounded.ToString().ShouldBe("123500000000");
-        rounded.ToDisplayString().ShouldBe("123.5e9");
+        amount.ToString().ShouldBe("123456789012");
+        amount.ToDisplayString().ShouldBe("123.5B");
+        PointAmount.ParseAbsolute("1234").ToDisplayString().ShouldBe("1,234");
+        PointAmount.ParseAbsolute("10000").ToDisplayString().ShouldBe("10K");
+        PointAmount.ParseAbsolute("999950").ToDisplayString().ShouldBe("1M");
+        PointAmount.ParseAbsolute("1234567890123").ToDisplayString().ShouldBe("1.235T");
+        PointAmount
+            .ParseAbsolute("1234567890123456789012345678901234")
+            .ToDisplayString()
+            .ShouldBe("1.235 x 10^33");
     }
 
     [Test]
@@ -139,6 +147,32 @@ public sealed class PointsTests
         result.Success.ShouldBeTrue();
         balance.Login.ShouldBe("viewer");
         balance.Amount.ShouldBe("10");
+    }
+
+    [Test]
+    public async Task Point_balance_mutations_store_full_precision_values()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var balances = new PointBalanceService(dbFactory);
+        var amount = PointAmount.ParseAbsolute("123456789012");
+
+        var result = await balances.AddAsync(
+            hostId,
+            "viewer",
+            amount,
+            "streamer",
+            "test",
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var balance = await db.PointBalances.SingleAsync(CancellationToken.None);
+        var ledger = await db.PointLedgerEntries.SingleAsync(CancellationToken.None);
+        result.Success.ShouldBeTrue();
+        result.Balance.ShouldBe(amount);
+        balance.Amount.ShouldBe("123456789012");
+        ledger.BalanceAfter.ShouldBe("123456789012");
     }
 
     [Test]

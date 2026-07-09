@@ -5,6 +5,9 @@ namespace BlokeBot.Features.Points.Balances;
 
 public readonly partial record struct PointAmount : IComparable<PointAmount>
 {
+    private const int DisplaySignificantFigures = 4;
+    private static readonly string[] CompactSuffixes = ["", "K", "M", "B", "T"];
+
     public static readonly BigInteger MaximumValue = BigInteger.Pow(10, 100);
     public static readonly PointAmount Zero = new(BigInteger.Zero);
 
@@ -41,11 +44,7 @@ public readonly partial record struct PointAmount : IComparable<PointAmount>
         return new PointAmount(Value - amount.Value);
     }
 
-    public PointAmount RoundForPersistence() =>
-        DigitCount(Value) > 10 ? new PointAmount(RoundToSignificantFigures(Value, 4)) : this;
-
-    public string ToDisplayString() =>
-        DigitCount(Value) > 10 ? FormatEngineering(Value, 4) : ToString();
+    public string ToDisplayString() => FormatForDisplay(Value, DisplaySignificantFigures);
 
     public override string ToString() => Value.ToString();
 
@@ -72,29 +71,45 @@ public readonly partial record struct PointAmount : IComparable<PointAmount>
         }
     }
 
-    private static string FormatEngineering(BigInteger value, int significantFigures)
+    private static string FormatForDisplay(BigInteger value, int significantFigures)
     {
+        if (value.IsZero)
+            return "0";
+
         var rounded = RoundToSignificantFigures(value, significantFigures);
         var digits = rounded.ToString();
-        var exponent = ((digits.Length - 1) / 3) * 3;
-        var integerDigits = digits.Length - exponent;
-        var significant = digits;
+        if (digits.Length <= significantFigures)
+            return rounded.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
 
-        if (significant.Length < significantFigures)
-            significant = significant.PadRight(significantFigures, '0');
+        var compactExponent = ((digits.Length - 1) / 3) * 3;
+        var suffixIndex = compactExponent / 3;
+        if (suffixIndex < CompactSuffixes.Length)
+        {
+            var integerDigits = digits.Length - compactExponent;
+            return $"{FormatSignificantDigits(digits, integerDigits, significantFigures)}{CompactSuffixes[suffixIndex]}";
+        }
 
-        if (significant.Length > significantFigures)
-            significant = significant[..significantFigures];
+        var scientificExponent = digits.Length - 1;
+        return $"{FormatSignificantDigits(digits, 1, significantFigures)} x 10^{scientificExponent}";
+    }
 
-        var mantissa =
-            integerDigits >= significantFigures
+    private static string FormatSignificantDigits(
+        string digits,
+        int integerDigits,
+        int significantFigures
+    )
+    {
+        var significant =
+            digits.Length < significantFigures
+                ? digits.PadRight(significantFigures, '0')
+                : digits[..significantFigures];
+        var formatted =
+            integerDigits >= significant.Length
                 ? significant
                 : significant.Insert(integerDigits, ".");
 
-        return $"{mantissa}e{exponent}";
+        return formatted.TrimEnd('0').TrimEnd('.');
     }
-
-    private static int DigitCount(BigInteger value) => value.IsZero ? 1 : value.ToString().Length;
 
     private static BigInteger RoundToSignificantFigures(BigInteger value, int significantFigures)
     {

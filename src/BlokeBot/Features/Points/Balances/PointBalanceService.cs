@@ -95,7 +95,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         if (current.Value + amount.Value > PointAmount.MaximumValue)
             return PointOperationResult.Failure(PointOperationFailureReason.CapExceeded);
 
-        var next = current.Add(amount).RoundForPersistence();
+        var next = current.Add(amount);
         target.Amount = next.ToString();
         target.UpdatedAtUtc = now;
         AddLedger(
@@ -140,7 +140,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
                 amount: amount
             );
 
-        var next = current.Subtract(amount).RoundForPersistence();
+        var next = current.Subtract(amount);
         target.Amount = next.ToString();
         target.UpdatedAtUtc = now;
         AddLedger(
@@ -237,8 +237,8 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
                 amount: amount
             );
 
-        var sourceNext = sourceCurrent.Subtract(amount).RoundForPersistence();
-        var targetNext = targetCurrent.Add(amount).RoundForPersistence();
+        var sourceNext = sourceCurrent.Subtract(amount);
+        var targetNext = targetCurrent.Add(amount);
         source.Amount = sourceNext.ToString();
         source.UpdatedAtUtc = now;
         target.Amount = targetNext.ToString();
@@ -308,12 +308,12 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
                     amount: stake
                 );
 
-            next = current.Add(stake).RoundForPersistence();
+            next = current.Add(stake);
             delta = stake.Value;
         }
         else
         {
-            next = current.Subtract(stake).RoundForPersistence();
+            next = current.Subtract(stake);
             delta = -stake.Value;
         }
 
@@ -356,7 +356,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
                 amount: amount
             );
 
-        var next = current.Add(amount).RoundForPersistence();
+        var next = current.Add(amount);
         row.Amount = next.ToString();
         row.UpdatedAtUtc = now;
         AddLedger(
