@@ -8,13 +8,15 @@
 
     <main class="lg:pl-72">
         <header class="app-shell__topbar sticky top-0 z-20 border-b border-slate-200 bg-white/75 backdrop-blur-xl">
-            <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-                <div class="min-w-0">
+            <div class="app-topbar__inner px-4 sm:px-6 lg:px-8">
+                <div class="app-topbar__identity min-w-0">
                     <p class="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Twitch operations</p>
                     <p class="truncate text-sm font-semibold text-slate-900">BlokeBot control room</p>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="app-topbar__controls min-w-0">
                     <TopBarControls />
+                </div>
+                <div class="app-topbar__utility">
                     <ThemeToggle />
                     <PageHelpButton />
                 </div>

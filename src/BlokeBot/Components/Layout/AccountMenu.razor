@@ -2,8 +2,8 @@
 @using BlokeBot.Hosts
 @inject NavigationManager Navigation
 
-<details class="group relative mr-2 min-w-0">
-    <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(8rem,1fr)_5.75rem_1.25rem] items-center gap-2 rounded-md pl-3 pr-4 marker:hidden">
+<details class="account-menu group relative min-w-0">
+    <summary class="account-menu__summary control-surface cursor-pointer list-none marker:hidden">
         @if (AccountImageUrl() is { Length: > 0 } imageUrl)
         {
             <img class="h-7 w-7 rounded-full border border-slate-200 object-cover" src="@imageUrl" alt="" />

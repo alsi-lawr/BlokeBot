@@ -139,10 +139,8 @@ public partial class HostSelector
 
     private string MyChannelHref => $"/auth/select-own-host?returnUrl={CurrentReturnUrl}";
 
-    private string SelectorGridStyle(bool showMyChannel) =>
-        showMyChannel
-            ? "grid-template-columns: 7.5rem 18rem 2.25rem"
-            : "grid-template-columns: 18rem 2.25rem";
+    private static string SelectorShellClass(bool showMyChannel) =>
+        showMyChannel ? "host-selector host-selector--with-my-channel" : "host-selector";
 
     private bool ShowMyChannelControl()
     {

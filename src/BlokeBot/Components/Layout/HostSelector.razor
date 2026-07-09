@@ -11,10 +11,10 @@
     var showMyChannel = ShowMyChannelControl();
     var hasAlternateHosts = visibleHosts.Count > 0;
 
-    <div class="hidden items-center gap-2 md:grid" style="@SelectorGridStyle(showMyChannel)">
+    <div class="@SelectorShellClass(showMyChannel)">
         @if (showMyChannel)
         {
-            <a class="control-surface inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            <a class="host-selector__my-channel control-surface inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                href="@MyChannelHref"
                data-enhance-nav="false">
                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
@@ -26,7 +26,7 @@
         }
         @if (hasAlternateHosts)
         {
-            <details class="group relative min-w-0">
+            <details class="host-selector__dropdown group relative min-w-0">
                 <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
                     @if (SelectedVisibleHost() is { } selected)
                     {
@@ -70,7 +70,7 @@
         }
         else
         {
-            <button class="surface-muted grid h-9 min-w-0 cursor-not-allowed grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 text-slate-500 opacity-75"
+            <button class="host-selector__dropdown surface-muted grid h-9 min-w-0 cursor-not-allowed grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 text-slate-500 opacity-75"
                     type="button"
                     disabled
                     aria-label="No alternate channels available">
@@ -88,7 +88,7 @@
                 </svg>
             </button>
         }
-        <a class="control-surface inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        <a class="host-selector__refresh control-surface inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
            title="Find channels again"
            aria-label="Find channels again"
            href="/auth/login?start=true&returnUrl=@CurrentReturnUrl"

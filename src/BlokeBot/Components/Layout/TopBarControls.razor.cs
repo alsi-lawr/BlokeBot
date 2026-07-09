@@ -54,18 +54,18 @@ public partial class TopBarControls
     )
     {
         if (isBotAccount)
-            return "grid items-center gap-3 md:grid-cols-[minmax(18rem,auto)]";
+            return "topbar-controls topbar-controls--account-only";
 
         if (selection is null)
         {
             return showHostSelector
-                ? "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]"
-                : "grid items-center gap-3 md:grid-cols-[minmax(18rem,auto)]";
+                ? "topbar-controls topbar-controls--selector-account"
+                : "topbar-controls topbar-controls--account-only";
         }
 
         if (isAdminEditing || !showHostSelector)
-            return "grid items-center gap-3 md:grid-cols-[auto_minmax(18rem,auto)]";
+            return "topbar-controls topbar-controls--status-account";
 
-        return "grid items-center gap-3 md:grid-cols-[auto_auto_minmax(18rem,auto)]";
+        return "topbar-controls topbar-controls--status-selector-account";
     }
 }
