@@ -161,6 +161,45 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         return PointOperationResult.Successful(balance: next, amount: amount);
     }
 
+    public async Task<PointOperationResult> DeleteBalanceAsync(
+        int hostId,
+        string targetLogin,
+        string actorLogin,
+        string note,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var normalized = LoginName.Parse(targetLogin).Value;
+        var row = await db.PointBalances.SingleOrDefaultAsync(
+            x => x.HostId == hostId && x.Login == normalized,
+            ct
+        );
+        if (row is null)
+            return PointOperationResult.Failure(PointOperationFailureReason.UnknownUser);
+
+        var current = PointAmount.ParseAbsolute(row.Amount);
+        var now = DateTime.UtcNow;
+        db.PointBalances.Remove(row);
+        AddLedger(
+            db,
+            hostId,
+            "DeleteBalance",
+            normalized,
+            -current.Value,
+            PointAmount.Zero,
+            actorLogin,
+            null,
+            null,
+            note,
+            now
+        );
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return PointOperationResult.Successful(balance: PointAmount.Zero, amount: current);
+    }
+
     public async Task<PointOperationResult> TransferAsync(
         int hostId,
         string fromLogin,

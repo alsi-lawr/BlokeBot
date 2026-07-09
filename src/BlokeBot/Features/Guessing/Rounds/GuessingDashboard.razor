@@ -161,7 +161,7 @@
                                 @foreach (var entry in leaderboard.Entries)
                                 {
                                     <tr @key="entry" class="motion-list__item">
-                                        <td class="px-5 py-3 font-semibold text-slate-900">#@entry.Rank</td>
+                                        <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
                                         <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
                                         <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
                                         <td class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>

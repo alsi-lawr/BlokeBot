@@ -142,6 +142,77 @@ public sealed class PointsTests
     }
 
     [Test]
+    public async Task Dashboard_remove_balance_deletes_row_and_writes_audit_ledger()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var balances = new PointBalanceService(dbFactory);
+        var service = new PointsDashboardService(
+            balances,
+            null!,
+            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new FixedPointTargetUserLookup([])
+        );
+        await balances.AddAsync(
+            hostId,
+            "viewer",
+            PointAmount.ParseAbsolute("25"),
+            "streamer",
+            "test",
+            CancellationToken.None
+        );
+
+        var result = await service.RemoveBalanceAsync(
+            hostId,
+            "viewer",
+            "streamer",
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var ledger = await db
+            .PointLedgerEntries.OrderBy(x => x.Id)
+            .ToListAsync(CancellationToken.None);
+        result.Success.ShouldBeTrue();
+        result.Message.ShouldBe("Point balance removed.");
+        (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
+        ledger.Count.ShouldBe(2);
+        ledger[^1].Kind.ShouldBe("DeleteBalance");
+        ledger[^1].Login.ShouldBe("viewer");
+        ledger[^1].Delta.ShouldBe("-25");
+        ledger[^1].BalanceAfter.ShouldBe("0");
+        ledger[^1].ActorLogin.ShouldBe("streamer");
+        ledger[^1].Note.ShouldBe("dashboard");
+    }
+
+    [Test]
+    public async Task Dashboard_remove_missing_balance_does_not_create_row()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = new PointsDashboardService(
+            new PointBalanceService(dbFactory),
+            null!,
+            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new FixedPointTargetUserLookup([])
+        );
+
+        var result = await service.RemoveBalanceAsync(
+            hostId,
+            "missingviewer",
+            "streamer",
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        result.Success.ShouldBeFalse();
+        result.FailureReason.ShouldBe(PointOperationFailureReason.UnknownUser);
+        result.Message.ShouldBe("No point balance found.");
+        (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
+        (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
+    }
+
+    [Test]
     public async Task Addpoints_command_rejects_unknown_twitch_user_without_creating_balance()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

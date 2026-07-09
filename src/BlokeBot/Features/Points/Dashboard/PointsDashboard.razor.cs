@@ -125,6 +125,11 @@ public partial class PointsDashboard
             )
         );
 
+    private Task RemoveLeaderboardEntryAsync(string login) =>
+        RunAsync(() =>
+            Dashboard.RemoveBalanceAsync(HostId, login, ActorLogin, CancellationToken.None)
+        );
+
     private async Task RunAsync(Func<Task<PointOperationResult>> operation)
     {
         await LoadFeatureStateAsync();

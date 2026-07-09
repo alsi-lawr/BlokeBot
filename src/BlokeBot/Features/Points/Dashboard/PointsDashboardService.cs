@@ -128,6 +128,34 @@ public sealed class PointsDashboardService(
             };
     }
 
+    public async Task<PointOperationResult> RemoveBalanceAsync(
+        int hostId,
+        string targetLogin,
+        string actorLogin,
+        CancellationToken ct
+    )
+    {
+        var result = await balances.DeleteBalanceAsync(
+            hostId,
+            targetLogin,
+            actorLogin,
+            "dashboard",
+            ct
+        );
+        if (result.Success)
+            await changes.NotifyChangedAsync();
+
+        return result.Success
+            ? result with
+            {
+                Message = "Point balance removed.",
+            }
+            : result with
+            {
+                Message = "No point balance found.",
+            };
+    }
+
     public Task<PointOperationResult> StartGiveawayAsync(
         int hostId,
         string hostLogin,
