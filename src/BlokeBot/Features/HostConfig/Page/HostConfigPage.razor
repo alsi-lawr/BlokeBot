@@ -3,6 +3,7 @@
 @using BlokeBot.Auth.Sessions
 @using BlokeBot.Eventing
 @using BlokeBot.Features.HostConfig.Access
+@using BlokeBot.Features.HostedChannels
 @using BlokeBot.Features.HostedChannels.Authorization
 @using BlokeBot.Features.HostedChannels.Runtime
 @using BlokeBot.Hosts
@@ -11,6 +12,7 @@
 @attribute [Authorize]
 @inherits AuthenticatedPageComponent
 @inject HostConfigService HostConfig
+@inject HostFeatureService Features
 @inject HostModAccessService ModAccess
 @inject HostedChannelRuntimeControlService Runtime
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
@@ -146,6 +148,36 @@
                 </div>
             </div>
         </section>
+
+        <section class="space-y-3">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-950">Bot functions</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Turn on the chat tools you want available in this channel.</p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                @foreach (var feature in state.Features)
+                {
+                    <button class="@FeatureCardClass(feature)"
+                            type="button"
+                            aria-pressed="@feature.Enabled"
+                            @onclick="() => SetFeatureEnabledAsync(hostId, feature.Feature, !feature.Enabled)">
+                        <span class="@FeatureIconClass(feature)">
+                            @FeatureIcon(feature.Feature)
+                        </span>
+                        <span class="min-w-0">
+                            <span class="flex items-center gap-2">
+                                <span class="truncate text-sm font-bold text-slate-950">@feature.Name</span>
+                                <span class="@FeatureBadgeClass(feature)">
+                                    <span class="@FeatureDotClass(feature)"></span>
+                                    @(feature.Enabled ? "on" : "off")
+                                </span>
+                            </span>
+                            <span class="mt-1 block text-xs leading-5 text-muted-foreground">@feature.Description</span>
+                        </span>
+                    </button>
+                }
+            </div>
+        </section>
     }
 </div>
 
@@ -218,6 +250,56 @@
             _ => "Bot stopped.",
         };
 
+    private static string FeatureBadgeClass(HostFeatureCardState feature) =>
+        feature.Enabled
+            ? "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 text-[0.68rem] font-bold text-emerald-700 ring-1 ring-emerald-200"
+            : "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2 text-[0.68rem] font-bold text-slate-600 ring-1 ring-slate-200";
+
+    private static string FeatureCardClass(HostFeatureCardState feature) =>
+        feature.Enabled
+            ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-lg p-3 text-left"
+            : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-lg p-3 text-left";
+
+    private static string FeatureDotClass(HostFeatureCardState feature) =>
+        feature.Enabled
+            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+            : "h-1.5 w-1.5 rounded-full bg-slate-400";
+
+    private static string FeatureIconClass(HostFeatureCardState feature) =>
+        feature.Enabled
+            ? feature.Feature switch
+            {
+                HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
+                _ => "feature-toggle-card__icon text-blue-600",
+            }
+            : "feature-toggle-card__icon text-slate-500";
+
+    private static MarkupString FeatureIcon(HostFeatureFlags feature) =>
+        new(
+            feature switch
+            {
+                HostFeatureFlags.Guessing =>
+                    """
+                    <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
+                        <path d="M9 9h.01" />
+                        <path d="M15 9h.01" />
+                        <path d="M12 12h.01" />
+                        <path d="M9 15h.01" />
+                        <path d="M15 15h.01" />
+                    </svg>
+                    """,
+                HostFeatureFlags.Points =>
+                    """
+                    <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v18" />
+                        <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
+                    </svg>
+                    """,
+                _ => string.Empty,
+            }
+        );
+
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
@@ -283,6 +365,17 @@
     {
         await ModAccess.SetModsEnabledAsync(hostId, args.Value is true, CancellationToken.None);
         await LoadAsync();
+    }
+
+    private async Task SetFeatureEnabledAsync(
+        int hostId,
+        HostFeatureFlags feature,
+        bool enabled
+    )
+    {
+        await Features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
+        await LoadAsync();
+        statusMessage = enabled ? "Feature enabled." : "Feature disabled.";
     }
 
     private async Task ClearChannelAuthorizationAsync(int hostId)
