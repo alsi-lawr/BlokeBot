@@ -13,13 +13,10 @@
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="space-y-2">
-            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Round settings</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Round types, chat commands, accepted answers, and bot replies.</p>
-        </div>
+    <PageHeader Title="Round settings"
+                Description="Round types, chat commands, accepted answers, and bot replies.">
         <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
-    </div>
+    </PageHeader>
 
     @if (Host is null)
     {

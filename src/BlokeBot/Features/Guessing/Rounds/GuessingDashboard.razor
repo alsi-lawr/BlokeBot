@@ -22,16 +22,11 @@
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="space-y-2">
-            <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
-                Dashboard
-            </div>
-            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Guessing game</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Run live rounds and look back at viewer results.</p>
-        </div>
+    <PageHeader Kicker="Dashboard"
+                Title="Guessing game"
+                Description="Run live rounds and look back at viewer results.">
         <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
-    </div>
+    </PageHeader>
 
     @if (Host is null)
     {

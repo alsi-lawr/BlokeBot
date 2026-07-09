@@ -28,12 +28,8 @@
 <PageTitle>BlokeBot | Admin</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div class="space-y-2">
-            <h1 class="text-3xl font-bold tracking-tight text-slate-950">Admin</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Host access and channel management.</p>
-        </div>
-    </div>
+    <PageHeader Title="Admin"
+                Description="Host access and channel management." />
 
     @if (state is null)
     {

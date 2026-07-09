@@ -55,6 +55,9 @@ public partial class NavMenu
     private IReadOnlySet<int> existingHostIds = new HashSet<int>();
     private IJSObjectReference? module;
 
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         hostedChannelSubscription = Events.SubscribeForComponentRefresh(
@@ -117,6 +120,9 @@ public partial class NavMenu
         if (module is not null)
             await module.InvokeVoidAsync("writeBoolean", PointsOpenStorageKey, pointsOpen);
     }
+
+    private Task NotifyNavigatedAsync() =>
+        OnNavigate.HasDelegate ? OnNavigate.InvokeAsync() : Task.CompletedTask;
 
     private bool FeatureIsVisible(
         AuthenticatedSession session,

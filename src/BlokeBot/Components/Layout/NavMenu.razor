@@ -35,7 +35,8 @@
                 <div class="nav-menu__panel nav-menu__panel--admin rounded-xl p-1.5">
                     <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                              ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
-                             href="admin">
+                             href="admin"
+                             @onclick="NotifyNavigatedAsync">
                         <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                             <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                             <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
@@ -53,7 +54,8 @@
                     <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                              ActiveClass="nav-menu__item-active"
                              Match="NavLinkMatch.All"
-                             href="">
+                             href=""
+                             @onclick="NotifyNavigatedAsync">
                         <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
                             <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 5h6v6H4Z" />
@@ -71,7 +73,8 @@
                     <div class="nav-menu__panel rounded-xl p-1.5">
                         <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                                  ActiveClass="nav-menu__item-active nav-menu__item-active--host"
-                                 href="host">
+                                 href="host"
+                                 @onclick="NotifyNavigatedAsync">
                             <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                                 <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M4 10.5 12 4l8 6.5V20H4Z" />
@@ -109,12 +112,14 @@
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
                          Match="NavLinkMatch.All"
-                         href="guessing">
+                         href="guessing"
+                         @onclick="NotifyNavigatedAsync">
                     Dashboard
                 </NavLink>
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
-                         href="guessing/settings">
+                         href="guessing/settings"
+                         @onclick="NotifyNavigatedAsync">
                     Settings
                 </NavLink>
             </div>
@@ -139,12 +144,14 @@
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
                          Match="NavLinkMatch.All"
-                         href="points">
+                         href="points"
+                         @onclick="NotifyNavigatedAsync">
                     Dashboard
                 </NavLink>
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
-                         href="points/settings">
+                         href="points/settings"
+                         @onclick="NotifyNavigatedAsync">
                     Settings
                 </NavLink>
             </div>

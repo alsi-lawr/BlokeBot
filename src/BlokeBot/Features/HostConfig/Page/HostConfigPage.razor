@@ -26,13 +26,9 @@
 <PageTitle>BlokeBot | Channel Setup</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
-    <div class="space-y-2">
-        <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
-            Channel setup
-        </div>
-        <h1 class="text-3xl font-bold tracking-tight text-slate-950">Channel setup</h1>
-        <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Connect the bot, choose who can help, and turn chat tools on or off.</p>
-    </div>
+    <PageHeader Kicker="Channel setup"
+                Title="Channel setup"
+                Description="Connect the bot, choose who can help, and turn chat tools on or off." />
 
     @if (blockedByMode)
     {

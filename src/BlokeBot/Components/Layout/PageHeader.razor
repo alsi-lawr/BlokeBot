@@ -1,0 +1,39 @@
+<header class="page-header">
+    <div class="page-header__inner">
+        <div class="min-w-0 space-y-2">
+            @if (!string.IsNullOrWhiteSpace(Kicker))
+            {
+                <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
+                    @Kicker
+                </div>
+            }
+            <div class="space-y-1">
+                <h1 class="page-header__title">@Title</h1>
+                @if (!string.IsNullOrWhiteSpace(Description))
+                {
+                    <p class="page-header__description">@Description</p>
+                }
+            </div>
+        </div>
+        @if (ChildContent is not null)
+        {
+            <div class="page-header__actions">
+                @ChildContent
+            </div>
+        }
+    </div>
+</header>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Kicker { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+}
