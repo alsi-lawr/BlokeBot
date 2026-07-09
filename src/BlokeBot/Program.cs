@@ -32,6 +32,7 @@ using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.HostSetup;
 using BlokeBot.Features.SiteAccess;
+using BlokeBot.Features.Toasts;
 using BlokeBot.Hosting;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
@@ -62,6 +63,7 @@ builder
     .AddBlokeBotHosts()
     .AddBlokeBotGuessing()
     .AddBlokeBotPoints()
+    .AddBlokeBotToasts()
     .AddBlokeBotAuth();
 builder.Services.AddTwitchOAuthApi();
 builder.Services.AddTwitchHelix();

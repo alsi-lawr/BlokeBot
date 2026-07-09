@@ -9,6 +9,7 @@
 @inject GuessingConfigurationService Configuration
 @inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
@@ -20,11 +21,6 @@
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="status-message px-4 py-3 text-sm">@statusMessage</div>
-    }
 
     @if (Host is null)
     {
@@ -68,7 +64,6 @@
     private GuessingConfiguration? config;
     private bool featureEnabled;
     private string newProfileName = string.Empty;
-    private string? statusMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,7 +106,7 @@
     private async Task CreateProfileAsync()
     {
         var result = await Configuration.CreateProfileAsync(HostId, newProfileName, CancellationToken.None);
-        statusMessage = result.Message;
+        PublishResult(result);
         newProfileName = string.Empty;
         config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
     }
@@ -122,7 +117,7 @@
             return;
 
         var result = await Configuration.DeleteProfileAsync(HostId, config.Profile.Id, CancellationToken.None);
-        statusMessage = result.Message;
+        PublishResult(result);
         config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
     }
 
@@ -136,11 +131,11 @@
             await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
             var selectedId = config.Profile.Id;
             config = await Configuration.LoadConfigurationAsync(HostId, selectedId, CancellationToken.None);
-            statusMessage = "Settings saved.";
+            Toasts.Success("Settings saved.");
         }
         catch (InvalidOperationException ex)
         {
-            statusMessage = ex.Message;
+            Toasts.Error(ex.Message);
         }
     }
 
@@ -150,6 +145,13 @@
             return;
 
         config = await Configuration.LoadConfigurationAsync(HostId, profileId, CancellationToken.None);
-        statusMessage = null;
+    }
+
+    private void PublishResult(GuessingOperationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(result.Message))
+            return;
+
+        Toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
     }
 }

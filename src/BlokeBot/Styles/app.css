@@ -84,14 +84,6 @@ a {
         border: 1px solid var(--app-border);
     }
 
-    .status-message {
-        background: var(--app-surface);
-        border: 1px solid var(--app-border);
-        border-radius: 0.5rem;
-        box-shadow: var(--app-shadow-sm);
-        color: var(--app-text-medium);
-    }
-
     .page-kicker {
         background: var(--app-surface-solid);
         border: 1px solid var(--app-border);

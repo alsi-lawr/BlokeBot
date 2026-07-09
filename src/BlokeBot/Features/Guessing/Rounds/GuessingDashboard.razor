@@ -18,6 +18,7 @@
 @inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
 @inject ITwitchChatMessageSender Chat
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
@@ -64,13 +65,6 @@
             History
         </button>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="status-message px-4 py-3 text-sm">
-            @statusMessage
-        </div>
-    }
 
     @if (activeTab == DashboardTab.Live)
     {
@@ -225,7 +219,6 @@
     private string historyUsername = string.Empty;
     private int selectedProfileId;
     private GuessingDashboardState? state;
-    private string? statusMessage;
     private string winnerName = string.Empty;
 
     private string RoundStartedText =>
@@ -255,13 +248,12 @@
         );
         await LoadPageContextAsync();
         await LoadFeatureStateAsync();
-        await LoadAsync(null);
+        await LoadAsync();
     }
 
     private async Task ActivateTabAsync(DashboardTab tab)
     {
         activeTab = tab;
-        statusMessage = null;
 
         if (tab == DashboardTab.History && leaderboard is null)
             await LoadHistoryAsync();
@@ -280,7 +272,7 @@
         if (activeTab == DashboardTab.History)
             await LoadHistoryAsync();
         else
-            await LoadAsync(statusMessage);
+            await LoadAsync();
     }
 
     private async Task ResetAndLoadHistoryAsync()
@@ -293,7 +285,7 @@
     {
         if (string.IsNullOrWhiteSpace(winnerName))
         {
-            statusMessage = "Choose a configured winner name first.";
+            Toasts.Warning("Choose a configured winner name first.");
             return;
         }
 
@@ -301,7 +293,7 @@
         winnerName = string.Empty;
     }
 
-    private async Task LoadAsync(string? message)
+    private async Task LoadAsync()
     {
         if (HostId == 0)
             return;
@@ -319,7 +311,6 @@
                 ?? state.Profiles.FirstOrDefault(x => x.IsDefault)?.Id
                 ?? state.Profiles.FirstOrDefault()?.Id
                 ?? 0;
-        statusMessage = message;
     }
 
     private async Task LoadHistoryAsync()
@@ -374,7 +365,7 @@
     private Task RefreshAsync() =>
         activeTab == DashboardTab.History
             ? LoadHistoryAsync()
-            : LoadAsync(null);
+            : LoadAsync();
 
     private async Task LoadFeatureStateAsync()
     {
@@ -426,9 +417,18 @@
         if (result.Succeeded)
             await Chat.SendAsync(Host!.Login, result.Message, CancellationToken.None);
 
-        await LoadAsync(result.Message);
+        PublishResult(result);
+        await LoadAsync();
 
         if (leaderboard is not null)
             await LoadHistoryAsync();
+    }
+
+    private void PublishResult(GuessingOperationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(result.Message))
+            return;
+
+        Toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
     }
 }

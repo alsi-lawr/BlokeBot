@@ -22,6 +22,7 @@
 @inject BotAccountAuthorizationService BotAccountAuthorization
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
@@ -53,7 +54,6 @@
                            @bind-NewWhitelistLogin="newWhitelistLogin" />
 
         <HostedChannelsSection Hosts="@hosts"
-                               Status="@hostStatus"
                                CreateHost="@CreateHostAsync"
                                CanEditHosts="@(!isBotAccount)"
                                RemoveHost="@RemoveHostAsync"
@@ -68,7 +68,6 @@
     private BotAccountAuthorizationStatus? botAccountStatus;
     private IReadOnlyList<HostedChannelAdminView> hosts = [];
     private bool isBotAccount;
-    private string? hostStatus;
     private int? pendingRuntimeHostId;
     private string newBlacklistLogin = string.Empty;
     private string newHostLogin = string.Empty;
@@ -177,7 +176,8 @@
 
     private void ApplyHostOperation(AdminHostOperationResult result)
     {
-        hostStatus = result.Message;
+        if (!string.IsNullOrWhiteSpace(result.Message))
+            Toasts.Publish(result.Succeeded ? ToastKind.Status : ToastKind.Error, result.Message);
         pendingRuntimeHostId = result.PendingRuntimeHostId;
     }
 

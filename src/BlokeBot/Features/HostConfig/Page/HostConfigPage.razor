@@ -18,6 +18,7 @@
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Host config</PageTitle>
 
@@ -29,11 +30,6 @@
         <h1 class="text-3xl font-bold tracking-tight text-slate-950">Host config</h1>
         <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Manage your channel access and bot runtime.</p>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="status-message px-4 py-3 text-sm font-semibold">@statusMessage</div>
-    }
 
     @if (blockedByMode)
     {
@@ -185,8 +181,8 @@
     private string newBlacklistLogin = string.Empty;
     private string newWhitelistLogin = string.Empty;
     private bool blockedByMode;
+    private BotChannelRuntimeState? pendingRuntimeState;
     private HostConfigState? state;
-    private string? statusMessage;
 
     private bool CanStart =>
         state?.RuntimeStatus is not null
@@ -350,9 +346,19 @@
 
     private async Task ReloadForEventAsync()
     {
+        var previousPendingRuntimeState = pendingRuntimeState;
         await LoadAsync();
-        if (state?.IsHostCreated == true)
-            statusMessage = RuntimeStatusMessage;
+
+        if (previousPendingRuntimeState is null)
+            return;
+
+        var currentRuntimeState = state?.RuntimeStatus?.RuntimeState;
+        if (currentRuntimeState == previousPendingRuntimeState)
+            return;
+
+        TrackPendingRuntimeTransition();
+        if (currentRuntimeState is not null)
+            Toasts.Status(RuntimeStatusMessage);
     }
 
     private async Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
@@ -375,27 +381,46 @@
     {
         await Features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
         await LoadAsync();
-        statusMessage = enabled ? "Feature enabled." : "Feature disabled.";
+        Toasts.Status(enabled ? "Feature enabled." : "Feature disabled.");
     }
 
     private async Task ClearChannelAuthorizationAsync(int hostId)
     {
         await ChannelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        statusMessage = "Channel authorization cleared.";
+        Toasts.Status("Channel authorization cleared.");
     }
 
     private async Task StartAsync(int hostId)
     {
         var result = await Runtime.StartAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        statusMessage = result.Succeeded ? RuntimeStatusMessage : result.Message;
+        if (result.Succeeded)
+            TrackPendingRuntimeTransition();
+        Toasts.Publish(
+            result.Succeeded ? ToastKind.Status : ToastKind.Error,
+            result.Succeeded ? RuntimeStatusMessage : result.Message
+        );
     }
 
     private async Task StopAsync(int hostId)
     {
         var result = await Runtime.StopAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        statusMessage = result.Succeeded ? RuntimeStatusMessage : result.Message;
+        if (result.Succeeded)
+            TrackPendingRuntimeTransition();
+        Toasts.Publish(
+            result.Succeeded ? ToastKind.Status : ToastKind.Error,
+            result.Succeeded ? RuntimeStatusMessage : result.Message
+        );
     }
+
+    private void TrackPendingRuntimeTransition()
+    {
+        var runtimeState = state?.RuntimeStatus?.RuntimeState;
+        pendingRuntimeState = IsRuntimeTransitionPending(runtimeState) ? runtimeState : null;
+    }
+
+    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? runtimeState) =>
+        runtimeState is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
 }

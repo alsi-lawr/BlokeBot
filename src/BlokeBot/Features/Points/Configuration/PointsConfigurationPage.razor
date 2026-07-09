@@ -9,6 +9,7 @@
 @inject PointsConfigurationService Configuration
 @inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 
@@ -20,11 +21,6 @@
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="status-message px-4 py-3 text-sm font-semibold">@statusMessage</div>
-    }
 
     @if (Host is null)
     {
@@ -117,7 +113,6 @@
 @code {
     private PointsConfiguration? config;
     private bool featureEnabled;
-    private string? statusMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -152,11 +147,11 @@
         {
             await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            statusMessage = "Settings saved.";
+            Toasts.Success("Settings saved.");
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
         {
-            statusMessage = ex.Message;
+            Toasts.Error(ex.Message);
         }
     }
 }

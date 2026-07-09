@@ -11,10 +11,6 @@
             <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
             <button class="btn-primary sm:w-40" @onclick="CreateHost">Create</button>
         </div>
-        @if (!string.IsNullOrWhiteSpace(Status))
-        {
-            <p @key="Status" class="motion-status mt-3 text-sm font-medium text-slate-700">@Status</p>
-        }
     </div>
     <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
         @if (Hosts.Count == 0)
@@ -44,7 +40,6 @@
     [Parameter] public EventCallback<string> NewHostLoginChanged { get; set; }
     [Parameter, EditorRequired] public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
     [Parameter, EditorRequired] public Func<int, Task> StartBot { get; set; } = _ => Task.CompletedTask;
-    [Parameter] public string? Status { get; set; }
     [Parameter, EditorRequired] public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
 
     private async Task OnInput(ChangeEventArgs args)

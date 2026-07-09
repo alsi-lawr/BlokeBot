@@ -1,0 +1,142 @@
+@rendermode InteractiveServer
+@implements IDisposable
+@inject ToastService Toasts
+
+@if (visibleToasts.Count > 0)
+{
+    <section class="toast-region" aria-label="Notifications" aria-live="polite" aria-atomic="false">
+        @foreach (var toast in visibleToasts)
+        {
+            <article @key="toast.Id" class="@ToastClass(toast)" role="@ToastRole(toast)">
+                <span class="toast-card__stripe" aria-hidden="true"></span>
+                <div class="toast-card__body">
+                    <div class="toast-card__header">
+                        <span class="toast-card__dot" aria-hidden="true"></span>
+                        <p class="toast-card__title">@toast.Title</p>
+                        @if (toast.RequiresManualDismiss)
+                        {
+                            <span class="toast-card__manual">Manual</span>
+                        }
+                    </div>
+                    <p class="toast-card__message">@toast.Message</p>
+                </div>
+                <button class="toast-card__close"
+                        type="button"
+                        aria-label="Dismiss notification"
+                        @onclick="() => BeginDismissAsync(toast.Id)">
+                    <span aria-hidden="true">x</span>
+                </button>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private const int RemovalAnimationDelayMs = 180;
+    private readonly Dictionary<Guid, CancellationTokenSource> autoDismissTokens = [];
+    private readonly HashSet<Guid> dismissingToastIds = [];
+    private CancellationTokenSource disposeToken = new();
+    private IReadOnlyList<ToastNotification> visibleToasts = [];
+
+    protected override void OnInitialized()
+    {
+        Toasts.Changed += OnToastsChanged;
+        RefreshToasts();
+    }
+
+    public void Dispose()
+    {
+        Toasts.Changed -= OnToastsChanged;
+        disposeToken.Cancel();
+        disposeToken.Dispose();
+        foreach (var token in autoDismissTokens.Values)
+        {
+            token.Cancel();
+            token.Dispose();
+        }
+        autoDismissTokens.Clear();
+    }
+
+    private async Task BeginDismissAsync(Guid toastId)
+    {
+        if (!dismissingToastIds.Add(toastId))
+            return;
+
+        if (autoDismissTokens.Remove(toastId, out var autoDismissToken))
+        {
+            autoDismissToken.Cancel();
+            autoDismissToken.Dispose();
+        }
+
+        await InvokeAsync(StateHasChanged);
+        await Task.Delay(RemovalAnimationDelayMs);
+        Toasts.Dismiss(toastId);
+        dismissingToastIds.Remove(toastId);
+    }
+
+    private async Task AutoDismissAsync(Guid toastId, TimeSpan delay, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Delay(delay, ct);
+            await InvokeAsync(() => BeginDismissAsync(toastId));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void OnToastsChanged() => _ = InvokeAsync(RefreshToasts);
+
+    private void RefreshToasts()
+    {
+        visibleToasts = Toasts.Current;
+        ScheduleAutoDismiss();
+        StateHasChanged();
+    }
+
+    private void ScheduleAutoDismiss()
+    {
+        var currentIds = visibleToasts.Select(toast => toast.Id).ToHashSet();
+        foreach (var staleId in autoDismissTokens.Keys.Where(id => !currentIds.Contains(id)).ToArray())
+        {
+            autoDismissTokens[staleId].Cancel();
+            autoDismissTokens[staleId].Dispose();
+            autoDismissTokens.Remove(staleId);
+        }
+
+        foreach (var toast in visibleToasts)
+        {
+            if (
+                toast.AutoDismissAfter is not { } delay
+                || autoDismissTokens.ContainsKey(toast.Id)
+                || dismissingToastIds.Contains(toast.Id)
+            )
+                continue;
+
+            var token = CancellationTokenSource.CreateLinkedTokenSource(disposeToken.Token);
+            autoDismissTokens[toast.Id] = token;
+            _ = AutoDismissAsync(toast.Id, delay, token.Token);
+        }
+    }
+
+    private string ToastClass(ToastNotification toast)
+    {
+        var classes = $"toast-card toast-card--{KindCssClass(toast.Kind)}";
+        return dismissingToastIds.Contains(toast.Id)
+            ? $"{classes} toast-card--removing"
+            : classes;
+    }
+
+    private static string KindCssClass(ToastKind kind) =>
+        kind switch
+        {
+            ToastKind.Success => "success",
+            ToastKind.Warning => "warning",
+            ToastKind.Error => "error",
+            _ => "status",
+        };
+
+    private static string ToastRole(ToastNotification toast) =>
+        toast.Kind is ToastKind.Error or ToastKind.Warning ? "alert" : "status";
+}

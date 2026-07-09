@@ -10,6 +10,7 @@
 @inject PointsDashboardService Dashboard
 @inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
+@inject ToastService Toasts
 
 <PageTitle>BlokeBot | Points</PageTitle>
 
@@ -22,11 +23,6 @@
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </div>
-
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="status-message px-4 py-3 text-sm font-semibold">@statusMessage</div>
-    }
 
     @if (Host is null)
     {
@@ -190,7 +186,6 @@
     private bool featureEnabled;
     private PointsDashboardState? state;
     private PointBalanceEntry? lookupResult;
-    private string? statusMessage;
     private string lookupLogin = string.Empty;
     private string giveFrom = string.Empty;
     private string giveTo = string.Empty;
@@ -251,7 +246,6 @@
     private async Task RefreshAsync()
     {
         await LoadAsync();
-        statusMessage = null;
     }
 
     private Task RemoveAsync() =>
@@ -266,7 +260,7 @@
             return;
 
         var result = await operation();
-        statusMessage = result.Message;
+        PublishResult(result);
         await LoadAsync();
     }
 
@@ -278,5 +272,13 @@
         featureEnabled =
             HostId != 0
             && await Features.IsEnabledAsync(HostId, HostFeatureFlags.Points, CancellationToken.None);
+    }
+
+    private void PublishResult(PointOperationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(result.Message))
+            return;
+
+        Toasts.Publish(result.Success ? ToastKind.Success : ToastKind.Warning, result.Message);
     }
 }
