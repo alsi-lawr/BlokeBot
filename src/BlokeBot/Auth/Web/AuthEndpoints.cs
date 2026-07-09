@@ -145,16 +145,10 @@ internal static class AuthEndpoints
                     );
                     if (session.IsConfiguredBotAccount(result.User.Login))
                     {
-                        return Results.Redirect(
-                            string.IsNullOrWhiteSpace(returnUrl)
-                                ? "/admin"
-                                : LocalReturnUrl.OrFallback(returnUrl, "/admin")
-                        );
+                        return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                     }
 
-                    return Results.Redirect(
-                        LocalReturnUrl.OrFallback(returnUrl, DefaultReturnUrl(result.User))
-                    );
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                 }
             )
             .AllowAnonymous();
@@ -198,7 +192,7 @@ internal static class AuthEndpoints
                         currentSession.AdminEditingLogin
                     );
 
-                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                 }
             )
             .RequireAuthorization();
@@ -230,7 +224,7 @@ internal static class AuthEndpoints
                             currentSession.AdminEditingLogin
                         );
 
-                        return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
+                        return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                     }
 
                     if (!currentSession.CanCreateHost)
@@ -288,7 +282,7 @@ internal static class AuthEndpoints
                         adminReturnHost: returnHost
                     );
 
-                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/guessing"));
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                 }
             )
             .RequireAuthorization("BotAdmin");
@@ -337,12 +331,7 @@ internal static class AuthEndpoints
                         adminEditingLogin: null
                     );
 
-                    return Results.Redirect(
-                        LocalReturnUrl.OrFallback(
-                            returnUrl,
-                            selected is null ? "/host" : "/guessing"
-                        )
-                    );
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                 }
             )
             .RequireAuthorization("BotAdmin");
@@ -357,18 +346,4 @@ internal static class AuthEndpoints
             )
             .AllowAnonymous();
     }
-
-    private static string DefaultReturnUrl(AuthenticatedUser user)
-    {
-        if (user.CanCreateHost && !HasOwnHostedChannel(user))
-            return "/host";
-
-        return user.Hosts.Count == 0 ? "/host" : "/guessing";
-    }
-
-    private static bool HasOwnHostedChannel(AuthenticatedUser user) =>
-        user.Hosts.Any(host =>
-            host.Role == AuthRole.Streamer
-            && string.Equals(host.Login, user.Login, StringComparison.OrdinalIgnoreCase)
-        );
 }

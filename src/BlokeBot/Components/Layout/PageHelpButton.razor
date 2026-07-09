@@ -102,7 +102,8 @@
     private static HelpPage? HelpForPath(string path) =>
         path switch
         {
-            "/" or "/guessing" => GuessingDashboardHelp,
+            "/" => HomeHelp,
+            "/guessing" => GuessingDashboardHelp,
             "/guessing/settings" => GuessingSettingsHelp,
             "/points" => PointsDashboardHelp,
             "/points/settings" => PointsSettingsHelp,
@@ -121,6 +122,22 @@
         "<strong>Winner and no-winners replies</strong>: <code>{name}</code>, <code>{winners}</code>, <code>{count}</code>",
         "<strong>Stop, closed, no-open-round, already-open, and moderator-only replies</strong>: no variables",
     ];
+
+    private static readonly HelpPage HomeHelp = new(
+        "Home",
+        [
+            new(
+                "Application home",
+                "Home is the top-level entry point for BlokeBot operations and links to the available application areas.",
+                []
+            ),
+            new(
+                "Channel access",
+                "Application areas appear when the current authorization can access the related hosted channel or admin capability.",
+                []
+            ),
+        ]
+    );
 
     private static readonly HelpPage HostConfigHelp = new(
         "Host config",
