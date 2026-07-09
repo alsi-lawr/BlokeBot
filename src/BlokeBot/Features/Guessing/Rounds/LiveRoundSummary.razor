@@ -20,9 +20,3 @@
         <p class="mt-1 text-xs text-muted-foreground">Set with the web action or win command</p>
     </div>
 </div>
-
-@code {
-    [Parameter, EditorRequired] public string RoundStartedText { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public string RoundStatusText { get; set; } = string.Empty;
-    [Parameter, EditorRequired] public GuessingDashboardState State { get; set; } = new();
-}

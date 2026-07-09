@@ -17,7 +17,3 @@
         <TextAreaField Label="No winners reply" @bind-Value="Replies.NoWinnersReply" />
     </div>
 </CollapsibleSection>
-
-@code {
-    [Parameter, EditorRequired] public ReplySettingsEditor Replies { get; set; } = new();
-}

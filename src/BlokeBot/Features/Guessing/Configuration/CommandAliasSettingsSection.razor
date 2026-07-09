@@ -7,7 +7,3 @@
         <Field Label="Available guesses" @bind-Value="Aliases.GuessesAliases" Placeholder="guesses, options" />
     </div>
 </CollapsibleSection>
-
-@code {
-    [Parameter, EditorRequired] public CommandAliasEditor Aliases { get; set; } = new();
-}

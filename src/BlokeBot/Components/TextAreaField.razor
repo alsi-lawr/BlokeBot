@@ -2,17 +2,3 @@
     <label class="label">@Label</label>
     <textarea class="input min-h-24 resize-y" value="@Value" @oninput="OnInput"></textarea>
 </div>
-
-@code {
-    [Parameter]
-    public string Label { get; set; } = string.Empty;
-
-    [Parameter]
-    public string Value { get; set; } = string.Empty;
-
-    [Parameter]
-    public EventCallback<string> ValueChanged { get; set; }
-
-    private Task OnInput(ChangeEventArgs e) =>
-        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
-}

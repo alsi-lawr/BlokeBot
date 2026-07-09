@@ -2,20 +2,3 @@
     <label class="label">@Label</label>
     <input class="input" placeholder="@Placeholder" value="@Value" @oninput="OnInput" />
 </div>
-
-@code {
-    [Parameter]
-    public string Label { get; set; } = string.Empty;
-
-    [Parameter]
-    public string Placeholder { get; set; } = string.Empty;
-
-    [Parameter]
-    public string Value { get; set; } = string.Empty;
-
-    [Parameter]
-    public EventCallback<string> ValueChanged { get; set; }
-
-    private Task OnInput(ChangeEventArgs e) =>
-        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
-}
