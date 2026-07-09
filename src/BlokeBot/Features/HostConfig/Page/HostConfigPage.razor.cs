@@ -47,8 +47,12 @@ namespace BlokeBot.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
+    private static readonly TimeSpan AccessModeSaveDebounce = TimeSpan.FromMilliseconds(180);
+
+    private CancellationTokenSource? allowModsByDefaultSaveCts;
     private string newBlacklistLogin = string.Empty;
     private string newWhitelistLogin = string.Empty;
+    private int allowModsByDefaultSaveVersion;
     private bool blockedByMode;
     private BotChannelRuntimeState? pendingRuntimeState;
     private IReadOnlyList<AccessListEntryProfile> blacklistEntries = [];
@@ -283,10 +287,74 @@ public partial class HostConfigPage
         await LoadAsync();
     }
 
-    private async Task SetAllowModsByDefaultAsync(int hostId, bool allowByDefault)
+    private void SetAllowModsByDefault(int hostId, bool allowByDefault)
     {
-        await ModAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, CancellationToken.None);
-        await LoadAsync();
+        if (state is null || state.ModAccess.AllowModsByDefault == allowByDefault)
+            return;
+
+        var previousAccess = state.ModAccess;
+        var version = ++allowModsByDefaultSaveVersion;
+        state = state with
+        {
+            ModAccess = previousAccess with { AllowModsByDefault = allowByDefault },
+        };
+
+        allowModsByDefaultSaveCts?.Cancel();
+        var saveCts = new CancellationTokenSource();
+        allowModsByDefaultSaveCts = saveCts;
+
+        _ = PersistAllowModsByDefaultAsync(
+            hostId,
+            allowByDefault,
+            previousAccess,
+            version,
+            saveCts
+        );
+    }
+
+    private async Task PersistAllowModsByDefaultAsync(
+        int hostId,
+        bool allowByDefault,
+        HostModAccessState previousAccess,
+        int version,
+        CancellationTokenSource saveCts
+    )
+    {
+        var cancellationToken = saveCts.Token;
+        try
+        {
+            await Task.Delay(AccessModeSaveDebounce, cancellationToken);
+            await ModAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, cancellationToken);
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (version == allowModsByDefaultSaveVersion)
+                await InvokeAsync(LoadAsync);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch
+        {
+            if (version != allowModsByDefaultSaveVersion)
+                return;
+
+            await InvokeAsync(() =>
+            {
+                if (state is not null)
+                    state = state with { ModAccess = previousAccess };
+
+                Toasts.Error(
+                    "Moderator access mode could not be saved. Your previous setting has been restored.",
+                    "Moderator access not saved"
+                );
+                StateHasChanged();
+            });
+        }
+        finally
+        {
+            if (ReferenceEquals(allowModsByDefaultSaveCts, saveCts))
+                allowModsByDefaultSaveCts = null;
+
+            saveCts.Dispose();
+        }
     }
 
     private async Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
@@ -408,4 +476,15 @@ public partial class HostConfigPage
 
     private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? runtimeState) =>
         runtimeState is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            allowModsByDefaultSaveCts?.Cancel();
+            allowModsByDefaultSaveCts = null;
+        }
+
+        base.Dispose(disposing);
+    }
 }

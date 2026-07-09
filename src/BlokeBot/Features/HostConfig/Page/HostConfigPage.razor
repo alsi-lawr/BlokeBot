@@ -172,13 +172,13 @@
                         <button class="@AccessModeTabClass(state.ModAccess.AllowModsByDefault)"
                                 type="button"
                                 aria-pressed="@state.ModAccess.AllowModsByDefault"
-                                @onclick="() => SetAllowModsByDefaultAsync(hostId, true)">
+                                @onclick="() => SetAllowModsByDefault(hostId, true)">
                             Allow by default
                         </button>
                         <button class="@AccessModeTabClass(!state.ModAccess.AllowModsByDefault)"
                                 type="button"
                                 aria-pressed="@(!state.ModAccess.AllowModsByDefault)"
-                                @onclick="() => SetAllowModsByDefaultAsync(hostId, false)">
+                                @onclick="() => SetAllowModsByDefault(hostId, false)">
                             Require allow list
                         </button>
                     </div>
