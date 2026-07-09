@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
 @using BlokeBot.Eventing
+@using BlokeBot.Features.AccessLists
 @using BlokeBot.Features.HostConfig.Access
 @using BlokeBot.Features.HostedChannels
 @using BlokeBot.Features.HostedChannels.Authorization
@@ -14,6 +15,7 @@
 @inject HostConfigService HostConfig
 @inject HostFeatureService Features
 @inject HostModAccessService ModAccess
+@inject AccessListProfileResolver AccessListProfiles
 @inject HostedChannelRuntimeControlService Runtime
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
 @inject EventBus<AppEventKind> Events
@@ -129,14 +131,14 @@
 
                 <div class="grid gap-5 lg:grid-cols-2">
                     <HostAccessList Title="Allowed moderators"
-                                    Entries="state.ModAccess.Whitelist"
+                                    Entries="whitelistEntries"
                                     NewLogin="@newWhitelistLogin"
                                     NewLoginChanged="value => newWhitelistLogin = value"
                                     Add="() => AddAccessAsync(hostId, AccessListEntryKind.Whitelist)"
                                     Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)" />
 
                     <HostAccessList Title="Blocked moderators"
-                                    Entries="state.ModAccess.Blacklist"
+                                    Entries="blacklistEntries"
                                     NewLogin="@newBlacklistLogin"
                                     NewLoginChanged="value => newBlacklistLogin = value"
                                     Add="() => AddAccessAsync(hostId, AccessListEntryKind.Blacklist)"

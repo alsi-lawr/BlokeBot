@@ -4,6 +4,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Commands;
@@ -157,6 +158,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotSiteAccess(this IServiceCollection services)
     {
+        services.AddTransient<AccessListProfileResolver>();
         services.AddSingleton<SiteAccessChangeNotifier>();
         services.AddScoped<SiteAccessService>();
         return services;

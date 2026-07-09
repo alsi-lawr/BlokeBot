@@ -7,6 +7,7 @@ using BlokeBot.Commands;
 using BlokeBot.Components;
 using BlokeBot.Components.Layout;
 using BlokeBot.Eventing;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Admin.SiteAccess;
@@ -53,6 +54,8 @@ public partial class AdminPage
     private SiteAccessAdminState? state;
     private BotAccountAuthorizationStatus? botAccountStatus;
     private IReadOnlyList<HostedChannelAdminView> hosts = [];
+    private IReadOnlyList<AccessListEntryProfile> siteBlacklistEntries = [];
+    private IReadOnlyList<AccessListEntryProfile> siteWhitelistEntries = [];
     private bool isBotAccount;
     private int? pendingRuntimeHostId;
     private string newBlacklistLogin = string.Empty;
@@ -131,6 +134,14 @@ public partial class AdminPage
     {
         isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
         state = await SiteAccess.LoadAdminStateAsync(CancellationToken.None);
+        siteWhitelistEntries = await AccessListProfiles.ResolveAsync(
+            state.Whitelist,
+            CancellationToken.None
+        );
+        siteBlacklistEntries = await AccessListProfiles.ResolveAsync(
+            state.Blacklist,
+            CancellationToken.None
+        );
         hosts = await HostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
         botAccountStatus = await BotAccountAuthorization.GetStatusAsync(CancellationToken.None);
     }

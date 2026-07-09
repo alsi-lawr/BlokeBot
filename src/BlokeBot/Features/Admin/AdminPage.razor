@@ -4,6 +4,7 @@
 @using BlokeBot.Twitch
 @using BlokeBot.Twitch.Auth
 @using BlokeBot.Twitch.Runtime
+@using BlokeBot.Features.AccessLists
 @using BlokeBot.Features.Admin.Authorization
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Features.Admin.SiteAccess
@@ -20,6 +21,7 @@
 @inject AdminHostManagementService HostManagement
 @inject HostedChannelDirectoryService HostedChannels
 @inject BotAccountAuthorizationService BotAccountAuthorization
+@inject AccessListProfileResolver AccessListProfiles
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
 @inject ToastService Toasts
@@ -45,6 +47,8 @@
                                         Refresh="@RefreshBotAccountAuthorizationAsync" />
 
         <SiteAccessSection State="@state"
+                           WhitelistEntries="@siteWhitelistEntries"
+                           BlacklistEntries="@siteBlacklistEntries"
                            AddBlacklist="@AddBlacklistAsync"
                            AddWhitelist="@AddWhitelistAsync"
                            RemoveBlacklist="@RemoveBlacklistAsync"

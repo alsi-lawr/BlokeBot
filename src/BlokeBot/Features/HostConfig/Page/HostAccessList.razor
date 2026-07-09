@@ -13,9 +13,26 @@
         {
             @foreach (var entry in Entries)
             {
-                <div @key="entry" class="@EntryRowClass(entry)">
-                    <span class="text-sm font-medium text-slate-800">@entry</span>
-                    <button class="text-sm font-semibold text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@pendingRemovals.Contains(entry)" @onclick="() => RemoveEntryAsync(entry)">Remove</button>
+                <div @key="entry.Login" class="@EntryRowClass(entry.Login)">
+                    <div class="flex min-w-0 items-center gap-2.5">
+                        @if (!string.IsNullOrWhiteSpace(entry.ProfileImageUrl))
+                        {
+                            <img class="h-7 w-7 shrink-0 rounded-full border border-slate-200 object-cover shadow-sm"
+                                 src="@entry.ProfileImageUrl"
+                                 alt="" />
+                        }
+                        else
+                        {
+                            <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500 ring-1 ring-slate-200">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M20 21a8 8 0 0 0-16 0" />
+                                    <path d="M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" />
+                                </svg>
+                            </span>
+                        }
+                        <span class="truncate text-sm font-medium text-slate-800">@entry.Login</span>
+                    </div>
+                    <button class="shrink-0 text-sm font-semibold text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@pendingRemovals.Contains(entry.Login)" @onclick="() => RemoveEntryAsync(entry.Login)">Remove</button>
                 </div>
             }
         }

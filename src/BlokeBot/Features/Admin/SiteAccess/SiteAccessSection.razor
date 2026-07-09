@@ -11,8 +11,8 @@
         </label>
 
         <div class="grid gap-5 lg:grid-cols-2">
-            <AccessList Title="Whitelist" Entries="@State.Whitelist" Placeholder="twitch login" Add="@AddWhitelist" Remove="@RemoveWhitelist" NewLogin="@NewWhitelistLogin" NewLoginChanged="@OnWhitelistInput" />
-            <AccessList Title="Blacklist" Entries="@State.Blacklist" Placeholder="twitch login" Add="@AddBlacklist" Remove="@RemoveBlacklist" NewLogin="@NewBlacklistLogin" NewLoginChanged="@OnBlacklistInput" />
+            <AccessList Title="Whitelist" Entries="@WhitelistEntries" Placeholder="twitch login" Add="@AddWhitelist" Remove="@RemoveWhitelist" NewLogin="@NewWhitelistLogin" NewLoginChanged="@OnWhitelistInput" />
+            <AccessList Title="Blacklist" Entries="@BlacklistEntries" Placeholder="twitch login" Add="@AddBlacklist" Remove="@RemoveBlacklist" NewLogin="@NewBlacklistLogin" NewLoginChanged="@OnBlacklistInput" />
         </div>
     </div>
 </section>

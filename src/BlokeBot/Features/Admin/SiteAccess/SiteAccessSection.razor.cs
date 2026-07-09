@@ -6,6 +6,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Components;
 using BlokeBot.Components.Layout;
 using BlokeBot.Eventing;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Guessing.Commands;
@@ -49,6 +50,9 @@ public partial class SiteAccessSection
     public Func<Task> AddWhitelist { get; set; } = () => Task.CompletedTask;
 
     [Parameter]
+    public IReadOnlyList<AccessListEntryProfile> BlacklistEntries { get; set; } = [];
+
+    [Parameter]
     public string NewBlacklistLogin { get; set; } = string.Empty;
 
     [Parameter]
@@ -71,6 +75,9 @@ public partial class SiteAccessSection
 
     [Parameter, EditorRequired]
     public Func<ChangeEventArgs, Task> ToggleWhitelist { get; set; } = _ => Task.CompletedTask;
+
+    [Parameter]
+    public IReadOnlyList<AccessListEntryProfile> WhitelistEntries { get; set; } = [];
 
     private async Task OnBlacklistInput(string value)
     {

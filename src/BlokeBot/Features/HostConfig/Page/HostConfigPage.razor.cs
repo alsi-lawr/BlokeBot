@@ -6,6 +6,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Components;
 using BlokeBot.Components.Layout;
 using BlokeBot.Eventing;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Guessing.Commands;
@@ -50,7 +51,9 @@ public partial class HostConfigPage
     private string newWhitelistLogin = string.Empty;
     private bool blockedByMode;
     private BotChannelRuntimeState? pendingRuntimeState;
+    private IReadOnlyList<AccessListEntryProfile> blacklistEntries = [];
     private HostConfigState? state;
+    private IReadOnlyList<AccessListEntryProfile> whitelistEntries = [];
 
     private bool CanStart =>
         state?.RuntimeStatus is not null
@@ -203,6 +206,7 @@ public partial class HostConfigPage
         {
             blockedByMode = true;
             state = null;
+            ClearAccessEntries();
             return;
         }
 
@@ -215,8 +219,14 @@ public partial class HostConfigPage
         if (blockedByMode)
         {
             state = null;
+            ClearAccessEntries();
             return;
         }
+
+        if (state is { IsHostCreated: true } loadedState)
+            await LoadAccessEntriesAsync(loadedState.ModAccess);
+        else
+            ClearAccessEntries();
     }
 
     private async Task ReloadForEventAsync()
@@ -253,6 +263,24 @@ public partial class HostConfigPage
         await Features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
         await LoadAsync();
         ToastFeatureChange(feature, enabled);
+    }
+
+    private async Task LoadAccessEntriesAsync(HostModAccessState access)
+    {
+        whitelistEntries = await AccessListProfiles.ResolveAsync(
+            access.Whitelist,
+            CancellationToken.None
+        );
+        blacklistEntries = await AccessListProfiles.ResolveAsync(
+            access.Blacklist,
+            CancellationToken.None
+        );
+    }
+
+    private void ClearAccessEntries()
+    {
+        whitelistEntries = [];
+        blacklistEntries = [];
     }
 
     private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)

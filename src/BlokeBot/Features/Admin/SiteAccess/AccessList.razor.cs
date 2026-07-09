@@ -6,6 +6,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Components;
 using BlokeBot.Components.Layout;
 using BlokeBot.Eventing;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Guessing.Commands;
@@ -49,7 +50,7 @@ public partial class AccessList
     public Func<Task> Add { get; set; } = () => Task.CompletedTask;
 
     [Parameter]
-    public IReadOnlyList<string> Entries { get; set; } = [];
+    public IReadOnlyList<AccessListEntryProfile> Entries { get; set; } = [];
 
     [Parameter]
     public string NewLogin { get; set; } = string.Empty;
