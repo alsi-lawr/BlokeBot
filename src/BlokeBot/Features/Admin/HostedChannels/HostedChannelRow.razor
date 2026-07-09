@@ -1,6 +1,6 @@
 @using BlokeBot.Persistence.Models
 
-<div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+<div class="@RowClass">
     <div class="flex min-w-0 items-center gap-3">
         @if (!string.IsNullOrWhiteSpace(Host.ProfileImageUrl))
         {
@@ -43,11 +43,14 @@
         {
             <a class="btn-secondary" href="@EditHostHref" data-enhance-nav="false">Edit as admin</a>
         }
-        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700" @onclick="() => RemoveHost(Host.Id)">Remove</button>
+        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@pendingRemoval" @onclick="RemoveHostAsync">Remove</button>
     </div>
 </div>
 
 @code {
+    private const int RemovalAnimationDelayMs = 150;
+    private bool pendingRemoval;
+
     [Parameter, EditorRequired] public HostedChannelAdminView Host { get; set; } = new(0, string.Empty, string.Empty, null, false, BotChannelRuntimeState.Stopped);
     [Parameter] public bool CanEditHost { get; set; } = true;
     [Parameter, EditorRequired] public Func<int, Task> RemoveHost { get; set; } = _ => Task.CompletedTask;
@@ -56,6 +59,11 @@
 
     private string EditHostHref =>
         $"/admin/select-host?hostId={Host.Id}&returnUrl={Uri.EscapeDataString("/admin")}";
+
+    private string RowClass =>
+        pendingRemoval
+            ? "motion-list__item motion-list__item--removing flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
+            : "motion-list__item flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between";
 
     private string BotStartedBadgeClass
     {
@@ -114,5 +122,23 @@
         return active
             ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
             : "h-1.5 w-1.5 rounded-full bg-amber-500";
+    }
+
+    private async Task RemoveHostAsync()
+    {
+        if (pendingRemoval)
+            return;
+
+        pendingRemoval = true;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(RemovalAnimationDelayMs);
+            await RemoveHost(Host.Id);
+        }
+        finally
+        {
+            pendingRemoval = false;
+        }
     }
 }

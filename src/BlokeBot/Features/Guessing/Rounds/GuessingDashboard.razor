@@ -151,7 +151,7 @@
                     </div>
                 </div>
 
-                <div class="overflow-hidden">
+                <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
                     @if (leaderboard.Entries.Count == 0)
                     {
                         <div class="p-8 text-sm text-muted-foreground">No historical guesses match the selected filters.</div>
@@ -172,7 +172,7 @@
                             <tbody class="divide-y divide-slate-100">
                                 @foreach (var entry in leaderboard.Entries)
                                 {
-                                    <tr>
+                                    <tr @key="entry" class="motion-list__item">
                                         <td class="px-5 py-3 font-semibold text-slate-900">#@entry.Rank</td>
                                         <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
                                         <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>

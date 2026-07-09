@@ -13,10 +13,10 @@
         </div>
         @if (!string.IsNullOrWhiteSpace(Status))
         {
-            <p class="mt-3 text-sm font-medium text-slate-700">@Status</p>
+            <p @key="Status" class="motion-status mt-3 text-sm font-medium text-slate-700">@Status</p>
         }
     </div>
-    <div class="divide-y divide-slate-100">
+    <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
         @if (Hosts.Count == 0)
         {
             <div class="p-8 text-sm text-muted-foreground">No hosted channels are available.</div>
@@ -25,7 +25,8 @@
         {
             @foreach (var host in Hosts)
             {
-                <HostedChannelRow Host="@host"
+                <HostedChannelRow @key="host.Id"
+                                  Host="@host"
                                   CanEditHost="@CanEditHosts"
                                   RemoveHost="@RemoveHost"
                                   StartBot="@StartBot"

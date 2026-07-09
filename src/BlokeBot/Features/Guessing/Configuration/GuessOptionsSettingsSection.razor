@@ -2,23 +2,61 @@
 
 <CollapsibleSection Title="Valid guesses" Description="Names and per-name replies for this profile." InitiallyOpen="true">
     <div class="space-y-3 p-4">
-        @for (var i = 0; i < Options.Count; i++)
-        {
-            var option = Options[i];
-            <div class="surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]">
-                <input class="input" placeholder="name" @bind="option.Name" />
-                <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
-                <button class="btn-secondary" @onclick="() => RemoveOption.InvokeAsync(option)">Remove</button>
-            </div>
-        }
+        <div class="motion-list scroll-panel scroll-panel--valid-guesses pr-2">
+            @if (Options.Count == 0)
+            {
+                <p class="text-sm text-muted-foreground">No valid guesses yet.</p>
+            }
+            else
+            {
+                @for (var i = 0; i < Options.Count; i++)
+                {
+                    var option = Options[i];
+                    <div @key="option" class="@OptionRowClass(option)">
+                        <input class="input" placeholder="name" @bind="option.Name" />
+                        <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
+                        <button class="btn-secondary" disabled="@pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
+                    </div>
+                }
+            }
+        </div>
         <button class="btn-secondary" @onclick="InvokeAddOptionAsync">Add guess option</button>
     </div>
 </CollapsibleSection>
 
 @code {
+    private const int RemovalAnimationDelayMs = 150;
+    private readonly HashSet<GuessOptionEditor> pendingRemovals = [];
+
     [Parameter, EditorRequired] public EventCallback AddOption { get; set; }
     [Parameter, EditorRequired] public List<GuessOptionEditor> Options { get; set; } = [];
     [Parameter, EditorRequired] public EventCallback<GuessOptionEditor> RemoveOption { get; set; }
 
     private async Task InvokeAddOptionAsync() => await AddOption.InvokeAsync();
+
+    private string OptionRowClass(GuessOptionEditor option)
+    {
+        const string baseClass =
+            "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]";
+        return pendingRemovals.Contains(option)
+            ? $"{baseClass} motion-list__item--removing"
+            : baseClass;
+    }
+
+    private async Task RemoveOptionAsync(GuessOptionEditor option)
+    {
+        if (!pendingRemovals.Add(option))
+            return;
+
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(RemovalAnimationDelayMs);
+            await RemoveOption.InvokeAsync(option);
+        }
+        finally
+        {
+            pendingRemovals.Remove(option);
+        }
+    }
 }

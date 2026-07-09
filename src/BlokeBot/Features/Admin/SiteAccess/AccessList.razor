@@ -4,7 +4,7 @@
         <input class="input" placeholder="@Placeholder" value="@NewLogin" @oninput="OnInput" />
         <button class="btn-secondary" @onclick="Add">Add</button>
     </div>
-    <div class="mt-4 space-y-2">
+    <div class="motion-list scroll-panel scroll-panel--access-list mt-4 pr-2">
         @if (Entries.Count == 0)
         {
             <p class="text-sm text-muted-foreground">No entries.</p>
@@ -13,9 +13,9 @@
         {
             @foreach (var entry in Entries)
             {
-                <div class="surface-row flex items-center justify-between rounded-md px-3 py-2">
+                <div @key="entry" class="@EntryRowClass(entry)">
                     <span class="text-sm font-medium text-slate-800">@entry</span>
-                    <button class="text-sm font-semibold text-red-600 hover:text-red-700" @onclick="() => Remove(entry)">Remove</button>
+                    <button class="text-sm font-semibold text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@pendingRemovals.Contains(entry)" @onclick="() => RemoveEntryAsync(entry)">Remove</button>
                 </div>
             }
         }
@@ -23,6 +23,9 @@
 </div>
 
 @code {
+    private const int RemovalAnimationDelayMs = 150;
+    private readonly HashSet<string> pendingRemovals = new(StringComparer.OrdinalIgnoreCase);
+
     [Parameter] public Func<Task> Add { get; set; } = () => Task.CompletedTask;
     [Parameter] public IReadOnlyList<string> Entries { get; set; } = [];
     [Parameter] public string NewLogin { get; set; } = string.Empty;
@@ -35,5 +38,31 @@
     {
         NewLogin = args.Value?.ToString() ?? string.Empty;
         await NewLoginChanged.InvokeAsync(NewLogin);
+    }
+
+    private string EntryRowClass(string entry)
+    {
+        const string baseClass =
+            "motion-list__item surface-row flex items-center justify-between rounded-md px-3 py-2";
+        return pendingRemovals.Contains(entry)
+            ? $"{baseClass} motion-list__item--removing"
+            : baseClass;
+    }
+
+    private async Task RemoveEntryAsync(string entry)
+    {
+        if (!pendingRemovals.Add(entry))
+            return;
+
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(RemovalAnimationDelayMs);
+            await Remove(entry);
+        }
+        finally
+        {
+            pendingRemovals.Remove(entry);
+        }
     }
 }

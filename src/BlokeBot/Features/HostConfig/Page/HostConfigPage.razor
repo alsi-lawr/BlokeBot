@@ -257,8 +257,8 @@
 
     private static string FeatureCardClass(HostFeatureCardState feature) =>
         feature.Enabled
-            ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-lg p-3 text-left"
-            : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-lg p-3 text-left";
+            ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left"
+            : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left";
 
     private static string FeatureDotClass(HostFeatureCardState feature) =>
         feature.Enabled
