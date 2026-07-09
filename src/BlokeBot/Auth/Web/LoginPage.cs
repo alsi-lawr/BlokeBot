@@ -4,6 +4,34 @@ namespace BlokeBot.Auth.Web;
 
 internal static class LoginPage
 {
+    private const string ThemeScript = """
+        <script>
+            (() => {
+                const storageKey = "blokebot.theme";
+                const media = window.matchMedia("(prefers-color-scheme: dark)");
+                const valid = value => value === "dark" || value === "light";
+
+                const storedTheme = () => {
+                    try {
+                        const value = window.localStorage.getItem(storageKey);
+                        return valid(value) ? value : null;
+                    } catch {
+                        return null;
+                    }
+                };
+
+                const systemTheme = () => media.matches ? "dark" : "light";
+                const selectedTheme = () => storedTheme() ?? systemTheme();
+                const applyTheme = theme => {
+                    document.documentElement.dataset.theme = theme;
+                    document.documentElement.style.colorScheme = theme;
+                };
+
+                applyTheme(selectedTheme());
+            })();
+        </script>
+        """;
+
     public static string Render(string? error = null)
     {
         var errorBlock = string.IsNullOrWhiteSpace(error)
@@ -21,19 +49,20 @@ internal static class LoginPage
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>Authenticate with Twitch</title>
+                {{ThemeScript}}
                 <link rel="stylesheet" href="/app.css" />
             </head>
-            <body class="min-h-screen bg-slate-50 text-slate-950">
+            <body class="min-h-screen bg-background text-foreground">
                 <main class="flex min-h-screen items-center justify-center px-4">
-                    <section class="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-2xl shadow-slate-200/70">
+                    <section class="surface w-full max-w-md rounded-lg p-8 shadow-xl shadow-slate-200/70">
                         <div class="mb-7">
                             <div class="flex items-center gap-3">
-                                <img class="h-10 w-10 rounded-lg border border-slate-200 bg-white p-1" src="/blokedroid.svg" alt="" />
-                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">BlokeBot</p>
+                                <img class="surface-muted h-10 w-10 rounded-lg p-1" src="/blokedroid.svg" alt="" />
+                                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">BlokeBot</p>
                             </div>
-                            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Authenticate with Twitch</h1>
+                            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground">Authenticate with Twitch</h1>
                         </div>
-                        <a class="inline-flex h-11 w-full items-center justify-center rounded-md bg-[#9146ff] px-4 text-sm font-semibold text-white shadow-lg shadow-purple-200 transition hover:bg-[#7c3aed] focus:outline-none focus:ring-2 focus:ring-[#9146ff] focus:ring-offset-2" href="/auth/login?start=true">
+                        <a class="btn-primary h-11 w-full" href="/auth/login?start=true">
                             Authenticate with Twitch
                         </a>
                         {{errorBlock}}
