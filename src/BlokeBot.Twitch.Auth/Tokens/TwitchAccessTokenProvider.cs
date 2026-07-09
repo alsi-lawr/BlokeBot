@@ -8,9 +8,6 @@ internal sealed class TwitchAccessTokenProvider(
     ITwitchOAuthClient oauth
 ) : ITwitchAccessTokenProvider, ITwitchAccessTokenCache
 {
-    private const string MissingRefreshTokenMessage =
-        "No Twitch refresh token is available. Complete OAuth setup first.";
-
     private readonly SemaphoreSlim gate = new(1, 1);
     private TwitchTokenSet? state;
     private bool loaded;
@@ -31,7 +28,10 @@ internal sealed class TwitchAccessTokenProvider(
             if (!string.IsNullOrWhiteSpace(accessToken))
                 return accessToken;
 
-            throw new InvalidOperationException(MissingRefreshTokenMessage);
+            throw new TwitchAccessTokenUnavailableException(
+                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+            );
         }
         finally
         {

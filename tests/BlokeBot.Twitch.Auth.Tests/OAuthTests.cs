@@ -125,9 +125,10 @@ public sealed class OAuthTests
             oauth
         );
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
+        var exception = await Should.ThrowAsync<TwitchAccessTokenUnavailableException>(() =>
             provider.GetAccessTokenAsync(CancellationToken.None)
         );
+        exception.Reason.ShouldBe(TwitchAccessTokenUnavailableReason.MissingRefreshToken);
 
         store.Loaded = new TwitchTokenSet(
             "authorized",

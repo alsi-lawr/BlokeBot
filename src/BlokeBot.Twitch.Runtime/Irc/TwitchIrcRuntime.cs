@@ -32,9 +32,9 @@ internal sealed class TwitchIrcRuntime(
             {
                 return;
             }
-            catch (InvalidOperationException ex)
+            catch (TwitchAccessTokenUnavailableException ex)
                 when (!stoppingToken.IsCancellationRequested
-                    && ex.Message == TwitchBotSetup.MissingRefreshTokenMessage
+                    && ex.Reason == TwitchAccessTokenUnavailableReason.MissingRefreshToken
                 )
             {
                 log.LogWarning(

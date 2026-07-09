@@ -28,6 +28,24 @@ public sealed class TwitchTokenStatusServiceTests
     }
 
     [Test]
+    public async Task Status_is_unavailable_when_access_token_is_unavailable()
+    {
+        var service = new TwitchTokenStatusService(
+            new ServiceProviderStub(new UnavailableTokenProvider()),
+            OAuthClient("""{"user_id":"123","login":"bot","scopes":["chat:read"]}""")
+        );
+
+        var status = await service.GetUserAccessTokenStatusAsync(
+            ["chat:read"],
+            CancellationToken.None
+        );
+
+        status.State.ShouldBe(TwitchTokenStatusState.Unavailable);
+        status.AccessToken.ShouldBeNull();
+        status.MissingScopes.ShouldBe(["chat:read"]);
+    }
+
+    [Test]
     public async Task Status_is_invalid_when_twitch_rejects_token()
     {
         var service = new TwitchTokenStatusService(
@@ -101,6 +119,15 @@ public sealed class TwitchTokenStatusServiceTests
     {
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
             Task.FromResult(accessToken);
+    }
+
+    private sealed class UnavailableTokenProvider : ITwitchAccessTokenProvider
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            throw new TwitchAccessTokenUnavailableException(
+                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+            );
     }
 
     private sealed class StatusHttpClientFactory(string? validationJson) : IHttpClientFactory

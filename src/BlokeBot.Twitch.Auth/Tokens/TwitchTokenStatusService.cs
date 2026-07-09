@@ -19,7 +19,7 @@ public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOA
         {
             accessToken = await provider.GetAccessTokenAsync(cancellationToken);
         }
-        catch (InvalidOperationException)
+        catch (TwitchAccessTokenUnavailableException)
         {
             return Unavailable(required);
         }

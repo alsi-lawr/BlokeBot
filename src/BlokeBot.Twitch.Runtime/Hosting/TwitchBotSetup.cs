@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch.Runtime;
 internal static class TwitchBotSetup
 {
     public const string MissingRefreshTokenMessage =
-        "No Twitch refresh token is available. Start OAuth authorization before connecting the bot.";
+        TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage;
 
     public static string CreateOAuthStartUri(string redirectUri)
     {
