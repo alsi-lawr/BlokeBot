@@ -48,6 +48,9 @@ public partial class CollapsibleSection
     public RenderFragment? ChildContent { get; set; }
 
     [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
     public string? Description { get; set; }
 
     [Parameter]
@@ -55,6 +58,9 @@ public partial class CollapsibleSection
 
     [Parameter]
     public string Title { get; set; } = string.Empty;
+
+    private string PanelClass =>
+        string.IsNullOrWhiteSpace(Class) ? "disclosure-panel" : $"disclosure-panel {Class}";
 
     protected override void OnInitialized()
     {

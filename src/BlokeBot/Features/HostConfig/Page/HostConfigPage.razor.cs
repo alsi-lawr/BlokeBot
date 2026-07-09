@@ -82,9 +82,9 @@ public partial class HostConfigPage
     private string AuthorizationText =>
         state?.IsChannelBotAuthorized == true
         && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
-            ? "bot authorized"
+            ? "channel authorized"
         : state?.IsChannelBotAuthorized == true ? "needs update"
-        : "bot needs auth";
+        : "channel needs auth";
 
     private string RuntimeBadgeClass =>
         state?.RuntimeStatus?.RuntimeState switch

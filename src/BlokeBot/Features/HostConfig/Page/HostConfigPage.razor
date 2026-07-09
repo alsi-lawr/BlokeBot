@@ -67,15 +67,11 @@
     }
     else if (state.HostId is { } hostId)
     {
-        <section class="card">
-            <div class="border-b border-slate-200 p-5">
-                <h2 class="text-lg font-semibold text-slate-950">#@state.DisplayName</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Bot access and connection controls for your channel.</p>
-            </div>
+        <CollapsibleSection Title="@($"#{state.DisplayName}")" Description="Bot access and connection controls for your channel." InitiallyOpen="true">
             <div class="grid gap-3 p-4 lg:grid-cols-3">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Authorization</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Channel access</p>
                         <span class="@AuthorizationBadgeClass">
                             <span class="@AuthorizationDotClass"></span>
                             @AuthorizationText
@@ -99,7 +95,7 @@
                     }
                     else
                     {
-                        <a class="mt-2 inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize bot</a>
+                        <a class="mt-2 inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize channel</a>
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@state.Login" ReloadKey="@BotAccountStatusReloadKey" />
@@ -117,7 +113,7 @@
                     </div>
                 </div>
             </div>
-        </section>
+        </CollapsibleSection>
 
         <BotAccountAuthorizationSection Status="@state.BotOverride.Status"
                                         Title="Bot account override"
@@ -132,13 +128,11 @@
                                         EnableToggleLabel="Use custom bot"
                                         EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
                                         Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
-                                        Refresh="LoadAsync" />
+                                        Refresh="LoadAsync"
+                                        Collapsible="true"
+                                        InitiallyOpen="true" />
 
-        <section class="card">
-            <div class="border-b border-slate-200 p-5">
-                <h2 class="text-lg font-semibold text-slate-950">Moderator access</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Choose which moderators can view and edit this channel.</p>
-            </div>
+        <CollapsibleSection Title="Moderator access" Description="Choose which moderators can view and edit this channel." InitiallyOpen="true">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -190,14 +184,10 @@
                                     Disabled="@(!state.ModAccess.ModsEnabled || !state.ModAccess.AllowModsByDefault)" />
                 </div>
             </div>
-        </section>
+        </CollapsibleSection>
 
-        <section class="space-y-3">
-            <div>
-                <h2 class="text-lg font-semibold text-slate-950">Bot functions</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Turn on the chat tools you want available in this channel.</p>
-            </div>
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <CollapsibleSection Title="Bot functions" Description="Turn on the chat tools you want available in this channel." InitiallyOpen="true">
+            <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in state.Features)
                 {
                     <button class="@FeatureCardClass(feature)"
@@ -220,6 +210,6 @@
                     </button>
                 }
             </div>
-        </section>
+        </CollapsibleSection>
     }
 </div>

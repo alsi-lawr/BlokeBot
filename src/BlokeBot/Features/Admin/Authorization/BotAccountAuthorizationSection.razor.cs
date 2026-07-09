@@ -69,6 +69,12 @@ public partial class BotAccountAuthorizationSection
     public bool Disabled { get; set; }
 
     [Parameter]
+    public bool Collapsible { get; set; }
+
+    [Parameter]
+    public bool InitiallyOpen { get; set; } = true;
+
+    [Parameter]
     public string? DisabledMessage { get; set; }
 
     [Parameter]
@@ -141,6 +147,8 @@ public partial class BotAccountAuthorizationSection
             : ConfiguredAccountFallbackText;
 
     private string SectionClass => Disabled ? "card bot-account-section--disabled" : "card";
+
+    private string? CollapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
 
     private string BodyClass =>
         Disabled

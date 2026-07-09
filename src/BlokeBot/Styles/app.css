@@ -214,6 +214,20 @@ a {
         width: 2.25rem;
     }
 
+    .bot-account-section--disabled {
+        background: var(--app-surface-muted);
+        border-color: var(--app-border);
+        filter: grayscale(0.45);
+    }
+
+    .bot-account-section--disabled .disclosure-trigger {
+        background: var(--app-surface-muted);
+    }
+
+    .bot-account-section--disabled .surface-muted {
+        background: color-mix(in srgb, var(--app-surface-muted) 82%, var(--app-border));
+    }
+
     .home-info-card {
         min-height: 11rem;
         transition:
