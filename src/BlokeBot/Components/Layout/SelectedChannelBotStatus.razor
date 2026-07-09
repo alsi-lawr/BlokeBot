@@ -17,7 +17,13 @@
         else if (CanAuthorizeSelectedHost())
         {
             <span class="@SelectedBotStatusDotClass"></span>
-            <a class="font-bold text-[#9146ff] transition hover:text-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize bot</a>
+            <AuthPopupButton Class="font-bold text-[#9146ff] transition hover:text-[#7c3aed] disabled:opacity-70"
+                             Url="/oauth/channel-bot/start"
+                             PopupName="blokebot-channel-oauth"
+                             OpeningText="Opening..."
+                             OnClosed="ReloadForEventAsync">
+                Authorize bot
+            </AuthPopupButton>
         }
         else
         {

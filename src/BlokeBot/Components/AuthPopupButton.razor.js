@@ -1,4 +1,4 @@
-export function openBotAuthorization(url) {
+export function openAuthPopup(url, name) {
     const width = 560;
     const height = 760;
     const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
@@ -13,7 +13,7 @@ export function openBotAuthorization(url) {
         "scrollbars=yes"
     ].join(",");
 
-    const popup = window.open(url, "blokebot-bot-oauth", features);
+    const popup = window.open(url, name || "blokebot-oauth", features);
     if (!popup) {
         window.location.assign(url);
         return Promise.resolve(false);

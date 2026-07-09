@@ -81,7 +81,13 @@
                     {
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization is current.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <a class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold text-[#6f2bdc] transition" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Reauthorize channel</a>
+                            <AuthPopupButton Class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold text-[#6f2bdc] transition disabled:opacity-70"
+                                             Url="/oauth/channel-bot/start"
+                                             PopupName="blokebot-channel-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="LoadAsync">
+                                Reauthorize channel
+                            </AuthPopupButton>
                             <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
                         </div>
                     }
@@ -89,13 +95,25 @@
                     {
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization needs to be updated.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
-                            <a class="inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Reauthorize channel</a>
+                            <AuthPopupButton Class="inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:opacity-70"
+                                             Url="/oauth/channel-bot/start"
+                                             PopupName="blokebot-channel-oauth"
+                                             OpeningText="Opening..."
+                                             OnClosed="LoadAsync">
+                                Reauthorize channel
+                            </AuthPopupButton>
                             <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
                         </div>
                     }
                     else
                     {
-                        <a class="mt-2 inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize channel</a>
+                        <AuthPopupButton Class="mt-2 inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:opacity-70"
+                                         Url="/oauth/channel-bot/start"
+                                         PopupName="blokebot-channel-oauth"
+                                         OpeningText="Opening..."
+                                         OnClosed="LoadAsync">
+                            Authorize channel
+                        </AuthPopupButton>
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@state.Login" ReloadKey="@BotAccountStatusReloadKey" />

@@ -1,0 +1,12 @@
+@implements IAsyncDisposable
+
+<button class="@Class"
+        type="button"
+        disabled="@(Disabled || opening)"
+        @onclick="OpenAsync">
+    @(opening && !string.IsNullOrWhiteSpace(OpeningText) ? OpeningText : null)
+    @if (!opening || string.IsNullOrWhiteSpace(OpeningText))
+    {
+        @ChildContent
+    }
+</button>

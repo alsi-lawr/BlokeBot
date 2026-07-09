@@ -1,5 +1,4 @@
 @using BlokeBot.Features.HostedChannels.Authorization
-@implements IAsyncDisposable
 
 @if (Collapsible)
 {
@@ -13,11 +12,14 @@
                         @EnableToggleLabel
                     </label>
                 }
-                <button class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:cursor-not-allowed disabled:opacity-70"
-                        @onclick="OpenAuthorizationAsync"
-                        disabled="@(Disabled || authorizationOpening)">
-                    @(authorizationOpening ? "Opening..." : AuthorizeButtonText)
-                </button>
+                <AuthPopupButton Class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:cursor-not-allowed disabled:opacity-70"
+                                 Url="@AuthorizationStartUrl"
+                                 PopupName="blokebot-bot-oauth"
+                                 Disabled="@Disabled"
+                                 OpeningText="Opening..."
+                                 OnClosed="Refresh">
+                    @AuthorizeButtonText
+                </AuthPopupButton>
                 <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Refresh">Refresh</button>
                 <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Clear authorization</button>
             </div>
@@ -89,11 +91,14 @@ else
                             @EnableToggleLabel
                         </label>
                     }
-                    <button class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:cursor-not-allowed disabled:opacity-70"
-                            @onclick="OpenAuthorizationAsync"
-                            disabled="@(Disabled || authorizationOpening)">
-                        @(authorizationOpening ? "Opening..." : AuthorizeButtonText)
-                    </button>
+                    <AuthPopupButton Class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:cursor-not-allowed disabled:opacity-70"
+                                     Url="@AuthorizationStartUrl"
+                                     PopupName="blokebot-bot-oauth"
+                                     Disabled="@Disabled"
+                                     OpeningText="Opening..."
+                                     OnClosed="Refresh">
+                        @AuthorizeButtonText
+                    </AuthPopupButton>
                     <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Refresh">Refresh</button>
                     <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Clear authorization</button>
                 </div>
