@@ -77,7 +77,7 @@ public partial class AccountMenu
             && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
         )
         {
-            return $"{Selection.Current.DisplayName} ({Session.AdminEditingLogin})";
+            return $"#{Selection.Current.DisplayName} ({Session.AdminEditingLogin})";
         }
 
         return Session.DisplayText;

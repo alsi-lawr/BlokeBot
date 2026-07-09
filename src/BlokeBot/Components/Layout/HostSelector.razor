@@ -31,7 +31,7 @@
                     @if (SelectedVisibleHost() is { } selected)
                     {
                         @ChannelImage(selected)
-                        <span class="truncate text-sm font-semibold text-slate-900">@selected.DisplayName</span>
+                        <span class="truncate text-sm font-semibold text-slate-900">#@selected.DisplayName</span>
                     }
                     else
                     {
@@ -56,7 +56,7 @@
                            href="@SelectHostHref(host.Id)"
                            data-enhance-nav="false">
                             @ChannelImage(host)
-                            <span class="min-w-0 truncate">@host.DisplayName</span>
+                            <span class="min-w-0 truncate">#@host.DisplayName</span>
                             @if (host.Id == selectedHostId)
                             {
                                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
