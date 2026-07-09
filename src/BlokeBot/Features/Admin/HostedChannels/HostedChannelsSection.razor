@@ -1,33 +1,36 @@
 @using BlokeBot.Features.Admin.Monitoring
 
-<section id="hosts" class="card">
-    <div class="border-b border-slate-200 p-5">
-        <h2 class="text-lg font-semibold text-slate-950">Hosted channels</h2>
-        <ConnectedChannelsSummary />
-    </div>
-    <div class="surface-band border-b p-5">
-        <label class="label" for="newHostLogin">Create hosted channel</label>
-        <div class="mt-2 flex flex-col gap-2 sm:flex-row">
-            <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
-            <button class="btn-primary sm:w-40" @onclick="CreateHost">Create</button>
+<div id="hosts">
+    <CollapsibleSection Title="Hosted channels"
+                        Description="Create channels and control their bot runtime."
+                        InitiallyOpen="true">
+        <div class="border-b border-slate-200 p-5">
+            <ConnectedChannelsSummary />
         </div>
-    </div>
-    <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
-        @if (Hosts.Count == 0)
-        {
-            <div class="p-8 text-sm text-muted-foreground">No hosted channels are available.</div>
-        }
-        else
-        {
-            @foreach (var host in Hosts)
+        <div class="surface-band border-b p-5">
+            <label class="label" for="newHostLogin">Create hosted channel</label>
+            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
+                <button class="btn-primary sm:w-40" @onclick="CreateHost">Create</button>
+            </div>
+        </div>
+        <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
+            @if (Hosts.Count == 0)
             {
-                <HostedChannelRow @key="host.Id"
-                                  Host="@host"
-                                  CanEditHost="@CanEditHosts"
-                                  RemoveHost="@RemoveHost"
-                                  StartBot="@StartBot"
-                                  StopBot="@StopBot" />
+                <div class="p-8 text-sm text-muted-foreground">No hosted channels are available.</div>
             }
-        }
-    </div>
-</section>
+            else
+            {
+                @foreach (var host in Hosts)
+                {
+                    <HostedChannelRow @key="host.Id"
+                                      Host="@host"
+                                      CanEditHost="@CanEditHosts"
+                                      RemoveHost="@RemoveHost"
+                                      StartBot="@StartBot"
+                                      StopBot="@StopBot" />
+                }
+            }
+        </div>
+    </CollapsibleSection>
+</div>

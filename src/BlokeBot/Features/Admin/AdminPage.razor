@@ -39,7 +39,9 @@
     {
         <BotAccountAuthorizationSection Status="@botAccountStatus"
                                         Clear="@ClearBotAccountAuthorizationAsync"
-                                        Refresh="@RefreshBotAccountAuthorizationAsync" />
+                                        Refresh="@RefreshBotAccountAuthorizationAsync"
+                                        Collapsible="true"
+                                        InitiallyOpen="true" />
 
         <SiteAccessSection State="@state"
                            WhitelistEntries="@siteWhitelistEntries"

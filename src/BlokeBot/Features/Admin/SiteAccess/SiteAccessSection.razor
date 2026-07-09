@@ -1,35 +1,36 @@
 @using BlokeBot.Features.SiteAccess
 
-<section id="host-access" class="card">
-    <div class="border-b border-slate-200 p-5">
-        <h2 class="text-lg font-semibold text-slate-950">Host access</h2>
-    </div>
-    <div class="space-y-5 p-5">
-        <label class="inline-flex items-center gap-3 text-sm font-semibold text-slate-800">
-            <input class="h-4 w-4" type="checkbox" checked="@State.WhitelistEnabled" @onchange="ToggleWhitelist" />
-            Require whitelist for new hosted sites
-        </label>
-        <p class="text-sm text-muted-foreground">
-            @(State.WhitelistEnabled ? "Only whitelisted Twitch users can create hosted sites." : "Twitch users can create hosted sites unless they are blacklisted.")
-        </p>
+<div id="host-access">
+    <CollapsibleSection Title="Host access"
+                        Description="Control who can create hosted sites."
+                        InitiallyOpen="true">
+        <div class="space-y-5 p-5">
+            <label class="inline-flex items-center gap-3 text-sm font-semibold text-slate-800">
+                <input class="h-4 w-4" type="checkbox" checked="@State.WhitelistEnabled" @onchange="ToggleWhitelist" />
+                Require whitelist for new hosted sites
+            </label>
+            <p class="text-sm text-muted-foreground">
+                @(State.WhitelistEnabled ? "Only whitelisted Twitch users can create hosted sites." : "Twitch users can create hosted sites unless they are blacklisted.")
+            </p>
 
-        <div class="grid gap-5 lg:grid-cols-2">
-            <AccessList Title="Whitelist"
-                        Entries="@WhitelistEntries"
-                        Placeholder="twitch login"
-                        Add="@AddWhitelist"
-                        Remove="@RemoveWhitelist"
-                        NewLogin="@NewWhitelistLogin"
-                        NewLoginChanged="@OnWhitelistInput"
-                        Disabled="@(!State.WhitelistEnabled)" />
-            <AccessList Title="Blacklist"
-                        Entries="@BlacklistEntries"
-                        Placeholder="twitch login"
-                        Add="@AddBlacklist"
-                        Remove="@RemoveBlacklist"
-                        NewLogin="@NewBlacklistLogin"
-                        NewLoginChanged="@OnBlacklistInput"
-                        Disabled="@State.WhitelistEnabled" />
+            <div class="grid gap-5 lg:grid-cols-2">
+                <AccessList Title="Whitelist"
+                            Entries="@WhitelistEntries"
+                            Placeholder="twitch login"
+                            Add="@AddWhitelist"
+                            Remove="@RemoveWhitelist"
+                            NewLogin="@NewWhitelistLogin"
+                            NewLoginChanged="@OnWhitelistInput"
+                            Disabled="@(!State.WhitelistEnabled)" />
+                <AccessList Title="Blacklist"
+                            Entries="@BlacklistEntries"
+                            Placeholder="twitch login"
+                            Add="@AddBlacklist"
+                            Remove="@RemoveBlacklist"
+                            NewLogin="@NewBlacklistLogin"
+                            NewLoginChanged="@OnBlacklistInput"
+                            Disabled="@State.WhitelistEnabled" />
+            </div>
         </div>
-    </div>
-</section>
+    </CollapsibleSection>
+</div>
