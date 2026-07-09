@@ -17,7 +17,7 @@ internal static class AuthEndpoints
                     var currentOptions = auth.CurrentOptions;
                     if (!auth.IsConfigured(currentOptions))
                         return Results.Content(
-                            LoginPage.Render("Twitch web authentication is not configured."),
+                            LoginPage.Render("Twitch sign-in is not set up yet."),
                             "text/html",
                             statusCode: StatusCodes.Status503ServiceUnavailable
                         );
@@ -90,7 +90,7 @@ internal static class AuthEndpoints
                         );
 
                     if (string.IsNullOrWhiteSpace(code))
-                        return Results.BadRequest("Missing code");
+                        return Results.BadRequest("Twitch sign-in did not finish. Try again.");
 
                     if (
                         string.IsNullOrWhiteSpace(state)
@@ -98,7 +98,7 @@ internal static class AuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return Results.BadRequest("Invalid state");
+                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
                     }
 
                     AuthResult result;
@@ -113,9 +113,9 @@ internal static class AuthEndpoints
                     catch (HttpRequestException)
                     {
                         return Results.Problem(
-                            "Twitch rejected the authentication request.",
+                            "Twitch could not finish sign-in.",
                             statusCode: StatusCodes.Status502BadGateway,
-                            title: "Twitch authentication failed"
+                            title: "Twitch sign-in failed"
                         );
                     }
                     catch (InvalidOperationException ex)
@@ -123,7 +123,7 @@ internal static class AuthEndpoints
                         return Results.Problem(
                             ex.Message,
                             statusCode: StatusCodes.Status502BadGateway,
-                            title: "Twitch authentication failed"
+                            title: "Twitch sign-in failed"
                         );
                     }
 

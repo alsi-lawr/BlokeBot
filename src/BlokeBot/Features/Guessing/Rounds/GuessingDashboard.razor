@@ -28,7 +28,7 @@
                 Dashboard
             </div>
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Guessing game</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Run live rounds and inspect player results.</p>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Run live rounds and look back at viewer results.</p>
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </div>
@@ -39,7 +39,7 @@
     }
     else if (!featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Guessing game is disabled for this channel. Enable it in Host config.</div>
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
     else
     {
@@ -69,7 +69,7 @@
     {
         @if (state is null)
         {
-            <div class="card p-8 text-sm text-muted-foreground">Loading dashboard...</div>
+            <div class="card p-8 text-sm text-muted-foreground">Loading guessing game...</div>
         }
         else
         {
@@ -91,8 +91,8 @@
     {
         <section id="history" class="card">
             <div class="border-b border-slate-200 p-5">
-                <h2 class="text-lg font-semibold text-slate-950">Historical leaderboard</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Rank players by correct guesses across saved rounds.</p>
+                <h2 class="text-lg font-semibold text-slate-950">Past results</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
             </div>
             <div class="surface-band grid gap-4 border-b p-5 lg:grid-cols-4">
                 <div>
@@ -121,7 +121,7 @@
 
             @if (leaderboard is null)
             {
-                <div class="p-8 text-sm text-muted-foreground">Loading historical data...</div>
+                <div class="p-8 text-sm text-muted-foreground">Loading past results...</div>
             }
             else
             {
@@ -147,7 +147,7 @@
                 <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
                     @if (leaderboard.Entries.Count == 0)
                     {
-                        <div class="p-8 text-sm text-muted-foreground">No historical guesses match the selected filters.</div>
+                        <div class="p-8 text-sm text-muted-foreground">No past guesses match these filters.</div>
                     }
                     else
                     {

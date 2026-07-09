@@ -46,9 +46,7 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
         );
         var validation = await oauth.ValidateTokenAsync(token.AccessToken, ct);
         if (validation is null)
-            throw new InvalidOperationException(
-                "Twitch did not validate the channel authorization grant."
-            );
+            throw new InvalidOperationException("Twitch did not finish connecting this channel.");
 
         return new ChannelBotAuthorizationGrant(
             validation.UserId,

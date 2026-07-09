@@ -100,7 +100,7 @@ public partial class PageHelpButton
         "<strong>Available guesses reply</strong>: <code>{round}</code>, <code>{options}</code>",
         "<strong>Win usage reply</strong>: <code>{command}</code>",
         "<strong>Winner and no-winners replies</strong>: <code>{name}</code>, <code>{winners}</code>, <code>{count}</code>",
-        "<strong>Stop, closed, no-open-round, already-open, and moderator-only replies</strong>: no variables",
+        "<strong>Stop, closed, no-open-round, already-open, and moderator-only replies</strong>: no placeholders",
     ];
 
     private static readonly HelpPage HomeHelp = new(
@@ -120,7 +120,7 @@ public partial class PageHelpButton
     );
 
     private static readonly HelpPage HostConfigHelp = new(
-        "Host config",
+        "Channel setup",
         [
             new(
                 "Channel setup",
@@ -157,7 +157,7 @@ public partial class PageHelpButton
     );
 
     private static readonly HelpPage GuessingSettingsHelp = new(
-        "Guessing game configuration",
+        "Guessing game settings",
         [
             new(
                 "Round types",
@@ -170,8 +170,8 @@ public partial class PageHelpButton
                 []
             ),
             new(
-                "Template variables",
-                "Use these placeholders in reply templates.",
+                "Reply placeholders",
+                "Use these placeholders in bot replies.",
                 TemplateVariableItems
             ),
         ]
@@ -200,7 +200,7 @@ public partial class PageHelpButton
     );
 
     private static readonly HelpPage PointsSettingsHelp = new(
-        "Points configuration",
+        "Points settings",
         [
             new(
                 "Commands",
@@ -212,7 +212,7 @@ public partial class PageHelpButton
                 ]
             ),
             new(
-                "Reply variables",
+                "Reply placeholders",
                 "Use these placeholders when you want chat replies to include live values.",
                 [
                     "Balance and gambling replies: <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, <code>{label}</code>.",
@@ -221,7 +221,7 @@ public partial class PageHelpButton
                 ]
             ),
             new(
-                "Follower eligibility",
+                "Follower-only giveaways",
                 "Follower-only giveaways need the bot account to be allowed to check followers, and the bot must be a moderator in the channel.",
                 []
             ),

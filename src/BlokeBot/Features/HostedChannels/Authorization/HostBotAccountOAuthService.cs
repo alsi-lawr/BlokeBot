@@ -79,7 +79,7 @@ public sealed class HostBotAccountOAuthService(
             || (requireSecret && string.IsNullOrWhiteSpace(identity.ClientSecret))
         )
         {
-            throw new InvalidOperationException("TwitchBot identity configuration is incomplete.");
+            throw new InvalidOperationException("The bot account is not set up yet.");
         }
     }
 }

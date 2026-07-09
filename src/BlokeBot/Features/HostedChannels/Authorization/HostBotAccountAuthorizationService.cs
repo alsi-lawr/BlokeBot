@@ -115,9 +115,7 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        throw new InvalidOperationException(
-            $"Bot account authorization is not ready for #{channelLogin}."
-        );
+        throw new InvalidOperationException($"The bot account for #{channelLogin} is not ready.");
     }
 
     public async Task<bool> CanAuthorizeAsync(int hostId, CancellationToken ct)
@@ -178,7 +176,7 @@ public sealed class HostBotAccountAuthorizationService(
         if (missingScopes.Length > 0)
         {
             return BotAccountAuthorizationResult.Failure(
-                "Bot account authorization is missing configured permissions.",
+                "The bot account needs more Twitch access.",
                 missingScopes
             );
         }
@@ -190,7 +188,7 @@ public sealed class HostBotAccountAuthorizationService(
 
         if (!settings.OverrideEnabled)
             return BotAccountAuthorizationResult.Failure(
-                "Enable bot override before authorizing it."
+                "Turn on custom bot before connecting it."
             );
 
         settings.AccessToken = grant.Token.AccessToken;
@@ -208,7 +206,7 @@ public sealed class HostBotAccountAuthorizationService(
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
 
-        return BotAccountAuthorizationResult.Success("Bot account authorization is current.");
+        return BotAccountAuthorizationResult.Success("The bot account is ready.");
     }
 
     public async Task ClearAsync(int hostId, CancellationToken ct)
@@ -396,7 +394,7 @@ public sealed class HostBotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Custom bot account authorization has not been completed."
+                "No custom bot account is connected yet."
             ),
             TwitchTokenStatusState.Invalid => new(
                 null,
@@ -406,7 +404,7 @@ public sealed class HostBotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Custom bot account authorization could not be verified."
+                "BlokeBot could not check the custom bot account."
             ),
             TwitchTokenStatusState.Unknown => new(
                 null,
@@ -416,7 +414,7 @@ public sealed class HostBotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Custom bot account authorization status could not be checked."
+                "BlokeBot could not check the custom bot account right now."
             ),
             TwitchTokenStatusState.MissingScopes => new(
                 null,
@@ -426,7 +424,7 @@ public sealed class HostBotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Custom bot account authorization is missing configured permissions."
+                "The custom bot account needs more Twitch access."
             ),
             _ => new(
                 null,
@@ -436,7 +434,7 @@ public sealed class HostBotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 [],
-                "Custom bot account authorization is current."
+                "The custom bot account is ready."
             ),
         };
 

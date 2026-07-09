@@ -63,10 +63,11 @@ public partial class PointsEligibilitySelector
         Status?.ModeratorState == HostBotModeratorState.IsModerator;
 
     private string FollowerEligibilityTitle =>
-        IsBackgroundLoading ? "Checking moderator status for follower-only giveaways."
-        : FollowerEligibilityAvailable ? "Followers"
-        : BackgroundError is not null ? "Moderator status could not be checked."
-        : Status?.ModeratorStatusMessage ?? "Moderator status is not ready for this channel.";
+        IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
+        : FollowerEligibilityAvailable ? "Followers can enter."
+        : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
+        : Status?.ModeratorStatusMessage
+            ?? "Follower-only giveaways are not ready for this channel.";
 
     private async Task OnEligibilityChangedAsync(ChangeEventArgs args)
     {

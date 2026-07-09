@@ -18,7 +18,7 @@
         <div class="space-y-2">
             <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">Dashboard</div>
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Points</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Balances, ledger entries, user controls, and the active giveaway.</p>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Check balances, adjust points, and run the current giveaway.</p>
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </div>
@@ -29,7 +29,7 @@
     }
     else if (!featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Points is disabled for this channel. Enable it in Host config.</div>
+        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
     }
     else if (state is null)
     {
@@ -73,11 +73,11 @@
 
             <section class="card">
                 <div class="border-b border-slate-200 p-5">
-                    <h2 class="text-lg font-semibold text-slate-950">User controls</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Look up a balance or adjust points.</p>
+                    <h2 class="text-lg font-semibold text-slate-950">Viewer points</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
                 </div>
                 <div class="grid gap-4 p-5 md:grid-cols-2">
-                    <Field Label="Lookup user" @bind-Value="lookupLogin" Placeholder="login" />
+                    <Field Label="Find viewer" @bind-Value="lookupLogin" Placeholder="username" />
                     <div class="flex items-end">
                         <button class="btn-secondary" @onclick="LookupAsync">Lookup</button>
                     </div>
@@ -92,20 +92,20 @@
                 <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Give</h3>
-                        <Field Label="From" @bind-Value="giveFrom" Placeholder="source login" />
-                        <Field Label="To" @bind-Value="giveTo" Placeholder="target login" />
+                        <Field Label="From" @bind-Value="giveFrom" Placeholder="from username" />
+                        <Field Label="To" @bind-Value="giveTo" Placeholder="to username" />
                         <Field Label="Amount" @bind-Value="giveAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="GiveAsync">Give</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Add</h3>
-                        <Field Label="User" @bind-Value="addLogin" Placeholder="target login" />
+                        <Field Label="Viewer" @bind-Value="addLogin" Placeholder="username" />
                         <Field Label="Amount" @bind-Value="addAmount" Placeholder="100" />
                         <button class="btn-secondary" @onclick="AddAsync">Add</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Remove</h3>
-                        <Field Label="User" @bind-Value="removeLogin" Placeholder="target login" />
+                        <Field Label="Viewer" @bind-Value="removeLogin" Placeholder="username" />
                         <Field Label="Amount" @bind-Value="removeAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="RemoveAsync">Remove</button>
                     </div>
@@ -149,17 +149,17 @@
 
         <section class="card">
             <div class="border-b border-slate-200 p-5">
-                <h2 class="text-lg font-semibold text-slate-950">Recent ledger</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Latest balance-changing entries.</p>
+                <h2 class="text-lg font-semibold text-slate-950">Recent changes</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
             <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>
                             <th class="px-5 py-3 font-semibold">Time</th>
-                            <th class="px-5 py-3 font-semibold">Kind</th>
+                            <th class="px-5 py-3 font-semibold">Change</th>
                             <th class="px-5 py-3 font-semibold">User</th>
-                            <th class="px-5 py-3 font-semibold">Delta</th>
+                            <th class="px-5 py-3 font-semibold">Amount</th>
                             <th class="px-5 py-3 font-semibold">Balance</th>
                         </tr>
                     </thead>

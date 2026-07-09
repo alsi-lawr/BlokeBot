@@ -21,7 +21,7 @@
                     @AuthorizeButtonText
                 </AuthPopupButton>
                 <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Refresh">Refresh</button>
-                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Clear authorization</button>
+                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Disconnect</button>
             </div>
         </div>
         <div class="@BodyClass">
@@ -53,7 +53,7 @@
                             </span>
                         </div>
                         <p class="mt-2 truncate text-sm font-semibold text-slate-900">@AuthorizedAccountText</p>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Configured as @ConfiguredAccountText</p>
+                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @ConfiguredAccountText</p>
                         <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
                         @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
                         {
@@ -63,12 +63,12 @@
                 </div>
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
-                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Permissions</p>
-                <p class="mt-2 text-xs font-medium text-slate-500">Required: @FormatScopes(Status?.RequiredScopes)</p>
-                <p class="mt-1 text-xs font-medium text-slate-500">Granted: @FormatScopes(Status?.GrantedScopes)</p>
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch access</p>
+                <p class="mt-2 text-xs font-medium text-slate-500">Needed: @FormatScopes(Status?.RequiredScopes)</p>
+                <p class="mt-1 text-xs font-medium text-slate-500">Saved: @FormatScopes(Status?.GrantedScopes)</p>
                 @if (Status?.MissingScopes.Count > 0)
                 {
-                    <p class="mt-1 text-xs font-bold text-amber-700">Missing: @FormatScopes(Status.MissingScopes)</p>
+                    <p class="mt-1 text-xs font-bold text-amber-700">Still needed: @FormatScopes(Status.MissingScopes)</p>
                 }
             </div>
         </div>
@@ -100,7 +100,7 @@ else
                         @AuthorizeButtonText
                     </AuthPopupButton>
                     <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Refresh">Refresh</button>
-                    <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Clear authorization</button>
+                    <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Disconnect</button>
                 </div>
             </div>
         </div>
@@ -133,7 +133,7 @@ else
                             </span>
                         </div>
                         <p class="mt-2 truncate text-sm font-semibold text-slate-900">@AuthorizedAccountText</p>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Configured as @ConfiguredAccountText</p>
+                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @ConfiguredAccountText</p>
                         <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
                         @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
                         {
@@ -143,12 +143,12 @@ else
                 </div>
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
-                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Permissions</p>
-                <p class="mt-2 text-xs font-medium text-slate-500">Required: @FormatScopes(Status?.RequiredScopes)</p>
-                <p class="mt-1 text-xs font-medium text-slate-500">Granted: @FormatScopes(Status?.GrantedScopes)</p>
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch access</p>
+                <p class="mt-2 text-xs font-medium text-slate-500">Needed: @FormatScopes(Status?.RequiredScopes)</p>
+                <p class="mt-1 text-xs font-medium text-slate-500">Saved: @FormatScopes(Status?.GrantedScopes)</p>
                 @if (Status?.MissingScopes.Count > 0)
                 {
-                    <p class="mt-1 text-xs font-bold text-amber-700">Missing: @FormatScopes(Status.MissingScopes)</p>
+                    <p class="mt-1 text-xs font-bold text-amber-700">Still needed: @FormatScopes(Status.MissingScopes)</p>
                 }
             </div>
         </div>

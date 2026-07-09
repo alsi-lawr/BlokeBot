@@ -23,24 +23,24 @@
 @inject NavigationManager Navigation
 @inject ToastService Toasts
 
-<PageTitle>BlokeBot | Host config</PageTitle>
+<PageTitle>BlokeBot | Channel Setup</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
     <div class="space-y-2">
         <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
-            Host config
+            Channel setup
         </div>
-        <h1 class="text-3xl font-bold tracking-tight text-slate-950">Host config</h1>
-        <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Manage your channel access and bot runtime.</p>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-950">Channel setup</h1>
+        <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Connect the bot, choose who can help, and turn chat tools on or off.</p>
     </div>
 
     @if (blockedByMode)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Select your own hosted channel to manage host config.</div>
+        <div class="card p-8 text-sm text-muted-foreground">Switch back to your own channel to change these settings.</div>
     }
     else if (state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading host config...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading channel setup...</div>
     }
     else if (!state.IsHostCreated)
     {
@@ -52,26 +52,26 @@
                 }
                 <div>
                     <h2 class="text-lg font-semibold text-slate-950">#@state.DisplayName</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Create your hosted channel to configure bot functions.</p>
+                    <p class="mt-1 text-sm text-muted-foreground">Create your channel setup before turning on bot tools.</p>
                 </div>
             </div>
             @if (state.CanCreateHost)
             {
-                <a class="btn-primary mt-5" href="/host/create?returnUrl=/host" data-enhance-nav="false">Create hosted channel</a>
+                <a class="btn-primary mt-5" href="/host/create?returnUrl=/host" data-enhance-nav="false">Create channel setup</a>
             }
             else
             {
-                <p class="mt-5 text-sm font-semibold text-slate-700">You do not currently have access to create a hosted channel.</p>
+                <p class="mt-5 text-sm font-semibold text-slate-700">This Twitch account cannot create a BlokeBot channel setup yet.</p>
             }
         </section>
     }
     else if (state.HostId is { } hostId)
     {
-        <CollapsibleSection Title="@($"#{state.DisplayName}")" Description="Bot access and connection controls for your channel." InitiallyOpen="true">
+        <CollapsibleSection Title="@($"#{state.DisplayName}")" Description="Connect the bot and start or stop it for your channel." InitiallyOpen="true">
             <div class="grid gap-3 p-4 lg:grid-cols-3">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Channel access</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch chat</p>
                         <span class="@AuthorizationBadgeClass">
                             <span class="@AuthorizationDotClass"></span>
                             @AuthorizationText
@@ -79,30 +79,30 @@
                     </div>
                     @if (state.IsChannelBotAuthorized && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization is current.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The bot can chat in this channel.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
                                              Url="/oauth/channel-bot/start"
                                              PopupName="blokebot-channel-oauth"
                                              OpeningText="Opening..."
                                              OnClosed="LoadAsync">
-                                Reauthorize channel
+                                Reconnect channel
                             </AuthPopupButton>
-                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
+                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
                         </div>
                     }
                     else if (state.IsChannelBotAuthorized)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">Channel chat authorization needs to be updated.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The bot needs a fresh Twitch connection for this channel.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
                                              Url="/oauth/channel-bot/start"
                                              PopupName="blokebot-channel-oauth"
                                              OpeningText="Opening..."
                                              OnClosed="LoadAsync">
-                                Reauthorize channel
+                                Reconnect channel
                             </AuthPopupButton>
-                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Clear authorization</button>
+                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
                         </div>
                     }
                     else
@@ -112,14 +112,14 @@
                                          PopupName="blokebot-channel-oauth"
                                          OpeningText="Opening..."
                                          OnClosed="LoadAsync">
-                            Authorize channel
+                            Connect channel
                         </AuthPopupButton>
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@state.Login" ReloadKey="@BotAccountStatusReloadKey" />
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Runtime</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
                         <span class="@RuntimeBadgeClass">
                             <span class="@RuntimeDotClass"></span>
                             @RuntimeText
@@ -134,12 +134,12 @@
         </CollapsibleSection>
 
         <BotAccountAuthorizationSection Status="@state.BotOverride.Status"
-                                        Title="Bot account override"
+                                        Title="Use your own bot account"
                                         Description="Use a Twitch account you control as the bot for this channel."
-                                        AuthorizeButtonText="Authorize custom bot"
+                                        AuthorizeButtonText="Connect custom bot"
                                         AuthorizationStartUrl="/oauth/host-bot/start"
                                         Disabled="@(!state.BotOverride.Enabled)"
-                                        DisabledMessage="Turn this on to authorize and use a channel-specific bot account."
+                                        DisabledMessage="Turn this on before connecting your own bot account."
                                         ConfiguredAccountFallbackText="custom bot account"
                                         ShowEnableToggle="true"
                                         EnableToggleValue="@state.BotOverride.Enabled"
@@ -150,42 +150,42 @@
                                         Collapsible="true"
                                         InitiallyOpen="true" />
 
-        <CollapsibleSection Title="Moderator access" Description="Choose which moderators can view and edit this channel." InitiallyOpen="true">
+        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="true">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
                         <input class="h-4 w-4" type="checkbox" checked="@state.ModAccess.ModsEnabled" @onchange="args => SetModsEnabledAsync(hostId, args)" />
-                        Allow moderators to view and edit this channel
+                        Let moderators help with this channel
                     </label>
-                    <p class="text-sm text-muted-foreground">When this is off, moderator access is disabled but your saved allow and block lists are kept.</p>
+                    <p class="text-sm text-muted-foreground">When this is off, your saved allow and block lists stay here, but mods cannot use them.</p>
                 </div>
 
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <p class="text-sm font-semibold text-foreground">Allow moderators by default</p>
+                        <p class="text-sm font-semibold text-foreground">Who can help?</p>
                         <p class="mt-1 text-sm text-muted-foreground">
-                            @(state.ModAccess.AllowModsByDefault ? "Moderators can access unless they are on the blocked list." : "Only moderators on the allowed list can access.")
+                            @(state.ModAccess.AllowModsByDefault ? "All channel mods can help unless they are blocked." : "Only mods on the allowed list can help.")
                         </p>
                     </div>
-                    <div class="@AccessModeSegmentClass" role="group" aria-label="Moderator access mode">
+                    <div class="@AccessModeSegmentClass" role="group" aria-label="Who can help with this channel">
                         <span class="segmented-motion__indicator" aria-hidden="true"></span>
                         <button class="@AccessModeTabClass(state.ModAccess.AllowModsByDefault)"
                                 type="button"
                                 aria-pressed="@state.ModAccess.AllowModsByDefault"
                                 @onclick="() => SetAllowModsByDefault(hostId, true)">
-                            Allow by default
+                            All mods
                         </button>
                         <button class="@AccessModeTabClass(!state.ModAccess.AllowModsByDefault)"
                                 type="button"
                                 aria-pressed="@(!state.ModAccess.AllowModsByDefault)"
                                 @onclick="() => SetAllowModsByDefault(hostId, false)">
-                            Require allow list
+                            Allowed list only
                         </button>
                     </div>
                 </div>
 
                 <div class="grid gap-5 lg:grid-cols-2">
-                    <HostAccessList Title="Allowed moderators"
+                    <HostAccessList Title="Allowed mods"
                                     Entries="whitelistEntries"
                                     NewLogin="@newWhitelistLogin"
                                     NewLoginChanged="value => newWhitelistLogin = value"
@@ -193,7 +193,7 @@
                                     Remove="login => RemoveAccessAsync(hostId, AccessListEntryKind.Whitelist, login)"
                                     Disabled="@(!state.ModAccess.ModsEnabled || state.ModAccess.AllowModsByDefault)" />
 
-                    <HostAccessList Title="Blocked moderators"
+                    <HostAccessList Title="Blocked mods"
                                     Entries="blacklistEntries"
                                     NewLogin="@newBlacklistLogin"
                                     NewLoginChanged="value => newBlacklistLogin = value"
@@ -204,7 +204,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Bot functions" Description="Turn on the chat tools you want available in this channel." InitiallyOpen="true">
+        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="true">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in state.Features)
                 {

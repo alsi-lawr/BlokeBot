@@ -12,11 +12,11 @@
     <div class="card p-5">
         <p class="text-sm font-medium text-muted-foreground">Valid names</p>
         <p class="mt-2 text-2xl font-bold text-slate-950">@State.Options.Count</p>
-        <p class="mt-1 text-xs text-muted-foreground">Configured choices accepted by chat</p>
+        <p class="mt-1 text-xs text-muted-foreground">Answers viewers can choose in chat</p>
     </div>
     <div class="card p-5">
         <p class="text-sm font-medium text-muted-foreground">Winner</p>
         <p class="mt-2 text-2xl font-bold text-slate-950">@(State.CurrentRound?.WinningName ?? "None")</p>
-        <p class="mt-1 text-xs text-muted-foreground">Set with the web action or win command</p>
+        <p class="mt-1 text-xs text-muted-foreground">Set here or with the win chat command</p>
     </div>
 </div>

@@ -1,7 +1,7 @@
-<CollapsibleSection Title="Round profiles" Description="Saved round types." InitiallyOpen="true">
+<CollapsibleSection Title="Round types" Description="Saved types of guessing game." InitiallyOpen="true">
     <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
-            <label class="label" for="profileSelect">Editing profile</label>
+            <label class="label" for="profileSelect">Round type to edit</label>
             <select id="profileSelect" class="input mt-2" value="@Configuration.Profile.Id" @onchange="SelectProfile">
                 @foreach (var profile in Configuration.Profiles)
                 {
@@ -15,7 +15,7 @@
         </div>
     </div>
     <div class="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[1.2fr_auto] lg:items-end">
-        <Field Label="Profile name" @bind-Value="Configuration.Profile.Name" Placeholder="Round type name" />
+        <Field Label="Round type name" @bind-Value="Configuration.Profile.Name" Placeholder="Round type name" />
         <div class="flex gap-2">
             <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                 <input type="checkbox" class="h-4 w-4" @bind="Configuration.Profile.IsDefault" />

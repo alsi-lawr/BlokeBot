@@ -78,6 +78,6 @@ public sealed class HostConfigService(
             [],
             [],
             [],
-            "Create your hosted channel before configuring a bot override."
+            "Create your channel setup before using a custom bot."
         );
 }

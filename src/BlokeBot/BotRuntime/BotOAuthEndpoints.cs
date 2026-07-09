@@ -14,7 +14,7 @@ internal static class BotOAuthEndpoints
         {
             app.MapGet(
                     "/oauth/start",
-                    () => Results.BadRequest("TwitchBot configuration is incomplete.")
+                    () => Results.BadRequest("The bot account is not set up yet.")
                 )
                 .RequireAuthorization("BotAdmin");
             return;
@@ -64,15 +64,15 @@ internal static class BotOAuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                         return Results.Content(
-                            $"OAuth error: {WebUtility.HtmlEncode(error)}",
+                            $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
                             "text/plain"
                         );
 
                     if (string.IsNullOrWhiteSpace(code))
-                        return Results.BadRequest("Missing code");
+                        return Results.BadRequest("Twitch sign-in did not finish. Try again.");
 
                     if (string.IsNullOrWhiteSpace(state))
-                        return Results.BadRequest("Invalid state");
+                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
 
                     try
                     {
@@ -84,10 +84,10 @@ internal static class BotOAuthEndpoints
                             <html lang="en">
                             <head>
                                 <meta charset="utf-8">
-                                <title>BlokeBot authorization complete</title>
+                                <title>BlokeBot connection complete</title>
                             </head>
                             <body>
-                                <p>Bot account authorization is complete. You can close this window.</p>
+                                <p>Bot account connected. You can close this window.</p>
                                 <script>
                                     window.close();
                                 </script>
@@ -99,7 +99,7 @@ internal static class BotOAuthEndpoints
                     }
                     catch (InvalidOperationException)
                     {
-                        return Results.BadRequest("Invalid state");
+                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
                     }
                 }
             )
@@ -167,12 +167,12 @@ internal static class BotOAuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                         return Results.Content(
-                            $"OAuth error: {WebUtility.HtmlEncode(error)}",
+                            $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
                             "text/plain"
                         );
 
                     if (string.IsNullOrWhiteSpace(code))
-                        return Results.BadRequest("Missing code");
+                        return Results.BadRequest("Twitch connection did not finish. Try again.");
 
                     if (
                         string.IsNullOrWhiteSpace(state)
@@ -180,12 +180,12 @@ internal static class BotOAuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return Results.BadRequest("Invalid state");
+                        return Results.BadRequest("This Twitch connection expired. Try again.");
                     }
 
                     var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is null)
-                        return Results.BadRequest("Select a hosted channel before authorizing it.");
+                        return Results.BadRequest("Choose your channel before connecting it.");
 
                     try
                     {
@@ -205,9 +205,9 @@ internal static class BotOAuthEndpoints
                     catch (HttpRequestException)
                     {
                         return Results.Problem(
-                            "Twitch rejected the channel bot authorization request.",
+                            "Twitch could not finish connecting this channel.",
                             statusCode: StatusCodes.Status502BadGateway,
-                            title: "Channel bot authorization failed"
+                            title: "Channel connection failed"
                         );
                     }
 
@@ -217,10 +217,10 @@ internal static class BotOAuthEndpoints
                         <html lang="en">
                         <head>
                             <meta charset="utf-8">
-                            <title>BlokeBot authorization complete</title>
+                            <title>BlokeBot connection complete</title>
                         </head>
                         <body>
-                            <p>Channel authorization is complete. You can close this window.</p>
+                            <p>Channel connected. You can close this window.</p>
                             <script>
                                 window.close();
                             </script>
@@ -249,12 +249,10 @@ internal static class BotOAuthEndpoints
 
                     var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is null)
-                        return Results.BadRequest(
-                            "Select your hosted channel before authorizing it."
-                        );
+                        return Results.BadRequest("Choose your channel before connecting it.");
 
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
-                        return Results.BadRequest("Enable bot override before authorizing it.");
+                        return Results.BadRequest("Turn on custom bot before connecting it.");
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     DeleteHostBotStateCookie(context);
@@ -295,10 +293,13 @@ internal static class BotOAuthEndpoints
         DeleteHostBotStateCookie(context);
 
         if (!string.IsNullOrWhiteSpace(error))
-            return Results.Content($"OAuth error: {WebUtility.HtmlEncode(error)}", "text/plain");
+            return Results.Content(
+                $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
+                "text/plain"
+            );
 
         if (string.IsNullOrWhiteSpace(code))
-            return Results.BadRequest("Missing code");
+            return Results.BadRequest("Twitch connection did not finish. Try again.");
 
         if (
             string.IsNullOrWhiteSpace(state)
@@ -306,12 +307,12 @@ internal static class BotOAuthEndpoints
             || !string.Equals(state, storedState, StringComparison.Ordinal)
         )
         {
-            return Results.BadRequest("Invalid state");
+            return Results.BadRequest("This Twitch connection expired. Try again.");
         }
 
         var selectedHost = session.HostSelection?.Current;
         if (selectedHost is null)
-            return Results.BadRequest("Select your hosted channel before authorizing it.");
+            return Results.BadRequest("Choose your channel before connecting it.");
 
         try
         {
@@ -331,9 +332,9 @@ internal static class BotOAuthEndpoints
         catch (HttpRequestException)
         {
             return Results.Problem(
-                "Twitch rejected the host bot authorization request.",
+                "Twitch could not finish connecting the custom bot.",
                 statusCode: StatusCodes.Status502BadGateway,
-                title: "Host bot authorization failed"
+                title: "Custom bot connection failed"
             );
         }
 
@@ -343,10 +344,10 @@ internal static class BotOAuthEndpoints
             <html lang="en">
             <head>
                 <meta charset="utf-8">
-                <title>BlokeBot authorization complete</title>
+                <title>BlokeBot connection complete</title>
             </head>
             <body>
-                <p>Bot account authorization is complete. You can close this window.</p>
+                <p>Bot account connected. You can close this window.</p>
                 <script>
                     window.close();
                 </script>

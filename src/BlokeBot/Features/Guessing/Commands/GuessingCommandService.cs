@@ -94,7 +94,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     }
 
     private static GuessingOperationResult NotConfigured() =>
-        new(false, "This channel is not configured.");
+        new(false, "This channel is not set up.");
 
     private static string FormatOptions(IEnumerable<string> options)
     {

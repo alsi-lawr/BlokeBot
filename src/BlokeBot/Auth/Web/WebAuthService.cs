@@ -30,7 +30,7 @@ internal sealed class WebAuthService(
     {
         var currentOptions = CurrentOptions;
         if (!IsConfigured(currentOptions))
-            return new AuthResult(false, null, "Twitch web authentication is incomplete.");
+            return new AuthResult(false, null, "Twitch sign-in is not set up yet.");
 
         var accessToken = await oauth.ExchangeCodeAsync(
             request,
@@ -85,7 +85,7 @@ internal sealed class WebAuthService(
             return new AuthResult(
                 false,
                 null,
-                "This Twitch account cannot create or manage any hosted BlokeBot channel yet."
+                "This Twitch account cannot create or manage a BlokeBot channel yet."
             );
         }
 

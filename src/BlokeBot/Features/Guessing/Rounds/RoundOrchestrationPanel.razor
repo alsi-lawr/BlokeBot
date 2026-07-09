@@ -1,7 +1,7 @@
 <section class="card">
     <div class="border-b border-slate-200 p-5">
-        <h2 class="text-lg font-semibold text-slate-950">Round orchestration</h2>
-        <p class="mt-1 text-sm text-muted-foreground">Start, stop, or resolve a round outside chat.</p>
+        <h2 class="text-lg font-semibold text-slate-950">Run a round</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Start a round, stop new guesses, or pick the winner from here.</p>
     </div>
     <div class="space-y-4 p-5">
         <div class="grid gap-3 sm:grid-cols-2">
@@ -20,7 +20,7 @@
         <div class="surface-muted rounded-lg p-4">
             <label class="label" for="winner">Winner name</label>
             <div class="mt-2 flex flex-col gap-2 sm:flex-row">
-                <input id="winner" class="input" placeholder="configured name" value="@WinnerName" @oninput="OnWinnerNameChanged" />
+                <input id="winner" class="input" placeholder="winning answer" value="@WinnerName" @oninput="OnWinnerNameChanged" />
                 <button class="btn-primary sm:w-40" @onclick="InvokeDeclareWinnerAsync">Declare win</button>
             </div>
         </div>

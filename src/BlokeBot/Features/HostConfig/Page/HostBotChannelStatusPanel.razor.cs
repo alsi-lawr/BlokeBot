@@ -82,15 +82,15 @@ public partial class HostBotChannelStatusPanel
             ? "checking"
             : Status?.ModeratorState switch
             {
-                HostBotModeratorState.IsModerator => "moderator",
-                HostBotModeratorState.NotModerator => "not moderator",
+                HostBotModeratorState.IsModerator => "yes",
+                HostBotModeratorState.NotModerator => "no",
                 _ => "unknown",
             };
 
     private string ModeratorStatusMessage =>
-        IsBackgroundLoading ? "Checking moderator status."
-        : BackgroundError is not null ? "Moderator status could not be checked."
-        : Status?.ModeratorStatusMessage ?? "Moderator status has not been checked yet.";
+        IsBackgroundLoading ? "Checking whether the bot is a channel mod."
+        : BackgroundError is not null ? "BlokeBot could not check whether the bot is a mod."
+        : Status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
 
     private string FollowerReadStatusBadgeClass =>
         Status?.CanReadFollowers == true
@@ -107,12 +107,13 @@ public partial class HostBotChannelStatusPanel
 
     private string FollowerReadStatusText =>
         IsBackgroundLoading ? "checking"
-        : Status?.CanReadFollowers == true ? "can read"
+        : Status?.CanReadFollowers == true ? "ready"
         : Status?.ModeratorState == HostBotModeratorState.Unknown ? "unknown"
-        : "not available";
+        : "not ready";
 
     private string FollowerReadStatusMessage =>
-        IsBackgroundLoading ? "Checking follower access."
-        : BackgroundError is not null ? "Follower access could not be checked."
-        : Status?.FollowerReadStatusMessage ?? "Follower access has not been checked yet.";
+        IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
+        : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
+        : Status?.FollowerReadStatusMessage
+            ?? "BlokeBot has not checked follower-only giveaways yet.";
 }

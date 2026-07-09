@@ -78,14 +78,14 @@
                                     <path d="M9 20v-6h6v6" />
                                 </svg>
                             </span>
-                            Host config
+                            Channel setup
                         </NavLink>
                     </div>
                 }
 
                 @if (showBotFunctions)
                 {
-        <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Bot functions</div>
+        <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>
         @if (showGuessing)
         {
         <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@guessingOpen">
@@ -115,7 +115,7 @@
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
                          href="guessing/settings">
-                    Configuration
+                    Settings
                 </NavLink>
             </div>
         </details>
@@ -145,7 +145,7 @@
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
                          href="points/settings">
-                    Configuration
+                    Settings
                 </NavLink>
             </div>
         </details>

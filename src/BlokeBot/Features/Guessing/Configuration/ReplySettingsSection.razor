@@ -1,6 +1,6 @@
 @using BlokeBot.Features.Guessing.Replies
 
-<CollapsibleSection Title="Replies" Description="Chat response templates." InitiallyOpen="false">
+<CollapsibleSection Title="Bot replies" Description="Messages the bot sends in chat." InitiallyOpen="false">
     <div class="grid gap-4 p-4 md:grid-cols-2">
         <TextAreaField Label="Round started" @bind-Value="Replies.RoundStartedReply" />
         <TextAreaField Label="Round already open" @bind-Value="Replies.RoundAlreadyOpenReply" />

@@ -1,11 +1,11 @@
 @using BlokeBot.Features.Guessing.Profiles
 
-<CollapsibleSection Title="Valid guesses" Description="Names and per-name replies for this profile." InitiallyOpen="true">
+<CollapsibleSection Title="Accepted answers" Description="Answers viewers can choose, with optional replies for each one." InitiallyOpen="true">
     <div class="space-y-3 p-4">
         <div class="motion-list scroll-panel scroll-panel--valid-guesses pr-2">
             @if (Options.Count == 0)
             {
-                <p class="text-sm text-muted-foreground">No valid guesses yet.</p>
+                <p class="text-sm text-muted-foreground">No answers added yet.</p>
             }
             else
             {
@@ -13,13 +13,13 @@
                 {
                     var option = Options[i];
                     <div @key="option" class="@OptionRowClass(option)">
-                        <input class="input" placeholder="name" @bind="option.Name" />
+                        <input class="input" placeholder="answer" @bind="option.Name" />
                         <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
                         <button class="btn-secondary" disabled="@pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                     </div>
                 }
             }
         </div>
-        <button class="btn-secondary" @onclick="InvokeAddOptionAsync">Add guess option</button>
+        <button class="btn-secondary" @onclick="InvokeAddOptionAsync">Add answer</button>
     </div>
 </CollapsibleSection>

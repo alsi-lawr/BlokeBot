@@ -36,12 +36,12 @@ public sealed class ChannelBotAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
-            return ChannelBotAuthorizationResult.Failure("Hosted channel was not found.");
+            return ChannelBotAuthorizationResult.Failure("Channel setup was not found.");
 
         if (!GrantMatchesHost(host.TwitchUserId, host.Login, grant))
         {
             return ChannelBotAuthorizationResult.Failure(
-                "The Twitch authorization belongs to a different channel."
+                "That Twitch sign-in belongs to a different channel."
             );
         }
 
@@ -49,7 +49,7 @@ public sealed class ChannelBotAuthorizationService(
         if (missingScopes.Length > 0)
         {
             return ChannelBotAuthorizationResult.Failure(
-                "Channel bot authorization is missing configured permissions.",
+                "The bot still needs more Twitch access for this channel.",
                 missingScopes
             );
         }
@@ -58,7 +58,7 @@ public sealed class ChannelBotAuthorizationService(
         host.ChannelBotAuthorizedScopes = TwitchScopeSet.Format(grant.Scopes);
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
-        return ChannelBotAuthorizationResult.Success("Channel bot authorization is current.");
+        return ChannelBotAuthorizationResult.Success("The bot can chat in this channel.");
     }
 
     public async Task ClearAsync(int hostId, CancellationToken ct)

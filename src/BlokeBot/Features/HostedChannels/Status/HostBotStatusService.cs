@@ -247,7 +247,7 @@ public sealed class HostBotStatusService(
     {
         var appTokens = services.GetService<TwitchAppAccessTokenProvider>();
         if (appTokens is null)
-            throw new InvalidOperationException("Twitch bot runtime is not configured.");
+            throw new InvalidOperationException("The Twitch bot runner is not set up yet.");
 
         return await appTokens.GetAccessTokenAsync(ct);
     }
@@ -265,7 +265,7 @@ public sealed class HostBotStatusService(
         if (status.AccessToken is not null && status.Validation is not null)
             return status;
 
-        throw new InvalidOperationException("Twitch bot runtime is not authorized.");
+        throw new InvalidOperationException("The Twitch bot runner is not connected.");
     }
 
     private async Task<Dictionary<string, string>> LookupUsersAsync(

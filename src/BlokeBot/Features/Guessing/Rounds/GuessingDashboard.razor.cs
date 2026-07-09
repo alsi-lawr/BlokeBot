@@ -133,7 +133,7 @@ public partial class GuessingDashboard
     {
         if (string.IsNullOrWhiteSpace(winnerName))
         {
-            Toasts.Warning("Choose a configured winner name first.");
+            Toasts.Warning("Choose one of the saved winner names first.");
             return;
         }
 

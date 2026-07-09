@@ -86,9 +86,9 @@ public partial class HostConfigPage
     private string AuthorizationText =>
         state?.IsChannelBotAuthorized == true
         && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
-            ? "channel authorized"
+            ? "connected"
         : state?.IsChannelBotAuthorized == true ? "needs update"
-        : "channel needs auth";
+        : "not connected";
 
     private string RuntimeBadgeClass =>
         state?.RuntimeStatus?.RuntimeState switch
@@ -342,8 +342,8 @@ public partial class HostConfigPage
                     state = state with { ModAccess = previousAccess };
 
                 Toasts.Error(
-                    "Moderator access mode could not be saved. Your previous setting has been restored.",
-                    "Moderator access not saved"
+                    "Who can help could not be saved. Your previous setting has been restored.",
+                    "Mod help not saved"
                 );
                 StateHasChanged();
             });
@@ -377,9 +377,9 @@ public partial class HostConfigPage
 
         Toasts.Status(
             enabled
-                ? "Custom bot override is enabled for this channel. Authorize the account before starting the bot."
-                : "Custom bot override is disabled for this channel. The global bot account will be used.",
-            enabled ? "Bot override enabled" : "Bot override disabled",
+                ? "Custom bot is turned on for this channel. Connect the account before starting the bot."
+                : "Custom bot is turned off. This channel will use the main bot account.",
+            enabled ? "Custom bot on" : "Custom bot off",
             enabled ? ToastTone.Positive : ToastTone.Caution
         );
     }
@@ -430,7 +430,7 @@ public partial class HostConfigPage
     {
         await ChannelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        Toasts.Status("Channel authorization cleared.");
+        Toasts.Status("The channel has been disconnected from Twitch chat.");
     }
 
     private async Task ClearBotOverrideAuthorizationAsync(int hostId)
@@ -438,8 +438,8 @@ public partial class HostConfigPage
         await HostBotAccounts.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
         Toasts.Status(
-            "Custom bot authorization cleared.",
-            "Bot override updated",
+            "The custom bot account has been disconnected.",
+            "Custom bot disconnected",
             ToastTone.Caution
         );
     }

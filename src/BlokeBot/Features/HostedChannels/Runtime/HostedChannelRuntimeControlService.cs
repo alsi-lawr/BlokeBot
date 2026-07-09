@@ -25,7 +25,7 @@ public sealed class HostedChannelRuntimeControlService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
-            return HostedChannelRuntimeControlResult.Failure("Hosted channel was not found.");
+            return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
 
         if (
             !channelBotAuthorization.IsCurrent(
@@ -35,7 +35,7 @@ public sealed class HostedChannelRuntimeControlService(
         )
         {
             return HostedChannelRuntimeControlResult.Failure(
-                "Authorize or reauthorize the bot on that channel before starting it."
+                "Connect the bot to Twitch chat before starting it."
             );
         }
 
@@ -47,7 +47,7 @@ public sealed class HostedChannelRuntimeControlService(
         )
         {
             return HostedChannelRuntimeControlResult.Failure(
-                "Authorize the custom bot account before starting it, or disable the bot override."
+                "Connect the custom bot account before starting it, or turn custom bot off."
             );
         }
 
@@ -66,7 +66,7 @@ public sealed class HostedChannelRuntimeControlService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
-            return HostedChannelRuntimeControlResult.Failure("Hosted channel was not found.");
+            return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
 
         if (CooldownMessage(host) is { } cooldown)
             return cooldown;
@@ -95,7 +95,7 @@ public sealed class HostedChannelRuntimeControlService(
         var nextAllowedAt = changedAt.Add(RuntimeChangeCooldown);
         return nextAllowedAt > DateTime.UtcNow
             ? HostedChannelRuntimeControlResult.Failure(
-                $"Wait until {nextAllowedAt.ToLocalTime():HH:mm:ss} before changing bot state again.",
+                $"Wait until {nextAllowedAt.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",
                 nextAllowedAt
             )
             : null;

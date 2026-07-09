@@ -47,14 +47,14 @@ public partial class BotAccountAuthorizationSection
     public BotAccountAuthorizationStatus? Status { get; set; }
 
     [Parameter]
-    public string Title { get; set; } = "Bot account authorization";
+    public string Title { get; set; } = "Bot account";
 
     [Parameter]
     public string Description { get; set; } =
-        "Authorize the Twitch account BlokeBot uses for chat and API checks.";
+        "Connect the Twitch account BlokeBot uses for chat and stream checks.";
 
     [Parameter]
-    public string AuthorizeButtonText { get; set; } = "Authorize bot account";
+    public string AuthorizeButtonText { get; set; } = "Connect bot account";
 
     [Parameter]
     public string AuthorizationStartUrl { get; set; } = "/oauth/start";
@@ -72,7 +72,7 @@ public partial class BotAccountAuthorizationSection
     public string? DisabledMessage { get; set; }
 
     [Parameter]
-    public string ConfiguredAccountFallbackText { get; set; } = "not configured";
+    public string ConfiguredAccountFallbackText { get; set; } = "not set";
 
     [Parameter]
     public bool ShowEnableToggle { get; set; }
@@ -95,7 +95,7 @@ public partial class BotAccountAuthorizationSection
     private string AuthorizedAccountText =>
         Status?.AuthorizedLogin is { Length: > 0 } login
             ? $"@{login}"
-            : "No saved Twitch authorization";
+            : "No Twitch account connected";
 
     private string ConfiguredAccountText =>
         Status?.ConfiguredBotLogin is { Length: > 0 } login
@@ -140,10 +140,10 @@ public partial class BotAccountAuthorizationSection
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled => "disabled",
-            BotAccountAuthorizationState.Ready => "current",
+            BotAccountAuthorizationState.Ready => "ready",
             BotAccountAuthorizationState.WrongAccount => "wrong account",
-            BotAccountAuthorizationState.MissingScopes => "missing permissions",
-            BotAccountAuthorizationState.NotAuthorized => "not authorized",
+            BotAccountAuthorizationState.MissingScopes => "needs more access",
+            BotAccountAuthorizationState.NotAuthorized => "not connected",
             _ => "unknown",
         };
 

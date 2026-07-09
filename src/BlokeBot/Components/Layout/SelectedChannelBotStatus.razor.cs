@@ -105,9 +105,9 @@ public partial class SelectedChannelBotStatus
             { RuntimeState: BotChannelRuntimeState.Stopping } => "bot stopping",
             { RuntimeState: BotChannelRuntimeState.Started } => "bot started",
             { IsChannelBotAuthorized: true, ChannelBotAuthorizationScopesCurrent: false } =>
-                "reauthorize bot",
-            { IsChannelBotAuthorized: true } => "bot authorized",
-            _ => "bot not authorized",
+                "reconnect bot",
+            { IsChannelBotAuthorized: true } => "bot connected",
+            _ => "bot not connected",
         };
 
     protected override void OnInitialized()

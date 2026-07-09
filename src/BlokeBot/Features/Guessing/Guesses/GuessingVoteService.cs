@@ -89,5 +89,5 @@ public sealed class GuessingVoteService(
         );
 
     private static GuessingOperationResult NotConfigured() =>
-        new(false, "This channel is not configured.");
+        new(false, "This channel is not set up.");
 }

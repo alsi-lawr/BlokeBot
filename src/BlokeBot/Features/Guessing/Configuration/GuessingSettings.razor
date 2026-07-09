@@ -16,7 +16,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="space-y-2">
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Round settings</h1>
-            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Round types, aliases, valid guesses, and replies.</p>
+            <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Round types, chat commands, accepted answers, and bot replies.</p>
         </div>
         <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
     </div>
@@ -27,11 +27,11 @@
     }
     else if (!featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Guessing game is disabled for this channel. Enable it in Host config.</div>
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
     else if (config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading configuration...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading guessing settings...</div>
     }
     else
     {

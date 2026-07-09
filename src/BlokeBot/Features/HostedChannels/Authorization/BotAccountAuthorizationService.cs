@@ -48,7 +48,7 @@ public sealed class BotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Bot account authorization has not been completed."
+                "No bot account is connected yet."
             );
         }
 
@@ -62,7 +62,7 @@ public sealed class BotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Bot account authorization could not be verified."
+                "BlokeBot could not check the connected bot account."
             );
         }
 
@@ -76,7 +76,7 @@ public sealed class BotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Bot account authorization status could not be checked."
+                "BlokeBot could not check the bot account right now."
             );
         }
 
@@ -92,7 +92,7 @@ public sealed class BotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "The saved authorization belongs to a different Twitch account."
+                "The connected Twitch account is not the expected bot account."
             );
         }
 
@@ -106,7 +106,7 @@ public sealed class BotAccountAuthorizationService(
                 status.RequiredScopes,
                 status.GrantedScopes,
                 status.MissingScopes,
-                "Bot account authorization is missing configured permissions."
+                "The bot account needs more Twitch access."
             );
         }
 
@@ -118,7 +118,7 @@ public sealed class BotAccountAuthorizationService(
             status.RequiredScopes,
             status.GrantedScopes,
             [],
-            "Bot account authorization is current."
+            "The bot account is ready."
         );
     }
 

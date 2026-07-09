@@ -59,8 +59,8 @@ public sealed record HostBotChannelStatus(
         new(
             HostBotChannelStatusFlags.None,
             HostBotModeratorState.Unknown,
-            "Moderator status cannot be checked until bot account settings are updated.",
-            "Follower access is not configured for the bot account."
+            "BlokeBot needs bot account settings before it can check this.",
+            "Follower-only giveaways are not set up for this bot account."
         );
 
     public static HostBotChannelStatus NeedsAuthorization(
@@ -73,8 +73,8 @@ public sealed record HostBotChannelStatus(
                     | HostBotChannelStatusFlags.FollowerReadConfigured
                 ),
             HostBotModeratorState.Unknown,
-            "Moderator status cannot be checked until the bot account is authorized.",
-            "Follower access is not available until the bot account is authorized."
+            "Connect the bot account before BlokeBot can check this.",
+            "Connect the bot account before follower-only giveaways can work."
         );
 
     public static HostBotChannelStatus MissingModeratorCheckPermission(
@@ -83,10 +83,10 @@ public sealed record HostBotChannelStatus(
         new(
             flags,
             HostBotModeratorState.Unknown,
-            "Moderator status cannot be checked with the current bot account authorization.",
+            "The connected bot account does not allow BlokeBot to check mod status.",
             (flags & HostBotChannelStatusFlags.FollowerReadConfigured) != 0
-                ? "Follower access depends on moderator status, which could not be checked."
-                : "Follower access is not configured for the bot account."
+                ? "Follower-only giveaways need the mod check to work first."
+                : "Follower-only giveaways are not set up for this bot account."
         );
 
     public static HostBotChannelStatus MissingFollowerReadPermission(
@@ -95,24 +95,24 @@ public sealed record HostBotChannelStatus(
         new(
             flags,
             HostBotModeratorState.IsModerator,
-            "Bot is a moderator in this channel.",
-            "Follower access is missing from the bot account authorization."
+            "The bot is a mod in this channel.",
+            "The connected bot account does not allow BlokeBot to check followers."
         );
 
     public static HostBotChannelStatus NotModerator(HostBotChannelStatusFlags flags) =>
         new(
             flags,
             HostBotModeratorState.NotModerator,
-            "Bot is not currently a moderator in this channel.",
-            "Follower access requires the bot to be a channel moderator."
+            "The bot is not a mod in this channel.",
+            "Follower-only giveaways need the bot to be a channel mod."
         );
 
     public static HostBotChannelStatus Unknown(HostBotChannelStatusFlags flags) =>
         new(
             flags,
             HostBotModeratorState.Unknown,
-            "Moderator status could not be checked.",
-            "Follower access could not be checked."
+            "BlokeBot could not check whether the bot is a mod.",
+            "BlokeBot could not check follower-only giveaways."
         );
 
     public static HostBotChannelStatus Ready() =>
@@ -123,8 +123,8 @@ public sealed record HostBotChannelStatus(
                 | HostBotChannelStatusFlags.FollowerReadConfigured
                 | HostBotChannelStatusFlags.FollowerReadGranted,
             HostBotModeratorState.IsModerator,
-            "Bot is a moderator in this channel.",
-            "Bot can read followers for this channel."
+            "The bot is a mod in this channel.",
+            "Follower-only giveaways are ready."
         );
 
     private bool HasAll(HostBotChannelStatusFlags flags) => (Flags & flags) == flags;
