@@ -5,6 +5,7 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -49,6 +50,21 @@ public sealed class HostBotAccountAuthorizationTests
 
         account.Login.ShouldBe("bot");
         account.AccessToken.ShouldBe("global-token");
+    }
+
+    [Test]
+    public async Task Disabled_override_does_not_report_missing_custom_bot_permissions()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+
+        var status = await service.GetStatusAsync(hostId, CancellationToken.None);
+
+        status.State.ShouldBe(BotAccountAuthorizationState.Disabled);
+        status.RequiredScopes.ShouldNotBeEmpty();
+        status.GrantedScopes.ShouldBeEmpty();
+        status.MissingScopes.ShouldBeEmpty();
     }
 
     [Test]
@@ -100,6 +116,51 @@ public sealed class HostBotAccountAuthorizationTests
         status.AuthorizedProfileImageUrl.ShouldBe("https://static-cdn.jtvnw.net/custombot.png");
     }
 
+    [Test]
+    public async Task Disabling_override_restarts_running_host_with_global_bot_account()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await AuthorizeCustomBotAsync(service, hostId);
+        await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
+
+        await service.SetOverrideEnabledAsync(hostId, false, CancellationToken.None);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);
+        var settings = await db.HostBotAccountSettings.SingleAsync(
+            x => x.HostId == hostId,
+            CancellationToken.None
+        );
+        host!.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Starting);
+        settings.OverrideEnabled.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task Enabling_authorized_override_restarts_running_host_with_custom_bot_account()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await AuthorizeCustomBotAsync(service, hostId);
+        await service.SetOverrideEnabledAsync(hostId, false, CancellationToken.None);
+        await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
+
+        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);
+        var settings = await db.HostBotAccountSettings.SingleAsync(
+            x => x.HostId == hostId,
+            CancellationToken.None
+        );
+        host!.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Starting);
+        settings.OverrideEnabled.ShouldBeTrue();
+    }
+
     private static HostBotAccountAuthorizationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         ITwitchAccessTokenProvider? tokenProvider
@@ -149,6 +210,44 @@ public sealed class HostBotAccountAuthorizationTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
+    }
+
+    private static async Task AuthorizeCustomBotAsync(
+        HostBotAccountAuthorizationService service,
+        int hostId
+    )
+    {
+        var result = await service.AuthorizeAsync(
+            hostId,
+            new HostBotAccountAuthorizationGrant(
+                new TwitchTokenSet(
+                    "override-token",
+                    "override-refresh",
+                    DateTimeOffset.UtcNow.AddHours(1)
+                ),
+                "custom-id",
+                LoginName.Parse("custombot"),
+                "CustomBot",
+                "https://static-cdn.jtvnw.net/custombot.png",
+                ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
+            ),
+            CancellationToken.None
+        );
+
+        result.Succeeded.ShouldBeTrue();
+    }
+
+    private static async Task SetRuntimeStateAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        BotChannelRuntimeState state
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);
+        host!.BotRuntimeState = state;
+        host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
     }
 
     private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider

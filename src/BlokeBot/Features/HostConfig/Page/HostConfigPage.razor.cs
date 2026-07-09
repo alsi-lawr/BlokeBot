@@ -298,8 +298,15 @@ public partial class HostConfigPage
 
     private async Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
     {
+        var runtimeWasActive =
+            state?.RuntimeStatus?.RuntimeState
+            is BotChannelRuntimeState.Starting
+                or BotChannelRuntimeState.Started;
         await HostBotAccounts.SetOverrideEnabledAsync(hostId, enabled, CancellationToken.None);
         await LoadAsync();
+        if (runtimeWasActive)
+            TrackPendingRuntimeTransition();
+
         Toasts.Status(
             enabled
                 ? "Custom bot override is enabled for this channel. Authorize the account before starting the bot."

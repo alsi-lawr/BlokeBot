@@ -222,32 +222,49 @@ internal sealed class TwitchEventSubRuntime(
             if (activeSubscriptions.Remove(channel, out var replaced))
             {
                 await TryDeleteSubscriptionAsync(channel, replaced, cancellationToken);
-                stoppedChannels.Add(channel);
             }
 
-            var identities = await helix.ResolveChatIdentitiesAsync(
-                channel,
-                botAccount.Login,
-                botAccount.AccessToken,
-                cancellationToken
-            );
-            activeSubscriptions[channel] = new ActiveEventSubSubscription(
-                await helix.CreateChatMessageSubscriptionAsync(
+            try
+            {
+                var identities = await helix.ResolveChatIdentitiesAsync(
+                    channel,
+                    botAccount.Login,
                     botAccount.AccessToken,
-                    identities.BroadcasterId,
-                    identities.BotUserId,
-                    sessionId,
                     cancellationToken
-                ),
-                botAccount.Login
-            );
-            await SendStartupMessageAsync(channel, cancellationToken);
-            startedChannels.Add(channel);
-            log.LogInformation(
-                "Subscribed to EventSub chat messages for #{Channel} as {BotUsername}.",
-                channel,
-                botAccount.Login
-            );
+                );
+                activeSubscriptions[channel] = new ActiveEventSubSubscription(
+                    await helix.CreateChatMessageSubscriptionAsync(
+                        botAccount.AccessToken,
+                        identities.BroadcasterId,
+                        identities.BotUserId,
+                        sessionId,
+                        cancellationToken
+                    ),
+                    botAccount.Login,
+                    botAccount.AccessToken
+                );
+                await SendStartupMessageAsync(channel, cancellationToken);
+                startedChannels.Add(channel);
+                log.LogInformation(
+                    "Subscribed to EventSub chat messages for #{Channel} as {BotUsername}.",
+                    channel,
+                    botAccount.Login
+                );
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                stoppedChannels.Add(channel);
+                log.LogWarning(
+                    ex,
+                    "Could not subscribe to EventSub chat messages for #{Channel} as {BotUsername}.",
+                    channel,
+                    botAccount.Login
+                );
+            }
         }
 
         status.SetAuthorized(desiredAccounts.Count > 0);
@@ -267,9 +284,8 @@ internal sealed class TwitchEventSubRuntime(
     {
         try
         {
-            var botAccount = await botAccounts.GetBotAccountAsync(channel, cancellationToken);
             await helix.DeleteEventSubSubscriptionAsync(
-                botAccount.AccessToken,
+                subscription.AccessToken,
                 subscription.SubscriptionId,
                 cancellationToken
             );
@@ -367,5 +383,9 @@ internal sealed class TwitchEventSubRuntime(
         return Encoding.UTF8.GetString(message.ToArray());
     }
 
-    private sealed record ActiveEventSubSubscription(string SubscriptionId, string BotLogin);
+    private sealed record ActiveEventSubSubscription(
+        string SubscriptionId,
+        string BotLogin,
+        string AccessToken
+    );
 }

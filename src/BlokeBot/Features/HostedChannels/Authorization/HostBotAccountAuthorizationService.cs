@@ -40,7 +40,7 @@ public sealed class HostBotAccountAuthorizationService(
                 BotAccountAuthorizationState.Disabled,
                 required,
                 SplitStoredScopes(settings?.AuthorizedScopes).ToArray(),
-                required,
+                [],
                 "This channel is using the global bot account."
             );
         }
@@ -133,12 +133,37 @@ public sealed class HostBotAccountAuthorizationService(
     public async Task SetOverrideEnabledAsync(int hostId, bool enabled, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        if (host is null)
+            return;
+
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
             return;
 
+        if (settings.OverrideEnabled == enabled)
+            return;
+
+        var restartRuntime =
+            host.BotRuntimeState
+            is BotChannelRuntimeState.Starting
+                or BotChannelRuntimeState.Started;
         settings.OverrideEnabled = enabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (restartRuntime)
+        {
+            host.BotRuntimeState = await CanStartWithSelectedBotAccountAsync(
+                db,
+                settings,
+                enabled,
+                ct
+            )
+                ? BotChannelRuntimeState.Starting
+                : BotChannelRuntimeState.Stopped;
+            host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
+        }
+
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
     }
@@ -337,6 +362,24 @@ public sealed class HostBotAccountAuthorizationService(
             : user.ProfileImageUrl;
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task<bool> CanStartWithSelectedBotAccountAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        bool overrideEnabled,
+        CancellationToken ct
+    )
+    {
+        var required = options.Identity.Scopes;
+        if (!overrideEnabled)
+        {
+            var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);
+            return globalStatus.State == TwitchTokenStatusState.Ready;
+        }
+
+        var customStatus = await GetStoredTokenStatusAsync(db, settings, required, ct);
+        return customStatus.State == TwitchTokenStatusState.Ready;
     }
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(
