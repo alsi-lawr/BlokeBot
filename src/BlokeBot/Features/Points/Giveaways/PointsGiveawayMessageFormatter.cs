@@ -13,12 +13,10 @@ public sealed class PointsGiveawayMessageFormatter
     ) =>
         outcome.Kind switch
         {
-            PointsGiveawayStartOutcomeKind.Started => Reply(
+            PointsGiveawayStartOutcomeKind.Started => ChatReply(
                 true,
                 outcome.Settings.GiveawayStartedReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayStarted
+                outcome.Settings
             ),
             PointsGiveawayStartOutcomeKind.AlreadyActive => Reply(
                 false,
@@ -125,21 +123,15 @@ public sealed class PointsGiveawayMessageFormatter
                 delivery,
                 PointsReplyKeys.GiveawayNotActive
             ),
-            PointsGiveawayDrawOutcomeKind.NoEntrants when outcome.Settings is { } settings => Reply(
-                true,
-                settings.GiveawayNoEntrantsReply,
-                settings,
-                delivery,
-                PointsReplyKeys.GiveawayNoEntrants
-            ),
-            PointsGiveawayDrawOutcomeKind.Winners when outcome.Settings is { } settings => Reply(
-                true,
-                settings.GiveawayEndedReply,
-                settings,
-                delivery,
-                PointsReplyKeys.GiveawayEnded,
-                winners: FormatWinners(outcome.Winners)
-            ),
+            PointsGiveawayDrawOutcomeKind.NoEntrants when outcome.Settings is { } settings =>
+                ChatReply(true, settings.GiveawayNoEntrantsReply, settings),
+            PointsGiveawayDrawOutcomeKind.Winners when outcome.Settings is { } settings =>
+                ChatReply(
+                    true,
+                    settings.GiveawayEndedReply,
+                    settings,
+                    winners: FormatWinners(outcome.Winners)
+                ),
             _ => new PointOperationResult(false, string.Empty),
         };
 
@@ -149,12 +141,10 @@ public sealed class PointsGiveawayMessageFormatter
     ) =>
         outcome.Kind switch
         {
-            PointsGiveawayCancelOutcomeKind.Cancelled => Reply(
+            PointsGiveawayCancelOutcomeKind.Cancelled => ChatReply(
                 true,
                 outcome.Settings.GiveawayCancelledReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayCancelled
+                outcome.Settings
             ),
             PointsGiveawayCancelOutcomeKind.NotActive => Reply(
                 false,
@@ -192,6 +182,25 @@ public sealed class PointsGiveawayMessageFormatter
                 timeLeft is null ? null : FormatTimeLeft(timeLeft.Value)
             ),
             Target: delivery.TargetFor(replyKey)
+        );
+
+    private PointOperationResult ChatReply(
+        bool success,
+        string template,
+        PointsSettings settings,
+        string? user = null,
+        string? winners = null,
+        TimeSpan? timeLeft = null
+    ) =>
+        new(
+            success,
+            Format(
+                template,
+                settings,
+                user,
+                winners,
+                timeLeft is null ? null : FormatTimeLeft(timeLeft.Value)
+            )
         );
 
     public string Format(

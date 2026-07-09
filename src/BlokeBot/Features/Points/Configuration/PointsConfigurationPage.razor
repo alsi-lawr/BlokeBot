@@ -1,7 +1,6 @@
 @page "/points/settings"
 @using BlokeBot.Eventing
 @using BlokeBot.Features.HostedChannels
-@using BlokeBot.Features.Points.Replies
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
@@ -77,32 +76,36 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends in chat." InitiallyOpen="false">
+        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false">
             <div class="scroll-panel scroll-panel--settings grid gap-4 p-4 md:grid-cols-2">
-                <ReplyTextAreaField Label="Balance" ReplyKey="@PointsReplyKeys.Balance" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.BalanceReply" />
-                <ReplyTextAreaField Label="Other balance" ReplyKey="@PointsReplyKeys.OtherBalance" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.OtherBalanceReply" />
-                <ReplyTextAreaField Label="Transfer" ReplyKey="@PointsReplyKeys.Transfer" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.TransferReply" />
-                <ReplyTextAreaField Label="Add" ReplyKey="@PointsReplyKeys.Add" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.AddReply" />
-                <ReplyTextAreaField Label="Remove" ReplyKey="@PointsReplyKeys.Remove" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.RemoveReply" />
-                <ReplyTextAreaField Label="Invalid amount" ReplyKey="@PointsReplyKeys.InvalidAmount" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.InvalidAmountReply" />
-                <ReplyTextAreaField Label="Insufficient balance" ReplyKey="@PointsReplyKeys.InsufficientBalance" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.InsufficientBalanceReply" />
-                <ReplyTextAreaField Label="Moderator only" ReplyKey="@PointsReplyKeys.ModeratorOnly" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.ModeratorOnlyReply" />
-                <ReplyTextAreaField Label="Gamble win" ReplyKey="@PointsReplyKeys.GamblingWin" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GamblingWinReply" />
-                <ReplyTextAreaField Label="Gamble loss" ReplyKey="@PointsReplyKeys.GamblingLose" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GamblingLoseReply" />
-                <ReplyTextAreaField Label="Giveaway started" ReplyKey="@PointsReplyKeys.GiveawayStarted" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayStartedReply" />
+                <TextAreaField Label="Balance" @bind-Value="config.Replies.BalanceReply" />
+                <TextAreaField Label="Other balance" @bind-Value="config.Replies.OtherBalanceReply" />
+                <TextAreaField Label="Transfer" @bind-Value="config.Replies.TransferReply" />
+                <TextAreaField Label="Add" @bind-Value="config.Replies.AddReply" />
+                <TextAreaField Label="Remove" @bind-Value="config.Replies.RemoveReply" />
+                <TextAreaField Label="Invalid amount" @bind-Value="config.Replies.InvalidAmountReply" />
+                <TextAreaField Label="Insufficient balance" @bind-Value="config.Replies.InsufficientBalanceReply" />
+                <TextAreaField Label="Moderator only" @bind-Value="config.Replies.ModeratorOnlyReply" />
+                <TextAreaField Label="Gamble win" @bind-Value="config.Replies.GamblingWinReply" />
+                <TextAreaField Label="Gamble loss" @bind-Value="config.Replies.GamblingLoseReply" />
+                <TextAreaField Label="Giveaway started" @bind-Value="config.Replies.GiveawayStartedReply" />
                 <TextAreaField Label="Giveaway update" @bind-Value="config.Replies.GiveawayUpdateReply" />
-                <ReplyTextAreaField Label="Giveaway joined" ReplyKey="@PointsReplyKeys.GiveawayJoined" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayJoinedReply" />
-                <ReplyTextAreaField Label="Already joined" ReplyKey="@PointsReplyKeys.GiveawayAlreadyJoined" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayAlreadyJoinedReply" />
-                <ReplyTextAreaField Label="Giveaway ended" ReplyKey="@PointsReplyKeys.GiveawayEnded" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayEndedReply" />
-                <ReplyTextAreaField Label="No entrants" ReplyKey="@PointsReplyKeys.GiveawayNoEntrants" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayNoEntrantsReply" />
-                <ReplyTextAreaField Label="Cancelled" ReplyKey="@PointsReplyKeys.GiveawayCancelled" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayCancelledReply" />
-                <ReplyTextAreaField Label="Already active" ReplyKey="@PointsReplyKeys.GiveawayAlreadyActive" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayAlreadyActiveReply" />
-                <ReplyTextAreaField Label="Not active" ReplyKey="@PointsReplyKeys.GiveawayNotActive" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayNotActiveReply" />
-                <ReplyTextAreaField Label="Cooldown" ReplyKey="@PointsReplyKeys.GiveawayCooldown" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.GiveawayCooldownReply" />
-                <ReplyTextAreaField Label="Stream offline" ReplyKey="@PointsReplyKeys.StreamOffline" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.StreamOfflineReply" />
-                <ReplyTextAreaField Label="Not eligible" ReplyKey="@PointsReplyKeys.NotEligible" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.NotEligibleReply" />
-                <ReplyTextAreaField Label="Followers-only unavailable" ReplyKey="@PointsReplyKeys.FollowerEligibilityUnavailable" Delivery="config.ReplyDelivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="config.Replies.FollowerEligibilityUnavailableReply" />
+                <TextAreaField Label="Giveaway joined" @bind-Value="config.Replies.GiveawayJoinedReply" />
+                <TextAreaField Label="Already joined" @bind-Value="config.Replies.GiveawayAlreadyJoinedReply" />
+                <TextAreaField Label="Giveaway ended" @bind-Value="config.Replies.GiveawayEndedReply" />
+                <TextAreaField Label="No entrants" @bind-Value="config.Replies.GiveawayNoEntrantsReply" />
+                <TextAreaField Label="Cancelled" @bind-Value="config.Replies.GiveawayCancelledReply" />
+                <TextAreaField Label="Already active" @bind-Value="config.Replies.GiveawayAlreadyActiveReply" />
+                <TextAreaField Label="Not active" @bind-Value="config.Replies.GiveawayNotActiveReply" />
+                <TextAreaField Label="Cooldown" @bind-Value="config.Replies.GiveawayCooldownReply" />
+                <TextAreaField Label="Stream offline" @bind-Value="config.Replies.StreamOfflineReply" />
+                <TextAreaField Label="Not eligible" @bind-Value="config.Replies.NotEligibleReply" />
+                <TextAreaField Label="Followers-only unavailable" @bind-Value="config.Replies.FollowerEligibilityUnavailableReply" />
             </div>
         </CollapsibleSection>
+
+        <ReplyDeliverySettingsSection Delivery="config.ReplyDelivery"
+                                      WhisperResponsesEnabled="config.WhisperResponsesEnabled"
+                                      Options="WhisperReplyOptions" />
     }
 </div>

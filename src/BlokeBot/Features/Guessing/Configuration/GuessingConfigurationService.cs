@@ -195,7 +195,7 @@ public sealed class GuessingConfigurationService(
             hostId,
             ReplyDeliveryFeature.Guessing,
             profile.Id,
-            config.ReplyDelivery,
+            config.ReplyDelivery.Only(GuessingReplyKeys.WhisperableKeys),
             ct
         );
 

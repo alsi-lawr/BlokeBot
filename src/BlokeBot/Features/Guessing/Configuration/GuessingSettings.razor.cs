@@ -27,6 +27,7 @@ using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Replies;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -44,6 +45,19 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public partial class GuessingSettings
 {
+    private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
+    [
+        new("Round already open", GuessingReplyKeys.RoundAlreadyOpen),
+        new("No open round", GuessingReplyKeys.NoOpenRound),
+        new("Guessing already stopped", GuessingReplyKeys.GuessingAlreadyStopped),
+        new("Guessing closed", GuessingReplyKeys.GuessingClosed),
+        new("Invalid guess", GuessingReplyKeys.InvalidGuess),
+        new("Guess usage", GuessingReplyKeys.GuessUsage),
+        new("Available guesses", GuessingReplyKeys.AvailableGuesses),
+        new("Win usage", GuessingReplyKeys.WinUsage),
+        new("Moderator only", GuessingReplyKeys.ModeratorOnly),
+    ];
+
     private GuessingConfiguration? config;
     private bool featureEnabled;
     private string newProfileName = string.Empty;

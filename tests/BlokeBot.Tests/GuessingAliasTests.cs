@@ -84,19 +84,28 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Profile_reply_delivery_controls_start_response_target()
+    public async Task Profile_reply_delivery_controls_round_already_open_response_target()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
+            db.Rounds.Add(
+                new GuessRound
+                {
+                    HostId = seed.Host.Id,
+                    GuessRoundProfileId = seed.SpecialProfile.Id,
+                    Status = GuessRoundStatus.Open,
+                    StartedAtUtc = DateTime.UtcNow,
+                }
+            );
             db.ReplyDeliverySettings.Add(
                 new ReplyDeliverySetting
                 {
                     HostId = seed.Host.Id,
                     Feature = ReplyDeliveryFeature.Guessing,
                     ScopeId = seed.SpecialProfile.Id,
-                    ReplyKey = GuessingReplyKeys.RoundStarted,
+                    ReplyKey = GuessingReplyKeys.RoundAlreadyOpen,
                     Target = ReplyDeliveryTargets.Whisper,
                 }
             );
@@ -124,6 +133,50 @@ public sealed class GuessingAliasTests
 
         var response = responses.Single();
         response.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        response.Message.ShouldBe("Already open.");
+    }
+
+    [Test]
+    public async Task Profile_start_announcement_ignores_unsupported_whisper_delivery_key()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.ReplyDeliverySettings.Add(
+                new ReplyDeliverySetting
+                {
+                    HostId = seed.Host.Id,
+                    Feature = ReplyDeliveryFeature.Guessing,
+                    ScopeId = seed.SpecialProfile.Id,
+                    ReplyKey = "round_started",
+                    Target = ReplyDeliveryTargets.Whisper,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        List<TwitchCommandResponse> responses = [];
+        var strategy = new StartGuessingCommandStrategy(
+            new GuessingCommandService(dbFactory),
+            new GuessingRoundService(
+                dbFactory,
+                new GuessingChangeNotifier(new EventBus<AppEventKind>())
+            )
+        );
+
+        await strategy.ExecuteAsync(
+            TypedCommandContext(
+                seed.Host.Login,
+                "special",
+                new AppCommandRouteState(seed.Host.Id, seed.SpecialProfile.Id),
+                [],
+                responses
+            ),
+            CancellationToken.None
+        );
+
+        var response = responses.Single();
+        response.Target.ShouldBe(TwitchCommandResponseTarget.Chat);
         response.Message.ShouldBe("Started Special: blue");
     }
 
@@ -241,6 +294,7 @@ public sealed class GuessingAliasTests
             ReplySettings = new BotReplySettings
             {
                 RoundStartedReply = "Started {round}: {options}",
+                RoundAlreadyOpenReply = "Already open.",
             },
             Options = [new GuessOption { Name = "red", ReplyText = "Red" }],
         };
@@ -252,6 +306,7 @@ public sealed class GuessingAliasTests
             ReplySettings = new BotReplySettings
             {
                 RoundStartedReply = "Started {round}: {options}",
+                RoundAlreadyOpenReply = "Already open.",
             },
             Options = [new GuessOption { Name = "blue", ReplyText = "Blue" }],
         };

@@ -454,9 +454,6 @@ public sealed class GambleCommandStrategy(
                     result.Success
                         ? result with
                         {
-                            Target = resolution.ReplyDelivery.TargetFor(
-                                won ? PointsReplyKeys.GamblingWin : PointsReplyKeys.GamblingLose
-                            ),
                             Message = Format(
                                 won
                                     ? resolution.Settings.GamblingWinReply

@@ -88,7 +88,7 @@ public sealed class PointsConfigurationService(
             hostId,
             ReplyDeliveryFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
-            config.ReplyDelivery,
+            config.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
             ct
         );
         await SaveAliasesAsync(db, hostId, config.Aliases, ct);

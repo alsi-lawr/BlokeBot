@@ -1,19 +1,17 @@
-@using BlokeBot.Features.Guessing.Replies
-
-<CollapsibleSection Title="Bot replies" Description="Messages the bot sends in chat." InitiallyOpen="false">
+<CollapsibleSection Title="Bot replies" Description="Messages the bot sends for guessing commands." InitiallyOpen="false">
     <div class="grid gap-4 p-4 md:grid-cols-2">
-        <ReplyTextAreaField Label="Round started" ReplyKey="@GuessingReplyKeys.RoundStarted" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.RoundStartedReply" />
-        <ReplyTextAreaField Label="Round already open" ReplyKey="@GuessingReplyKeys.RoundAlreadyOpen" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.RoundAlreadyOpenReply" />
-        <ReplyTextAreaField Label="No open round" ReplyKey="@GuessingReplyKeys.NoOpenRound" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.NoOpenRoundReply" />
-        <ReplyTextAreaField Label="Guessing stopped" ReplyKey="@GuessingReplyKeys.GuessingStopped" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.GuessingStoppedReply" />
-        <ReplyTextAreaField Label="Guessing already stopped" ReplyKey="@GuessingReplyKeys.GuessingAlreadyStopped" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.GuessingAlreadyStoppedReply" />
-        <ReplyTextAreaField Label="Guessing closed" ReplyKey="@GuessingReplyKeys.GuessingClosed" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.GuessingClosedReply" />
-        <ReplyTextAreaField Label="Invalid guess" ReplyKey="@GuessingReplyKeys.InvalidGuess" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.InvalidGuessReply" />
-        <ReplyTextAreaField Label="Guess usage" ReplyKey="@GuessingReplyKeys.GuessUsage" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.GuessUsageReply" />
-        <ReplyTextAreaField Label="Available guesses" ReplyKey="@GuessingReplyKeys.AvailableGuesses" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.AvailableGuessesReply" />
-        <ReplyTextAreaField Label="Win usage" ReplyKey="@GuessingReplyKeys.WinUsage" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.WinUsageReply" />
-        <ReplyTextAreaField Label="Moderator only" ReplyKey="@GuessingReplyKeys.ModeratorOnly" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.ModeratorOnlyReply" />
-        <ReplyTextAreaField Label="Winner reply" ReplyKey="@GuessingReplyKeys.Winner" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.WinnerReply" />
-        <ReplyTextAreaField Label="No winners reply" ReplyKey="@GuessingReplyKeys.NoWinners" Delivery="Delivery" WhisperDisabled="@WhisperDisabled" WhisperDisabledTooltip="@WhisperDisabledTooltip" @bind-Value="Replies.NoWinnersReply" />
+        <TextAreaField Label="Round started" @bind-Value="Replies.RoundStartedReply" />
+        <TextAreaField Label="Round already open" @bind-Value="Replies.RoundAlreadyOpenReply" />
+        <TextAreaField Label="No open round" @bind-Value="Replies.NoOpenRoundReply" />
+        <TextAreaField Label="Guessing stopped" @bind-Value="Replies.GuessingStoppedReply" />
+        <TextAreaField Label="Guessing already stopped" @bind-Value="Replies.GuessingAlreadyStoppedReply" />
+        <TextAreaField Label="Guessing closed" @bind-Value="Replies.GuessingClosedReply" />
+        <TextAreaField Label="Invalid guess" @bind-Value="Replies.InvalidGuessReply" />
+        <TextAreaField Label="Guess usage" @bind-Value="Replies.GuessUsageReply" />
+        <TextAreaField Label="Available guesses" @bind-Value="Replies.AvailableGuessesReply" />
+        <TextAreaField Label="Win usage" @bind-Value="Replies.WinUsageReply" />
+        <TextAreaField Label="Moderator only" @bind-Value="Replies.ModeratorOnlyReply" />
+        <TextAreaField Label="Winner reply" @bind-Value="Replies.WinnerReply" />
+        <TextAreaField Label="No winners reply" @bind-Value="Replies.NoWinnersReply" />
     </div>
 </CollapsibleSection>

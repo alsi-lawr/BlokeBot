@@ -27,6 +27,8 @@ using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Points.Replies;
+using BlokeBot.Features.Replies;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -44,13 +46,28 @@ namespace BlokeBot.Features.Points.Configuration;
 
 public partial class PointsConfigurationPage
 {
-    private const string WhisperDisabledTooltip =
-        "Enable whisper responses in Channel setup before using whisper replies.";
+    private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
+    [
+        new("Balance", PointsReplyKeys.Balance),
+        new("Other balance", PointsReplyKeys.OtherBalance),
+        new("Transfer", PointsReplyKeys.Transfer),
+        new("Add", PointsReplyKeys.Add),
+        new("Remove", PointsReplyKeys.Remove),
+        new("Invalid amount", PointsReplyKeys.InvalidAmount),
+        new("Insufficient balance", PointsReplyKeys.InsufficientBalance),
+        new("Moderator only", PointsReplyKeys.ModeratorOnly),
+        new("Giveaway joined", PointsReplyKeys.GiveawayJoined),
+        new("Already joined", PointsReplyKeys.GiveawayAlreadyJoined),
+        new("Already active", PointsReplyKeys.GiveawayAlreadyActive),
+        new("Not active", PointsReplyKeys.GiveawayNotActive),
+        new("Cooldown", PointsReplyKeys.GiveawayCooldown),
+        new("Stream offline", PointsReplyKeys.StreamOffline),
+        new("Not eligible", PointsReplyKeys.NotEligible),
+        new("Followers-only unavailable", PointsReplyKeys.FollowerEligibilityUnavailable),
+    ];
 
     private PointsConfiguration? config;
     private bool featureEnabled;
-
-    private bool WhisperDisabled => config?.WhisperResponsesEnabled != true;
 
     protected override async Task OnInitializedAsync()
     {

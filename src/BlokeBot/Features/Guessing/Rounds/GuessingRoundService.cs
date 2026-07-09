@@ -68,10 +68,8 @@ public sealed class GuessingRoundService(
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
 
-        var template = winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply;
-        var replyKey = winners.Count == 0 ? GuessingReplyKeys.NoWinners : GuessingReplyKeys.Winner;
         var message = MessageTemplateFormatter.Format(
-            template,
+            winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["name"] = normalizedName,
@@ -79,7 +77,7 @@ public sealed class GuessingRoundService(
                 ["count"] = winners.Count.ToString(),
             }
         );
-        return new GuessingOperationResult(true, message, delivery.TargetFor(replyKey));
+        return new GuessingOperationResult(true, message);
     }
 
     public async Task<GuessingOperationResult> DeclareWinnerAsync(
@@ -143,8 +141,7 @@ public sealed class GuessingRoundService(
                 settings.RoundStartedReply,
                 profile.Name,
                 FormatOptions(profile.Options.Select(x => x.Name))
-            ),
-            delivery.TargetFor(GuessingReplyKeys.RoundStarted)
+            )
         );
     }
 
@@ -200,11 +197,7 @@ public sealed class GuessingRoundService(
         round.ClosedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync();
-        return new GuessingOperationResult(
-            true,
-            settings.GuessingStoppedReply,
-            delivery.TargetFor(GuessingReplyKeys.GuessingStopped)
-        );
+        return new GuessingOperationResult(true, settings.GuessingStoppedReply);
     }
 
     public async Task<GuessingOperationResult> StopGuessingAsync(

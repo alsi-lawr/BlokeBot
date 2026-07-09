@@ -52,9 +52,10 @@
         </div>
 
         <div id="replies">
-            <ReplySettingsSection Replies="config.Profile.Replies"
-                                  Delivery="config.ReplyDelivery"
-                                  WhisperResponsesEnabled="config.WhisperResponsesEnabled" />
+            <ReplySettingsSection Replies="config.Profile.Replies" />
+            <ReplyDeliverySettingsSection Delivery="config.ReplyDelivery"
+                                          WhisperResponsesEnabled="config.WhisperResponsesEnabled"
+                                          Options="WhisperReplyOptions" />
         </div>
     }
 </div>

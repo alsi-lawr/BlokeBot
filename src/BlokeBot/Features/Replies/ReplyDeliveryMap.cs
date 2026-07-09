@@ -31,6 +31,12 @@ public sealed class ReplyDeliveryMap
 
     public bool IsWhisper(string replyKey) => whisperKeys.Contains(replyKey);
 
+    public ReplyDeliveryMap Only(IEnumerable<string> allowedKeys)
+    {
+        var allowed = allowedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return new ReplyDeliveryMap(whisperKeys.Where(allowed.Contains));
+    }
+
     public TwitchCommandResponseTarget TargetFor(string replyKey) =>
         IsWhisper(replyKey)
             ? TwitchCommandResponseTarget.Whisper
