@@ -16,6 +16,7 @@ public enum BotAccountAuthorizationState
 public sealed record BotAccountAuthorizationStatus(
     string ConfiguredBotLogin,
     string? AuthorizedLogin,
+    string? AuthorizedProfileImageUrl,
     BotAccountAuthorizationState State,
     IReadOnlyList<string> RequiredScopes,
     IReadOnlyList<string> GrantedScopes,
@@ -26,6 +27,7 @@ public sealed record BotAccountAuthorizationStatus(
 public sealed class BotAccountAuthorizationService(
     IOptions<TwitchBotOptions> options,
     IServiceProvider services,
+    TwitchHelixApiClient helix,
     TwitchTokenStatusService tokens,
     HostedChannelChangeNotifier changes
 )
@@ -40,6 +42,7 @@ public sealed class BotAccountAuthorizationService(
             return new(
                 configuredBotLogin,
                 null,
+                null,
                 BotAccountAuthorizationState.NotAuthorized,
                 status.RequiredScopes,
                 status.GrantedScopes,
@@ -52,6 +55,7 @@ public sealed class BotAccountAuthorizationService(
         {
             return new(
                 configuredBotLogin,
+                null,
                 null,
                 BotAccountAuthorizationState.NotAuthorized,
                 status.RequiredScopes,
@@ -66,6 +70,7 @@ public sealed class BotAccountAuthorizationService(
             return new(
                 configuredBotLogin,
                 null,
+                null,
                 BotAccountAuthorizationState.Unknown,
                 status.RequiredScopes,
                 status.GrantedScopes,
@@ -75,11 +80,13 @@ public sealed class BotAccountAuthorizationService(
         }
 
         var authorizedLogin = LoginName.Parse(status.Validation.Login).Value;
+        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(status, ct);
         if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
         {
             return new(
                 configuredBotLogin,
                 authorizedLogin,
+                authorizedProfileImageUrl,
                 BotAccountAuthorizationState.WrongAccount,
                 status.RequiredScopes,
                 status.GrantedScopes,
@@ -93,6 +100,7 @@ public sealed class BotAccountAuthorizationService(
             return new(
                 configuredBotLogin,
                 authorizedLogin,
+                authorizedProfileImageUrl,
                 BotAccountAuthorizationState.MissingScopes,
                 status.RequiredScopes,
                 status.GrantedScopes,
@@ -104,6 +112,7 @@ public sealed class BotAccountAuthorizationService(
         return new(
             configuredBotLogin,
             authorizedLogin,
+            authorizedProfileImageUrl,
             BotAccountAuthorizationState.Ready,
             status.RequiredScopes,
             status.GrantedScopes,
@@ -123,5 +132,21 @@ public sealed class BotAccountAuthorizationService(
             await tokenCache.ClearAsync(ct);
 
         await changes.NotifyChangedAsync();
+    }
+
+    private async Task<string?> LoadAuthorizedProfileImageUrlAsync(
+        TwitchTokenStatus status,
+        CancellationToken ct
+    )
+    {
+        if (string.IsNullOrWhiteSpace(status.AccessToken))
+            return null;
+
+        var user = await helix.GetCurrentUserAsync(
+            new TwitchHelixRequestContext(options.Value.Identity.ClientId, status.AccessToken),
+            ct
+        );
+
+        return string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl;
     }
 }

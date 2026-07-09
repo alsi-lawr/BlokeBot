@@ -44,13 +44,7 @@ namespace BlokeBot.Components.Layout;
 public partial class TopBarControls
 {
     private static bool ShowsHostSelector(AuthenticatedSession session) =>
-        !session.IsAdminEditing
-        && !session.IsBotAccount
-        && session.AvailableHosts.Any(host =>
-            host.Role != AuthRole.Admin
-            && host.Role != AuthRole.Streamer
-            && !string.Equals(host.Login, session.Login, StringComparison.OrdinalIgnoreCase)
-        );
+        !session.IsAdminEditing && !session.IsBotAccount;
 
     private static string ControlsGridClass(
         BotHostSelection? selection,

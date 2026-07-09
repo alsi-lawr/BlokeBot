@@ -6,9 +6,10 @@
 @inject HostedChannelDirectoryService HostedChannels
 @inject NavigationManager Navigation
 
-@if (!IsAdminEditing() && visibleHosts.Count > 0)
+@if (!IsAdminEditing())
 {
     var showMyChannel = ShowMyChannelControl();
+    var hasAlternateHosts = visibleHosts.Count > 0;
 
     <div class="hidden items-center gap-2 md:grid" style="@SelectorGridStyle(showMyChannel)">
         @if (showMyChannel)
@@ -23,47 +24,70 @@
                 <span class="truncate">My channel</span>
             </a>
         }
-        <details class="group relative min-w-0">
-            <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
-                @if (SelectedVisibleHost() is { } selected)
-                {
-                    @ChannelImage(selected)
-                    <span class="truncate text-sm font-semibold text-slate-900">@selected.DisplayName</span>
-                }
-                else
-                {
-                    <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500 ring-1 ring-slate-200">
-                        <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M6 8h12" />
-                            <path d="m15 5 3 3-3 3" />
-                            <path d="M18 16H6" />
-                            <path d="m9 13-3 3 3 3" />
-                        </svg>
-                    </span>
-                    <span class="truncate text-sm font-semibold text-slate-900">Other channels</span>
-                }
-                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+        @if (hasAlternateHosts)
+        {
+            <details class="group relative min-w-0">
+                <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
+                    @if (SelectedVisibleHost() is { } selected)
+                    {
+                        @ChannelImage(selected)
+                        <span class="truncate text-sm font-semibold text-slate-900">@selected.DisplayName</span>
+                    }
+                    else
+                    {
+                        <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-500 ring-1 ring-slate-200">
+                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M6 8h12" />
+                                <path d="m15 5 3 3-3 3" />
+                                <path d="M18 16H6" />
+                                <path d="m9 13-3 3 3 3" />
+                            </svg>
+                        </span>
+                        <span class="truncate text-sm font-semibold text-slate-900">Other channels</span>
+                    }
+                    <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" />
+                    </svg>
+                </summary>
+                <div class="surface absolute left-0 z-50 mt-2 w-full overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
+                    @foreach (var host in visibleHosts)
+                    {
+                        <a class="@HostItemClass(host)"
+                           href="@SelectHostHref(host.Id)"
+                           data-enhance-nav="false">
+                            @ChannelImage(host)
+                            <span class="min-w-0 truncate">@host.DisplayName</span>
+                            @if (host.Id == selectedHostId)
+                            {
+                                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="m5 12 4 4 10-10" />
+                                </svg>
+                            }
+                        </a>
+                    }
+                </div>
+            </details>
+        }
+        else
+        {
+            <button class="surface-muted grid h-9 min-w-0 cursor-not-allowed grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 text-slate-500 opacity-75"
+                    type="button"
+                    disabled
+                    aria-label="No alternate channels available">
+                <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-slate-400 ring-1 ring-slate-200">
+                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 8h12" />
+                        <path d="m15 5 3 3-3 3" />
+                        <path d="M18 16H6" />
+                        <path d="m9 13-3 3 3 3" />
+                    </svg>
+                </span>
+                <span class="truncate text-sm font-semibold">No other channels</span>
+                <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                 </svg>
-            </summary>
-            <div class="surface absolute left-0 z-50 mt-2 w-full overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
-                @foreach (var host in visibleHosts)
-                {
-                    <a class="@HostItemClass(host)"
-                       href="@SelectHostHref(host.Id)"
-                       data-enhance-nav="false">
-                        @ChannelImage(host)
-                        <span class="min-w-0 truncate">@host.DisplayName</span>
-                        @if (host.Id == selectedHostId)
-                        {
-                            <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
-                                <path d="m5 12 4 4 10-10" />
-                            </svg>
-                        }
-                    </a>
-                }
-            </div>
-        </details>
+            </button>
+        }
         <a class="control-surface inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
            title="Refresh channel access"
            aria-label="Refresh channel access"

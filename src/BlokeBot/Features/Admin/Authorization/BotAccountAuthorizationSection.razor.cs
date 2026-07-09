@@ -43,6 +43,12 @@ namespace BlokeBot.Features.Admin.Authorization;
 
 public partial class BotAccountAuthorizationSection
 {
+    private IJSObjectReference? authorizationModule;
+    private bool authorizationOpening;
+
+    [Inject]
+    public IJSRuntime Js { get; set; } = default!;
+
     [Parameter]
     public BotAccountAuthorizationStatus? Status { get; set; }
 
@@ -51,6 +57,52 @@ public partial class BotAccountAuthorizationSection
 
     [Parameter, EditorRequired]
     public Func<Task> Refresh { get; set; } = () => Task.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (authorizationModule is null)
+            return;
+
+        try
+        {
+            await authorizationModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task OpenAuthorizationAsync()
+    {
+        if (authorizationOpening)
+            return;
+
+        authorizationOpening = true;
+        try
+        {
+            authorizationModule ??= await Js.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./Features/Admin/Authorization/BotAccountAuthorizationSection.razor.js"
+            );
+            var popupClosed = await authorizationModule.InvokeAsync<bool>(
+                "openBotAuthorization",
+                "/oauth/start"
+            );
+            if (popupClosed)
+                await Refresh();
+        }
+        finally
+        {
+            authorizationOpening = false;
+        }
+    }
+
+    private string AuthorizedAccountText =>
+        Status?.AuthorizedLogin is { Length: > 0 } login
+            ? $"@{login}"
+            : "No saved Twitch authorization";
+
+    private string ConfiguredAccountText =>
+        Status?.ConfiguredBotLogin is { Length: > 0 } login ? $"@{login}" : "not configured";
 
     private string StatusBadgeClass =>
         Status?.State switch

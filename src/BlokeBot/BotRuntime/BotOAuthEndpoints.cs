@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Authorization;
+using BlokeBot.Features.HostedChannels.Runtime;
 
 namespace BlokeBot.BotRuntime;
 
@@ -37,6 +38,7 @@ internal static class BotOAuthEndpoints
                     string? state,
                     string? error,
                     ITwitchOAuthFlow oauth,
+                    HostedChannelChangeNotifier changes,
                     CancellationToken ct
                 ) =>
                 {
@@ -55,9 +57,24 @@ internal static class BotOAuthEndpoints
                     try
                     {
                         await oauth.CompleteAuthorizationAsync(code, state, ct);
+                        await changes.NotifyChangedAsync();
                         return Results.Content(
-                            "OK. Tokens saved. You can close this window.",
-                            "text/plain"
+                            """
+                            <!doctype html>
+                            <html lang="en">
+                            <head>
+                                <meta charset="utf-8">
+                                <title>BlokeBot authorization complete</title>
+                            </head>
+                            <body>
+                                <p>Bot account authorization is complete. You can close this window.</p>
+                                <script>
+                                    window.close();
+                                </script>
+                            </body>
+                            </html>
+                            """,
+                            "text/html"
                         );
                     }
                     catch (InvalidOperationException)
