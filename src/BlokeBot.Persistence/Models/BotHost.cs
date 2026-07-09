@@ -20,5 +20,7 @@ public sealed class BotHost
 
     public DateTime? BotRuntimeStateChangedAtUtc { get; set; }
 
+    public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.All;
+
     public DateTime CreatedAtUtc { get; set; }
 }

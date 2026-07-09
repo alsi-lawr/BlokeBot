@@ -34,6 +34,9 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.BotRuntimeStateChangedAtUtc);
             b.Property(x => x.ChannelBotAuthorizedAtUtc);
             b.Property(x => x.ChannelBotAuthorizedScopes).HasMaxLength(512);
+            b.Property(x => x.EnabledFeatures)
+                .HasConversion(features => (long)features, value => (HostFeatureFlags)(ulong)value)
+                .HasDefaultValue(HostFeatureFlags.All);
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.DisplayName).HasMaxLength(128);
             b.Property(x => x.ProfileImageUrl).HasMaxLength(512);

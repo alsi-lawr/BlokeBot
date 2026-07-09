@@ -1,11 +1,14 @@
 @page "/points"
 @rendermode InteractiveServer
 @using BlokeBot.Eventing
+@using BlokeBot.Features.HostedChannels
 @using BlokeBot.Hosts
+@using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject PointsDashboardService Dashboard
+@inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
 
 <PageTitle>BlokeBot | Points</PageTitle>
@@ -17,7 +20,7 @@
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Points</h1>
             <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Balances, ledger entries, user controls, and the active giveaway.</p>
         </div>
-        <button class="btn-primary" @onclick="RefreshAsync">Refresh</button>
+        <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -28,6 +31,10 @@
     @if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else if (!featureEnabled)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Points is disabled for this channel. Enable it in Host config.</div>
     }
     else if (state is null)
     {
@@ -180,6 +187,7 @@
 </div>
 
 @code {
+    private bool featureEnabled;
     private PointsDashboardState? state;
     private PointBalanceEntry? lookupResult;
     private string? statusMessage;
@@ -201,7 +209,7 @@
     {
         TrackSubscription(
             Events.SubscribeForComponentRefresh(
-                AppEventKind.PointsChanged,
+                [AppEventKind.PointsChanged, AppEventKind.HostedChannelsChanged],
                 work => InvokeAsync(work),
                 LoadAsync,
                 StateHasChanged
@@ -211,23 +219,30 @@
         await LoadAsync();
     }
 
-    private async Task AddAsync() => await RunAsync(await Dashboard.AddAsync(HostId, addLogin, addAmount, ActorLogin, CancellationToken.None));
+    private Task AddAsync() =>
+        RunAsync(() => Dashboard.AddAsync(HostId, addLogin, addAmount, ActorLogin, CancellationToken.None));
 
-    private async Task CancelGiveawayAsync() => await RunAsync(await Dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
+    private Task CancelGiveawayAsync() =>
+        RunAsync(() => Dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
 
-    private async Task EndGiveawayAsync() => await RunAsync(await Dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    private Task EndGiveawayAsync() =>
+        RunAsync(() => Dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
 
-    private async Task GiveAsync() => await RunAsync(await Dashboard.GiveAsync(HostId, giveFrom, giveTo, giveAmount, CancellationToken.None));
+    private Task GiveAsync() =>
+        RunAsync(() => Dashboard.GiveAsync(HostId, giveFrom, giveTo, giveAmount, CancellationToken.None));
 
     private async Task LoadAsync()
     {
-        if (HostId != 0)
-            state = await Dashboard.LoadAsync(HostId, CancellationToken.None);
+        if (HostId == 0)
+            return;
+
+        await LoadFeatureStateAsync();
+        state = featureEnabled ? await Dashboard.LoadAsync(HostId, CancellationToken.None) : null;
     }
 
     private async Task LookupAsync()
     {
-        if (HostId == 0 || string.IsNullOrWhiteSpace(lookupLogin))
+        if (HostId == 0 || !featureEnabled || string.IsNullOrWhiteSpace(lookupLogin))
             return;
 
         lookupResult = await Dashboard.LookupAsync(HostId, lookupLogin, CancellationToken.None);
@@ -239,13 +254,29 @@
         statusMessage = null;
     }
 
-    private async Task RemoveAsync() => await RunAsync(await Dashboard.RemoveAsync(HostId, removeLogin, removeAmount, ActorLogin, CancellationToken.None));
+    private Task RemoveAsync() =>
+        RunAsync(() =>
+            Dashboard.RemoveAsync(HostId, removeLogin, removeAmount, ActorLogin, CancellationToken.None)
+        );
 
-    private async Task RunAsync(PointOperationResult result)
+    private async Task RunAsync(Func<Task<PointOperationResult>> operation)
     {
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
+            return;
+
+        var result = await operation();
         statusMessage = result.Message;
         await LoadAsync();
     }
 
-    private async Task StartGiveawayAsync() => await RunAsync(await Dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    private Task StartGiveawayAsync() =>
+        RunAsync(() => Dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+
+    private async Task LoadFeatureStateAsync()
+    {
+        featureEnabled =
+            HostId != 0
+            && await Features.IsEnabledAsync(HostId, HostFeatureFlags.Points, CancellationToken.None);
+    }
 }

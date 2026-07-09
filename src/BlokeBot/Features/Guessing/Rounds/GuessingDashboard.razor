@@ -6,13 +6,16 @@
 @using BlokeBot.Twitch.Auth
 @using BlokeBot.Twitch.Runtime
 @using BlokeBot.Eventing
+@using BlokeBot.Features.HostedChannels
 @using BlokeBot.Hosts
+@using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject GuessingDashboardService Dashboard
 @inject GuessingHistoryService History
 @inject GuessingRoundService Rounds
+@inject HostFeatureService Features
 @inject EventBus<AppEventKind> Events
 @inject ITwitchChatMessageSender Chat
 
@@ -27,19 +30,39 @@
             <h1 class="text-3xl font-bold tracking-tight text-slate-950">Guessing game</h1>
             <p class="max-w-2xl text-sm leading-6 text-muted-foreground">Run live rounds and inspect player results.</p>
         </div>
-        <button class="btn-primary" @onclick="RefreshAsync">Refresh</button>
+        <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </div>
 
     @if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
+    else if (!featureEnabled)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is disabled for this channel. Enable it in Host config.</div>
+    }
     else
     {
 
-    <div id="live" class="control-surface inline-flex rounded-lg p-1">
-        <button class="@TabClass(DashboardTab.Live)" @onclick="() => ActivateTabAsync(DashboardTab.Live)">Live</button>
-        <button class="@TabClass(DashboardTab.History)" @onclick="() => ActivateTabAsync(DashboardTab.History)">History</button>
+    <div id="live"
+         class="@SegmentedControlClass"
+         role="tablist"
+         aria-label="Guessing dashboard view">
+        <span class="segmented-motion__indicator" aria-hidden="true"></span>
+        <button class="@TabClass(DashboardTab.Live)"
+                type="button"
+                role="tab"
+                aria-selected="@(activeTab == DashboardTab.Live)"
+                @onclick="() => ActivateTabAsync(DashboardTab.Live)">
+            Live
+        </button>
+        <button class="@TabClass(DashboardTab.History)"
+                type="button"
+                role="tab"
+                aria-selected="@(activeTab == DashboardTab.History)"
+                @onclick="() => ActivateTabAsync(DashboardTab.History)">
+            History
+        </button>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -192,6 +215,7 @@
     }
 
     private DashboardTab activeTab;
+    private bool featureEnabled;
     private GuessLeaderboardPage? leaderboard;
     private int historyPage = 1;
     private int historyPageSize = 25;
@@ -214,17 +238,23 @@
             ? "Idle"
             : $"{state.CurrentRound.ProfileName}: {state.CurrentRound.Status}";
 
+    private string SegmentedControlClass =>
+        activeTab == DashboardTab.History
+            ? "segmented-motion segmented-motion--history"
+            : "segmented-motion";
+
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
             Events.SubscribeForComponentRefresh(
-                AppEventKind.GuessingChanged,
+                [AppEventKind.GuessingChanged, AppEventKind.HostedChannelsChanged],
                 work => InvokeAsync(work),
                 ReloadForEventAsync,
                 StateHasChanged
             )
         );
         await LoadPageContextAsync();
+        await LoadFeatureStateAsync();
         await LoadAsync(null);
     }
 
@@ -239,6 +269,14 @@
 
     private async Task ReloadForEventAsync()
     {
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
+        {
+            state = null;
+            leaderboard = null;
+            return;
+        }
+
         if (activeTab == DashboardTab.History)
             await LoadHistoryAsync();
         else
@@ -268,6 +306,13 @@
         if (HostId == 0)
             return;
 
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
+        {
+            state = null;
+            return;
+        }
+
         state = await Dashboard.LoadStateAsync(HostId, CancellationToken.None);
         if (selectedProfileId == 0)
             selectedProfileId = state.CurrentRound?.ProfileId
@@ -281,6 +326,14 @@
     {
         if (HostId == 0)
             return;
+
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
+        {
+            state = null;
+            leaderboard = null;
+            return;
+        }
 
         state = await Dashboard.LoadStateAsync(HostId, CancellationToken.None);
         leaderboard = await History.LoadLeaderboardAsync(
@@ -323,6 +376,17 @@
             ? LoadHistoryAsync()
             : LoadAsync(null);
 
+    private async Task LoadFeatureStateAsync()
+    {
+        featureEnabled =
+            HostId != 0
+            && await Features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Guessing,
+                CancellationToken.None
+            );
+    }
+
     private Task StartRoundAsync() =>
         RunAsync(() => Rounds.StartRoundAsync(HostId, selectedProfileId, CancellationToken.None));
 
@@ -345,13 +409,17 @@
     private string TabClass(DashboardTab tab)
     {
         return activeTab == tab
-            ? "segmented-tab-active h-9 rounded-md px-4 text-sm font-semibold"
-            : "segmented-tab h-9 rounded-md px-4 text-sm font-semibold transition";
+            ? "segmented-motion__tab segmented-motion__tab--active"
+            : "segmented-motion__tab";
     }
 
     private async Task RunAsync(Func<Task<GuessingOperationResult>> operation)
     {
         if (HostId == 0)
+            return;
+
+        await LoadFeatureStateAsync();
+        if (!featureEnabled)
             return;
 
         var result = await operation();

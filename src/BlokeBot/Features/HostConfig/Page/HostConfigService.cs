@@ -1,5 +1,6 @@
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
+using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
@@ -39,6 +40,7 @@ public sealed class HostConfigService(
                 false,
                 null,
                 null,
+                [],
                 new HostModAccessState(true, [], [])
             );
         }
@@ -54,6 +56,7 @@ public sealed class HostConfigService(
             host.ChannelBotAuthorizedAtUtc is not null,
             status,
             host.BotRuntimeStateChangedAtUtc,
+            HostFeatureCatalog.Cards(host.EnabledFeatures),
             await modAccess.LoadAsync(host.Id, ct)
         );
     }

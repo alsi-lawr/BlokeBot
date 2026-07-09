@@ -1,9 +1,10 @@
 ﻿@rendermode InteractiveServer
 @using BlokeBot.Auth.Sessions
-@using BlokeBot.Features.Admin.HostedChannels
+@using BlokeBot.Features.HostedChannels
 @using BlokeBot.Hosts
+@using BlokeBot.Persistence.Models
 @inject EventBus<AppEventKind> Events
-@inject HostedChannelDirectoryService HostedChannels
+@inject HostFeatureService Features
 @inject IJSRuntime Js
 @inject BlokeBotPageContextAccessor PageContext
 @implements IAsyncDisposable
@@ -12,14 +13,7 @@
     <div class="nav-menu__brand flex items-center gap-3 border-b px-5 py-5">
         <img class="h-11 w-11 rounded-xl border p-1 shadow-soft" src="/blokedroid.svg" alt="" />
         <div>
-            <AuthorizeView>
-                <Authorized Context="brandAuth">
-                    <a class="block text-base font-bold text-slate-950" href="@BrandHref(PageContext.FromPrincipal(brandAuth.User))">BlokeBot</a>
-                </Authorized>
-                <NotAuthorized>
-                    <a class="block text-base font-bold text-slate-950" href="guessing">BlokeBot</a>
-                </NotAuthorized>
-            </AuthorizeView>
+            <a class="block text-base font-bold text-slate-950" href="">BlokeBot</a>
             <p class="text-xs font-medium text-slate-500">Channel tools</p>
         </div>
     </div>
@@ -32,8 +26,11 @@
                     var session = navContext.Session;
                     var selection = navContext.HostSelection;
                     var showHostConfig = session.CanOpenHostConfig(existingHostIds);
-                    var showBotFunctions = session.CanUseBotFunctions(existingHostIds);
+                    var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
+                    var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
+                    var showBotFunctions = showGuessing || showPoints;
                 }
+
                 <AuthorizeView Policy="BotAdmin">
                     <Authorized>
                 <div class="nav-menu__panel nav-menu__panel--admin rounded-xl p-1.5">
@@ -49,8 +46,26 @@
                         Admin
                     </NavLink>
                 </div>
+                <div class="nav-menu__separator" aria-hidden="true"></div>
                     </Authorized>
                 </AuthorizeView>
+
+                <div class="nav-menu__panel rounded-xl p-1.5">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active"
+                             Match="NavLinkMatch.All"
+                             href="">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
+                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 5h6v6H4Z" />
+                                <path d="M14 5h6v6h-6Z" />
+                                <path d="M4 15h6v4H4Z" />
+                                <path d="M14 15h6v4h-6Z" />
+                            </svg>
+                        </span>
+                        Home
+                    </NavLink>
+                </div>
 
                 @if (showHostConfig)
                 {
@@ -72,6 +87,8 @@
                 @if (showBotFunctions)
                 {
         <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Bot functions</div>
+        @if (showGuessing)
+        {
         <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@guessingOpen">
             <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleGuessingAsync">
                 <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
@@ -103,6 +120,9 @@
                 </NavLink>
             </div>
         </details>
+        }
+        @if (showPoints)
+        {
         <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="points" open="@pointsOpen">
             <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="TogglePointsAsync">
                 <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
@@ -130,6 +150,7 @@
                 </NavLink>
             </div>
         </details>
+        }
                 }
 
                 @if (selection is not null)
@@ -151,28 +172,20 @@
     private bool guessingOpen = true;
     private bool pointsOpen = true;
     private IDisposable? hostedChannelSubscription;
+    private IReadOnlyDictionary<int, HostFeatureFlags> hostedFeatures =
+        new Dictionary<int, HostFeatureFlags>();
     private IReadOnlySet<int> existingHostIds = new HashSet<int>();
     private IJSObjectReference? module;
-
-    private static string BrandHref(BlokeBotPageContext context)
-    {
-        if (context.IsBotAccount)
-            return "admin";
-
-        return context.Session.CanCreateHost && context.HostSelection is null
-            ? "host"
-            : "guessing";
-    }
 
     protected override async Task OnInitializedAsync()
     {
         hostedChannelSubscription = Events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             work => InvokeAsync(work),
-            LoadHostedChannelIdsAsync,
+            LoadHostedFeaturesAsync,
             StateHasChanged
         );
-        await LoadHostedChannelIdsAsync();
+        await LoadHostedFeaturesAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -239,8 +252,22 @@
             await module.InvokeVoidAsync("writeBoolean", PointsOpenStorageKey, pointsOpen);
     }
 
-    private async Task LoadHostedChannelIdsAsync()
+    private bool FeatureIsVisible(
+        AuthenticatedSession session,
+        BotHostSelection? selection,
+        HostFeatureFlags feature
+    )
     {
-        existingHostIds = await HostedChannels.LoadHostedChannelIdsAsync(CancellationToken.None);
+        if (!session.CanUseBotFunctions(existingHostIds) || selection is null)
+            return false;
+
+        return hostedFeatures.TryGetValue(selection.Current.Id, out var features)
+            && features.Contains(feature);
+    }
+
+    private async Task LoadHostedFeaturesAsync()
+    {
+        hostedFeatures = await Features.LoadHostedFeaturesAsync(CancellationToken.None);
+        existingHostIds = hostedFeatures.Keys.ToHashSet();
     }
 }

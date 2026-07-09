@@ -16,6 +16,7 @@ using BlokeBot.Features.Guessing.HostSetup;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostConfig.Page;
+using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
@@ -179,6 +180,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostedChannelRuntimeControlService>();
         services.AddSingleton<HostedChannelRuntimeLifecycleService>();
         services.AddSingleton<HostedChannelRuntimeStatusService>();
+        services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
         services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<ITwitchBotChannelLifecycleNotifier, HostedChannelLifecycleNotifier>();

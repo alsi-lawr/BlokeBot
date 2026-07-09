@@ -1,9 +1,13 @@
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.HostedChannels;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Guessing.Commands;
 
-public sealed class GuessingCommandRouteResolver(AppCommandAliasResolver aliases)
-    : ICommandRouteResolver<GuessCommandKind, AppCommandRouteState>
+public sealed class GuessingCommandRouteResolver(
+    AppCommandAliasResolver aliases,
+    HostFeatureService features
+) : ICommandRouteResolver<GuessCommandKind, AppCommandRouteState>
 {
     public async ValueTask<CommandRoute<GuessCommandKind, AppCommandRouteState>?> ResolveAsync(
         TwitchCommandContext context,
@@ -18,6 +22,17 @@ public sealed class GuessingCommandRouteResolver(AppCommandAliasResolver aliases
         if (
             resolution is null
             || !GuessingAppCommandKindMap.TryFromAppKind(resolution.Kind, out var kind)
+        )
+        {
+            return null;
+        }
+
+        if (
+            !await features.IsEnabledAsync(
+                resolution.HostId,
+                HostFeatureFlags.Guessing,
+                cancellationToken
+            )
         )
         {
             return null;

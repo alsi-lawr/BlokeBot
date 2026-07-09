@@ -1,9 +1,13 @@
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.HostedChannels;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Commands;
 
-public sealed class PointsCommandRouteResolver(AppCommandAliasResolver aliases)
-    : ICommandRouteResolver<PointsCommandKind, AppCommandRouteState>
+public sealed class PointsCommandRouteResolver(
+    AppCommandAliasResolver aliases,
+    HostFeatureService features
+) : ICommandRouteResolver<PointsCommandKind, AppCommandRouteState>
 {
     public async ValueTask<CommandRoute<PointsCommandKind, AppCommandRouteState>?> ResolveAsync(
         TwitchCommandContext context,
@@ -18,6 +22,17 @@ public sealed class PointsCommandRouteResolver(AppCommandAliasResolver aliases)
         if (
             resolution is null
             || !PointsAppCommandKindMap.TryFromAppKind(resolution.Kind, out var kind)
+        )
+        {
+            return null;
+        }
+
+        if (
+            !await features.IsEnabledAsync(
+                resolution.HostId,
+                HostFeatureFlags.Points,
+                cancellationToken
+            )
         )
         {
             return null;
