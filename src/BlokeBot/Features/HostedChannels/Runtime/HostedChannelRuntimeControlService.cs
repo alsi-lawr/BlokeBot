@@ -10,6 +10,7 @@ public sealed class HostedChannelRuntimeControlService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
     ChannelBotAuthorizationService channelBotAuthorization,
+    HostBotAccountAuthorizationService botAccounts,
     IOptions<BlokeBotOptions> options
 )
 {
@@ -35,6 +36,18 @@ public sealed class HostedChannelRuntimeControlService(
         {
             return HostedChannelRuntimeControlResult.Failure(
                 "Authorize or reauthorize the bot on that channel before starting it."
+            );
+        }
+
+        var botAccountStatus = await botAccounts.GetStatusAsync(host.Id, ct);
+        if (
+            botAccountStatus.State
+            is not BotAccountAuthorizationState.Disabled
+                and not BotAccountAuthorizationState.Ready
+        )
+        {
+            return HostedChannelRuntimeControlResult.Failure(
+                "Authorize the custom bot account before starting it, or disable the bot override."
             );
         }
 

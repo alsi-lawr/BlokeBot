@@ -1,11 +1,12 @@
 using System.Text.Json;
+using BlokeBot.Features.HostedChannels.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed class HostBotStatusService(
     IServiceProvider services,
-    TwitchTokenStatusService tokens,
+    HostBotAccountAuthorizationService botAccounts,
     TwitchHelixApiClient helix,
     IOptions<TwitchBotOptions> options
 )
@@ -50,7 +51,11 @@ public sealed class HostBotStatusService(
         CancellationToken ct
     )
     {
-        var tokenStatus = await tokens.GetUserAccessTokenStatusAsync(options.Identity.Scopes, ct);
+        var tokenStatus = await botAccounts.GetActiveTokenStatusAsync(
+            channelLogin,
+            options.Identity.Scopes,
+            ct
+        );
         return tokenStatus.State switch
         {
             TwitchTokenStatusState.Unavailable => HostBotReadinessOutcome.TokenUnavailable(
@@ -71,7 +76,7 @@ public sealed class HostBotStatusService(
 
     private async Task<HostBotReadinessOutcome> EvaluateAuthorizedReadinessAsync(
         string channelLogin,
-        TwitchTokenStatus tokenStatus,
+        ActiveBotAccountTokenStatus tokenStatus,
         HostBotChannelStatusFlags configuredFlags,
         CancellationToken ct
     )
@@ -84,14 +89,14 @@ public sealed class HostBotStatusService(
             tokenStatus.AccessToken!,
             [
                 TwitchLogin.Normalize(channelLogin),
-                TwitchLogin.Normalize(options.Identity.BotUsername),
+                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
             ],
             ct
         );
         if (
             !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
             || !identities.TryGetValue(
-                TwitchLogin.Normalize(options.Identity.BotUsername),
+                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
                 out var botId
             )
         )
@@ -145,13 +150,14 @@ public sealed class HostBotStatusService(
         if (status.ModeratorState != HostBotModeratorState.IsModerator)
             return FollowerCheckResult.Unavailable;
 
-        var token = await GetValidatedUserAccessTokenAsync(ct);
+        var tokenStatus = await GetValidatedUserAccessTokenAsync(channelLogin, ct);
+        var token = tokenStatus.AccessToken!;
         var identities = await LookupUsersAsync(
             token,
             [
                 TwitchLogin.Normalize(channelLogin),
                 TwitchLogin.Normalize(viewerLogin),
-                TwitchLogin.Normalize(options.Identity.BotUsername),
+                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
             ],
             ct
         );
@@ -159,7 +165,7 @@ public sealed class HostBotStatusService(
             !identities.TryGetValue(TwitchLogin.Normalize(channelLogin), out var channelId)
             || !identities.TryGetValue(TwitchLogin.Normalize(viewerLogin), out var viewerId)
             || !identities.TryGetValue(
-                TwitchLogin.Normalize(options.Identity.BotUsername),
+                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
                 out var botId
             )
         )
@@ -240,11 +246,18 @@ public sealed class HostBotStatusService(
         return await appTokens.GetAccessTokenAsync(ct);
     }
 
-    private async Task<string> GetValidatedUserAccessTokenAsync(CancellationToken ct)
+    private async Task<ActiveBotAccountTokenStatus> GetValidatedUserAccessTokenAsync(
+        string channelLogin,
+        CancellationToken ct
+    )
     {
-        var status = await tokens.GetUserAccessTokenStatusAsync(options.Identity.Scopes, ct);
+        var status = await botAccounts.GetActiveTokenStatusAsync(
+            channelLogin,
+            options.Identity.Scopes,
+            ct
+        );
         if (status.AccessToken is not null && status.Validation is not null)
-            return status.AccessToken;
+            return status;
 
         throw new InvalidOperationException("Twitch bot runtime is not authorized.");
     }

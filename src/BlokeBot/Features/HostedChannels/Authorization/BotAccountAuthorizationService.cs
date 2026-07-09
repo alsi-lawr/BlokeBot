@@ -6,6 +6,7 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public enum BotAccountAuthorizationState
 {
+    Disabled,
     Unknown,
     NotAuthorized,
     WrongAccount,
@@ -14,7 +15,7 @@ public enum BotAccountAuthorizationState
 }
 
 public sealed record BotAccountAuthorizationStatus(
-    string ConfiguredBotLogin,
+    string? ConfiguredBotLogin,
     string? AuthorizedLogin,
     string? AuthorizedProfileImageUrl,
     BotAccountAuthorizationState State,

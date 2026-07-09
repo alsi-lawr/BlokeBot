@@ -45,10 +45,15 @@ public partial class HostBotChannelStatusPanel
     [Parameter, EditorRequired]
     public string HostLogin { get; set; } = string.Empty;
 
+    [Parameter]
+    public string? ReloadKey { get; set; }
+
     private HostBotChannelStatus? Status => BackgroundValue;
 
     protected override object? BackgroundLoadKey =>
-        string.IsNullOrWhiteSpace(HostLogin) ? null : HostLogin.Trim().ToLowerInvariant();
+        string.IsNullOrWhiteSpace(HostLogin)
+            ? null
+            : $"{HostLogin.Trim().ToLowerInvariant()}:{ReloadKey}";
 
     protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct) =>
         HostBotStatus.GetStatusAsync(HostLogin, ct);

@@ -52,6 +52,40 @@ public partial class BotAccountAuthorizationSection
     [Parameter]
     public BotAccountAuthorizationStatus? Status { get; set; }
 
+    [Parameter]
+    public string Title { get; set; } = "Bot account authorization";
+
+    [Parameter]
+    public string Description { get; set; } =
+        "Authorize the Twitch account BlokeBot uses for chat and API checks.";
+
+    [Parameter]
+    public string AuthorizeButtonText { get; set; } = "Authorize bot account";
+
+    [Parameter]
+    public string AuthorizationStartUrl { get; set; } = "/oauth/start";
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public string? DisabledMessage { get; set; }
+
+    [Parameter]
+    public string ConfiguredAccountFallbackText { get; set; } = "not configured";
+
+    [Parameter]
+    public bool ShowEnableToggle { get; set; }
+
+    [Parameter]
+    public bool EnableToggleValue { get; set; }
+
+    [Parameter]
+    public string EnableToggleLabel { get; set; } = "Enable";
+
+    [Parameter]
+    public Func<bool, Task> EnableToggleChanged { get; set; } = _ => Task.CompletedTask;
+
     [Parameter, EditorRequired]
     public Func<Task> Clear { get; set; } = () => Task.CompletedTask;
 
@@ -85,7 +119,7 @@ public partial class BotAccountAuthorizationSection
             );
             var popupClosed = await authorizationModule.InvokeAsync<bool>(
                 "openBotAuthorization",
-                "/oauth/start"
+                AuthorizationStartUrl
             );
             if (popupClosed)
                 await Refresh();
@@ -102,11 +136,22 @@ public partial class BotAccountAuthorizationSection
             : "No saved Twitch authorization";
 
     private string ConfiguredAccountText =>
-        Status?.ConfiguredBotLogin is { Length: > 0 } login ? $"@{login}" : "not configured";
+        Status?.ConfiguredBotLogin is { Length: > 0 } login
+            ? $"@{login}"
+            : ConfiguredAccountFallbackText;
+
+    private string SectionClass => Disabled ? "card bot-account-section--disabled" : "card";
+
+    private string BodyClass =>
+        Disabled
+            ? "grid gap-4 p-5 opacity-60 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
+            : "grid gap-4 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]";
 
     private string StatusBadgeClass =>
         Status?.State switch
         {
+            BotAccountAuthorizationState.Disabled =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
             BotAccountAuthorizationState.Ready =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
             BotAccountAuthorizationState.WrongAccount
@@ -119,6 +164,7 @@ public partial class BotAccountAuthorizationSection
     private string StatusDotClass =>
         Status?.State switch
         {
+            BotAccountAuthorizationState.Disabled => "h-1.5 w-1.5 rounded-full bg-slate-400",
             BotAccountAuthorizationState.Ready => "h-1.5 w-1.5 rounded-full bg-emerald-500",
             BotAccountAuthorizationState.WrongAccount
             or BotAccountAuthorizationState.MissingScopes =>
@@ -129,6 +175,7 @@ public partial class BotAccountAuthorizationSection
     private string StatusText =>
         Status?.State switch
         {
+            BotAccountAuthorizationState.Disabled => "disabled",
             BotAccountAuthorizationState.Ready => "current",
             BotAccountAuthorizationState.WrongAccount => "wrong account",
             BotAccountAuthorizationState.MissingScopes => "missing permissions",
@@ -138,4 +185,9 @@ public partial class BotAccountAuthorizationSection
 
     private static string FormatScopes(IReadOnlyList<string>? scopes) =>
         scopes is { Count: > 0 } ? string.Join(", ", scopes) : "none";
+
+    private async Task SetEnableToggleAsync(ChangeEventArgs args)
+    {
+        await EnableToggleChanged(args.Value is true);
+    }
 }

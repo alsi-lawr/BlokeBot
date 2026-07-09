@@ -1,5 +1,8 @@
 using System.Net;
 using System.Text;
+using BlokeBot.Eventing;
+using BlokeBot.Features.HostedChannels.Authorization;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -13,12 +16,12 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_unavailable_token()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory(),
             includeTokenProvider: false
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.TokenUnavailable);
     }
@@ -26,14 +29,14 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_invalid_token()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
             {
                 ValidationStatusCode = HttpStatusCode.Unauthorized,
             }
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.InvalidToken);
     }
@@ -41,14 +44,14 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_missing_moderator_scope()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
             {
                 GrantedScopes = [TwitchScopes.ModeratorReadFollowers],
             }
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.MissingModeratorCheckScope);
     }
@@ -56,7 +59,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_not_moderator()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
             {
                 GrantedScopes =
@@ -68,7 +71,7 @@ public sealed class HostBotStatusTests
             }
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.NotModerator);
     }
@@ -76,7 +79,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_missing_follower_scope()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
             {
                 GrantedScopes = [TwitchScopes.UserReadModeratedChannels],
@@ -84,7 +87,7 @@ public sealed class HostBotStatusTests
             }
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.MissingFollowerReadScope);
     }
@@ -92,7 +95,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task Readiness_reports_ready()
     {
-        var service = CreateService(
+        await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
             {
                 GrantedScopes =
@@ -104,18 +107,19 @@ public sealed class HostBotStatusTests
             }
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
-        var status = await service.GetStatusAsync("streamer", CancellationToken.None);
+        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var status = await fixture.Service.GetStatusAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
         status.CanReadFollowers.ShouldBeTrue();
     }
 
-    private static HostBotStatusService CreateService(
+    private static async Task<HostBotStatusFixture> CreateFixtureAsync(
         HostBotStatusHttpClientFactory httpClientFactory,
         bool includeTokenProvider = true
     )
     {
+        var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var services = new ServiceCollection();
         if (includeTokenProvider)
             services.AddSingleton<ITwitchAccessTokenProvider>(
@@ -123,26 +127,47 @@ public sealed class HostBotStatusTests
             );
 
         var provider = services.BuildServiceProvider();
-        return new HostBotStatusService(
-            provider,
-            new TwitchTokenStatusService(provider, new TwitchOAuthApiClient(httpClientFactory)),
-            new TwitchHelixApiClient(httpClientFactory),
-            Options.Create(
-                new TwitchBotOptions
+        var options = Options.Create(
+            new TwitchBotOptions
+            {
+                Identity = new TwitchBotIdentityOptions
                 {
-                    Identity = new TwitchBotIdentityOptions
-                    {
-                        BotUsername = "bot",
-                        ClientId = "client",
-                        Scopes =
-                        [
-                            TwitchScopes.UserReadModeratedChannels,
-                            TwitchScopes.ModeratorReadFollowers,
-                        ],
-                    },
-                }
-            )
+                    BotUsername = "bot",
+                    ClientId = "client",
+                    ClientSecret = "secret",
+                    Scopes =
+                    [
+                        TwitchScopes.UserReadModeratedChannels,
+                        TwitchScopes.ModeratorReadFollowers,
+                    ],
+                },
+            }
         );
+        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var hostBotAccounts = new HostBotAccountAuthorizationService(
+            dbFactory,
+            new HostBotAccountOAuthService(options, oauth, helix),
+            oauth,
+            helix,
+            new TwitchTokenStatusService(provider, oauth),
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            options
+        );
+        return new HostBotStatusFixture(
+            new HostBotStatusService(provider, hostBotAccounts, helix, options),
+            dbFactory
+        );
+    }
+
+    private sealed class HostBotStatusFixture(
+        HostBotStatusService service,
+        SqliteBlokeBotDbFactory dbFactory
+    ) : IAsyncDisposable
+    {
+        public HostBotStatusService Service { get; } = service;
+
+        public async ValueTask DisposeAsync() => await dbFactory.DisposeAsync();
     }
 
     private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider

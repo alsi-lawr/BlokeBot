@@ -24,25 +24,33 @@ public sealed class HostedChannelRuntimeStatusTests
         using var services = new ServiceCollection()
             .AddSingleton<ITwitchAccessTokenProvider>(new StaticTokenProvider("saved-token"))
             .BuildServiceProvider();
+        var options = Options.Create(
+            new TwitchBotOptions
+            {
+                Identity = new TwitchBotIdentityOptions
+                {
+                    BotUsername = "bot",
+                    ClientId = "client",
+                    ClientSecret = "secret",
+                    Scopes = [TwitchScopes.UserReadModeratedChannels],
+                },
+            }
+        );
+        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var hostBotAccounts = new HostBotAccountAuthorizationService(
+            dbFactory,
+            new HostBotAccountOAuthService(options, oauth, helix),
+            oauth,
+            helix,
+            new TwitchTokenStatusService(services, oauth),
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            options
+        );
         var service = new HostedChannelRuntimeStatusService(
             dbFactory,
             ChannelAuthorizationService(dbFactory, "channel:bot"),
-            new HostBotStatusService(
-                services,
-                new TwitchTokenStatusService(services, new TwitchOAuthApiClient(httpClientFactory)),
-                new TwitchHelixApiClient(httpClientFactory),
-                Options.Create(
-                    new TwitchBotOptions
-                    {
-                        Identity = new TwitchBotIdentityOptions
-                        {
-                            BotUsername = "bot",
-                            ClientId = "client",
-                            Scopes = [TwitchScopes.UserReadModeratedChannels],
-                        },
-                    }
-                )
-            )
+            new HostBotStatusService(services, hostBotAccounts, helix, options)
         );
 
         var summary = await service.LoadHostRuntimeSummaryAsync(hostId, CancellationToken.None);

@@ -79,6 +79,7 @@ public static class TwitchBotServiceCollectionExtensions
             ITwitchBotChannelLifecycleNotifier,
             NoOpTwitchBotChannelLifecycleNotifier
         >();
+        services.TryAddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
         services.TryAddSingleton<TwitchBotRuntimeStatusStore>();
         services.TryAddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>

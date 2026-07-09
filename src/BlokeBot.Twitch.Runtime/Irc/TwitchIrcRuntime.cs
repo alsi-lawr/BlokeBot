@@ -13,7 +13,7 @@ internal sealed class TwitchIrcRuntime(
     ITwitchAccessTokenProvider tokens,
     TwitchCommandDispatcher dispatcher,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
-    TwitchOutboundMessageQueue outboundMessages,
+    ITwitchChatMessageSender sender,
     TwitchBotRuntimeStatusStore status,
     ILogger<TwitchIrcRuntime> log
 )
@@ -141,22 +141,7 @@ internal sealed class TwitchIrcRuntime(
                         message.Channel,
                         reply
                     );
-                    await outboundMessages.SendAsync(
-                        message.Channel,
-                        reply,
-                        async (outboundMessage, sendToken) =>
-                        {
-                            await writer.WriteLineAsync(
-                                $"PRIVMSG #{outboundMessage.Channel} :{outboundMessage.Message}"
-                            );
-                            await writer.FlushAsync(sendToken);
-                            log.LogInformation(
-                                "Twitch chat reply write completed for #{Channel}.",
-                                outboundMessage.Channel
-                            );
-                        },
-                        ct
-                    );
+                    await sender.SendAsync(message.Channel, reply, ct);
                 },
                 cancellationToken
             );
@@ -216,16 +201,7 @@ internal sealed class TwitchIrcRuntime(
         if (string.IsNullOrWhiteSpace(startupMessage))
             return;
 
-        await outboundMessages.SendAsync(
-            channel,
-            startupMessage,
-            async (message, sendToken) =>
-            {
-                await writer.WriteLineAsync($"PRIVMSG #{message.Channel} :{message.Message}");
-                await writer.FlushAsync(sendToken);
-            },
-            cancellationToken
-        );
+        await sender.SendAsync(channel, startupMessage, cancellationToken);
     }
 
     private void LogServerLine(string line)

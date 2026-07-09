@@ -7,6 +7,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     : DbContext(options)
 {
     public DbSet<BotHost> Hosts => Set<BotHost>();
+    public DbSet<HostBotAccountSettings> HostBotAccountSettings => Set<HostBotAccountSettings>();
     public DbSet<BotReplySettings> ReplySettings => Set<BotReplySettings>();
     public DbSet<CommandAlias> CommandAliases => Set<CommandAlias>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
@@ -42,6 +43,24 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.ProfileImageUrl).HasMaxLength(512);
             b.Property(x => x.TwitchUserId).HasMaxLength(64);
             b.HasIndex(x => x.Login).IsUnique();
+        });
+
+        modelBuilder.Entity<HostBotAccountSettings>(b =>
+        {
+            b.ToTable("host_bot_account_settings");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.AccessToken).HasMaxLength(4096);
+            b.Property(x => x.AuthorizedScopes).HasMaxLength(512);
+            b.Property(x => x.DisplayName).HasMaxLength(128);
+            b.Property(x => x.Login).HasMaxLength(128);
+            b.Property(x => x.ProfileImageUrl).HasMaxLength(512);
+            b.Property(x => x.RefreshToken).HasMaxLength(4096);
+            b.Property(x => x.TwitchUserId).HasMaxLength(64);
+            b.HasIndex(x => x.HostId).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<SiteAccessSettings>(b =>

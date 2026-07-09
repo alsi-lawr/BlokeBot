@@ -4,7 +4,7 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchChatMessageSender(
     TwitchAppAccessTokenProvider appTokens,
-    ITwitchAccessTokenProvider userTokens,
+    ITwitchBotAccountProvider botAccounts,
     TwitchHelixChatClient helix,
     TwitchOutboundMessageQueue queue,
     ILogger<TwitchChatMessageSender> log
@@ -21,10 +21,11 @@ internal sealed class TwitchChatMessageSender(
         CancellationToken cancellationToken
     )
     {
-        var userAccessToken = await userTokens.GetAccessTokenAsync(cancellationToken);
+        var botAccount = await botAccounts.GetBotAccountAsync(message.Channel, cancellationToken);
         var identities = await helix.ResolveChatIdentitiesAsync(
             message.Channel,
-            userAccessToken,
+            botAccount.Login,
+            botAccount.AccessToken,
             cancellationToken
         );
         var appAccessToken = await appTokens.GetAccessTokenAsync(cancellationToken);

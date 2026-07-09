@@ -72,12 +72,13 @@ internal sealed class TwitchHelixChatClient(
 
     public async Task<TwitchChatIdentitySet> ResolveChatIdentitiesAsync(
         string channelLogin,
+        string botLogin,
         string accessToken,
         CancellationToken cancellationToken
     )
     {
         var channel = TwitchLogin.Normalize(channelLogin);
-        var bot = TwitchLogin.Normalize(opts.BotUsername);
+        var bot = TwitchLogin.Normalize(botLogin);
         var users = await helix.GetUsersByLoginAsync(
             new TwitchHelixRequestContext(opts.ClientId, accessToken),
             [channel, bot],
@@ -96,9 +97,7 @@ internal sealed class TwitchHelixChatClient(
             );
 
         if (string.IsNullOrWhiteSpace(botUser?.Id))
-            throw new InvalidOperationException(
-                $"Twitch bot login '{opts.BotUsername}' was not found."
-            );
+            throw new InvalidOperationException($"Twitch bot login '{botLogin}' was not found.");
 
         return new TwitchChatIdentitySet(broadcaster.Id, botUser.Id);
     }

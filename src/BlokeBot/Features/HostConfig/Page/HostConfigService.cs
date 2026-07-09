@@ -1,6 +1,7 @@
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels;
+using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
@@ -12,6 +13,7 @@ namespace BlokeBot.Features.HostConfig.Page;
 public sealed class HostConfigService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostModAccessService modAccess,
+    HostBotAccountAuthorizationService botAccounts,
     HostedChannelRuntimeStatusService runtimeStatus,
     SiteAccessService siteAccess
 )
@@ -40,12 +42,14 @@ public sealed class HostConfigService(
                 false,
                 null,
                 null,
+                new HostBotAccountOverrideState(false, DisabledBotOverrideStatus()),
                 [],
                 new HostModAccessState(true, true, [], [])
             );
         }
 
         var status = await runtimeStatus.LoadHostRuntimeSummaryAsync(host.Id, ct);
+        var botOverrideStatus = await botAccounts.GetStatusAsync(host.Id, ct);
         return new HostConfigState(
             host.Id,
             host.Login,
@@ -56,8 +60,24 @@ public sealed class HostConfigService(
             host.ChannelBotAuthorizedAtUtc is not null,
             status,
             host.BotRuntimeStateChangedAtUtc,
+            new HostBotAccountOverrideState(
+                botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
+                botOverrideStatus
+            ),
             HostFeatureCatalog.Cards(host.EnabledFeatures),
             await modAccess.LoadAsync(host.Id, ct)
         );
     }
+
+    private static BotAccountAuthorizationStatus DisabledBotOverrideStatus() =>
+        new(
+            null,
+            null,
+            null,
+            BotAccountAuthorizationState.Disabled,
+            [],
+            [],
+            [],
+            "Create your hosted channel before configuring a bot override."
+        );
 }

@@ -59,6 +59,7 @@ public partial class HostConfigPage
         state?.RuntimeStatus is not null
         && state.IsChannelBotAuthorized
         && state.RuntimeStatus.ChannelBotAuthorizationScopesCurrent
+        && BotAccountCanStart
         && state.RuntimeStatus.RuntimeState is BotChannelRuntimeState.Stopped;
 
     private bool CanStop =>
@@ -124,6 +125,22 @@ public partial class HostConfigPage
             BotChannelRuntimeState.Stopping => "Bot stopping.",
             _ => "Bot stopped.",
         };
+
+    private bool BotAccountCanStart =>
+        state?.BotOverride.Enabled != true
+        || state.BotOverride.Status.State == BotAccountAuthorizationState.Ready;
+
+    private string BotAccountStatusReloadKey =>
+        state is null
+            ? string.Empty
+            : string.Join(
+                ":",
+                state.Login,
+                state.BotOverride.Enabled,
+                state.BotOverride.Status.State,
+                state.BotOverride.Status.AuthorizedLogin ?? string.Empty,
+                string.Join(",", state.BotOverride.Status.GrantedScopes)
+            );
 
     private string AccessModeSegmentClass =>
         state?.ModAccess.AllowModsByDefault == false
@@ -279,6 +296,19 @@ public partial class HostConfigPage
         ToastFeatureChange(feature, enabled);
     }
 
+    private async Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
+    {
+        await HostBotAccounts.SetOverrideEnabledAsync(hostId, enabled, CancellationToken.None);
+        await LoadAsync();
+        Toasts.Status(
+            enabled
+                ? "Custom bot override is enabled for this channel. Authorize the account before starting the bot."
+                : "Custom bot override is disabled for this channel. The global bot account will be used.",
+            enabled ? "Bot override enabled" : "Bot override disabled",
+            enabled ? ToastTone.Positive : ToastTone.Caution
+        );
+    }
+
     private async Task LoadAccessEntriesAsync(HostModAccessState access)
     {
         whitelistEntries = await AccessListProfiles.ResolveAsync(
@@ -326,6 +356,17 @@ public partial class HostConfigPage
         await ChannelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
         Toasts.Status("Channel authorization cleared.");
+    }
+
+    private async Task ClearBotOverrideAuthorizationAsync(int hostId)
+    {
+        await HostBotAccounts.ClearAsync(hostId, CancellationToken.None);
+        await LoadAsync();
+        Toasts.Status(
+            "Custom bot authorization cleared.",
+            "Bot override updated",
+            ToastTone.Caution
+        );
     }
 
     private async Task StartAsync(int hostId)

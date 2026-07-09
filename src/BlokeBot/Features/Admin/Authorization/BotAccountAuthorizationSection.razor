@@ -1,25 +1,32 @@
 @using BlokeBot.Features.HostedChannels.Authorization
 @implements IAsyncDisposable
 
-<section class="card">
+<section class="@SectionClass">
     <div class="border-b border-slate-200 p-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-lg font-semibold text-slate-950">Bot account authorization</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Authorize the Twitch account BlokeBot uses for chat and API checks.</p>
+                <h2 class="text-lg font-semibold text-slate-950">@Title</h2>
+                <p class="mt-1 text-sm text-muted-foreground">@Description</p>
             </div>
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+                @if (ShowEnableToggle)
+                {
+                    <label class="control-surface inline-flex h-8 items-center gap-2 rounded-md px-3 text-xs font-bold transition">
+                        <input class="h-4 w-4" type="checkbox" checked="@EnableToggleValue" @onchange="SetEnableToggleAsync" />
+                        @EnableToggleLabel
+                    </label>
+                }
                 <button class="inline-flex h-8 items-center rounded-md bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed] disabled:cursor-not-allowed disabled:opacity-70"
                         @onclick="OpenAuthorizationAsync"
-                        disabled="@authorizationOpening">
-                    @(authorizationOpening ? "Opening..." : "Authorize bot account")
+                        disabled="@(Disabled || authorizationOpening)">
+                    @(authorizationOpening ? "Opening..." : AuthorizeButtonText)
                 </button>
-                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition" @onclick="Refresh">Refresh</button>
-                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition" @onclick="Clear">Clear authorization</button>
+                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Refresh">Refresh</button>
+                <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Clear authorization</button>
             </div>
         </div>
     </div>
-    <div class="grid gap-4 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+    <div class="@BodyClass">
         <div class="surface-muted rounded-lg p-4">
             <div class="flex items-center gap-4">
                 @if (Status?.AuthorizedProfileImageUrl is { Length: > 0 } imageUrl)
@@ -50,6 +57,10 @@
                     <p class="mt-2 truncate text-sm font-semibold text-slate-900">@AuthorizedAccountText</p>
                     <p class="mt-1 text-xs font-medium text-slate-500">Configured as @ConfiguredAccountText</p>
                     <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
+                    @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
+                    {
+                        <p class="mt-1 text-xs font-bold text-slate-500">@DisabledMessage</p>
+                    }
                 </div>
             </div>
         </div>

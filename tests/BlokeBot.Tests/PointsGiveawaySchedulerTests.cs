@@ -1,4 +1,6 @@
 using BlokeBot.Eventing;
+using BlokeBot.Features.HostedChannels.Authorization;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
@@ -362,15 +364,20 @@ public sealed class PointsGiveawaySchedulerTests
     )
     {
         var httpClientFactory = new FakeHttpClientFactory();
-        var status = new HostBotStatusService(
-            new ServiceCollection().BuildServiceProvider(),
-            new TwitchTokenStatusService(
-                new ServiceCollection().BuildServiceProvider(),
-                new TwitchOAuthApiClient(httpClientFactory)
-            ),
-            new TwitchHelixApiClient(httpClientFactory),
-            Options.Create(new TwitchBotOptions())
+        var serviceProvider = new ServiceCollection().BuildServiceProvider();
+        var options = Options.Create(new TwitchBotOptions());
+        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var hostBotAccounts = new HostBotAccountAuthorizationService(
+            dbFactory,
+            new HostBotAccountOAuthService(options, oauth, helix),
+            oauth,
+            helix,
+            new TwitchTokenStatusService(serviceProvider, oauth),
+            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            options
         );
+        var status = new HostBotStatusService(serviceProvider, hostBotAccounts, helix, options);
         return new PointsGiveawayService(
             dbFactory,
             new PointsGiveawayDrawService(

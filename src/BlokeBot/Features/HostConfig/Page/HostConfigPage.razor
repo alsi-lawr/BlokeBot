@@ -2,6 +2,7 @@
 @using BlokeBot.Auth.Sessions
 @using BlokeBot.Eventing
 @using BlokeBot.Features.AccessLists
+@using BlokeBot.Features.Admin.Authorization
 @using BlokeBot.Features.HostConfig.Access
 @using BlokeBot.Features.HostedChannels
 @using BlokeBot.Features.HostedChannels.Authorization
@@ -17,6 +18,7 @@
 @inject AccessListProfileResolver AccessListProfiles
 @inject HostedChannelRuntimeControlService Runtime
 @inject ChannelBotAuthorizationService ChannelBotAuthorization
+@inject HostBotAccountAuthorizationService HostBotAccounts
 @inject EventBus<AppEventKind> Events
 @inject NavigationManager Navigation
 @inject ToastService Toasts
@@ -100,7 +102,7 @@
                         <a class="mt-2 inline-flex h-7 items-center rounded-full bg-[#9146ff] px-3 text-xs font-bold text-white shadow-sm transition hover:bg-[#7c3aed]" href="/oauth/channel-bot/start" target="_blank" rel="noopener noreferrer" data-enhance-nav="false">Authorize bot</a>
                     }
                 </div>
-                <HostBotChannelStatusPanel HostLogin="@state.Login" />
+                <HostBotChannelStatusPanel HostLogin="@state.Login" ReloadKey="@BotAccountStatusReloadKey" />
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Runtime</p>
@@ -116,6 +118,21 @@
                 </div>
             </div>
         </section>
+
+        <BotAccountAuthorizationSection Status="@state.BotOverride.Status"
+                                        Title="Bot account override"
+                                        Description="Use a Twitch account you control as the bot for this channel."
+                                        AuthorizeButtonText="Authorize custom bot"
+                                        AuthorizationStartUrl="/oauth/host-bot/start"
+                                        Disabled="@(!state.BotOverride.Enabled)"
+                                        DisabledMessage="Turn this on to authorize and use a channel-specific bot account."
+                                        ConfiguredAccountFallbackText="custom bot account"
+                                        ShowEnableToggle="true"
+                                        EnableToggleValue="@state.BotOverride.Enabled"
+                                        EnableToggleLabel="Use custom bot"
+                                        EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
+                                        Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
+                                        Refresh="LoadAsync" />
 
         <section class="card">
             <div class="border-b border-slate-200 p-5">

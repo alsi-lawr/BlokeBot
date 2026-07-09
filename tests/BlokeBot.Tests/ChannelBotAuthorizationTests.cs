@@ -9,6 +9,7 @@ using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
@@ -110,6 +111,7 @@ public sealed class ChannelBotAuthorizationTests
             dbFactory,
             ChangeNotifier(),
             authorization,
+            HostBotAccounts(dbFactory),
             Options.Create(new BlokeBotOptions { BotStateChangeCooldownSeconds = 0 })
         );
 
@@ -135,6 +137,36 @@ public sealed class ChannelBotAuthorizationTests
     {
         var httpClientFactory = new EmptyHttpClientFactory();
         return new(ConfigurationWithScopes(scopes), new TwitchOAuthApiClient(httpClientFactory));
+    }
+
+    private static HostBotAccountAuthorizationService HostBotAccounts(
+        SqliteBlokeBotDbFactory dbFactory
+    )
+    {
+        var httpClientFactory = new EmptyHttpClientFactory();
+        var options = Options.Create(
+            new TwitchBotOptions
+            {
+                Identity = new TwitchBotIdentityOptions
+                {
+                    BotUsername = "bot",
+                    ClientId = "client",
+                    ClientSecret = "secret",
+                },
+            }
+        );
+        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var services = new ServiceCollection().BuildServiceProvider();
+        return new HostBotAccountAuthorizationService(
+            dbFactory,
+            new HostBotAccountOAuthService(options, oauth, helix),
+            oauth,
+            helix,
+            new TwitchTokenStatusService(services, oauth),
+            ChangeNotifier(),
+            options
+        );
     }
 
     private static HostedChannelChangeNotifier ChangeNotifier() =>

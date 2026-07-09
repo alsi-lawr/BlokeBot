@@ -178,6 +178,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotHostedChannels(this IServiceCollection services)
     {
         services.AddSingleton<ChannelBotAuthorizationService>();
+        services.AddSingleton<HostBotAccountOAuthService>();
+        services.AddSingleton<HostBotAccountAuthorizationService>();
+        services.AddSingleton<ITwitchBotAccountProvider>(sp =>
+            sp.GetRequiredService<HostBotAccountAuthorizationService>()
+        );
         services.AddSingleton<HostedChannelChangeNotifier>();
         services.AddSingleton<HostedChannelRuntimeControlService>();
         services.AddSingleton<HostedChannelRuntimeLifecycleService>();
