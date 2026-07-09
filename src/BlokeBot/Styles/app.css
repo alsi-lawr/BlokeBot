@@ -91,6 +91,22 @@ a {
         color: var(--app-text-muted);
     }
 
+    .app-blue-badge {
+        --tw-ring-color: rgb(147 197 253);
+        background: rgb(239 246 255);
+        color: rgb(29 78 216);
+    }
+
+    .app-blue-status {
+        background: rgb(239 246 255);
+        border-color: rgb(147 197 253);
+        color: rgb(29 78 216);
+    }
+
+    .app-blue-dot {
+        background: rgb(59 130 246);
+    }
+
     .control-surface {
         background: var(--app-control-bg);
         border: 1px solid var(--app-control-border);
@@ -355,12 +371,14 @@ a {
 
     .primary-control {
         background: var(--app-primary-button-bg);
+        border: 1px solid var(--app-primary-button-border);
         box-shadow: var(--app-shadow-sm);
         color: var(--app-primary-button-fg);
     }
 
     .primary-control:hover {
         background: var(--app-primary-button-hover);
+        border-color: var(--app-primary-button-hover-border);
     }
 
     .btn-primary,
@@ -383,11 +401,27 @@ a {
 
     .btn-primary {
         background: var(--app-primary-button-bg);
+        border: 1px solid var(--app-primary-button-border);
         color: var(--app-primary-button-fg);
     }
 
     .btn-primary:hover {
         background: var(--app-primary-button-hover);
+        border-color: var(--app-primary-button-hover-border);
+        transform: translateY(-1px);
+    }
+
+    .auth-action {
+        background: var(--app-auth-button-bg);
+        border: 1px solid var(--app-auth-button-border);
+        box-shadow: var(--app-shadow-sm);
+        color: var(--app-auth-button-fg);
+    }
+
+    .auth-action:hover {
+        background: var(--app-auth-button-hover);
+        border-color: var(--app-auth-button-hover-border);
+        color: var(--app-auth-button-hover-fg);
         transform: translateY(-1px);
     }
 
@@ -448,16 +482,24 @@ html {
     --app-text-strong: #0f172a;
     --app-text-medium: #334155;
     --app-text-muted: #64748b;
-    --app-primary-button-bg: #0f172a;
-    --app-primary-button-fg: #ffffff;
-    --app-primary-button-hover: #1e293b;
+    --app-primary-button-bg: rgb(241 245 249 / 0.92);
+    --app-primary-button-border: rgb(203 213 225 / 0.95);
+    --app-primary-button-fg: #334155;
+    --app-primary-button-hover: rgb(226 232 240 / 0.95);
+    --app-primary-button-hover-border: #94a3b8;
+    --app-auth-button-bg: rgb(250 245 255 / 0.98);
+    --app-auth-button-border: rgb(216 180 254 / 0.78);
+    --app-auth-button-fg: #6b21a8;
+    --app-auth-button-hover: rgb(243 232 255);
+    --app-auth-button-hover-border: rgb(192 132 252 / 0.78);
+    --app-auth-button-hover-fg: #581c87;
     --app-warning-bg: #fef3c7;
     --app-warning-border: #f59e0b;
     --app-warning-text: #78350f;
     --app-nav-bg: linear-gradient(180deg, #f8fafc 0%, #ffffff 48%, #f1f5f9 100%);
     --app-nav-brand-bg: transparent;
     --app-nav-panel-bg: rgb(255 255 255 / 0.78);
-    --app-nav-admin-panel-bg: linear-gradient(135deg, rgb(255 255 255), rgb(254 242 242 / 0.7));
+    --app-nav-admin-panel-bg: linear-gradient(135deg, rgb(255 255 255), rgb(254 226 226 / 0.78));
     --app-nav-active-channel-bg: linear-gradient(135deg, rgb(255 255 255 / 0.8), rgb(240 253 250 / 0.7));
     --app-nav-active-channel-border: rgb(226 232 240 / 0.8);
     --app-nav-selected-bg: linear-gradient(135deg, rgb(241 245 249 / 0.95), rgb(226 232 240 / 0.78));
@@ -465,9 +507,9 @@ html {
     --app-nav-selected-icon-bg: rgb(255 255 255 / 0.72);
     --app-nav-selected-inner: rgb(255 255 255 / 0.66);
     --app-nav-selected-text: #0f172a;
-    --app-nav-selected-admin-bg: linear-gradient(135deg, rgb(248 250 252 / 0.96), rgb(237 232 230 / 0.82));
-    --app-nav-selected-admin-border: rgb(207 199 196 / 0.9);
-    --app-nav-selected-admin-icon-bg: rgb(255 255 255 / 0.74);
+    --app-nav-selected-admin-bg: linear-gradient(135deg, rgb(248 250 252 / 0.98), rgb(229 217 214 / 0.9));
+    --app-nav-selected-admin-border: rgb(190 178 174 / 0.95);
+    --app-nav-selected-admin-icon-bg: rgb(255 255 255 / 0.82);
     --app-nav-selected-host-bg: linear-gradient(135deg, rgb(248 250 252 / 0.96), rgb(229 238 237 / 0.82));
     --app-nav-selected-host-border: rgb(194 210 208 / 0.86);
     --app-nav-selected-host-icon-bg: rgb(255 255 255 / 0.74);
@@ -509,15 +551,23 @@ html[data-theme="dark"] {
     --app-text-medium: rgb(205 201 196);
     --app-text-muted: rgb(158 152 146);
     --app-primary-button-bg: rgb(52 56 58);
+    --app-primary-button-border: rgb(82 86 89 / 0.76);
     --app-primary-button-fg: rgb(232 230 227);
     --app-primary-button-hover: rgb(66 70 73);
+    --app-primary-button-hover-border: rgb(104 108 111 / 0.82);
+    --app-auth-button-bg: rgb(88 28 135 / 0.34);
+    --app-auth-button-border: rgb(168 85 247 / 0.42);
+    --app-auth-button-fg: rgb(216 180 254);
+    --app-auth-button-hover: rgb(107 33 168 / 0.42);
+    --app-auth-button-hover-border: rgb(192 132 252 / 0.52);
+    --app-auth-button-hover-fg: rgb(237 233 254);
     --app-warning-bg: rgb(120 53 15 / 0.92);
     --app-warning-border: rgb(245 158 11 / 0.44);
     --app-warning-text: rgb(254 243 199);
     --app-nav-bg: linear-gradient(180deg, rgb(17 19 20) 0%, rgb(20 22 23) 48%, rgb(14 16 17) 100%);
     --app-nav-brand-bg: rgb(14 16 17 / 0.36);
     --app-nav-panel-bg: linear-gradient(135deg, rgb(28 30 31 / 0.94), rgb(18 20 21 / 0.84));
-    --app-nav-admin-panel-bg: linear-gradient(135deg, rgb(28 30 31 / 0.94), rgb(22 24 25 / 0.86));
+    --app-nav-admin-panel-bg: linear-gradient(135deg, rgb(30 32 33 / 0.96), rgb(31 25 25 / 0.9));
     --app-nav-active-channel-bg: linear-gradient(135deg, rgb(28 30 31 / 0.9), rgb(34 37 38 / 0.78));
     --app-nav-active-channel-border: rgb(92 97 99 / 0.32);
     --app-nav-selected-bg: linear-gradient(135deg, rgb(45 48 50 / 0.92), rgb(34 37 38 / 0.88));
@@ -525,8 +575,8 @@ html[data-theme="dark"] {
     --app-nav-selected-icon-bg: rgb(40 43 45 / 0.92);
     --app-nav-selected-inner: rgb(255 255 255 / 0.05);
     --app-nav-selected-text: rgb(232 230 227);
-    --app-nav-selected-admin-bg: linear-gradient(135deg, rgb(47 45 45 / 0.94), rgb(38 35 35 / 0.88));
-    --app-nav-selected-admin-border: rgb(105 95 95 / 0.42);
+    --app-nav-selected-admin-bg: linear-gradient(135deg, rgb(52 47 47 / 0.96), rgb(43 36 36 / 0.92));
+    --app-nav-selected-admin-border: rgb(122 108 108 / 0.52);
     --app-nav-selected-admin-icon-bg: rgb(42 39 39 / 0.92);
     --app-nav-selected-host-bg: linear-gradient(135deg, rgb(42 47 47 / 0.94), rgb(34 39 39 / 0.88));
     --app-nav-selected-host-border: rgb(83 100 98 / 0.42);
@@ -566,6 +616,22 @@ html[data-theme="dark"] .feature-toggle-card--disabled {
 html[data-theme="dark"] .feature-toggle-card--disabled .feature-toggle-card__icon {
     background: rgb(31 33 34 / 0.92);
     border-color: rgb(82 86 89 / 0.42);
+}
+
+html[data-theme="dark"] .app-blue-badge {
+    --tw-ring-color: rgb(96 165 250 / 0.55);
+    background: rgb(30 64 175 / 0.32);
+    color: rgb(147 197 253);
+}
+
+html[data-theme="dark"] .app-blue-status {
+    background: rgb(30 64 175 / 0.32);
+    border-color: rgb(96 165 250 / 0.55);
+    color: rgb(147 197 253);
+}
+
+html[data-theme="dark"] .app-blue-dot {
+    background: rgb(96 165 250);
 }
 
 .nav-menu {

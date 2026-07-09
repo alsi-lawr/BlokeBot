@@ -212,8 +212,22 @@ internal static class BotOAuthEndpoints
                     }
 
                     return Results.Content(
-                        "OK. Channel bot authorization granted. You can close this window.",
-                        "text/plain"
+                        """
+                        <!doctype html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="utf-8">
+                            <title>BlokeBot authorization complete</title>
+                        </head>
+                        <body>
+                            <p>Channel authorization is complete. You can close this window.</p>
+                            <script>
+                                window.close();
+                            </script>
+                        </body>
+                        </html>
+                        """,
+                        "text/html"
                     );
                 }
             )

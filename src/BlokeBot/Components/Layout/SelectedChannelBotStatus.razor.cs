@@ -71,7 +71,7 @@ public partial class SelectedChannelBotStatus
                     "border-purple-200 bg-purple-50 text-purple-700",
                 { RuntimeState: BotChannelRuntimeState.Started } =>
                     "border-emerald-200 bg-emerald-50 text-emerald-700",
-                { IsChannelBotAuthorized: true } => "border-blue-600 bg-blue-600 text-white",
+                { IsChannelBotAuthorized: true } => "app-blue-status",
                 _ => "border-slate-200 bg-slate-100 text-slate-600",
             };
 
@@ -90,7 +90,7 @@ public partial class SelectedChannelBotStatus
                 { RuntimeState: BotChannelRuntimeState.Starting } => "bg-orange-500",
                 { RuntimeState: BotChannelRuntimeState.Stopping } => "bg-purple-500",
                 { RuntimeState: BotChannelRuntimeState.Started } => "bg-emerald-500",
-                { IsChannelBotAuthorized: true } => "bg-white",
+                { IsChannelBotAuthorized: true } => "app-blue-dot",
                 _ => "bg-slate-400",
             };
 

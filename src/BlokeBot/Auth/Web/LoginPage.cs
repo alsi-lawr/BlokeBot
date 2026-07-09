@@ -48,7 +48,7 @@ internal static class LoginPage
             <head>
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Authenticate with Twitch</title>
+                <title>Sign in to BlokeBot</title>
                 {{ThemeScript}}
                 <link rel="stylesheet" href="/app.css" />
             </head>
@@ -60,10 +60,10 @@ internal static class LoginPage
                                 <img class="surface-muted h-10 w-10 rounded-lg p-1" src="/blokedroid.svg" alt="" />
                                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">BlokeBot</p>
                             </div>
-                            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground">Authenticate with Twitch</h1>
+                            <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground">Sign in to BlokeBot</h1>
                         </div>
-                        <a class="btn-primary h-11 w-full" href="/auth/login?start=true">
-                            Authenticate with Twitch
+                        <a class="btn-primary auth-action h-11 w-full" href="/auth/login?start=true">
+                            Continue with Twitch
                         </a>
                         {{errorBlock}}
                     </section>
