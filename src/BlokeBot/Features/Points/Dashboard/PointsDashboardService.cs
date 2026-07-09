@@ -7,7 +7,8 @@ namespace BlokeBot.Features.Points.Dashboard;
 public sealed class PointsDashboardService(
     PointBalanceService balances,
     PointsGiveawayService giveaways,
-    PointsChangeNotifier changes
+    PointsChangeNotifier changes,
+    IPointTargetUserLookup users
 )
 {
     public async Task<PointsDashboardState> LoadAsync(int hostId, CancellationToken ct) =>
@@ -37,14 +38,14 @@ public sealed class PointsDashboardService(
                 "Invalid amount."
             );
 
-        var result = await balances.AddAsync(
-            hostId,
-            targetLogin,
-            amount,
-            actorLogin,
-            "dashboard",
-            ct
-        );
+        var target = LoginName.Parse(targetLogin).Value;
+        if (!await users.ExistsAsync(target, ct))
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.UnknownUser,
+                $"Twitch user @{target} was not found."
+            );
+
+        var result = await balances.AddAsync(hostId, target, amount, actorLogin, "dashboard", ct);
         await changes.NotifyChangedAsync();
         return result.Success
             ? result with
@@ -72,7 +73,14 @@ public sealed class PointsDashboardService(
                 "Invalid amount."
             );
 
-        var result = await balances.TransferAsync(hostId, fromLogin, toLogin, amount, ct);
+        var target = LoginName.Parse(toLogin).Value;
+        if (!await users.ExistsAsync(target, ct))
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.UnknownUser,
+                $"Twitch user @{target} was not found."
+            );
+
+        var result = await balances.TransferAsync(hostId, fromLogin, target, amount, ct);
         await changes.NotifyChangedAsync();
         return result.Success
             ? result with

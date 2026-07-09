@@ -227,8 +227,8 @@ public sealed class CommandCatalogTests
     > PointsCatalog() =>
         new([
             new PointsBalanceCommandStrategy(null!, null!),
-            new GivePointsCommandStrategy(null!, null!),
-            new AddPointsCommandStrategy(null!, null!),
+            new GivePointsCommandStrategy(null!, null!, null!),
+            new AddPointsCommandStrategy(null!, null!, null!),
             new RemovePointsCommandStrategy(null!, null!),
             new GambleCommandStrategy(null!, null!, null!),
             new StartGiveawayCommandStrategy(null!, null!),

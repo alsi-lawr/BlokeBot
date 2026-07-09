@@ -85,6 +85,12 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
             Format(settings.InvalidAmountReply, settings)
         );
 
+    protected static PointOperationResult UnknownUser(string login) =>
+        PointOperationResult.Failure(
+            PointOperationFailureReason.UnknownUser,
+            $"Twitch user @{login} was not found."
+        );
+
     protected static bool TryParseSpend(
         string value,
         PointAmount sourceBalance,
@@ -166,7 +172,8 @@ public sealed class PointsBalanceCommandStrategy(
 
 public sealed class GivePointsCommandStrategy(
     PointsCommandService commands,
-    PointBalanceService balances
+    PointBalanceService balances,
+    IPointTargetUserLookup users
 ) : PointsCommandStrategy(commands)
 {
     public override PointsCommandKind Kind => PointsCommandKind.GivePoints;
@@ -200,29 +207,36 @@ public sealed class GivePointsCommandStrategy(
             else
             {
                 var target = LoginName.Parse(context.Args[0]).Value;
-                result = await balances.TransferAsync(
-                    resolution.HostId,
-                    context.Command.Message.Login,
-                    target,
-                    amount,
-                    cancellationToken
-                );
-                result =
-                    result.Success
-                        ? result with
-                        {
-                            Message = Format(
-                                resolution.Settings.TransferReply,
-                                resolution.Settings,
-                                from: context.Command.Message.Login,
-                                to: target,
-                                amount: amount.ToDisplayString(),
-                                balance: result.Balance?.ToDisplayString()
-                            ),
-                        }
-                    : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings)
-                    : Invalid(resolution.Settings);
+                if (!await users.ExistsAsync(target, cancellationToken))
+                {
+                    result = UnknownUser(target);
+                }
+                else
+                {
+                    result = await balances.TransferAsync(
+                        resolution.HostId,
+                        context.Command.Message.Login,
+                        target,
+                        amount,
+                        cancellationToken
+                    );
+                    result =
+                        result.Success
+                            ? result with
+                            {
+                                Message = Format(
+                                    resolution.Settings.TransferReply,
+                                    resolution.Settings,
+                                    from: context.Command.Message.Login,
+                                    to: target,
+                                    amount: amount.ToDisplayString(),
+                                    balance: result.Balance?.ToDisplayString()
+                                ),
+                            }
+                        : result.FailureReason == PointOperationFailureReason.InsufficientBalance
+                            ? Insufficient(resolution.Settings)
+                        : Invalid(resolution.Settings);
+                }
             }
         }
 
@@ -232,7 +246,8 @@ public sealed class GivePointsCommandStrategy(
 
 public sealed class AddPointsCommandStrategy(
     PointsCommandService commands,
-    PointBalanceService balances
+    PointBalanceService balances,
+    IPointTargetUserLookup users
 ) : PointsCommandStrategy(commands)
 {
     public override PointsCommandKind Kind => PointsCommandKind.AddPoints;
@@ -259,26 +274,33 @@ public sealed class AddPointsCommandStrategy(
         else
         {
             var target = LoginName.Parse(context.Args[0]).Value;
-            result = await balances.AddAsync(
-                resolution.HostId,
-                target,
-                amount,
-                context.Command.Message.Login,
-                "chat command",
-                cancellationToken
-            );
-            result = result.Success
-                ? result with
-                {
-                    Message = Format(
-                        resolution.Settings.AddReply,
-                        resolution.Settings,
-                        user: target,
-                        amount: amount.ToDisplayString(),
-                        balance: result.Balance?.ToDisplayString()
-                    ),
-                }
-                : Invalid(resolution.Settings);
+            if (!await users.ExistsAsync(target, cancellationToken))
+            {
+                result = UnknownUser(target);
+            }
+            else
+            {
+                result = await balances.AddAsync(
+                    resolution.HostId,
+                    target,
+                    amount,
+                    context.Command.Message.Login,
+                    "chat command",
+                    cancellationToken
+                );
+                result = result.Success
+                    ? result with
+                    {
+                        Message = Format(
+                            resolution.Settings.AddReply,
+                            resolution.Settings,
+                            user: target,
+                            amount: amount.ToDisplayString(),
+                            balance: result.Balance?.ToDisplayString()
+                        ),
+                    }
+                    : Invalid(resolution.Settings);
+            }
         }
 
         await ReplyAsync(context, result, cancellationToken);

@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch;
 public static class TwitchLogin
 {
     public static string Normalize(string? value) =>
-        (value ?? string.Empty).Trim().TrimStart('#').ToLowerInvariant();
+        (value ?? string.Empty).Trim().TrimStart('#', '@').ToLowerInvariant();
 
     public static string[] NormalizeMany(IEnumerable<string?> values) =>
         values

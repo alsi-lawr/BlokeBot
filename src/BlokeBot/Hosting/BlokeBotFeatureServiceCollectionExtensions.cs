@@ -130,6 +130,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         >();
         services.AddSingleton<PointsCommandService>();
         services.AddSingleton<PointBalanceService>();
+        services.AddSingleton<IPointTargetUserLookup, TwitchPointTargetUserLookup>();
         services.AddSingleton<PointsConfigurationService>();
         services.AddSingleton<PointsDashboardService>();
         services.AddSingleton<PointsGiveawayScheduler>();

@@ -4,6 +4,7 @@ public enum PointOperationFailureReason
 {
     None,
     InvalidAmount,
+    UnknownUser,
     InsufficientBalance,
     CapExceeded,
     NotActive,
