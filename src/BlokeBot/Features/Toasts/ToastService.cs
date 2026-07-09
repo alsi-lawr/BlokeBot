@@ -19,19 +19,30 @@ public sealed class ToastService
         }
     }
 
-    public ToastNotification Error(string message, string? title = null) =>
-        Publish(ToastKind.Error, message, title);
+    public ToastNotification Error(string message, string? title = null, ToastTone? tone = null) =>
+        Publish(ToastKind.Error, message, title, tone);
 
-    public ToastNotification Status(string message, string? title = null) =>
-        Publish(ToastKind.Status, message, title);
+    public ToastNotification Status(string message, string? title = null, ToastTone? tone = null) =>
+        Publish(ToastKind.Status, message, title, tone);
 
-    public ToastNotification Success(string message, string? title = null) =>
-        Publish(ToastKind.Success, message, title);
+    public ToastNotification Success(
+        string message,
+        string? title = null,
+        ToastTone? tone = null
+    ) => Publish(ToastKind.Success, message, title, tone);
 
-    public ToastNotification Warning(string message, string? title = null) =>
-        Publish(ToastKind.Warning, message, title);
+    public ToastNotification Warning(
+        string message,
+        string? title = null,
+        ToastTone? tone = null
+    ) => Publish(ToastKind.Warning, message, title, tone);
 
-    public ToastNotification Publish(ToastKind kind, string message, string? title = null)
+    public ToastNotification Publish(
+        ToastKind kind,
+        string message,
+        string? title = null,
+        ToastTone? tone = null
+    )
     {
         var trimmed = message.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
@@ -40,6 +51,7 @@ public sealed class ToastService
         var toast = new ToastNotification(
             Guid.NewGuid(),
             kind,
+            tone ?? DefaultTone(kind),
             trimmed,
             string.IsNullOrWhiteSpace(title) ? DefaultTitle(kind) : title.Trim(),
             DateTimeOffset.UtcNow,
@@ -72,6 +84,15 @@ public sealed class ToastService
     }
 
     private void NotifyChanged() => Changed?.Invoke();
+
+    private static ToastTone DefaultTone(ToastKind kind) =>
+        kind switch
+        {
+            ToastKind.Success => ToastTone.Positive,
+            ToastKind.Warning => ToastTone.Caution,
+            ToastKind.Error => ToastTone.Critical,
+            _ => ToastTone.Neutral,
+        };
 
     private static TimeSpan? DefaultAutoDismiss(ToastKind kind) =>
         kind switch

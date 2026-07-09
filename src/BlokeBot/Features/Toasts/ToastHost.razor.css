@@ -16,9 +16,10 @@
     border-radius: 0.75rem;
     box-shadow: var(--app-shadow-surface);
     color: var(--app-text-medium);
+    cursor: pointer;
     display: grid;
     gap: 0;
-    grid-template-columns: 0.25rem minmax(0, 1fr) auto;
+    grid-template-columns: 0.25rem minmax(0, 1fr);
     min-height: 4.75rem;
     overflow: hidden;
     pointer-events: auto;
@@ -34,6 +35,12 @@
     border-color: var(--app-control-hover-border);
     box-shadow: 0 18px 62px -30px rgb(15 23 42 / 0.42);
     transform: translateY(-2px);
+}
+
+.toast-card:focus-visible {
+    border-color: var(--toast-accent);
+    box-shadow: 0 0 0 3px var(--toast-focus-ring), var(--app-shadow-surface);
+    outline: none;
 }
 
 .toast-card--removing {
@@ -90,47 +97,24 @@
     line-height: 1.4;
 }
 
-.toast-card__close {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    color: var(--app-text-muted);
-    display: inline-flex;
-    font-size: 1rem;
-    font-weight: 800;
-    height: 2rem;
-    justify-content: center;
-    margin: 0.65rem 0.65rem 0 0;
-    transition:
-        background-color 150ms ease,
-        color 150ms ease,
-        transform 150ms ease;
-    width: 2rem;
-}
-
-.toast-card__close:hover,
-.toast-card__close:focus-visible {
-    background: var(--app-control-hover);
-    border-radius: 0.5rem;
-    color: var(--app-text-strong);
-    outline: none;
-    transform: scale(1.04);
-}
-
-.toast-card--status {
+.toast-card--neutral {
     --toast-accent: #64748b;
+    --toast-focus-ring: rgb(100 116 139 / 0.22);
 }
 
-.toast-card--success {
+.toast-card--positive {
     --toast-accent: #10b981;
+    --toast-focus-ring: rgb(16 185 129 / 0.22);
 }
 
-.toast-card--warning {
+.toast-card--caution {
     --toast-accent: #f59e0b;
+    --toast-focus-ring: rgb(245 158 11 / 0.24);
 }
 
-.toast-card--error {
+.toast-card--critical {
     --toast-accent: #ef4444;
+    --toast-focus-ring: rgb(239 68 68 / 0.22);
 }
 
 html[data-theme="dark"] .toast-card {
@@ -176,15 +160,12 @@ html[data-theme="dark"] .toast-card:hover {
 
 @media (prefers-reduced-motion: reduce) {
     .toast-card,
-    .toast-card--removing,
-    .toast-card__close {
+    .toast-card--removing {
         animation: none !important;
         transition-duration: 1ms !important;
     }
 
-    .toast-card:hover,
-    .toast-card__close:hover,
-    .toast-card__close:focus-visible {
+    .toast-card:hover {
         transform: none;
     }
 }

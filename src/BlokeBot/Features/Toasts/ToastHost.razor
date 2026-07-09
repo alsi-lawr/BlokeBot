@@ -7,7 +7,14 @@
     <section class="toast-region" aria-label="Notifications" aria-live="polite" aria-atomic="false">
         @foreach (var toast in visibleToasts)
         {
-            <article @key="toast.Id" class="@ToastClass(toast)" role="@ToastRole(toast)">
+            <article @key="toast.Id"
+                     class="@ToastClass(toast)"
+                     role="@ToastRole(toast)"
+                     tabindex="0"
+                     aria-label="@DismissLabel(toast)"
+                     title="Dismiss notification"
+                     @onclick="() => BeginDismissAsync(toast.Id)"
+                     @onkeydown="args => BeginDismissOnKeyAsync(args, toast.Id)">
                 <span class="toast-card__stripe" aria-hidden="true"></span>
                 <div class="toast-card__body">
                     <div class="toast-card__header">
@@ -20,12 +27,6 @@
                     </div>
                     <p class="toast-card__message">@toast.Message</p>
                 </div>
-                <button class="toast-card__close"
-                        type="button"
-                        aria-label="Dismiss notification"
-                        @onclick="() => BeginDismissAsync(toast.Id)">
-                    <span aria-hidden="true">x</span>
-                </button>
             </article>
         }
     </section>

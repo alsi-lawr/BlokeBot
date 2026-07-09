@@ -84,6 +84,9 @@ public partial class ToastHost
         dismissingToastIds.Remove(toastId);
     }
 
+    private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId) =>
+        args.Key is "Enter" or " " ? BeginDismissAsync(toastId) : Task.CompletedTask;
+
     private async Task AutoDismissAsync(Guid toastId, TimeSpan delay, CancellationToken ct)
     {
         try
@@ -132,17 +135,20 @@ public partial class ToastHost
 
     private string ToastClass(ToastNotification toast)
     {
-        var classes = $"toast-card toast-card--{KindCssClass(toast.Kind)}";
+        var classes = $"toast-card toast-card--{ToneCssClass(toast.Tone)}";
         return dismissingToastIds.Contains(toast.Id) ? $"{classes} toast-card--removing" : classes;
     }
 
-    private static string KindCssClass(ToastKind kind) =>
-        kind switch
+    private static string DismissLabel(ToastNotification toast) =>
+        $"Dismiss notification: {toast.Title}. {toast.Message}";
+
+    private static string ToneCssClass(ToastTone tone) =>
+        tone switch
         {
-            ToastKind.Success => "success",
-            ToastKind.Warning => "warning",
-            ToastKind.Error => "error",
-            _ => "status",
+            ToastTone.Positive => "positive",
+            ToastTone.Caution => "caution",
+            ToastTone.Critical => "critical",
+            _ => "neutral",
         };
 
     private static string ToastRole(ToastNotification toast) =>

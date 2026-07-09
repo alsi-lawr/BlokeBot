@@ -252,8 +252,32 @@ public partial class HostConfigPage
     {
         await Features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
         await LoadAsync();
-        Toasts.Status(enabled ? "Feature enabled." : "Feature disabled.");
+        ToastFeatureChange(feature, enabled);
     }
+
+    private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)
+    {
+        var featureName = FeatureName(feature);
+        var channelName = state is { Login.Length: > 0 } ? $"#{state.Login}" : "this channel";
+        var stateText = enabled ? "enabled" : "disabled";
+        var impactText = enabled
+            ? "Its chat commands and pages are available again."
+            : "Its chat commands and pages are unavailable until you enable it again.";
+
+        Toasts.Status(
+            $"{featureName} is now {stateText} for {channelName}. {impactText}",
+            $"{featureName} {stateText}",
+            enabled ? ToastTone.Positive : ToastTone.Caution
+        );
+    }
+
+    private static string FeatureName(HostFeatureFlags feature) =>
+        feature switch
+        {
+            HostFeatureFlags.Guessing => "Guessing game",
+            HostFeatureFlags.Points => "Points",
+            _ => "Feature",
+        };
 
     private async Task ClearChannelAuthorizationAsync(int hostId)
     {

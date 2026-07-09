@@ -14,6 +14,8 @@ public sealed class ToastServiceTests
         var status = service.Status("Saved.");
         var success = service.Success("Created.");
 
+        status.Tone.ShouldBe(ToastTone.Neutral);
+        success.Tone.ShouldBe(ToastTone.Positive);
         status.AutoDismissAfter.ShouldNotBeNull();
         success.AutoDismissAfter.ShouldNotBeNull();
         status.RequiresManualDismiss.ShouldBeFalse();
@@ -28,6 +30,8 @@ public sealed class ToastServiceTests
         var warning = service.Warning("Review this.");
         var error = service.Error("Could not save.");
 
+        warning.Tone.ShouldBe(ToastTone.Caution);
+        error.Tone.ShouldBe(ToastTone.Critical);
         warning.AutoDismissAfter.ShouldBeNull();
         error.AutoDismissAfter.ShouldBeNull();
         warning.RequiresManualDismiss.ShouldBeTrue();
@@ -51,5 +55,19 @@ public sealed class ToastServiceTests
 
         service.Current.ShouldBeEmpty();
         changeCount.ShouldBe(2);
+    }
+
+    [Test]
+    public void Status_toasts_can_override_tone_without_changing_behavior()
+    {
+        var service = new ToastService();
+
+        var toast = service.Status("Points is now disabled.", "Points disabled", ToastTone.Caution);
+
+        toast.Kind.ShouldBe(ToastKind.Status);
+        toast.Tone.ShouldBe(ToastTone.Caution);
+        toast.Title.ShouldBe("Points disabled");
+        toast.AutoDismissAfter.ShouldNotBeNull();
+        toast.RequiresManualDismiss.ShouldBeFalse();
     }
 }
