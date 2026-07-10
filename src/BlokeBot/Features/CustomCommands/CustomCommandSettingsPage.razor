@@ -53,7 +53,10 @@
                         {
                             <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_9rem_auto] xl:items-end">
-                                    <Field Label="Name" @bind-Value="entry.Name" Placeholder="welcome" />
+                                    <Field Id="@($"message-entry-{entry.Id}-name")"
+                                           Label="Name"
+                                           @bind-Value="entry.Name"
+                                           Placeholder="welcome" />
                                     <div class="space-y-2">
                                         <label class="label">Selection</label>
                                         <select class="input" @bind="entry.SelectionMode">
@@ -221,7 +224,8 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Announcements"
+        <CollapsibleSection ContentId="custom-announcement-settings"
+                            Title="Announcements"
                             Description="Saved announcement configuration. Sending is handled separately."
                             InitiallyOpen="false">
             <div class="space-y-4 p-4">

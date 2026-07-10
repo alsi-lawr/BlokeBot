@@ -11,11 +11,13 @@
   <Folder Name="/tests/">
     <Project Path="tests/BlokeBot.Commands.Tests/BlokeBot.Commands.Tests.csproj" />
     <Project Path="tests/BlokeBot.Eventing.Tests/BlokeBot.Eventing.Tests.csproj" />
+    <Project Path="tests/BlokeBot.Integration.Tests/BlokeBot.Integration.Tests.csproj" />
     <Project Path="tests/BlokeBot.Persistence.Tests/BlokeBot.Persistence.Tests.csproj" />
     <Project Path="tests/BlokeBot.Testing/BlokeBot.Testing.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Auth.Tests/BlokeBot.Twitch.Auth.Tests.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Runtime.Tests/BlokeBot.Twitch.Runtime.Tests.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Tests/BlokeBot.Twitch.Tests.csproj" />
+    <Project Path="tests/BlokeBot.UI.Tests/BlokeBot.UI.Tests.csproj" />
     <Project Path="tests/BlokeBot.Tests/BlokeBot.Tests.csproj" />
   </Folder>
 </Solution>

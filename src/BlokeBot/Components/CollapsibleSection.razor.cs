@@ -42,6 +42,7 @@ namespace BlokeBot.Components;
 
 public partial class CollapsibleSection
 {
+    private readonly string generatedContentId = $"disclosure-{Guid.NewGuid():N}";
     private bool isOpen;
 
     [Parameter]
@@ -49,6 +50,9 @@ public partial class CollapsibleSection
 
     [Parameter]
     public string? Class { get; set; }
+
+    [Parameter]
+    public string? ContentId { get; set; }
 
     [Parameter]
     public string? Description { get; set; }
@@ -61,6 +65,9 @@ public partial class CollapsibleSection
 
     private string PanelClass =>
         string.IsNullOrWhiteSpace(Class) ? "disclosure-panel" : $"disclosure-panel {Class}";
+
+    private string ResolvedContentId =>
+        string.IsNullOrWhiteSpace(ContentId) ? generatedContentId : ContentId;
 
     protected override void OnInitialized()
     {

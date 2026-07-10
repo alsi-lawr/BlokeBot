@@ -2,6 +2,7 @@
     <button
         type="button"
         class="disclosure-trigger"
+        aria-controls="@ResolvedContentId"
         aria-expanded="@isOpen"
         @onclick="Toggle">
         <span class="disclosure-copy">
@@ -20,7 +21,7 @@
 
     @if (isOpen)
     {
-        <div class="disclosure-content">
+        <div id="@ResolvedContentId" class="disclosure-content">
             @ChildContent
         </div>
     }
