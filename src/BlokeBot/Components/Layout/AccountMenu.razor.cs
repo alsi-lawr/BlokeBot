@@ -48,16 +48,7 @@ public partial class AccountMenu
 
     private BotHostSelection? Selection => Session.HostSelection;
 
-    private string CurrentReturnUrl
-    {
-        get
-        {
-            var path = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
-            return Uri.EscapeDataString(path);
-        }
-    }
-
-    private string ExitImpersonationHref => $"/auth/exit-admin?returnUrl={CurrentReturnUrl}";
+    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
 
     private bool IsAdminEditing => Session.IsAdminEditing;
 

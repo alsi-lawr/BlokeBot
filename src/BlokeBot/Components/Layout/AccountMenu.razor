@@ -17,12 +17,17 @@
     <div class="surface absolute right-0 z-50 mt-2 w-52 overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
         @if (IsAdminEditing)
         {
-            <a class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" href="@ExitImpersonationHref" data-enhance-nav="false">
-                Exit impersonation
-            </a>
+            <form method="get" action="/auth/exit-admin" data-enhance-nav="false">
+                <input type="hidden" name="returnUrl" value="@CurrentPath" />
+                <button class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" type="submit">
+                    Exit impersonation
+                </button>
+            </form>
         }
-        <a class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" href="/auth/logout" data-enhance-nav="false">
-            Sign out
-        </a>
+        <form method="get" action="/auth/logout" data-enhance-nav="false">
+            <button class="menu-item block w-full px-3 py-2 text-left text-sm font-semibold" type="submit">
+                Sign out
+            </button>
+        </form>
     </div>
 </details>
