@@ -10,7 +10,7 @@ namespace BlokeBot.Features.Alerts;
 internal sealed class DurableOutboundQueueAlertObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     DurableAlertService alerts,
-    IOutboundQueueAlertWhisperSender whisperSender,
+    OutboundQueueAlertSubscriberDispatcher subscribers,
     ILogger<DurableOutboundQueueAlertObserver> log
 ) : ITwitchOutboundQueueAlertObserver
 {
@@ -49,8 +49,9 @@ internal sealed class DurableOutboundQueueAlertObserver(
         if (!result.Created)
             return;
 
-        await whisperSender.TrySendAsync(
-            new OutboundQueueAlertWhisperRequest(
+        await subscribers.AlertCreatedAsync(
+            new OutboundQueueAlertNotification(
+                result.Alert.Id,
                 host.Id,
                 host.Login,
                 host.TwitchUserId,

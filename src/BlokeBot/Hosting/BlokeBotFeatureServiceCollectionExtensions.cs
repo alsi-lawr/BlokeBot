@@ -76,7 +76,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotAlerts(this IServiceCollection services)
     {
         services.TryAddSingleton<DurableAlertService>();
-        services.TryAddSingleton<IOutboundQueueAlertWhisperSender, OutboundQueueAlertWhisperSender>();
+        services.TryAddSingleton<OutboundQueueAlertSubscriberDispatcher>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IOutboundQueueAlertSubscriber,
+                OutboundQueueAlertWhisperSender
+            >()
+        );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
                 ITwitchOutboundQueueAlertObserver,

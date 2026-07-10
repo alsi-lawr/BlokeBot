@@ -60,6 +60,7 @@
                                         </a>
                                     }
                                     <button class="btn-primary"
+                                            aria-label="@($"Acknowledge {alert.Title}")"
                                             disabled="@(!canAcknowledge)"
                                             @onclick="() => AcknowledgeAsync(alert)">
                                         Acknowledge

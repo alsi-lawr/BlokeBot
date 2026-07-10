@@ -28,6 +28,7 @@
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
+                    var showAlerts = selection is not null && !session.IsBotAccount;
                     var showBotFunctions = showGuessing || showPoints || showCustomCommands;
                 }
 
@@ -68,6 +69,25 @@
                         Home
                     </NavLink>
                 </div>
+
+                @if (showAlerts)
+                {
+                    <div class="nav-menu__panel rounded-xl p-1.5">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="alerts"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M10.3 4.3 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+                                    <path d="M12 9v4" />
+                                    <path d="M12 17h.01" />
+                                </svg>
+                            </span>
+                            Alerts
+                        </NavLink>
+                    </div>
+                }
 
                 @if (showHostConfig)
                 {

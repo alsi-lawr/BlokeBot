@@ -86,7 +86,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task Outbound_queue_observer_persists_alert_once_when_whisper_sender_skips()
+    public async Task Outbound_queue_observer_persists_alert_once_and_notifies_subscribers()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -94,11 +94,11 @@ public sealed class DurableAlertTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
         var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
-        var whispers = new RecordingWhisperSender();
+        var subscriber = new RecordingAlertSubscriber();
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
             alerts,
-            whispers,
+            Dispatcher(subscriber),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
         var backlog = new TwitchOutboundQueueBacklog(
@@ -118,9 +118,10 @@ public sealed class DurableAlertTests
         stored.Source.ShouldBe("twitch-outbound-queue");
         stored.SourceKey.ShouldStartWith("streamer:");
         stored.AcknowledgedAtUtc.ShouldBeNull();
-        whispers.Requests.Count.ShouldBe(1);
-        whispers.Requests[0].HostId.ShouldBe(hostId);
-        whispers.Requests[0].HostLogin.ShouldBe("streamer");
+        subscriber.Notifications.Count.ShouldBe(1);
+        subscriber.Notifications[0].AlertId.ShouldBe(stored.Id);
+        subscriber.Notifications[0].HostId.ShouldBe(hostId);
+        subscriber.Notifications[0].HostLogin.ShouldBe("streamer");
     }
 
     [Test]
@@ -132,11 +133,11 @@ public sealed class DurableAlertTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
         var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
-        var whispers = new RecordingWhisperSender();
+        var subscriber = new RecordingAlertSubscriber();
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
             alerts,
-            whispers,
+            Dispatcher(subscriber),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
 
@@ -163,7 +164,39 @@ public sealed class DurableAlertTests
         var alertsCreated = await db.DurableAlerts.ToArrayAsync(CancellationToken.None);
         alertsCreated.Length.ShouldBe(2);
         alertsCreated.Select(x => x.SourceKey).Distinct().Count().ShouldBe(2);
-        whispers.Requests.Count.ShouldBe(2);
+        subscriber.Notifications.Count.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task Subscriber_failure_does_not_block_durable_alert_or_other_subscribers()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedHostAsync(dbFactory, "streamer");
+        var clock = new FixedTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
+        var recording = new RecordingAlertSubscriber();
+        var observer = new DurableOutboundQueueAlertObserver(
+            dbFactory,
+            alerts,
+            Dispatcher(new ThrowingAlertSubscriber(), recording),
+            NullLogger<DurableOutboundQueueAlertObserver>.Instance
+        );
+
+        await observer.QueueBackedUpAsync(
+            new TwitchOutboundQueueBacklog(
+                "streamer",
+                3,
+                TimeSpan.FromSeconds(31),
+                clock.GetUtcNow()
+            ),
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.DurableAlerts.CountAsync()).ShouldBe(1);
+        recording.Notifications.Count.ShouldBe(1);
     }
 
     private static async Task<int> SeedHostAsync(
@@ -184,15 +217,34 @@ public sealed class DurableAlertTests
         return host.Id;
     }
 
-    private sealed class RecordingWhisperSender : IOutboundQueueAlertWhisperSender
-    {
-        public List<OutboundQueueAlertWhisperRequest> Requests { get; } = [];
+    private static OutboundQueueAlertSubscriberDispatcher Dispatcher(
+        params IOutboundQueueAlertSubscriber[] subscribers
+    ) =>
+        new(
+            subscribers,
+            NullLogger<OutboundQueueAlertSubscriberDispatcher>.Instance
+        );
 
-        public Task TrySendAsync(OutboundQueueAlertWhisperRequest request, CancellationToken ct)
+    private sealed class RecordingAlertSubscriber : IOutboundQueueAlertSubscriber
+    {
+        public List<OutboundQueueAlertNotification> Notifications { get; } = [];
+
+        public Task AlertCreatedAsync(
+            OutboundQueueAlertNotification notification,
+            CancellationToken ct
+        )
         {
-            Requests.Add(request);
+            Notifications.Add(notification);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class ThrowingAlertSubscriber : IOutboundQueueAlertSubscriber
+    {
+        public Task AlertCreatedAsync(
+            OutboundQueueAlertNotification notification,
+            CancellationToken ct
+        ) => throw new InvalidOperationException("Subscriber failed.");
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

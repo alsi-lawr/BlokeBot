@@ -15,11 +15,14 @@ internal sealed class OutboundQueueAlertWhisperSender(
     TwitchHelixChatClient helix,
     IOptions<TwitchBotIdentityOptions> options,
     ILogger<OutboundQueueAlertWhisperSender> log
-) : IOutboundQueueAlertWhisperSender
+) : IOutboundQueueAlertSubscriber
 {
     private readonly TwitchBotIdentityOptions identity = options.Value;
 
-    public async Task TrySendAsync(OutboundQueueAlertWhisperRequest request, CancellationToken ct)
+    public async Task AlertCreatedAsync(
+        OutboundQueueAlertNotification request,
+        CancellationToken ct
+    )
     {
         try
         {
@@ -124,7 +127,7 @@ internal sealed class OutboundQueueAlertWhisperSender(
     }
 
     private async Task<string?> ResolveStreamerUserIdAsync(
-        OutboundQueueAlertWhisperRequest request,
+        OutboundQueueAlertNotification request,
         string accessToken,
         CancellationToken ct
     )
@@ -146,7 +149,7 @@ internal sealed class OutboundQueueAlertWhisperSender(
             ?.Id;
     }
 
-    private static string WhisperMessage(OutboundQueueAlertWhisperRequest request) =>
+    private static string WhisperMessage(OutboundQueueAlertNotification request) =>
         $"BlokeBot alert: outbound chat messages for #{request.HostLogin} are delayed. {request.PendingCount} messages are pending; the oldest has waited about {FormatAge(request.OldestPendingAge)}. Open BlokeBot alerts to acknowledge it.";
 
     private static string FormatAge(TimeSpan age)
