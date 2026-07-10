@@ -1,0 +1,87 @@
+@page "/guessing/leaderboard/{Channel}"
+@using System.Globalization
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject GuessingHistoryService History
+@inject PublicLeaderboardHostLookup Hosts
+
+<PageTitle>BlokeBot | Guessing Leaderboard</PageTitle>
+
+<div class="mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Public leaderboard"
+                Title="Guessing leaderboard"
+                Description="@HeaderDescription">
+        <a class="btn-secondary" href="/auth/login">Sign in</a>
+    </PageHeader>
+
+    @if (!loaded)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
+    }
+    else if (host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Channel not found.</div>
+    }
+    else if (!FeatureEnabled)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel.</div>
+    }
+    else if (leaderboard is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Leaderboard unavailable.</div>
+    }
+    else
+    {
+        <section class="card">
+            <div class="grid gap-4 border-b border-slate-200 p-5 md:grid-cols-3">
+                <div class="surface-row rounded-lg p-4">
+                    <p class="text-sm font-medium text-muted-foreground">Players</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalPlayers</p>
+                </div>
+                <div class="surface-row rounded-lg p-4">
+                    <p class="text-sm font-medium text-muted-foreground">Guesses</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalGuesses</p>
+                </div>
+                <div class="surface-row rounded-lg p-4">
+                    <p class="text-sm font-medium text-muted-foreground">Correct</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.CorrectGuesses</p>
+                </div>
+            </div>
+
+            <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                @if (leaderboard.Entries.Count == 0)
+                {
+                    <div class="p-8 text-sm text-muted-foreground">No completed guesses yet.</div>
+                }
+                else
+                {
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Rank</th>
+                                <th class="px-5 py-3 font-semibold">Player</th>
+                                <th class="px-5 py-3 font-semibold">Correct</th>
+                                <th class="px-5 py-3 font-semibold">Rounds</th>
+                                <th class="px-5 py-3 font-semibold">Hit rate</th>
+                                <th class="px-5 py-3 font-semibold">Latest</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var entry in leaderboard.Entries)
+                            {
+                                <tr @key="entry.Login" class="motion-list__item">
+                                    <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
+                                    <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                    <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
+                                    <td class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
+                                    <td class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
+                                    <td class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </section>
+    }
+</div>

@@ -1,0 +1,70 @@
+@page "/points/leaderboard/{Channel}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject PointBalanceService Balances
+@inject PublicLeaderboardHostLookup Hosts
+
+<PageTitle>BlokeBot | Points Leaderboard</PageTitle>
+
+<div class="mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Public leaderboard"
+                Title="Points leaderboard"
+                Description="@HeaderDescription">
+        <a class="btn-secondary" href="/auth/login">Sign in</a>
+    </PageHeader>
+
+    @if (!loaded)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
+    }
+    else if (host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Channel not found.</div>
+    }
+    else if (!FeatureEnabled)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel.</div>
+    }
+    else if (leaderboard is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Leaderboard unavailable.</div>
+    }
+    else
+    {
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">Top balances</h2>
+                <p class="mt-1 text-sm text-muted-foreground">@host.DisplayName</p>
+            </div>
+            <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                @if (leaderboard.Count == 0)
+                {
+                    <div class="p-8 text-sm text-muted-foreground">No balances yet.</div>
+                }
+                else
+                {
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Rank</th>
+                                <th class="px-5 py-3 font-semibold">User</th>
+                                <th class="px-5 py-3 font-semibold">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @for (var i = 0; i < leaderboard.Count; i++)
+                            {
+                                var entry = leaderboard[i];
+                                <tr @key="entry.Login" class="motion-list__item">
+                                    <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@(i + 1)" /></td>
+                                    <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                    <td class="px-5 py-3 text-slate-700">@entry.Balance.ToDisplayString()</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </section>
+    }
+</div>

@@ -30,6 +30,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.HostSetup;
+using BlokeBot.Features.PublicLeaderboards;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using Microsoft.AspNetCore.Authorization;
@@ -170,6 +171,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<BotHostProvisioningService>();
         services.AddSingleton<BotHostRemovalService>();
+        services.AddSingleton<PublicLeaderboardHostLookup>();
         services.AddTransient<AuthorizedHostSelectionService>();
         services.AddScoped<BotHostSelectionAccessor>();
         services.AddScoped<HostConfigService>();

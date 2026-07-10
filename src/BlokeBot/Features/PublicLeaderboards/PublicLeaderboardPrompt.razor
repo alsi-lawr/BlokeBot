@@ -1,0 +1,36 @@
+@using BlokeBot.Twitch
+@inject NavigationManager Navigation
+
+<div class="mt-6 border-t border-slate-200 pt-5">
+    <p class="text-sm font-bold text-slate-950">Public leaderboard</p>
+    <div class="mt-3 grid gap-3">
+        <select class="input" aria-label="Leaderboard feature" @bind="feature">
+            <option value="guessing">Guessing</option>
+            <option value="points">Points</option>
+        </select>
+        <input class="input" placeholder="channel" aria-label="Channel" @bind="channel" @bind:event="oninput" />
+        <button class="btn-secondary h-10 w-full disabled:cursor-not-allowed disabled:opacity-50"
+                type="button"
+                disabled="@(!CanNavigate)"
+                @onclick="OpenLeaderboard">
+            View leaderboard
+        </button>
+    </div>
+</div>
+
+@code {
+    private string channel = string.Empty;
+    private string feature = "guessing";
+
+    private bool CanNavigate => NormalizedChannel.Length > 0;
+
+    private string NormalizedChannel => TwitchLogin.Normalize(channel);
+
+    private void OpenLeaderboard()
+    {
+        if (!CanNavigate)
+            return;
+
+        Navigation.NavigateTo($"/{feature}/leaderboard/{Uri.EscapeDataString(NormalizedChannel)}");
+    }
+}

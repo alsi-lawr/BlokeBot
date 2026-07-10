@@ -32,6 +32,34 @@ internal static class LoginPage
         </script>
         """;
 
+    private const string LeaderboardScript = """
+        <script>
+            document.addEventListener("DOMContentLoaded", () => {
+                const form = document.querySelector("[data-public-leaderboard-form]");
+                if (!form) {
+                    return;
+                }
+
+                form.addEventListener("submit", event => {
+                    event.preventDefault();
+                    const feature = form.querySelector("[name='feature']")?.value ?? "guessing";
+                    const channelInput = form.querySelector("[name='channel']");
+                    const channel = (channelInput?.value ?? "")
+                        .trim()
+                        .replace(/^[@#]+/, "")
+                        .toLowerCase();
+
+                    if (!channel) {
+                        channelInput?.focus();
+                        return;
+                    }
+
+                    window.location.href = `/${feature}/leaderboard/${encodeURIComponent(channel)}`;
+                });
+            });
+        </script>
+        """;
+
     public static string Render(string? error = null)
     {
         var errorBlock = string.IsNullOrWhiteSpace(error)
@@ -65,9 +93,21 @@ internal static class LoginPage
                         <a class="btn-primary auth-action h-11 w-full" href="/auth/login?start=true">
                             Continue with Twitch
                         </a>
+                        <div class="mt-6 border-t border-slate-200 pt-5">
+                            <p class="text-sm font-bold text-slate-950">Public leaderboard</p>
+                            <form class="mt-3 grid gap-3" data-public-leaderboard-form>
+                                <select class="input" name="feature" aria-label="Leaderboard feature">
+                                    <option value="guessing">Guessing</option>
+                                    <option value="points">Points</option>
+                                </select>
+                                <input class="input" name="channel" placeholder="channel" aria-label="Channel" />
+                                <button class="btn-secondary h-10 w-full" type="submit">View leaderboard</button>
+                            </form>
+                        </div>
                         {{errorBlock}}
                     </section>
                 </main>
+                {{LeaderboardScript}}
             </body>
             </html>
             """;
