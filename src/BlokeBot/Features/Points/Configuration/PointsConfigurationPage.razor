@@ -33,11 +33,15 @@
     else
     {
         <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true">
-            <div class="grid gap-4 p-4 md:grid-cols-2">
+            <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Label="Point label" @bind-Value="config.PointLabel" Placeholder="points" />
                 <div class="space-y-2">
                     <label class="label" for="winRate">Gambling win rate</label>
                     <input id="winRate" class="input" type="number" min="0" max="100" @bind="config.GamblingWinRatePercent" />
+                </div>
+                <div class="space-y-2">
+                    <label class="label" for="gamblingCooldown">Gambling cooldown seconds</label>
+                    <input id="gamblingCooldown" class="input" type="number" min="0" @bind="config.GamblingCooldownSeconds" />
                 </div>
             </div>
         </CollapsibleSection>

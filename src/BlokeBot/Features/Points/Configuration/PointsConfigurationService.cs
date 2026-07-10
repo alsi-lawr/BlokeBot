@@ -57,6 +57,7 @@ public sealed class PointsConfigurationService(
             ReplyDelivery = replyDelivery,
             WhisperResponsesEnabled = whisperResponsesEnabled,
             GamblingWinRatePercent = settings.GamblingWinRatePercent,
+            GamblingCooldownSeconds = settings.GamblingCooldownSeconds,
             GiveawayDurationSeconds = settings.GiveawayDurationSeconds,
             GiveawayMinimumPayout = settings.GiveawayMinimumPayout,
             GiveawayMaximumPayout = settings.GiveawayMaximumPayout,
@@ -102,6 +103,7 @@ public sealed class PointsConfigurationService(
             ? "points"
             : config.PointLabel.Trim();
         settings.GamblingWinRatePercent = Math.Clamp(config.GamblingWinRatePercent, 0, 100);
+        settings.GamblingCooldownSeconds = Math.Max(0, config.GamblingCooldownSeconds);
         settings.GiveawayDurationSeconds = Math.Max(1, config.GiveawayDurationSeconds);
         settings.GiveawayMinimumPayout = PointAmount
             .ParseAbsolute(config.GiveawayMinimumPayout)
@@ -196,6 +198,9 @@ public sealed class PointsConfigurationService(
 
         if (config.GamblingWinRatePercent is < 0 or > 100)
             throw new InvalidOperationException("Gambling win rate must be between 0 and 100.");
+
+        if (config.GamblingCooldownSeconds < 0)
+            config.GamblingCooldownSeconds = 0;
 
         if (config.GiveawayCooldownSeconds < MinimumGiveawayCooldownSeconds)
             config.GiveawayCooldownSeconds = MinimumGiveawayCooldownSeconds;

@@ -6,6 +6,7 @@ using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
+using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.Points.Commands;
 
@@ -409,7 +410,9 @@ public sealed class RemovePointsCommandStrategy(
 public sealed class GambleCommandStrategy(
     PointsCommandService commands,
     PointBalanceService balances,
-    IPointsRandom random
+    IPointsRandom random,
+    PointsGamblingCooldownStore cooldowns,
+    IOptions<BlokeBotOptions> options
 ) : PointsCommandStrategy(commands)
 {
     public override PointsCommandKind Kind => PointsCommandKind.Gamble;
@@ -440,8 +443,21 @@ public sealed class GambleCommandStrategy(
             {
                 result = Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
+            else if (source.Balance.Value < stake.Value)
+            {
+                result = Insufficient(resolution.Settings, resolution.ReplyDelivery);
+            }
             else
             {
+                if (
+                    !cooldowns.TryRecord(
+                        resolution.HostId,
+                        context.Command.Message.Login,
+                        Cooldown(resolution.Settings)
+                    )
+                )
+                    return;
+
                 var won = random.NextDouble() * 100 < resolution.Settings.GamblingWinRatePercent;
                 result = await balances.ApplyGambleAsync(
                     resolution.HostId,
@@ -471,6 +487,15 @@ public sealed class GambleCommandStrategy(
         }
 
         await ReplyAsync(context, result, cancellationToken);
+    }
+
+    private TimeSpan Cooldown(PointsSettings settings)
+    {
+        var seconds = Math.Max(
+            Math.Max(0, settings.GamblingCooldownSeconds),
+            Math.Max(0, options.Value.Points.MinimumGamblingCooldownSeconds)
+        );
+        return TimeSpan.FromSeconds(seconds);
     }
 }
 

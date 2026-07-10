@@ -318,7 +318,7 @@ public sealed class CommandCatalogTests
             new GivePointsCommandStrategy(null!, null!, null!),
             new AddPointsCommandStrategy(null!, null!, null!),
             new RemovePointsCommandStrategy(null!, null!),
-            new GambleCommandStrategy(null!, null!, null!),
+            new GambleCommandStrategy(null!, null!, null!, null!, null!),
             new StartGiveawayCommandStrategy(null!, null!),
             new JoinGiveawayCommandStrategy(null!, null!),
             new EndGiveawayCommandStrategy(null!, null!),

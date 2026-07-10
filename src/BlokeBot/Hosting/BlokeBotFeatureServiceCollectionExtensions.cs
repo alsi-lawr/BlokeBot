@@ -164,8 +164,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<PointsGiveawayMessageFormatter>();
         services.AddSingleton<PointsGiveawayService>();
         services.AddSingleton<IPointsRandom, PointsRandom>();
+        services.AddSingleton<PointsGamblingCooldownStore>();
         services.AddSingleton<PointsChangeNotifier>();
         services.AddSingleton<IBotHostSeeder, PointsHostSeeder>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 

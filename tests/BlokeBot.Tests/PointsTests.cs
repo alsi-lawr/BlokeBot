@@ -7,12 +7,15 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Dashboard;
+using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -352,13 +355,177 @@ public sealed class PointsTests
         response.Message.ShouldContain("viewer");
     }
 
+    [Test]
+    public async Task Gamble_cooldown_is_per_user_and_silent()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedPointsSettingsAsync(
+            dbFactory,
+            hostId,
+            settings =>
+            {
+                settings.GamblingWinRatePercent = 100;
+                settings.GamblingCooldownSeconds = 30;
+            }
+        );
+        await AddBalanceAsync(dbFactory, hostId, "alice", "100");
+        await AddBalanceAsync(dbFactory, hostId, "bob", "100");
+        var strategy = CreateGambleStrategy(dbFactory, clock);
+        List<string> replies = [];
+
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "bob",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(
+            [
+                "alice gambled 10 points and won. Balance: 110.",
+                "bob gambled 10 points and won. Balance: 110.",
+            ]
+        );
+    }
+
+    [Test]
+    public async Task Gamble_cooldown_uses_appsettings_minimum_when_host_cooldown_is_lower()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedPointsSettingsAsync(
+            dbFactory,
+            hostId,
+            settings =>
+            {
+                settings.GamblingWinRatePercent = 100;
+                settings.GamblingCooldownSeconds = 1;
+            }
+        );
+        await AddBalanceAsync(dbFactory, hostId, "alice", "100");
+        var strategy = CreateGambleStrategy(
+            dbFactory,
+            clock,
+            minimumGamblingCooldownSeconds: 5
+        );
+        List<string> replies = [];
+
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+        clock.Advance(TimeSpan.FromSeconds(1));
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+        clock.Advance(TimeSpan.FromSeconds(4));
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(
+            [
+                "alice gambled 10 points and won. Balance: 110.",
+                "alice gambled 10 points and won. Balance: 120.",
+            ]
+        );
+        var balance = await new PointBalanceService(dbFactory).GetBalanceAsync(
+            hostId,
+            "alice",
+            CancellationToken.None
+        );
+        balance.Balance.ToString().ShouldBe("120");
+    }
+
+    [Test]
+    public async Task Points_configuration_saves_and_loads_gambling_cooldown()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateConfigurationService(dbFactory);
+
+        var config = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        config.GamblingCooldownSeconds = 42;
+        await service.SaveConfigurationAsync(hostId, config, CancellationToken.None);
+        var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+
+        loaded.GamblingCooldownSeconds.ShouldBe(42);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var settings = await db.PointsSettings.SingleAsync(CancellationToken.None);
+        settings.GamblingCooldownSeconds.ShouldBe(42);
+    }
+
     private static CommandStrategyContext<PointsCommandKind, AppCommandRouteState> CommandContext(
         int hostId,
         string login,
         string channel,
         string commandName,
         IReadOnlyList<string> args,
-        List<string> replies
+        List<string> replies,
+        PointsCommandKind kind = PointsCommandKind.AddPoints
     )
     {
         var constructor = typeof(TwitchCommandContext)
@@ -386,11 +553,75 @@ public sealed class PointsTests
             ]);
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
-            PointsCommandKind.AddPoints,
+            kind,
             new AppCommandRouteState(hostId),
             command,
             args
         );
+    }
+
+    private static GambleCommandStrategy CreateGambleStrategy(
+        SqliteBlokeBotDbFactory dbFactory,
+        TimeProvider clock,
+        int minimumGamblingCooldownSeconds = 0
+    ) =>
+        new(
+            new PointsCommandService(dbFactory),
+            new PointBalanceService(dbFactory),
+            new FixedPointsRandom(),
+            new PointsGamblingCooldownStore(clock),
+            Options.Create(
+                new BlokeBotOptions
+                {
+                    Points = new BlokeBotPointsOptions
+                    {
+                        MinimumGamblingCooldownSeconds = minimumGamblingCooldownSeconds,
+                    },
+                }
+            )
+        );
+
+    private static PointsConfigurationService CreateConfigurationService(
+        SqliteBlokeBotDbFactory dbFactory
+    )
+    {
+        var events = new EventBus<AppEventKind>();
+        return new PointsConfigurationService(
+            dbFactory,
+            new CommandAliasRegistry(),
+            new PointsChangeNotifier(events)
+        );
+    }
+
+    private static async Task AddBalanceAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        string login,
+        string amount
+    )
+    {
+        var result = await new PointBalanceService(dbFactory).AddAsync(
+            hostId,
+            login,
+            PointAmount.ParseAbsolute(amount),
+            "streamer",
+            "test",
+            CancellationToken.None
+        );
+        result.Success.ShouldBeTrue();
+    }
+
+    private static async Task SeedPointsSettingsAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        Action<PointsSettings> configure
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var settings = new PointsSettings { HostId = hostId };
+        configure(settings);
+        db.PointsSettings.Add(settings);
+        await db.SaveChangesAsync();
     }
 
     private static CommandStrategyContext<
@@ -472,5 +703,24 @@ public sealed class PointsTests
 
         public Task<bool> ExistsAsync(string login, CancellationToken ct) =>
             Task.FromResult(users.Contains(TwitchLogin.Normalize(login)));
+    }
+
+    private sealed class FixedPointsRandom : IPointsRandom
+    {
+        public double NextDouble() => 0;
+
+        public int Next(int minValue, int maxValue) => minValue;
+    }
+
+    private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset current = now;
+
+        public override DateTimeOffset GetUtcNow() => current;
+
+        public void Advance(TimeSpan interval)
+        {
+            current += interval;
+        }
     }
 }
