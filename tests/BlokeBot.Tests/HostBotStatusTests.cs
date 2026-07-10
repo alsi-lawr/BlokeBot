@@ -15,7 +15,7 @@ namespace BlokeBot.Tests;
 public sealed class HostBotStatusTests
 {
     [Test]
-    public async Task Readiness_reports_unavailable_token()
+    public async Task MissingTokenProvider_CheckingReadiness_ReportsTokenUnavailable()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory(),
@@ -28,7 +28,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_reports_invalid_token()
+    public async Task RejectedToken_CheckingReadiness_ReportsInvalidToken()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
@@ -43,7 +43,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_reports_missing_moderator_scope()
+    public async Task MissingModeratorScope_CheckingReadiness_ReportsScopeFailure()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
@@ -58,7 +58,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_reports_not_moderator()
+    public async Task BotNotModerator_CheckingReadiness_ReportsNotModerator()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
@@ -78,7 +78,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_reports_missing_follower_scope()
+    public async Task MissingFollowerScope_CheckingReadiness_ReportsScopeFailure()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
@@ -94,7 +94,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_reports_ready()
+    public async Task FullyAuthorizedBot_CheckingReadiness_ReportsReadyAndFollowerAccess()
     {
         await using var fixture = await CreateFixtureAsync(
             new HostBotStatusHttpClientFactory
@@ -116,7 +116,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_checks_custom_bot_override_moderator_status()
+    public async Task CustomBotOverride_CheckingReadiness_UsesCustomBotModeratorIdentity()
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory
         {
@@ -138,7 +138,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task Readiness_treats_custom_bot_override_broadcaster_as_channel_authority()
+    public async Task CustomBotIsBroadcaster_CheckingReadiness_TreatsAccountAsChannelAuthority()
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory
         {

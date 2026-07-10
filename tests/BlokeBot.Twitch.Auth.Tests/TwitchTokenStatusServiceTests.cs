@@ -9,7 +9,7 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class TwitchTokenStatusServiceTests
 {
     [Test]
-    public async Task Status_is_unavailable_when_token_provider_is_missing()
+    public async Task MissingTokenProvider_LoadingStatus_ReturnsUnavailableWithRequiredScopes()
     {
         var service = new TwitchTokenStatusService(
             new ServiceProviderStub(null),
@@ -28,7 +28,7 @@ public sealed class TwitchTokenStatusServiceTests
     }
 
     [Test]
-    public async Task Status_is_unavailable_when_access_token_is_unavailable()
+    public async Task UnavailableAccessToken_LoadingStatus_ReturnsUnavailable()
     {
         var service = new TwitchTokenStatusService(
             new ServiceProviderStub(new UnavailableTokenProvider()),
@@ -46,7 +46,7 @@ public sealed class TwitchTokenStatusServiceTests
     }
 
     [Test]
-    public async Task Status_is_invalid_when_twitch_rejects_token()
+    public async Task RejectedAccessToken_LoadingStatus_ReturnsInvalidWithToken()
     {
         var service = new TwitchTokenStatusService(
             new ServiceProviderStub(new StaticTokenProvider("saved-token")),
@@ -65,7 +65,7 @@ public sealed class TwitchTokenStatusServiceTests
     }
 
     [Test]
-    public async Task Status_is_ready_for_valid_token_with_required_scopes()
+    public async Task ValidTokenWithRequiredScopes_LoadingStatus_ReturnsReady()
     {
         var service = new TwitchTokenStatusService(
             new ServiceProviderStub(new StaticTokenProvider("saved-token")),
@@ -88,7 +88,7 @@ public sealed class TwitchTokenStatusServiceTests
     }
 
     [Test]
-    public async Task Status_reports_missing_scopes_for_valid_token()
+    public async Task ValidTokenMissingScope_LoadingStatus_ReturnsMissingScopes()
     {
         var service = new TwitchTokenStatusService(
             new ServiceProviderStub(new StaticTokenProvider("saved-token")),

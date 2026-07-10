@@ -7,7 +7,7 @@ namespace BlokeBot.Tests;
 public sealed class ToastServiceTests
 {
     [Test]
-    public void Status_and_success_toasts_auto_dismiss_by_default()
+    public void StatusAndSuccessToasts_Publishing_AutoDismissWithExpectedTone()
     {
         var service = new ToastService();
 
@@ -23,7 +23,7 @@ public sealed class ToastServiceTests
     }
 
     [Test]
-    public void Warning_and_error_toasts_require_manual_dismissal_by_default()
+    public void WarningAndErrorToasts_Publishing_RequireManualDismissWithExpectedTone()
     {
         var service = new ToastService();
 
@@ -39,7 +39,7 @@ public sealed class ToastServiceTests
     }
 
     [Test]
-    public void Publish_and_dismiss_update_current_toasts_and_raise_changes()
+    public void PublishedToast_Dismissing_UpdatesCollectionAndRaisesChanges()
     {
         var service = new ToastService();
         var changeCount = 0;
@@ -58,7 +58,7 @@ public sealed class ToastServiceTests
     }
 
     [Test]
-    public void Status_toasts_can_override_tone_without_changing_behavior()
+    public void StatusToastWithToneOverride_Publishing_PreservesStatusBehaviorAndUsesTone()
     {
         var service = new ToastService();
 

@@ -1,4 +1,3 @@
-using System.Reflection;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Commands;
@@ -22,7 +21,7 @@ namespace BlokeBot.Tests;
 public sealed class GuessingAliasTests
 {
     [Test]
-    public async Task Configuration_loads_aliases_for_selected_profile_only()
+    public async Task SelectedGuessingProfile_LoadingConfiguration_ReturnsOnlyOwnedAliases()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -39,7 +38,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Configuration_rejects_duplicate_aliases_across_profiles()
+    public async Task AliasUsedByAnotherProfile_SavingConfiguration_RejectsCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -57,7 +56,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Profile_owned_start_alias_starts_owning_profile_without_argument()
+    public async Task ProfileOwnedStartAlias_ExecutingWithoutArgument_StartsOwningProfile()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -85,7 +84,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Profile_reply_delivery_controls_round_already_open_response_target()
+    public async Task ProfileWhisperDelivery_StartingOpenRound_ReturnsWhisperResponse()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -135,7 +134,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Profile_start_announcement_ignores_unsupported_whisper_delivery_key()
+    public async Task UnsupportedWhisperKey_StartingRound_ReturnsChatAnnouncement()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -176,7 +175,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Configuration_save_applies_answer_reply_delivery_to_every_option()
+    public async Task ProfileWideWhisperAnswers_SavingConfiguration_UpdatesEveryOption()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -208,7 +207,7 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
-    public async Task Guess_answer_replies_use_profile_wide_delivery_for_mixed_legacy_options()
+    public async Task MixedLegacyOptionDelivery_RecordingGuess_UsesProfileWideTarget()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
@@ -275,29 +274,17 @@ public sealed class GuessingAliasTests
         List<string> replies
     )
     {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(constructor => constructor.GetParameters().Length == 4);
-        var text = $"!{commandName}";
-        var command = (TwitchCommandContext)
-            constructor.Invoke([
-                new TwitchChatMessage(
-                    "moderator",
-                    channel,
-                    text,
-                    $":moderator!u@h PRIVMSG #{channel} :{text}",
-                    new Dictionary<string, string>()
-                ),
-                commandName,
-                new EmptyServiceProvider(),
-                new Func<string, CancellationToken, ValueTask>(
-                    (message, _) =>
-                    {
-                        replies.Add(message);
-                        return ValueTask.CompletedTask;
-                    }
-                ),
-            ]);
+        var command = TestCommandContext.Create(
+            "moderator",
+            channel,
+            commandName,
+            args,
+            (string message, CancellationToken _) =>
+            {
+                replies.Add(message);
+                return ValueTask.CompletedTask;
+            }
+        );
 
         return new CommandStrategyContext<GuessCommandKind, AppCommandRouteState>(
             GuessCommandKind.Start,
@@ -318,30 +305,17 @@ public sealed class GuessingAliasTests
         List<TwitchCommandResponse> responses
     )
     {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(constructor => constructor.GetParameters().Length == 5);
-        var text = $"!{commandName}";
-        var command = (TwitchCommandContext)
-            constructor.Invoke([
-                new TwitchChatMessage(
-                    "moderator",
-                    channel,
-                    text,
-                    $":moderator!u@h PRIVMSG #{channel} :{text}",
-                    new Dictionary<string, string>()
-                ),
-                commandName,
-                new EmptyServiceProvider(),
-                new Func<TwitchCommandResponse, CancellationToken, ValueTask>(
-                    (response, _) =>
-                    {
-                        responses.Add(response);
-                        return ValueTask.CompletedTask;
-                    }
-                ),
-                false,
-            ]);
+        var command = TestCommandContext.Create(
+            "moderator",
+            channel,
+            commandName,
+            args,
+            (TwitchCommandResponse response, CancellationToken _) =>
+            {
+                responses.Add(response);
+                return ValueTask.CompletedTask;
+            }
+        );
 
         return new CommandStrategyContext<GuessCommandKind, AppCommandRouteState>(
             GuessCommandKind.Start,
@@ -417,8 +391,4 @@ public sealed class GuessingAliasTests
         GuessRoundProfile SpecialProfile
     );
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => null;
-    }
 }

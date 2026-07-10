@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Reflection;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Commands;
@@ -24,7 +23,7 @@ namespace BlokeBot.Tests;
 public sealed class PointsTests
 {
     [Test]
-    public void Point_amount_rejects_invalid_negative_and_over_cap_values()
+    public void InvalidNegativeOrOversizedAmount_ParsingOrConstructing_RejectsValue()
     {
         PointAmount.TryParseAbsolute("100", out var amount).ShouldBeTrue();
         amount.Value.ShouldBe(new BigInteger(100));
@@ -37,7 +36,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public void Point_amount_displays_with_four_significant_figures_without_rounding_value()
+    public void LargePointAmounts_FormattingForDisplay_UsesFourSignificantFiguresWithoutChangingValue()
     {
         var amount = PointAmount.ParseAbsolute("123456789012");
 
@@ -54,7 +53,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public void Spend_amount_parser_supports_absolute_percentage_and_all()
+    public void AbsolutePercentageOrAllSpend_Parsing_ReturnsExpectedAmountAndRejectsInvalidInput()
     {
         var balance = PointAmount.ParseAbsolute("2500");
 
@@ -71,14 +70,14 @@ public sealed class PointsTests
     }
 
     [Test]
-    public void Twitch_login_normalization_strips_channel_and_mention_prefixes()
+    public void ChannelOrMentionPrefixedLogin_Normalizing_RemovesPrefixAndLowercases()
     {
         TwitchLogin.Normalize(" #Streamer ").ShouldBe("streamer");
         TwitchLogin.Normalize(" @Viewer ").ShouldBe("viewer");
     }
 
     [Test]
-    public void Channel_authorization_uses_configured_scopes()
+    public void ConfiguredChannelScopes_LoadingAuthorizationRequest_ReturnsNormalizedScopes()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(
@@ -101,7 +100,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Dashboard_add_rejects_unknown_twitch_user_without_creating_balance()
+    public async Task UnknownDashboardTarget_AddingPoints_ReturnsTypedFailureWithoutBalance()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -128,7 +127,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Dashboard_add_strips_mention_prefix_before_storing_balance()
+    public async Task MentionPrefixedDashboardTarget_AddingPoints_StoresNormalizedLogin()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -155,7 +154,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Point_balance_mutations_store_full_precision_values()
+    public async Task LargePointMutation_AddingBalance_PersistsFullPrecisionInBalanceAndLedger()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -181,7 +180,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Dashboard_remove_balance_deletes_row_and_writes_audit_ledger()
+    public async Task ExistingDashboardBalance_Removing_DeletesRowAndWritesAuditLedger()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -225,7 +224,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Dashboard_remove_missing_balance_does_not_create_row()
+    public async Task MissingDashboardBalance_Removing_ReturnsFailureWithoutRows()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -252,7 +251,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Addpoints_command_rejects_unknown_twitch_user_without_creating_balance()
+    public async Task UnknownCommandTarget_AddingPoints_ReturnsReplyWithoutBalance()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -281,7 +280,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Addpoints_command_strips_mention_prefix_before_storing_balance()
+    public async Task MentionPrefixedCommandTarget_AddingPoints_StoresNormalizedLogin()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -312,7 +311,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Points_balance_command_uses_configured_reply_delivery()
+    public async Task WhisperConfiguredBalanceReply_ExecutingCommand_ReturnsWhisperResponse()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -356,7 +355,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Gamble_cooldown_is_per_user_and_silent()
+    public async Task TwoUsersWithinGambleCooldown_ExecutingGambles_SuppressesOnlyRepeatedUser()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTimeProvider(
@@ -423,7 +422,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Gamble_cooldown_uses_appsettings_minimum_when_host_cooldown_is_lower()
+    public async Task HostCooldownBelowMinimum_ExecutingGambles_UsesConfiguredMinimum()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTimeProvider(
@@ -501,7 +500,7 @@ public sealed class PointsTests
     }
 
     [Test]
-    public async Task Points_configuration_saves_and_loads_gambling_cooldown()
+    public async Task ChangedGamblingCooldown_SavingConfiguration_RoundTripsValue()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -528,29 +527,17 @@ public sealed class PointsTests
         PointsCommandKind kind = PointsCommandKind.AddPoints
     )
     {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(constructor => constructor.GetParameters().Length == 4);
-        var text = $"!{commandName} {string.Join(' ', args)}";
-        var command = (TwitchCommandContext)
-            constructor.Invoke([
-                new TwitchChatMessage(
-                    login,
-                    channel,
-                    text,
-                    $":{login}!u@h PRIVMSG #{channel} :{text}",
-                    new Dictionary<string, string>()
-                ),
-                commandName,
-                new EmptyServiceProvider(),
-                new Func<string, CancellationToken, ValueTask>(
-                    (message, _) =>
-                    {
-                        replies.Add(message);
-                        return ValueTask.CompletedTask;
-                    }
-                ),
-            ]);
+        var command = TestCommandContext.Create(
+            login,
+            channel,
+            commandName,
+            args,
+            (string message, CancellationToken _) =>
+            {
+                replies.Add(message);
+                return ValueTask.CompletedTask;
+            }
+        );
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
             kind,
@@ -637,30 +624,17 @@ public sealed class PointsTests
         PointsCommandKind kind
     )
     {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(constructor => constructor.GetParameters().Length == 5);
-        var text = $"!{commandName} {string.Join(' ', args)}";
-        var command = (TwitchCommandContext)
-            constructor.Invoke([
-                new TwitchChatMessage(
-                    login,
-                    channel,
-                    text,
-                    $":{login}!u@h PRIVMSG #{channel} :{text}",
-                    new Dictionary<string, string>()
-                ),
-                commandName,
-                new EmptyServiceProvider(),
-                new Func<TwitchCommandResponse, CancellationToken, ValueTask>(
-                    (response, _) =>
-                    {
-                        responses.Add(response);
-                        return ValueTask.CompletedTask;
-                    }
-                ),
-                false,
-            ]);
+        var command = TestCommandContext.Create(
+            login,
+            channel,
+            commandName,
+            args,
+            (TwitchCommandResponse response, CancellationToken _) =>
+            {
+                responses.Add(response);
+                return ValueTask.CompletedTask;
+            }
+        );
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
             kind,
@@ -687,11 +661,6 @@ public sealed class PointsTests
     private sealed class FakeHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
-    }
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => null;
     }
 
     private sealed class FixedPointTargetUserLookup(IEnumerable<string> existingUsers)

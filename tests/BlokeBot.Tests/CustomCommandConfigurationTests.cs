@@ -10,7 +10,7 @@ namespace BlokeBot.Tests;
 public sealed class CustomCommandConfigurationTests
 {
     [Test]
-    public async Task Saves_and_loads_custom_command_configuration()
+    public async Task CompleteCustomCommandDraft_SavingThenLoading_RoundTripsConfiguration()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -124,7 +124,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task Save_rejects_builtin_and_draft_alias_collisions()
+    public async Task BuiltInOrDuplicateDraftAlias_Saving_RejectsCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -163,7 +163,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task Save_updates_variant_types_and_replaces_aliases()
+    public async Task ActionAndScheduleTypeChanges_Saving_ReplacesVariantsAndAliases()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -232,7 +232,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task Save_deletes_removed_graph_and_aliases()
+    public async Task RemovedConfigurationGraph_Saving_DeletesOwnedRowsAndAliases()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -273,7 +273,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task Save_rejects_missing_ids_invalid_references_and_host_boundary_reuse()
+    public async Task InvalidOrCrossHostGraphReferences_Saving_RejectsWithoutMutation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var firstHostId = await SeedHostAsync(dbFactory, "first");
@@ -322,7 +322,7 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task Save_rejects_invalid_schedule_variants()
+    public async Task InvalidAnnouncementSchedule_Saving_RejectsVariant()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

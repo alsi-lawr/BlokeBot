@@ -11,7 +11,7 @@ namespace BlokeBot.Tests;
 public sealed class HostLifecycleTests
 {
     [Test]
-    public async Task Removing_host_deletes_all_host_owned_data_through_cascades()
+    public async Task HostWithOwnedGraph_Removing_CascadesHostDataAndPreservesSiteData()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostedChannelGraphAsync(dbFactory);
@@ -51,7 +51,7 @@ public sealed class HostLifecycleTests
     }
 
     [Test]
-    public async Task Removing_missing_host_returns_false_without_event()
+    public async Task MissingHost_Removing_ReturnsFalseWithoutEvent()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = new EventBus<AppEventKind>();
@@ -73,7 +73,7 @@ public sealed class HostLifecycleTests
     }
 
     [Test]
-    public async Task Provisioning_host_notifies_hosted_channel_changes()
+    public async Task NewHost_Provisioning_PublishesHostedChannelChange()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = new EventBus<AppEventKind>();

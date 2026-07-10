@@ -8,7 +8,7 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class OAuthTests
 {
     [Test]
-    public void State_store_issues_and_consumes_once()
+    public void IssuedOAuthState_ConsumingTwice_SucceedsOnlyOnce()
     {
         ITwitchOAuthStateStore store = new InMemoryTwitchOAuthStateStore();
 
@@ -21,7 +21,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task OAuth_flow_rejects_invalid_state()
+    public async Task InvalidOAuthState_CompletingFlow_RejectsAuthorization()
     {
         var flow = new TwitchOAuthFlow(
             Options.Create(OptionsWithPath("tokens.json")),
@@ -36,7 +36,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task OAuth_flow_exchanges_and_persists_valid_state()
+    public async Task ValidOAuthState_CompletingFlow_ExchangesAndPersistsToken()
     {
         var oauth = new FakeOAuthClient
         {
@@ -63,7 +63,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task Access_token_provider_reuses_cached_valid_token()
+    public async Task ValidCachedToken_RequestingAccessToken_ReusesWithoutRefresh()
     {
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore
@@ -83,7 +83,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task Access_token_provider_refreshes_expired_token_and_persists_rotation()
+    public async Task ExpiredCachedToken_RequestingAccessToken_RefreshesAndPersistsRotation()
     {
         var oauth = new FakeOAuthClient
         {
@@ -115,7 +115,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task Access_token_provider_reloads_store_after_missing_token()
+    public async Task InitiallyMissingToken_RequestingAfterStoreUpdate_ReloadsAndReturnsToken()
     {
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore();
@@ -143,7 +143,7 @@ public sealed class OAuthTests
     }
 
     [Test]
-    public async Task Json_token_store_round_trips_tokens()
+    public async Task TokenSet_SavingAndLoadingJsonStore_RoundTrips()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "tokens.json");
         var store = new JsonTwitchTokenStore();

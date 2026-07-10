@@ -7,7 +7,7 @@ namespace BlokeBot.Tests;
 public sealed class LocalReturnUrlTests
 {
     [Test]
-    public void Return_url_keeps_local_app_paths()
+    public void LocalAppPath_NormalizingReturnUrl_PreservesPath()
     {
         LocalReturnUrl.OrFallback("/", "/fallback").ShouldBe("/");
         LocalReturnUrl.OrFallback("/guessing", "/fallback").ShouldBe("/guessing");
@@ -17,7 +17,7 @@ public sealed class LocalReturnUrlTests
     }
 
     [Test]
-    public void Return_url_rejects_protocol_relative_and_absolute_urls()
+    public void AbsoluteOrProtocolRelativeUrl_NormalizingReturnUrl_UsesFallback()
     {
         LocalReturnUrl.OrFallback("//attacker.invalid", "/fallback").ShouldBe("/fallback");
         LocalReturnUrl.OrFallback("https://attacker.invalid/", "/fallback").ShouldBe("/fallback");
@@ -25,7 +25,7 @@ public sealed class LocalReturnUrlTests
     }
 
     [Test]
-    public void Return_url_rejects_backslash_variants()
+    public void BackslashUrlVariant_NormalizingReturnUrl_UsesFallback()
     {
         LocalReturnUrl.OrFallback("\\\\attacker.invalid", "/fallback").ShouldBe("/fallback");
         LocalReturnUrl.OrFallback("/\\attacker.invalid", "/fallback").ShouldBe("/fallback");
@@ -33,7 +33,7 @@ public sealed class LocalReturnUrlTests
     }
 
     [Test]
-    public void Return_url_rejects_empty_or_relative_values()
+    public void EmptyOrRelativeUrl_NormalizingReturnUrl_UsesFallback()
     {
         LocalReturnUrl.OrFallback(null, "/fallback").ShouldBe("/fallback");
         LocalReturnUrl.OrFallback("", "/fallback").ShouldBe("/fallback");

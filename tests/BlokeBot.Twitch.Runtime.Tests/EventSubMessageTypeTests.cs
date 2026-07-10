@@ -14,7 +14,7 @@ public sealed class EventSubMessageTypeTests
     [Arguments("revocation", TwitchEventSubMessageType.Revocation)]
     [Arguments("mystery", TwitchEventSubMessageType.Unknown)]
     [Arguments("", TwitchEventSubMessageType.Unknown)]
-    public void Parses_eventsub_message_types(
+    public void KnownUnknownOrEmptyMessageType_Parsing_ReturnsTypedValue(
         string raw,
         TwitchEventSubMessageType expectedMessageType
     )
@@ -23,7 +23,7 @@ public sealed class EventSubMessageTypeTests
     }
 
     [Test]
-    public void Parses_missing_eventsub_message_type_as_unknown()
+    public void MissingMessageType_Parsing_ReturnsUnknown()
     {
         TwitchEventSubMessageTypes.Parse(null).ShouldBe(TwitchEventSubMessageType.Unknown);
     }

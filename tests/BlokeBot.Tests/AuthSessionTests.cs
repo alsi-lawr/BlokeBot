@@ -21,7 +21,7 @@ namespace BlokeBot.Tests;
 public sealed class AuthSessionTests
 {
     [Test]
-    public void Session_distinguishes_bot_account_from_operator()
+    public void BotAccountPrincipal_CreatingSession_GrantsAdminButNotOperatorCapability()
     {
         var session = AuthenticatedSession.FromPrincipal(
             TestPrincipals.BlokeBotUser(
@@ -41,7 +41,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Invalid_selected_host_claim_does_not_fall_back_to_available_host()
+    public void InvalidSelectedHostClaim_CreatingSession_DoesNotFallbackToAvailableHost()
     {
         var available = new[]
         {
@@ -65,7 +65,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Malformed_role_claim_marks_session_claims_invalid()
+    public void MalformedRoleClaim_CreatingSession_MarksClaimsInvalid()
     {
         var session = AuthenticatedSession.FromPrincipal(
             TestPrincipals.BlokeBotUser(login: "streamer", roleClaim: "owner")
@@ -76,7 +76,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Malformed_available_host_payload_marks_session_claims_invalid()
+    public void MalformedAvailableHostClaim_CreatingSession_MarksClaimsInvalid()
     {
         var session = AuthenticatedSession.FromPrincipal(
             TestPrincipals.BlokeBotUser(
@@ -91,7 +91,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Conflicting_selected_host_claim_is_invalid()
+    public void SelectedHostConflictsWithAvailableHost_CreatingSession_MarksSelectionInvalid()
     {
         var available = new BotHostChoice(1, "streamer", "Streamer", AuthRole.Streamer);
         var selected = available with { Role = AuthRole.Moderator };
@@ -110,7 +110,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Host_payload_codec_round_trips_structured_payload()
+    public void StructuredHostChoice_EncodingThenDecoding_RoundTrips()
     {
         var host = new BotHostChoice(
             42,
@@ -126,13 +126,13 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Host_payload_codec_rejects_old_pipe_payload()
+    public void LegacyPipeHostPayload_Decoding_ReturnsNull()
     {
         BotHostClaimCodec.Decode("42|streamer|Streamer|streamer|").ShouldBeNull();
     }
 
     [Test]
-    public void Host_config_can_open_for_create_allowed_user_with_moderator_selection()
+    public void CreateAllowedUserWithModeratorSelection_CheckingHostConfigAccess_ReturnsTrue()
     {
         var selectedHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator);
         var session = AuthenticatedSession.FromPrincipal(
@@ -149,7 +149,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public void Available_hosts_do_not_require_selected_host_for_create_allowed_user()
+    public void CreateAllowedUserWithoutSelection_CreatingSession_PreservesHostsWithoutBotAccess()
     {
         var alternateHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator);
         var session = AuthenticatedSession.FromPrincipal(
@@ -168,7 +168,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public async Task Cookie_validator_allows_create_authorized_user_without_selected_host()
+    public async Task CreateAllowedUserWithoutSelection_ValidatingCookie_RemainsAuthenticated()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var validator = CreateValidator(dbFactory);
@@ -186,7 +186,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public async Task Cookie_validator_rejects_invalid_selected_host_without_fallback()
+    public async Task InvalidSelectedHostClaim_ValidatingCookie_RejectsPrincipalWithoutFallback()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");
@@ -207,7 +207,7 @@ public sealed class AuthSessionTests
     }
 
     [Test]
-    public async Task Cookie_validator_rejects_revoked_moderator_access()
+    public async Task RevokedModeratorAccess_ValidatingCookie_RejectsPrincipal()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

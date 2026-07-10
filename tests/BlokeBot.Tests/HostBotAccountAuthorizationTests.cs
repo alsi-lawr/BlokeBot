@@ -16,7 +16,7 @@ namespace BlokeBot.Tests;
 public sealed class HostBotAccountAuthorizationTests
 {
     [Test]
-    public void Host_bot_oauth_uses_configured_bot_redirect_uri()
+    public void ConfiguredBotRedirectUri_CreatingAuthorizationUri_UsesConfiguredValue()
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
@@ -40,7 +40,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Disabled_override_resolves_global_bot_account()
+    public async Task OverrideDisabled_ResolvingBotAccount_ReturnsGlobalAccount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");
@@ -53,7 +53,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Disabled_override_does_not_report_missing_custom_bot_permissions()
+    public async Task OverrideDisabled_LoadingStatus_DoesNotReportCustomPermissionGaps()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -68,7 +68,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Enabled_override_without_authorization_does_not_fallback_to_global_bot()
+    public async Task UnauthorizedOverrideEnabled_ResolvingBotAccount_DoesNotFallbackToGlobal()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -81,7 +81,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Enabled_override_authorizes_and_resolves_custom_bot_account()
+    public async Task AuthorizedOverrideEnabled_ResolvingBotAccount_ReturnsCustomAccountAndReadyStatus()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -117,7 +117,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Whisper_responses_cannot_be_enabled_without_custom_bot_override()
+    public async Task OverrideDisabled_EnablingWhispers_RejectsWithoutPersisting()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -140,7 +140,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Whisper_responses_require_whisper_scope_for_custom_bot_authorization()
+    public async Task WhispersEnabled_AuthorizingCustomBot_RequiresWhisperScope()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -181,7 +181,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Disabling_override_restarts_running_host_with_global_bot_account()
+    public async Task RunningHostWithOverride_DisablingOverride_QueuesRestartWithGlobalAccount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -203,7 +203,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public async Task Enabling_authorized_override_restarts_running_host_with_custom_bot_account()
+    public async Task RunningHostWithAuthorizedOverride_EnablingOverride_QueuesRestartWithCustomAccount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

@@ -21,7 +21,7 @@ namespace BlokeBot.Tests;
 public sealed class PointsGiveawaySchedulerTests
 {
     [Test]
-    public async Task Restart_rehydrates_future_active_giveaway()
+    public async Task FutureActiveGiveaway_RehydratingScheduler_ReschedulesWithoutStateChange()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -44,7 +44,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Restart_expires_overdue_active_giveaway_without_payout()
+    public async Task OverdueActiveGiveaway_RehydratingScheduler_ExpiresWithoutPayout()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -70,7 +70,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Scheduler_logs_overdue_expiration_failures()
+    public async Task OverdueExpirationFailure_RehydratingScheduler_LogsError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -101,7 +101,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Manual_cancel_cancels_scheduled_giveaway()
+    public async Task ScheduledGiveaway_CancellingManually_CancelsScheduleAndPersistsStatus()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -125,7 +125,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Cancel_outcome_reports_cancelled()
+    public async Task ActiveGiveaway_RequestingCancelOutcome_ReturnsCancelled()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -138,7 +138,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Manual_end_cancels_scheduled_giveaway()
+    public async Task ScheduledGiveaway_EndingManually_CancelsScheduleAndCompletes()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -162,7 +162,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Start_outcome_reports_active_giveaway()
+    public async Task ActiveGiveaway_RequestingStartOutcome_ReturnsAlreadyActive()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -180,7 +180,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Start_outcome_reports_cooldown()
+    public async Task RecentCompletedGiveaway_RequestingStartOutcome_ReturnsCooldown()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -210,7 +210,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Start_outcome_reports_offline_stream()
+    public async Task OfflineStream_RequestingStartOutcome_ReturnsStreamOffline()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -227,7 +227,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Join_outcome_reports_duplicate_join()
+    public async Task ExistingEntrant_RequestingJoinOutcome_ReturnsDuplicateJoin()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -252,7 +252,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Join_outcome_reports_ineligible_user()
+    public async Task IneligibleViewer_RequestingJoinOutcome_ReturnsNotEligible()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -276,7 +276,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Draw_outcome_reports_no_entrants()
+    public async Task GiveawayWithoutEntrants_Drawing_ReturnsNoEntrants()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -295,7 +295,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Draw_outcome_reports_winners()
+    public async Task GiveawayWithEntrant_Drawing_ReturnsWinnerAndPayout()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -317,7 +317,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task Duplicate_draw_attempts_do_not_double_pay()
+    public async Task CompletedGiveaway_DrawingAgain_DoesNotPayTwice()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

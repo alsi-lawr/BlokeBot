@@ -18,7 +18,7 @@ namespace BlokeBot.Tests;
 public sealed class WhisperResponseTests
 {
     [Test]
-    public async Task Quota_counts_unique_recipient_once_per_day()
+    public async Task SameRecipientSameDay_ReservingQuota_CountsOnce()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -50,7 +50,7 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task Quota_blocks_new_recipient_after_limit_but_allows_existing_recipient()
+    public async Task QuotaAtLimit_ReservingExistingAndNewRecipient_AllowsExistingAndBlocksNew()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -95,7 +95,7 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task Sender_marks_quota_exhausted_and_falls_back_to_chat_when_twitch_rate_limits()
+    public async Task TwitchRateLimit_SendingWhisper_FallsBackToChatAndExhaustsQuota()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -154,7 +154,7 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task Sender_falls_back_to_chat_without_twitch_request_for_self_whisper()
+    public async Task SelfWhisper_SendingResponse_FallsBackWithoutRequestOrQuota()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -212,7 +212,7 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task Helix_whisper_send_result_keeps_rejection_body()
+    public async Task RejectedWhisper_SendingThroughHelix_PreservesStatusAndBody()
     {
         var body = """{"status":400,"message":"cannot whisper yourself"}""";
         var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.BadRequest, body);

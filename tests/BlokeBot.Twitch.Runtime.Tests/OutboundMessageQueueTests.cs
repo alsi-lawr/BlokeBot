@@ -9,7 +9,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class OutboundMessageQueueTests
 {
     [Test]
-    public void Split_prefers_line_sentence_then_word_breaks()
+    public void MessageWithMultipleBreakTypes_Splitting_PrefersLineSentenceThenWord()
     {
         TwitchChatMessageSplitter
             .Split("first line\nsecond line", 12)
@@ -23,7 +23,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task Long_messages_are_split_and_sent_in_order()
+    public async Task MessageOverLength_Queueing_SplitsAndSendsInOrder()
     {
         var queue = CreateQueue(
             new TwitchBotOptions
@@ -50,7 +50,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task Duplicate_messages_wait_without_blocking_different_messages()
+    public async Task DuplicateAndDistinctMessages_Queueing_DelaysOnlyDuplicate()
     {
         var clock = new ManualTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
@@ -86,7 +86,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task Stuck_queue_alerts_once_per_backup_and_resets_after_drain()
+    public async Task RepeatedAndLaterBackups_MonitoringQueue_AlertsOncePerIncident()
     {
         var clock = new ManualTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
@@ -146,7 +146,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public void Duplicate_cooldown_expires_at_boundary_and_prunes_stale_entries()
+    public void DuplicateCooldownAtBoundary_CheckingNextAllowed_PrunesStaleEntries()
     {
         var cooldown = new TwitchOutboundDuplicateCooldown();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -166,7 +166,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public void Backlog_monitor_tracks_channels_independently_and_resets_after_drain()
+    public void BacklogsAcrossChannels_CapturingAlerts_TracksIndependentlyAndResetsDrained()
     {
         var monitor = new TwitchOutboundQueueBacklogMonitor();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 10, TimeSpan.Zero);
@@ -199,7 +199,7 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task Alert_dispatcher_contains_observer_failure()
+    public async Task FailingQueueAlertObserver_DispatchingAlert_NotifiesRemainingObservers()
     {
         var recording = new RecordingQueueAlertObserver();
         var dispatcher = new TwitchOutboundQueueAlertDispatcher(

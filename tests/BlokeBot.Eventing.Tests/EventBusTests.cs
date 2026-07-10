@@ -7,7 +7,7 @@ namespace BlokeBot.Eventing.Tests;
 public sealed class EventBusTests
 {
     [Test]
-    public async Task Publish_continues_notifying_subscribers_after_failure()
+    public async Task FailingSubscriber_PublishingEvent_NotifiesRemainingSubscribers()
     {
         var events = new EventBus<string>();
         var received = new List<string>();
@@ -39,7 +39,7 @@ public sealed class EventBusTests
     }
 
     [Test]
-    public async Task Disposed_subscription_no_longer_receives_events()
+    public async Task DisposedSubscription_PublishingEvent_DoesNotNotifyHandler()
     {
         var events = new EventBus<string>();
         var received = 0;
@@ -60,7 +60,7 @@ public sealed class EventBusTests
     }
 
     [Test]
-    public async Task Subscription_set_disposes_all_subscriptions()
+    public async Task SubscriptionSet_Disposing_UnsubscribesEveryHandler()
     {
         var events = new EventBus<string>();
         var received = 0;
@@ -90,7 +90,7 @@ public sealed class EventBusTests
     }
 
     [Test]
-    public async Task Multi_key_subscription_receives_each_key_until_disposed()
+    public async Task MultipleSubscribedKeys_PublishingEvents_NotifiesUntilDisposed()
     {
         var events = new EventBus<string>();
         var received = new List<string>();
@@ -112,26 +112,4 @@ public sealed class EventBusTests
         received.ShouldBe(["first", "second"]);
     }
 
-    [Test]
-    public async Task Event_notifier_publishes_configured_key()
-    {
-        var events = new EventBus<string>();
-        var received = new List<string>();
-        events.Subscribe(
-            "changed",
-            notification =>
-            {
-                received.Add(notification.Key);
-                return Task.CompletedTask;
-            }
-        );
-        var notifier = new StringEventNotifier(events, "changed");
-
-        await notifier.NotifyChangedAsync();
-
-        received.ShouldBe(["changed"]);
-    }
-
-    private sealed class StringEventNotifier(EventBus<string> events, string key)
-        : EventNotifier<string>(events, key);
 }

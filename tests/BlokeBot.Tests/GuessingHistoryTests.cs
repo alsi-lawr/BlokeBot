@@ -8,7 +8,7 @@ namespace BlokeBot.Tests;
 public sealed class GuessingHistoryTests
 {
     [Test]
-    public async Task Recent_completed_rounds_excludes_live_rounds_and_counts_winners()
+    public async Task LiveAndCompletedRounds_LoadingRecentHistory_ReturnsCompletedRoundWithWinnerCounts()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         BotHost host;

@@ -7,7 +7,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class IrcTests
 {
     [Test]
-    public void Parses_privmsg_with_tags()
+    public void TaggedPrivmsg_Parsing_ReturnsNormalizedMessage()
     {
         var line =
             "@badge-info=;display-name=Alice\\sA;color=#fff :alice!alice@alice.tmi.twitch.tv PRIVMSG #channel :!deaths 5";
@@ -26,7 +26,7 @@ public sealed class IrcTests
     }
 
     [Test]
-    public void Rejects_non_privmsg_lines()
+    public void NonPrivmsgLine_Parsing_ReturnsNotPrivmsg()
     {
         var result = TwitchIrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
 
@@ -36,7 +36,7 @@ public sealed class IrcTests
     }
 
     [Test]
-    public void Rejects_malformed_privmsg_lines_with_typed_status()
+    public void MalformedPrivmsg_Parsing_ReturnsTypedFailureStatus()
     {
         TwitchIrcProtocol
             .ParsePrivMsg(":missing-prefix PRIVMSG #channel :hello")
@@ -50,7 +50,7 @@ public sealed class IrcTests
     }
 
     [Test]
-    public void Handles_ping_lines()
+    public void PingLine_Handling_RecognizesPingAndBuildsPong()
     {
         TwitchIrcProtocol.IsPing("PING :tmi.twitch.tv").ShouldBeTrue();
         TwitchIrcProtocol.CreatePong("PING :tmi.twitch.tv").ShouldBe("PONG :tmi.twitch.tv");

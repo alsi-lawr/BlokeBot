@@ -12,7 +12,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class PersistenceInvariantTests
 {
     [Test]
-    public async Task Database_rejects_duplicate_active_giveaways_for_host()
+    public async Task TwoActiveGiveawaysForHost_Saving_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -27,7 +27,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_duplicate_unresolved_guessing_rounds_for_host()
+    public async Task TwoUnresolvedRoundsForHost_Saving_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -43,7 +43,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_duplicate_default_profiles_for_host()
+    public async Task TwoDefaultProfilesForHost_Saving_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -64,7 +64,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_invalid_status_and_kind_values()
+    public async Task InvalidStatusOrKindToken_Inserting_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -94,7 +94,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_invalid_custom_command_and_alert_values()
+    public async Task InvalidCustomCommandOrAlertToken_Inserting_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -124,7 +124,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_invalid_action_and_schedule_payloads()
+    public async Task InconsistentActionOrSchedulePayload_Inserting_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -171,7 +171,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Database_rejects_cross_host_custom_command_references()
+    public async Task CrossHostCustomCommandReference_Inserting_ThrowsDatabaseError()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -262,7 +262,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Deleting_custom_command_and_announcement_cascades_owned_variants()
+    public async Task OwnedCommandAndAnnouncementGraph_Deleting_CascadesVariantsButPreservesSharedMessages()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -299,7 +299,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public void Persisted_enum_tokens_are_exact_and_round_trip()
+    public void PersistedEnums_FormattingAndParsing_UseExactRoundTrippableTokens()
     {
         AssertTokens<AccessListEntryKind>(["blacklist", "whitelist"]);
         AssertTokens<AppCommandKind>(
@@ -329,7 +329,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task Typed_variant_migration_preserves_existing_configuration()
+    public async Task LegacyVariantConfiguration_ApplyingTypedVariantMigration_PreservesData()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();

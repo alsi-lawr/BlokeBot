@@ -14,7 +14,7 @@ namespace BlokeBot.Tests;
 public sealed class DurableAlertTests
 {
     [Test]
-    public async Task Load_state_returns_active_alerts_and_acknowledgement_history()
+    public async Task ActiveAndAcknowledgedAlerts_LoadingState_SeparatesActiveAndHistory()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -61,7 +61,7 @@ public sealed class DurableAlertTests
     [Arguments(AuthRole.Moderator, true)]
     [Arguments(AuthRole.Admin, true)]
     [Arguments(AuthRole.Bot, false)]
-    public void Selected_host_operator_roles_can_acknowledge_alerts(AuthRole role, bool expected)
+    public void SelectedHostRole_CheckingAcknowledgePermission_MatchesOperatorCapability(AuthRole role, bool expected)
     {
         var selectedHost = new BotHostChoice(42, "streamer", "Streamer", role);
         var principal = TestPrincipals.BlokeBotUser(
@@ -77,7 +77,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public void Users_without_selected_host_cannot_acknowledge_alerts()
+    public void SessionWithoutSelectedHost_CheckingAcknowledgePermission_ReturnsFalse()
     {
         var principal = TestPrincipals.BlokeBotUser("operator", canCreateHost: true);
         var session = AuthenticatedSession.FromPrincipal(principal);
@@ -86,7 +86,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task Outbound_queue_observer_persists_alert_once_and_notifies_subscribers()
+    public async Task RepeatedQueueIncident_Observing_PersistsAndNotifiesOnce()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -125,7 +125,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task Outbound_queue_observer_creates_new_alert_for_later_backup_incident()
+    public async Task LaterQueueIncident_Observing_CreatesNewAlertAndNotification()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");
@@ -168,7 +168,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task Subscriber_failure_does_not_block_durable_alert_or_other_subscribers()
+    public async Task FailingAlertSubscriber_ObservingQueueIncident_PersistsAndNotifiesOthers()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");

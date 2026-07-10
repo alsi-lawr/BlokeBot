@@ -10,7 +10,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class ChatActivityHookTests
 {
     [Test]
-    public async Task Irc_chat_activity_runs_before_command_dispatch()
+    public async Task IrcChatMessage_Dispatching_RunsActivityBeforeCommandAndResponse()
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
@@ -42,7 +42,7 @@ public sealed class ChatActivityHookTests
     }
 
     [Test]
-    public async Task EventSub_chat_activity_runs_before_command_dispatch()
+    public async Task EventSubChatMessage_Dispatching_RunsActivityBeforeCommandAndResponse()
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);

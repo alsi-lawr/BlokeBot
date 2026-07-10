@@ -9,7 +9,7 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class TwitchOAuthApiClientTests
 {
     [Test]
-    public void OAuth_client_builds_authorization_uri_with_normalized_scopes()
+    public void DuplicateNoisyScopes_CreatingAuthorizationUri_NormalizesAndEncodesRequest()
     {
         var client = new TwitchOAuthApiClient(new ScriptedHttpClientFactory());
 
@@ -30,7 +30,7 @@ public sealed class TwitchOAuthApiClientTests
     }
 
     [Test]
-    public async Task OAuth_client_exchanges_code_and_validates_token_payload()
+    public async Task AuthorizationCodeAndTokenPayload_ExchangingThenValidating_MapsRequestsAndResponses()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(request =>

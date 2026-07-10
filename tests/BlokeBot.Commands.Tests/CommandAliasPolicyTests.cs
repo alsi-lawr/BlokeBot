@@ -14,14 +14,14 @@ public sealed class CommandAliasPolicyTests
     }
 
     [Test]
-    public void Normalizer_trims_bang_lowercases_splits_and_deduplicates()
+    public void NoisyDuplicateAliases_Normalizing_TrimsPrefixesAndDeduplicates()
     {
         CommandAliasNormalizer.Normalize(" !POINTS ").ShouldBe("points");
         CommandAliasNormalizer.Split("!One, TWO, one,  ").ShouldBe(["one", "two"]);
     }
 
     [Test]
-    public void Alias_policy_detects_duplicates_inside_drafts()
+    public void DuplicateDraftAliases_Validating_ReturnsNormalizedDuplicate()
     {
         var duplicate = CommandAliasPolicy.FindDuplicateAlias([
             new CommandAliasDraft<TestKind>(TestKind.One, "points"),
@@ -32,7 +32,7 @@ public sealed class CommandAliasPolicyTests
     }
 
     [Test]
-    public void Alias_policy_detects_collisions_outside_owned_kinds()
+    public void AliasOwnedByOtherKind_CheckingCollision_ReturnsCollision()
     {
         var collision = CommandAliasPolicy.FindCollision(
             [new CommandAliasDraft<TestKind>(TestKind.One, "points")],
@@ -47,7 +47,7 @@ public sealed class CommandAliasPolicyTests
     }
 
     [Test]
-    public void Alias_policy_ignores_collisions_inside_owned_kinds()
+    public void AliasOwnedByReplacedKind_CheckingCollision_ReturnsNoCollision()
     {
         var collision = CommandAliasPolicy.FindCollision(
             [new CommandAliasDraft<TestKind>(TestKind.One, "points")],

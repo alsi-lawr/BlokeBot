@@ -9,7 +9,7 @@ namespace BlokeBot.Tests;
 public sealed class CooldownStoreTests
 {
     [Test]
-    public void Custom_command_cooldown_expires_at_boundary_and_prunes_stale_keys()
+    public void CustomCommandCooldownAtBoundary_Recording_PrunesExpiredKeysAndAllowsReuse()
     {
         var clock = new ManualTimeProvider();
         var store = new CustomCommandCooldownStore(clock);
@@ -34,7 +34,7 @@ public sealed class CooldownStoreTests
     }
 
     [Test]
-    public void Gambling_cooldown_expires_at_boundary_and_prunes_stale_keys()
+    public void GamblingCooldownAtBoundary_Recording_PrunesExpiredKeysAndAllowsReuse()
     {
         var clock = new ManualTimeProvider();
         var store = new PointsGamblingCooldownStore(clock);

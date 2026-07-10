@@ -15,7 +15,7 @@ namespace BlokeBot.UI.Tests;
 public sealed class AlertUiTests
 {
     [Test]
-    public async Task Top_bar_shows_active_alert_and_navigates_to_alerts()
+    public async Task ActiveAlertInTopBar_ClickingIndicator_NavigatesToAlerts()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
@@ -45,7 +45,7 @@ public sealed class AlertUiTests
     }
 
     [Test]
-    public async Task Sidebar_exposes_alerts_for_selected_operator()
+    public async Task SelectedOperator_RenderingSidebar_ShowsAlertsLink()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
@@ -60,7 +60,7 @@ public sealed class AlertUiTests
     }
 
     [Test]
-    public async Task Alerts_page_acknowledges_active_alert_and_moves_it_to_history()
+    public async Task ActiveAlertOnAlertsPage_Acknowledging_MovesAlertToHistory()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);

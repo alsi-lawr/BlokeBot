@@ -15,7 +15,7 @@ namespace BlokeBot.Tests;
 public sealed class AccessListPolicyTests
 {
     [Test]
-    public async Task Site_access_allows_by_default_and_blacklist_precedes_default_allow()
+    public async Task DefaultSiteAccess_AddingBlacklistedLogin_DeniesNormalizedLogin()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var service = CreateSiteAccessService(dbFactory);
@@ -39,7 +39,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Site_access_whitelist_mode_requires_allow_entry()
+    public async Task WhitelistSiteAccess_CheckingUnlistedAndListedLogin_RequiresAllowEntry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var service = CreateSiteAccessService(dbFactory);
@@ -63,7 +63,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Site_access_mode_selects_active_list_without_removing_inactive_entries()
+    public async Task StoredSiteAccessLists_SwitchingActiveMode_PreservesEntriesAndSelectsPolicy()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var service = CreateSiteAccessService(dbFactory);
@@ -90,7 +90,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Site_access_bot_admin_bypasses_access_list_policy()
+    public async Task BotAdminInRestrictedSite_CheckingAccess_BypassesLists()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var service = CreateSiteAccessService(dbFactory, botAdmins: ["admin"]);
@@ -102,7 +102,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_access_allows_by_default_until_disabled()
+    public async Task DefaultHostModeratorAccess_DisablingModerators_DeniesAccess()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -123,7 +123,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_restrictive_mode_requires_allow_entry()
+    public async Task RestrictedHostModeratorAccess_AddingAllowedLogin_AllowsOnlyNormalizedEntry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -157,7 +157,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_mode_selects_active_list_without_removing_inactive_entries()
+    public async Task StoredHostModeratorLists_SwitchingActiveMode_PreservesEntriesAndSelectsPolicy()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -203,7 +203,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_default_allow_ignores_whitelist_entries()
+    public async Task DefaultAllowHostModeratorAccess_WithWhitelist_AllowsUnlistedModerator()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -225,7 +225,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_access_is_scoped_to_host()
+    public async Task HostScopedModeratorBlacklist_CheckingTwoHosts_DeniesOnlyConfiguredHost()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var firstHostId = await SeedHostAsync(dbFactory, "first");
@@ -251,7 +251,7 @@ public sealed class AccessListPolicyTests
     }
 
     [Test]
-    public async Task Host_moderator_access_changes_notify_hosted_channel_changes()
+    public async Task HostModeratorAccessChanges_MutatingPolicy_PublishesEachChange()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

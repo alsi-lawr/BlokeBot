@@ -17,7 +17,7 @@ namespace BlokeBot.Tests;
 public sealed class GuessingPointRewardTests
 {
     [Test]
-    public async Task Configuration_save_persists_winning_guess_point_reward()
+    public async Task WinningGuessReward_SavingConfiguration_PersistsValue()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedRoundAsync(dbFactory, "0");
@@ -41,7 +41,7 @@ public sealed class GuessingPointRewardTests
     }
 
     [Test]
-    public async Task Declare_winner_awards_configured_points_to_correct_guesses()
+    public async Task CorrectGuessesWithReward_DeclaringWinner_AwardsBalancesAndLedgerEntries()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedRoundAsync(dbFactory, "25");
@@ -74,7 +74,7 @@ public sealed class GuessingPointRewardTests
     }
 
     [Test]
-    public async Task Declare_winner_does_not_create_point_rows_when_reward_is_zero()
+    public async Task CorrectGuessesWithZeroReward_DeclaringWinner_CreatesNoPointRows()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedRoundAsync(dbFactory, "0");

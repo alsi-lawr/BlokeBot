@@ -8,7 +8,7 @@ namespace BlokeBot.Tests;
 public sealed class PublicLeaderboardTests
 {
     [Test]
-    public async Task Public_leaderboard_host_lookup_normalizes_channel_names()
+    public async Task PrefixedMixedCaseChannel_LookingUpLeaderboardHost_ReturnsNormalizedHost()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
@@ -35,7 +35,7 @@ public sealed class PublicLeaderboardTests
     }
 
     [Test]
-    public async Task Public_leaderboard_host_lookup_returns_null_for_unknown_channel()
+    public async Task UnknownChannel_LookingUpLeaderboardHost_ReturnsNull()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var lookup = new PublicLeaderboardHostLookup(dbFactory);

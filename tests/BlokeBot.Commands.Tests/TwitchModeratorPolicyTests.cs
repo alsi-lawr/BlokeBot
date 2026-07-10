@@ -7,13 +7,13 @@ namespace BlokeBot.Commands.Tests;
 public sealed class TwitchModeratorPolicyTests
 {
     [Test]
-    public void Channel_owner_is_moderator()
+    public void ChannelOwner_CheckingModeratorStatus_ReturnsTrue()
     {
         TwitchModeratorPolicy.IsModerator(Message("streamer", "streamer")).ShouldBeTrue();
     }
 
     [Test]
-    public void Mod_tag_marks_moderator()
+    public void ModTagPresent_CheckingModeratorStatus_ReturnsTrue()
     {
         TwitchModeratorPolicy
             .IsModerator(
@@ -23,7 +23,7 @@ public sealed class TwitchModeratorPolicyTests
     }
 
     [Test]
-    public void Badges_mark_broadcaster_or_moderator()
+    public void ModeratorOrBroadcasterBadge_CheckingModeratorStatus_ReturnsTrue()
     {
         TwitchModeratorPolicy
             .IsModerator(
@@ -37,7 +37,7 @@ public sealed class TwitchModeratorPolicyTests
     }
 
     [Test]
-    public void Viewer_without_mod_signals_is_not_moderator()
+    public void ViewerWithoutModeratorSignals_CheckingModeratorStatus_ReturnsFalse()
     {
         TwitchModeratorPolicy.IsModerator(Message("viewer", "streamer")).ShouldBeFalse();
     }

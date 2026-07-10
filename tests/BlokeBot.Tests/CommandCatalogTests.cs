@@ -13,7 +13,7 @@ namespace BlokeBot.Tests;
 public sealed class CommandCatalogTests
 {
     [Test]
-    public async Task Alias_resolver_resolves_known_alias_and_ignores_unknown_alias()
+    public async Task KnownAndUnknownAliases_Resolving_ReturnsKnownRouteAndNull()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -42,7 +42,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public async Task Alias_resolver_returns_guessing_profile_ownership()
+    public async Task ProfileOwnedGuessingAlias_Resolving_ReturnsProfileOwnership()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -81,7 +81,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public async Task Alias_registry_rejects_duplicate_aliases_inside_owned_commands()
+    public async Task DuplicateAliasesWithinReplacement_UpdatingRegistry_Rejects()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -103,7 +103,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public async Task Alias_registry_rejects_cross_feature_collisions()
+    public async Task AliasOwnedByOtherFeature_UpdatingRegistry_Rejects()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -131,7 +131,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public async Task Alias_registry_rejects_collisions_across_guessing_profiles()
+    public async Task AliasOwnedByOtherGuessingProfile_UpdatingRegistry_Rejects()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -178,7 +178,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void Strategy_catalogs_describe_every_feature_command_kind_once()
+    public void FeatureStrategyCatalogs_EnumeratingDescriptors_CoverEveryKindOnce()
     {
         GuessingCatalog()
             .Descriptors.Select(x => x.Kind)
@@ -189,7 +189,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void Strategy_catalogs_declare_default_aliases()
+    public void FeatureStrategyCatalogs_ReadingDefaults_ExposeExpectedAliases()
     {
         var guessing = GuessingCatalog();
         var points = PointsCatalog();
@@ -209,7 +209,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void Strategy_catalogs_declare_moderator_only_commands()
+    public void FeatureStrategyCatalogs_ReadingPermissions_ExposeModeratorRequirements()
     {
         var guessing = GuessingCatalog();
         var points = PointsCatalog();
@@ -229,7 +229,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void Persisted_app_command_kind_maps_explicitly_to_feature_command_kinds()
+    public void FeatureAndPersistedCommandKinds_Mapping_CoversEveryKindWithoutOverlap()
     {
         GuessingAppCommandKindMap.ToAppKind(GuessCommandKind.Guess).ShouldBe(AppCommandKind.Guess);
         PointsAppCommandKindMap.ToAppKind(PointsCommandKind.Gamble).ShouldBe(AppCommandKind.Gamble);
@@ -252,7 +252,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public async Task Point_balance_failures_are_typed_not_message_codes()
+    public async Task InvalidBalanceMutation_ReturningFailure_UsesTypedReasonWithoutMessageCode()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");

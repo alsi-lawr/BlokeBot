@@ -9,7 +9,7 @@ namespace BlokeBot.Twitch.Tests;
 public sealed class TwitchHelixApiClientTests
 {
     [Test]
-    public async Task Helix_client_loads_paginated_moderated_channels()
+    public async Task PaginatedModeratedChannels_LoadingThroughHelix_ReturnsAllPagesWithAuth()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(request =>

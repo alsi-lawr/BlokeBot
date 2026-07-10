@@ -8,7 +8,7 @@ namespace BlokeBot.Commands.Tests;
 public sealed class CommandTests
 {
     [Test]
-    public async Task Dispatches_callback_commands_with_case_insensitive_route_and_args()
+    public async Task CallbackCommand_DispatchingCaseInsensitiveRoute_PassesArgumentsAndReplies()
     {
         List<string> replies = [];
         IReadOnlyList<string> capturedArgs = [];
@@ -37,7 +37,7 @@ public sealed class CommandTests
     }
 
     [Test]
-    public async Task Dispatch_ignores_unknown_or_non_command_messages()
+    public async Task UnknownOrPlainMessage_Dispatching_DoesNotInvokeHandler()
     {
         var calls = 0;
         var dispatcher = BuildDispatcher(builder =>
@@ -68,7 +68,7 @@ public sealed class CommandTests
     }
 
     [Test]
-    public async Task Filters_can_deny_commands()
+    public async Task DenyingFilter_Dispatching_PreventsHandlerExecution()
     {
         var calls = 0;
         var dispatcher = BuildDispatcher(builder =>
@@ -96,7 +96,7 @@ public sealed class CommandTests
     }
 
     [Test]
-    public async Task Dispatches_module_commands()
+    public async Task RegisteredCommandModule_Dispatching_ExecutesModuleHandler()
     {
         List<string> replies = [];
         var dispatcher = BuildDispatcher(builder => builder.AddCommandModule<TestModule>());

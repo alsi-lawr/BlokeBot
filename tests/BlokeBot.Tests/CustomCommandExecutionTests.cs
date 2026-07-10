@@ -13,7 +13,7 @@ namespace BlokeBot.Tests;
 public sealed class CustomCommandExecutionTests
 {
     [Test]
-    public async Task Resolves_aliases_by_normalized_host_and_ignores_disabled_feature()
+    public async Task NormalizedHostAliasWithDisabledPeer_Dispatching_ExecutesOnlyEnabledHostCommand()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -39,7 +39,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task Moderator_only_commands_allow_moderators_and_streamer()
+    public async Task ModeratorOnlyCommand_DispatchingByRoles_AllowsModeratorAndStreamerOnly()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -79,7 +79,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task Templates_include_standard_args_and_leave_unknown_tokens_literal()
+    public async Task StandardAndUnknownTemplateTokens_Rendering_ReplacesKnownAndPreservesUnknown()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -114,7 +114,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task Message_selection_handles_first_sequential_and_random_modes()
+    public async Task ConfiguredMessageSelectionModes_Dispatching_UseExpectedVariantsAndRotation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -159,7 +159,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task Counter_commands_increment_counter_and_render_count()
+    public async Task CounterCommand_Dispatching_IncrementsAndRendersNewCount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -191,7 +191,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     [Test]
-    public async Task Cooldowns_support_global_user_scopes_and_configured_minimum()
+    public async Task GlobalAndUserCooldowns_Dispatching_RespectScopeBoundaryAndMinimum()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTimeProvider(

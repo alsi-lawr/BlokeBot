@@ -20,7 +20,7 @@ namespace BlokeBot.Tests;
 public sealed class AuthorizedHostSelectionServiceTests
 {
     [Test]
-    public async Task Selection_returns_self_host_and_host_mod_filtered_moderated_hosts()
+    public async Task SelfAndModeratedHosts_LoadingAuthorizedSelection_ReturnsSelfAndAllowedModeratedHosts()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer", "Streamer");

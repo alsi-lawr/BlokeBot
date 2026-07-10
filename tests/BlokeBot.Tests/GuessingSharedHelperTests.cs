@@ -9,7 +9,7 @@ namespace BlokeBot.Tests;
 public sealed class GuessingSharedHelperTests
 {
     [Test]
-    public void Reply_settings_mapper_applies_available_guesses_fallback()
+    public void MissingAvailableGuessesReply_MappingToEditor_UsesDefaultReply()
     {
         var editor = ReplySettingsMapper.ToEditor(new BotReplySettings());
 
@@ -17,7 +17,7 @@ public sealed class GuessingSharedHelperTests
     }
 
     [Test]
-    public async Task Reply_settings_query_uses_unresolved_round_profile_before_default()
+    public async Task UnresolvedRoundWithNondefaultProfile_QueryingReplySettings_UsesRoundProfile()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();

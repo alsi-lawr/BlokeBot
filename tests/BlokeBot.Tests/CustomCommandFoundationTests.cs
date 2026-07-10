@@ -1,5 +1,4 @@
 using BlokeBot.Eventing;
-using BlokeBot.Features.Alerts;
 using BlokeBot.Features.CustomCommands;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,7 +10,7 @@ namespace BlokeBot.Tests;
 public sealed class CustomCommandFoundationTests
 {
     [Test]
-    public async Task Custom_alias_registry_rejects_builtin_and_custom_collisions()
+    public async Task BuiltInOrExistingCustomAlias_ValidatingCustomAlias_RejectsCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -65,7 +64,7 @@ public sealed class CustomCommandFoundationTests
     }
 
     [Test]
-    public async Task Host_timezone_service_validates_and_persists_timezone()
+    public async Task ValidThenInvalidTimeZone_SavingHostSettings_PersistsOnlyValidZone()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -85,55 +84,6 @@ public sealed class CustomCommandFoundationTests
             .Select(x => x.TimeZoneId)
             .SingleAsync(CancellationToken.None);
         timeZone.ShouldBe("UTC");
-    }
-
-    [Test]
-    public async Task Durable_alerts_are_created_once_and_acknowledged_with_actor()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var clock = new FixedTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
-        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
-
-        var first = await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Warning,
-            "queue",
-            "streamer",
-            "Queue delayed",
-            "Outbound messages are delayed.",
-            "/alerts",
-            CancellationToken.None
-        );
-        var duplicate = await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Warning,
-            "queue",
-            "streamer",
-            "Queue delayed",
-            "Outbound messages are delayed.",
-            "/alerts",
-            CancellationToken.None
-        );
-
-        duplicate.Id.ShouldBe(first.Id);
-        (await alerts.CountActiveAsync(hostId, CancellationToken.None)).ShouldBe(1);
-
-        var acknowledged = await alerts.AcknowledgeAsync(
-            hostId,
-            first.Id,
-            "moderator",
-            CancellationToken.None
-        );
-
-        acknowledged.ShouldBeTrue();
-        (await alerts.CountActiveAsync(hostId, CancellationToken.None)).ShouldBe(0);
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var stored = await db.DurableAlerts.SingleAsync(CancellationToken.None);
-        stored.AcknowledgedByLogin.ShouldBe("moderator");
-        stored.AcknowledgedAtUtc.ShouldBe(clock.GetUtcNow().UtcDateTime);
     }
 
     private static CustomMessageLibraryEntry MessageEntry(int hostId, string name) =>
@@ -168,10 +118,5 @@ public sealed class CustomCommandFoundationTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
-    }
-
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
     }
 }

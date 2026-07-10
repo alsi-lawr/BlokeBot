@@ -1,4 +1,3 @@
-using System.Reflection;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
@@ -15,7 +14,7 @@ namespace BlokeBot.Tests;
 public sealed class HostFeatureTests
 {
     [Test]
-    public async Task Hosts_enable_all_features_by_default_and_publish_changes_when_toggled()
+    public async Task NewHostAndFeatureToggle_LoadingAndChangingFeatures_DefaultsAllAndPublishesChanges()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -57,7 +56,7 @@ public sealed class HostFeatureTests
     }
 
     [Test]
-    public async Task Command_route_resolvers_ignore_aliases_for_disabled_features()
+    public async Task EnabledAndDisabledFeatures_ResolvingCommandAliases_ReturnsOnlyEnabledRoutes()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer", HostFeatureFlags.Points);
@@ -112,7 +111,7 @@ public sealed class HostFeatureTests
     }
 
     [Test]
-    public async Task Guessing_route_resolver_preserves_alias_profile_ownership()
+    public async Task ProfileOwnedGuessingAlias_ResolvingRoute_PreservesProfileId()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -161,25 +160,7 @@ public sealed class HostFeatureTests
     }
 
     private static TwitchCommandContext CommandContext(string channel, string commandName)
-    {
-        var constructor = typeof(TwitchCommandContext)
-            .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
-            .Single(constructor => constructor.GetParameters().Length == 4);
-
-        return (TwitchCommandContext)
-            constructor.Invoke([
-                new TwitchChatMessage(
-                    "viewer",
-                    channel,
-                    $"!{commandName}",
-                    $":viewer!u@h PRIVMSG #{channel} :!{commandName}",
-                    new Dictionary<string, string>()
-                ),
-                commandName,
-                new EmptyServiceProvider(),
-                new Func<string, CancellationToken, ValueTask>((_, _) => ValueTask.CompletedTask),
-            ]);
-    }
+        => TestCommandContext.Create("viewer", channel, commandName);
 
     private static async Task SeedAliasAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -219,8 +200,4 @@ public sealed class HostFeatureTests
         return host.Id;
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => null;
-    }
 }

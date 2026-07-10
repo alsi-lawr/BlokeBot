@@ -14,7 +14,7 @@ public sealed class OutboundQueueAlertIntegrationTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task Queue_backup_creates_durable_alert_with_optional_subscriber(
+    public async Task QueueBackupWithOptionalSubscriber_DetectingIncident_PersistsAlertAndNotifiesWhenPresent(
         bool includeSubscriber
     )
     {

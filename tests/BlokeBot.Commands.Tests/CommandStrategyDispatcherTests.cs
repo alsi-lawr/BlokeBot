@@ -14,7 +14,7 @@ public sealed class CommandStrategyDispatcherTests
     }
 
     [Test]
-    public async Task Strategy_module_executes_resolved_dynamic_route()
+    public async Task ResolvedDynamicRoute_Dispatching_ExecutesMatchingStrategy()
     {
         List<string> replies = [];
         var services = BuildServices(new TestResolver(TestKind.Public, "state"));
@@ -30,7 +30,7 @@ public sealed class CommandStrategyDispatcherTests
     }
 
     [Test]
-    public async Task Strategy_dispatcher_applies_moderator_gate()
+    public async Task ModeratorOnlyRoute_DispatchingViewer_ReturnsModeratorReply()
     {
         List<string> replies = [];
         var services = BuildServices(new TestResolver(TestKind.Moderator, "state"));

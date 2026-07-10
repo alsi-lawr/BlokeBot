@@ -16,7 +16,7 @@ namespace BlokeBot.Tests;
 public sealed class HostedChannelRuntimeStatusTests
 {
     [Test]
-    public async Task Runtime_summary_reads_local_status_without_bot_status_check()
+    public async Task HostedChannelWithLocalRuntimeState_LoadingSummary_AvoidsRemoteBotCheck()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);

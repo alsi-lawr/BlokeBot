@@ -20,7 +20,7 @@ namespace BlokeBot.Tests;
 public sealed class OutboundQueueAlertWhisperSenderTests
 {
     [Test]
-    public async Task Sender_skips_when_custom_bot_token_is_unavailable()
+    public async Task MissingCustomBotToken_SendingQueueAlert_SkipsWhisperAndLookup()
     {
         await using var fixture = await SenderFixture.CreateAsync(seedCustomBot: false);
 
@@ -31,7 +31,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_skips_when_custom_bot_token_lacks_whisper_scope()
+    public async Task CustomBotWithoutWhisperScope_SendingQueueAlert_SkipsWhisper()
     {
         await using var fixture = await SenderFixture.CreateAsync(
             validationScopes: ["chat:edit"]
@@ -44,7 +44,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_resolves_missing_streamer_id_before_sending()
+    public async Task HostWithoutTwitchId_SendingQueueAlert_ResolvesIdAndWhispers()
     {
         await using var fixture = await SenderFixture.CreateAsync(
             hostTwitchUserId: null,
@@ -59,7 +59,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_skips_when_streamer_lookup_returns_no_user()
+    public async Task HostLookupWithoutUser_SendingQueueAlert_SkipsWhisper()
     {
         await using var fixture = await SenderFixture.CreateAsync(
             hostTwitchUserId: null,
@@ -73,7 +73,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_prevents_self_whisper_before_reserving_quota()
+    public async Task CustomBotMatchesStreamer_SendingQueueAlert_SkipsWhisperBeforeQuota()
     {
         await using var fixture = await SenderFixture.CreateAsync(
             hostTwitchUserId: "custom-id"
@@ -91,7 +91,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_skips_when_daily_recipient_quota_is_exhausted()
+    public async Task ExhaustedRecipientQuota_SendingQueueAlert_SkipsWhisper()
     {
         await using var fixture = await SenderFixture.CreateAsync();
         await fixture.ExhaustQuotaAsync();
@@ -112,7 +112,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     [Arguments(HttpStatusCode.NoContent, false)]
     [Arguments(HttpStatusCode.BadRequest, false)]
     [Arguments(HttpStatusCode.TooManyRequests, true)]
-    public async Task Sender_handles_twitch_delivery_outcomes(
+    public async Task TwitchDeliveryOutcome_SendingQueueAlert_UpdatesQuotaExhaustion(
         HttpStatusCode status,
         bool expectedExhausted
     )
@@ -132,7 +132,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
     }
 
     [Test]
-    public async Task Sender_contains_transport_exceptions_after_quota_reservation()
+    public async Task WhisperTransportFailure_SendingQueueAlert_ContainsExceptionAfterReservation()
     {
         await using var fixture = await SenderFixture.CreateAsync(throwOnWhisper: true);
 

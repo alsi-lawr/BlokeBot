@@ -11,7 +11,7 @@ namespace BlokeBot.UI.Tests;
 public sealed class CustomCommandSettingsUiTests
 {
     [Test]
-    public async Task Variant_controls_follow_selected_action_and_schedule_types()
+    public async Task ActionAndScheduleVariants_ChangingSelections_ShowsMatchingControls()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -29,7 +29,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task Invalid_editor_state_surfaces_validation_error_without_persisting()
+    public async Task InvalidCustomCommandEditor_Saving_ShowsErrorWithoutPersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);

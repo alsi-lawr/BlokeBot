@@ -19,7 +19,7 @@ namespace BlokeBot.Tests;
 public sealed class ChannelBotAuthorizationTests
 {
     [Test]
-    public async Task Channel_oauth_completion_validates_returned_token()
+    public async Task ReturnedOAuthToken_CompletingChannelAuthorization_ValidatesAndNormalizesGrant()
     {
         var httpClientFactory = new TwitchOAuthHttpClientFactory();
         var service = new ChannelBotOAuthService(
@@ -36,7 +36,7 @@ public sealed class ChannelBotAuthorizationTests
     }
 
     [Test]
-    public async Task Channel_authorization_rejects_wrong_granted_account()
+    public async Task GrantForDifferentAccount_AuthorizingChannel_RejectsWithoutPersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
@@ -55,7 +55,7 @@ public sealed class ChannelBotAuthorizationTests
     }
 
     [Test]
-    public async Task Channel_authorization_rejects_missing_granted_scopes()
+    public async Task GrantMissingRequiredScopes_AuthorizingChannel_RejectsAndReportsMissingScopes()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
@@ -75,7 +75,7 @@ public sealed class ChannelBotAuthorizationTests
     }
 
     [Test]
-    public async Task Channel_authorization_persists_valid_granted_scopes()
+    public async Task ValidChannelGrant_AuthorizingChannel_PersistsNormalizedScopes()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
@@ -97,7 +97,7 @@ public sealed class ChannelBotAuthorizationTests
     }
 
     [Test]
-    public async Task Runtime_start_rejects_stale_channel_authorization_scopes()
+    public async Task StaleChannelScopes_StartingRuntime_RejectsAndKeepsStopped()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(

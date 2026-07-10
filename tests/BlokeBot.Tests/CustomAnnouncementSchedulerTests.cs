@@ -12,7 +12,7 @@ namespace BlokeBot.Tests;
 public sealed class CustomAnnouncementSchedulerTests
 {
     [Test]
-    public async Task Interval_announcement_sends_and_persists_last_sent_and_rotation()
+    public async Task DueIntervalAnnouncement_RunningTicks_SendsOnceAndPersistsRotation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -44,7 +44,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Interval_after_chat_requires_chat_count_and_resets_after_send()
+    public async Task IntervalAfterChatBelowAndAtThreshold_RunningTicks_SendsOnlyAtThresholdAndResets()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -91,7 +91,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Weekly_announcement_sends_once_at_scheduled_local_time()
+    public async Task DueWeeklyAnnouncement_RunningRepeatedTick_SendsOnceAtScheduledLocalTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 5, 0, TimeSpan.Zero);
@@ -128,7 +128,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Weekly_announcement_missed_while_offline_is_not_replayed()
+    public async Task WeeklyAnnouncementMissedOffline_RunningCurrentAndNextWindow_DoesNotReplayMissedSend()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var missedAt = new DateTimeOffset(2026, 7, 10, 13, 0, 0, TimeSpan.Zero);
@@ -161,7 +161,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Scheduler_ignores_hosts_without_custom_commands_or_started_runtime()
+    public async Task StoppedOrFeatureDisabledHost_RunningTick_SendsNothing()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -201,7 +201,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Due_announcement_is_not_advanced_when_sender_is_disabled()
+    public async Task DueAnnouncementWithDisabledSender_RunningTick_DoesNotAdvanceSchedule()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -234,7 +234,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Blank_announcement_message_is_not_sent_or_advanced()
+    public async Task DueAnnouncementWithBlankMessage_RunningTick_DoesNotSendOrAdvance()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -265,7 +265,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Sender_failure_does_not_block_other_channels()
+    public async Task OneChannelSendFailure_RunningTick_ContinuesOtherChannels()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
@@ -308,7 +308,7 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
-    public async Task Weekly_announcement_skips_invalid_dst_local_time()
+    public async Task WeeklyAnnouncementInDstGap_RunningTick_SkipsInvalidLocalTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero);
