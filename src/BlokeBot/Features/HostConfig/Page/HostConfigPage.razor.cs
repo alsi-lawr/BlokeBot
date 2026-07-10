@@ -212,6 +212,7 @@ public partial class HostConfigPage
             ? feature.Feature switch
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
+                HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
                 _ => "feature-toggle-card__icon text-blue-600",
             }
             : "feature-toggle-card__icon text-slate-500";
@@ -234,6 +235,14 @@ public partial class HostConfigPage
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 3v18" />
                     <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
+                </svg>
+                """,
+                HostFeatureFlags.CustomCommands => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h16" />
+                    <path d="M4 12h10" />
+                    <path d="M4 17h7" />
+                    <path d="m16 14 3 3-3 3" />
                 </svg>
                 """,
                 _ => string.Empty,
@@ -488,6 +497,7 @@ public partial class HostConfigPage
         {
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
+            HostFeatureFlags.CustomCommands => "Custom commands",
             _ => "Feature",
         };
 

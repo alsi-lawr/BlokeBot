@@ -22,5 +22,7 @@ public sealed class BotHost
 
     public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.All;
 
+    public string TimeZoneId { get; set; } = "UTC";
+
     public DateTime CreatedAtUtc { get; set; }
 }

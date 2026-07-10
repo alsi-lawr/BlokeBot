@@ -46,7 +46,11 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddOptions<BlokeBotOptions>().BindConfiguration("BlokeBot").ValidateOnStart();
+builder
+    .Services.AddOptions<BlokeBotOptions>()
+    .BindConfiguration("BlokeBot")
+    .Validate(BlokeBotOptionsValidation.IsValid, "BlokeBot options are invalid.")
+    .ValidateOnStart();
 builder.Services.AddOptions<WebAuthOptions>().BindConfiguration("TwitchWebAuth").ValidateOnStart();
 builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
@@ -57,6 +61,7 @@ builder.Services.AddBlokeBotPersistence(
 builder.Services.AddSingleton<EventBus<AppEventKind>>();
 builder
     .Services.AddBlokeBotAppCommands()
+    .AddBlokeBotCustomCommands()
     .AddBlokeBotSiteAccess()
     .AddBlokeBotAdmin()
     .AddBlokeBotHostedChannels()

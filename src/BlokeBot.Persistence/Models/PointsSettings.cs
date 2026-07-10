@@ -10,6 +10,8 @@ public sealed class PointsSettings
 
     public int GamblingWinRatePercent { get; set; } = 50;
 
+    public int GamblingCooldownSeconds { get; set; }
+
     public int GiveawayDurationSeconds { get; set; } = 300;
 
     public string GiveawayMinimumPayout { get; set; } = "10";

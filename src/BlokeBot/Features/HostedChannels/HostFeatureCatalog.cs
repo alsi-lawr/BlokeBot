@@ -18,6 +18,12 @@ public static class HostFeatureCatalog
                 "Track viewer points, giveaways, gambling, and moderator adjustments.",
                 enabledFeatures.Contains(HostFeatureFlags.Points)
             ),
+            new(
+                HostFeatureFlags.CustomCommands,
+                "Custom commands",
+                "Create reusable chat replies, counters, and scheduled announcements.",
+                enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
+            ),
         ];
 
     public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature) =>

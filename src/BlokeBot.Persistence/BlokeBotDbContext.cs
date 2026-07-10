@@ -13,6 +13,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<ReplyDeliverySetting> ReplyDeliverySettings => Set<ReplyDeliverySetting>();
     public DbSet<BotReplySettings> ReplySettings => Set<BotReplySettings>();
     public DbSet<CommandAlias> CommandAliases => Set<CommandAlias>();
+    public DbSet<CustomMessageLibraryEntry> CustomMessageLibraryEntries =>
+        Set<CustomMessageLibraryEntry>();
+    public DbSet<CustomMessageVariant> CustomMessageVariants => Set<CustomMessageVariant>();
+    public DbSet<CustomCommand> CustomCommands => Set<CustomCommand>();
+    public DbSet<CustomCommandAlias> CustomCommandAliases => Set<CustomCommandAlias>();
+    public DbSet<CustomCounter> CustomCounters => Set<CustomCounter>();
+    public DbSet<CustomAnnouncement> CustomAnnouncements => Set<CustomAnnouncement>();
+    public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
@@ -44,6 +52,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.DisplayName).HasMaxLength(128);
             b.Property(x => x.ProfileImageUrl).HasMaxLength(512);
+            b.Property(x => x.TimeZoneId).HasMaxLength(128).HasDefaultValue("UTC");
             b.Property(x => x.TwitchUserId).HasMaxLength(64);
             b.HasIndex(x => x.Login).IsUnique();
         });
@@ -222,6 +231,179 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasOne(x => x.GuessRoundProfile)
                 .WithMany(x => x.CommandAliases)
                 .HasForeignKey(x => x.GuessRoundProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomMessageLibraryEntry>(b =>
+        {
+            b.ToTable(
+                "custom_message_library_entries",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_custom_message_library_entries_SelectionMode",
+                        KindIn("SelectionMode", CustomMessageSelectionModes)
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.SelectionMode)
+                .HasConversion(
+                    mode => CustomMessageSelectionModeStore.Format(mode),
+                    value => CustomMessageSelectionModeStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasMany(x => x.Variants)
+                .WithOne(x => x.Entry)
+                .HasForeignKey(x => x.CustomMessageLibraryEntryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomMessageVariant>(b =>
+        {
+            b.ToTable("custom_message_variants");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Text).HasMaxLength(500);
+            b.HasIndex(x => new { x.CustomMessageLibraryEntryId, x.SortOrder }).IsUnique();
+        });
+
+        modelBuilder.Entity<CustomCounter>(b =>
+        {
+            b.ToTable("custom_counters");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomCommand>(b =>
+        {
+            b.ToTable(
+                "custom_commands",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_custom_commands_ActionType",
+                        KindIn("ActionType", CustomCommandActionTypes)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_commands_CooldownScope",
+                        KindIn("CooldownScope", CustomCommandCooldownScopes)
+                    );
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.ActionType)
+                .HasConversion(
+                    action => CustomCommandActionTypeStore.Format(action),
+                    value => CustomCommandActionTypeStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.CooldownScope)
+                .HasConversion(
+                    scope => CustomCommandCooldownScopeStore.Format(scope),
+                    value => CustomCommandCooldownScopeStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.MessageLibraryEntry)
+                .WithMany()
+                .HasForeignKey(x => x.MessageLibraryEntryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(x => x.Counter)
+                .WithMany()
+                .HasForeignKey(x => x.CounterId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasMany(x => x.Aliases)
+                .WithOne(x => x.Command)
+                .HasForeignKey(x => x.CustomCommandId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomCommandAlias>(b =>
+        {
+            b.ToTable("custom_command_aliases");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Alias).HasMaxLength(64);
+            b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
+        });
+
+        modelBuilder.Entity<CustomAnnouncement>(b =>
+        {
+            b.ToTable(
+                "custom_announcements",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_ScheduleType",
+                        KindIn("ScheduleType", CustomAnnouncementScheduleTypes)
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.ScheduleType)
+                .HasConversion(
+                    type => CustomAnnouncementScheduleTypeStore.Format(type),
+                    value => CustomAnnouncementScheduleTypeStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.MessageLibraryEntry)
+                .WithMany()
+                .HasForeignKey(x => x.MessageLibraryEntryId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DurableAlert>(b =>
+        {
+            b.ToTable(
+                "durable_alerts",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_durable_alerts_Severity",
+                        KindIn("Severity", DurableAlertSeverities)
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Severity)
+                .HasConversion(
+                    severity => DurableAlertSeverityStore.Format(severity),
+                    value => DurableAlertSeverityStore.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.Source).HasMaxLength(64);
+            b.Property(x => x.SourceKey).HasMaxLength(256);
+            b.Property(x => x.Title).HasMaxLength(160);
+            b.Property(x => x.Message).HasMaxLength(1000);
+            b.Property(x => x.LinkPath).HasMaxLength(256);
+            b.Property(x => x.AcknowledgedByLogin).HasMaxLength(128);
+            b.HasIndex(x => new { x.HostId, x.AcknowledgedAtUtc });
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.Source,
+                    x.SourceKey,
+                })
+                .IsUnique()
+                .HasFilter("\"AcknowledgedAtUtc\" IS NULL");
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -410,6 +592,21 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     private static readonly string[] AccessKinds = AccessListEntryKindStore.Values.ToArray();
 
     private static readonly string[] CommandAliasKinds = AppCommandKindStore.Values.ToArray();
+
+    private static readonly string[] CustomAnnouncementScheduleTypes =
+        CustomAnnouncementScheduleTypeStore.Values.ToArray();
+
+    private static readonly string[] CustomCommandActionTypes =
+        CustomCommandActionTypeStore.Values.ToArray();
+
+    private static readonly string[] CustomCommandCooldownScopes =
+        CustomCommandCooldownScopeStore.Values.ToArray();
+
+    private static readonly string[] CustomMessageSelectionModes =
+        CustomMessageSelectionModeStore.Values.ToArray();
+
+    private static readonly string[] DurableAlertSeverities =
+        DurableAlertSeverityStore.Values.ToArray();
 
     private static readonly string[] GuessRoundStatusKinds = ["Closed", "Completed", "Open"];
 

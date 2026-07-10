@@ -27,6 +27,7 @@ public static class TwitchBotServiceCollectionExtensions
             .AddOptions<TwitchBotOptions>()
             .Bind(configuration)
             .ValidateDataAnnotations()
+            .Validate(TwitchBotOptionsValidation.IsValid, "Twitch bot options are invalid.")
             .ValidateOnStart();
         services
             .AddOptions<TwitchBotIdentityOptions>()
@@ -55,6 +56,7 @@ public static class TwitchBotServiceCollectionExtensions
             .AddOptions<TwitchBotOptions>()
             .Configure(configure)
             .ValidateDataAnnotations()
+            .Validate(TwitchBotOptionsValidation.IsValid, "Twitch bot options are invalid.")
             .ValidateOnStart();
         services
             .AddOptions<TwitchBotIdentityOptions>()

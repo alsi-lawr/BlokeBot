@@ -4,10 +4,12 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
+using BlokeBot.Features.Alerts;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.CustomCommands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Configuration;
 using BlokeBot.Features.Guessing.Game;
@@ -44,6 +46,14 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<CommandAliasRegistry>();
         services.AddSingleton<AppCommandAliasResolver>();
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotCustomCommands(this IServiceCollection services)
+    {
+        services.AddSingleton<CustomCommandAliasRegistry>();
+        services.AddSingleton<HostCustomCommandSettingsService>();
+        services.AddSingleton<DurableAlertService>();
         return services;
     }
 

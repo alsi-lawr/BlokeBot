@@ -40,7 +40,9 @@ public sealed class HostFeatureTests
             CancellationToken.None
         );
 
-        (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(HostFeatureFlags.Points);
+        (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(
+            HostFeatureFlags.Points | HostFeatureFlags.CustomCommands
+        );
         publishCount.ShouldBe(1);
 
         await service.SetEnabledAsync(

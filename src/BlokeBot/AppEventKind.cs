@@ -6,4 +6,6 @@ public enum AppEventKind
     SiteAccessChanged,
     GuessingChanged,
     PointsChanged,
+    CustomCommandsChanged,
+    AlertsChanged,
 }

@@ -91,6 +91,36 @@ public sealed class PersistenceInvariantTests
         );
     }
 
+    [Test]
+    public async Task Database_rejects_invalid_custom_command_and_alert_values()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hostId = await SeedHostAsync(db);
+
+        await Should.ThrowAsync<SqliteException>(async () =>
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO custom_message_library_entries
+                    (HostId, Name, SelectionMode, CurrentVariantIndex, CreatedAtUtc, UpdatedAtUtc)
+                VALUES
+                    ({hostId}, 'message', 'Bogus', 0, {DateTime.UtcNow}, {DateTime.UtcNow})
+                """
+            )
+        );
+
+        await Should.ThrowAsync<SqliteException>(async () =>
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO durable_alerts
+                    (HostId, Severity, Source, SourceKey, Title, Message, CreatedAtUtc)
+                VALUES
+                    ({hostId}, 'Bogus', 'test', 'one', 'Title', 'Message', {DateTime.UtcNow})
+                """
+            )
+        );
+    }
+
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>
         new()
         {
