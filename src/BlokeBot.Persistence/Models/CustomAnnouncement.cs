@@ -12,17 +12,6 @@ public sealed class CustomAnnouncement
 
     public int MessageLibraryEntryId { get; set; }
 
-    public CustomAnnouncementScheduleType ScheduleType { get; set; } =
-        CustomAnnouncementScheduleType.Interval;
-
-    public int IntervalMinutes { get; set; } = 30;
-
-    public int RequiredChatMessages { get; set; }
-
-    public DayOfWeek? WeeklyDay { get; set; }
-
-    public TimeOnly? WeeklyTime { get; set; }
-
     public DateTime? LastSentAtUtc { get; set; }
 
     public int ChatMessagesSinceLastSent { get; set; }
@@ -32,4 +21,6 @@ public sealed class CustomAnnouncement
     public DateTime UpdatedAtUtc { get; set; }
 
     public CustomMessageLibraryEntry? MessageLibraryEntry { get; set; }
+
+    public CustomAnnouncementSchedule Schedule { get; set; } = null!;
 }

@@ -46,9 +46,9 @@ public sealed class CustomCommandExecutionService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var command = await db
-            .CustomCommands.Include(x => x.MessageLibraryEntry)
+            .CustomCommands.Include(x => x.Action)
+            .ThenInclude(x => x.MessageLibraryEntry)
             .ThenInclude(x => x!.Variants)
-            .Include(x => x.Counter)
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
             return true;
@@ -59,13 +59,16 @@ public sealed class CustomCommandExecutionService(
         if (!cooldowns.TryRecord(command.Id, command.CooldownScope, context.Message.Login, Cooldown(command)))
             return true;
 
-        var count = command.ActionType == CustomCommandActionType.Counter
-            ? IncrementCounter(command)
-            : null;
-        if (command.ActionType == CustomCommandActionType.Counter && count is null)
-            return true;
+        long? count = null;
+        if (command.Action is CounterCustomCommandAction counterAction)
+        {
+            await db.Entry(counterAction).Reference(x => x.Counter).LoadAsync(ct);
+            count = IncrementCounter(counterAction);
+            if (count is null)
+                return true;
+        }
 
-        var selectedMessage = messageSelector.SelectMessage(command.MessageLibraryEntry);
+        var selectedMessage = messageSelector.SelectMessage(command.Action.MessageLibraryEntry);
         if (selectedMessage is null)
             return true;
 
@@ -86,14 +89,14 @@ public sealed class CustomCommandExecutionService(
         return TimeSpan.FromSeconds(seconds);
     }
 
-    private long? IncrementCounter(CustomCommand command)
+    private long? IncrementCounter(CounterCustomCommandAction action)
     {
-        if (command.Counter is null)
+        if (action.Counter is null)
             return null;
 
-        command.Counter.Value++;
-        command.Counter.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
-        return command.Counter.Value;
+        action.Counter.Value++;
+        action.Counter.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
+        return action.Counter.Value;
     }
 
     private static bool HasCustomCommands(HostFeatureFlags features) =>

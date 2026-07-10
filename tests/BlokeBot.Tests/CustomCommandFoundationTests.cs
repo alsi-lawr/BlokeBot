@@ -32,7 +32,11 @@ public sealed class CustomCommandFoundationTests
             {
                 HostId = hostId,
                 Name = "Hello",
-                MessageLibraryEntryId = entry.Id,
+                Action = new MessageCustomCommandAction
+                {
+                    HostId = hostId,
+                    MessageLibraryEntryId = entry.Id,
+                },
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,
             };

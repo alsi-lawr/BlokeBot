@@ -10,19 +10,25 @@ namespace BlokeBot.Features.CustomCommands;
 
 internal sealed class CustomAnnouncementScheduler(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IServiceProvider services,
+    ICustomAnnouncementSender sender,
+    ICustomAnnouncementTickScheduler scheduler,
     CustomMessageSelector messageSelector,
     IOptions<BlokeBotOptions> options,
-    TimeProvider clock,
     ILogger<CustomAnnouncementScheduler> log
 ) : BackgroundService
 {
     internal async Task RunTickAsync(CancellationToken cancellationToken)
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var now = clock.GetUtcNow().UtcDateTime;
+        var now = scheduler.GetUtcNow().UtcDateTime;
         var candidates = await (
             from announcement in db.CustomAnnouncements.AsNoTracking()
+            join schedule in db.CustomAnnouncementSchedules.AsNoTracking()
+                on new { announcement.HostId, CustomAnnouncementId = announcement.Id } equals new
+                {
+                    schedule.HostId,
+                    schedule.CustomAnnouncementId,
+                }
             join host in db.Hosts.AsNoTracking() on announcement.HostId equals host.Id
             where
                 announcement.Enabled
@@ -32,20 +38,20 @@ internal sealed class CustomAnnouncementScheduler(
             orderby announcement.Id
             select new AnnouncementCandidate(
                 announcement,
+                schedule,
                 host.Login,
                 host.TimeZoneId,
                 host.BotRuntimeStateChangedAtUtc
             )
         ).ToListAsync(cancellationToken);
 
-        var sender = services.GetService(typeof(ITwitchChatMessageSender)) as ITwitchChatMessageSender;
         foreach (var candidate in candidates)
         {
             var due = IsDue(candidate, now);
             if (!due.ShouldSend)
                 continue;
 
-            if (sender is null)
+            if (!sender.IsEnabled)
             {
                 log.LogWarning(
                     "Custom announcement {AnnouncementId} is due for host {HostLogin}, but no Twitch chat sender is registered.",
@@ -55,7 +61,23 @@ internal sealed class CustomAnnouncementScheduler(
                 continue;
             }
 
-            await SendAsync(db, sender, candidate, due, now, cancellationToken);
+            try
+            {
+                await SendAsync(db, candidate, due, now, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(
+                    ex,
+                    "Custom announcement {AnnouncementId} failed for host {HostLogin}.",
+                    candidate.Announcement.Id,
+                    candidate.HostLogin
+                );
+            }
         }
     }
 
@@ -75,7 +97,7 @@ internal sealed class CustomAnnouncementScheduler(
 
             try
             {
-                await Task.Delay(TickInterval(), clock, stoppingToken);
+                await scheduler.DelayAsync(TickInterval(), stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
         }
@@ -83,7 +105,6 @@ internal sealed class CustomAnnouncementScheduler(
 
     private async Task SendAsync(
         BlokeBotDbContext db,
-        ITwitchChatMessageSender sender,
         AnnouncementCandidate candidate,
         AnnouncementDueResult due,
         DateTime now,
@@ -118,56 +139,65 @@ internal sealed class CustomAnnouncementScheduler(
     }
 
     private AnnouncementDueResult IsDue(AnnouncementCandidate candidate, DateTime nowUtc) =>
-        candidate.Announcement.ScheduleType switch
+        candidate.Schedule switch
         {
-            CustomAnnouncementScheduleType.Interval => IsIntervalDue(
+            IntervalCustomAnnouncementSchedule schedule => IsIntervalDue(
                 candidate.Announcement,
+                schedule.IntervalMinutes,
                 nowUtc
             ),
-            CustomAnnouncementScheduleType.IntervalAfterChat => IsIntervalAfterChatDue(
+            IntervalAfterChatCustomAnnouncementSchedule schedule => IsIntervalAfterChatDue(
                 candidate.Announcement,
+                schedule,
                 nowUtc
             ),
-            CustomAnnouncementScheduleType.Weekly => IsWeeklyDue(candidate, nowUtc),
+            WeeklyCustomAnnouncementSchedule schedule => IsWeeklyDue(
+                candidate,
+                schedule,
+                nowUtc
+            ),
             _ => AnnouncementDueResult.NotDue,
         };
 
     private static AnnouncementDueResult IsIntervalDue(
         CustomAnnouncement announcement,
+        int intervalMinutes,
         DateTime nowUtc
     )
     {
         var baseline = announcement.LastSentAtUtc ?? announcement.CreatedAtUtc;
-        return baseline.AddMinutes(Math.Max(1, announcement.IntervalMinutes)) <= nowUtc
+        return baseline.AddMinutes(intervalMinutes) <= nowUtc
             ? new AnnouncementDueResult(true, nowUtc)
             : AnnouncementDueResult.NotDue;
     }
 
     private static AnnouncementDueResult IsIntervalAfterChatDue(
         CustomAnnouncement announcement,
+        IntervalAfterChatCustomAnnouncementSchedule schedule,
         DateTime nowUtc
     )
     {
-        if (announcement.ChatMessagesSinceLastSent < Math.Max(1, announcement.RequiredChatMessages))
+        if (announcement.ChatMessagesSinceLastSent < schedule.RequiredChatMessages)
             return AnnouncementDueResult.NotDue;
 
-        return IsIntervalDue(announcement, nowUtc);
+        return IsIntervalDue(announcement, schedule.IntervalMinutes, nowUtc);
     }
 
-    private AnnouncementDueResult IsWeeklyDue(AnnouncementCandidate candidate, DateTime nowUtc)
+    private AnnouncementDueResult IsWeeklyDue(
+        AnnouncementCandidate candidate,
+        WeeklyCustomAnnouncementSchedule schedule,
+        DateTime nowUtc
+    )
     {
         var announcement = candidate.Announcement;
-        if (announcement.WeeklyDay is null || announcement.WeeklyTime is null)
-            return AnnouncementDueResult.NotDue;
-
         var timeZone = ResolveTimeZone(candidate.TimeZoneId);
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, timeZone);
-        if (localNow.DayOfWeek != announcement.WeeklyDay.Value)
+        if (localNow.DayOfWeek != schedule.Day)
             return AnnouncementDueResult.NotDue;
 
         var scheduledLocal = DateOnly
             .FromDateTime(localNow)
-            .ToDateTime(announcement.WeeklyTime.Value, DateTimeKind.Unspecified);
+            .ToDateTime(schedule.Time, DateTimeKind.Unspecified);
         if (scheduledLocal > localNow)
             return AnnouncementDueResult.NotDue;
 
@@ -223,6 +253,7 @@ internal sealed class CustomAnnouncementScheduler(
 
     private sealed record AnnouncementCandidate(
         CustomAnnouncement Announcement,
+        CustomAnnouncementSchedule Schedule,
         string HostLogin,
         string TimeZoneId,
         DateTime? BotRuntimeStateChangedAtUtc

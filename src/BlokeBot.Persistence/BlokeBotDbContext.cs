@@ -17,9 +17,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         Set<CustomMessageLibraryEntry>();
     public DbSet<CustomMessageVariant> CustomMessageVariants => Set<CustomMessageVariant>();
     public DbSet<CustomCommand> CustomCommands => Set<CustomCommand>();
+    public DbSet<CustomCommandAction> CustomCommandActions => Set<CustomCommandAction>();
     public DbSet<CustomCommandAlias> CustomCommandAliases => Set<CustomCommandAlias>();
     public DbSet<CustomCounter> CustomCounters => Set<CustomCounter>();
     public DbSet<CustomAnnouncement> CustomAnnouncements => Set<CustomAnnouncement>();
+    public DbSet<CustomAnnouncementSchedule> CustomAnnouncementSchedules =>
+        Set<CustomAnnouncementSchedule>();
     public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
@@ -144,8 +147,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Kind)
                 .HasConversion(
-                    kind => AccessListEntryKindStore.Format(kind),
-                    value => AccessListEntryKindStore.Parse(value)
+                    kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
+                    value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new { x.Kind, x.Login }).IsUnique();
@@ -177,8 +180,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Kind)
                 .HasConversion(
-                    kind => AccessListEntryKindStore.Format(kind),
-                    value => AccessListEntryKindStore.Parse(value)
+                    kind => PersistedEnumTokens<AccessListEntryKind>.Format(kind),
+                    value => PersistedEnumTokens<AccessListEntryKind>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new
@@ -217,20 +220,21 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.Kind)
                 .HasConversion(
-                    kind => AppCommandKindStore.Format(kind),
-                    value => AppCommandKindStore.Parse(value)
+                    kind => PersistedEnumTokens<AppCommandKind>.Format(kind),
+                    value => PersistedEnumTokens<AppCommandKind>.Parse(value)
                 )
                 .HasMaxLength(64);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
-            b.HasIndex(x => x.GuessRoundProfileId);
+            b.HasIndex(x => new { x.HostId, x.GuessRoundProfileId });
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasOne(x => x.GuessRoundProfile)
                 .WithMany(x => x.CommandAliases)
-                .HasForeignKey(x => x.GuessRoundProfileId)
+                .HasForeignKey(x => new { x.HostId, x.GuessRoundProfileId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -245,11 +249,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     )
             );
             b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.SelectionMode)
                 .HasConversion(
-                    mode => CustomMessageSelectionModeStore.Format(mode),
-                    value => CustomMessageSelectionModeStore.Parse(value)
+                    mode => PersistedEnumTokens<CustomMessageSelectionMode>.Format(mode),
+                    value => PersistedEnumTokens<CustomMessageSelectionMode>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
@@ -275,6 +280,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         {
             b.ToTable("custom_counters");
             b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
             b.HasOne<BotHost>()
@@ -288,29 +294,18 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.ToTable(
                 "custom_commands",
                 t =>
-                {
-                    t.HasCheckConstraint(
-                        "CK_custom_commands_ActionType",
-                        KindIn("ActionType", CustomCommandActionTypes)
-                    );
                     t.HasCheckConstraint(
                         "CK_custom_commands_CooldownScope",
                         KindIn("CooldownScope", CustomCommandCooldownScopes)
-                    );
-                }
+                    )
             );
             b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.ActionType)
-                .HasConversion(
-                    action => CustomCommandActionTypeStore.Format(action),
-                    value => CustomCommandActionTypeStore.Parse(value)
-                )
-                .HasMaxLength(32);
             b.Property(x => x.CooldownScope)
                 .HasConversion(
-                    scope => CustomCommandCooldownScopeStore.Format(scope),
-                    value => CustomCommandCooldownScopeStore.Parse(value)
+                    scope => PersistedEnumTokens<CustomCommandCooldownScope>.Format(scope),
+                    value => PersistedEnumTokens<CustomCommandCooldownScope>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
@@ -318,18 +313,49 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .WithMany()
                 .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.Action)
+                .WithOne(x => x.Command)
+                .HasForeignKey<CustomCommandAction>(x => new { x.HostId, x.CustomCommandId })
+                .HasPrincipalKey<CustomCommand>(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomCommandAction>(b =>
+        {
+            b.ToTable(
+                "custom_command_actions",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_custom_command_actions_ActionType",
+                        KindIn("ActionType", CustomCommandActionTypes)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_command_actions_Payload",
+                        "(ActionType = 'Message' AND CounterId IS NULL) OR "
+                            + "(ActionType = 'Counter' AND CounterId IS NOT NULL)"
+                    );
+                }
+            );
+            b.HasKey(x => x.CustomCommandId);
+            b.Property<string>("ActionType").HasMaxLength(32);
+            b.HasDiscriminator<string>("ActionType")
+                .HasValue<MessageCustomCommandAction>(MessageCustomCommandAction.Discriminator)
+                .HasValue<CounterCustomCommandAction>(CounterCustomCommandAction.Discriminator);
             b.HasOne(x => x.MessageLibraryEntry)
                 .WithMany()
-                .HasForeignKey(x => x.MessageLibraryEntryId)
+                .HasForeignKey(x => new { x.HostId, x.MessageLibraryEntryId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CounterCustomCommandAction>(b =>
+        {
             b.HasOne(x => x.Counter)
                 .WithMany()
-                .HasForeignKey(x => x.CounterId)
+                .HasForeignKey(x => new { x.HostId, x.CounterId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
-            b.HasMany(x => x.Aliases)
-                .WithOne(x => x.Command)
-                .HasForeignKey(x => x.CustomCommandId)
-                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CustomCommandAlias>(b =>
@@ -338,26 +364,19 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
+            b.HasOne(x => x.Command)
+                .WithMany(x => x.Aliases)
+                .HasForeignKey(x => new { x.HostId, x.CustomCommandId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CustomAnnouncement>(b =>
         {
-            b.ToTable(
-                "custom_announcements",
-                t =>
-                    t.HasCheckConstraint(
-                        "CK_custom_announcements_ScheduleType",
-                        KindIn("ScheduleType", CustomAnnouncementScheduleTypes)
-                    )
-            );
+            b.ToTable("custom_announcements");
             b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.ScheduleType)
-                .HasConversion(
-                    type => CustomAnnouncementScheduleTypeStore.Format(type),
-                    value => CustomAnnouncementScheduleTypeStore.Parse(value)
-                )
-                .HasMaxLength(32);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -365,8 +384,66 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasOne(x => x.MessageLibraryEntry)
                 .WithMany()
-                .HasForeignKey(x => x.MessageLibraryEntryId)
+                .HasForeignKey(x => new { x.HostId, x.MessageLibraryEntryId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(x => x.Schedule)
+                .WithOne(x => x.Announcement)
+                .HasForeignKey<CustomAnnouncementSchedule>(x =>
+                    new { x.HostId, x.CustomAnnouncementId }
+                )
+                .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomAnnouncementSchedule>(b =>
+        {
+            b.ToTable(
+                "custom_announcement_schedules",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_custom_announcement_schedules_ScheduleType",
+                        KindIn("ScheduleType", CustomAnnouncementScheduleTypes)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcement_schedules_Payload",
+                        "(ScheduleType = 'Interval' AND IntervalMinutes >= 1 "
+                            + "AND RequiredChatMessages IS NULL AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR "
+                            + "(ScheduleType = 'IntervalAfterChat' AND IntervalMinutes >= 1 "
+                            + "AND RequiredChatMessages >= 1 AND WeeklyDay IS NULL AND WeeklyTime IS NULL) OR "
+                            + "(ScheduleType = 'Weekly' AND IntervalMinutes IS NULL "
+                            + "AND RequiredChatMessages IS NULL AND WeeklyDay BETWEEN 0 AND 6 "
+                            + "AND WeeklyTime IS NOT NULL)"
+                    );
+                }
+            );
+            b.HasKey(x => x.CustomAnnouncementId);
+            b.Property<string>("ScheduleType").HasMaxLength(32);
+            b.HasDiscriminator<string>("ScheduleType")
+                .HasValue<IntervalCustomAnnouncementSchedule>(
+                    IntervalCustomAnnouncementSchedule.Discriminator
+                )
+                .HasValue<IntervalAfterChatCustomAnnouncementSchedule>(
+                    IntervalAfterChatCustomAnnouncementSchedule.Discriminator
+                )
+                .HasValue<WeeklyCustomAnnouncementSchedule>(
+                    WeeklyCustomAnnouncementSchedule.Discriminator
+                );
+        });
+
+        modelBuilder.Entity<IntervalCustomAnnouncementSchedule>(b =>
+            b.Property(x => x.IntervalMinutes).HasColumnName("IntervalMinutes")
+        );
+        modelBuilder.Entity<IntervalAfterChatCustomAnnouncementSchedule>(b =>
+        {
+            b.Property(x => x.IntervalMinutes).HasColumnName("IntervalMinutes");
+            b.Property(x => x.RequiredChatMessages).HasColumnName("RequiredChatMessages");
+        });
+        modelBuilder.Entity<WeeklyCustomAnnouncementSchedule>(b =>
+        {
+            b.Property(x => x.Day).HasColumnName("WeeklyDay");
+            b.Property(x => x.Time).HasColumnName("WeeklyTime");
         });
 
         modelBuilder.Entity<DurableAlert>(b =>
@@ -382,8 +459,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.Severity)
                 .HasConversion(
-                    severity => DurableAlertSeverityStore.Format(severity),
-                    value => DurableAlertSeverityStore.Parse(value)
+                    severity => PersistedEnumTokens<DurableAlertSeverity>.Format(severity),
+                    value => PersistedEnumTokens<DurableAlertSeverity>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.Property(x => x.Source).HasMaxLength(64);
@@ -423,8 +500,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.GiveawayMaximumPayout).HasMaxLength(128);
             b.Property(x => x.GiveawayEligibility)
                 .HasConversion(
-                    mode => PointsEligibilityModeStore.Format(mode),
-                    value => PointsEligibilityModeStore.Parse(value)
+                    mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
+                    value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.Property(x => x.FollowerEligibilityUnavailableReply)
@@ -483,13 +560,18 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 }
             );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            b.Property(x => x.Status)
+                .HasConversion(
+                    status => PersistedEnumTokens<PointsGiveawayStatus>.Format(status),
+                    value => PersistedEnumTokens<PointsGiveawayStatus>.Parse(value)
+                )
+                .HasMaxLength(32);
             b.Property(x => x.MinimumPayout).HasMaxLength(128);
             b.Property(x => x.MaximumPayout).HasMaxLength(128);
             b.Property(x => x.Eligibility)
                 .HasConversion(
-                    mode => PointsEligibilityModeStore.Format(mode),
-                    value => PointsEligibilityModeStore.Parse(value)
+                    mode => PersistedEnumTokens<PointsEligibilityMode>.Format(mode),
+                    value => PersistedEnumTokens<PointsEligibilityMode>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" = 'Active'");
@@ -540,6 +622,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         {
             b.ToTable("guess_round_profiles");
             b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.Slug).HasMaxLength(128);
             b.Property(x => x.WinningGuessPointReward).HasMaxLength(128).HasDefaultValue("0");
@@ -562,7 +645,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     )
             );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            b.Property(x => x.Status)
+                .HasConversion(
+                    status => PersistedEnumTokens<GuessRoundStatus>.Format(status),
+                    value => PersistedEnumTokens<GuessRoundStatus>.Parse(value)
+                )
+                .HasMaxLength(32);
             b.Property(x => x.WinningName).HasMaxLength(128);
             b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"Status\" IN ('Open', 'Closed')");
             b.HasOne<BotHost>()
@@ -589,41 +677,42 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         });
     }
 
-    private static readonly string[] AccessKinds = AccessListEntryKindStore.Values.ToArray();
+    private static readonly string[] AccessKinds =
+        PersistedEnumTokens<AccessListEntryKind>.Values.ToArray();
 
-    private static readonly string[] CommandAliasKinds = AppCommandKindStore.Values.ToArray();
+    private static readonly string[] CommandAliasKinds =
+        PersistedEnumTokens<AppCommandKind>.Values.ToArray();
 
     private static readonly string[] CustomAnnouncementScheduleTypes =
-        CustomAnnouncementScheduleTypeStore.Values.ToArray();
+    [
+        IntervalCustomAnnouncementSchedule.Discriminator,
+        IntervalAfterChatCustomAnnouncementSchedule.Discriminator,
+        WeeklyCustomAnnouncementSchedule.Discriminator,
+    ];
 
     private static readonly string[] CustomCommandActionTypes =
-        CustomCommandActionTypeStore.Values.ToArray();
+    [
+        CounterCustomCommandAction.Discriminator,
+        MessageCustomCommandAction.Discriminator,
+    ];
 
     private static readonly string[] CustomCommandCooldownScopes =
-        CustomCommandCooldownScopeStore.Values.ToArray();
+        PersistedEnumTokens<CustomCommandCooldownScope>.Values.ToArray();
 
     private static readonly string[] CustomMessageSelectionModes =
-        CustomMessageSelectionModeStore.Values.ToArray();
+        PersistedEnumTokens<CustomMessageSelectionMode>.Values.ToArray();
 
     private static readonly string[] DurableAlertSeverities =
-        DurableAlertSeverityStore.Values.ToArray();
+        PersistedEnumTokens<DurableAlertSeverity>.Values.ToArray();
 
-    private static readonly string[] GuessRoundStatusKinds = ["Closed", "Completed", "Open"];
+    private static readonly string[] GuessRoundStatusKinds =
+        PersistedEnumTokens<GuessRoundStatus>.Values.ToArray();
 
     private static readonly string[] PointsEligibilityKinds =
-    [
-        "everyone",
-        "followers",
-        "subscribers",
-    ];
+        PersistedEnumTokens<PointsEligibilityMode>.Values.ToArray();
 
     private static readonly string[] PointsGiveawayStatusKinds =
-    [
-        "Active",
-        "Cancelled",
-        "Completed",
-        "Expired",
-    ];
+        PersistedEnumTokens<PointsGiveawayStatus>.Values.ToArray();
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>
         $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";

@@ -58,6 +58,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandTemplateRenderer>();
         services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
+        services.TryAddSingleton<ICustomAnnouncementTickScheduler, TimeProviderCustomAnnouncementTickScheduler>();
+        services.TryAddSingleton<ICustomAnnouncementSender>(sp =>
+            sp.GetService<ITwitchChatMessageSender>() is { } sender
+                ? new TwitchCustomAnnouncementSender(sender)
+                : new DisabledCustomAnnouncementSender()
+        );
         services.AddSingleton<ITwitchChatMessageObserver, CustomAnnouncementChatActivity>();
         services.AddSingleton<CustomAnnouncementScheduler>();
         services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());

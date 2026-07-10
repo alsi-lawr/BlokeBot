@@ -15,7 +15,10 @@
 <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Custom command settings"
                 Description="Reusable chat replies, counters, scheduled announcements, and command aliases.">
-        <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
+        <button class="btn-primary"
+                aria-label="Save custom command settings"
+                disabled="@(!featureEnabled || config is null)"
+                @onclick="SaveAsync">Save changes</button>
     </PageHeader>
 
     @if (Host is null)
@@ -143,9 +146,11 @@
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Action type</label>
-                                        <select class="input" @bind="command.ActionType">
-                                            @foreach (var action in ActionTypes)
+                                        <label class="label" for="@($"command-{command.Id}-action-kind")">Action type</label>
+                                        <select id="@($"command-{command.Id}-action-kind")"
+                                                class="input"
+                                                @bind="command.ActionKind">
+                                            @foreach (var action in ActionKinds)
                                             {
                                                 <option value="@action">@action</option>
                                             }
@@ -153,23 +158,31 @@
                                     </div>
                                     <div class="space-y-2">
                                         <label class="label">Message entry</label>
-                                        <select class="input" @bind="command.MessageLibraryEntryId">
+                                        <select class="input" @bind="command.Action.MessageLibraryEntryId">
                                             @foreach (var entry in config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
                                         </select>
                                     </div>
-                                    <div class="space-y-2 md:col-span-2">
-                                        <label class="label">Counter</label>
-                                        <select class="input" @bind="command.CounterId">
-                                            <option value="">None</option>
-                                            @foreach (var counter in config.Counters)
-                                            {
-                                                <option value="@counter.Id">@counter.Name</option>
-                                            }
-                                        </select>
-                                    </div>
+                                    @if (command.Action is CounterCustomCommandActionEditor counterAction)
+                                    {
+                                        <div class="space-y-2 md:col-span-2">
+                                            <label class="label" for="@($"command-{command.Id}-counter-id")">Counter</label>
+                                            <select id="@($"command-{command.Id}-counter-id")"
+                                                    class="input"
+                                                    @bind="counterAction.CounterId">
+                                                @if (config.Counters.Count == 0)
+                                                {
+                                                    <option value="0">No counters available</option>
+                                                }
+                                                @foreach (var counter in config.Counters)
+                                                {
+                                                    <option value="@counter.Id">@counter.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+                                    }
                                 </div>
                             </div>
                         }
@@ -208,7 +221,9 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Announcements" Description="Saved announcement configuration. Sending is handled separately." InitiallyOpen="false">
+        <CollapsibleSection Title="Announcements"
+                            Description="Saved announcement configuration. Sending is handled separately."
+                            InitiallyOpen="false">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@config.Announcements.Count announcements</p>
@@ -244,39 +259,58 @@
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Schedule type</label>
-                                        <select class="input" @bind="announcement.ScheduleType">
-                                            @foreach (var type in AnnouncementScheduleTypes)
+                                        <label class="label" for="@($"announcement-{announcement.Id}-schedule-kind")">Schedule type</label>
+                                        <select id="@($"announcement-{announcement.Id}-schedule-kind")"
+                                                class="input"
+                                                @bind="announcement.ScheduleKind">
+                                            @foreach (var type in AnnouncementScheduleKinds)
                                             {
                                                 <option value="@type">@type</option>
                                             }
                                         </select>
                                     </div>
-                                    <div class="space-y-2">
-                                        <label class="label">Interval minutes</label>
-                                        <input class="input" type="number" min="1" @bind="announcement.IntervalMinutes" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label">Required chat messages</label>
-                                        <input class="input" type="number" min="0" @bind="announcement.RequiredChatMessages" />
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label">Weekly day</label>
-                                        <select class="input" value="@announcement.WeeklyDay?.ToString()" @onchange="args => SetWeeklyDay(announcement, args)">
-                                            <option value="">None</option>
-                                            @foreach (var day in DaysOfWeek)
-                                            {
-                                                <option value="@day">@day</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label">Weekly time</label>
-                                        <input class="input"
-                                               type="time"
-                                               value="@announcement.WeeklyTime"
-                                               @oninput="args => announcement.WeeklyTime = args.Value?.ToString() ?? string.Empty" />
-                                    </div>
+                                    @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
+                                    {
+                                        <div class="space-y-2">
+                                            <label class="label">Interval minutes</label>
+                                            <input class="input" type="number" min="1" @bind="interval.IntervalMinutes" />
+                                        </div>
+                                    }
+                                    else if (announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
+                                    {
+                                        <div class="space-y-2">
+                                            <label class="label" for="@($"announcement-{announcement.Id}-interval-minutes")">Interval minutes</label>
+                                            <input id="@($"announcement-{announcement.Id}-interval-minutes")"
+                                                   class="input"
+                                                   type="number"
+                                                   min="1"
+                                                   @bind="intervalAfterChat.IntervalMinutes" />
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="label" for="@($"announcement-{announcement.Id}-required-chat-messages")">Required chat messages</label>
+                                            <input id="@($"announcement-{announcement.Id}-required-chat-messages")"
+                                                   class="input"
+                                                   type="number"
+                                                   min="1"
+                                                   @bind="intervalAfterChat.RequiredChatMessages" />
+                                        </div>
+                                    }
+                                    else if (announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
+                                    {
+                                        <div class="space-y-2">
+                                            <label class="label">Weekly day</label>
+                                            <select class="input" @bind="weekly.Day">
+                                                @foreach (var day in DaysOfWeek)
+                                                {
+                                                    <option value="@day">@day</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <label class="label">Weekly time</label>
+                                            <input class="input" type="time" @bind="weekly.Time" />
+                                        </div>
+                                    }
                                     <div class="surface-row rounded-lg px-3 py-2">
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
                                         <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>

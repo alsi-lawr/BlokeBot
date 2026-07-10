@@ -30,11 +30,13 @@ public sealed class CustomAnnouncementChatActivity(
         if (host is null || !HasCustomCommands(host.EnabledFeatures))
             return;
 
+        var intervalAfterChatIds = db
+            .CustomAnnouncementSchedules.OfType<IntervalAfterChatCustomAnnouncementSchedule>()
+            .Where(x => x.HostId == host.Id)
+            .Select(x => x.CustomAnnouncementId);
         var announcements = await db
             .CustomAnnouncements.Where(x =>
-                x.HostId == host.Id
-                && x.Enabled
-                && x.ScheduleType == CustomAnnouncementScheduleType.IntervalAfterChat
+                x.HostId == host.Id && x.Enabled && intervalAfterChatIds.Contains(x.Id)
             )
             .ToListAsync(cancellationToken);
         if (announcements.Count == 0)

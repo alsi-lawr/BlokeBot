@@ -168,7 +168,7 @@ public sealed class CustomCommandExecutionTests
             hostId,
             "death",
             ["Count {count} {user}"],
-            actionType: CustomCommandActionType.Counter,
+            counterCommand: true,
             counterValue: 41
         );
         await using var services = BuildServices(dbFactory);
@@ -287,7 +287,7 @@ public sealed class CustomCommandExecutionTests
         bool moderatorOnly = false,
         int cooldownSeconds = 0,
         CustomCommandCooldownScope cooldownScope = CustomCommandCooldownScope.Global,
-        CustomCommandActionType actionType = CustomCommandActionType.Message,
+        bool counterCommand = false,
         long? counterValue = null
     )
     {
@@ -311,7 +311,7 @@ public sealed class CustomCommandExecutionTests
         db.CustomMessageLibraryEntries.Add(entry);
 
         CustomCounter? counter = null;
-        if (actionType == CustomCommandActionType.Counter)
+        if (counterCommand)
         {
             counter = new CustomCounter
             {
@@ -333,9 +333,18 @@ public sealed class CustomCommandExecutionTests
             ModeratorOnly = moderatorOnly,
             CooldownSeconds = cooldownSeconds,
             CooldownScope = cooldownScope,
-            ActionType = actionType,
-            MessageLibraryEntryId = entry.Id,
-            CounterId = counter?.Id,
+            Action = counter is null
+                ? new MessageCustomCommandAction
+                {
+                    HostId = hostId,
+                    MessageLibraryEntryId = entry.Id,
+                }
+                : new CounterCustomCommandAction
+                {
+                    HostId = hostId,
+                    MessageLibraryEntryId = entry.Id,
+                    CounterId = counter.Id,
+                },
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };

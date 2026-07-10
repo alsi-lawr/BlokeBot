@@ -17,19 +17,11 @@ public sealed class CustomCommand
     public CustomCommandCooldownScope CooldownScope { get; set; } =
         CustomCommandCooldownScope.Global;
 
-    public CustomCommandActionType ActionType { get; set; } = CustomCommandActionType.Message;
-
-    public int MessageLibraryEntryId { get; set; }
-
-    public int? CounterId { get; set; }
-
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 
-    public CustomMessageLibraryEntry? MessageLibraryEntry { get; set; }
-
-    public CustomCounter? Counter { get; set; }
+    public CustomCommandAction Action { get; set; } = null!;
 
     public List<CustomCommandAlias> Aliases { get; set; } = [];
 }

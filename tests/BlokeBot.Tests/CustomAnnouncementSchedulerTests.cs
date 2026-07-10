@@ -2,7 +2,6 @@ using BlokeBot.Features.CustomCommands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -22,10 +21,9 @@ public sealed class CustomAnnouncementSchedulerTests
         var seed = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
-            CustomAnnouncementScheduleType.Interval,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
             ["First", "Second"],
-            createdAtUtc: now.AddMinutes(-31).UtcDateTime,
-            intervalMinutes: 30
+            createdAtUtc: now.AddMinutes(-31).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -55,11 +53,13 @@ public sealed class CustomAnnouncementSchedulerTests
         var seed = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
-            CustomAnnouncementScheduleType.IntervalAfterChat,
+            new IntervalAfterChatCustomAnnouncementSchedule
+            {
+                IntervalMinutes = 30,
+                RequiredChatMessages = 2,
+            },
             ["After chat"],
-            createdAtUtc: now.AddHours(-1).UtcDateTime,
-            intervalMinutes: 30,
-            requiredChatMessages: 2
+            createdAtUtc: now.AddHours(-1).UtcDateTime
         );
         var activity = new CustomAnnouncementChatActivity(dbFactory, clock);
         var sender = new RecordingChatMessageSender();
@@ -105,11 +105,13 @@ public sealed class CustomAnnouncementSchedulerTests
         await SeedAnnouncementAsync(
             dbFactory,
             hostId,
-            CustomAnnouncementScheduleType.Weekly,
+            new WeeklyCustomAnnouncementSchedule
+            {
+                Day = DayOfWeek.Saturday,
+                Time = new TimeOnly(0, 0),
+            },
             ["Weekly"],
-            createdAtUtc: now.AddDays(-7).UtcDateTime,
-            weeklyDay: DayOfWeek.Saturday,
-            weeklyTime: new TimeOnly(0, 0)
+            createdAtUtc: now.AddDays(-7).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -140,11 +142,13 @@ public sealed class CustomAnnouncementSchedulerTests
         await SeedAnnouncementAsync(
             dbFactory,
             hostId,
-            CustomAnnouncementScheduleType.Weekly,
+            new WeeklyCustomAnnouncementSchedule
+            {
+                Day = DayOfWeek.Saturday,
+                Time = new TimeOnly(0, 0),
+            },
             ["Weekly"],
-            createdAtUtc: missedAt.AddDays(-7).UtcDateTime,
-            weeklyDay: DayOfWeek.Saturday,
-            weeklyTime: new TimeOnly(0, 0)
+            createdAtUtc: missedAt.AddDays(-7).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -177,16 +181,154 @@ public sealed class CustomAnnouncementSchedulerTests
         await SeedAnnouncementAsync(
             dbFactory,
             stoppedHostId,
-            CustomAnnouncementScheduleType.Interval,
+            new IntervalCustomAnnouncementSchedule(),
             ["Stopped"],
             createdAtUtc: now.AddHours(-1).UtcDateTime
         );
         await SeedAnnouncementAsync(
             dbFactory,
             disabledHostId,
-            CustomAnnouncementScheduleType.Interval,
+            new IntervalCustomAnnouncementSchedule(),
             ["Disabled"],
             createdAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var sender = new RecordingChatMessageSender();
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task Due_announcement_is_not_advanced_when_sender_is_disabled()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Message"],
+            now.AddHours(-1).UtcDateTime
+        );
+        var scheduler = CreateScheduler(
+            dbFactory,
+            clock,
+            new DisabledCustomAnnouncementSender()
+        );
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var announcement = await db.CustomAnnouncements.SingleAsync(x =>
+            x.Id == seed.AnnouncementId
+        );
+        announcement.LastSentAtUtc.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Blank_announcement_message_is_not_sent_or_advanced()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["   "],
+            now.AddHours(-1).UtcDateTime
+        );
+        var sender = new RecordingChatMessageSender();
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBeEmpty();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var announcement = await db.CustomAnnouncements.SingleAsync(x =>
+            x.Id == seed.AnnouncementId
+        );
+        announcement.LastSentAtUtc.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Sender_failure_does_not_block_other_channels()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var firstHostId = await SeedHostAsync(
+            dbFactory,
+            "first",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var secondHostId = await SeedHostAsync(
+            dbFactory,
+            "second",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var first = await SeedAnnouncementAsync(
+            dbFactory,
+            firstHostId,
+            new IntervalCustomAnnouncementSchedule(),
+            ["First"],
+            now.AddHours(-1).UtcDateTime
+        );
+        var second = await SeedAnnouncementAsync(
+            dbFactory,
+            secondHostId,
+            new IntervalCustomAnnouncementSchedule(),
+            ["Second"],
+            now.AddHours(-1).UtcDateTime
+        );
+        var sender = new FailingChannelSender("first");
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBe([new SentChatMessage("second", "Second")]);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomAnnouncements.FindAsync(first.AnnouncementId))!
+            .LastSentAtUtc.ShouldBeNull();
+        (await db.CustomAnnouncements.FindAsync(second.AnnouncementId))!
+            .LastSentAtUtc.ShouldBe(now.UtcDateTime);
+    }
+
+    [Test]
+    public async Task Weekly_announcement_skips_invalid_dst_local_time()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 3, 29, 1, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            timeZoneId: "Europe/London",
+            changedAtUtc: now.AddHours(-2).UtcDateTime
+        );
+        await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new WeeklyCustomAnnouncementSchedule
+            {
+                Day = DayOfWeek.Sunday,
+                Time = new TimeOnly(1, 30),
+            },
+            ["DST"],
+            now.AddDays(-7).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -199,13 +341,13 @@ public sealed class CustomAnnouncementSchedulerTests
     private static CustomAnnouncementScheduler CreateScheduler(
         SqliteBlokeBotDbFactory dbFactory,
         TimeProvider clock,
-        ITwitchChatMessageSender sender
+        ICustomAnnouncementSender sender
     )
     {
-        var services = new ServiceCollection().AddSingleton(sender).BuildServiceProvider();
         return new CustomAnnouncementScheduler(
             dbFactory,
-            services,
+            sender,
+            new TimeProviderCustomAnnouncementTickScheduler(clock),
             new CustomMessageSelector(clock),
             Options.Create(
                 new BlokeBotOptions
@@ -216,7 +358,6 @@ public sealed class CustomAnnouncementSchedulerTests
                     },
                 }
             ),
-            clock,
             NullLogger<CustomAnnouncementScheduler>.Instance
         );
     }
@@ -249,13 +390,9 @@ public sealed class CustomAnnouncementSchedulerTests
     private static async Task<AnnouncementSeed> SeedAnnouncementAsync(
         SqliteBlokeBotDbFactory dbFactory,
         int hostId,
-        CustomAnnouncementScheduleType scheduleType,
+        CustomAnnouncementSchedule schedule,
         string[] variants,
-        DateTime createdAtUtc,
-        int intervalMinutes = 30,
-        int requiredChatMessages = 0,
-        DayOfWeek? weeklyDay = null,
-        TimeOnly? weeklyTime = null
+        DateTime createdAtUtc
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -277,17 +414,15 @@ public sealed class CustomAnnouncementSchedulerTests
         db.CustomMessageLibraryEntries.Add(entry);
         await db.SaveChangesAsync();
 
+        schedule.HostId = hostId;
+
         var announcement = new CustomAnnouncement
         {
             HostId = hostId,
             Name = $"announcement-{Guid.NewGuid():N}",
             Enabled = true,
             MessageLibraryEntryId = entry.Id,
-            ScheduleType = scheduleType,
-            IntervalMinutes = intervalMinutes,
-            RequiredChatMessages = requiredChatMessages,
-            WeeklyDay = weeklyDay,
-            WeeklyTime = weeklyTime,
+            Schedule = schedule,
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
         };
@@ -303,9 +438,11 @@ public sealed class CustomAnnouncementSchedulerTests
 
     private sealed record SentChatMessage(string Channel, string Message);
 
-    private sealed class RecordingChatMessageSender : ITwitchChatMessageSender
+    private sealed class RecordingChatMessageSender : ICustomAnnouncementSender
     {
         public List<SentChatMessage> Messages { get; } = [];
+
+        public bool IsEnabled => true;
 
         public Task SendAsync(
             string channel,
@@ -313,6 +450,27 @@ public sealed class CustomAnnouncementSchedulerTests
             CancellationToken cancellationToken
         )
         {
+            Messages.Add(new SentChatMessage(channel, message));
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FailingChannelSender(string failingChannel)
+        : ICustomAnnouncementSender
+    {
+        public List<SentChatMessage> Messages { get; } = [];
+
+        public bool IsEnabled => true;
+
+        public Task SendAsync(
+            string channel,
+            string message,
+            CancellationToken cancellationToken
+        )
+        {
+            if (channel == failingChannel)
+                throw new InvalidOperationException("Send failed.");
+
             Messages.Add(new SentChatMessage(channel, message));
             return Task.CompletedTask;
         }

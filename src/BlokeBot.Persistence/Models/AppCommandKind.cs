@@ -2,46 +2,45 @@ namespace BlokeBot.Persistence.Models;
 
 public enum AppCommandKind
 {
+    [PersistedToken("Start")]
     Start,
+
+    [PersistedToken("Stop")]
     Stop,
+
+    [PersistedToken("Win")]
     Win,
+
+    [PersistedToken("Guess")]
     Guess,
+
+    [PersistedToken("Guesses")]
     Guesses,
+
+    [PersistedToken("Points")]
     Points,
+
+    [PersistedToken("GivePoints")]
     GivePoints,
+
+    [PersistedToken("AddPoints")]
     AddPoints,
+
+    [PersistedToken("RemovePoints")]
     RemovePoints,
+
+    [PersistedToken("Gamble")]
     Gamble,
+
+    [PersistedToken("Giveaway")]
     Giveaway,
+
+    [PersistedToken("Join")]
     Join,
+
+    [PersistedToken("EndGiveaway")]
     EndGiveaway,
+
+    [PersistedToken("CancelGiveaway")]
     CancelGiveaway,
-}
-
-public static class AppCommandKindStore
-{
-    public static IReadOnlyList<string> Values { get; } =
-    [
-        Format(AppCommandKind.AddPoints),
-        Format(AppCommandKind.CancelGiveaway),
-        Format(AppCommandKind.EndGiveaway),
-        Format(AppCommandKind.Gamble),
-        Format(AppCommandKind.Giveaway),
-        Format(AppCommandKind.GivePoints),
-        Format(AppCommandKind.Guess),
-        Format(AppCommandKind.Guesses),
-        Format(AppCommandKind.Join),
-        Format(AppCommandKind.Points),
-        Format(AppCommandKind.RemovePoints),
-        Format(AppCommandKind.Start),
-        Format(AppCommandKind.Stop),
-        Format(AppCommandKind.Win),
-    ];
-
-    public static string Format(AppCommandKind kind) => kind.ToString();
-
-    public static AppCommandKind Parse(string value) =>
-        Enum.TryParse<AppCommandKind>(value, ignoreCase: true, out var kind)
-            ? kind
-            : throw new FormatException($"Unknown app command kind '{value}'.");
 }

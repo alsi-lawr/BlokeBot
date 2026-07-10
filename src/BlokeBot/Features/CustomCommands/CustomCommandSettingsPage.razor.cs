@@ -12,10 +12,10 @@ public partial class CustomCommandSettingsPage
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> CooldownScopes =
         Enum.GetValues<CustomCommandCooldownScope>();
-    private static readonly IReadOnlyList<CustomCommandActionType> ActionTypes =
-        Enum.GetValues<CustomCommandActionType>();
-    private static readonly IReadOnlyList<CustomAnnouncementScheduleType> AnnouncementScheduleTypes =
-        Enum.GetValues<CustomAnnouncementScheduleType>();
+    private static readonly IReadOnlyList<CustomCommandActionKind> ActionKinds =
+        Enum.GetValues<CustomCommandActionKind>();
+    private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> AnnouncementScheduleKinds =
+        Enum.GetValues<CustomAnnouncementScheduleKind>();
     private static readonly IReadOnlyList<DayOfWeek> DaysOfWeek = Enum.GetValues<DayOfWeek>();
     private static readonly IReadOnlyList<TimeZoneInfo> TimeZones =
         TimeZoneInfo.GetSystemTimeZones();
@@ -100,7 +100,7 @@ public partial class CustomCommandSettingsPage
             return;
 
         if (
-            config.Commands.Any(x => x.MessageLibraryEntryId == entry.Id)
+            config.Commands.Any(x => x.Action.MessageLibraryEntryId == entry.Id)
             || config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
@@ -165,7 +165,10 @@ public partial class CustomCommandSettingsPage
                 Id = NextTemporaryId(),
                 Name = "New command",
                 Aliases = "newcommand",
-                MessageLibraryEntryId = config.MessageEntries[0].Id,
+                Action = new MessageCustomCommandActionEditor
+                {
+                    MessageLibraryEntryId = config.MessageEntries[0].Id,
+                },
             }
         );
     }
@@ -194,7 +197,12 @@ public partial class CustomCommandSettingsPage
         if (config is null)
             return;
 
-        if (config.Commands.Any(x => x.CounterId == counter.Id))
+        if (
+            config.Commands.Any(x =>
+                x.Action is CounterCustomCommandActionEditor action
+                && action.CounterId == counter.Id
+            )
+        )
         {
             Toasts.Warning("Counters used by commands cannot be deleted.");
             return;
@@ -214,7 +222,10 @@ public partial class CustomCommandSettingsPage
                 Id = NextTemporaryId(),
                 Name = "New announcement",
                 MessageLibraryEntryId = config.MessageEntries[0].Id,
-                IntervalMinutes = 30,
+                Schedule = new IntervalCustomAnnouncementScheduleEditor
+                {
+                    IntervalMinutes = 30,
+                },
             }
         );
     }
@@ -222,19 +233,6 @@ public partial class CustomCommandSettingsPage
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
     {
         config?.Announcements.Remove(announcement);
-    }
-
-    private static void SetWeeklyDay(
-        CustomAnnouncementEditor announcement,
-        ChangeEventArgs args
-    )
-    {
-        announcement.WeeklyDay = Enum.TryParse<DayOfWeek>(
-            args.Value?.ToString(),
-            out var day
-        )
-            ? day
-            : null;
     }
 
     private int NextTemporaryId() => nextTemporaryId--;
