@@ -130,6 +130,27 @@ public partial class HostConfigPage
             _ => "Bot stopped.",
         };
 
+    private string StartRuntimeTooltip =>
+        CanStart ? "Start the bot runtime for this channel." : StartRuntimeDisabledTooltip;
+
+    private string StopRuntimeTooltip =>
+        CanStop ? "Stop the bot runtime for this channel." : StopRuntimeDisabledTooltip;
+
+    private string StartRuntimeDisabledTooltip =>
+        state is null ? "Load the channel before starting the bot runtime."
+        : state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot runtime."
+        : state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
+            ? "Reconnect the channel before starting the bot runtime."
+        : !BotAccountCanStart ? "Connect the custom bot account before starting the bot runtime."
+        : state.RuntimeStatus?.RuntimeState is not BotChannelRuntimeState.Stopped
+            ? "The bot runtime can only be started while stopped."
+        : "The bot runtime cannot be started right now.";
+
+    private string StopRuntimeDisabledTooltip =>
+        state?.RuntimeStatus?.RuntimeState is BotChannelRuntimeState.Stopping
+            ? "The bot runtime is already stopping."
+            : "The bot runtime can only be stopped while started or starting.";
+
     private bool BotAccountCanStart =>
         state?.BotOverride.Enabled != true
         || state.BotOverride.Status.State == BotAccountAuthorizationState.Ready;
