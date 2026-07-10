@@ -58,17 +58,6 @@ public partial class NavMenu
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
-    [Parameter]
-    public bool Compact { get; set; }
-
-    [Parameter]
-    public bool ShowBrand { get; set; } = true;
-
-    private string RootClass => Compact ? "nav-menu flex flex-col" : "nav-menu flex h-full flex-col";
-
-    private string NavigationClass =>
-        Compact ? "flex flex-col gap-3 px-3 py-4" : "flex flex-1 flex-col gap-3 px-3 py-4";
-
     protected override async Task OnInitializedAsync()
     {
         hostedChannelSubscription = Events.SubscribeForComponentRefresh(
