@@ -11,6 +11,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Commands;
+using BlokeBot.Features.CustomCommands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Configuration;
 using BlokeBot.Features.Guessing.Game;
@@ -138,7 +139,8 @@ if (botRuntimeConfigured)
     builder
         .Services.AddTwitchBot(botSection)
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
-        .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>();
+        .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
+        .AddCommandModule<CustomCommandModule>();
 }
 builder.Services.TryAddSingleton<ITwitchBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
 

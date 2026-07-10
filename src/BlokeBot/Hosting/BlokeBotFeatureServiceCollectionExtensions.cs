@@ -52,8 +52,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotCustomCommands(this IServiceCollection services)
     {
         services.AddSingleton<CustomCommandAliasRegistry>();
+        services.AddSingleton<CustomCommandCooldownStore>();
+        services.AddSingleton<CustomCommandExecutionService>();
+        services.AddSingleton<CustomCommandTemplateRenderer>();
         services.AddSingleton<HostCustomCommandSettingsService>();
         services.AddSingleton<DurableAlertService>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 
