@@ -52,12 +52,16 @@ public sealed class OutboundMessageQueueTests
     [Test]
     public async Task Duplicate_messages_wait_without_blocking_different_messages()
     {
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
         var queue = CreateQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 1,
-            }
+            },
+            clock
         );
         List<string> sent = [];
 
@@ -65,10 +69,11 @@ public sealed class OutboundMessageQueueTests
         var duplicate = queue.SendAsync("channel", "same", SendAsync, CancellationToken.None);
         var different = queue.SendAsync("channel", "different", SendAsync, CancellationToken.None);
 
-        var completed = await Task.WhenAny(different, Task.Delay(TimeSpan.FromMilliseconds(250)));
-        completed.ShouldBe(different);
+        await different;
         duplicate.IsCompleted.ShouldBeFalse();
 
+        await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(1));
         await duplicate;
         sent.ShouldBe(["same", "different", "same"]);
         return;
@@ -106,7 +111,7 @@ public sealed class OutboundMessageQueueTests
         var second = queue.SendAsync("channel", "second", SendAsync, CancellationToken.None);
         var third = queue.SendAsync("channel", "third", SendAsync, CancellationToken.None);
 
-        await LetProcessorRunAsync();
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         await observer.WaitForCountAsync(1);
 
@@ -114,19 +119,21 @@ public sealed class OutboundMessageQueueTests
         observer.Alerts[0].OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));
         observer.Alerts[0].PendingCount.ShouldBeGreaterThanOrEqualTo(1);
 
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await second.WaitAsync(TimeSpan.FromSeconds(2));
-        await LetProcessorRunAsync();
+        await second;
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(10));
-        await third.WaitAsync(TimeSpan.FromSeconds(2));
+        await third;
         observer.Alerts.Count.ShouldBe(1);
 
         var fourth = queue.SendAsync("channel", "fourth", SendAsync, CancellationToken.None);
-        await LetProcessorRunAsync();
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         await observer.WaitForCountAsync(2);
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await fourth.WaitAsync(TimeSpan.FromSeconds(2));
+        await fourth;
 
         sent.ShouldBe(["first", "second", "third", "fourth"]);
         return;
@@ -138,6 +145,79 @@ public sealed class OutboundMessageQueueTests
         }
     }
 
+    [Test]
+    public void Duplicate_cooldown_expires_at_boundary_and_prunes_stale_entries()
+    {
+        var cooldown = new TwitchOutboundDuplicateCooldown();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var first = new TwitchOutboundChatMessage("first", "same");
+        var second = new TwitchOutboundChatMessage("second", "same");
+        cooldown.RecordSent(first, now, TimeSpan.FromSeconds(5));
+        cooldown.RecordSent(second, now, TimeSpan.FromSeconds(5));
+        cooldown.EntryCount.ShouldBe(2);
+
+        cooldown
+            .NextAllowedAt(first, now.AddSeconds(4), TimeSpan.FromSeconds(5))
+            .ShouldBe(now.AddSeconds(5));
+        cooldown
+            .NextAllowedAt(first, now.AddSeconds(5), TimeSpan.FromSeconds(5))
+            .ShouldBe(now.AddSeconds(5));
+        cooldown.EntryCount.ShouldBe(0);
+    }
+
+    [Test]
+    public void Backlog_monitor_tracks_channels_independently_and_resets_after_drain()
+    {
+        var monitor = new TwitchOutboundQueueBacklogMonitor();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 10, TimeSpan.Zero);
+        TwitchOutboundPendingState[] pending =
+        [
+            new("first", now.AddSeconds(-10)),
+            new("first", now.AddSeconds(-6)),
+            new("second", now.AddSeconds(-7)),
+        ];
+
+        var firstIncidents = monitor.CaptureAlerts(
+            pending,
+            now,
+            TimeSpan.FromSeconds(5),
+            enabled: true
+        );
+        firstIncidents.Select(x => x.Channel).ShouldBe(["first", "second"]);
+        monitor
+            .CaptureAlerts(pending, now, TimeSpan.FromSeconds(5), enabled: true)
+            .ShouldBeEmpty();
+
+        monitor.ResetDrainedChannels([new("second", now)]);
+        var nextFirstIncident = monitor.CaptureAlerts(
+            [new("first", now.AddSeconds(-5)), new("second", now.AddSeconds(-5))],
+            now,
+            TimeSpan.FromSeconds(5),
+            enabled: true
+        );
+        nextFirstIncident.Select(x => x.Channel).ShouldBe(["first"]);
+    }
+
+    [Test]
+    public async Task Alert_dispatcher_contains_observer_failure()
+    {
+        var recording = new RecordingQueueAlertObserver();
+        var dispatcher = new TwitchOutboundQueueAlertDispatcher(
+            [new ThrowingQueueAlertObserver(), recording],
+            NullLogger<TwitchOutboundQueueAlertDispatcher>.Instance
+        );
+        var alert = new TwitchOutboundQueueBacklog(
+            "channel",
+            2,
+            TimeSpan.FromSeconds(5),
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+
+        await dispatcher.NotifyAsync([alert]);
+
+        recording.Alerts.ShouldBe([alert]);
+    }
+
     private static TwitchOutboundMessageQueue CreateQueue(
         TwitchBotOptions options,
         TimeProvider? timeProvider = null,
@@ -146,15 +226,14 @@ public sealed class OutboundMessageQueueTests
         new(
             Options.Create(options),
             timeProvider ?? TimeProvider.System,
-            observers ?? [],
+            new TwitchOutboundDuplicateCooldown(),
+            new TwitchOutboundQueueBacklogMonitor(),
+            new TwitchOutboundQueueAlertDispatcher(
+                observers ?? [],
+                NullLogger<TwitchOutboundQueueAlertDispatcher>.Instance
+            ),
             NullLogger<TwitchOutboundMessageQueue>.Instance
         );
-
-    private static async Task LetProcessorRunAsync()
-    {
-        await Task.Yield();
-        await Task.Delay(1);
-    }
 
     private sealed class RecordingQueueAlertObserver : ITwitchOutboundQueueAlertObserver
     {
@@ -188,9 +267,17 @@ public sealed class OutboundMessageQueueTests
 
                 waiterTarget = count;
                 waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                return waiter.Task.WaitAsync(TimeSpan.FromSeconds(2));
+                return waiter.Task;
             }
         }
+    }
+
+    private sealed class ThrowingQueueAlertObserver : ITwitchOutboundQueueAlertObserver
+    {
+        public ValueTask QueueBackedUpAsync(
+            TwitchOutboundQueueBacklog backlog,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Observer failed.");
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset initialNow) : TimeProvider
@@ -198,6 +285,7 @@ public sealed class OutboundMessageQueueTests
         private readonly object gate = new();
         private readonly List<ManualTimer> timers = [];
         private DateTimeOffset now = initialNow;
+        private TaskCompletionSource? timerWaiter;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -234,12 +322,28 @@ public sealed class OutboundMessageQueueTests
                 timer.Fire();
         }
 
+        public Task WaitForTimerRegistrationAsync()
+        {
+            lock (gate)
+            {
+                if (timers.Count > 0)
+                    return Task.CompletedTask;
+
+                timerWaiter = new TaskCompletionSource(
+                    TaskCreationOptions.RunContinuationsAsynchronously
+                );
+                return timerWaiter.Task;
+            }
+        }
+
         private void AddTimer(ManualTimer timer)
         {
             lock (gate)
             {
                 if (!timers.Contains(timer))
                     timers.Add(timer);
+                timerWaiter?.TrySetResult();
+                timerWaiter = null;
             }
         }
 
@@ -324,7 +428,7 @@ public sealed class OutboundMessageQueueTests
                     }
                 }
 
-                ThreadPool.QueueUserWorkItem(_ => callback(state));
+                callback(state);
             }
         }
     }

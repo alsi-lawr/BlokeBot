@@ -6,7 +6,16 @@ namespace BlokeBot.Features.CustomCommands;
 public sealed class CustomCommandCooldownStore(TimeProvider clock)
 {
     private readonly object gate = new();
-    private readonly Dictionary<CooldownKey, DateTimeOffset> lastUses = [];
+    private readonly Dictionary<CooldownKey, DateTimeOffset> blockedUntil = [];
+
+    internal int EntryCount
+    {
+        get
+        {
+            lock (gate)
+                return blockedUntil.Count;
+        }
+    }
 
     public bool TryRecord(
         int commandId,
@@ -15,25 +24,37 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
         TimeSpan cooldown
     )
     {
-        if (cooldown <= TimeSpan.Zero)
-            return true;
-
-        var key = new CooldownKey(
-            commandId,
-            scope == CustomCommandCooldownScope.User
-                ? TwitchLogin.Normalize(userLogin)
-                : string.Empty
-        );
         var now = clock.GetUtcNow();
 
         lock (gate)
         {
-            if (lastUses.TryGetValue(key, out var lastUse) && now - lastUse < cooldown)
+            PruneExpired(now);
+            if (cooldown <= TimeSpan.Zero)
+                return true;
+
+            var key = new CooldownKey(
+                commandId,
+                scope == CustomCommandCooldownScope.User
+                    ? TwitchLogin.Normalize(userLogin)
+                    : string.Empty
+            );
+            if (blockedUntil.TryGetValue(key, out var expiry) && expiry > now)
                 return false;
 
-            lastUses[key] = now;
+            blockedUntil[key] = now + cooldown;
             return true;
         }
+    }
+
+    private void PruneExpired(DateTimeOffset now)
+    {
+        foreach (
+            var key in blockedUntil
+                .Where(pair => pair.Value <= now)
+                .Select(pair => pair.Key)
+                .ToArray()
+        )
+            blockedUntil.Remove(key);
     }
 
     private readonly record struct CooldownKey(int CommandId, string UserLogin);
