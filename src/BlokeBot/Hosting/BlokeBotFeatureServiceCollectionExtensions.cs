@@ -55,6 +55,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandCooldownStore>();
         services.AddSingleton<CustomCommandExecutionService>();
         services.AddSingleton<CustomCommandTemplateRenderer>();
+        services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
         services.AddSingleton<DurableAlertService>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);

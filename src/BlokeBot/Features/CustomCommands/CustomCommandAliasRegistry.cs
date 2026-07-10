@@ -12,6 +12,21 @@ public sealed class CustomCommandAliasRegistry
         int? commandId,
         string aliases,
         CancellationToken ct
+    ) =>
+        await ValidateExcludingCommandsAsync(
+            db,
+            hostId,
+            commandId is { } id ? new HashSet<int> { id } : new HashSet<int>(),
+            aliases,
+            ct
+        );
+
+    public async Task<string[]> ValidateExcludingCommandsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        IReadOnlySet<int> excludedCommandIds,
+        string aliases,
+        CancellationToken ct
     )
     {
         var normalized = CommandAliasNormalizer.Split(aliases).ToArray();
@@ -40,7 +55,7 @@ public sealed class CustomCommandAliasRegistry
             .Where(x =>
                 x.HostId == hostId
                 && normalized.Contains(x.Alias)
-                && (commandId == null || x.CustomCommandId != commandId.Value)
+                && !excludedCommandIds.Contains(x.CustomCommandId)
             )
             .Select(x => x.Alias)
             .FirstOrDefaultAsync(ct);

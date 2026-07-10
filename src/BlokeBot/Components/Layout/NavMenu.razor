@@ -27,7 +27,8 @@
                     var showHostConfig = session.CanOpenHostConfig(existingHostIds);
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
-                    var showBotFunctions = showGuessing || showPoints;
+                    var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
+                    var showBotFunctions = showGuessing || showPoints || showCustomCommands;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -151,6 +152,33 @@
                 <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
                          ActiveClass="nav-menu__item-active"
                          href="points/settings"
+                         @onclick="NotifyNavigatedAsync">
+                    Settings
+                </NavLink>
+            </div>
+        </details>
+        }
+        @if (showCustomCommands)
+        {
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="custom-commands" open="@customCommandsOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleCustomCommandsAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700">
+                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h16" />
+                        <path d="M4 12h10" />
+                        <path d="M4 17h7" />
+                        <path d="m16 14 3 3-3 3" />
+                    </svg>
+                </span>
+                <span class="min-w-0 flex-1">Custom commands</span>
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="custom-commands/settings"
                          @onclick="NotifyNavigatedAsync">
                     Settings
                 </NavLink>

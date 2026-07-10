@@ -46,9 +46,11 @@ public partial class NavMenu
 {
     private const string GuessingOpenStorageKey = "blokebot.sidebar.guessing.open";
     private const string PointsOpenStorageKey = "blokebot.sidebar.points.open";
+    private const string CustomCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
 
     private bool guessingOpen = true;
     private bool pointsOpen = true;
+    private bool customCommandsOpen = true;
     private IDisposable? hostedChannelSubscription;
     private IReadOnlyDictionary<int, HostFeatureFlags> hostedFeatures =
         new Dictionary<int, HostFeatureFlags>();
@@ -86,6 +88,11 @@ public partial class NavMenu
                 true
             );
             pointsOpen = await module.InvokeAsync<bool>("readBoolean", PointsOpenStorageKey, true);
+            customCommandsOpen = await module.InvokeAsync<bool>(
+                "readBoolean",
+                CustomCommandsOpenStorageKey,
+                true
+            );
             StateHasChanged();
         }
         catch (JSDisconnectedException) { }
@@ -119,6 +126,17 @@ public partial class NavMenu
         pointsOpen = !pointsOpen;
         if (module is not null)
             await module.InvokeVoidAsync("writeBoolean", PointsOpenStorageKey, pointsOpen);
+    }
+
+    private async Task ToggleCustomCommandsAsync()
+    {
+        customCommandsOpen = !customCommandsOpen;
+        if (module is not null)
+            await module.InvokeVoidAsync(
+                "writeBoolean",
+                CustomCommandsOpenStorageKey,
+                customCommandsOpen
+            );
     }
 
     private Task NotifyNavigatedAsync() =>
