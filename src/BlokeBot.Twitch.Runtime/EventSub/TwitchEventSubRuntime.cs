@@ -17,6 +17,7 @@ internal sealed class TwitchEventSubRuntime(
     ITwitchCommandResponseSender responses,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
     TwitchBotRuntimeStatusStore status,
+    IEnumerable<ITwitchChatMessageObserver> messageObservers,
     ILogger<TwitchEventSubRuntime> log
 )
 {
@@ -314,7 +315,7 @@ internal sealed class TwitchEventSubRuntime(
         await sender.SendAsync(channel, startupMessage, cancellationToken);
     }
 
-    private async Task DispatchChatMessageAsync(
+    internal async Task DispatchChatMessageAsync(
         TwitchEventSubChatMessageEvent chatEvent,
         string rawJson,
         CancellationToken cancellationToken
@@ -332,11 +333,34 @@ internal sealed class TwitchEventSubRuntime(
             CreateTags(chatEvent)
         );
 
+        await NotifyMessageObserversAsync(message, cancellationToken);
         await dispatcher.DispatchResponsesAsync(
             message,
             async (response, ct) => await responses.SendAsync(message, response, ct),
             cancellationToken
         );
+    }
+
+    private async ValueTask NotifyMessageObserversAsync(
+        TwitchChatMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in messageObservers)
+        {
+            try
+            {
+                await observer.MessageReceivedAsync(message, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Twitch EventSub chat message observer failed.");
+            }
+        }
     }
 
     private static IReadOnlyDictionary<string, string> CreateTags(

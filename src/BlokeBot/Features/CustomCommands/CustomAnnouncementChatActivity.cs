@@ -1,0 +1,55 @@
+using BlokeBot.Commands;
+using BlokeBot.Identity;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch.Runtime;
+using Microsoft.EntityFrameworkCore;
+
+namespace BlokeBot.Features.CustomCommands;
+
+public sealed class CustomAnnouncementChatActivity(
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    TimeProvider clock
+) : ITwitchChatMessageObserver
+{
+    public async ValueTask MessageReceivedAsync(
+        TwitchChatMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        var hostLogin = LoginName.Parse(message.Channel).Value;
+        if (hostLogin.Length == 0)
+            return;
+
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var host = await db
+            .Hosts.AsNoTracking()
+            .Where(x => x.Login == hostLogin)
+            .Select(x => new { x.Id, x.EnabledFeatures })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (host is null || !HasCustomCommands(host.EnabledFeatures))
+            return;
+
+        var announcements = await db
+            .CustomAnnouncements.Where(x =>
+                x.HostId == host.Id
+                && x.Enabled
+                && x.ScheduleType == CustomAnnouncementScheduleType.IntervalAfterChat
+            )
+            .ToListAsync(cancellationToken);
+        if (announcements.Count == 0)
+            return;
+
+        var now = clock.GetUtcNow().UtcDateTime;
+        foreach (var announcement in announcements)
+        {
+            announcement.ChatMessagesSinceLastSent++;
+            announcement.UpdatedAtUtc = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static bool HasCustomCommands(HostFeatureFlags features) =>
+        (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+}

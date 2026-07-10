@@ -16,6 +16,7 @@ internal sealed class TwitchIrcRuntime(
     ITwitchChatMessageSender sender,
     ITwitchCommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
+    IEnumerable<ITwitchChatMessageObserver> messageObservers,
     ILogger<TwitchIrcRuntime> log
 )
 {
@@ -133,20 +134,51 @@ internal sealed class TwitchIrcRuntime(
                 message.Text
             );
 
-            await dispatcher.DispatchResponsesAsync(
-                message,
-                async (response, ct) =>
-                {
-                    log.LogInformation(
-                        "Queueing Twitch {Target} response to #{Channel}: {Reply}",
-                        response.Target,
-                        message.Channel,
-                        response.Message
-                    );
-                    await responses.SendAsync(message, response, ct);
-                },
-                cancellationToken
-            );
+            await DispatchChatMessageAsync(message, cancellationToken);
+        }
+    }
+
+    internal async Task DispatchChatMessageAsync(
+        TwitchChatMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        await NotifyMessageObserversAsync(message, cancellationToken);
+        await dispatcher.DispatchResponsesAsync(
+            message,
+            async (response, ct) =>
+            {
+                log.LogInformation(
+                    "Queueing Twitch {Target} response to #{Channel}: {Reply}",
+                    response.Target,
+                    message.Channel,
+                    response.Message
+                );
+                await responses.SendAsync(message, response, ct);
+            },
+            cancellationToken
+        );
+    }
+
+    private async ValueTask NotifyMessageObserversAsync(
+        TwitchChatMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in messageObservers)
+        {
+            try
+            {
+                await observer.MessageReceivedAsync(message, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log.LogWarning(ex, "Twitch IRC chat message observer failed.");
+            }
         }
     }
 
