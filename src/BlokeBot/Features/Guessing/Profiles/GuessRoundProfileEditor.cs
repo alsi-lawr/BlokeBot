@@ -8,6 +8,7 @@ public sealed class GuessRoundProfileEditor
     public string Name { get; set; } = string.Empty;
     public bool IsDefault { get; set; }
     public bool WhisperAnswerReplies { get; set; }
+    public string WinningGuessPointReward { get; set; } = "0";
     public ReplySettingsEditor Replies { get; set; } = new();
     public List<GuessOptionEditor> Options { get; set; } = [];
 }

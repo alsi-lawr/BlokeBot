@@ -9,6 +9,8 @@ using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Features.Points;
+using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -62,10 +64,7 @@ public sealed class GuessingAliasTests
         List<string> replies = [];
         var strategy = new StartGuessingCommandStrategy(
             new GuessingCommandService(dbFactory),
-            new GuessingRoundService(
-                dbFactory,
-                new GuessingChangeNotifier(new EventBus<AppEventKind>())
-            )
+            RoundService(dbFactory)
         );
 
         await strategy.ExecuteAsync(
@@ -116,10 +115,7 @@ public sealed class GuessingAliasTests
         List<TwitchCommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
             new GuessingCommandService(dbFactory),
-            new GuessingRoundService(
-                dbFactory,
-                new GuessingChangeNotifier(new EventBus<AppEventKind>())
-            )
+            RoundService(dbFactory)
         );
 
         await strategy.ExecuteAsync(
@@ -160,10 +156,7 @@ public sealed class GuessingAliasTests
         List<TwitchCommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
             new GuessingCommandService(dbFactory),
-            new GuessingRoundService(
-                dbFactory,
-                new GuessingChangeNotifier(new EventBus<AppEventKind>())
-            )
+            RoundService(dbFactory)
         );
 
         await strategy.ExecuteAsync(
@@ -264,6 +257,14 @@ public sealed class GuessingAliasTests
             dbFactory,
             new CommandAliasRegistry(),
             new GuessingChangeNotifier(new EventBus<AppEventKind>())
+        );
+
+    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
+        new(
+            dbFactory,
+            new GuessingChangeNotifier(new EventBus<AppEventKind>()),
+            new PointBalanceService(dbFactory),
+            new PointsChangeNotifier(new EventBus<AppEventKind>())
         );
 
     private static CommandStrategyContext<GuessCommandKind, AppCommandRouteState> CommandContext(

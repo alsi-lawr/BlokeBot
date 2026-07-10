@@ -4,6 +4,7 @@ using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
+using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -171,6 +172,9 @@ public sealed class GuessingConfigurationService(
         profile.Name = profileName;
         profile.Slug = slug.Value;
         profile.IsDefault = config.Profile.IsDefault;
+        profile.WinningGuessPointReward = PointAmount
+            .ParseAbsolute(config.Profile.WinningGuessPointReward)
+            .ToString();
 
         if (profile.IsDefault)
         {
@@ -298,6 +302,7 @@ public sealed class GuessingConfigurationService(
             Name = profile.Name,
             IsDefault = profile.IsDefault,
             WhisperAnswerReplies = whisperAnswerReplies,
+            WinningGuessPointReward = profile.WinningGuessPointReward,
             Replies = ReplySettingsMapper.ToEditor(
                 profile.ReplySettings ?? ReplySettingsMapper.ToEntity(GuessingDefaults.Replies())
             ),

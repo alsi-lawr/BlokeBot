@@ -360,6 +360,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.Slug).HasMaxLength(128);
+            b.Property(x => x.WinningGuessPointReward).HasMaxLength(128).HasDefaultValue("0");
             b.HasIndex(x => new { x.HostId, x.Slug }).IsUnique();
             b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");
             b.HasOne<BotHost>()

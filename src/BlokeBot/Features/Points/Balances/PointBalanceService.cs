@@ -375,6 +375,47 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         return PointOperationResult.Successful(balance: next, amount: amount);
     }
 
+    public async Task<PointOperationResult> AwardGuessWinAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        int roundId,
+        string login,
+        PointAmount amount,
+        DateTime now,
+        CancellationToken ct
+    )
+    {
+        if (amount.IsZero)
+            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+
+        var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
+        var current = PointAmount.ParseAbsolute(row.Amount);
+        if (current.Value + amount.Value > PointAmount.MaximumValue)
+            return PointOperationResult.Failure(
+                PointOperationFailureReason.CapExceeded,
+                balance: current,
+                amount: amount
+            );
+
+        var next = current.Add(amount);
+        row.Amount = next.ToString();
+        row.UpdatedAtUtc = now;
+        AddLedger(
+            db,
+            hostId,
+            "GuessWin",
+            row.Login,
+            amount.Value,
+            next,
+            null,
+            null,
+            null,
+            $"guess round {roundId}",
+            now
+        );
+        return PointOperationResult.Successful(balance: next, amount: amount);
+    }
+
     private static void AddLedger(
         BlokeBotDbContext db,
         int hostId,

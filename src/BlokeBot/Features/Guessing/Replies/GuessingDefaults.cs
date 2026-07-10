@@ -17,7 +17,7 @@ public static class GuessingDefaults
             AvailableGuessesReply = "Available guesses: {options}.",
             WinUsageReply = "Usage: !{command} <name>",
             ModeratorOnlyReply = "Only moderators can use that command.",
-            WinnerReply = "{name} wins. Correct guesses: {winners}.",
+            WinnerReply = "{name} wins. Correct guesses: {winners}.{reward_text}",
             NoWinnersReply = "{name} wins. Nobody guessed correctly.",
         };
 }

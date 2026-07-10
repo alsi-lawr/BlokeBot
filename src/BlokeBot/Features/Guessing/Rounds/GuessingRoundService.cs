@@ -2,6 +2,8 @@ using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
+using BlokeBot.Features.Points;
+using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
@@ -12,7 +14,9 @@ namespace BlokeBot.Features.Guessing.Rounds;
 
 public sealed class GuessingRoundService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    GuessingChangeNotifier changes
+    GuessingChangeNotifier changes,
+    PointBalanceService balances,
+    PointsChangeNotifier pointsChanges
 )
 {
     public async Task<GuessingOperationResult> DeclareWinnerAsync(
@@ -61,12 +65,48 @@ public sealed class GuessingRoundService(
             .OrderBy(x => x.GuessedAtUtc)
             .Select(x => x.Login)
             .ToListAsync(ct);
+        var reward = await db
+            .Profiles.AsNoTracking()
+            .Where(x => x.Id == round.GuessRoundProfileId)
+            .Select(x => x.WinningGuessPointReward)
+            .SingleAsync(ct);
+        var rewardAmount = PointAmount.ParseAbsolute(reward);
+        var pointLabel =
+            await db
+                .PointsSettings.AsNoTracking()
+                .Where(x => x.HostId == hostId)
+                .Select(x => x.PointLabel)
+                .SingleOrDefaultAsync(ct)
+            ?? "points";
+        var now = DateTime.UtcNow;
 
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         round.Status = GuessRoundStatus.Completed;
-        round.ClosedAtUtc ??= DateTime.UtcNow;
+        round.ClosedAtUtc ??= now;
         round.WinningName = normalizedName;
+        var awardedAnyPoints = false;
+        if (!rewardAmount.IsZero)
+        {
+            foreach (var winner in winners)
+            {
+                var result = await balances.AwardGuessWinAsync(
+                    db,
+                    hostId,
+                    round.Id,
+                    winner,
+                    rewardAmount,
+                    now,
+                    ct
+                );
+                awardedAnyPoints = awardedAnyPoints || result.Success;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
         await changes.NotifyChangedAsync();
+        if (awardedAnyPoints)
+            await pointsChanges.NotifyChangedAsync();
 
         var message = MessageTemplateFormatter.Format(
             winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
@@ -75,6 +115,12 @@ public sealed class GuessingRoundService(
                 ["name"] = normalizedName,
                 ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
                 ["count"] = winners.Count.ToString(),
+                ["reward"] = rewardAmount.ToDisplayString(),
+                ["label"] = pointLabel,
+                ["reward_text"] =
+                    rewardAmount.IsZero || winners.Count == 0
+                        ? string.Empty
+                        : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
             }
         );
         return new GuessingOperationResult(true, message);
