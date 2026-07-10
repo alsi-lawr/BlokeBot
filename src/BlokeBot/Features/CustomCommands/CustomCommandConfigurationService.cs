@@ -7,9 +7,9 @@ namespace BlokeBot.Features.CustomCommands;
 public sealed class CustomCommandConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     CustomCommandAliasRegistry aliasRegistry,
+    CustomCommandConfigurationGraphWriter graphWriter,
     HostCustomCommandSettingsService hostSettings,
-    EventBus<AppEventKind> events,
-    TimeProvider clock
+    EventBus<AppEventKind> events
 )
 {
     private const int AliasMaxLength = 64;
@@ -106,7 +106,6 @@ public sealed class CustomCommandConfigurationService(
             ct
         );
 
-        var graphWriter = new CustomCommandConfigurationGraphWriter(dbFactory, clock);
         await graphWriter.WriteAsync(hostId, config, normalizedAliases, ct);
         await hostSettings.SetTimeZoneIdAsync(hostId, normalizedTimeZone, ct);
         await events.PublishAsync(AppEventKind.CustomCommandsChanged);

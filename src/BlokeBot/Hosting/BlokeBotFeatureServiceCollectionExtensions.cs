@@ -56,6 +56,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandExecutionService>();
         services.AddSingleton<CustomMessageSelector>();
         services.AddSingleton<CustomCommandTemplateRenderer>();
+        services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
         services.TryAddSingleton<ICustomAnnouncementTickScheduler, TimeProviderCustomAnnouncementTickScheduler>();
