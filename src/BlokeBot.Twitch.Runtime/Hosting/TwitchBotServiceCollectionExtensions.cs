@@ -76,6 +76,7 @@ public static class TwitchBotServiceCollectionExtensions
     {
         services.AddTwitchAuth();
         services.AddTwitchHelix();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddSingleton<TwitchOutboundMessageQueue>();
         services.TryAddSingleton<
             ITwitchBotChannelLifecycleNotifier,

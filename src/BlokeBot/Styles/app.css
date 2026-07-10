@@ -293,16 +293,32 @@ a {
             grid-template-columns: minmax(14rem, 18rem);
         }
 
+        .topbar-controls--account-only.topbar-controls--with-alert {
+            grid-template-columns: auto minmax(14rem, 18rem);
+        }
+
         .topbar-controls--selector-account {
             grid-template-columns: auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--selector-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto minmax(14rem, 18rem);
         }
 
         .topbar-controls--status-account {
             grid-template-columns: auto minmax(14rem, 18rem);
         }
 
+        .topbar-controls--status-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto minmax(14rem, 18rem);
+        }
+
         .topbar-controls--status-selector-account {
             grid-template-columns: auto auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--status-selector-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto auto minmax(14rem, 18rem);
         }
 
         .host-selector {

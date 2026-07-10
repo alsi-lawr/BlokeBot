@@ -62,6 +62,7 @@ builder.Services.AddBlokeBotPersistence(
 builder.Services.AddSingleton<EventBus<AppEventKind>>();
 builder
     .Services.AddBlokeBotAppCommands()
+    .AddBlokeBotAlerts()
     .AddBlokeBotCustomCommands()
     .AddBlokeBotSiteAccess()
     .AddBlokeBotAdmin()

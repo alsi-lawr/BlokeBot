@@ -1,0 +1,115 @@
+@page "/alerts"
+@using BlokeBot.Eventing
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "Operator")]
+@inherits AuthenticatedPageComponent
+@inject DurableAlertService Alerts
+@inject EventBus<AppEventKind> Events
+
+<PageTitle>BlokeBot | Alerts</PageTitle>
+
+<div class="mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Operations"
+                Title="Alerts"
+                Description="Review active channel alerts and acknowledgement history.">
+        <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
+    </PageHeader>
+
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else if (state is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
+    }
+    else
+    {
+        <section class="space-y-3">
+            <div>
+                <h2 class="text-lg font-semibold text-slate-950">Active</h2>
+                <p class="mt-1 text-sm text-muted-foreground">@ActiveSummary</p>
+            </div>
+
+            @if (state.Active.Count == 0)
+            {
+                <div class="card p-8 text-sm text-muted-foreground">No active alerts.</div>
+            }
+            else
+            {
+                <div class="grid gap-3">
+                    @foreach (var alert in state.Active)
+                    {
+                        <article @key="alert.Id" class="card p-5">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="@SeverityBadgeClass(alert.Severity)">@alert.Severity</span>
+                                        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@alert.Source</span>
+                                    </div>
+                                    <h3 class="mt-3 text-base font-semibold text-slate-950">@alert.Title</h3>
+                                    <p class="mt-2 text-sm leading-6 text-slate-700">@alert.Message</p>
+                                    <p class="mt-3 text-xs font-medium text-muted-foreground">Created @FormatTimestamp(alert.CreatedAtUtc)</p>
+                                </div>
+                                <div class="flex shrink-0 flex-wrap gap-2">
+                                    @if (!string.IsNullOrWhiteSpace(alert.LinkPath))
+                                    {
+                                        <a class="control-surface inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-bold transition"
+                                           href="@alert.LinkPath">
+                                            Open
+                                        </a>
+                                    }
+                                    <button class="btn-primary"
+                                            disabled="@(!canAcknowledge)"
+                                            @onclick="() => AcknowledgeAsync(alert)">
+                                        Acknowledge
+                                    </button>
+                                </div>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">History</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Acknowledged alerts stay here with actor and timestamp.</p>
+            </div>
+            @if (state.History.Count == 0)
+            {
+                <div class="p-8 text-sm text-muted-foreground">No acknowledged alerts yet.</div>
+            }
+            else
+            {
+                <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Alert</th>
+                                <th class="px-5 py-3 font-semibold">Severity</th>
+                                <th class="px-5 py-3 font-semibold">Acknowledged by</th>
+                                <th class="px-5 py-3 font-semibold">Acknowledged at</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var alert in state.History)
+                            {
+                                <tr @key="alert.Id">
+                                    <td class="px-5 py-3">
+                                        <p class="font-semibold text-slate-950">@alert.Title</p>
+                                        <p class="mt-1 text-xs text-muted-foreground">@alert.Source</p>
+                                    </td>
+                                    <td class="px-5 py-3 text-slate-700">@alert.Severity</td>
+                                    <td class="px-5 py-3 text-slate-700">@alert.AcknowledgedByLogin</td>
+                                    <td class="px-5 py-3 text-slate-700">@FormatTimestamp(alert.AcknowledgedAtUtc)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    }
+</div>

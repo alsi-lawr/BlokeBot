@@ -20,6 +20,29 @@ public sealed class DurableAlertService(
         string message,
         string? linkPath,
         CancellationToken ct
+    ) =>
+        (
+            await CreateOrGetActiveAsync(
+                hostId,
+                severity,
+                source,
+                sourceKey,
+                title,
+                message,
+                linkPath,
+                ct
+            )
+        ).Alert;
+
+    public async Task<DurableAlertCreateResult> CreateOrGetActiveAsync(
+        int hostId,
+        DurableAlertSeverity severity,
+        string source,
+        string sourceKey,
+        string title,
+        string message,
+        string? linkPath,
+        CancellationToken ct
     )
     {
         var normalizedSource = NormalizeRequired(source, nameof(source));
@@ -35,7 +58,7 @@ public sealed class DurableAlertService(
             ct
         );
         if (existing is not null)
-            return existing;
+            return new DurableAlertCreateResult(existing, Created: false);
 
         var alert = new DurableAlert
         {
@@ -51,7 +74,7 @@ public sealed class DurableAlertService(
         db.DurableAlerts.Add(alert);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.AlertsChanged);
-        return alert;
+        return new DurableAlertCreateResult(alert, Created: true);
     }
 
     public async Task<bool> AcknowledgeAsync(
@@ -89,6 +112,33 @@ public sealed class DurableAlertService(
         );
     }
 
+    public async Task<DurableAlertState> LoadStateAsync(int hostId, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var alerts = await db
+            .DurableAlerts.AsNoTracking()
+            .Where(x => x.HostId == hostId)
+            .OrderByDescending(x => x.CreatedAtUtc)
+            .Select(x => new DurableAlertItem(
+                x.Id,
+                x.Severity,
+                x.Source,
+                x.SourceKey,
+                x.Title,
+                x.Message,
+                x.LinkPath,
+                x.CreatedAtUtc,
+                x.AcknowledgedAtUtc,
+                x.AcknowledgedByLogin
+            ))
+            .ToArrayAsync(ct);
+
+        return new DurableAlertState(
+            alerts.Where(x => x.IsActive).ToArray(),
+            alerts.Where(x => !x.IsActive).ToArray()
+        );
+    }
+
     private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
 
     private static string NormalizeRequired(string value, string parameterName)
@@ -98,4 +148,30 @@ public sealed class DurableAlertService(
 
         return value.Trim();
     }
+}
+
+public sealed record DurableAlertCreateResult(DurableAlert Alert, bool Created);
+
+public sealed record DurableAlertState(
+    IReadOnlyList<DurableAlertItem> Active,
+    IReadOnlyList<DurableAlertItem> History
+)
+{
+    public int ActiveCount => Active.Count;
+}
+
+public sealed record DurableAlertItem(
+    int Id,
+    DurableAlertSeverity Severity,
+    string Source,
+    string SourceKey,
+    string Title,
+    string Message,
+    string? LinkPath,
+    DateTime CreatedAtUtc,
+    DateTime? AcknowledgedAtUtc,
+    string? AcknowledgedByLogin
+)
+{
+    public bool IsActive => AcknowledgedAtUtc is null;
 }

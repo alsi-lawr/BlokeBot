@@ -5,10 +5,14 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchOutboundMessageQueue(
     IOptions<TwitchBotOptions> options,
+    TimeProvider timeProvider,
+    IEnumerable<ITwitchOutboundQueueAlertObserver> alertObservers,
     ILogger<TwitchOutboundMessageQueue> log
 )
 {
     private readonly object gate = new();
+    private readonly ITwitchOutboundQueueAlertObserver[] alertObservers = alertObservers.ToArray();
+    private readonly HashSet<string> backedUpAlertChannels = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<TwitchOutboundMessageKey, DateTimeOffset> lastSent = [];
     private readonly List<PendingMessage> pending = [];
     private TaskCompletionSource processorWakeSignal = NewWakeSignal();
@@ -39,6 +43,7 @@ internal sealed class TwitchOutboundMessageQueue(
         var item = new PendingMessage(
             new TwitchOutboundChatMessage(channel, message),
             send,
+            UtcNow(),
             cancellationToken
         );
         using var registration = cancellationToken.Register(item.Cancel);
@@ -66,21 +71,33 @@ internal sealed class TwitchOutboundMessageQueue(
         {
             var delay = TimeSpan.Zero;
             PendingMessage? item = null;
+            IReadOnlyList<TwitchOutboundQueueBacklog> queueAlerts;
 
             lock (gate)
             {
                 pending.RemoveAll(x => x.IsCanceled);
+                ResetDrainedAlertChannelsLocked();
                 if (pending.Count == 0)
                 {
                     processing = false;
                     return;
                 }
 
-                var now = DateTimeOffset.UtcNow;
+                var now = UtcNow();
+                queueAlerts = CaptureQueueAlertsLocked(now);
                 (item, delay) = NextPendingMessage(now);
                 if (item is not null)
+                {
                     pending.Remove(item);
+                    ResetDrainedAlertChannelsLocked();
+                }
+                else if (NextQueueAlertDelayLocked(now) is { } alertDelay)
+                {
+                    delay = delay <= TimeSpan.Zero ? alertDelay : Min(delay, alertDelay);
+                }
             }
+
+            await NotifyQueueAlertsAsync(queueAlerts);
 
             if (item is null)
             {
@@ -98,7 +115,7 @@ internal sealed class TwitchOutboundMessageQueue(
         lock (gate)
             wakeTask = processorWakeSignal.Task;
 
-        var completed = await Task.WhenAny(Task.Delay(delay), wakeTask);
+        var completed = await Task.WhenAny(Task.Delay(delay, timeProvider), wakeTask);
         if (completed != wakeTask)
             return;
 
@@ -140,7 +157,7 @@ internal sealed class TwitchOutboundMessageQueue(
         try
         {
             await item.Send(item.Message, item.CancellationToken);
-            var now = DateTimeOffset.UtcNow;
+            var now = UtcNow();
             lock (gate)
             {
                 lastSendAttemptAt = now;
@@ -151,7 +168,7 @@ internal sealed class TwitchOutboundMessageQueue(
         catch (Exception ex)
         {
             lock (gate)
-                lastSendAttemptAt = DateTimeOffset.UtcNow;
+                lastSendAttemptAt = UtcNow();
 
             log.LogWarning(
                 ex,
@@ -168,15 +185,145 @@ internal sealed class TwitchOutboundMessageQueue(
     private TimeSpan DuplicateCooldown =>
         TimeSpan.FromSeconds(Math.Max(0, options.Value.DuplicateChatMessageCooldownSeconds));
 
+    private TimeSpan QueueStuckThreshold =>
+        TimeSpan.FromSeconds(Math.Max(0, options.Value.OutboundQueueAlerts.StuckAfterSeconds));
+
     private int MaxMessageLength => Math.Max(0, options.Value.MaxChatMessageLength);
 
     private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
         left >= right ? left : right;
 
+    private static TimeSpan Min(TimeSpan left, TimeSpan right) => left <= right ? left : right;
+
+    private DateTimeOffset UtcNow() => timeProvider.GetUtcNow();
+
+    private IReadOnlyList<TwitchOutboundQueueBacklog> CaptureQueueAlertsLocked(
+        DateTimeOffset now
+    )
+    {
+        if (alertObservers.Length == 0)
+            return [];
+
+        var threshold = QueueStuckThreshold;
+        if (threshold <= TimeSpan.Zero)
+            return [];
+
+        List<TwitchOutboundQueueBacklog>? alerts = null;
+        foreach (var group in PendingByChannelLocked())
+        {
+            if (backedUpAlertChannels.Contains(group.Channel))
+                continue;
+
+            var oldest = group.Messages.MinBy(x => x.EnqueuedAt);
+            if (oldest is null)
+                continue;
+
+            var age = now - oldest.EnqueuedAt;
+            if (age < threshold)
+                continue;
+
+            backedUpAlertChannels.Add(group.Channel);
+            alerts ??= [];
+            alerts.Add(
+                new TwitchOutboundQueueBacklog(
+                    group.Channel,
+                    group.Messages.Count,
+                    age,
+                    oldest.EnqueuedAt
+                )
+            );
+        }
+
+        return alerts ?? [];
+    }
+
+    private TimeSpan? NextQueueAlertDelayLocked(DateTimeOffset now)
+    {
+        if (alertObservers.Length == 0)
+            return null;
+
+        var threshold = QueueStuckThreshold;
+        if (threshold <= TimeSpan.Zero)
+            return null;
+
+        TimeSpan? next = null;
+        foreach (var group in PendingByChannelLocked())
+        {
+            if (backedUpAlertChannels.Contains(group.Channel))
+                continue;
+
+            var oldest = group.Messages.MinBy(x => x.EnqueuedAt);
+            if (oldest is null)
+                continue;
+
+            var remaining = threshold - (now - oldest.EnqueuedAt);
+            if (remaining <= TimeSpan.Zero)
+                return TimeSpan.Zero;
+
+            next = next is null ? remaining : Min(next.Value, remaining);
+        }
+
+        return next;
+    }
+
+    private List<PendingChannelGroup> PendingByChannelLocked() =>
+        pending
+            .GroupBy(x => NormalizeChannel(x.Message.Channel), StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .Select(group => new PendingChannelGroup(group.Key, group.ToList()))
+            .ToList();
+
+    private async Task NotifyQueueAlertsAsync(IReadOnlyList<TwitchOutboundQueueBacklog> alerts)
+    {
+        if (alerts.Count == 0 || alertObservers.Length == 0)
+            return;
+
+        foreach (var alert in alerts)
+        {
+            foreach (var observer in alertObservers)
+            {
+                try
+                {
+                    await observer.QueueBackedUpAsync(alert, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    log.LogWarning(
+                        ex,
+                        "Twitch outbound queue alert observer failed for #{Channel}.",
+                        alert.Channel
+                    );
+                }
+            }
+        }
+    }
+
+    private void ResetDrainedAlertChannelsLocked()
+    {
+        if (backedUpAlertChannels.Count == 0)
+            return;
+
+        if (pending.Count == 0)
+        {
+            backedUpAlertChannels.Clear();
+            return;
+        }
+
+        var activeChannels = pending
+            .Select(x => NormalizeChannel(x.Message.Channel))
+            .Where(channel => !string.IsNullOrWhiteSpace(channel))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        backedUpAlertChannels.RemoveWhere(channel => !activeChannels.Contains(channel));
+    }
+
+    private static string NormalizeChannel(string channel) => channel.Trim().ToLowerInvariant();
+
     private static TaskCompletionSource NewWakeSignal() =>
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly record struct PendingCandidate(PendingMessage Message, DateTimeOffset SendAt);
+
+    private sealed record PendingChannelGroup(string Channel, List<PendingMessage> Messages);
 
     private readonly record struct TwitchOutboundMessageKey(string Channel, string Message)
     {
@@ -194,13 +341,17 @@ internal sealed class TwitchOutboundMessageQueue(
         public PendingMessage(
             TwitchOutboundChatMessage message,
             Func<TwitchOutboundChatMessage, CancellationToken, Task> send,
+            DateTimeOffset enqueuedAt,
             CancellationToken cancellationToken
         )
         {
             Message = message;
             Send = send;
+            EnqueuedAt = enqueuedAt;
             this.cancellationToken = cancellationToken;
         }
+
+        public DateTimeOffset EnqueuedAt { get; }
 
         public CancellationToken CancellationToken => cancellationToken;
 

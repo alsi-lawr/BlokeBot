@@ -61,7 +61,21 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<ITwitchChatMessageObserver, CustomAnnouncementChatActivity>();
         services.AddSingleton<CustomAnnouncementScheduler>();
         services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());
-        services.AddSingleton<DurableAlertService>();
+        services.TryAddSingleton<DurableAlertService>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotAlerts(this IServiceCollection services)
+    {
+        services.TryAddSingleton<DurableAlertService>();
+        services.TryAddSingleton<IOutboundQueueAlertWhisperSender, OutboundQueueAlertWhisperSender>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                ITwitchOutboundQueueAlertObserver,
+                DurableOutboundQueueAlertObserver
+            >()
+        );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
