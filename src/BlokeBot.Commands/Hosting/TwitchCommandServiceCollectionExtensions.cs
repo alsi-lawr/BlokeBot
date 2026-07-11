@@ -17,7 +17,7 @@ public static class TwitchCommandServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddOptions<TwitchCommandRegistrationOptions>();
+        services.TryAddSingleton<TwitchCommandRegistrationSnapshot>();
         services.TryAddSingleton<TwitchCommandRegistry>();
         services.TryAddSingleton(serviceProvider =>
             new TwitchCommandDispatcher(

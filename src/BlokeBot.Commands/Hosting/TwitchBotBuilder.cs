@@ -10,8 +10,11 @@ internal sealed class TwitchBotBuilder(IServiceCollection services) : ITwitchBot
     public ITwitchBotBuilder AddCommands(Action<ITwitchCommandBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        Services.Configure<TwitchCommandRegistrationOptions>(options =>
-            options.CommandCallbacks.Add(configure)
+        Services.AddSingleton(
+            new TwitchCommandRegistration
+            {
+                Configure = configure,
+            }
         );
         return this;
     }

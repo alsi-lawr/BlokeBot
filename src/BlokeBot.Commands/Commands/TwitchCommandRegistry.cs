@@ -1,18 +1,16 @@
-using Microsoft.Extensions.Options;
-
 namespace BlokeBot.Commands;
 
 internal sealed class TwitchCommandRegistry
 {
     public TwitchCommandRegistry(
-        IOptions<TwitchCommandRegistrationOptions> registrations,
+        TwitchCommandRegistrationSnapshot registrations,
         IEnumerable<ITwitchCommandModule> modules,
         IEnumerable<ITwitchCommandFilter> filters
     )
     {
         var builder = new TwitchCommandPlanBuilder(filters);
 
-        foreach (var callback in registrations.Value.CommandCallbacks)
+        foreach (var callback in registrations.CommandCallbacks)
             callback(builder);
 
         foreach (var module in modules)
