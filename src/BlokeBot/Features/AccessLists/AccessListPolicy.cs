@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,9 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
                 normalizedLogin,
                 StringComparer.OrdinalIgnoreCase
             ),
-            _ => throw new ArgumentOutOfRangeException(nameof(policy), policy.WhitelistMode, null),
+            _ => throw new UnreachableException(
+                $"Unknown access-list whitelist mode: {policy.WhitelistMode}."
+            ),
         };
     }
 

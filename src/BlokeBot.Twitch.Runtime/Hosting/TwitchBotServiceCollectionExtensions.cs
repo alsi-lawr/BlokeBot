@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Eventing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -223,9 +224,7 @@ public static class TwitchBotServiceCollectionExtensions
                 );
                 return;
             default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(registration),
-                    registration.Kind,
+                throw new UnreachableException(
                     "Unknown Twitch bot account-provider policy."
                 );
         }
@@ -251,9 +250,7 @@ public static class TwitchBotServiceCollectionExtensions
                 );
                 return;
             default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(registration),
-                    registration.Kind,
+                throw new UnreachableException(
                     "Unknown Twitch command-response sender policy."
                 );
         }
@@ -279,9 +276,7 @@ public static class TwitchBotServiceCollectionExtensions
                 );
                 return;
             default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(registration),
-                    registration.Kind,
+                throw new UnreachableException(
                     "Unknown Twitch bot channel-lifecycle notifier policy."
                 );
         }
