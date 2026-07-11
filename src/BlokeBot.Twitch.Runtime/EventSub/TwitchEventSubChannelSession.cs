@@ -17,7 +17,15 @@ internal interface ITwitchEventSubChannelOperations
         CancellationToken cancellationToken
     );
 
-    ValueTask CompleteSetupAsync(string channel, CancellationToken cancellationToken);
+    ValueTask DeliverStartupMessageAsync(
+        string channel,
+        CancellationToken cancellationToken
+    );
+
+    ValueTask NotifyChannelStartedAsync(
+        string channel,
+        CancellationToken cancellationToken
+    );
 
     ValueTask DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
@@ -65,20 +73,23 @@ internal sealed class TwitchEventSubChannelOperations(
             ),
             BotLogin = account.Login,
             AccessToken = account.AccessToken,
-            Readiness = TwitchEventSubSubscriptionReadiness.PendingSetup,
+            Readiness = TwitchEventSubSubscriptionReadiness.PendingStartupDelivery,
         };
     }
 
-    public async ValueTask CompleteSetupAsync(
+    public async ValueTask DeliverStartupMessageAsync(
         string channel,
         CancellationToken cancellationToken
     )
     {
         if (!string.IsNullOrWhiteSpace(settings.StartupMessage))
             await sender.SendAsync(channel, settings.StartupMessage, cancellationToken);
-
-        await lifecycle.ChannelStartedAsync(channel, cancellationToken);
     }
+
+    public ValueTask NotifyChannelStartedAsync(
+        string channel,
+        CancellationToken cancellationToken
+    ) => new(lifecycle.ChannelStartedAsync(channel, cancellationToken));
 
     public ValueTask DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
@@ -133,6 +144,8 @@ internal sealed class TwitchEventSubChannelSession(
     private readonly Dictionary<string, ActiveEventSubSubscription> subscriptions =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TwitchEventSubChannelStatus> states =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, TwitchEventSubChannelFailureDetails> failures =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> authorizedChannels = new(
         StringComparer.OrdinalIgnoreCase
@@ -370,17 +383,13 @@ internal sealed class TwitchEventSubChannelSession(
         lock (gate)
             states.TryGetValue(channel, out state);
 
-        if (state is TwitchEventSubChannelStatus.Degraded degraded)
+        if (state is TwitchEventSubChannelStatus.Degraded)
         {
             await RunRecoveryCycleAsync(
                 channel,
                 target,
                 trigger,
-                new TwitchEventSubChannelFailureDetails(
-                    degraded.Phase,
-                    degraded.Failure.Classification,
-                    degraded.Failure.FailureType
-                ),
+                GetFailureDetails(channel),
                 cancellationToken
             );
             return;
@@ -448,6 +457,18 @@ internal sealed class TwitchEventSubChannelSession(
         }
 
         PublishSuccess(channel, target, attempt: 1, trigger);
+    }
+
+    private TwitchEventSubChannelFailureDetails GetFailureDetails(string channel)
+    {
+        lock (gate)
+        {
+            return failures.TryGetValue(channel, out var failure)
+                ? failure
+                : throw new UnreachableException(
+                    "A failed EventSub channel state has no internal failure context."
+                );
+        }
     }
 
     private async Task RunRecoveryCycleAsync(
@@ -600,19 +621,42 @@ internal sealed class TwitchEventSubChannelSession(
                 subscriptions[channel] = active;
         }
 
-        if (active.Readiness is TwitchEventSubSubscriptionReadiness.PendingSetup)
+        switch (active.Readiness)
         {
-            await RunPhaseAsync(
-                context,
-                TwitchEventSubChannelPhase.SubscriptionSetup,
-                token => operations.CompleteSetupAsync(channel, token),
-                cancellationToken
-            );
-            lock (gate)
-                subscriptions[channel] = active with
+            case TwitchEventSubSubscriptionReadiness.PendingStartupDelivery:
+                await RunPhaseAsync(
+                    context,
+                    TwitchEventSubChannelPhase.SubscriptionSetup,
+                    token => operations.DeliverStartupMessageAsync(channel, token),
+                    cancellationToken
+                );
+                active = active with
+                {
+                    Readiness = TwitchEventSubSubscriptionReadiness.PendingLifecycleStart,
+                };
+                lock (gate)
+                    subscriptions[channel] = active;
+                goto case TwitchEventSubSubscriptionReadiness.PendingLifecycleStart;
+            case TwitchEventSubSubscriptionReadiness.PendingLifecycleStart:
+                await RunPhaseAsync(
+                    context,
+                    TwitchEventSubChannelPhase.SubscriptionSetup,
+                    token => operations.NotifyChannelStartedAsync(channel, token),
+                    cancellationToken
+                );
+                active = active with
                 {
                     Readiness = TwitchEventSubSubscriptionReadiness.Ready,
                 };
+                lock (gate)
+                    subscriptions[channel] = active;
+                break;
+            case TwitchEventSubSubscriptionReadiness.Ready:
+                break;
+            default:
+                throw new UnreachableException(
+                    "Unknown EventSub subscription setup stage."
+                );
         }
 
         context.Phase = TwitchEventSubChannelPhase.Reconciliation;
@@ -727,13 +771,16 @@ internal sealed class TwitchEventSubChannelSession(
         {
             case TwitchEventSubChannelReconciliationTarget.Present:
                 Publish(
-                    new TwitchEventSubChannelStatus.Healthy
+                    new TwitchEventSubChannelDiagnosticReport.Healthy
                     {
-                        Channel = channel,
-                        Phase = TwitchEventSubChannelPhase.Reconciliation,
-                        Attempt = attempt,
-                        ChangedAt = timeProvider.GetUtcNow(),
-                        Trigger = trigger,
+                        ChannelStatus = new TwitchEventSubChannelStatus.Healthy
+                        {
+                            Channel = channel,
+                            Phase = TwitchEventSubChannelPhase.Reconciliation,
+                            Attempt = attempt,
+                            ChangedAt = timeProvider.GetUtcNow(),
+                            Trigger = trigger,
+                        },
                     }
                 );
                 return;
@@ -741,6 +788,7 @@ internal sealed class TwitchEventSubChannelSession(
                 lock (gate)
                 {
                     states.Remove(channel);
+                    failures.Remove(channel);
                     statusScope.Remove(channel);
                     UpdateRuntimeStatusLocked();
                 }
@@ -759,15 +807,19 @@ internal sealed class TwitchEventSubChannelSession(
         TwitchEventSubChannelFailureDetails failure
     ) =>
         Publish(
-            new TwitchEventSubChannelStatus.Recovering
+            new TwitchEventSubChannelDiagnosticReport.Recovering
             {
-                Channel = channel,
-                Phase = failure.Phase,
-                Attempt = attempt,
-                ChangedAt = timeProvider.GetUtcNow(),
-                Trigger = trigger,
-                Failure = failure.ToPublicFailure(),
-                NextAction = TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
+                ChannelStatus = new TwitchEventSubChannelStatus.Recovering
+                {
+                    Channel = channel,
+                    Phase = failure.Phase,
+                    Attempt = attempt,
+                    ChangedAt = timeProvider.GetUtcNow(),
+                    Trigger = trigger,
+                    Failure = failure.ToPublicFailure(),
+                    NextAction = TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
+                },
+                Failure = failure,
             }
         );
 
@@ -786,31 +838,53 @@ internal sealed class TwitchEventSubChannelSession(
         }
 
         Publish(
-            new TwitchEventSubChannelStatus.Degraded
+            new TwitchEventSubChannelDiagnosticReport.Degraded
             {
-                Channel = channel,
-                Phase = failure.Phase,
-                Attempt = attempt,
-                ChangedAt = timeProvider.GetUtcNow(),
-                Trigger = trigger,
-                Failure = failure.ToPublicFailure(),
-                NextAction = nextAction,
+                ChannelStatus = new TwitchEventSubChannelStatus.Degraded
+                {
+                    Channel = channel,
+                    Phase = failure.Phase,
+                    Attempt = attempt,
+                    ChangedAt = timeProvider.GetUtcNow(),
+                    Trigger = trigger,
+                    Failure = failure.ToPublicFailure(),
+                    NextAction = nextAction,
+                },
+                Failure = failure,
             }
         );
     }
 
-    private void Publish(TwitchEventSubChannelStatus state)
+    private void Publish(TwitchEventSubChannelDiagnosticReport report)
     {
         try
         {
+            var state = report.Status;
             lock (gate)
             {
                 states[state.Channel] = state;
+                switch (report)
+                {
+                    case TwitchEventSubChannelDiagnosticReport.Healthy:
+                        failures.Remove(state.Channel);
+                        break;
+                    case TwitchEventSubChannelDiagnosticReport.Recovering recovering:
+                        failures[state.Channel] = recovering.Failure;
+                        break;
+                    case TwitchEventSubChannelDiagnosticReport.Degraded degraded:
+                        failures[state.Channel] = degraded.Failure;
+                        break;
+                    default:
+                        throw new UnreachableException(
+                            "Unknown EventSub channel diagnostic report."
+                        );
+                }
+
                 statusScope.Set(state);
                 UpdateRuntimeStatusLocked();
             }
 
-            diagnostics.Report(state);
+            diagnostics.Report(report);
         }
         catch (Exception exception)
         {
@@ -851,7 +925,8 @@ internal sealed class TwitchEventSubChannelStatusPublicationException(
 
 internal enum TwitchEventSubSubscriptionReadiness
 {
-    PendingSetup,
+    PendingStartupDelivery,
+    PendingLifecycleStart,
     Ready,
 }
 

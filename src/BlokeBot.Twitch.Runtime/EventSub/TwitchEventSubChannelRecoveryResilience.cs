@@ -87,7 +87,8 @@ internal static class TwitchEventSubChannelFailureClassifier
         return new TwitchEventSubChannelFailureDetails(
             phase,
             classification,
-            failure.GetType().FullName ?? failure.GetType().Name
+            failure.GetType().FullName ?? failure.GetType().Name,
+            failure
         );
     }
 
@@ -105,7 +106,8 @@ internal static class TwitchEventSubChannelFailureClassifier
 internal readonly record struct TwitchEventSubChannelFailureDetails(
     TwitchEventSubChannelPhase Phase,
     TwitchEventSubChannelFailureClassification Classification,
-    string FailureType
+    string FailureType,
+    Exception Exception
 )
 {
     internal TwitchEventSubChannelFailure ToPublicFailure() =>

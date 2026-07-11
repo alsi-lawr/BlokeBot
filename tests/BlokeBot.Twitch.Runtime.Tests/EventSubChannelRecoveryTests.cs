@@ -150,12 +150,49 @@ public sealed class EventSubChannelRecoveryTests
             Now
         );
         degraded.ToString().ShouldNotContain("raw payload");
+        var diagnostic = harness.Diagnostics.DiagnosticReports
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>();
+        diagnostic.Failure.Exception.ShouldBeSameAs(failure);
+        typeof(TwitchEventSubChannelFailure)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(property => property.Name)
+            .Order()
+            .ShouldBe(["Classification", "FailureType"]);
+        typeof(TwitchEventSubChannelDiagnosticReport.Healthy)
+            .GetProperty(
+                "Failure",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            .ShouldBeNull();
         harness.RuntimeStatus.Current.IsAuthorized.ShouldBeTrue();
         harness.RuntimeStatus.Current.IsConnected.ShouldBeFalse();
         harness.Session.ActiveChannels.ShouldBeEmpty();
         operations.CreateCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(0);
         harness.Status.Current.Channels.ShouldHaveSingleItem().ShouldBeSameAs(degraded);
+    }
+
+    [Test]
+    public async Task Setup_LifecycleStartFailure_RetriesWithoutRepeatingStartupDelivery()
+    {
+        var failure = new IOException("lifecycle start temporarily unavailable");
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueChannelStartedFailure("channel", failure);
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        operations.StartupDeliveryCount("channel").ShouldBe(1);
+        operations.ChannelStartedCount("channel").ShouldBe(2);
+        harness.Session.ActiveChannels.ShouldBe(["channel"]);
+        harness.Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>();
+        harness.Diagnostics.DiagnosticReports
+            .OfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .ShouldHaveSingleItem()
+            .Failure.Exception.ShouldBeSameAs(failure);
     }
 
     [Test]
@@ -264,6 +301,19 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
             Now
         );
+        var failureReports = harness.Diagnostics.DiagnosticReports;
+        failureReports[0]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .Failure.Exception.ShouldBeSameAs(initialFailure);
+        failureReports[1]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
+            .Failure.Exception.ShouldBeSameAs(initialFailure);
+        failureReports[2]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
+            .Failure.Exception.ShouldBeSameAs(firstRecoveryFailure);
+        failureReports[3]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .Failure.Exception.ShouldBeSameAs(exhaustedFailure);
 
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
         harness.Diagnostics.Clear();
@@ -293,6 +343,34 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             Now.AddMinutes(1)
         );
+        harness.Diagnostics.DiagnosticReports[0]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
+            .Failure.Exception.ShouldBeSameAs(exhaustedFailure);
+    }
+
+    [Test]
+    public async Task Diagnostics_ReporterFailure_EscalatesOutsideChannelRecovery()
+    {
+        var operationFailure = new IOException("account lookup failed");
+        var reporterFailure = new InvalidOperationException("diagnostic sink failed");
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueAccountFailure("channel", operationFailure);
+        var harness = CreateHarness(operations, attemptLimit: 2);
+        harness.Diagnostics.EnqueueFailure(reporterFailure);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        var taskFailure = await Should.ThrowAsync<
+            TwitchEventSubChannelStatusPublicationException
+        >(() => harness.Session.DrainAsync());
+
+        taskFailure.InnerException.ShouldBeSameAs(reporterFailure);
+        harness.Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>();
+        harness.Diagnostics.DiagnosticReports.ShouldBeEmpty();
+        var cleanupFailure = await Should.ThrowAsync<
+            TwitchEventSubChannelStatusPublicationException
+        >(() => harness.DisposeAsync().AsTask());
+        cleanupFailure.InnerException.ShouldBeSameAs(reporterFailure);
     }
 
     [Test]
@@ -739,7 +817,13 @@ public sealed class EventSubChannelRecoveryTests
         private readonly Dictionary<string, int> deleteCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, int> completeSetupCounts = new(
+        private readonly Dictionary<string, int> startupDeliveryCounts = new(
+            StringComparer.OrdinalIgnoreCase
+        );
+        private readonly Dictionary<string, int> channelStartedCounts = new(
+            StringComparer.OrdinalIgnoreCase
+        );
+        private readonly Dictionary<string, Queue<Exception>> channelStartedFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
         private readonly Dictionary<string, int> completeStopCounts = new(
@@ -775,8 +859,16 @@ public sealed class EventSubChannelRecoveryTests
         internal int DeleteCount(string channel) =>
             deleteCounts.GetValueOrDefault(channel);
 
-        internal int CompleteSetupCount(string channel) =>
-            completeSetupCounts.GetValueOrDefault(channel);
+        internal int StartupDeliveryCount(string channel) =>
+            startupDeliveryCounts.GetValueOrDefault(channel);
+
+        internal int ChannelStartedCount(string channel) =>
+            channelStartedCounts.GetValueOrDefault(channel);
+
+        internal void EnqueueChannelStartedFailure(
+            string channel,
+            Exception exception
+        ) => GetQueue(channelStartedFailures, channel).Enqueue(exception);
 
         internal int CompleteStopCount(string channel) =>
             completeStopCounts.GetValueOrDefault(channel);
@@ -821,17 +913,34 @@ public sealed class EventSubChannelRecoveryTests
                     SubscriptionId = $"{sessionId}-{channel}",
                     BotLogin = account.Login,
                     AccessToken = account.AccessToken,
-                    Readiness = TwitchEventSubSubscriptionReadiness.PendingSetup,
+                    Readiness = TwitchEventSubSubscriptionReadiness.PendingStartupDelivery,
                 }
             );
         }
 
-        public ValueTask CompleteSetupAsync(
+        public ValueTask DeliverStartupMessageAsync(
             string channel,
             CancellationToken cancellationToken
         )
         {
-            completeSetupCounts[channel] = CompleteSetupCount(channel) + 1;
+            startupDeliveryCounts[channel] = StartupDeliveryCount(channel) + 1;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask NotifyChannelStartedAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            channelStartedCounts[channel] = ChannelStartedCount(channel) + 1;
+            if (
+                channelStartedFailures.TryGetValue(channel, out var failures)
+                && failures.Count > 0
+            )
+            {
+                return ValueTask.FromException(failures.Dequeue());
+            }
+
             return ValueTask.CompletedTask;
         }
 
@@ -877,7 +986,8 @@ public sealed class EventSubChannelRecoveryTests
     private sealed class RecordingDiagnostics : ITwitchEventSubChannelDiagnosticReporter
     {
         private readonly object gate = new();
-        private readonly List<TwitchEventSubChannelStatus> reports = [];
+        private readonly List<TwitchEventSubChannelDiagnosticReport> reports = [];
+        private readonly Queue<Exception> failures = [];
         private readonly Channel<TwitchEventSubChannelStatus> transitions =
             Channel.CreateUnbounded<TwitchEventSubChannelStatus>();
 
@@ -886,15 +996,36 @@ public sealed class EventSubChannelRecoveryTests
             get
             {
                 lock (gate)
+                    return reports.Select(report => report.Status).ToArray();
+            }
+        }
+
+        internal IReadOnlyList<TwitchEventSubChannelDiagnosticReport> DiagnosticReports
+        {
+            get
+            {
+                lock (gate)
                     return reports.ToArray();
             }
         }
 
-        public void Report(TwitchEventSubChannelStatus status)
+        public void Report(TwitchEventSubChannelDiagnosticReport report)
         {
             lock (gate)
-                reports.Add(status);
-            transitions.Writer.TryWrite(status).ShouldBeTrue();
+            {
+                if (failures.TryDequeue(out var failure))
+                    throw failure;
+
+                reports.Add(report);
+            }
+
+            transitions.Writer.TryWrite(report.Status).ShouldBeTrue();
+        }
+
+        internal void EnqueueFailure(Exception failure)
+        {
+            lock (gate)
+                failures.Enqueue(failure);
         }
 
         internal void Clear()
