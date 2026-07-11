@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Threading.Channels;
 using BlokeBot.Functional;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,8 @@ internal sealed class PointsGiveawayScheduler(
     private readonly object scheduleGate = new();
     private readonly Dictionary<int, ScheduledGiveaway> schedules = [];
     private readonly TimeSpan retryDelay = ValidRetryDelay(recoveryPolicy);
+    private readonly Channel<PointsGiveawaySchedulerUnhealthyReport> unhealthyReports =
+        Channel.CreateUnbounded<PointsGiveawaySchedulerUnhealthyReport>();
     private CancellationToken shutdownToken;
 
     public void Schedule(PointsGiveawaySchedule schedule)
@@ -58,6 +61,35 @@ internal sealed class PointsGiveawayScheduler(
 
     internal async Task RehydrateAsync(CancellationToken ct)
     {
+        try
+        {
+            await RehydrateCoreAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (PointsGiveawaySchedulerUnhealthyException exception)
+        {
+            LogUnhealthy(exception.Report);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var report = new PointsGiveawaySchedulerUnhealthyReport.Rehydration
+            {
+                Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(
+                    exception
+                ),
+                Cause = exception,
+            };
+            LogUnhealthy(report);
+            throw new PointsGiveawaySchedulerUnhealthyException(report);
+        }
+    }
+
+    private async Task RehydrateCoreAsync(CancellationToken ct)
+    {
         var activeGiveaways = await LoadActiveWithRecoveryAsync(ct);
         var now = GetUtcNow();
         var overdueExpirations = new List<Task>();
@@ -97,9 +129,15 @@ internal sealed class PointsGiveawayScheduler(
         try
         {
             await RehydrateAsync(stoppingToken);
-            await Task.Delay(Timeout.InfiniteTimeSpan, timeProvider, stoppingToken);
+            await ThrowWhenUnhealthyAsync(stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+    }
+
+    internal async Task ThrowWhenUnhealthyAsync(CancellationToken ct)
+    {
+        var report = await unhealthyReports.Reader.ReadAsync(ct);
+        throw new PointsGiveawaySchedulerUnhealthyException(report);
     }
 
     internal async Task ExecuteScheduleAsync(
@@ -130,6 +168,9 @@ internal sealed class PointsGiveawayScheduler(
             schedule.GiveawayId,
             ct
         );
+        if (drawOutcome.Success)
+            await NotifyChangedAsync(schedule.GiveawayId, ct);
+
         var drawMessage = await BuildDrawNotificationAsync(schedule, drawOutcome, ct);
         await SendAsync(
             schedule,
@@ -144,33 +185,25 @@ internal sealed class PointsGiveawayScheduler(
         CancellationTokenSource cts
     )
     {
-        var unexpectedAttempt = 1;
         try
         {
-            while (true)
-            {
-                try
-                {
-                    await ExecuteScheduleAsync(schedule, cts.Token);
-                    return;
-                }
-                catch (OperationCanceledException) when (cts.IsCancellationRequested)
-                {
-                    return;
-                }
-                catch (Exception exception)
-                {
-                    ReportRetryScheduled(
-                        PointsGiveawaySchedulerOperation.Schedule,
-                        schedule.GiveawayId,
-                        unexpectedAttempt++,
-                        exception
-                    );
-                    await DelayForRecoveryAsync(cts.Token);
-                }
-            }
+            await ExecuteScheduleAsync(schedule, cts.Token);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
+        catch (PointsGiveawaySchedulerUnhealthyException exception)
+        {
+            PublishUnhealthy(exception.Report);
+        }
+        catch (Exception exception)
+        {
+            PublishUnhealthy(
+                GiveawayUnhealthyReport(
+                    PointsGiveawaySchedulerOperation.Schedule,
+                    schedule.GiveawayId,
+                    exception
+                )
+            );
+        }
         finally
         {
             RemoveCompleted(schedule.GiveawayId, cts);
@@ -182,70 +215,117 @@ internal sealed class PointsGiveawayScheduler(
         CancellationToken ct
     )
     {
-        var operation = operations.LoadActive();
-        var attempt = 1;
-        while (true)
+        try
         {
-            var result = ToAttempt(await operation.ExecuteAsync(ct));
-            switch (result)
+            var operation = operations.LoadActive();
+            var attempt = 1;
+            while (true)
             {
-                case OperationAttempt<IReadOnlyList<PointsGiveawaySchedule>>.Succeeded success:
-                    if (attempt > 1)
-                    {
-                        log.LogInformation(
-                            "Points giveaway scheduler rehydration recovered on attempt {Attempt}.",
-                            attempt
-                        );
-                    }
+                var result = ToAttempt(await operation.ExecuteAsync(ct));
+                switch (result)
+                {
+                    case OperationAttempt<
+                        IReadOnlyList<PointsGiveawaySchedule>,
+                        PointsGiveawaySchedulerTransientFailure
+                    >.Succeeded success:
+                        if (attempt > 1)
+                        {
+                            log.LogInformation(
+                                "Points giveaway scheduler rehydration recovered on attempt {Attempt}.",
+                                attempt
+                            );
+                        }
 
-                    return success.Value;
-                case OperationAttempt<IReadOnlyList<PointsGiveawaySchedule>>.Failed failure:
-                    ReportRehydrationRetryScheduled(attempt++, failure.Failure.Cause);
-                    await DelayForRecoveryAsync(ct);
-                    break;
-                default:
-                    throw new UnreachableException("Unknown scheduler operation attempt.");
+                        return success.Value;
+                    case OperationAttempt<
+                        IReadOnlyList<PointsGiveawaySchedule>,
+                        PointsGiveawaySchedulerTransientFailure
+                    >.Failed failure:
+                        ReportRehydrationRetryScheduled(attempt++, failure.Failure.Cause);
+                        await DelayForRecoveryAsync(ct);
+                        break;
+                    default:
+                        throw new UnreachableException("Unknown scheduler operation attempt.");
+                }
             }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var report = new PointsGiveawaySchedulerUnhealthyReport.Rehydration
+            {
+                Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(
+                    exception
+                ),
+                Cause = exception,
+            };
+            throw new PointsGiveawaySchedulerUnhealthyException(report);
         }
     }
 
     private async Task<TValue> ExecuteGiveawayOperationWithRecoveryAsync<TValue>(
-        IO<TValue, PointsGiveawaySchedulerOperationFailure> operation,
+        IO<TValue, PointsGiveawaySchedulerTransientFailure> operation,
         PointsGiveawaySchedulerOperation operationKind,
         int giveawayId,
         CancellationToken ct
     )
     {
-        var attempt = 1;
-        while (true)
+        try
         {
-            var result = ToAttempt(await operation.ExecuteAsync(ct));
-            switch (result)
+            var attempt = 1;
+            while (true)
             {
-                case OperationAttempt<TValue>.Succeeded success:
-                    if (attempt > 1)
-                    {
-                        log.LogInformation(
-                            "Points giveaway scheduler {Operation} recovered for giveaway {GiveawayId} on attempt {Attempt}.",
+                var result = ToAttempt(await operation.ExecuteAsync(ct));
+                switch (result)
+                {
+                    case OperationAttempt<
+                        TValue,
+                        PointsGiveawaySchedulerTransientFailure
+                    >.Succeeded success:
+                        if (attempt > 1)
+                        {
+                            log.LogInformation(
+                                "Points giveaway scheduler {Operation} recovered for giveaway {GiveawayId} on attempt {Attempt}.",
+                                operationKind,
+                                giveawayId,
+                                attempt
+                            );
+                        }
+
+                        return success.Value;
+                    case OperationAttempt<
+                        TValue,
+                        PointsGiveawaySchedulerTransientFailure
+                    >.Failed failure:
+                        ReportRetryScheduled(
                             operationKind,
                             giveawayId,
-                            attempt
+                            attempt++,
+                            failure.Failure.Cause
                         );
-                    }
-
-                    return success.Value;
-                case OperationAttempt<TValue>.Failed failure:
-                    ReportRetryScheduled(
-                        operationKind,
-                        giveawayId,
-                        attempt++,
-                        failure.Failure.Cause
-                    );
-                    await DelayForRecoveryAsync(ct);
-                    break;
-                default:
-                    throw new UnreachableException("Unknown scheduler operation attempt.");
+                        await DelayForRecoveryAsync(ct);
+                        break;
+                    default:
+                        throw new UnreachableException("Unknown scheduler operation attempt.");
+                }
             }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (PointsGiveawaySchedulerUnhealthyException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new PointsGiveawaySchedulerUnhealthyException(
+                GiveawayUnhealthyReport(operationKind, giveawayId, exception)
+            );
         }
     }
 
@@ -261,9 +341,15 @@ internal sealed class PointsGiveawayScheduler(
         );
         switch (result)
         {
-            case OperationAttempt<Option<string>>.Succeeded success:
+            case OperationAttempt<
+                Option<string>,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Succeeded success:
                 return success.Value;
-            case OperationAttempt<Option<string>>.Failed failure:
+            case OperationAttempt<
+                Option<string>,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Failed failure:
                 ReportNotificationFailure(
                     schedule.GiveawayId,
                     PointsGiveawayNotificationKind.Reminder,
@@ -286,15 +372,46 @@ internal sealed class PointsGiveawayScheduler(
         );
         switch (result)
         {
-            case OperationAttempt<Option<string>>.Succeeded success:
+            case OperationAttempt<
+                Option<string>,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Succeeded success:
                 return success.Value;
-            case OperationAttempt<Option<string>>.Failed failure:
+            case OperationAttempt<
+                Option<string>,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Failed failure:
                 ReportNotificationFailure(
                     schedule.GiveawayId,
                     PointsGiveawayNotificationKind.DrawResult,
                     failure.Failure.Cause
                 );
                 return Option<string>.None;
+            default:
+                throw new UnreachableException("Unknown scheduler operation attempt.");
+        }
+    }
+
+    private async Task NotifyChangedAsync(int giveawayId, CancellationToken ct)
+    {
+        var result = ToAttempt(await operations.NotifyChanged().ExecuteAsync(ct));
+        switch (result)
+        {
+            case OperationAttempt<
+                PointsGiveawayChangeNotificationCompleted,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Succeeded:
+                return;
+            case OperationAttempt<
+                PointsGiveawayChangeNotificationCompleted,
+                PointsGiveawaySchedulerNotificationFailure
+            >.Failed failure:
+                ReportNotificationFailure(
+                    giveawayId,
+                    PointsGiveawayNotificationKind.StateChanged,
+                    failure.Failure.Cause
+                );
+                return;
             default:
                 throw new UnreachableException("Unknown scheduler operation attempt.");
         }
@@ -314,6 +431,7 @@ internal sealed class PointsGiveawayScheduler(
         switch (outcome)
         {
             case PointsGiveawayExpirationOutcome.Expired:
+                await NotifyChangedAsync(schedule.GiveawayId, ct);
                 log.LogInformation(
                     "Expired overdue points giveaway {GiveawayId} for host {HostId}.",
                     schedule.GiveawayId,
@@ -351,6 +469,9 @@ internal sealed class PointsGiveawayScheduler(
                 throw;
             }
             catch (Exception exception)
+                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(
+                    exception
+                ))
             {
                 ReportNotificationFailure(schedule.GiveawayId, kind, exception);
             }
@@ -441,12 +562,59 @@ internal sealed class PointsGiveawayScheduler(
         return policy.RetryDelay;
     }
 
-    private static OperationAttempt<TValue> ToAttempt<TValue>(
-        Result<TValue, PointsGiveawaySchedulerOperationFailure> result
+    private void PublishUnhealthy(PointsGiveawaySchedulerUnhealthyReport report)
+    {
+        if (!unhealthyReports.Writer.TryWrite(report))
+            throw new UnreachableException("The scheduler unhealthy report could not be queued.");
+        LogUnhealthy(report);
+    }
+
+    private void LogUnhealthy(PointsGiveawaySchedulerUnhealthyReport report)
+    {
+        switch (report)
+        {
+            case PointsGiveawaySchedulerUnhealthyReport.Rehydration rehydration:
+                log.LogCritical(
+                    "Points giveaway scheduler rehydration is unhealthy after a {Classification} failure ({FailureType}); the hosted scheduler will stop.",
+                    rehydration.Classification,
+                    rehydration.FailureType.FullName
+                );
+                return;
+            case PointsGiveawaySchedulerUnhealthyReport.Giveaway giveaway:
+                log.LogCritical(
+                    "Points giveaway scheduler {Operation} is unhealthy for giveaway {GiveawayId} after a {Classification} failure ({FailureType}); the hosted scheduler will stop.",
+                    giveaway.Operation,
+                    giveaway.GiveawayId,
+                    giveaway.Classification,
+                    giveaway.FailureType.FullName
+                );
+                return;
+            default:
+                throw new UnreachableException("Unknown giveaway scheduler unhealthy report.");
+        }
+    }
+
+    private static PointsGiveawaySchedulerUnhealthyReport.Giveaway GiveawayUnhealthyReport(
+        PointsGiveawaySchedulerOperation operation,
+        int giveawayId,
+        Exception exception
     ) =>
-        result.Match<OperationAttempt<TValue>>(
-            value => new OperationAttempt<TValue>.Succeeded(value),
-            failure => new OperationAttempt<TValue>.Failed(failure)
+        new()
+        {
+            Operation = operation,
+            GiveawayId = giveawayId,
+            Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(
+                exception
+            ),
+            Cause = exception,
+        };
+
+    private static OperationAttempt<TValue, TError> ToAttempt<TValue, TError>(
+        Result<TValue, TError> result
+    ) =>
+        result.Match<OperationAttempt<TValue, TError>>(
+            value => new OperationAttempt<TValue, TError>.Succeeded(value),
+            failure => new OperationAttempt<TValue, TError>.Failed(failure)
         );
 
     private static IEnumerable<DateTime> ReminderTimes(PointsGiveawaySchedule schedule)
@@ -465,26 +633,19 @@ internal sealed class PointsGiveawayScheduler(
         public Task Task { get; set; } = Task.CompletedTask;
     }
 
-    private abstract record OperationAttempt<TValue>
+    private abstract record OperationAttempt<TValue, TError>
     {
         private OperationAttempt() { }
 
-        internal sealed record Succeeded(TValue Value) : OperationAttempt<TValue>;
+        internal sealed record Succeeded(TValue Value) : OperationAttempt<TValue, TError>;
 
-        internal sealed record Failed(PointsGiveawaySchedulerOperationFailure Failure)
-            : OperationAttempt<TValue>;
+        internal sealed record Failed(TError Failure) : OperationAttempt<TValue, TError>;
     }
-}
-
-internal enum PointsGiveawaySchedulerOperation
-{
-    Schedule,
-    Draw,
-    Expire,
 }
 
 internal enum PointsGiveawayNotificationKind
 {
     Reminder,
     DrawResult,
+    StateChanged,
 }

@@ -3,18 +3,51 @@ using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Features.Points.Giveaways;
 
 public sealed class PointsGiveawayDrawService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
-    IPointsRandom random,
-    PointsChangeNotifier changes
+    IPointsRandom random
 )
 {
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
+        CancellationToken ct
+    )
+    {
+        PointsGiveawayDrawOutcome? committedOutcome = null;
+        try
+        {
+            return await DrawAndCommitOutcomeAsync(
+                giveawayId,
+                outcome => committedOutcome = outcome,
+                ct
+            );
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (PointsGiveawayDrawCommitAmbiguousException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (committedOutcome is not null)
+        {
+            throw new PointsGiveawayDrawPostCommitException(
+                giveawayId,
+                committedOutcome,
+                exception
+            );
+        }
+    }
+
+    private async Task<PointsGiveawayDrawOutcome> DrawAndCommitOutcomeAsync(
+        int giveawayId,
+        Action<PointsGiveawayDrawOutcome> onCommitted,
         CancellationToken ct
     )
     {
@@ -57,9 +90,10 @@ public sealed class PointsGiveawayDrawService(
             .ToList();
         if (entrants.Count == 0)
         {
-            await tx.CommitAsync(ct);
-            await changes.NotifyChangedAsync(ct);
-            return PointsGiveawayDrawOutcome.NoEntrants(settings);
+            var outcome = PointsGiveawayDrawOutcome.NoEntrants(settings);
+            await CommitAsync(tx, giveawayId, outcome, ct);
+            onCommitted(outcome);
+            return outcome;
         }
 
         var winnerCount = Math.Min(Math.Max(1, giveaway.WinnerCount), entrants.Count);
@@ -92,9 +126,10 @@ public sealed class PointsGiveawayDrawService(
         }
 
         await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
-        return PointsGiveawayDrawOutcome.WithWinners(settings, winnerPayouts);
+        var completed = PointsGiveawayDrawOutcome.WithWinners(settings, winnerPayouts);
+        await CommitAsync(tx, giveawayId, completed, ct);
+        onCommitted(completed);
+        return completed;
     }
 
     private PointAmount RandomPayout(string minimum, string maximum)
@@ -106,4 +141,51 @@ public sealed class PointsGiveawayDrawService(
             range <= int.MaxValue ? random.Next(0, (int)range + 1) : random.Next(0, int.MaxValue);
         return new PointAmount((min + offset) * 10);
     }
+
+    private static async Task CommitAsync(
+        IDbContextTransaction transaction,
+        int giveawayId,
+        PointsGiveawayDrawOutcome intendedOutcome,
+        CancellationToken ct
+    )
+    {
+        try
+        {
+            await transaction.CommitAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new PointsGiveawayDrawCommitAmbiguousException(
+                giveawayId,
+                intendedOutcome,
+                exception
+            );
+        }
+    }
+}
+
+internal sealed class PointsGiveawayDrawCommitAmbiguousException(
+    int giveawayId,
+    PointsGiveawayDrawOutcome intendedOutcome,
+    Exception innerException
+) : Exception("The points giveaway draw commit outcome is ambiguous.", innerException)
+{
+    internal int GiveawayId { get; } = giveawayId;
+
+    internal PointsGiveawayDrawOutcome IntendedOutcome { get; } = intendedOutcome;
+}
+
+internal sealed class PointsGiveawayDrawPostCommitException(
+    int giveawayId,
+    PointsGiveawayDrawOutcome committedOutcome,
+    Exception innerException
+) : Exception("The committed points giveaway draw cleanup failed.", innerException)
+{
+    internal int GiveawayId { get; } = giveawayId;
+
+    internal PointsGiveawayDrawOutcome CommittedOutcome { get; } = committedOutcome;
 }

@@ -250,7 +250,10 @@ public sealed class PointsGiveawayService(
 
         var result = await draws.DrawOutcomeAsync(giveawayId.Value, ct);
         if (result.Success)
+        {
             scheduler.Cancel(giveawayId.Value);
+            await changes.NotifyChangedAsync(ct);
+        }
 
         return result;
     }

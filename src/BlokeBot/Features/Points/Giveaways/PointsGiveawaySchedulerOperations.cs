@@ -3,62 +3,73 @@ using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Features.Points.Giveaways;
 
 internal interface IPointsGiveawaySchedulerOperations
 {
-    IO<IReadOnlyList<PointsGiveawaySchedule>, PointsGiveawaySchedulerOperationFailure> LoadActive();
+    IO<IReadOnlyList<PointsGiveawaySchedule>, PointsGiveawaySchedulerTransientFailure> LoadActive();
 
-    IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildUpdate(
+    IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildUpdate(
         int giveawayId,
         DateTime endsAtUtc
     );
 
-    IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerOperationFailure> Draw(
+    IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
         int giveawayId
     );
 
-    IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildDrawNotification(
+    IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
         PointsGiveawayDrawOutcome outcome
     );
 
-    IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerOperationFailure> Expire(
+    IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure> Expire(
         int giveawayId
     );
+
+    IO<
+        PointsGiveawayChangeNotificationCompleted,
+        PointsGiveawaySchedulerNotificationFailure
+    > NotifyChanged();
 }
 
 internal sealed class PointsGiveawaySchedulerOperations(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointsGiveawayDrawService draws,
     PointsGiveawayMessageFormatter formatter,
-    PointsChangeNotifier changes,
+    IPointsGiveawayChangeNotification changeNotification,
     TimeProvider timeProvider
 ) : IPointsGiveawaySchedulerOperations
 {
     public IO<
         IReadOnlyList<PointsGiveawaySchedule>,
-        PointsGiveawaySchedulerOperationFailure
-    > LoadActive() => Capture(LoadActiveAsync);
+        PointsGiveawaySchedulerTransientFailure
+    > LoadActive() => CaptureDurable(LoadActiveAsync);
 
-    public IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildUpdate(
+    public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildUpdate(
         int giveawayId,
         DateTime endsAtUtc
-    ) => Capture(ct => BuildUpdateAsync(giveawayId, endsAtUtc, ct));
+    ) => CaptureNotification(ct => BuildUpdateAsync(giveawayId, endsAtUtc, ct));
 
-    public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerOperationFailure> Draw(
+    public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
         int giveawayId
     ) =>
-        Capture(ct => DrawAsync(giveawayId, ct));
+        CaptureDurable(ct => DrawAsync(giveawayId, ct));
 
-    public IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildDrawNotification(
+    public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
         PointsGiveawayDrawOutcome outcome
-    ) => Capture(ct => BuildDrawNotificationAsync(outcome, ct));
+    ) => CaptureNotification(ct => BuildDrawNotificationAsync(outcome, ct));
 
     public IO<
         PointsGiveawayExpirationOutcome,
-        PointsGiveawaySchedulerOperationFailure
-    > Expire(int giveawayId) => Capture(ct => ExpireAsync(giveawayId, ct));
+        PointsGiveawaySchedulerTransientFailure
+    > Expire(int giveawayId) => CaptureDurable(ct => ExpireAsync(giveawayId, ct));
+
+    public IO<
+        PointsGiveawayChangeNotificationCompleted,
+        PointsGiveawaySchedulerNotificationFailure
+    > NotifyChanged() => CaptureNotification(NotifyChangedAsync);
 
     private async ValueTask<IReadOnlyList<PointsGiveawaySchedule>> LoadActiveAsync(
         CancellationToken ct
@@ -123,7 +134,41 @@ internal sealed class PointsGiveawaySchedulerOperations(
         CancellationToken ct
     )
     {
+        PointsGiveawayExpirationOutcome? committedOutcome = null;
+        try
+        {
+            return await ExpireAndCommitAsync(
+                giveawayId,
+                outcome => committedOutcome = outcome,
+                ct
+            );
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (PointsGiveawayExpirationCommitAmbiguousException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (committedOutcome is not null)
+        {
+            throw new PointsGiveawayExpirationPostCommitException(
+                giveawayId,
+                committedOutcome.Value,
+                exception
+            );
+        }
+    }
+
+    private async ValueTask<PointsGiveawayExpirationOutcome> ExpireAndCommitAsync(
+        int giveawayId,
+        Action<PointsGiveawayExpirationOutcome> onCommitted,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var expired = await db
             .PointsGiveaways.Where(x =>
                 x.Id == giveawayId && x.Status == PointsGiveawayStatus.Active
@@ -139,17 +184,62 @@ internal sealed class PointsGiveawaySchedulerOperations(
         if (expired == 0)
             return PointsGiveawayExpirationOutcome.AlreadyInactive;
 
-        await changes.NotifyChangedAsync(ct);
+        await CommitExpirationAsync(transaction, giveawayId, ct);
+        onCommitted(PointsGiveawayExpirationOutcome.Expired);
         return PointsGiveawayExpirationOutcome.Expired;
     }
 
-    private static IO<TValue, PointsGiveawaySchedulerOperationFailure> Capture<TValue>(
+    private async ValueTask<PointsGiveawayChangeNotificationCompleted> NotifyChangedAsync(
+        CancellationToken ct
+    )
+    {
+        await changeNotification.NotifyAsync(ct);
+        return new PointsGiveawayChangeNotificationCompleted();
+    }
+
+    private static IO<TValue, PointsGiveawaySchedulerTransientFailure> CaptureDurable<TValue>(
         Func<CancellationToken, ValueTask<TValue>> operation
     ) =>
-        IO<TValue, PointsGiveawaySchedulerOperationFailure>.FromException<Exception>(
-            operation,
-            exception => new PointsGiveawaySchedulerOperationFailure(exception)
-        );
+        IO<TValue, PointsGiveawaySchedulerTransientFailure>.Create(async ct =>
+        {
+            try
+            {
+                return Result<TValue, PointsGiveawaySchedulerTransientFailure>.Success(
+                    await operation(ct)
+                );
+            }
+            catch (Exception exception)
+                when (PointsGiveawaySchedulerFailureClassifier.IsTransient(exception))
+            {
+                ct.ThrowIfCancellationRequested();
+                return Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
+                    new PointsGiveawaySchedulerTransientFailure(exception)
+                );
+            }
+        });
+
+    private static IO<TValue, PointsGiveawaySchedulerNotificationFailure> CaptureNotification<
+        TValue
+    >(Func<CancellationToken, ValueTask<TValue>> operation) =>
+        IO<TValue, PointsGiveawaySchedulerNotificationFailure>.Create(async ct =>
+        {
+            try
+            {
+                return Result<TValue, PointsGiveawaySchedulerNotificationFailure>.Success(
+                    await operation(ct)
+                );
+            }
+            catch (Exception exception)
+                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(
+                    exception
+                ))
+            {
+                ct.ThrowIfCancellationRequested();
+                return Result<TValue, PointsGiveawaySchedulerNotificationFailure>.Error(
+                    new PointsGiveawaySchedulerNotificationFailure(exception)
+                );
+            }
+        });
 
     private static Option<string> Message(string? message) =>
         string.IsNullOrWhiteSpace(message)
@@ -166,9 +256,56 @@ internal sealed class PointsGiveawaySchedulerOperations(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await PointsGiveawayQueries.LoadReplyDeliveryAsync(db, hostId, ct);
     }
+
+    private static async Task CommitExpirationAsync(
+        IDbContextTransaction transaction,
+        int giveawayId,
+        CancellationToken ct
+    )
+    {
+        try
+        {
+            await transaction.CommitAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new PointsGiveawayExpirationCommitAmbiguousException(
+                giveawayId,
+                exception
+            );
+        }
+    }
 }
 
-internal sealed record PointsGiveawaySchedulerOperationFailure(Exception Cause);
+internal sealed record PointsGiveawaySchedulerTransientFailure(Exception Cause);
+
+internal sealed record PointsGiveawaySchedulerNotificationFailure(Exception Cause);
+
+internal sealed class PointsGiveawayExpirationCommitAmbiguousException(
+    int giveawayId,
+    Exception innerException
+) : Exception("The points giveaway expiration commit outcome is ambiguous.", innerException)
+{
+    internal int GiveawayId { get; } = giveawayId;
+
+    internal PointsGiveawayExpirationOutcome IntendedOutcome =>
+        PointsGiveawayExpirationOutcome.Expired;
+}
+
+internal sealed class PointsGiveawayExpirationPostCommitException(
+    int giveawayId,
+    PointsGiveawayExpirationOutcome committedOutcome,
+    Exception innerException
+) : Exception("The committed points giveaway expiration cleanup failed.", innerException)
+{
+    internal int GiveawayId { get; } = giveawayId;
+
+    internal PointsGiveawayExpirationOutcome CommittedOutcome { get; } = committedOutcome;
+}
 
 internal enum PointsGiveawayExpirationOutcome
 {

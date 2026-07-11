@@ -207,6 +207,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<PointsConfigurationService>();
         services.AddSingleton<PointsDashboardService>();
         services.AddSingleton<
+            IPointsGiveawayChangeNotification,
+            PointsGiveawayChangeNotification
+        >();
+        services.AddSingleton<
             IPointsGiveawaySchedulerOperations,
             PointsGiveawaySchedulerOperations
         >();
