@@ -1,5 +1,7 @@
+using System.Threading.Channels;
 using BlokeBot.Twitch.Runtime;
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -203,7 +205,7 @@ public sealed class OutboundMessageQueueTests
     {
         var recording = new RecordingQueueAlertObserver();
         var dispatcher = new TwitchOutboundQueueAlertDispatcher(
-            [new ThrowingQueueAlertObserver(), recording],
+            [new ThrowingQueueAlertObserver("Observer failed."), recording],
             QueueAlertFanOut()
         );
         var alert = new TwitchOutboundQueueBacklog(
@@ -216,6 +218,83 @@ public sealed class OutboundMessageQueueTests
         await dispatcher.NotifyAsync([alert], CancellationToken.None);
 
         recording.Alerts.ShouldBe([alert]);
+    }
+
+    [Test]
+    public async Task AlertHandlingEscalation_ProcessingQueue_SendsPendingAndLaterMessages()
+    {
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var logger = new RecordingLogger<TwitchOutboundMessageQueue>();
+        var queue = new TwitchOutboundMessageQueue(
+            TwitchBotSettings.FromOptions(
+                new TwitchBotOptions
+                {
+                    ChatMessageSendIntervalSeconds = 10,
+                    DuplicateChatMessageCooldownSeconds = 0,
+                    OutboundQueueAlerts = new TwitchOutboundQueueAlertOptions
+                    {
+                        StuckAfterSeconds = 5,
+                    },
+                }
+            ),
+            clock,
+            new TwitchOutboundDuplicateCooldown(),
+            new TwitchOutboundQueueBacklogMonitor(),
+            new TwitchOutboundQueueAlertDispatcher(
+                [new ThrowingQueueAlertObserver("observer secret payload")],
+                RuntimeTestObserverFanOut.EscalatingContinue<
+                    TwitchOutboundQueueAlertObserverBoundary,
+                    TwitchOutboundQueueBacklog,
+                    TwitchOutboundQueueAlertDeadLetter
+                >(
+                    TwitchBotObserverBoundaries.OutboundQueueAlerts,
+                    new IOException("reporter secret payload")
+                )
+            ),
+            logger
+        );
+        var sent = new List<string>();
+
+        await queue.SendAsync("channel", "first", SendAsync, CancellationToken.None);
+        var second = queue.SendAsync(
+            "channel",
+            "second secret chat payload",
+            SendAsync,
+            CancellationToken.None
+        );
+        second.IsCompleted.ShouldBeFalse();
+        await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await second;
+
+        var third = queue.SendAsync("channel", "third", SendAsync, CancellationToken.None);
+        third.IsCompleted.ShouldBeFalse();
+        await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await third;
+
+        sent.ShouldBe(["first", "second secret chat payload", "third"]);
+        logger.Entries.Count.ShouldBe(2);
+        foreach (var entry in logger.Entries)
+        {
+            entry.Level.ShouldBe(LogLevel.Error);
+            entry.Exception.ShouldBeNull();
+            entry.Message.ShouldContain("Continuing queued chat processing");
+            entry.Message.ShouldContain(TwitchBotObserverBoundaries.OutboundQueueAlerts.Value);
+            entry.Message.ShouldContain(nameof(ObserverFailureHandlingStage.Reporter));
+            entry.Message.ShouldNotContain("observer secret payload");
+            entry.Message.ShouldNotContain("reporter secret payload");
+            entry.Message.ShouldNotContain("second secret chat payload");
+        }
+        return;
+
+        Task SendAsync(TwitchOutboundChatMessage message, CancellationToken _)
+        {
+            sent.Add(message.Message);
+            return Task.CompletedTask;
+        }
     }
 
     private static TwitchOutboundMessageQueue CreateQueue(
@@ -283,20 +362,47 @@ public sealed class OutboundMessageQueueTests
         }
     }
 
-    private sealed class ThrowingQueueAlertObserver : ITwitchOutboundQueueAlertObserver
+    private sealed class ThrowingQueueAlertObserver(string failureMessage)
+        : ITwitchOutboundQueueAlertObserver
     {
         public ValueTask QueueBackedUpAsync(
             TwitchOutboundQueueBacklog backlog,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("Observer failed.");
+        ) => throw new InvalidOperationException(failureMessage);
     }
+
+    private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
+    {
+        internal List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception
+    );
 
     private sealed class ManualTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
         private readonly object gate = new();
         private readonly List<ManualTimer> timers = [];
+        private readonly Channel<bool> timerRegistrations =
+            Channel.CreateUnbounded<bool>();
         private DateTimeOffset now = initialNow;
-        private TaskCompletionSource? timerWaiter;
+        private bool waitingForTimerRegistration;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -333,17 +439,22 @@ public sealed class OutboundMessageQueueTests
                 timer.Fire();
         }
 
-        public Task WaitForTimerRegistrationAsync()
+        public ValueTask<bool> WaitForTimerRegistrationAsync()
         {
             lock (gate)
             {
                 if (timers.Count > 0)
-                    return Task.CompletedTask;
+                    return ValueTask.FromResult(true);
 
-                timerWaiter = new TaskCompletionSource(
-                    TaskCreationOptions.RunContinuationsAsynchronously
-                );
-                return timerWaiter.Task;
+                if (waitingForTimerRegistration)
+                {
+                    throw new InvalidOperationException(
+                        "Only one timer-registration observer is supported."
+                    );
+                }
+
+                waitingForTimerRegistration = true;
+                return timerRegistrations.Reader.ReadAsync();
             }
         }
 
@@ -353,8 +464,16 @@ public sealed class OutboundMessageQueueTests
             {
                 if (!timers.Contains(timer))
                     timers.Add(timer);
-                timerWaiter?.TrySetResult();
-                timerWaiter = null;
+                if (!waitingForTimerRegistration)
+                    return;
+
+                waitingForTimerRegistration = false;
+                if (!timerRegistrations.Writer.TryWrite(true))
+                {
+                    throw new InvalidOperationException(
+                        "The timer-registration observer could not be notified."
+                    );
+                }
             }
         }
 

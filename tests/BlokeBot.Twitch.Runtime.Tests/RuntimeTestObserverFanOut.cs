@@ -19,6 +19,21 @@ internal static class RuntimeTestObserverFanOut
             new TestCorrelationIdProvider()
         );
 
+    internal static ObserverFanOut<TBoundary, TEvent, TDeadLetter> EscalatingContinue<
+        TBoundary,
+        TEvent,
+        TDeadLetter
+    >(ObserverBoundary boundary, Exception reporterFailure)
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        new(
+            new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
+            {
+                Boundary = boundary,
+            },
+            new ThrowingReporter(reporterFailure),
+            new TestCorrelationIdProvider()
+        );
+
     private sealed class TestReporter : IObserverFailureDiagnosticReporter
     {
         private readonly List<ObserverFailureDiagnosticReport> reports = [];
@@ -39,5 +54,14 @@ internal static class RuntimeTestObserverFanOut
 
         public ObserverCorrelationId Next() =>
             ObserverCorrelationId.Named($"runtime-test-{++next}");
+    }
+
+    private sealed class ThrowingReporter(Exception failure)
+        : IObserverFailureDiagnosticReporter
+    {
+        public ValueTask ReportAsync(
+            ObserverFailureDiagnosticReport report,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromException(failure);
     }
 }

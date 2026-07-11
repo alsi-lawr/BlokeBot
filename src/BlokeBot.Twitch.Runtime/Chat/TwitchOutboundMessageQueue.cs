@@ -1,3 +1,4 @@
+using BlokeBot.Eventing;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -107,7 +108,14 @@ internal sealed class TwitchOutboundMessageQueue(
                 }
             }
 
-            await alertDispatcher.NotifyAsync(queueAlerts, CancellationToken.None);
+            try
+            {
+                await alertDispatcher.NotifyAsync(queueAlerts, CancellationToken.None);
+            }
+            catch (ObserverFanOutEscalationException escalation)
+            {
+                ReportAlertEscalation(escalation, queueAlerts.Count);
+            }
 
             if (item is null)
             {
@@ -198,6 +206,54 @@ internal sealed class TwitchOutboundMessageQueue(
 
     private TimeSpan QueueStuckThreshold =>
         TimeSpan.FromSeconds(Math.Max(0, settings.OutboundQueueAlerts.StuckAfterSeconds));
+
+    private void ReportAlertEscalation(
+        ObserverFanOutEscalationException escalation,
+        int alertCount
+    )
+    {
+        var boundaries = string.Join(
+            ", ",
+            escalation.Failures
+                .Select(failure => failure.Boundary.Value)
+                .Distinct(StringComparer.Ordinal)
+        );
+        var events = string.Join(
+            ", ",
+            escalation.Failures
+                .Select(failure => failure.Event.Value)
+                .Distinct(StringComparer.Ordinal)
+        );
+        var correlations = string.Join(
+            ", ",
+            escalation.Failures
+                .Select(failure => failure.CorrelationId.Value)
+                .Distinct(StringComparer.Ordinal)
+        );
+        var handlingStages = string.Join(
+            ", ",
+            escalation.HandlingFailures
+                .Select(failure => failure.Stage)
+                .Distinct()
+        );
+        var handlingFailureTypes = string.Join(
+            ", ",
+            escalation.HandlingFailures
+                .Select(failure => failure.FailureType)
+                .Distinct(StringComparer.Ordinal)
+        );
+        log.LogError(
+            "Outbound queue alert handling escalated for {AlertCount} alerts after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures at {Boundaries} for {Events}; stages {HandlingStages}, failure types {HandlingFailureTypes}, correlations {CorrelationIds}. Continuing queued chat processing.",
+            alertCount,
+            escalation.Failures.Count,
+            escalation.HandlingFailures.Count,
+            boundaries,
+            events,
+            handlingStages,
+            handlingFailureTypes,
+            correlations
+        );
+    }
 
     private int MaxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
 
