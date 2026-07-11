@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/BlokeBot.Commands/BlokeBot.Commands.csproj" />
     <Project Path="src/BlokeBot.Eventing/BlokeBot.Eventing.csproj" />
+    <Project Path="src/BlokeBot.Functional/BlokeBot.Functional.csproj" />
     <Project Path="src/BlokeBot.Persistence/BlokeBot.Persistence.csproj" />
     <Project Path="src/BlokeBot.Twitch.Auth/BlokeBot.Twitch.Auth.csproj" />
     <Project Path="src/BlokeBot.Twitch.Runtime/BlokeBot.Twitch.Runtime.csproj" />
@@ -11,6 +12,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/BlokeBot.Commands.Tests/BlokeBot.Commands.Tests.csproj" />
     <Project Path="tests/BlokeBot.Eventing.Tests/BlokeBot.Eventing.Tests.csproj" />
+    <Project Path="tests/BlokeBot.Functional.Tests/BlokeBot.Functional.Tests.csproj" />
     <Project Path="tests/BlokeBot.Integration.Tests/BlokeBot.Integration.Tests.csproj" />
     <Project Path="tests/BlokeBot.Persistence.Tests/BlokeBot.Persistence.Tests.csproj" />
     <Project Path="tests/BlokeBot.Testing/BlokeBot.Testing.csproj" />
