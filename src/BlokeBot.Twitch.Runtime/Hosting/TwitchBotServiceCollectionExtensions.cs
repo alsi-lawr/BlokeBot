@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Polly;
+using Polly.Registry;
 
 namespace BlokeBot.Twitch.Runtime;
 
@@ -140,6 +142,12 @@ public static class TwitchBotServiceCollectionExtensions
     )
     {
         RegisterSettings(services, settings);
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.TryAddSingleton<
+            ITwitchRuntimeSessionHealthReporter,
+            TwitchRuntimeSessionHealthLogger
+        >();
+        services.TryAddSingleton<ITwitchRuntimeIdleWait, TwitchRuntimeIdleWait>();
         RegisterPolicies(services, policies);
         RegisterAccountProvider(services, accountProvider);
         RegisterResponseSender(services, responseSender);
@@ -151,7 +159,6 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddContinueAndReportObserverPolicy(
             TwitchBotObserverPolicyKeys.OutboundQueueAlerts
         );
-        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddSingleton<TwitchOutboundDuplicateCooldown>();
         services.TryAddSingleton<TwitchOutboundQueueBacklogMonitor>();
         services.TryAddSingleton<TwitchOutboundQueueAlertDispatcher>();
@@ -161,8 +168,13 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<TwitchBotRuntimeStatusStore>()
         );
+        services.TryAddSingleton<
+            ITwitchEventSubConnectionSession,
+            TwitchEventSubConnectionSession
+        >();
         services.TryAddSingleton<TwitchEventSubRuntime>();
         services.TryAddSingleton<TwitchHelixChatClient>();
+        services.TryAddSingleton<ITwitchIrcConnectionSession, TwitchIrcConnectionSession>();
         services.TryAddSingleton<TwitchIrcRuntime>();
         services.AddSingleton<ITwitchBotRuntimeStrategy, TwitchEventSubRuntimeStrategy>();
         services.AddSingleton<ITwitchBotRuntimeStrategy, TwitchIrcRuntimeStrategy>();
@@ -314,5 +326,51 @@ public static class TwitchBotServiceCollectionExtensions
             policies.PublicChatRetry
         );
         services.AddSingleton(policies.PublicChatTerminalRetention);
+        services.AddResiliencePipeline(
+            TwitchBotResiliencePipeline.IrcSession,
+            (builder, context) =>
+            {
+                builder.TimeProvider = context.ServiceProvider.GetRequiredService<TimeProvider>();
+                TwitchRuntimeSessionResilience.ConfigureIrc(
+                    builder,
+                    policies.IrcSession,
+                    context.ServiceProvider.GetRequiredService<
+                        ITwitchRuntimeSessionHealthReporter
+                    >()
+                );
+            }
+        );
+        services.AddResiliencePipeline(
+            TwitchBotResiliencePipeline.EventSubSession,
+            (builder, context) =>
+            {
+                builder.TimeProvider = context.ServiceProvider.GetRequiredService<TimeProvider>();
+                TwitchRuntimeSessionResilience.ConfigureEventSub(
+                    builder,
+                    policies.EventSubSession,
+                    context.ServiceProvider.GetRequiredService<
+                        ITwitchRuntimeSessionHealthReporter
+                    >()
+                );
+            }
+        );
+        services.AddSingleton(serviceProvider =>
+            new TwitchIrcSessionResiliencePipeline(
+                serviceProvider
+                    .GetRequiredService<
+                        ResiliencePipelineProvider<TwitchBotResiliencePipeline>
+                    >()
+                    .GetPipeline(TwitchBotResiliencePipeline.IrcSession)
+            )
+        );
+        services.AddSingleton(serviceProvider =>
+            new TwitchEventSubSessionResiliencePipeline(
+                serviceProvider
+                    .GetRequiredService<
+                        ResiliencePipelineProvider<TwitchBotResiliencePipeline>
+                    >()
+                    .GetPipeline(TwitchBotResiliencePipeline.EventSubSession)
+            )
+        );
     }
 }

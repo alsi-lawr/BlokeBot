@@ -13,7 +13,7 @@ public sealed class ChatActivityHookTests
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
-        var runtime = new TwitchIrcRuntime(
+        var session = new TwitchIrcConnectionSession(
             TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
@@ -23,10 +23,10 @@ public sealed class ChatActivityHookTests
             new RecordingCommandResponseSender(recorder),
             new TwitchBotRuntimeStatusStore(),
             [new RecordingChatMessageObserver(recorder)],
-            NullLogger<TwitchIrcRuntime>.Instance
+            NullLogger<TwitchIrcConnectionSession>.Instance
         );
 
-        await runtime.DispatchChatMessageAsync(
+        await session.DispatchChatMessageAsync(
             new TwitchChatMessage(
                 "viewer",
                 "streamer",
@@ -45,7 +45,7 @@ public sealed class ChatActivityHookTests
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
-        var runtime = new TwitchEventSubRuntime(
+        var session = new TwitchEventSubConnectionSession(
             TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
@@ -56,10 +56,10 @@ public sealed class ChatActivityHookTests
             null!,
             new TwitchBotRuntimeStatusStore(),
             [new RecordingChatMessageObserver(recorder)],
-            NullLogger<TwitchEventSubRuntime>.Instance
+            NullLogger<TwitchEventSubConnectionSession>.Instance
         );
 
-        await runtime.DispatchChatMessageAsync(
+        await session.DispatchChatMessageAsync(
             new TwitchEventSubChatMessageEvent
             {
                 BroadcasterUserLogin = "streamer",
