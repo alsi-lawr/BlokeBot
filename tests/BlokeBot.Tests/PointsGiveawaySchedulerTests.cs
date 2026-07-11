@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data.Common;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
@@ -10,7 +11,9 @@ using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -70,6 +73,98 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
+    public async Task OverdueGiveaways_ExpiringConcurrently_UseDistinctFactoryConnections()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var firstHostId = await SeedHostAsync(dbFactory, "first-streamer");
+        var secondHostId = await SeedHostAsync(dbFactory, "second-streamer");
+        var firstStartedAtUtc = DateTime.UtcNow.AddMinutes(-10);
+        var firstEndsAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        var firstGiveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            firstHostId,
+            firstStartedAtUtc,
+            firstEndsAtUtc
+        );
+        var secondStartedAtUtc = DateTime.UtcNow.AddMinutes(-9);
+        var secondEndsAtUtc = DateTime.UtcNow.AddMinutes(-4);
+        var secondGiveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            secondHostId,
+            secondStartedAtUtc,
+            secondEndsAtUtc
+        );
+        var recordingFactory = new RecordingDbContextFactory(dbFactory);
+        var scheduler = CreateScheduler(recordingFactory);
+        await using var firstContext = await recordingFactory.CreateDbContextAsync();
+        await using var secondContext = await recordingFactory.CreateDbContextAsync();
+        await firstContext.Database.OpenConnectionAsync();
+        await secondContext.Database.OpenConnectionAsync();
+
+        firstContext.Database.GetDbConnection().ShouldNotBeSameAs(
+            secondContext.Database.GetDbConnection()
+        );
+        await Task.WhenAll(
+            Task.Run(() =>
+                scheduler.ExecuteScheduleAsync(
+                    new PointsGiveawaySchedule(
+                        firstGiveawayId,
+                        firstHostId,
+                        "first-streamer",
+                        firstStartedAtUtc,
+                        firstEndsAtUtc,
+                        null
+                    ),
+                    CancellationToken.None
+                )
+            ),
+            Task.Run(() =>
+                scheduler.ExecuteScheduleAsync(
+                    new PointsGiveawaySchedule(
+                        secondGiveawayId,
+                        secondHostId,
+                        "second-streamer",
+                        secondStartedAtUtc,
+                        secondEndsAtUtc,
+                        null
+                    ),
+                    CancellationToken.None
+                )
+            )
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var statuses = await db
+            .PointsGiveaways.Where(x =>
+                x.Id == firstGiveawayId || x.Id == secondGiveawayId
+            )
+            .Select(x => x.Status)
+            .ToArrayAsync();
+        statuses.ShouldBe([
+            PointsGiveawayStatus.Expired,
+            PointsGiveawayStatus.Expired,
+        ], ignoreOrder: true);
+        var connections = recordingFactory.Connections;
+        connections.Length.ShouldBeGreaterThanOrEqualTo(4);
+        connections
+            .Distinct(ReferenceEqualityComparer.Instance)
+            .Count()
+            .ShouldBe(connections.Length);
+    }
+
+    [Test]
+    public void SqliteBusyAndLocked_Classifying_AreTransientWithDirectEfWrapping()
+    {
+        var busy = new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY);
+        var locked = new SqliteException("database locked", SQLitePCL.raw.SQLITE_LOCKED);
+        var wrappedLocked = new DbUpdateException("update locked", locked);
+
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(busy).ShouldBeTrue();
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(locked).ShouldBeTrue();
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(wrappedLocked).ShouldBeTrue();
+    }
+
+    [Test]
     public async Task ClassifiedTransientStorageFailure_Rehydrating_RetriesProductionOperation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -81,7 +176,7 @@ public sealed class PointsGiveawaySchedulerTests
             now.UtcDateTime,
             now.AddHours(1).UtcDateTime
         );
-        var transient = new TestTransientDbException();
+        var transient = new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY);
         var flakyFactory = new FailingOnceDbContextFactory(dbFactory, transient);
         var timeProvider = new StaticTimeProvider(now);
         var changes = new PointsChangeNotifier(TestEventBus.Create<AppEventKind>());
@@ -116,6 +211,72 @@ public sealed class PointsGiveawaySchedulerTests
         );
 
         await scheduler.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task SqliteConstraintWrappedByDbUpdate_Rehydrating_IsTerminalWithoutRetry()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var constraint = new SqliteException(
+            "constraint secret",
+            SQLitePCL.raw.SQLITE_CONSTRAINT
+        );
+        var terminal = new DbUpdateException("update secret", constraint);
+        var genericDatabaseFailure = new TestDatabaseException();
+        var flakyFactory = new FailingOnceDbContextFactory(dbFactory, terminal);
+        var timeProvider = new StaticTimeProvider(
+            new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero)
+        );
+        var changes = new PointsChangeNotifier(TestEventBus.Create<AppEventKind>());
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = new PointsGiveawayScheduler(
+            new PointsGiveawaySchedulerOperations(
+                flakyFactory,
+                CreateDrawService(flakyFactory),
+                new PointsGiveawayMessageFormatter(),
+                new PointsGiveawayChangeNotification(changes),
+                timeProvider
+            ),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
+            timeProvider,
+            logger
+        );
+
+        var thrown = await Should.ThrowAsync<PointsGiveawaySchedulerUnhealthyException>(() =>
+            scheduler.RehydrateAsync(CancellationToken.None)
+        );
+
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(constraint).ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(terminal).ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier
+            .IsTransient(genericDatabaseFailure)
+            .ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier
+            .IsNotificationFailure(terminal)
+            .ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier
+            .IsNotificationFailure(genericDatabaseFailure)
+            .ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(constraint).ShouldBe(
+            PointsGiveawaySchedulerFailureClassification.Terminal
+        );
+        PointsGiveawaySchedulerFailureClassifier
+            .ClassifyUnhealthy(genericDatabaseFailure)
+            .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
+        flakyFactory.Attempts.ShouldBe(1);
+        var report = thrown.Report.ShouldBeOfType<
+            PointsGiveawaySchedulerUnhealthyReport.Rehydration
+        >();
+        report.Classification.ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
+        report.Cause.ShouldBeSameAs(terminal);
+        thrown.InnerException.ShouldBeSameAs(terminal);
+        var diagnostic = logger.Entries.Single();
+        diagnostic.Level.ShouldBe(LogLevel.Critical);
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic.Message.ShouldNotContain("constraint secret");
+        diagnostic.Message.ShouldNotContain("update secret");
+        diagnostic.Message.ShouldNotContain("retry scheduled");
     }
 
     [Test]
@@ -265,11 +426,11 @@ public sealed class PointsGiveawaySchedulerTests
         var draw = new PointsGiveawayDrawCommitAmbiguousException(
             42,
             intendedDraw,
-            new TestTransientDbException()
+            new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
         );
         var expiration = new PointsGiveawayExpirationCommitAmbiguousException(
             42,
-            new TestTransientDbException()
+            new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
         );
 
         PointsGiveawaySchedulerFailureClassifier.IsTransient(draw).ShouldBeFalse();
@@ -284,6 +445,44 @@ public sealed class PointsGiveawaySchedulerTests
         );
         expiration.GiveawayId.ShouldBe(42);
         expiration.IntendedOutcome.ShouldBe(PointsGiveawayExpirationOutcome.Expired);
+    }
+
+    [Test]
+    public async Task CommitStageCancellation_Drawing_IsTerminalAmbiguousAndNotRetryable()
+    {
+        var commitCancellation = new CommitCancellationInterceptor();
+        await using var dbFactory = await InterceptedSqliteBlokeBotDbFactory.CreateAsync(
+            commitCancellation
+        );
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(dbFactory, hostId);
+        var giveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow.AddMinutes(-1),
+            DateTime.UtcNow.AddMinutes(1),
+            "entrant"
+        );
+        commitCancellation.FailNextCommit();
+
+        var thrown = await Should.ThrowAsync<PointsGiveawayDrawCommitAmbiguousException>(() =>
+            CreateDrawService(dbFactory).DrawOutcomeAsync(giveawayId, CancellationToken.None)
+        );
+
+        commitCancellation.CommitAttempts.ShouldBe(1);
+        commitCancellation.ObservedCancellationToken.CanBeCanceled.ShouldBeFalse();
+        thrown.GiveawayId.ShouldBe(giveawayId);
+        thrown.IntendedOutcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.Winners);
+        thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
+        PointsGiveawaySchedulerFailureClassifier.IsTransient(thrown).ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(thrown).ShouldBe(
+            PointsGiveawaySchedulerFailureClassification.Terminal
+        );
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
+        giveaway.Status.ShouldBe(PointsGiveawayStatus.Active);
+        (await db.PointsGiveawayWinners.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
+        (await db.PointLedgerEntries.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
     }
 
     [Test]
@@ -405,7 +604,7 @@ public sealed class PointsGiveawaySchedulerTests
         );
         var flakyFactory = new FailingOnceDbContextFactory(
             dbFactory,
-            new TestTransientDbException()
+            new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
         );
         var chat = new RecordingSchedulerNotification();
         var logger = new RecordingLogger<PointsGiveawayScheduler>();
@@ -709,7 +908,9 @@ public sealed class PointsGiveawaySchedulerTests
         balance.Amount.ShouldBe("10");
     }
 
-    private static PointsGiveawayScheduler CreateScheduler(SqliteBlokeBotDbFactory dbFactory)
+    private static PointsGiveawayScheduler CreateScheduler(
+        IDbContextFactory<BlokeBotDbContext> dbFactory
+    )
     {
         var timeProvider = TimeProvider.System;
         var formatter = new PointsGiveawayMessageFormatter();
@@ -788,10 +989,15 @@ public sealed class PointsGiveawaySchedulerTests
 
     private static Result<TValue, PointsGiveawaySchedulerTransientFailure> Failure<TValue>() =>
         Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
-            new PointsGiveawaySchedulerTransientFailure(new TestTransientDbException())
+            new PointsGiveawaySchedulerTransientFailure(
+                new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
+            )
         );
 
-    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
+    private static async Task<int> SeedHostAsync(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        string login
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
@@ -806,7 +1012,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     private static async Task SeedSettingsAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int hostId,
         Action<PointsSettings>? configure = null
     )
@@ -825,7 +1031,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     private static async Task<int> SeedGiveawayAsync(
-        SqliteBlokeBotDbFactory dbFactory,
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
         int hostId,
         DateTime startedAtUtc,
         DateTime endsAtUtc,
@@ -1041,7 +1247,102 @@ public sealed class PointsGiveawaySchedulerTests
         }
     }
 
-    private sealed class TestTransientDbException : DbException;
+    private sealed class RecordingDbContextFactory(
+        IDbContextFactory<BlokeBotDbContext> inner
+    ) : IDbContextFactory<BlokeBotDbContext>
+    {
+        private readonly ConcurrentQueue<DbConnection> connections = [];
+
+        public DbConnection[] Connections => connections.ToArray();
+
+        public BlokeBotDbContext CreateDbContext()
+        {
+            var db = inner.CreateDbContext();
+            connections.Enqueue(db.Database.GetDbConnection());
+            return db;
+        }
+
+        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            var db = await inner.CreateDbContextAsync(cancellationToken);
+            connections.Enqueue(db.Database.GetDbConnection());
+            return db;
+        }
+    }
+
+    private sealed class InterceptedSqliteBlokeBotDbFactory(
+        SqliteConnection keeperConnection,
+        DbContextOptions<BlokeBotDbContext> options
+    ) : IDbContextFactory<BlokeBotDbContext>, IAsyncDisposable
+    {
+        public static async Task<InterceptedSqliteBlokeBotDbFactory> CreateAsync(
+            IInterceptor interceptor
+        )
+        {
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = $"BlokeBotInterceptedTests-{Guid.NewGuid():N}",
+                Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false,
+                DefaultTimeout = 0,
+            }.ToString();
+            var keeperConnection = new SqliteConnection(connectionString);
+            await keeperConnection.OpenAsync();
+            var creationOptions = new DbContextOptionsBuilder<BlokeBotDbContext>()
+                .UseSqlite(connectionString)
+                .Options;
+            await using (var db = new BlokeBotDbContext(creationOptions))
+                await db.Database.EnsureCreatedAsync();
+
+            var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+                .UseSqlite(connectionString)
+                .AddInterceptors(interceptor)
+                .Options;
+            return new InterceptedSqliteBlokeBotDbFactory(keeperConnection, options);
+        }
+
+        public BlokeBotDbContext CreateDbContext() => new(options);
+
+        public Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        ) => Task.FromResult(CreateDbContext());
+
+        public async ValueTask DisposeAsync() => await keeperConnection.DisposeAsync();
+    }
+
+    private sealed class CommitCancellationInterceptor : DbTransactionInterceptor
+    {
+        private bool failNextCommit;
+
+        public int CommitAttempts { get; private set; }
+
+        public CancellationToken ObservedCancellationToken { get; private set; }
+
+        public void FailNextCommit() => failNextCommit = true;
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (!failNextCommit)
+                return ValueTask.FromResult(result);
+
+            failNextCommit = false;
+            CommitAttempts++;
+            ObservedCancellationToken = cancellationToken;
+            return ValueTask.FromException<InterceptionResult>(
+                new OperationCanceledException("commit cancellation")
+            );
+        }
+    }
+
+    private sealed class TestDatabaseException : DbException;
 
     private sealed class ThrowingGiveawayChangeNotification(string failureMessage)
         : IPointsGiveawayChangeNotification

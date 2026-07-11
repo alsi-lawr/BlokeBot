@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Diagnostics;
 using BlokeBot.Eventing;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Points.Giveaways;
@@ -59,17 +60,22 @@ internal sealed class PointsGiveawaySchedulerUnhealthyException(
 internal static class PointsGiveawaySchedulerFailureClassifier
 {
     internal static bool IsTransient(Exception exception) =>
-        exception is DbException or DbUpdateException or TimeoutException;
+        exception switch
+        {
+            SqliteException sqliteException => IsTransient(sqliteException),
+            DbUpdateException { InnerException: SqliteException sqliteException } =>
+                IsTransient(sqliteException),
+            TimeoutException => true,
+            _ => false,
+        };
 
     internal static bool IsNotificationFailure(Exception exception) =>
-        exception
-            is DbException
-                or DbUpdateException
-                or HttpRequestException
+        IsTransient(exception)
+        || exception
+            is HttpRequestException
                 or IOException
                 or ObserverFanOutEscalationException
-                or OperationCanceledException
-                or TimeoutException;
+                or OperationCanceledException;
 
     internal static PointsGiveawaySchedulerFailureClassification ClassifyUnhealthy(
         Exception exception
@@ -79,10 +85,17 @@ internal static class PointsGiveawaySchedulerFailureClassifier
                 or InvalidOperationException
                 or NotSupportedException
                 or UnreachableException
+                or DbException
+                or DbUpdateException
                 or PointsGiveawayDrawCommitAmbiguousException
                 or PointsGiveawayDrawPostCommitException
                 or PointsGiveawayExpirationCommitAmbiguousException
                 or PointsGiveawayExpirationPostCommitException
             ? PointsGiveawaySchedulerFailureClassification.Terminal
             : PointsGiveawaySchedulerFailureClassification.Unexpected;
+
+    private static bool IsTransient(SqliteException exception) =>
+        exception.SqliteErrorCode
+            is SQLitePCL.raw.SQLITE_BUSY
+                or SQLitePCL.raw.SQLITE_LOCKED;
 }

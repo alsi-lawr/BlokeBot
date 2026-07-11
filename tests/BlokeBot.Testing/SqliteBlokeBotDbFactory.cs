@@ -6,20 +6,33 @@ namespace BlokeBot.Testing;
 
 public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContext>, IAsyncDisposable
 {
-    private readonly SqliteConnection connection;
+    private readonly SqliteConnection keeperConnection;
     private readonly DbContextOptions<BlokeBotDbContext> options;
 
-    private SqliteBlokeBotDbFactory(SqliteConnection connection)
+    private SqliteBlokeBotDbFactory(
+        SqliteConnection keeperConnection,
+        string connectionString
+    )
     {
-        this.connection = connection;
-        options = new DbContextOptionsBuilder<BlokeBotDbContext>().UseSqlite(connection).Options;
+        this.keeperConnection = keeperConnection;
+        options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connectionString)
+            .Options;
     }
 
     public static async Task<SqliteBlokeBotDbFactory> CreateAsync()
     {
-        var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var factory = new SqliteBlokeBotDbFactory(connection);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = $"BlokeBotTests-{Guid.NewGuid():N}",
+            Mode = SqliteOpenMode.Memory,
+            Cache = SqliteCacheMode.Shared,
+            Pooling = false,
+            DefaultTimeout = 0,
+        }.ToString();
+        var keeperConnection = new SqliteConnection(connectionString);
+        await keeperConnection.OpenAsync();
+        var factory = new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
         await using var db = factory.CreateDbContext();
         await db.Database.EnsureCreatedAsync();
         return factory;
@@ -31,5 +44,5 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
         CancellationToken cancellationToken = default
     ) => ValueTask.FromResult(CreateDbContext());
 
-    public async ValueTask DisposeAsync() => await connection.DisposeAsync();
+    public async ValueTask DisposeAsync() => await keeperConnection.DisposeAsync();
 }

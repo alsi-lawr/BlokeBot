@@ -263,13 +263,10 @@ internal sealed class PointsGiveawaySchedulerOperations(
         CancellationToken ct
     )
     {
+        ct.ThrowIfCancellationRequested();
         try
         {
-            await transaction.CommitAsync(ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
+            await transaction.CommitAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
