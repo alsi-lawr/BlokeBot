@@ -2,87 +2,85 @@ namespace BlokeBot.Twitch.Auth;
 
 internal sealed class TwitchAccessTokenProvider(
     TwitchBotIdentity identity,
+    ITwitchAccessTokenCache cache,
     ITwitchTokenStore tokenStore,
     ITwitchOAuthClient oauth
-) : ITwitchAccessTokenProvider, ITwitchAccessTokenCache
+) : ITwitchAccessTokenProvider
 {
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private TwitchTokenSet? state;
-    private bool loaded;
+    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+        cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken);
 
-    public async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    private async Task<string> GetAccessTokenSynchronizedAsync(
+        ITwitchAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
     {
-        await gate.WaitAsync(cancellationToken);
-        try
-        {
-            await LoadTokenIfNeededAsync(cancellationToken);
+        await LoadTokenIfNeededAsync(transaction, cancellationToken);
 
-            var accessToken = await TryGetAccessTokenAsync(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(accessToken))
-                return accessToken;
+        var accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(accessToken))
+            return accessToken;
 
-            await LoadTokenAsync(cancellationToken);
-            accessToken = await TryGetAccessTokenAsync(cancellationToken);
-            if (!string.IsNullOrWhiteSpace(accessToken))
-                return accessToken;
+        await LoadTokenAsync(transaction, cancellationToken);
+        accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(accessToken))
+            return accessToken;
 
-            throw new TwitchAccessTokenUnavailableException(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
-                TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
-            );
-        }
-        finally
-        {
-            gate.Release();
-        }
+        throw new TwitchAccessTokenUnavailableException(
+            TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+        );
     }
 
-    public async Task ClearAsync(CancellationToken cancellationToken)
+    private async Task LoadTokenAsync(
+        ITwitchAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
     {
-        await gate.WaitAsync(cancellationToken);
-        try
-        {
-            state = null;
-            loaded = true;
-        }
-        finally
-        {
-            gate.Release();
-        }
+        var loadedToken = await tokenStore.LoadAsync(
+            identity.TokenCachePath,
+            cancellationToken
+        );
+        transaction.SetLoaded(loadedToken);
     }
 
-    private async Task LoadTokenAsync(CancellationToken cancellationToken)
+    private async Task LoadTokenIfNeededAsync(
+        ITwitchAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
     {
-        state = await tokenStore.LoadAsync(identity.TokenCachePath, cancellationToken);
-        loaded = true;
+        if (!transaction.IsLoaded)
+            await LoadTokenAsync(transaction, cancellationToken);
     }
 
-    private async Task LoadTokenIfNeededAsync(CancellationToken cancellationToken)
-    {
-        if (!loaded)
-            await LoadTokenAsync(cancellationToken);
-    }
-
-    private async Task<string?> TryGetAccessTokenAsync(CancellationToken cancellationToken)
+    private async Task<string?> TryGetAccessTokenAsync(
+        ITwitchAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
     {
         if (
-            state is { } current
+            transaction.Current is { } current
             && current.ExpiresAtUtc > DateTimeOffset.UtcNow
             && await oauth.ValidateAsync(current.AccessToken, cancellationToken)
         )
             return current.AccessToken;
 
-        if (state is { RefreshToken.Length: > 0 } refreshable)
+        if (transaction.Current is { RefreshToken.Length: > 0 } refreshable)
         {
             var refreshed = await oauth.RefreshAsync(refreshable.RefreshToken, cancellationToken);
-            state = string.IsNullOrWhiteSpace(refreshed.RefreshToken)
+            var refreshedTokenSet = string.IsNullOrWhiteSpace(refreshed.RefreshToken)
                 ? refreshed with
                 {
                     RefreshToken = refreshable.RefreshToken,
                 }
                 : refreshed;
-            await tokenStore.SaveAsync(identity.TokenCachePath, state, cancellationToken);
-            return state.AccessToken;
+            await tokenStore.SaveAsync(
+                identity.TokenCachePath,
+                refreshedTokenSet,
+                cancellationToken
+            );
+            transaction.SetLoaded(refreshedTokenSet);
+            return refreshedTokenSet.AccessToken;
         }
 
         return null;

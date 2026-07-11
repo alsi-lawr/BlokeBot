@@ -39,13 +39,8 @@ public static class TwitchAuthServiceCollectionExtensions
         services.TryAddSingleton<ITwitchOAuthStateStore, InMemoryTwitchOAuthStateStore>();
         services.TryAddSingleton<ITwitchOAuthClient, TwitchOAuthClient>();
         services.TryAddSingleton<ITwitchOAuthFlow, TwitchOAuthFlow>();
-        services.TryAddSingleton<TwitchAccessTokenProvider>();
-        services.TryAddSingleton<ITwitchAccessTokenProvider>(sp =>
-            sp.GetRequiredService<TwitchAccessTokenProvider>()
-        );
-        services.TryAddSingleton<ITwitchAccessTokenCache>(sp =>
-            sp.GetRequiredService<TwitchAccessTokenProvider>()
-        );
+        services.TryAddSingleton<ITwitchAccessTokenCache, TwitchAccessTokenCache>();
+        services.TryAddSingleton<ITwitchAccessTokenProvider, TwitchAccessTokenProvider>();
 
         return services;
     }

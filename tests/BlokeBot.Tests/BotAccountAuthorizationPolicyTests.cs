@@ -87,6 +87,11 @@ public sealed class BotAccountAuthorizationPolicyTests
     {
         public int ClearCount { get; private set; }
 
+        Task<TResult> ITwitchAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
+            Func<ITwitchAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Read-through should not run while clearing.");
+
         public Task ClearAsync(CancellationToken cancellationToken)
         {
             ClearCount++;
