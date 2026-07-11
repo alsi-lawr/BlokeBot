@@ -10,17 +10,23 @@ internal sealed class TwitchEventSubRuntime(
 {
     public Task RunAsync(CancellationToken stoppingToken) =>
         TwitchRuntimeSessionRunner.RunUntilStoppedAsync(
-            RunSessionAsync,
+            TwitchBotRuntime.EventSub,
+            new TwitchRuntimeConnectionTarget.Initial(),
+            EstablishSessionAsync,
+            TwitchEventSubSessionFailureClassifier.Classify,
+            health,
+            status,
             idleWait,
             stoppingToken
         );
 
-    internal Task<TwitchRuntimeSessionOutcome> RunSessionAsync(
+    internal Task<TwitchRuntimeSessionOutcome> EstablishSessionAsync(
+        TwitchRuntimeConnectionTarget target,
         CancellationToken stoppingToken
     ) =>
-        TwitchRuntimeSessionRunner.RunOnceAsync(
+        TwitchRuntimeSessionRunner.EstablishOnceAsync(
             TwitchBotRuntime.EventSub,
-            session.RunAsync,
+            cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
             TwitchEventSubSessionFailureClassifier.Classify,
             health,

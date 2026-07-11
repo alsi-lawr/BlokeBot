@@ -8,7 +8,10 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface ITwitchEventSubConnectionSession
 {
-    Task RunAsync(CancellationToken cancellationToken);
+    Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
+        TwitchRuntimeConnectionTarget target,
+        CancellationToken cancellationToken
+    );
 }
 
 internal sealed class TwitchEventSubConnectionSession(
@@ -26,12 +29,14 @@ internal sealed class TwitchEventSubConnectionSession(
 ) : ITwitchEventSubConnectionSession
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly Uri DefaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
     private readonly TwitchBotSettings opts = settings;
+    private ILogger<TwitchEventSubConnectionSession> Log { get; } = log;
 
-    public Task RunAsync(CancellationToken cancellationToken) =>
-        RunWebSocketAsync(null, cancellationToken);
-
-    private async Task RunWebSocketAsync(string? reconnectUrl, CancellationToken cancellationToken)
+    public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
+        TwitchRuntimeConnectionTarget target,
+        CancellationToken cancellationToken
+    )
     {
         var channelLogins = TwitchChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
@@ -39,89 +44,66 @@ internal sealed class TwitchEventSubConnectionSession(
         if (channelLogins.Length == 0)
         {
             status.SetConnected(false, []);
-            log.LogWarning(
+            Log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );
-            return;
+            return new TwitchRuntimeSessionEstablishment.Idle();
         }
 
-        using var socket = new ClientWebSocket();
-        var uri = new Uri(reconnectUrl ?? "wss://eventsub.wss.twitch.tv/ws");
-        await socket.ConnectAsync(uri, cancellationToken);
-        log.LogInformation("Connected to Twitch EventSub WebSocket.");
-        var activeSubscriptions = new Dictionary<string, ActiveEventSubSubscription>(
-            StringComparer.OrdinalIgnoreCase
-        );
-        string? activeSessionId = null;
-
-        while (!cancellationToken.IsCancellationRequested)
+        var endpoint = target switch
         {
+            TwitchRuntimeConnectionTarget.Initial => DefaultEndpoint,
+            TwitchRuntimeConnectionTarget.EventSubReconnect reconnect => reconnect.Uri,
+            _ => throw new InvalidOperationException(
+                "Unknown EventSub connection target."
+            ),
+        };
+        var socket = new ClientWebSocket();
+        try
+        {
+            await socket.ConnectAsync(endpoint, cancellationToken);
+            Log.LogInformation("Connected to Twitch EventSub WebSocket.");
             var json = await ReadTextMessageAsync(socket, cancellationToken);
             if (json is null)
                 throw new IOException("EventSub WebSocket disconnected.");
 
             var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(json, JsonOptions);
-            var rawMessageType = envelope?.Metadata.MessageType;
-            var messageType = TwitchEventSubMessageTypes.Parse(rawMessageType);
+            var messageType = TwitchEventSubMessageTypes.Parse(
+                envelope?.Metadata.MessageType
+            );
+            if (messageType is not TwitchEventSubMessageType.SessionWelcome)
+                throw new InvalidOperationException(
+                    "EventSub did not begin with a session welcome message."
+                );
 
-            switch (messageType)
+            var sessionId = envelope?.Payload.Session?.Id;
+            if (string.IsNullOrWhiteSpace(sessionId))
+                throw new InvalidOperationException(
+                    "EventSub session welcome did not include a session ID."
+                );
+
+            var activeSubscriptions = new Dictionary<string, ActiveEventSubSubscription>(
+                StringComparer.OrdinalIgnoreCase
+            );
+            await SyncChatSubscriptionsAsync(
+                activeSubscriptions,
+                sessionId,
+                cancellationToken
+            );
+            return new TwitchRuntimeSessionEstablishment.Established
             {
-                case TwitchEventSubMessageType.SessionWelcome:
-                    var sessionId = envelope?.Payload.Session?.Id;
-                    if (string.IsNullOrWhiteSpace(sessionId))
-                        throw new InvalidOperationException(
-                            "EventSub session welcome did not include a session ID."
-                        );
-
-                    activeSessionId = sessionId;
-                    await SyncChatSubscriptionsAsync(
-                        activeSubscriptions,
-                        sessionId,
-                        cancellationToken
-                    );
-                    break;
-
-                case TwitchEventSubMessageType.SessionKeepalive:
-                    if (activeSessionId is not null)
-                    {
-                        await SyncChatSubscriptionsAsync(
-                            activeSubscriptions,
-                            activeSessionId,
-                            cancellationToken
-                        );
-                    }
-                    break;
-
-                case TwitchEventSubMessageType.SessionReconnect:
-                    var reconnect = envelope?.Payload.Session?.ReconnectUrl;
-                    if (string.IsNullOrWhiteSpace(reconnect))
-                        throw new InvalidOperationException(
-                            "EventSub reconnect message did not include a reconnect URL."
-                        );
-
-                    log.LogInformation("Twitch requested EventSub WebSocket reconnect.");
-                    await RunWebSocketAsync(reconnect, cancellationToken);
-                    return;
-
-                case TwitchEventSubMessageType.Notification:
-                    if (envelope?.Payload.Event is not { } chatEvent)
-                        break;
-
-                    await DispatchChatMessageAsync(chatEvent, json, cancellationToken);
-                    break;
-
-                case TwitchEventSubMessageType.Revocation:
-                    log.LogWarning("EventSub subscription was revoked: {Payload}", json);
-                    throw new InvalidOperationException("EventSub chat subscription was revoked.");
-
-                case TwitchEventSubMessageType.Unknown:
-                    log.LogDebug(
-                        "Unhandled EventSub message type {MessageType}: {Payload}",
-                        rawMessageType,
-                        json
-                    );
-                    break;
-            }
+                Session = new EstablishedSession(
+                    this,
+                    socket,
+                    activeSubscriptions,
+                    sessionId
+                ),
+            };
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
         }
     }
 
@@ -155,7 +137,7 @@ internal sealed class TwitchEventSubConnectionSession(
             }
             catch (Exception ex)
             {
-                log.LogWarning(
+                Log.LogWarning(
                     ex,
                     "Bot account is not available for EventSub channel #{Channel}; skipping subscription.",
                     channel
@@ -176,7 +158,10 @@ internal sealed class TwitchEventSubConnectionSession(
             );
             activeSubscriptions.Remove(channel);
             stoppedChannels.Add(channel);
-            log.LogInformation("Unsubscribed from EventSub chat messages for #{Channel}.", channel);
+            Log.LogInformation(
+                "Unsubscribed from EventSub chat messages for #{Channel}.",
+                channel
+            );
         }
 
         foreach (var (channel, botAccount) in desiredAccounts.ToArray())
@@ -219,7 +204,7 @@ internal sealed class TwitchEventSubConnectionSession(
                 );
                 await SendStartupMessageAsync(channel, cancellationToken);
                 startedChannels.Add(channel);
-                log.LogInformation(
+                Log.LogInformation(
                     "Subscribed to EventSub chat messages for #{Channel} as {BotUsername}.",
                     channel,
                     botAccount.Login
@@ -232,7 +217,7 @@ internal sealed class TwitchEventSubConnectionSession(
             catch (Exception ex)
             {
                 stoppedChannels.Add(channel);
-                log.LogWarning(
+                Log.LogWarning(
                     ex,
                     "Could not subscribe to EventSub chat messages for #{Channel} as {BotUsername}.",
                     channel,
@@ -270,7 +255,7 @@ internal sealed class TwitchEventSubConnectionSession(
         }
         catch (Exception ex)
         {
-            log.LogWarning(
+            Log.LogWarning(
                 ex,
                 "Could not delete EventSub chat subscription for #{Channel}; removing local subscription state.",
                 channel
@@ -330,7 +315,7 @@ internal sealed class TwitchEventSubConnectionSession(
             }
             catch (Exception ex)
             {
-                log.LogWarning(ex, "Twitch EventSub chat message observer failed.");
+                Log.LogWarning(ex, "Twitch EventSub chat message observer failed.");
             }
         }
     }
@@ -379,6 +364,117 @@ internal sealed class TwitchEventSubConnectionSession(
         }
 
         return Encoding.UTF8.GetString(message.ToArray());
+    }
+
+    private static Uri RequireReconnectEndpoint(string? reconnectUrl)
+    {
+        if (
+            !Uri.TryCreate(reconnectUrl, UriKind.Absolute, out var endpoint)
+            || (
+                !endpoint.Scheme.Equals(Uri.UriSchemeWs, StringComparison.OrdinalIgnoreCase)
+                && !endpoint.Scheme.Equals(
+                    Uri.UriSchemeWss,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+        )
+        {
+            throw new InvalidOperationException(
+                "EventSub reconnect message did not include a valid WebSocket URL."
+            );
+        }
+
+        return endpoint;
+    }
+
+    private sealed class EstablishedSession(
+        TwitchEventSubConnectionSession owner,
+        ClientWebSocket socket,
+        Dictionary<string, ActiveEventSubSubscription> activeSubscriptions,
+        string sessionId
+    ) : ITwitchRuntimeEstablishedSession
+    {
+        public async Task<TwitchRuntimeReconnectRequest> ListenAsync(
+            CancellationToken cancellationToken
+        )
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var json = await ReadTextMessageAsync(socket, cancellationToken);
+                if (json is null)
+                    throw new IOException("EventSub WebSocket disconnected.");
+
+                var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(
+                    json,
+                    JsonOptions
+                );
+                var rawMessageType = envelope?.Metadata.MessageType;
+                var messageType = TwitchEventSubMessageTypes.Parse(rawMessageType);
+
+                switch (messageType)
+                {
+                    case TwitchEventSubMessageType.SessionWelcome:
+                        throw new InvalidOperationException(
+                            "EventSub sent a duplicate session welcome message."
+                        );
+
+                    case TwitchEventSubMessageType.SessionKeepalive:
+                        await owner.SyncChatSubscriptionsAsync(
+                            activeSubscriptions,
+                            sessionId,
+                            cancellationToken
+                        );
+                        break;
+
+                    case TwitchEventSubMessageType.SessionReconnect:
+                        owner.Log.LogInformation(
+                            "Twitch requested EventSub WebSocket reconnect."
+                        );
+                        return new TwitchRuntimeReconnectRequest
+                        {
+                            Target = new TwitchRuntimeConnectionTarget.EventSubReconnect
+                            {
+                                Uri = RequireReconnectEndpoint(
+                                    envelope?.Payload.Session?.ReconnectUrl
+                                ),
+                            },
+                        };
+
+                    case TwitchEventSubMessageType.Notification:
+                        if (envelope?.Payload.Event is { } chatEvent)
+                            await owner.DispatchChatMessageAsync(
+                                chatEvent,
+                                json,
+                                cancellationToken
+                            );
+                        break;
+
+                    case TwitchEventSubMessageType.Revocation:
+                        owner.Log.LogWarning(
+                            "EventSub subscription was revoked: {Payload}",
+                            json
+                        );
+                        throw new InvalidOperationException(
+                            "EventSub chat subscription was revoked."
+                        );
+
+                    case TwitchEventSubMessageType.Unknown:
+                        owner.Log.LogDebug(
+                            "Unhandled EventSub message type {MessageType}: {Payload}",
+                            rawMessageType,
+                            json
+                        );
+                        break;
+                }
+            }
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            socket.Dispose();
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed record ActiveEventSubSubscription(

@@ -33,6 +33,11 @@ internal abstract record TwitchRuntimeSessionHealthReport
         private protected override void Seal() { }
     }
 
+    internal sealed record ReconnectScheduled : TwitchRuntimeSessionHealthReport
+    {
+        private protected override void Seal() { }
+    }
+
     internal sealed record Unhealthy : TwitchRuntimeSessionHealthReport
     {
         private protected override void Seal() { }
@@ -59,6 +64,15 @@ internal sealed class TwitchRuntimeSessionHealthLogger(
                     retry.Attempt,
                     retry.Classification,
                     retry.FailureType.FullName
+                );
+                return;
+            case TwitchRuntimeSessionHealthReport.ReconnectScheduled reconnect:
+                log.LogWarning(
+                    "{Runtime} session established on attempt {Attempt} disconnected with {Classification} ({FailureType}); a fresh bounded establishment cycle is scheduled.",
+                    reconnect.Runtime,
+                    reconnect.Attempt,
+                    reconnect.Classification,
+                    reconnect.FailureType.FullName
                 );
                 return;
             case TwitchRuntimeSessionHealthReport.Unhealthy unhealthy:

@@ -103,12 +103,14 @@ internal static class TwitchRuntimeSessionResilience
 
 internal sealed class TwitchIrcSessionResiliencePipeline(ResiliencePipeline pipeline)
 {
-    internal ValueTask ExecuteAsync(
-        Func<CancellationToken, Task> operation,
+    internal ValueTask<TwitchRuntimeSessionEstablishment> ExecuteAsync(
+        Func<CancellationToken, Task<TwitchRuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
     ) =>
         pipeline.ExecuteAsync(
-            static (callback, token) => new ValueTask(callback(token)),
+            static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
+                callback(token)
+            ),
             operation,
             cancellationToken
         );
@@ -116,12 +118,14 @@ internal sealed class TwitchIrcSessionResiliencePipeline(ResiliencePipeline pipe
 
 internal sealed class TwitchEventSubSessionResiliencePipeline(ResiliencePipeline pipeline)
 {
-    internal ValueTask ExecuteAsync(
-        Func<CancellationToken, Task> operation,
+    internal ValueTask<TwitchRuntimeSessionEstablishment> ExecuteAsync(
+        Func<CancellationToken, Task<TwitchRuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
     ) =>
         pipeline.ExecuteAsync(
-            static (callback, token) => new ValueTask(callback(token)),
+            static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
+                callback(token)
+            ),
             operation,
             cancellationToken
         );
