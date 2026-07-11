@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Commands\BlokeBot.Commands.csproj" />
+    <ProjectReference Include="..\BlokeBot.Eventing\BlokeBot.Eventing.csproj" />
     <ProjectReference Include="..\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
     <ProjectReference Include="..\BlokeBot.Twitch\BlokeBot.Twitch.csproj" />
   </ItemGroup>
@@ -12,5 +13,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+    <PackageReference Include="Microsoft.Extensions.Resilience" />
   </ItemGroup>
 </Project>

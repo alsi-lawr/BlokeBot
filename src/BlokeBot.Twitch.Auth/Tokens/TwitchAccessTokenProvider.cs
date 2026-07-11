@@ -1,9 +1,7 @@
-using Microsoft.Extensions.Options;
-
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class TwitchAccessTokenProvider(
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     ITwitchTokenStore tokenStore,
     ITwitchOAuthClient oauth
 ) : ITwitchAccessTokenProvider, ITwitchAccessTokenCache
@@ -55,7 +53,7 @@ internal sealed class TwitchAccessTokenProvider(
 
     private async Task LoadTokenAsync(CancellationToken cancellationToken)
     {
-        state = await tokenStore.LoadAsync(options.Value.TokenCachePath, cancellationToken);
+        state = await tokenStore.LoadAsync(identity.TokenCachePath, cancellationToken);
         loaded = true;
     }
 
@@ -83,7 +81,7 @@ internal sealed class TwitchAccessTokenProvider(
                     RefreshToken = refreshable.RefreshToken,
                 }
                 : refreshed;
-            await tokenStore.SaveAsync(options.Value.TokenCachePath, state, cancellationToken);
+            await tokenStore.SaveAsync(identity.TokenCachePath, state, cancellationToken);
             return state.AccessToken;
         }
 

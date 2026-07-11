@@ -6,7 +6,6 @@ using BlokeBot.Features.SiteAccess;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -294,7 +293,9 @@ public sealed class AccessListPolicyTests
         return new SiteAccessService(
             dbFactory,
             new BotAdminService(
-                Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
+                BotAdminSettings.FromOptions(
+                    new BlokeBotOptions { BotAdmins = botAdmins ?? [] }
+                )
             ),
             new SiteAccessChangeNotifier(events)
         );

@@ -4,7 +4,6 @@ using BlokeBot.Twitch;
 using BlokeBot.Twitch.Auth;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.Alerts;
 
@@ -13,12 +12,10 @@ internal sealed class OutboundQueueAlertWhisperSender(
     HostWhisperQuotaService quota,
     TwitchHelixApiClient users,
     TwitchHelixChatClient helix,
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     ILogger<OutboundQueueAlertWhisperSender> log
 ) : IOutboundQueueAlertSubscriber
 {
-    private readonly TwitchBotIdentityOptions identity = options.Value;
-
     public async Task AlertCreatedAsync(
         OutboundQueueAlertNotification request,
         CancellationToken ct

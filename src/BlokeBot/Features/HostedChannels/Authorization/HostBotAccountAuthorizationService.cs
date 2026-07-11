@@ -2,7 +2,6 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
@@ -13,11 +12,10 @@ public sealed class HostBotAccountAuthorizationService(
     TwitchHelixApiClient helix,
     TwitchTokenStatusService globalTokenStatus,
     HostedChannelChangeNotifier changes,
-    IOptions<TwitchBotOptions> options
+    TwitchBotSettings botSettings
 ) : ITwitchBotAccountProvider
 {
     private static readonly TimeSpan RefreshSkew = TimeSpan.FromMinutes(1);
-    private readonly TwitchBotOptions options = options.Value;
 
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(
         int hostId,
@@ -92,7 +90,7 @@ public sealed class HostBotAccountAuthorizationService(
             }
         }
 
-        var configuredBotLogin = TwitchLogin.Normalize(options.Identity.BotUsername);
+        var configuredBotLogin = botSettings.Identity.BotUsername;
         var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);
         return ActiveBotAccountTokenStatus.FromStatus(configuredBotLogin, null, globalStatus);
     }
@@ -138,7 +136,7 @@ public sealed class HostBotAccountAuthorizationService(
     {
         var status = await GetActiveTokenStatusAsync(
             channelLogin,
-            options.Identity.Scopes,
+            botSettings.Identity.Scopes,
             cancellationToken
         );
         if (
@@ -386,8 +384,8 @@ public sealed class HostBotAccountAuthorizationService(
         try
         {
             var refreshed = await oauth.RefreshAsync(
-                options.Identity.ClientId,
-                options.Identity.ClientSecret,
+                botSettings.Identity.ClientId,
+                botSettings.Identity.ClientSecret,
                 settings.RefreshToken,
                 ct
             );
@@ -416,7 +414,7 @@ public sealed class HostBotAccountAuthorizationService(
     )
     {
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(options.Identity.ClientId, accessToken),
+            new TwitchHelixRequestContext(botSettings.Identity.ClientId, accessToken),
             ct
         );
         if (user is null)
@@ -439,7 +437,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = options.Identity.Scopes;
+        var required = botSettings.Identity.Scopes;
         if (!overrideEnabled)
         {
             var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);

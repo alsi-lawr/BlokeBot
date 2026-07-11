@@ -3,7 +3,6 @@ using BlokeBot.Features.Alerts;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -72,7 +71,7 @@ public sealed class OutboundQueueAlertIntegrationTests
         ITwitchOutboundQueueAlertObserver observer
     ) =>
         new(
-            Options.Create(
+            TwitchBotSettings.FromOptions(
                 new TwitchBotOptions
                 {
                     ChatMessageSendIntervalSeconds = 10,

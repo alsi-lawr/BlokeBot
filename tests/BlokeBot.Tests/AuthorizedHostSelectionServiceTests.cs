@@ -11,7 +11,6 @@ using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -41,7 +40,7 @@ public sealed class AuthorizedHostSelectionServiceTests
             dbFactory,
             new SiteAccessService(
                 dbFactory,
-                new BotAdminService(Options.Create(new BlokeBotOptions())),
+                new BotAdminService(BotAdminSettings.FromOptions(new BlokeBotOptions())),
                 new SiteAccessChangeNotifier(events)
             ),
             modAccess,

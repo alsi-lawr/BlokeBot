@@ -1,9 +1,7 @@
-using Microsoft.Extensions.Options;
-
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class TwitchOAuthFlow(
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     ITwitchOAuthClient oauth,
     ITwitchOAuthStateStore states,
     ITwitchTokenStore tokens
@@ -27,7 +25,7 @@ internal sealed class TwitchOAuthFlow(
             throw new InvalidOperationException("Invalid OAuth state.");
 
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
-        await tokens.SaveAsync(options.Value.TokenCachePath, tokenSet, cancellationToken);
+        await tokens.SaveAsync(identity.TokenCachePath, tokenSet, cancellationToken);
         return tokenSet;
     }
 }

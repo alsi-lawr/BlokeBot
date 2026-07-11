@@ -12,7 +12,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -365,7 +364,7 @@ public sealed class PointsGiveawaySchedulerTests
     {
         var httpClientFactory = new FakeHttpClientFactory();
         var serviceProvider = new ServiceCollection().BuildServiceProvider();
-        var options = Options.Create(new TwitchBotOptions());
+        var options = TwitchBotSettings.FromOptions(new TwitchBotOptions());
         var oauth = new TwitchOAuthApiClient(httpClientFactory);
         var helix = new TwitchHelixApiClient(httpClientFactory);
         var hostBotAccounts = new HostBotAccountAuthorizationService(

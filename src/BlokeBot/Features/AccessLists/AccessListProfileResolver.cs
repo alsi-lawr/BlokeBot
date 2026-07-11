@@ -1,12 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.AccessLists;
 
 public sealed class AccessListProfileResolver(
     IServiceProvider services,
     TwitchHelixApiClient helix,
-    IOptions<TwitchBotOptions> options
+    TwitchBotSettings settings
 )
 {
     public async Task<IReadOnlyList<AccessListEntryProfile>> ResolveAsync(
@@ -22,7 +21,7 @@ public sealed class AccessListProfileResolver(
             return [];
 
         var appTokens = services.GetService<TwitchAppAccessTokenProvider>();
-        var clientId = options.Value.Identity.ClientId;
+        var clientId = settings.Identity.ClientId;
         if (appTokens is null || string.IsNullOrWhiteSpace(clientId))
             return entries.Select(login => new AccessListEntryProfile(login, null)).ToArray();
 

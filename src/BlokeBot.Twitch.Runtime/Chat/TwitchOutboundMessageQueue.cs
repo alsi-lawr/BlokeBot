@@ -1,10 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchOutboundMessageQueue(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     TimeProvider timeProvider,
     TwitchOutboundDuplicateCooldown duplicateCooldown,
     TwitchOutboundQueueBacklogMonitor backlogMonitor,
@@ -192,15 +191,15 @@ internal sealed class TwitchOutboundMessageQueue(
     }
 
     private TimeSpan SendInterval =>
-        TimeSpan.FromSeconds(Math.Max(0, options.Value.ChatMessageSendIntervalSeconds));
+        TimeSpan.FromSeconds(Math.Max(0, settings.ChatMessageSendIntervalSeconds));
 
     private TimeSpan DuplicateCooldown =>
-        TimeSpan.FromSeconds(Math.Max(0, options.Value.DuplicateChatMessageCooldownSeconds));
+        TimeSpan.FromSeconds(Math.Max(0, settings.DuplicateChatMessageCooldownSeconds));
 
     private TimeSpan QueueStuckThreshold =>
-        TimeSpan.FromSeconds(Math.Max(0, options.Value.OutboundQueueAlerts.StuckAfterSeconds));
+        TimeSpan.FromSeconds(Math.Max(0, settings.OutboundQueueAlerts.StuckAfterSeconds));
 
-    private int MaxMessageLength => Math.Max(0, options.Value.MaxChatMessageLength);
+    private int MaxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
 
     private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
         left >= right ? left : right;

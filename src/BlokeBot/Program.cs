@@ -62,7 +62,9 @@ builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
         ?? new BlokeBotOptions().DatabasePath
 );
-builder.Services.AddSingleton<EventBus<AppEventKind>>();
+builder.Services.AddEventBus<AppEventKind>(
+    ObserverFailurePolicyKey.Named("BlokeBot.ApplicationEvents")
+);
 builder
     .Services.AddBlokeBotAppCommands()
     .AddBlokeBotAlerts()
@@ -139,7 +141,6 @@ builder.Services.AddAuthorization(options =>
     );
 });
 
-builder.Services.AddOptions<TwitchBotOptions>().Bind(botSection);
 if (botRuntimeConfigured)
 {
     builder
@@ -150,6 +151,7 @@ if (botRuntimeConfigured)
 }
 else
 {
+    builder.Services.AddTwitchBotSettings(botSection);
     builder.Services.AddOfflineBotRuntimeStatus();
 }
 

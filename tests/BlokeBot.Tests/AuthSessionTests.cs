@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -246,7 +245,9 @@ public sealed class AuthSessionTests
     {
         var appEvents = new EventBus<AppEventKind>();
         var admins = new BotAdminService(
-            Options.Create(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
+            BotAdminSettings.FromOptions(
+                new BlokeBotOptions { BotAdmins = botAdmins ?? [] }
+            )
         );
         return new AuthCookieValidator(
             dbFactory,
@@ -256,7 +257,7 @@ public sealed class AuthSessionTests
             admins,
             new AuthSessionService(
                 admins,
-                Options.Create(
+                TwitchBotSettings.FromOptions(
                     new TwitchBotOptions
                     {
                         Identity = new TwitchBotIdentityOptions { BotUsername = botUsername },

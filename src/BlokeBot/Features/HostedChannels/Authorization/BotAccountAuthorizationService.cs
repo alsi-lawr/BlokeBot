@@ -1,6 +1,5 @@
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
@@ -26,7 +25,7 @@ public sealed record BotAccountAuthorizationStatus(
 );
 
 public sealed class BotAccountAuthorizationService(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     IServiceProvider services,
     TwitchHelixApiClient helix,
     TwitchTokenStatusService tokens,
@@ -35,8 +34,8 @@ public sealed class BotAccountAuthorizationService(
 {
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct)
     {
-        var configuredBotLogin = LoginName.Parse(options.Value.Identity.BotUsername).Value;
-        var status = await tokens.GetUserAccessTokenStatusAsync(options.Value.Identity.Scopes, ct);
+        var configuredBotLogin = settings.Identity.BotUsername;
+        var status = await tokens.GetUserAccessTokenStatusAsync(settings.Identity.Scopes, ct);
 
         if (status.State == TwitchTokenStatusState.Unavailable)
         {
@@ -124,7 +123,7 @@ public sealed class BotAccountAuthorizationService(
 
     public async Task ClearAsync(CancellationToken ct)
     {
-        var tokenCachePath = options.Value.Identity.TokenCachePath;
+        var tokenCachePath = settings.Identity.TokenCachePath;
         if (!string.IsNullOrWhiteSpace(tokenCachePath) && File.Exists(tokenCachePath))
             File.Delete(tokenCachePath);
 
@@ -144,7 +143,7 @@ public sealed class BotAccountAuthorizationService(
             return null;
 
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(options.Value.Identity.ClientId, status.AccessToken),
+            new TwitchHelixRequestContext(settings.Identity.ClientId, status.AccessToken),
             ct
         );
 

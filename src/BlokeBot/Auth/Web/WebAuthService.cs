@@ -4,7 +4,6 @@ using BlokeBot.Auth.Users;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Hosts;
 using BlokeBot.Identity;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Auth.Web;
 
@@ -13,7 +12,7 @@ internal sealed class WebAuthService(
     WebOAuthClient oauth,
     UserLookupService users,
     BotAdminService admins,
-    IOptions<TwitchBotOptions> botOptions,
+    TwitchBotSettings botSettings,
     AuthorizedHostSelectionService hosts
 )
 {
@@ -107,10 +106,10 @@ internal sealed class WebAuthService(
         configuration.IsConfigured(currentOptions);
 
     private bool IsConfiguredBotAccount(string login) =>
-        !string.IsNullOrWhiteSpace(botOptions.Value.Identity.BotUsername)
+        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
         && string.Equals(
             TwitchLogin.Normalize(login),
-            TwitchLogin.Normalize(botOptions.Value.Identity.BotUsername),
+            botSettings.Identity.BotUsername,
             StringComparison.Ordinal
         );
 }

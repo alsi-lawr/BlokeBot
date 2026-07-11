@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Status;
 
@@ -8,11 +7,9 @@ public sealed class HostBotStatusService(
     IServiceProvider services,
     HostBotAccountAuthorizationService botAccounts,
     TwitchHelixApiClient helix,
-    IOptions<TwitchBotOptions> options
+    TwitchBotSettings settings
 )
 {
-    private readonly TwitchBotOptions options = options.Value;
-
     public async Task<HostBotChannelStatus> GetStatusAsync(
         string channelLogin,
         CancellationToken ct
@@ -53,7 +50,7 @@ public sealed class HostBotStatusService(
     {
         var tokenStatus = await botAccounts.GetActiveTokenStatusAsync(
             channelLogin,
-            options.Identity.Scopes,
+            settings.Identity.Scopes,
             ct
         );
         return tokenStatus.State switch
@@ -195,7 +192,7 @@ public sealed class HostBotStatusService(
 
     private HostBotChannelStatusFlags ConfiguredFlags()
     {
-        return options
+        return settings
             .Identity.Scopes.Select(TwitchScopeSet.Normalize)
             .Aggregate(
                 HostBotChannelStatusFlags.None,
@@ -259,7 +256,7 @@ public sealed class HostBotStatusService(
     {
         var status = await botAccounts.GetActiveTokenStatusAsync(
             channelLogin,
-            options.Identity.Scopes,
+            settings.Identity.Scopes,
             ct
         );
         if (status.AccessToken is not null && status.Validation is not null)
@@ -283,5 +280,5 @@ public sealed class HostBotStatusService(
     }
 
     private TwitchHelixRequestContext HelixContext(string token) =>
-        new(options.Identity.ClientId, token);
+        new(settings.Identity.ClientId, token);
 }

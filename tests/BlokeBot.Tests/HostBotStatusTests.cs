@@ -6,7 +6,6 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -182,7 +181,7 @@ public sealed class HostBotStatusTests
             );
 
         var provider = services.BuildServiceProvider();
-        var options = Options.Create(
+        var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions

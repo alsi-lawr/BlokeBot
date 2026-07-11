@@ -3,12 +3,11 @@ using System.Net.Sockets;
 using System.Text;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchIrcRuntime(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     ITwitchBotChannelProvider channels,
     ITwitchAccessTokenProvider tokens,
     TwitchCommandDispatcher dispatcher,
@@ -20,7 +19,7 @@ internal sealed class TwitchIrcRuntime(
     ILogger<TwitchIrcRuntime> log
 )
 {
-    private readonly TwitchBotOptions opts = options.Value;
+    private readonly TwitchBotSettings opts = settings;
 
     public async Task RunAsync(CancellationToken stoppingToken)
     {

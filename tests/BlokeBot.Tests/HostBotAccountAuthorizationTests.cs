@@ -7,7 +7,6 @@ using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -20,7 +19,7 @@ public sealed class HostBotAccountAuthorizationTests
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
-            Options.Create(
+            TwitchBotSettings.FromOptions(
                 new TwitchBotOptions
                 {
                     Identity = new TwitchBotIdentityOptions
@@ -236,7 +235,7 @@ public sealed class HostBotAccountAuthorizationTests
             services.AddSingleton(tokenProvider);
 
         var serviceProvider = services.BuildServiceProvider();
-        var options = Options.Create(
+        var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions

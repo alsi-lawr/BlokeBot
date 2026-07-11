@@ -3,13 +3,12 @@ using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Hosts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Auth.Sessions;
 
 internal sealed class AuthSessionService(
     BotAdminService admins,
-    IOptions<TwitchBotOptions> botOptions
+    TwitchBotSettings botSettings
 )
 {
     public async Task SignInAsync(
@@ -153,10 +152,10 @@ internal sealed class AuthSessionService(
     }
 
     public bool IsConfiguredBotAccount(string login) =>
-        !string.IsNullOrWhiteSpace(botOptions.Value.Identity.BotUsername)
+        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
         && string.Equals(
             TwitchLogin.Normalize(login),
-            TwitchLogin.Normalize(botOptions.Value.Identity.BotUsername),
+            botSettings.Identity.BotUsername,
             StringComparison.Ordinal
         );
 

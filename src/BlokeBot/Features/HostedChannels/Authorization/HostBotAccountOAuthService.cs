@@ -1,19 +1,16 @@
 using BlokeBot.Identity;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public sealed class HostBotAccountOAuthService(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     TwitchOAuthApiClient oauth,
     TwitchHelixApiClient helix
 )
 {
-    private readonly TwitchBotOptions options = options.Value;
-
     public Uri CreateAuthorizationUri(string state, IEnumerable<string?>? scopes = null)
     {
-        var identity = options.Identity;
+        var identity = settings.Identity;
         ValidateConfiguredIdentity(identity, requireSecret: false);
 
         return oauth.CreateAuthorizationUri(
@@ -31,7 +28,7 @@ public sealed class HostBotAccountOAuthService(
         CancellationToken ct
     )
     {
-        var identity = options.Identity;
+        var identity = settings.Identity;
         ValidateConfiguredIdentity(identity, requireSecret: true);
 
         var token = await oauth.ExchangeCodeAsync(
@@ -66,10 +63,10 @@ public sealed class HostBotAccountOAuthService(
         );
     }
 
-    public string[] RequestedScopes() => TwitchScopeSet.NormalizeMany(options.Identity.Scopes);
+    public string[] RequestedScopes() => TwitchScopeSet.NormalizeMany(settings.Identity.Scopes);
 
     private static void ValidateConfiguredIdentity(
-        TwitchBotIdentityOptions identity,
+        TwitchBotIdentity identity,
         bool requireSecret
     )
     {

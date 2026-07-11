@@ -1,16 +1,13 @@
 using System.Net.Http.Json;
-using Microsoft.Extensions.Options;
-
 namespace BlokeBot.Twitch.Auth;
 
 public sealed class TwitchAppAccessTokenProvider(
     IHttpClientFactory factory,
-    IOptions<TwitchBotIdentityOptions> options
+    TwitchBotIdentity identity
 )
 {
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly HttpClient http = factory.CreateClient("twitch-oauth");
-    private readonly TwitchBotIdentityOptions opts = options.Value;
     private string? accessToken;
     private DateTimeOffset expiresAtUtc;
 
@@ -29,8 +26,8 @@ public sealed class TwitchAppAccessTokenProvider(
 
             var form = new Dictionary<string, string>
             {
-                ["client_id"] = opts.ClientId,
-                ["client_secret"] = opts.ClientSecret,
+                ["client_id"] = identity.ClientId,
+                ["client_secret"] = identity.ClientSecret,
                 ["grant_type"] = "client_credentials",
             };
 

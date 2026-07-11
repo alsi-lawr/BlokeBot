@@ -9,7 +9,6 @@ using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -125,11 +124,11 @@ public sealed class WhisperResponseTests
             helixUsers,
             new TwitchHelixChatClient(
                 httpClientFactory,
-                Options.Create(options.Value.Identity),
+                options.Identity,
                 helixUsers
             ),
             dbFactory,
-            Options.Create(options.Value.Identity),
+            options.Identity,
             NullLogger<HostWhisperCommandResponseSender>.Instance
         );
         var source = new TwitchChatMessage(
@@ -184,11 +183,11 @@ public sealed class WhisperResponseTests
             helixUsers,
             new TwitchHelixChatClient(
                 httpClientFactory,
-                Options.Create(options.Value.Identity),
+                options.Identity,
                 helixUsers
             ),
             dbFactory,
-            Options.Create(options.Value.Identity),
+            options.Identity,
             NullLogger<HostWhisperCommandResponseSender>.Instance
         );
         var source = new TwitchChatMessage(
@@ -220,7 +219,7 @@ public sealed class WhisperResponseTests
         var helixUsers = new TwitchHelixApiClient(httpClientFactory);
         var helix = new TwitchHelixChatClient(
             httpClientFactory,
-            Options.Create(options.Value.Identity),
+            options.Identity,
             helixUsers
         );
 
@@ -237,8 +236,8 @@ public sealed class WhisperResponseTests
         result.ResponseBody.ShouldBe(body);
     }
 
-    private static IOptions<TwitchBotOptions> BotOptions() =>
-        Options.Create(
+    private static TwitchBotSettings BotOptions() =>
+        TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions

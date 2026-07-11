@@ -1,16 +1,15 @@
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchBotRuntimeHostedService(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     IServiceProvider services
 ) : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return options.Value.Runtime switch
+        return settings.Runtime switch
         {
             var runtime when Matches<TwitchEventSubRuntimeStrategy>(runtime) =>
                 RunAsync<TwitchEventSubRuntimeStrategy>(stoppingToken),

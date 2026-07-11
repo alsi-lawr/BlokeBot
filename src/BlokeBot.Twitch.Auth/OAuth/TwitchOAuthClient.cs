@@ -1,18 +1,19 @@
-using Microsoft.Extensions.Options;
-
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class TwitchOAuthClient(
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     TwitchOAuthApiClient twitch
 ) : ITwitchOAuthClient
 {
-    private readonly TwitchBotIdentityOptions opts = options.Value;
-
     public Uri BuildAuthorizeUri(string state)
     {
         return twitch.CreateAuthorizationUri(
-            new TwitchAuthorizationUriRequest(opts.ClientId, opts.RedirectUri, opts.Scopes, state)
+            new TwitchAuthorizationUriRequest(
+                identity.ClientId,
+                identity.RedirectUri,
+                identity.Scopes,
+                state
+            )
         );
     }
 
@@ -23,9 +24,9 @@ internal sealed class TwitchOAuthClient(
     {
         var response = await twitch.ExchangeCodeAsync(
             new TwitchAuthorizationCodeExchange(
-                opts.ClientId,
-                opts.ClientSecret,
-                opts.RedirectUri,
+                identity.ClientId,
+                identity.ClientSecret,
+                identity.RedirectUri,
                 code
             ),
             cancellationToken
@@ -40,8 +41,8 @@ internal sealed class TwitchOAuthClient(
     {
         return ToTokenSet(
             await twitch.RefreshAsync(
-                opts.ClientId,
-                opts.ClientSecret,
+                identity.ClientId,
+                identity.ClientSecret,
                 refreshToken,
                 cancellationToken
             )

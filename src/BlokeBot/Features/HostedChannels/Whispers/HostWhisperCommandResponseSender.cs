@@ -3,7 +3,6 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
 
@@ -14,12 +13,10 @@ public sealed class HostWhisperCommandResponseSender(
     TwitchHelixApiClient users,
     TwitchHelixChatClient helix,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     ILogger<HostWhisperCommandResponseSender> log
 ) : ITwitchCommandResponseSender
 {
-    private readonly TwitchBotIdentityOptions identity = options.Value;
-
     public async ValueTask SendAsync(
         TwitchChatMessage sourceMessage,
         TwitchCommandResponse response,

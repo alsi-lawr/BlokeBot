@@ -11,7 +11,6 @@ using BlokeBot.Twitch.Auth;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -256,10 +255,10 @@ public sealed class OutboundQueueAlertWhisperSenderTests
                 users,
                 new TwitchHelixChatClient(
                     http,
-                    Options.Create(options.Value.Identity),
+                    options.Identity,
                     users
                 ),
-                Options.Create(options.Value.Identity),
+                options.Identity,
                 NullLogger<OutboundQueueAlertWhisperSender>.Instance
             );
             return new SenderFixture(
@@ -312,8 +311,8 @@ public sealed class OutboundQueueAlertWhisperSenderTests
 
         public ValueTask DisposeAsync() => dbFactory.DisposeAsync();
 
-        private static IOptions<TwitchBotOptions> BotOptions() =>
-            Options.Create(
+        private static TwitchBotSettings BotOptions() =>
+            TwitchBotSettings.FromOptions(
                 new TwitchBotOptions
                 {
                     Identity = new TwitchBotIdentityOptions

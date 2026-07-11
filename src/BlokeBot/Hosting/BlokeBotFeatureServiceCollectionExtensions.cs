@@ -4,6 +4,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
+using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
@@ -36,6 +37,7 @@ using BlokeBot.Features.PublicLeaderboards;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Hosting;
@@ -90,6 +92,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotAlerts(this IServiceCollection services)
     {
+        services.AddContinueAndReportObserverPolicy(
+            ObserverFailurePolicyKey.Named("BlokeBot.OutboundQueueAlertSubscribers")
+        );
         services.TryAddSingleton<DurableAlertService>();
         services.TryAddSingleton<OutboundQueueAlertSubscriberDispatcher>();
         services.TryAddEnumerable(
@@ -215,6 +220,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotAdmin(this IServiceCollection services)
     {
+        services.AddSingleton(sp =>
+            BotAdminSettings.FromOptions(sp.GetRequiredService<IOptions<BlokeBotOptions>>().Value)
+        );
         services.AddSingleton<BotAdminService>();
         services.AddSingleton<AdminHostManagementService>();
         services.AddSingleton<HostedChannelDirectoryService>();

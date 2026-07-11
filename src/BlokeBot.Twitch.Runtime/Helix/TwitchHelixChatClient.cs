@@ -2,19 +2,17 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
 public sealed class TwitchHelixChatClient(
     IHttpClientFactory factory,
-    IOptions<TwitchBotIdentityOptions> options,
+    TwitchBotIdentity identity,
     TwitchHelixApiClient helix
 )
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient http = factory.CreateClient("twitch-helix");
-    private readonly TwitchBotIdentityOptions opts = options.Value;
 
     public async Task<string> CreateChatMessageSubscriptionAsync(
         string accessToken,
@@ -80,7 +78,7 @@ public sealed class TwitchHelixChatClient(
         var channel = TwitchLogin.Normalize(channelLogin);
         var bot = TwitchLogin.Normalize(botLogin);
         var users = await helix.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(opts.ClientId, accessToken),
+            new TwitchHelixRequestContext(identity.ClientId, accessToken),
             [channel, bot],
             cancellationToken
         );
@@ -191,7 +189,7 @@ public sealed class TwitchHelixChatClient(
     {
         var request = new HttpRequestMessage(method, uri);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        request.Headers.Add("Client-Id", opts.ClientId);
+        request.Headers.Add("Client-Id", identity.ClientId);
         return request;
     }
 }

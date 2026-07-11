@@ -1,6 +1,5 @@
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -224,7 +223,7 @@ public sealed class OutboundMessageQueueTests
         IEnumerable<ITwitchOutboundQueueAlertObserver>? observers = null
     ) =>
         new(
-            Options.Create(options),
+            TwitchBotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
             new TwitchOutboundDuplicateCooldown(),
             new TwitchOutboundQueueBacklogMonitor(),

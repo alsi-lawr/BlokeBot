@@ -3,12 +3,11 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchEventSubRuntime(
-    IOptions<TwitchBotOptions> options,
+    TwitchBotSettings settings,
     ITwitchBotChannelProvider channels,
     ITwitchBotAccountProvider botAccounts,
     TwitchCommandDispatcher dispatcher,
@@ -22,7 +21,7 @@ internal sealed class TwitchEventSubRuntime(
 )
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly TwitchBotOptions opts = options.Value;
+    private readonly TwitchBotSettings opts = settings;
 
     public async Task RunAsync(CancellationToken stoppingToken)
     {

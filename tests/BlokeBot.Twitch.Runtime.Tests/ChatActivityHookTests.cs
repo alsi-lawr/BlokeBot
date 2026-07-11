@@ -1,7 +1,6 @@
 using BlokeBot.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -15,7 +14,7 @@ public sealed class ChatActivityHookTests
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
         var runtime = new TwitchIrcRuntime(
-            Options.Create(new TwitchBotOptions()),
+            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
             dispatcher,
@@ -47,7 +46,7 @@ public sealed class ChatActivityHookTests
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
         var runtime = new TwitchEventSubRuntime(
-            Options.Create(new TwitchBotOptions()),
+            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
             dispatcher,

@@ -1,5 +1,4 @@
 using BlokeBot.Twitch.Auth;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -24,7 +23,7 @@ public sealed class OAuthTests
     public async Task InvalidOAuthState_CompletingFlow_RejectsAuthorization()
     {
         var flow = new TwitchOAuthFlow(
-            Options.Create(OptionsWithPath("tokens.json")),
+            IdentityWithPath("tokens.json"),
             new FakeOAuthClient(),
             new InMemoryTwitchOAuthStateStore(),
             new MemoryTokenStore()
@@ -49,7 +48,7 @@ public sealed class OAuthTests
         var states = new InMemoryTwitchOAuthStateStore();
         var store = new MemoryTokenStore();
         var flow = new TwitchOAuthFlow(
-            Options.Create(OptionsWithPath("tokens.json")),
+            IdentityWithPath("tokens.json"),
             oauth,
             states,
             store
@@ -71,7 +70,7 @@ public sealed class OAuthTests
             Loaded = new TwitchTokenSet("cached", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
         };
         var provider = new TwitchAccessTokenProvider(
-            Options.Create(OptionsWithPath("tokens.json")),
+            IdentityWithPath("tokens.json"),
             store,
             oauth
         );
@@ -102,7 +101,7 @@ public sealed class OAuthTests
             ),
         };
         var provider = new TwitchAccessTokenProvider(
-            Options.Create(OptionsWithPath("tokens.json")),
+            IdentityWithPath("tokens.json"),
             store,
             oauth
         );
@@ -120,7 +119,7 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore();
         var provider = new TwitchAccessTokenProvider(
-            Options.Create(OptionsWithPath("tokens.json")),
+            IdentityWithPath("tokens.json"),
             store,
             oauth
         );
@@ -158,13 +157,15 @@ public sealed class OAuthTests
         loaded.ExpiresAtUtc.ShouldBe(token.ExpiresAtUtc);
     }
 
-    private static TwitchBotIdentityOptions OptionsWithPath(string path) =>
-        new()
-        {
-            BotUsername = "bot",
-            ClientId = "client",
-            ClientSecret = "secret",
-            RedirectUri = "http://localhost/callback",
-            TokenCachePath = path,
-        };
+    private static TwitchBotIdentity IdentityWithPath(string path) =>
+        TwitchBotIdentity.FromOptions(
+            new TwitchBotIdentityOptions
+            {
+                BotUsername = "bot",
+                ClientId = "client",
+                ClientSecret = "secret",
+                RedirectUri = "http://localhost/callback",
+                TokenCachePath = path,
+            }
+        );
 }

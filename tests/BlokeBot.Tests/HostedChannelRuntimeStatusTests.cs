@@ -7,7 +7,6 @@ using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -24,7 +23,7 @@ public sealed class HostedChannelRuntimeStatusTests
         using var services = new ServiceCollection()
             .AddSingleton<ITwitchAccessTokenProvider>(new StaticTokenProvider("saved-token"))
             .BuildServiceProvider();
-        var options = Options.Create(
+        var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions

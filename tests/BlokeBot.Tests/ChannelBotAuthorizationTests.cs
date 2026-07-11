@@ -144,7 +144,7 @@ public sealed class ChannelBotAuthorizationTests
     )
     {
         var httpClientFactory = new EmptyHttpClientFactory();
-        var options = Options.Create(
+        var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions
