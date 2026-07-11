@@ -148,7 +148,9 @@ if (botRuntimeConfigured)
         .Services.AddTwitchBot(
             botSection,
             accountProvider => accountProvider.UseBlokeBotHostedChannelProvider(),
-            responseSender => responseSender.UseBlokeBotHostedWhisperSender()
+            responseSender => responseSender.UseBlokeBotHostedWhisperSender(),
+            lifecycleNotifier =>
+                lifecycleNotifier.UseBlokeBotHostedChannelLifecycleNotifier()
         )
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()

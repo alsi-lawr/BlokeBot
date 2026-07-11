@@ -2,25 +2,37 @@ using Microsoft.Extensions.Hosting;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchBotRuntimeHostedService(
-    TwitchBotSettings settings,
-    IServiceProvider services
-) : BackgroundService
+internal sealed class TwitchBotRuntimeHostedService : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    private readonly ITwitchBotRuntimeStrategy strategy;
+
+    public TwitchBotRuntimeHostedService(
+        TwitchBotSettings settings,
+        IEnumerable<ITwitchBotRuntimeStrategy> strategies
+    )
     {
-        return settings.Runtime switch
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(strategies);
+
+        var matches = strategies
+            .Where(candidate => candidate.Runtime == settings.Runtime)
+            .Take(2)
+            .ToArray();
+        strategy = matches switch
         {
-            var runtime when Matches<TwitchEventSubRuntimeStrategy>(runtime) =>
-                RunAsync<TwitchEventSubRuntimeStrategy>(stoppingToken),
-            _ => RunAsync<TwitchIrcRuntimeStrategy>(stoppingToken),
+            [var selected] => selected,
+            [] => throw new InvalidOperationException(
+                $"No runtime strategy is registered for '{settings.Runtime}'."
+            ),
+            _ => throw new InvalidOperationException(
+                $"Multiple runtime strategies are registered for '{settings.Runtime}'."
+            ),
         };
     }
 
-    private static bool Matches<TStrategy>(TwitchBotRuntime runtime)
-        where TStrategy : ITwitchBotRuntimeStrategy<TStrategy> => TStrategy.Matches(runtime);
+    internal Task RunSelectedStrategyAsync(CancellationToken cancellationToken) =>
+        strategy.RunAsync(cancellationToken);
 
-    private Task RunAsync<TStrategy>(CancellationToken stoppingToken)
-        where TStrategy : ITwitchBotRuntimeStrategy<TStrategy> =>
-        TStrategy.RunAsync(services, stoppingToken);
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        RunSelectedStrategyAsync(stoppingToken);
 }

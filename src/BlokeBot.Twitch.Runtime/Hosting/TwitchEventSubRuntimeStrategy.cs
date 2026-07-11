@@ -1,12 +1,10 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Twitch.Runtime;
 
-internal readonly record struct TwitchEventSubRuntimeStrategy
-    : ITwitchBotRuntimeStrategy<TwitchEventSubRuntimeStrategy>
+internal sealed class TwitchEventSubRuntimeStrategy(TwitchEventSubRuntime runtime)
+    : ITwitchBotRuntimeStrategy
 {
-    public static TwitchBotRuntime Runtime => TwitchBotRuntime.EventSub;
+    public TwitchBotRuntime Runtime => TwitchBotRuntime.EventSub;
 
-    public static Task RunAsync(IServiceProvider services, CancellationToken cancellationToken) =>
-        services.GetRequiredService<TwitchEventSubRuntime>().RunAsync(cancellationToken);
+    public Task RunAsync(CancellationToken cancellationToken) =>
+        runtime.RunAsync(cancellationToken);
 }
