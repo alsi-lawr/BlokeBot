@@ -37,7 +37,7 @@ internal static class UiTestContextFactory
         context.Services.AddSingleton<HostedChannelChangeNotifier>();
         context.Services.AddSingleton<HostFeatureService>();
         context.Services.AddBlokeBotAlerts();
-        context.Services.AddBlokeBotCustomCommands();
+        context.Services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         context.Services.AddBlokeBotToasts();
 
         var host = new BotHostChoice(hostId, hostLogin, "Streamer", AuthRole.Streamer);

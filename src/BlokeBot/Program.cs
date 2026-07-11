@@ -55,6 +55,9 @@ builder
 builder.Services.AddOptions<WebAuthOptions>().BindConfiguration("TwitchWebAuth").ValidateOnStart();
 builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
+var botSection = builder.Configuration.GetSection("TwitchBot");
+var botRuntimeConfigured = IsBotRuntimeConfigured(botSection);
+
 builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
         ?? new BlokeBotOptions().DatabasePath
@@ -63,7 +66,11 @@ builder.Services.AddSingleton<EventBus<AppEventKind>>();
 builder
     .Services.AddBlokeBotAppCommands()
     .AddBlokeBotAlerts()
-    .AddBlokeBotCustomCommands()
+    .AddBlokeBotCustomCommands(
+        botRuntimeConfigured
+            ? CustomAnnouncementDeliveryMode.TwitchChat
+            : CustomAnnouncementDeliveryMode.Disabled
+    )
     .AddBlokeBotSiteAccess()
     .AddBlokeBotAdmin()
     .AddBlokeBotHostedChannels()
@@ -132,9 +139,7 @@ builder.Services.AddAuthorization(options =>
     );
 });
 
-var botSection = builder.Configuration.GetSection("TwitchBot");
 builder.Services.AddOptions<TwitchBotOptions>().Bind(botSection);
-var botRuntimeConfigured = IsBotRuntimeConfigured(botSection);
 if (botRuntimeConfigured)
 {
     builder
@@ -143,7 +148,10 @@ if (botRuntimeConfigured)
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CustomCommandModule>();
 }
-builder.Services.TryAddSingleton<ITwitchBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
+else
+{
+    builder.Services.AddOfflineBotRuntimeStatus();
+}
 
 var app = builder.Build();
 

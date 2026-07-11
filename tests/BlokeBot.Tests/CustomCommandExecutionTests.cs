@@ -254,7 +254,7 @@ public sealed class CustomCommandExecutionTests
         if (clock is not null)
             services.AddSingleton(clock);
 
-        services.AddBlokeBotCustomCommands();
+        services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         services.AddTwitchCommands().AddCommandModule<CustomCommandModule>();
         return services.BuildServiceProvider();
     }

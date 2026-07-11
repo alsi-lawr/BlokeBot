@@ -49,8 +49,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBlokeBotCustomCommands(this IServiceCollection services)
+    public static IServiceCollection AddBlokeBotCustomCommands(
+        this IServiceCollection services,
+        CustomAnnouncementDeliveryMode announcementDelivery
+    )
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddSingleton<CustomCommandAliasRegistry>();
         services.AddSingleton<CustomCommandCooldownStore>();
         services.AddSingleton<CustomCommandExecutionService>();
@@ -60,11 +65,21 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
         services.TryAddSingleton<ICustomAnnouncementTickScheduler, TimeProviderCustomAnnouncementTickScheduler>();
-        services.TryAddSingleton<ICustomAnnouncementSender>(sp =>
-            sp.GetService<ITwitchChatMessageSender>() is { } sender
-                ? new TwitchCustomAnnouncementSender(sender)
-                : new DisabledCustomAnnouncementSender()
-        );
+        switch (announcementDelivery)
+        {
+            case CustomAnnouncementDeliveryMode.Disabled:
+                services.AddSingleton<ICustomAnnouncementSender, DisabledCustomAnnouncementSender>();
+                break;
+            case CustomAnnouncementDeliveryMode.TwitchChat:
+                services.AddSingleton<ICustomAnnouncementSender, TwitchCustomAnnouncementSender>();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(announcementDelivery),
+                    announcementDelivery,
+                    "Unknown custom-announcement delivery mode."
+                );
+        }
         services.AddSingleton<ITwitchChatMessageObserver, CustomAnnouncementChatActivity>();
         services.AddSingleton<CustomAnnouncementScheduler>();
         services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());

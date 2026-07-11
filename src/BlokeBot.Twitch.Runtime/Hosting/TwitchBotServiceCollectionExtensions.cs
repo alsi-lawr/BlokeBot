@@ -88,8 +88,8 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
         services.TryAddSingleton<ITwitchCommandResponseSender, TwitchChatCommandResponseSender>();
-        services.TryAddSingleton<TwitchBotRuntimeStatusStore>();
-        services.TryAddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
+        services.AddSingleton<TwitchBotRuntimeStatusStore>();
+        services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<TwitchBotRuntimeStatusStore>()
         );
         services.TryAddSingleton<TwitchEventSubRuntime>();
