@@ -28,11 +28,14 @@ public sealed class GuessingConfigurationService(
 
         var normalizedName = NormalizeDisplayName(name);
         if (string.IsNullOrWhiteSpace(normalizedName))
-            return new GuessingOperationResult(false, "Profile name is required.");
+            return new GuessingOperationResult(false, "Round type name is required.");
 
         var slug = GuessRoundProfileSlug.FromName(normalizedName);
         if (await db.Profiles.AnyAsync(x => x.HostId == hostId && x.Slug == slug.Value, ct))
-            return new GuessingOperationResult(false, "A profile with that name already exists.");
+            return new GuessingOperationResult(
+                false,
+                "A round type with that name already exists."
+            );
 
         db.Profiles.Add(
             new GuessRoundProfile
@@ -62,15 +65,15 @@ public sealed class GuessingConfigurationService(
             ct
         );
         if (profile is null)
-            return new GuessingOperationResult(false, "Profile not found.");
+            return new GuessingOperationResult(false, "Round type not found.");
 
         if (await db.Profiles.CountAsync(x => x.HostId == hostId, ct) <= 1)
-            return new GuessingOperationResult(false, "At least one profile is required.");
+            return new GuessingOperationResult(false, "Keep at least one round type.");
 
         if (await db.Rounds.AnyAsync(x => x.GuessRoundProfileId == profileId, ct))
             return new GuessingOperationResult(
                 false,
-                "Profiles with round history cannot be deleted."
+                "Round types used by past rounds cannot be deleted."
             );
 
         var wasDefault = profile.IsDefault;
@@ -167,7 +170,9 @@ public sealed class GuessingConfigurationService(
             ct
         );
         if (duplicate)
-            throw new InvalidOperationException("A profile with that name already exists.");
+            throw new InvalidOperationException(
+                "A round type with that name already exists."
+            );
 
         profile.Name = profileName;
         profile.Slug = slug.Value;
@@ -274,7 +279,7 @@ public sealed class GuessingConfigurationService(
                 .Include(x => x.ReplySettings)
                 .Include(x => x.Options)
                 .SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct)
-            ?? throw new InvalidOperationException("Round profile not found.");
+            ?? throw new InvalidOperationException("Round type not found.");
 
         var options = profile
             .Options.OrderBy(x => x.Name)

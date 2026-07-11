@@ -150,7 +150,7 @@ public sealed class CustomCommandConfigurationTests
                 CancellationToken.None
             )
         );
-        builtInCollision.Message.ShouldContain("another bot function");
+        builtInCollision.Message.ShouldContain("another bot command");
 
         var draftCollision = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(
@@ -291,14 +291,14 @@ public sealed class CustomCommandConfigurationTests
         var missingError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(firstHostId, missingId, CancellationToken.None)
         );
-        missingError.Message.ShouldContain("was not found");
+        missingError.Message.ShouldContain("no longer available");
 
         var invalidMessage = ConfigurationWithCommands(("Invalid", "invalid"));
         invalidMessage.Commands.Single().Action.MessageLibraryEntryId = -999;
         var messageError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(firstHostId, invalidMessage, CancellationToken.None)
         );
-        messageError.Message.ShouldContain("needs a message library entry");
+        messageError.Message.ShouldContain("Choose a saved reply");
 
         var invalidCounter = ConfigurationWithCommands(("Counter", "counter"));
         invalidCounter.Commands.Single().Action = new CounterCustomCommandActionEditor
@@ -309,12 +309,12 @@ public sealed class CustomCommandConfigurationTests
         var counterError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(firstHostId, invalidCounter, CancellationToken.None)
         );
-        counterError.Message.ShouldContain("missing counter");
+        counterError.Message.ShouldContain("Choose a counter");
 
         var hostBoundaryError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(secondHostId, stored, CancellationToken.None)
         );
-        hostBoundaryError.Message.ShouldContain("was not found");
+        hostBoundaryError.Message.ShouldContain("no longer available");
 
         var unchanged = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         unchanged.Commands.Single().Name.ShouldBe("Command");
@@ -345,7 +345,7 @@ public sealed class CustomCommandConfigurationTests
         var afterChatError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(hostId, afterChat, CancellationToken.None)
         );
-        afterChatError.Message.ShouldContain("at least one required chat message");
+        afterChatError.Message.ShouldContain("at least 1 chat message");
     }
 
     private static CustomCommandConfiguration ConfigurationWithCommands(

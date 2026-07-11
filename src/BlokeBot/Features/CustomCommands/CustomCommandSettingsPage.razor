@@ -10,13 +10,13 @@
 @inject EventBus<AppEventKind> Events
 @inject ToastService Toasts
 
-<PageTitle>BlokeBot | Custom Command Settings</PageTitle>
+<PageTitle>BlokeBot | Custom Commands</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Title="Custom command settings"
-                Description="Reusable chat replies, counters, scheduled announcements, and command aliases.">
+    <PageHeader Title="Custom commands"
+                Description="Create chat commands, choose what the bot says, keep counters, and send automatic announcements.">
         <button class="btn-primary"
-                aria-label="Save custom command settings"
+                aria-label="Save custom commands"
                 disabled="@(!featureEnabled || config is null)"
                 @onclick="SaveAsync">Save changes</button>
     </PageHeader>
@@ -31,20 +31,20 @@
     }
     else if (config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading custom command settings...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading custom commands...</div>
     }
     else
     {
-        <CollapsibleSection Title="Message library" Description="Saved messages and ordered variants used by commands and announcements." InitiallyOpen="true">
+        <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@config.MessageEntries.Count message entries</p>
-                    <button class="btn-secondary" @onclick="AddMessageEntry">Add message</button>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.MessageEntries.Count, "reply")</p>
+                    <button class="btn-secondary" @onclick="AddMessageEntry">Add reply</button>
                 </div>
 
                 @if (config.MessageEntries.Count == 0)
                 {
-                    <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No message entries yet.</p>
+                    <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No replies yet.</p>
                 }
                 else
                 {
@@ -52,35 +52,39 @@
                         @foreach (var entry in config.MessageEntries)
                         {
                             <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
-                                <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_9rem_auto] xl:items-end">
+                                <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,1.2fr)_12rem_auto] xl:items-end">
                                     <Field Id="@($"message-entry-{entry.Id}-name")"
-                                           Label="Name"
+                                           Label="Reply name"
                                            @bind-Value="entry.Name"
                                            Placeholder="welcome" />
                                     <div class="space-y-2">
-                                        <label class="label">Selection</label>
+                                        <label class="label">How the bot chooses</label>
                                         <select class="input" @bind="entry.SelectionMode">
                                             @foreach (var mode in MessageSelectionModes)
                                             {
-                                                <option value="@mode">@mode</option>
+                                                <option value="@mode">@MessageSelectionLabel(mode)</option>
                                             }
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Rotation index</label>
-                                        <input class="input"
-                                               type="number"
-                                               min="0"
-                                               disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
-                                               @bind="entry.CurrentVariantIndex" />
+                                        <label class="label">Next message</label>
+                                        <select class="input"
+                                                disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
+                                                @bind="entry.CurrentVariantIndex">
+                                            @for (var i = 0; i < entry.Variants.Count; i++)
+                                            {
+                                                var index = i;
+                                                <option value="@index">Message @(index + 1)</option>
+                                            }
+                                        </select>
                                     </div>
                                     <button class="btn-secondary" @onclick="() => RemoveMessageEntry(entry)">Delete</button>
                                 </div>
 
                                 <div class="space-y-2 border-t border-slate-200 pt-3">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Variants</p>
-                                        <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => AddVariant(entry)">Add variant</button>
+                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Messages</p>
+                                        <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => AddVariant(entry)">Add message</button>
                                     </div>
                                     @for (var i = 0; i < entry.Variants.Count; i++)
                                     {
@@ -88,7 +92,7 @@
                                         var variant = entry.Variants[index];
                                         <div @key="variant" class="grid gap-2 lg:grid-cols-[3rem_minmax(0,1fr)_auto] lg:items-start">
                                             <span class="rank-indicator mt-7">@(index + 1)</span>
-                                            <TextAreaField Label="@($"Variant {index + 1}")" @bind-Value="variant.Text" />
+                                            <TextAreaField Label="@($"Message {index + 1}")" @bind-Value="variant.Text" />
                                             <div class="mt-7 flex flex-wrap gap-2">
                                                 <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == 0)" @onclick="() => MoveVariant(entry, index, -1)">Up</button>
                                                 <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == entry.Variants.Count - 1)" @onclick="() => MoveVariant(entry, index, 1)">Down</button>
@@ -104,10 +108,10 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Custom commands" Description="Chat aliases, cooldowns, access, and command actions." InitiallyOpen="true">
+        <CollapsibleSection Title="Chat commands" Description="Choose what viewers type and what the bot should do." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@config.Commands.Count custom commands</p>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Commands.Count, "command")</p>
                     <button class="btn-secondary" disabled="@(config.MessageEntries.Count == 0)" @onclick="AddCommand">Add command</button>
                 </div>
 
@@ -122,45 +126,45 @@
                         {
                             <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
-                                    <Field Label="Name" @bind-Value="command.Name" Placeholder="Hello" />
-                                    <Field Label="Aliases" @bind-Value="command.Aliases" Placeholder="hello, hi" />
+                                    <Field Label="Command name" @bind-Value="command.Name" Placeholder="Hello" />
+                                    <Field Label="Command words (without !)" @bind-Value="command.Aliases" Placeholder="hello, hi" />
                                     <button class="btn-secondary" @onclick="() => RemoveCommand(command)">Delete</button>
                                 </div>
                                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                     <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                                         <input class="h-4 w-4" type="checkbox" @bind="command.Enabled" />
-                                        Enabled
+                                        Turned on
                                     </label>
                                     <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                                         <input class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
-                                        Moderator only
+                                        Only moderators can use this
                                     </label>
                                     <div class="space-y-2">
-                                        <label class="label">Cooldown seconds</label>
+                                        <label class="label">Wait between uses (seconds)</label>
                                         <input class="input" type="number" min="0" @bind="command.CooldownSeconds" />
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Cooldown scope</label>
+                                        <label class="label">Who waits?</label>
                                         <select class="input" @bind="command.CooldownScope">
                                             @foreach (var scope in CooldownScopes)
                                             {
-                                                <option value="@scope">@scope</option>
+                                                <option value="@scope">@CooldownScopeLabel(scope)</option>
                                             }
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"command-{command.Id}-action-kind")">Action type</label>
+                                        <label class="label" for="@($"command-{command.Id}-action-kind")">What happens?</label>
                                         <select id="@($"command-{command.Id}-action-kind")"
                                                 class="input"
                                                 @bind="command.ActionKind">
                                             @foreach (var action in ActionKinds)
                                             {
-                                                <option value="@action">@action</option>
+                                                <option value="@action">@ActionKindLabel(action)</option>
                                             }
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Message entry</label>
+                                        <label class="label">Reply</label>
                                         <select class="input" @bind="command.Action.MessageLibraryEntryId">
                                             @foreach (var entry in config.MessageEntries)
                                             {
@@ -177,7 +181,7 @@
                                                     @bind="counterAction.CounterId">
                                                 @if (config.Counters.Count == 0)
                                                 {
-                                                    <option value="0">No counters available</option>
+                                                    <option value="0">Create a counter first</option>
                                                 }
                                                 @foreach (var counter in config.Counters)
                                                 {
@@ -194,10 +198,10 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Global counters" Description="Shared counter names and values used by counter commands." InitiallyOpen="true">
+        <CollapsibleSection Title="Counters" Description="Keep track of things such as deaths, wins, or drinks." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@config.Counters.Count counters</p>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Counters.Count, "counter")</p>
                     <button class="btn-secondary" @onclick="AddCounter">Add counter</button>
                 </div>
 
@@ -211,9 +215,9 @@
                         @foreach (var counter in config.Counters)
                         {
                             <div @key="counter" class="surface-muted grid gap-3 rounded-lg p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
-                                <Field Label="Name" @bind-Value="counter.Name" Placeholder="deaths" />
+                                <Field Label="Counter name" @bind-Value="counter.Name" Placeholder="deaths" />
                                 <div class="space-y-2">
-                                    <label class="label">Value</label>
+                                    <label class="label">Current number</label>
                                     <input class="input" type="number" @bind="counter.Value" />
                                 </div>
                                 <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete</button>
@@ -226,11 +230,11 @@
 
         <CollapsibleSection ContentId="custom-announcement-settings"
                             Title="Announcements"
-                            Description="Saved announcement configuration. Sending is handled separately."
+                            Description="Send a saved reply automatically on a timer or after chat activity."
                             InitiallyOpen="false">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@config.Announcements.Count announcements</p>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Announcements.Count, "announcement")</p>
                     <button class="btn-secondary" disabled="@(config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add announcement</button>
                 </div>
 
@@ -245,16 +249,16 @@
                         {
                             <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
-                                    <Field Label="Name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
+                                    <Field Label="Announcement name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
                                     <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
                                         <input class="h-4 w-4" type="checkbox" @bind="announcement.Enabled" />
-                                        Enabled
+                                        Turned on
                                     </label>
                                     <button class="btn-secondary" @onclick="() => RemoveAnnouncement(announcement)">Delete</button>
                                 </div>
                                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                     <div class="space-y-2">
-                                        <label class="label">Message entry</label>
+                                        <label class="label">Reply to send</label>
                                         <select class="input" @bind="announcement.MessageLibraryEntryId">
                                             @foreach (var entry in config.MessageEntries)
                                             {
@@ -263,27 +267,27 @@
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-schedule-kind")">Schedule type</label>
+                                        <label class="label" for="@($"announcement-{announcement.Id}-schedule-kind")">When to send</label>
                                         <select id="@($"announcement-{announcement.Id}-schedule-kind")"
                                                 class="input"
                                                 @bind="announcement.ScheduleKind">
                                             @foreach (var type in AnnouncementScheduleKinds)
                                             {
-                                                <option value="@type">@type</option>
+                                                <option value="@type">@AnnouncementScheduleLabel(type)</option>
                                             }
                                         </select>
                                     </div>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label">Interval minutes</label>
+                                            <label class="label">Send every (minutes)</label>
                                             <input class="input" type="number" min="1" @bind="interval.IntervalMinutes" />
                                         </div>
                                     }
                                     else if (announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label" for="@($"announcement-{announcement.Id}-interval-minutes")">Interval minutes</label>
+                                            <label class="label" for="@($"announcement-{announcement.Id}-interval-minutes")">Send every (minutes)</label>
                                             <input id="@($"announcement-{announcement.Id}-interval-minutes")"
                                                    class="input"
                                                    type="number"
@@ -291,7 +295,7 @@
                                                    @bind="intervalAfterChat.IntervalMinutes" />
                                         </div>
                                         <div class="space-y-2">
-                                            <label class="label" for="@($"announcement-{announcement.Id}-required-chat-messages")">Required chat messages</label>
+                                            <label class="label" for="@($"announcement-{announcement.Id}-required-chat-messages")">Chat messages needed</label>
                                             <input id="@($"announcement-{announcement.Id}-required-chat-messages")"
                                                    class="input"
                                                    type="number"
@@ -302,7 +306,7 @@
                                     else if (announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label">Weekly day</label>
+                                            <label class="label">Day</label>
                                             <select class="input" @bind="weekly.Day">
                                                 @foreach (var day in DaysOfWeek)
                                                 {
@@ -311,7 +315,7 @@
                                             </select>
                                         </div>
                                         <div class="space-y-2">
-                                            <label class="label">Weekly time</label>
+                                            <label class="label">Time</label>
                                             <input class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
@@ -320,7 +324,7 @@
                                         <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
                                     </div>
                                     <div class="surface-row rounded-lg px-3 py-2">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Messages since last sent</p>
+                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
                                         <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
                                     </div>
                                 </div>
@@ -331,25 +335,25 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Host timezone" Description="Timezone used when interpreting weekly announcement times." InitiallyOpen="false">
+        <CollapsibleSection Title="Time zone" Description="Weekly announcements use this local time." InitiallyOpen="false">
             <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <div class="space-y-2">
-                    <label class="label">Timezone</label>
+                    <label class="label">Time zone</label>
                     <select class="input" @bind="config.TimeZoneId">
                         @foreach (var timeZone in TimeZones)
                         {
-                            <option value="@timeZone.Id">@timeZone.Id</option>
+                            <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
                         }
                     </select>
                 </div>
                 <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Current selection</p>
-                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@config.TimeZoneId</p>
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selected time zone</p>
+                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@SelectedTimeZoneLabel</p>
                 </div>
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Alerts" Description="Current durable alert state for this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Alerts" Description="Problems that may need your attention." InitiallyOpen="false">
             <div class="space-y-3 p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Active alerts</p>
@@ -367,7 +371,7 @@
                             <div @key="alert" class="surface-row rounded-lg p-3">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <p class="text-sm font-bold text-slate-950">@alert.Title</p>
-                                    <span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">@alert.Severity</span>
+                                    <span class="inline-flex h-6 items-center rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200">@AlertImportanceLabel(alert.Severity)</span>
                                 </div>
                                 <p class="mt-1 text-sm text-muted-foreground">@alert.Message</p>
                                 @if (!string.IsNullOrWhiteSpace(alert.LinkPath))

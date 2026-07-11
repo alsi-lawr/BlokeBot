@@ -147,8 +147,21 @@ public partial class BotAccountAuthorizationSection
             _ => "unknown",
         };
 
-    private static string FormatScopes(IReadOnlyList<string>? scopes) =>
-        scopes is { Count: > 0 } ? string.Join(", ", scopes) : "none";
+    private string ConnectionHelpText =>
+        Status?.State switch
+        {
+            BotAccountAuthorizationState.Disabled =>
+                "Turn this on when you want to connect this account.",
+            BotAccountAuthorizationState.Ready =>
+                "This account has everything BlokeBot needs.",
+            BotAccountAuthorizationState.WrongAccount =>
+                "Reconnect with the Twitch account shown above.",
+            BotAccountAuthorizationState.MissingScopes =>
+                "Reconnect this account so Twitch can give BlokeBot the access it needs.",
+            BotAccountAuthorizationState.NotAuthorized =>
+                "Connect a Twitch account to continue.",
+            _ => "Refresh to check this Twitch connection.",
+        };
 
     private async Task SetEnableToggleAsync(ChangeEventArgs args)
     {

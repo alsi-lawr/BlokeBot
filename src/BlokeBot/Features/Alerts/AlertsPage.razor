@@ -9,9 +9,9 @@
 <PageTitle>BlokeBot | Alerts</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Operations"
+    <PageHeader Kicker="Channel health"
                 Title="Alerts"
-                Description="Review active channel alerts and acknowledgement history.">
+                Description="See problems that need attention and alerts you have already handled.">
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
     </PageHeader>
 
@@ -44,12 +44,12 @@
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="@SeverityBadgeClass(alert.Severity)">@alert.Severity</span>
-                                        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@alert.Source</span>
+                                        <span class="@SeverityBadgeClass(alert.Severity)">@ImportanceLabel(alert.Severity)</span>
+                                        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@AlertAreaLabel(alert.Source)</span>
                                     </div>
                                     <h3 class="mt-3 text-base font-semibold text-slate-950">@alert.Title</h3>
                                     <p class="mt-2 text-sm leading-6 text-slate-700">@alert.Message</p>
-                                    <p class="mt-3 text-xs font-medium text-muted-foreground">Created @FormatTimestamp(alert.CreatedAtUtc)</p>
+                                    <p class="mt-3 text-xs font-medium text-muted-foreground">First seen @FormatTimestamp(alert.CreatedAtUtc)</p>
                                 </div>
                                 <div class="flex shrink-0 flex-wrap gap-2">
                                     @if (!string.IsNullOrWhiteSpace(alert.LinkPath))
@@ -60,10 +60,10 @@
                                         </a>
                                     }
                                     <button class="btn-primary"
-                                            aria-label="@($"Acknowledge {alert.Title}")"
+                                            aria-label="@($"Mark {alert.Title} as handled")"
                                             disabled="@(!canAcknowledge)"
                                             @onclick="() => AcknowledgeAsync(alert)">
-                                        Acknowledge
+                                        Mark as handled
                                     </button>
                                 </div>
                             </div>
@@ -76,11 +76,11 @@
         <section class="card">
             <div class="border-b border-slate-200 p-5">
                 <h2 class="text-lg font-semibold text-slate-950">History</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Acknowledged alerts stay here with actor and timestamp.</p>
+                <p class="mt-1 text-sm text-muted-foreground">Handled alerts stay here so you can see who dealt with them and when.</p>
             </div>
             @if (state.History.Count == 0)
             {
-                <div class="p-8 text-sm text-muted-foreground">No acknowledged alerts yet.</div>
+                <div class="p-8 text-sm text-muted-foreground">No handled alerts yet.</div>
             }
             else
             {
@@ -89,9 +89,9 @@
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
                                 <th class="px-5 py-3 font-semibold">Alert</th>
-                                <th class="px-5 py-3 font-semibold">Severity</th>
-                                <th class="px-5 py-3 font-semibold">Acknowledged by</th>
-                                <th class="px-5 py-3 font-semibold">Acknowledged at</th>
+                                <th class="px-5 py-3 font-semibold">Importance</th>
+                                <th class="px-5 py-3 font-semibold">Handled by</th>
+                                <th class="px-5 py-3 font-semibold">Handled at</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -100,9 +100,9 @@
                                 <tr @key="alert.Id">
                                     <td class="px-5 py-3">
                                         <p class="font-semibold text-slate-950">@alert.Title</p>
-                                        <p class="mt-1 text-xs text-muted-foreground">@alert.Source</p>
+                                        <p class="mt-1 text-xs text-muted-foreground">@AlertAreaLabel(alert.Source)</p>
                                     </td>
-                                    <td class="px-5 py-3 text-slate-700">@alert.Severity</td>
+                                    <td class="px-5 py-3 text-slate-700">@ImportanceLabel(alert.Severity)</td>
                                     <td class="px-5 py-3 text-slate-700">@alert.AcknowledgedByLogin</td>
                                     <td class="px-5 py-3 text-slate-700">@FormatTimestamp(alert.AcknowledgedAtUtc)</td>
                                 </tr>

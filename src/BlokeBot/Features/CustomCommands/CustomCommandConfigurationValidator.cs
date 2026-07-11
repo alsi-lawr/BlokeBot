@@ -9,23 +9,23 @@ internal static class CustomCommandConfigurationValidator
 
     public static void Validate(CustomCommandConfiguration config)
     {
-        EnsureUniqueEditorIds(config.MessageEntries.Select(x => x.Id), "message library entries");
+        EnsureUniqueEditorIds(config.MessageEntries.Select(x => x.Id), "replies");
         EnsureUniqueEditorIds(config.Counters.Select(x => x.Id), "counters");
-        EnsureUniqueEditorIds(config.Commands.Select(x => x.Id), "custom commands");
+        EnsureUniqueEditorIds(config.Commands.Select(x => x.Id), "commands");
         EnsureUniqueEditorIds(config.Announcements.Select(x => x.Id), "announcements");
-        EnsureUniqueNames(config.MessageEntries, x => x.Name, "message library entry");
+        EnsureUniqueNames(config.MessageEntries, x => x.Name, "reply");
         EnsureUniqueNames(config.Counters, x => x.Name, "counter");
-        EnsureUniqueNames(config.Commands, x => x.Name, "custom command");
+        EnsureUniqueNames(config.Commands, x => x.Name, "command");
         EnsureUniqueNames(config.Announcements, x => x.Name, "announcement");
 
         var messageEntryIds = config.MessageEntries.Select(x => x.Id).ToHashSet();
         var counterIds = config.Counters.Select(x => x.Id).ToHashSet();
         foreach (var entry in config.MessageEntries)
         {
-            RequiredName(entry.Name, "Message library entry");
+            RequiredName(entry.Name, "Reply");
             if (entry.Variants.Count == 0)
                 throw new InvalidOperationException(
-                    $"Message library entry '{entry.Name.Trim()}' needs at least one variant."
+                    $"Reply '{entry.Name.Trim()}' needs at least one message."
                 );
 
             foreach (var variant in entry.Variants)
@@ -33,12 +33,12 @@ internal static class CustomCommandConfigurationValidator
                 var text = variant.Text.Trim();
                 if (string.IsNullOrWhiteSpace(text))
                     throw new InvalidOperationException(
-                        $"Message library entry '{entry.Name.Trim()}' has an empty variant."
+                        $"Reply '{entry.Name.Trim()}' has a blank message."
                     );
 
                 if (text.Length > MessageVariantMaxLength)
                     throw new InvalidOperationException(
-                        $"Message variants cannot exceed {MessageVariantMaxLength} characters."
+                        $"Reply messages cannot exceed {MessageVariantMaxLength} characters."
                     );
             }
         }
@@ -48,14 +48,16 @@ internal static class CustomCommandConfigurationValidator
 
         foreach (var command in config.Commands)
         {
-            RequiredName(command.Name, "Custom command");
+            RequiredName(command.Name, "Command");
             if (!messageEntryIds.Contains(command.Action.MessageLibraryEntryId))
                 throw new InvalidOperationException(
-                    $"Custom command '{command.Name.Trim()}' needs a message library entry."
+                    $"Choose a saved reply for command '{command.Name.Trim()}'."
                 );
 
             if (command.CooldownSeconds < 0)
-                throw new InvalidOperationException("Command cooldown seconds cannot be negative.");
+                throw new InvalidOperationException(
+                    "The wait between command uses cannot be negative."
+                );
 
             switch (command.Action)
             {
@@ -64,12 +66,14 @@ internal static class CustomCommandConfigurationValidator
                 case CounterCustomCommandActionEditor counter
                     when !counterIds.Contains(counter.CounterId):
                     throw new InvalidOperationException(
-                        $"Custom command '{command.Name.Trim()}' references a missing counter."
+                        $"Choose a counter for command '{command.Name.Trim()}'."
                     );
                 case CounterCustomCommandActionEditor:
                     break;
                 default:
-                    throw new InvalidOperationException("Unsupported custom command action.");
+                    throw new InvalidOperationException(
+                        $"Choose what command '{command.Name.Trim()}' should do."
+                    );
             }
         }
 
@@ -78,7 +82,7 @@ internal static class CustomCommandConfigurationValidator
             RequiredName(announcement.Name, "Announcement");
             if (!messageEntryIds.Contains(announcement.MessageLibraryEntryId))
                 throw new InvalidOperationException(
-                    $"Announcement '{announcement.Name.Trim()}' needs a message library entry."
+                    $"Choose a saved reply for announcement '{announcement.Name.Trim()}'."
                 );
 
             switch (announcement.Schedule)
@@ -86,31 +90,31 @@ internal static class CustomCommandConfigurationValidator
                 case IntervalCustomAnnouncementScheduleEditor interval
                     when interval.IntervalMinutes < 1:
                     throw new InvalidOperationException(
-                        "Announcement interval minutes must be at least 1."
+                        "Announcements must wait at least 1 minute."
                     );
                 case IntervalCustomAnnouncementScheduleEditor:
                     break;
                 case IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat
                     when intervalAfterChat.IntervalMinutes < 1:
                     throw new InvalidOperationException(
-                        "Announcement interval minutes must be at least 1."
+                        "Announcements must wait at least 1 minute."
                     );
                 case IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat
                     when intervalAfterChat.RequiredChatMessages < 1:
                     throw new InvalidOperationException(
-                        "Interval-after-chat announcements need at least one required chat message."
+                        "Chat-based announcements need at least 1 chat message."
                     );
                 case IntervalAfterChatCustomAnnouncementScheduleEditor:
                     break;
                 case WeeklyCustomAnnouncementScheduleEditor weekly:
                     if (!Enum.IsDefined(weekly.Day))
                         throw new InvalidOperationException(
-                            "Weekly announcement day is invalid."
+                            "Choose a valid day for weekly announcements."
                         );
                     break;
                 default:
                     throw new InvalidOperationException(
-                        "Unsupported custom announcement schedule."
+                        $"Choose when announcement '{announcement.Name.Trim()}' should be sent."
                     );
             }
         }
@@ -127,34 +131,35 @@ internal static class CustomCommandConfigurationValidator
         EnsurePositiveIdsExist(
             config.MessageEntries.Select(x => x.Id),
             messageEntries.Select(x => x.Id).ToHashSet(),
-            "Message library entry"
+            "saved reply"
         );
         EnsurePositiveIdsExist(
             config.Counters.Select(x => x.Id),
             counters.Select(x => x.Id).ToHashSet(),
-            "Counter"
+            "counter"
         );
         EnsurePositiveIdsExist(
             config.Commands.Select(x => x.Id),
             commands.Select(x => x.Id).ToHashSet(),
-            "Custom command"
+            "command"
         );
         EnsurePositiveIdsExist(
             config.Announcements.Select(x => x.Id),
             announcements.Select(x => x.Id).ToHashSet(),
-            "Announcement"
+            "announcement"
         );
     }
 
     public static string RequiredName(string value, string entityName)
     {
         var trimmed = value.Trim();
+        var displayName = char.ToUpperInvariant(entityName[0]) + entityName[1..];
         if (string.IsNullOrWhiteSpace(trimmed))
-            throw new InvalidOperationException($"{entityName} name is required.");
+            throw new InvalidOperationException($"{displayName} name is required.");
 
         if (trimmed.Length > NameMaxLength)
             throw new InvalidOperationException(
-                $"{entityName} names cannot exceed {NameMaxLength} characters."
+                $"{displayName} names cannot exceed {NameMaxLength} characters."
             );
 
         return trimmed;
@@ -165,7 +170,7 @@ internal static class CustomCommandConfigurationValidator
         var duplicate = ids.GroupBy(x => x).FirstOrDefault(x => x.Count() > 1);
         if (duplicate is not null)
             throw new InvalidOperationException(
-                $"Editor IDs for {entityName} must be unique."
+                $"Some {entityName} were duplicated while you were editing. Reload the page and try again."
             );
     }
 
@@ -182,7 +187,7 @@ internal static class CustomCommandConfigurationValidator
             ?.Key;
         if (!string.IsNullOrWhiteSpace(duplicate))
             throw new InvalidOperationException(
-                $"A {entityName} named '{duplicate}' already exists."
+                $"Another {entityName} named '{duplicate}' already exists."
             );
     }
 
@@ -194,6 +199,8 @@ internal static class CustomCommandConfigurationValidator
     {
         var missingId = editorIds.Where(x => x > 0).FirstOrDefault(x => !existingIds.Contains(x));
         if (missingId != 0)
-            throw new InvalidOperationException($"{entityName} {missingId} was not found.");
+            throw new InvalidOperationException(
+                $"A {entityName} you edited is no longer available. Reload the page and try again."
+            );
     }
 }

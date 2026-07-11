@@ -63,13 +63,8 @@
                 </div>
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
-                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch access</p>
-                <p class="mt-2 text-xs font-medium text-slate-500">Needed: @FormatScopes(Status?.RequiredScopes)</p>
-                <p class="mt-1 text-xs font-medium text-slate-500">Saved: @FormatScopes(Status?.GrantedScopes)</p>
-                @if (Status?.MissingScopes.Count > 0)
-                {
-                    <p class="mt-1 text-xs font-bold text-amber-700">Still needed: @FormatScopes(Status.MissingScopes)</p>
-                }
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch connection</p>
+                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@ConnectionHelpText</p>
             </div>
         </div>
     </CollapsibleSection>
@@ -143,13 +138,8 @@ else
                 </div>
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
-                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch access</p>
-                <p class="mt-2 text-xs font-medium text-slate-500">Needed: @FormatScopes(Status?.RequiredScopes)</p>
-                <p class="mt-1 text-xs font-medium text-slate-500">Saved: @FormatScopes(Status?.GrantedScopes)</p>
-                @if (Status?.MissingScopes.Count > 0)
-                {
-                    <p class="mt-1 text-xs font-bold text-amber-700">Still needed: @FormatScopes(Status.MissingScopes)</p>
-                }
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch connection</p>
+                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@ConnectionHelpText</p>
             </div>
         </div>
     </section>

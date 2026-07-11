@@ -21,7 +21,7 @@
                     var option = Options[i];
                     <div @key="option" class="@OptionRowClass(option)">
                         <input class="input" placeholder="answer" @bind="option.Name" />
-                        <input class="input" placeholder="reply text, supports {name} and {login}" @bind="option.ReplyText" />
+                        <input class="input" placeholder="bot reply (you can use {name} and {login})" @bind="option.ReplyText" />
                         <button class="btn-secondary" disabled="@pendingRemovals.Contains(option)" @onclick="() => RemoveOptionAsync(option)">Remove</button>
                     </div>
                 }

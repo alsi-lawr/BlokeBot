@@ -41,7 +41,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
             DurableAlertSeverity.Warning,
             Source,
             SourceKey(channel, backlog.OldestPendingAt),
-            "Outbound chat queue delayed",
+            "Chat messages are delayed",
             Message(host.Login, backlog),
             LinkPath,
             cancellationToken
@@ -73,7 +73,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
     }
 
     private static string Message(string hostLogin, TwitchOutboundQueueBacklog backlog) =>
-        $"BlokeBot has {backlog.PendingCount} pending outbound chat messages for #{hostLogin}. The oldest has waited about {FormatAge(backlog.OldestPendingAge)}.";
+        $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
 
     private static string SourceKey(string channel, DateTimeOffset oldestPendingAt) =>
         $"{channel}:{oldestPendingAt.UtcDateTime:O}";

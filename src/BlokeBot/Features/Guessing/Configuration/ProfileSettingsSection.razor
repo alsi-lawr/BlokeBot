@@ -1,4 +1,4 @@
-<CollapsibleSection Title="Round types" Description="Saved types of guessing game." InitiallyOpen="true">
+<CollapsibleSection Title="Round types" Description="Save different versions of the guessing game, each with its own answers and replies." InitiallyOpen="true">
     <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
             <label class="label" for="profileSelect">Round type to edit</label>
@@ -19,12 +19,12 @@
         <div class="flex gap-2">
             <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                 <input type="checkbox" class="h-4 w-4" @bind="Configuration.Profile.IsDefault" />
-                Default
+                Use by default
             </label>
             <button class="btn-secondary" @onclick="InvokeDeleteProfileAsync">Delete</button>
         </div>
     </div>
     <div class="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-2">
-        <Field Label="Winning guess reward" @bind-Value="Configuration.Profile.WinningGuessPointReward" Placeholder="0" />
+        <Field Label="Points for a winning guess" @bind-Value="Configuration.Profile.WinningGuessPointReward" Placeholder="0" />
     </div>
 </CollapsibleSection>

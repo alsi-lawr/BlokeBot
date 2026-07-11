@@ -31,14 +31,14 @@ public sealed class CustomCommandAliasRegistry
     {
         var normalized = CommandAliasNormalizer.Split(aliases).ToArray();
         if (normalized.Length == 0)
-            throw new InvalidOperationException("At least one command alias is required.");
+            throw new InvalidOperationException("Enter at least one command word.");
 
         var duplicate = normalized
             .GroupBy(alias => alias, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => group.Count() > 1)
             ?.Key;
         if (duplicate is not null)
-            throw new InvalidOperationException($"Alias !{duplicate} is used more than once.");
+            throw new InvalidOperationException($"!{duplicate} is entered more than once.");
 
         var builtInCollision = await db
             .CommandAliases.AsNoTracking()
@@ -47,7 +47,7 @@ public sealed class CustomCommandAliasRegistry
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(builtInCollision))
             throw new InvalidOperationException(
-                $"Alias !{builtInCollision} is already used by another bot function."
+                $"!{builtInCollision} is already used by another bot command."
             );
 
         var customCollision = await db
@@ -61,7 +61,7 @@ public sealed class CustomCommandAliasRegistry
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(customCollision))
             throw new InvalidOperationException(
-                $"Alias !{customCollision} is already used by another custom command."
+                $"!{customCollision} is already used by another custom command."
             );
 
         return normalized;

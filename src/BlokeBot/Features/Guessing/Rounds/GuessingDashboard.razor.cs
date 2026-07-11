@@ -74,13 +74,22 @@ public partial class GuessingDashboard
 
     private string RoundStartedText =>
         state?.CurrentRound is null
-            ? "No active or stopped round"
+            ? "Start a round when you're ready"
             : state.CurrentRound.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
 
     private string RoundStatusText =>
         state?.CurrentRound is null
-            ? "Idle"
-            : $"{state.CurrentRound.ProfileName}: {state.CurrentRound.Status}";
+            ? "No round running"
+            : $"{state.CurrentRound.ProfileName}: {RoundStatusLabel(state.CurrentRound.Status)}";
+
+    private static string RoundStatusLabel(GuessRoundStatus status) =>
+        status switch
+        {
+            GuessRoundStatus.Open => "Accepting guesses",
+            GuessRoundStatus.Closed => "Waiting for a winner",
+            GuessRoundStatus.Completed => "Finished",
+            _ => "Not running",
+        };
 
     private string SegmentedControlClass =>
         activeTab switch
@@ -284,7 +293,7 @@ public partial class GuessingDashboard
     }
 
     private static string FormatEndedAt(GuessRoundHistoryEntry round) =>
-        round.ClosedAtUtc?.ToLocalTime().ToString("MMM d, HH:mm") ?? "Unknown";
+        round.ClosedAtUtc?.ToLocalTime().ToString("MMM d, HH:mm") ?? "Not recorded";
 
     private Task StopGuessingAsync() =>
         RunAsync(() => Rounds.StopGuessingAsync(HostId, CancellationToken.None));

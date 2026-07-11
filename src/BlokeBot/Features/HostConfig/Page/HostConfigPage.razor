@@ -126,7 +126,7 @@
                             <button class="primary-control grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                                     type="button"
                                     disabled="@(!CanStart)"
-                                    aria-label="Start bot runtime"
+                                    aria-label="Start bot"
                                     @onclick="() => StartAsync(hostId)">
                                 <span class="inline-flex h-9 w-9 items-center justify-center">
                                     <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
@@ -135,7 +135,7 @@
                                 </span>
                                 <span class="min-w-0">
                                     <span class="block text-sm font-bold">Start bot</span>
-                                    <span class="mt-1 block text-xs font-medium opacity-75">Begin chat runtime</span>
+                                    <span class="mt-1 block text-xs font-medium opacity-75">Let the bot join chat</span>
                                 </span>
                             </button>
                         </span>
@@ -143,7 +143,7 @@
                             <button class="control-surface grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                                     type="button"
                                     disabled="@(!CanStop)"
-                                    aria-label="Stop bot runtime"
+                                    aria-label="Stop bot"
                                     @onclick="() => StopAsync(hostId)">
                                 <span class="inline-flex h-9 w-9 items-center justify-center text-red-700">
                                     <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
@@ -152,7 +152,7 @@
                                 </span>
                                 <span class="min-w-0">
                                     <span class="block text-sm font-bold text-red-700">Stop bot</span>
-                                    <span class="mt-1 block text-xs font-medium text-slate-500">End chat runtime</span>
+                                    <span class="mt-1 block text-xs font-medium text-slate-500">Take the bot out of chat</span>
                                 </span>
                             </button>
                         </span>
@@ -197,7 +197,7 @@
                 </div>
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Whisper recipients today</p>
+                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
                         <span class="@WhisperQuotaBadgeClass">
                             <span class="@WhisperQuotaDotClass"></span>
                             @WhisperQuotaText
@@ -205,8 +205,8 @@
                     </div>
                     <p class="mt-2 text-xs font-medium text-slate-500">
                         @(state.BotOverride.WhisperQuota.Exhausted
-                            ? "Twitch whisper quota is unavailable for new recipients today."
-                            : $"{state.BotOverride.WhisperQuota.Remaining} new recipients remain today.")
+                            ? "Twitch has paused whispers to new people for today."
+                            : $"The bot can whisper {state.BotOverride.WhisperQuota.Remaining} more new people today.")
                     </p>
                 </div>
             </div>

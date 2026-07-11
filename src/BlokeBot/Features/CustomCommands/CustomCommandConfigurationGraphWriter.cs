@@ -416,7 +416,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             var entry = messageEntries[editor.Id];
             entry.Name = CustomCommandConfigurationValidator.RequiredName(
                 editor.Name,
-                "Message library entry"
+                "Reply"
             );
             entry.SelectionMode = editor.SelectionMode;
             entry.CurrentVariantIndex = ClampVariantIndex(

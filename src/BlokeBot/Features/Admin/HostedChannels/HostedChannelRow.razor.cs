@@ -101,9 +101,9 @@ public partial class HostedChannelRow
             return Host.RuntimeState switch
             {
                 BotChannelRuntimeState.Starting => "bot starting",
-                BotChannelRuntimeState.Started => "bot started",
+                BotChannelRuntimeState.Started => "bot running",
                 BotChannelRuntimeState.Stopping => "bot stopping",
-                _ => "bot stopped",
+                _ => "bot offline",
             };
         }
     }

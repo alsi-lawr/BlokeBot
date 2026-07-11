@@ -19,8 +19,17 @@ public sealed class CustomCommandSettingsUiTests
 
         var cut = context.Render<CustomCommandSettingsPage>();
 
+        cut.Markup.ShouldContain("Always use the first message");
+        cut.Markup.ShouldContain("Everyone shares the wait");
+        cut.Markup.ShouldContain("Add 1 to a counter, then send a reply");
+        cut.Markup.ShouldContain("Message 1");
+        cut.Markup.ShouldNotContain("Message library");
+        cut.Markup.ShouldNotContain("Rotation index");
+        cut.Markup.ShouldNotContain("Action type");
         cut.Find($"#command-{seeded.CommandId}-counter-id");
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
+        cut.Markup.ShouldContain("On a timer, after chat activity");
+        cut.Markup.ShouldNotContain("Schedule type");
         cut.Find($"#announcement-{seeded.AnnouncementId}-required-chat-messages");
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
@@ -38,11 +47,11 @@ public sealed class CustomCommandSettingsUiTests
         var cut = context.Render<CustomCommandSettingsPage>();
         cut.Find($"#message-entry-{seeded.MessageEntryId}-name").Input(string.Empty);
 
-        cut.Find("button[aria-label='Save custom command settings']").Click();
+        cut.Find("button[aria-label='Save custom commands']").Click();
 
         var error = toasts.Current.Single();
         error.Kind.ShouldBe(ToastKind.Error);
-        error.Message.ShouldNotBeNullOrWhiteSpace();
+        error.Message.ShouldBe("Reply name is required.");
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId))!
             .Name.ShouldBe("Message");

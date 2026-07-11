@@ -37,7 +37,7 @@ public sealed class CommandAliasRegistry
             .ToArray();
         var duplicate = CommandAliasPolicy.FindDuplicateAlias(genericDrafts);
         if (duplicate is not null)
-            throw new InvalidOperationException($"Alias !{duplicate} is used more than once.");
+            throw new InvalidOperationException($"!{duplicate} is entered more than once.");
 
         var requestedAliases = rows.Select(x => x.Alias).ToArray();
         var existingCollision = await db
@@ -51,7 +51,7 @@ public sealed class CommandAliasRegistry
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(existingCollision))
             throw new InvalidOperationException(
-                $"Alias !{existingCollision} is already used by another bot function."
+                $"!{existingCollision} is already used by another bot command."
             );
 
         db.CommandAliases.RemoveRange(

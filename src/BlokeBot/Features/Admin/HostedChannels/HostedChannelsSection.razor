@@ -1,23 +1,23 @@
 @using BlokeBot.Features.Admin.Monitoring
 
 <div id="hosts">
-    <CollapsibleSection Title="Hosted channels"
-                        Description="Create channels and control their bot runtime."
+    <CollapsibleSection Title="Channels using BlokeBot"
+                        Description="Add channels and start or stop their bots."
                         InitiallyOpen="true">
         <div class="border-b border-slate-200 p-5">
             <ConnectedChannelsSummary />
         </div>
         <div class="surface-band border-b p-5">
-            <label class="label" for="newHostLogin">Create hosted channel</label>
+            <label class="label" for="newHostLogin">Add a channel</label>
             <div class="mt-2 flex flex-col gap-2 sm:flex-row">
                 <input id="newHostLogin" class="input" placeholder="twitch login" value="@NewHostLogin" @oninput="OnInput" />
-                <button class="btn-primary sm:w-40" @onclick="CreateHost">Create</button>
+                <button class="btn-primary sm:w-40" @onclick="CreateHost">Add channel</button>
             </div>
         </div>
         <div class="motion-list motion-list--divided scroll-panel scroll-panel--hosted-channels divide-y divide-slate-100">
             @if (Hosts.Count == 0)
             {
-                <div class="p-8 text-sm text-muted-foreground">No hosted channels are available.</div>
+                <div class="p-8 text-sm text-muted-foreground">No channels have been added yet.</div>
             }
             else
             {

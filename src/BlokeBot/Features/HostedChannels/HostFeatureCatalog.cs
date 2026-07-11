@@ -9,19 +9,19 @@ public static class HostFeatureCatalog
             new(
                 HostFeatureFlags.Guessing,
                 "Guessing game",
-                "Let chat guess live results and keep a round history.",
+                "Let chat guess live results and see past rounds.",
                 enabledFeatures.Contains(HostFeatureFlags.Guessing)
             ),
             new(
                 HostFeatureFlags.Points,
                 "Points",
-                "Track viewer points, giveaways, gambling, and moderator adjustments.",
+                "Track viewer points, run giveaways, and let moderators change balances.",
                 enabledFeatures.Contains(HostFeatureFlags.Points)
             ),
             new(
                 HostFeatureFlags.CustomCommands,
                 "Custom commands",
-                "Create reusable chat replies, counters, and scheduled announcements.",
+                "Create chat commands, keep counters, and send automatic announcements.",
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
         ];

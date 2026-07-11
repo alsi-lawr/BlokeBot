@@ -150,7 +150,7 @@ internal sealed class OutboundQueueAlertWhisperSender(
     }
 
     private static string WhisperMessage(OutboundQueueAlertNotification request) =>
-        $"BlokeBot alert: outbound chat messages for #{request.HostLogin} are delayed. {request.PendingCount} messages are pending; the oldest has waited about {FormatAge(request.OldestPendingAge)}. Open BlokeBot alerts to acknowledge it.";
+        $"BlokeBot alert: chat messages for #{request.HostLogin} are taking longer to send. {request.PendingCount} messages are waiting; the oldest has waited about {FormatAge(request.OldestPendingAge)}. Open Alerts in BlokeBot and mark it as handled after you check it.";
 
     private static string FormatAge(TimeSpan age)
     {

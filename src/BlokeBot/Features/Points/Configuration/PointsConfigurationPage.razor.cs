@@ -49,21 +49,21 @@ public partial class PointsConfigurationPage
     private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
     [
         new("Balance", PointsReplyKeys.Balance),
-        new("Other balance", PointsReplyKeys.OtherBalance),
-        new("Transfer", PointsReplyKeys.Transfer),
-        new("Add", PointsReplyKeys.Add),
-        new("Remove", PointsReplyKeys.Remove),
-        new("Invalid amount", PointsReplyKeys.InvalidAmount),
-        new("Insufficient balance", PointsReplyKeys.InsufficientBalance),
-        new("Moderator only", PointsReplyKeys.ModeratorOnly),
+        new("Another viewer's balance", PointsReplyKeys.OtherBalance),
+        new("Points given", PointsReplyKeys.Transfer),
+        new("Moderator adds points", PointsReplyKeys.Add),
+        new("Moderator removes points", PointsReplyKeys.Remove),
+        new("Amount not understood", PointsReplyKeys.InvalidAmount),
+        new("Not enough points", PointsReplyKeys.InsufficientBalance),
+        new("Only moderators can use this", PointsReplyKeys.ModeratorOnly),
         new("Giveaway joined", PointsReplyKeys.GiveawayJoined),
         new("Already joined", PointsReplyKeys.GiveawayAlreadyJoined),
-        new("Already active", PointsReplyKeys.GiveawayAlreadyActive),
-        new("Not active", PointsReplyKeys.GiveawayNotActive),
-        new("Cooldown", PointsReplyKeys.GiveawayCooldown),
-        new("Stream offline", PointsReplyKeys.StreamOffline),
-        new("Not eligible", PointsReplyKeys.NotEligible),
-        new("Followers-only unavailable", PointsReplyKeys.FollowerEligibilityUnavailable),
+        new("Giveaway already running", PointsReplyKeys.GiveawayAlreadyActive),
+        new("No giveaway running", PointsReplyKeys.GiveawayNotActive),
+        new("Giveaway used too recently", PointsReplyKeys.GiveawayCooldown),
+        new("Stream is offline", PointsReplyKeys.StreamOffline),
+        new("Viewer cannot enter", PointsReplyKeys.NotEligible),
+        new("Follower check unavailable", PointsReplyKeys.FollowerEligibilityUnavailable),
     ];
 
     private PointsConfiguration? config;
@@ -106,7 +106,7 @@ public partial class PointsConfigurationPage
         {
             await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            Toasts.Success("Settings saved.");
+            Toasts.Success("Points settings saved.");
         }
         catch (Exception ex)
             when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)

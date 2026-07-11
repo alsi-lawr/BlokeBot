@@ -131,7 +131,7 @@ public sealed class CustomCommandConfigurationService(
             );
             if (aliases.Any(alias => alias.Length > AliasMaxLength))
                 throw new InvalidOperationException(
-                    $"Custom command aliases cannot exceed {AliasMaxLength} characters."
+                    $"Command words cannot exceed {AliasMaxLength} characters."
                 );
 
             normalized[command] = aliases;
@@ -144,7 +144,7 @@ public sealed class CustomCommandConfigurationService(
             ?.Key;
         if (duplicate is not null)
             throw new InvalidOperationException(
-                $"Alias !{duplicate} is already used by another custom command."
+                $"!{duplicate} is already used by another custom command."
             );
 
         return normalized;

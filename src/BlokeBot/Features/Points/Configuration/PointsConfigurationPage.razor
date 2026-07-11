@@ -14,7 +14,7 @@
 
 <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Points settings"
-                Description="Point names, chat commands, gambling odds, giveaways, and bot replies.">
+                Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says.">
         <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
     </PageHeader>
 
@@ -36,17 +36,17 @@
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Label="Point label" @bind-Value="config.PointLabel" Placeholder="points" />
                 <div class="space-y-2">
-                    <label class="label" for="winRate">Gambling win rate</label>
+                    <label class="label" for="winRate">Chance of winning (%)</label>
                     <input id="winRate" class="input" type="number" min="0" max="100" @bind="config.GamblingWinRatePercent" />
                 </div>
                 <div class="space-y-2">
-                    <label class="label" for="gamblingCooldown">Gambling cooldown seconds</label>
+                    <label class="label" for="gamblingCooldown">Wait between gambles (seconds)</label>
                     <input id="gamblingCooldown" class="input" type="number" min="0" @bind="config.GamblingCooldownSeconds" />
                 </div>
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat commands" Description="Use commas when a command has more than one name." InitiallyOpen="true">
+        <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-2">
                 <Field Label="Balance" @bind-Value="config.Aliases.PointsAliases" Placeholder="points" />
                 <Field Label="Give" @bind-Value="config.Aliases.GivePointsAliases" Placeholder="givepoints" />
@@ -63,18 +63,18 @@
         <CollapsibleSection Title="Giveaways" Description="Prizes, timing, and who can enter." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <div class="space-y-2">
-                    <label class="label" for="duration">Duration in seconds</label>
+                    <label class="label" for="duration">Time to enter (seconds)</label>
                     <input id="duration" class="input" type="number" min="1" @bind="config.GiveawayDurationSeconds" />
                 </div>
-                <Field Label="Minimum payout" @bind-Value="config.GiveawayMinimumPayout" Placeholder="10" />
-                <Field Label="Maximum payout" @bind-Value="config.GiveawayMaximumPayout" Placeholder="100" />
+                <Field Label="Smallest prize" @bind-Value="config.GiveawayMinimumPayout" Placeholder="10" />
+                <Field Label="Largest prize" @bind-Value="config.GiveawayMaximumPayout" Placeholder="100" />
                 <div class="space-y-2">
                     <label class="label" for="winnerCount">Number of winners</label>
                     <input id="winnerCount" class="input" type="number" min="1" @bind="config.GiveawayWinnerCount" />
                 </div>
                 <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="config.GiveawayEligibility" />
                 <div class="space-y-2">
-                    <label class="label" for="cooldown">Time between giveaways in seconds</label>
+                    <label class="label" for="cooldown">Wait between giveaways (seconds)</label>
                     <input id="cooldown" class="input" type="number" min="@PointsConfigurationService.MinimumGiveawayCooldownSeconds" @bind="config.GiveawayCooldownSeconds" />
                 </div>
             </div>
@@ -83,28 +83,28 @@
         <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false">
             <div class="scroll-panel scroll-panel--settings grid gap-4 p-4 md:grid-cols-2">
                 <TextAreaField Label="Balance" @bind-Value="config.Replies.BalanceReply" />
-                <TextAreaField Label="Other balance" @bind-Value="config.Replies.OtherBalanceReply" />
-                <TextAreaField Label="Transfer" @bind-Value="config.Replies.TransferReply" />
-                <TextAreaField Label="Add" @bind-Value="config.Replies.AddReply" />
-                <TextAreaField Label="Remove" @bind-Value="config.Replies.RemoveReply" />
-                <TextAreaField Label="Invalid amount" @bind-Value="config.Replies.InvalidAmountReply" />
-                <TextAreaField Label="Insufficient balance" @bind-Value="config.Replies.InsufficientBalanceReply" />
-                <TextAreaField Label="Moderator only" @bind-Value="config.Replies.ModeratorOnlyReply" />
+                <TextAreaField Label="Another viewer's balance" @bind-Value="config.Replies.OtherBalanceReply" />
+                <TextAreaField Label="Points given" @bind-Value="config.Replies.TransferReply" />
+                <TextAreaField Label="Moderator adds points" @bind-Value="config.Replies.AddReply" />
+                <TextAreaField Label="Moderator removes points" @bind-Value="config.Replies.RemoveReply" />
+                <TextAreaField Label="Amount not understood" @bind-Value="config.Replies.InvalidAmountReply" />
+                <TextAreaField Label="Not enough points" @bind-Value="config.Replies.InsufficientBalanceReply" />
+                <TextAreaField Label="Only moderators can use this" @bind-Value="config.Replies.ModeratorOnlyReply" />
                 <TextAreaField Label="Gamble win" @bind-Value="config.Replies.GamblingWinReply" />
                 <TextAreaField Label="Gamble loss" @bind-Value="config.Replies.GamblingLoseReply" />
                 <TextAreaField Label="Giveaway started" @bind-Value="config.Replies.GiveawayStartedReply" />
-                <TextAreaField Label="Giveaway update" @bind-Value="config.Replies.GiveawayUpdateReply" />
+                <TextAreaField Label="Giveaway status" @bind-Value="config.Replies.GiveawayUpdateReply" />
                 <TextAreaField Label="Giveaway joined" @bind-Value="config.Replies.GiveawayJoinedReply" />
                 <TextAreaField Label="Already joined" @bind-Value="config.Replies.GiveawayAlreadyJoinedReply" />
                 <TextAreaField Label="Giveaway ended" @bind-Value="config.Replies.GiveawayEndedReply" />
-                <TextAreaField Label="No entrants" @bind-Value="config.Replies.GiveawayNoEntrantsReply" />
+                <TextAreaField Label="No one joined" @bind-Value="config.Replies.GiveawayNoEntrantsReply" />
                 <TextAreaField Label="Cancelled" @bind-Value="config.Replies.GiveawayCancelledReply" />
-                <TextAreaField Label="Already active" @bind-Value="config.Replies.GiveawayAlreadyActiveReply" />
-                <TextAreaField Label="Not active" @bind-Value="config.Replies.GiveawayNotActiveReply" />
-                <TextAreaField Label="Cooldown" @bind-Value="config.Replies.GiveawayCooldownReply" />
-                <TextAreaField Label="Stream offline" @bind-Value="config.Replies.StreamOfflineReply" />
-                <TextAreaField Label="Not eligible" @bind-Value="config.Replies.NotEligibleReply" />
-                <TextAreaField Label="Followers-only unavailable" @bind-Value="config.Replies.FollowerEligibilityUnavailableReply" />
+                <TextAreaField Label="Giveaway already running" @bind-Value="config.Replies.GiveawayAlreadyActiveReply" />
+                <TextAreaField Label="No giveaway running" @bind-Value="config.Replies.GiveawayNotActiveReply" />
+                <TextAreaField Label="Giveaway used too recently" @bind-Value="config.Replies.GiveawayCooldownReply" />
+                <TextAreaField Label="Stream is offline" @bind-Value="config.Replies.StreamOfflineReply" />
+                <TextAreaField Label="Viewer cannot enter" @bind-Value="config.Replies.NotEligibleReply" />
+                <TextAreaField Label="Follower check unavailable" @bind-Value="config.Replies.FollowerEligibilityUnavailableReply" />
             </div>
         </CollapsibleSection>
 

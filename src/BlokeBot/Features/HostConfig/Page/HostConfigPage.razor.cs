@@ -115,41 +115,41 @@ public partial class HostConfigPage
     private string RuntimeText =>
         state?.RuntimeStatus?.RuntimeState switch
         {
-            BotChannelRuntimeState.Starting => "bot starting",
-            BotChannelRuntimeState.Started => "bot started",
-            BotChannelRuntimeState.Stopping => "bot stopping",
-            _ => "bot stopped",
+            BotChannelRuntimeState.Starting => "starting",
+            BotChannelRuntimeState.Started => "online",
+            BotChannelRuntimeState.Stopping => "stopping",
+            _ => "offline",
         };
 
     private string RuntimeStatusMessage =>
         state?.RuntimeStatus?.RuntimeState switch
         {
-            BotChannelRuntimeState.Starting => "Bot starting.",
-            BotChannelRuntimeState.Started => "Bot started.",
-            BotChannelRuntimeState.Stopping => "Bot stopping.",
-            _ => "Bot stopped.",
+            BotChannelRuntimeState.Starting => "The bot is starting.",
+            BotChannelRuntimeState.Started => "The bot is in chat.",
+            BotChannelRuntimeState.Stopping => "The bot is leaving chat.",
+            _ => "The bot is offline.",
         };
 
     private string StartRuntimeTooltip =>
-        CanStart ? "Start the bot runtime for this channel." : StartRuntimeDisabledTooltip;
+        CanStart ? "Start the bot for this channel." : StartRuntimeDisabledTooltip;
 
     private string StopRuntimeTooltip =>
-        CanStop ? "Stop the bot runtime for this channel." : StopRuntimeDisabledTooltip;
+        CanStop ? "Stop the bot for this channel." : StopRuntimeDisabledTooltip;
 
     private string StartRuntimeDisabledTooltip =>
-        state is null ? "Load the channel before starting the bot runtime."
-        : state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot runtime."
+        state is null ? "Wait for the channel to load before starting the bot."
+        : state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot."
         : state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
-            ? "Reconnect the channel before starting the bot runtime."
-        : !BotAccountCanStart ? "Connect the custom bot account before starting the bot runtime."
+            ? "Reconnect the channel before starting the bot."
+        : !BotAccountCanStart ? "Connect the custom bot account before starting the bot."
         : state.RuntimeStatus?.RuntimeState is not BotChannelRuntimeState.Stopped
-            ? "The bot runtime can only be started while stopped."
-        : "The bot runtime cannot be started right now.";
+            ? "Wait for the bot to stop before starting it again."
+        : "The bot cannot be started right now.";
 
     private string StopRuntimeDisabledTooltip =>
         state?.RuntimeStatus?.RuntimeState is BotChannelRuntimeState.Stopping
-            ? "The bot runtime is already stopping."
-            : "The bot runtime can only be stopped while started or starting.";
+            ? "The bot is already stopping."
+            : "The bot is not running right now.";
 
     private bool BotAccountCanStart =>
         state?.BotOverride.Enabled != true
@@ -181,8 +181,8 @@ public partial class HostConfigPage
 
     private string WhisperQuotaText =>
         state?.BotOverride.WhisperQuota is { } quota
-            ? $"{quota.RecipientCount}/{quota.Limit}"
-            : "0/40";
+            ? $"{quota.RecipientCount} of {quota.Limit}"
+            : "0 of 40";
 
     private string AccessModeSegmentClass =>
         state?.ModAccess.AllowModsByDefault == false

@@ -47,7 +47,7 @@
                                 <th class="px-5 py-3 font-semibold">Rank</th>
                                 <th class="px-5 py-3 font-semibold">User</th>
                                 <th class="px-5 py-3 font-semibold">Balance</th>
-                                <th class="px-5 py-3 font-semibold">Action</th>
+                                <th class="px-5 py-3 font-semibold">Manage</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -62,7 +62,7 @@
                                         <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold text-red-700 transition"
                                                 type="button"
                                                 @onclick="() => RemoveLeaderboardEntryAsync(entry.Login)">
-                                            Remove
+                                            Delete balance
                                         </button>
                                     </td>
                                 </tr>
@@ -84,7 +84,7 @@
                 <div class="grid gap-4 p-5 md:grid-cols-2">
                     <Field Label="Find viewer" @bind-Value="lookupLogin" Placeholder="username" />
                     <div class="flex items-end">
-                        <button class="btn-secondary" @onclick="LookupAsync">Lookup</button>
+                        <button class="btn-secondary" @onclick="LookupAsync">Search</button>
                     </div>
                     @if (lookupResult is not null)
                     {
@@ -96,23 +96,23 @@
                 </div>
                 <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
                     <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Give</h3>
-                        <Field Label="From" @bind-Value="giveFrom" Placeholder="from username" />
-                        <Field Label="To" @bind-Value="giveTo" Placeholder="to username" />
+                        <h3 class="text-sm font-bold text-slate-950">Move points</h3>
+                        <Field Label="From viewer" @bind-Value="giveFrom" Placeholder="from username" />
+                        <Field Label="To viewer" @bind-Value="giveTo" Placeholder="to username" />
                         <Field Label="Amount" @bind-Value="giveAmount" Placeholder="100, 50%, all" />
-                        <button class="btn-secondary" @onclick="GiveAsync">Give</button>
+                        <button class="btn-secondary" @onclick="GiveAsync">Move points</button>
                     </div>
                     <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Add</h3>
+                        <h3 class="text-sm font-bold text-slate-950">Add points</h3>
                         <Field Label="Viewer" @bind-Value="addLogin" Placeholder="username" />
                         <Field Label="Amount" @bind-Value="addAmount" Placeholder="100" />
-                        <button class="btn-secondary" @onclick="AddAsync">Add</button>
+                        <button class="btn-secondary" @onclick="AddAsync">Add points</button>
                     </div>
                     <div class="space-y-3">
-                        <h3 class="text-sm font-bold text-slate-950">Remove</h3>
+                        <h3 class="text-sm font-bold text-slate-950">Take away points</h3>
                         <Field Label="Viewer" @bind-Value="removeLogin" Placeholder="username" />
                         <Field Label="Amount" @bind-Value="removeAmount" Placeholder="100, 50%, all" />
-                        <button class="btn-secondary" @onclick="RemoveAsync">Remove</button>
+                        <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
                     </div>
                 </div>
             </section>
@@ -132,7 +132,7 @@
             </div>
             <div class="grid gap-5 p-5 lg:grid-cols-2">
                 <div>
-                    <h3 class="text-sm font-bold text-slate-950">Entrants</h3>
+                    <h3 class="text-sm font-bold text-slate-950">People who joined</h3>
                     <div class="scroll-panel scroll-panel--tag-cloud mt-3 flex flex-wrap gap-2 pr-2">
                         @foreach (var entrant in state.ActiveGiveaway?.Entrants ?? [])
                         {
@@ -173,7 +173,7 @@
                         {
                             <tr @key="entry" class="motion-list__item">
                                 <td class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
-                                <td class="px-5 py-3 font-medium text-slate-900">@entry.Kind</td>
+                                <td class="px-5 py-3 font-medium text-slate-900">@LedgerChangeLabel(entry.Kind)</td>
                                 <td class="px-5 py-3 text-slate-700">@entry.Login</td>
                                 <td class="px-5 py-3 text-slate-700">@entry.Delta</td>
                                 <td class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>

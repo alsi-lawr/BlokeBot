@@ -47,15 +47,15 @@ public partial class GuessingSettings
 {
     private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
     [
-        new("Round already open", GuessingReplyKeys.RoundAlreadyOpen),
-        new("No open round", GuessingReplyKeys.NoOpenRound),
+        new("Round already running", GuessingReplyKeys.RoundAlreadyOpen),
+        new("No round running", GuessingReplyKeys.NoOpenRound),
         new("Guessing already stopped", GuessingReplyKeys.GuessingAlreadyStopped),
         new("Guessing closed", GuessingReplyKeys.GuessingClosed),
         new("Invalid guess", GuessingReplyKeys.InvalidGuess),
-        new("Guess usage", GuessingReplyKeys.GuessUsage),
+        new("How to guess", GuessingReplyKeys.GuessUsage),
         new("Available guesses", GuessingReplyKeys.AvailableGuesses),
-        new("Win usage", GuessingReplyKeys.WinUsage),
-        new("Moderator only", GuessingReplyKeys.ModeratorOnly),
+        new("How to choose a winner", GuessingReplyKeys.WinUsage),
+        new("Only moderators can use this", GuessingReplyKeys.ModeratorOnly),
     ];
 
     private GuessingConfiguration? config;
@@ -152,7 +152,7 @@ public partial class GuessingSettings
                 selectedId,
                 CancellationToken.None
             );
-            Toasts.Success("Settings saved.");
+            Toasts.Success("Guessing settings saved.");
         }
         catch (InvalidOperationException ex)
         {

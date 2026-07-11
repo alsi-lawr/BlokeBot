@@ -87,6 +87,7 @@ public partial class PageHelpButton
             "/guessing/settings" => GuessingSettingsHelp,
             "/points" => PointsDashboardHelp,
             "/points/settings" => PointsSettingsHelp,
+            "/custom-commands/settings" => CustomCommandsHelp,
             "/host" => HostConfigHelp,
             _ => null,
         };
@@ -96,11 +97,11 @@ public partial class PageHelpButton
         "<strong>Start reply</strong>: <code>{round}</code>, <code>{options}</code>",
         "<strong>Guess option reply</strong>: <code>{name}</code>, <code>{login}</code>",
         "<strong>Invalid guess reply</strong>: <code>{name}</code>, <code>{login}</code>",
-        "<strong>Guess usage reply</strong>: <code>{command}</code>",
+        "<strong>How to guess reply</strong>: <code>{command}</code>",
         "<strong>Available guesses reply</strong>: <code>{round}</code>, <code>{options}</code>",
-        "<strong>Win usage reply</strong>: <code>{command}</code>",
+        "<strong>How to choose a winner reply</strong>: <code>{command}</code>",
         "<strong>Winner and no-winners replies</strong>: <code>{name}</code>, <code>{winners}</code>, <code>{count}</code>",
-        "<strong>Stop, closed, no-open-round, already-open, and moderator-only replies</strong>: no placeholders",
+        "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong>: no live details",
     ];
 
     private static readonly HelpPage HomeHelp = new(
@@ -170,8 +171,8 @@ public partial class PageHelpButton
                 []
             ),
             new(
-                "Reply placeholders",
-                "Use these placeholders in bot replies.",
+                "Add live details to replies",
+                "Words in braces are replaced with details from the current round or viewer.",
                 TemplateVariableItems
             ),
         ]
@@ -212,8 +213,8 @@ public partial class PageHelpButton
                 ]
             ),
             new(
-                "Reply placeholders",
-                "Use these placeholders when you want chat replies to include live values.",
+                "Add live details to replies",
+                "Words in braces are replaced with details from the current viewer, balance, or giveaway.",
                 [
                     "Balance and gambling replies: <code>{user}</code>, <code>{balance}</code>, <code>{amount}</code>, <code>{label}</code>.",
                     "Transfer replies: <code>{from}</code>, <code>{to}</code>, <code>{amount}</code>, <code>{label}</code>.",
@@ -223,6 +224,31 @@ public partial class PageHelpButton
             new(
                 "Follower-only giveaways",
                 "Follower-only giveaways need the bot account to be allowed to check followers, and the bot must be a moderator in the channel.",
+                []
+            ),
+        ]
+    );
+
+    private static readonly HelpPage CustomCommandsHelp = new(
+        "Custom commands",
+        [
+            new(
+                "Replies",
+                "A reply is a saved message. Add more than one message when you want the bot to rotate through them or pick one at random.",
+                []
+            ),
+            new(
+                "Chat commands",
+                "Command words are what viewers type after the exclamation mark. Separate extra command words with commas.",
+                [
+                    "Use <code>{user}</code> for the viewer's name and <code>{channel}</code> for the channel name.",
+                    "Use <code>{args}</code> for everything typed after the command, or <code>{arg1}</code> through <code>{arg9}</code> for individual words.",
+                    "Counter commands can use <code>{count}</code> for the new number.",
+                ]
+            ),
+            new(
+                "Announcements",
+                "Choose a saved reply, then decide whether it should be sent on a timer, after enough chat activity, or once a week.",
                 []
             ),
         ]

@@ -57,6 +57,21 @@ public partial class AlertsPage
     private static string FormatTimestamp(DateTime? value) =>
         value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
 
+    private static string AlertAreaLabel(string source) =>
+        source switch
+        {
+            "twitch-outbound-queue" => "Chat messages",
+            _ => "BlokeBot",
+        };
+
+    private static string ImportanceLabel(DurableAlertSeverity severity) =>
+        severity switch
+        {
+            DurableAlertSeverity.Critical => "Urgent",
+            DurableAlertSeverity.Warning => "Warning",
+            _ => "Information",
+        };
+
     private static string SeverityBadgeClass(DurableAlertSeverity severity) =>
         severity switch
         {

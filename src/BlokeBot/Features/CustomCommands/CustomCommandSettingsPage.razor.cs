@@ -63,7 +63,7 @@ public partial class CustomCommandSettingsPage
             await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
             config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
             nextTemporaryId = -1;
-            Toasts.Success("Settings saved.");
+            Toasts.Success("Custom commands saved.");
         }
         catch (Exception ex)
             when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
@@ -81,13 +81,13 @@ public partial class CustomCommandSettingsPage
             new CustomMessageLibraryEntryEditor
             {
                 Id = NextTemporaryId(),
-                Name = "New message",
+                Name = "New reply",
                 Variants =
                 [
                     new CustomMessageVariantEditor
                     {
                         Id = NextTemporaryId(),
-                        Text = "Message text",
+                        Text = "Type your reply here.",
                     },
                 ],
             }
@@ -104,7 +104,9 @@ public partial class CustomCommandSettingsPage
             || config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
-            Toasts.Warning("Message entries used by commands or announcements cannot be deleted.");
+            Toasts.Warning(
+                "This reply is used by a command or announcement. Change that first, then delete it."
+            );
             return;
         }
 
@@ -117,7 +119,7 @@ public partial class CustomCommandSettingsPage
             new CustomMessageVariantEditor
             {
                 Id = NextTemporaryId(),
-                Text = "Message text",
+                Text = "Type your reply here.",
             }
         );
     }
@@ -129,7 +131,7 @@ public partial class CustomCommandSettingsPage
     {
         if (entry.Variants.Count <= 1)
         {
-            Toasts.Warning("Message entries need at least one variant.");
+            Toasts.Warning("A reply needs at least one message.");
             return;
         }
 
@@ -204,7 +206,9 @@ public partial class CustomCommandSettingsPage
             )
         )
         {
-            Toasts.Warning("Counters used by commands cannot be deleted.");
+            Toasts.Warning(
+                "This counter is used by a command. Change that command first, then delete it."
+            );
             return;
         }
 
@@ -236,6 +240,61 @@ public partial class CustomCommandSettingsPage
     }
 
     private int NextTemporaryId() => nextTemporaryId--;
+
+    private string SelectedTimeZoneLabel =>
+        config is null
+            ? string.Empty
+            : TimeZones.FirstOrDefault(x => x.Id == config.TimeZoneId) is { } timeZone
+                ? TimeZoneLabel(timeZone)
+                : config.TimeZoneId;
+
+    private static string CountLabel(int count, string singular) =>
+        $"{count} {(count == 1 ? singular : singular + "s")}";
+
+    private static string MessageSelectionLabel(CustomMessageSelectionMode mode) =>
+        mode switch
+        {
+            CustomMessageSelectionMode.First => "Always use the first message",
+            CustomMessageSelectionMode.Random => "Pick a message at random",
+            CustomMessageSelectionMode.Sequential => "Use each message in order",
+            _ => "Choose a message",
+        };
+
+    private static string CooldownScopeLabel(CustomCommandCooldownScope scope) =>
+        scope switch
+        {
+            CustomCommandCooldownScope.Global => "Everyone shares the wait",
+            CustomCommandCooldownScope.User => "Each viewer has their own wait",
+            _ => "Choose who waits",
+        };
+
+    private static string ActionKindLabel(CustomCommandActionKind action) =>
+        action switch
+        {
+            CustomCommandActionKind.Message => "Send a reply",
+            CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
+            _ => "Choose what happens",
+        };
+
+    private static string AnnouncementScheduleLabel(CustomAnnouncementScheduleKind schedule) =>
+        schedule switch
+        {
+            CustomAnnouncementScheduleKind.Interval => "On a timer",
+            CustomAnnouncementScheduleKind.IntervalAfterChat =>
+                "On a timer, after chat activity",
+            CustomAnnouncementScheduleKind.Weekly => "Once a week",
+            _ => "Choose when to send",
+        };
+
+    private static string TimeZoneLabel(TimeZoneInfo timeZone) => timeZone.DisplayName;
+
+    private static string AlertImportanceLabel(DurableAlertSeverity severity) =>
+        severity switch
+        {
+            DurableAlertSeverity.Critical => "Urgent",
+            DurableAlertSeverity.Warning => "Warning",
+            _ => "Information",
+        };
 
     private static string FormatLastSent(DateTime? value) =>
         value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");

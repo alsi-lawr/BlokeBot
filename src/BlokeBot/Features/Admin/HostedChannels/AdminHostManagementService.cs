@@ -24,12 +24,15 @@ internal sealed class AdminHostManagementService(
         {
             return new AdminHostOperationResult(
                 false,
-                "Authorize the bot account before creating hosted channels."
+                "Connect the bot account before adding channels."
             );
         }
         catch (HttpRequestException)
         {
-            return new AdminHostOperationResult(false, "Twitch user lookup failed.");
+            return new AdminHostOperationResult(
+                false,
+                "Twitch could not look up that user. Try again."
+            );
         }
 
         if (user is null || string.IsNullOrWhiteSpace(user.Login))
@@ -45,7 +48,7 @@ internal sealed class AdminHostManagementService(
             user.ProfileImageUrl,
             ct
         );
-        return new AdminHostOperationResult(true, $"Created hosted channel for {displayName}.");
+        return new AdminHostOperationResult(true, $"Added a channel for {displayName}.");
     }
 
     public async Task<AdminHostOperationResult> RemoveHostAsync(int hostId, CancellationToken ct)
@@ -54,7 +57,7 @@ internal sealed class AdminHostManagementService(
         var removed = await hostRemoval.RemoveAsync(hostId, ct);
         return new AdminHostOperationResult(
             true,
-            removed ? "Hosted channel removed." : "Hosted channel was already removed."
+            removed ? "Channel removed." : "Channel was already removed."
         );
     }
 
@@ -98,9 +101,9 @@ internal sealed class AdminHostManagementService(
         state switch
         {
             BotChannelRuntimeState.Starting => "Bot starting.",
-            BotChannelRuntimeState.Started => "Bot started.",
+            BotChannelRuntimeState.Started => "Bot running.",
             BotChannelRuntimeState.Stopping => "Bot stopping.",
-            _ => "Bot stopped.",
+            _ => "Bot offline.",
         };
 
     private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? state) =>

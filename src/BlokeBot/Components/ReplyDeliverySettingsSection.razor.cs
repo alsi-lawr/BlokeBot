@@ -6,13 +6,13 @@ namespace BlokeBot.Components;
 public partial class ReplyDeliverySettingsSection
 {
     private const string WhisperDisabledTooltip =
-        "Enable whisper responses in Channel setup before using whisper replies.";
+        "Turn on whisper responses in Channel setup before sending replies as whispers.";
 
     [Parameter]
     public string Title { get; set; } = "Whisper replies";
 
     [Parameter]
-    public string Description { get; set; } = "Direct replies that can use whispers.";
+    public string Description { get; set; } = "Choose which replies are sent privately.";
 
     [Parameter, EditorRequired]
     public ReplyDeliveryMap Delivery { get; set; } = new();

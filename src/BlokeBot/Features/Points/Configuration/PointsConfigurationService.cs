@@ -190,14 +190,16 @@ public sealed class PointsConfigurationService(
         var max = PointAmount.ParseAbsolute(config.GiveawayMaximumPayout);
         if (min.Value > max.Value)
             throw new InvalidOperationException(
-                "Minimum giveaway payout cannot exceed maximum payout."
+                "The smallest giveaway prize cannot be larger than the largest prize."
             );
 
         if (min.Value % 10 != 0 || max.Value % 10 != 0)
-            throw new InvalidOperationException("Giveaway payouts must be multiples of 10.");
+            throw new InvalidOperationException("Giveaway prizes must be multiples of 10.");
 
         if (config.GamblingWinRatePercent is < 0 or > 100)
-            throw new InvalidOperationException("Gambling win rate must be between 0 and 100.");
+            throw new InvalidOperationException(
+                "The chance of winning must be between 0% and 100%."
+            );
 
         if (config.GamblingCooldownSeconds < 0)
             config.GamblingCooldownSeconds = 0;

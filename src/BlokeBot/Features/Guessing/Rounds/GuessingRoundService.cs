@@ -153,7 +153,7 @@ public sealed class GuessingRoundService(
             includeOptions: true
         );
         if (profile is null)
-            return new GuessingOperationResult(false, "Round profile not found.");
+            return new GuessingOperationResult(false, "Round type not found.");
 
         var settings = profile.ReplySettings!;
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
@@ -212,7 +212,7 @@ public sealed class GuessingRoundService(
             );
 
         if (profile is null)
-            return new GuessingOperationResult(false, $"Unknown round profile: {profileName}.");
+            return new GuessingOperationResult(false, $"Unknown round type: {profileName}.");
 
         return await StartRoundAsync(hostId.Value, profile.Id, ct);
     }

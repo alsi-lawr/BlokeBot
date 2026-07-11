@@ -78,12 +78,12 @@ public sealed class AlertUiTests
         );
 
         var cut = context.Render<AlertsPage>();
-        cut.Find("button[aria-label='Acknowledge Queue delayed']").Click();
+        cut.Find("button[aria-label='Mark Queue delayed as handled']").Click();
 
         var state = await alerts.LoadStateAsync(hostId, CancellationToken.None);
         state.Active.ShouldBeEmpty();
         state.History.Single().AcknowledgedByLogin.ShouldBe("streamer");
-        cut.FindAll("button[aria-label='Acknowledge Queue delayed']").ShouldBeEmpty();
+        cut.FindAll("button[aria-label='Mark Queue delayed as handled']").ShouldBeEmpty();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)

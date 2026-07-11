@@ -59,8 +59,23 @@ public partial class PointsDashboard
 
     private string GiveawaySummary =>
         state?.ActiveGiveaway is null
-            ? "No active giveaway."
-            : $"Active until {state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm} with {state.ActiveGiveaway.Entrants.Count} entrants.";
+            ? "No giveaway running."
+            : $"Runs until {state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {state.ActiveGiveaway.Entrants.Count} people joined.";
+
+    private static string LedgerChangeLabel(string kind) =>
+        kind switch
+        {
+            "Add" => "Points added",
+            "Remove" => "Points removed",
+            "DeleteBalance" => "Balance deleted",
+            "TransferOut" => "Points given",
+            "TransferIn" => "Points received",
+            "GambleWin" => "Gamble won",
+            "GambleLoss" => "Gamble lost",
+            "GiveawayWin" => "Giveaway prize",
+            "GuessWin" => "Guessing prize",
+            _ => "Points changed",
+        };
 
     protected override async Task OnInitializedAsync()
     {

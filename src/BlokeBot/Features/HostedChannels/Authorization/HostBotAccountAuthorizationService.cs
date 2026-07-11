@@ -41,7 +41,7 @@ public sealed class HostBotAccountAuthorizationService(
                 required,
                 SplitStoredScopes(settings?.AuthorizedScopes).ToArray(),
                 [],
-                "This channel is using the global bot account."
+                "This channel is using the main BlokeBot account."
             );
         }
 
@@ -158,7 +158,7 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        throw new InvalidOperationException($"The bot account for #{channelLogin} is not ready.");
+        throw new InvalidOperationException($"The bot for #{channelLogin} is not ready yet.");
     }
 
     public async Task<bool> CanAuthorizeAsync(int hostId, CancellationToken ct)
@@ -245,7 +245,7 @@ public sealed class HostBotAccountAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
-            return BotAccountAuthorizationResult.Failure("Hosted channel was not found.");
+            return BotAccountAuthorizationResult.Failure("Channel was not found.");
 
         if (!settings.OverrideEnabled)
             return BotAccountAuthorizationResult.Failure(
