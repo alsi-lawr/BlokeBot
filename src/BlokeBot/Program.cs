@@ -93,7 +93,11 @@ builder
     )
     .AddBlokeBotHosts()
     .AddBlokeBotGuessing()
-    .AddBlokeBotPoints()
+    .AddBlokeBotPoints(
+        botRuntimeConfigured
+            ? PointsGiveawayNotificationMode.TwitchChat
+            : PointsGiveawayNotificationMode.ReplyOnly
+    )
     .AddBlokeBotToasts()
     .AddBlokeBotAuth();
 builder.Services.AddTwitchOAuthApi();

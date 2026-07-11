@@ -255,67 +255,14 @@ public sealed class PointsGiveawayService(
         return result;
     }
 
-    internal async Task<PointOperationResult> DrawAsync(int giveawayId, CancellationToken ct)
-    {
-        var outcome = await draws.DrawOutcomeAsync(giveawayId, ct);
-        var delivery = outcome.Settings is { } settings
-            ? await LoadReplyDeliveryAsync(settings.HostId, ct)
-            : new ReplyDeliveryMap();
-        return formatter.Reply(outcome, delivery);
-    }
-
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
         CancellationToken ct
     ) => await draws.DrawOutcomeAsync(giveawayId, ct);
 
-    internal async Task<bool> ExpireAsync(int giveawayId, CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var expired = await db
-            .PointsGiveaways.Where(x =>
-                x.Id == giveawayId && x.Status == PointsGiveawayStatus.Active
-            )
-            .ExecuteUpdateAsync(
-                update =>
-                    update
-                        .SetProperty(x => x.Status, PointsGiveawayStatus.Expired)
-                        .SetProperty(x => x.CompletedAtUtc, DateTime.UtcNow),
-                ct
-            );
-
-        if (expired == 0)
-            return false;
-
-        await changes.NotifyChangedAsync(ct);
-        return true;
-    }
-
     private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await PointsGiveawayQueries.LoadReplyDeliveryAsync(db, hostId, ct);
-    }
-
-    internal async Task<string?> BuildUpdateMessageAsync(
-        int giveawayId,
-        DateTime endsAtUtc,
-        CancellationToken ct
-    )
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var giveaway = await db
-            .PointsGiveaways.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Id == giveawayId, ct);
-        if (giveaway is null || giveaway.Status != PointsGiveawayStatus.Active)
-            return null;
-
-        var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveaway.HostId, ct);
-        var message = formatter.Format(
-            settings.GiveawayUpdateReply,
-            settings,
-            timeLeft: formatter.FormatTimeLeft(endsAtUtc - DateTime.UtcNow)
-        );
-        return message;
     }
 }

@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\BlokeBot.Commands\BlokeBot.Commands.csproj" />
     <ProjectReference Include="..\BlokeBot.Eventing\BlokeBot.Eventing.csproj" />
+    <ProjectReference Include="..\BlokeBot.Functional\BlokeBot.Functional.csproj" />
     <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
     <ProjectReference Include="..\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
     <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />

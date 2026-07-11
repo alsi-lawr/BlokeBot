@@ -1,6 +1,5 @@
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
-using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -11,19 +10,9 @@ public sealed class PointsGiveawayDrawService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PointBalanceService balances,
     IPointsRandom random,
-    PointsGiveawayMessageFormatter formatter,
     PointsChangeNotifier changes
 )
 {
-    public async Task<PointOperationResult> DrawAsync(int giveawayId, CancellationToken ct)
-    {
-        var outcome = await DrawOutcomeAsync(giveawayId, ct);
-        var delivery = outcome.Settings is { } settings
-            ? await LoadReplyDeliveryAsync(settings.HostId, ct)
-            : new ReplyDeliveryMap();
-        return formatter.Reply(outcome, delivery);
-    }
-
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
         CancellationToken ct
@@ -116,11 +105,5 @@ public sealed class PointsGiveawayDrawService(
         var offset =
             range <= int.MaxValue ? random.Next(0, (int)range + 1) : random.Next(0, int.MaxValue);
         return new PointAmount((min + offset) * 10);
-    }
-
-    private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await PointsGiveawayQueries.LoadReplyDeliveryAsync(db, hostId, ct);
     }
 }

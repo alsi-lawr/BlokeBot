@@ -154,7 +154,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBlokeBotPoints(this IServiceCollection services)
+    public static IServiceCollection AddBlokeBotPoints(
+        this IServiceCollection services,
+        PointsGiveawayNotificationMode notificationMode
+    )
     {
         services.AddSingleton<CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState>>();
         services.AddSingleton<CommandStrategyDispatcher<PointsCommandKind, AppCommandRouteState>>();
@@ -203,6 +206,38 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IPointTargetUserLookup, TwitchPointTargetUserLookup>();
         services.AddSingleton<PointsConfigurationService>();
         services.AddSingleton<PointsDashboardService>();
+        services.AddSingleton<
+            IPointsGiveawaySchedulerOperations,
+            PointsGiveawaySchedulerOperations
+        >();
+        services.AddSingleton(
+            new PointsGiveawaySchedulerRecoveryPolicy
+            {
+                RetryDelay = TimeSpan.FromSeconds(30),
+            }
+        );
+        switch (notificationMode)
+        {
+            case PointsGiveawayNotificationMode.ReplyOnly:
+                services.AddSingleton<
+                    IPointsGiveawaySchedulerNotification,
+                    ReplyOnlyPointsGiveawaySchedulerNotification
+                >();
+                break;
+            case PointsGiveawayNotificationMode.TwitchChat:
+                services.AddSingleton<
+                    IPointsGiveawaySchedulerNotification,
+                    TwitchPointsGiveawaySchedulerNotification
+                >();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(notificationMode),
+                    notificationMode,
+                    "Unknown points giveaway notification mode."
+                );
+        }
+
         services.AddSingleton<PointsGiveawayScheduler>();
         services.AddSingleton<IPointsGiveawayScheduler>(sp =>
             sp.GetRequiredService<PointsGiveawayScheduler>()

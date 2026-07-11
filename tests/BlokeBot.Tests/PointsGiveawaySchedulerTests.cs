@@ -6,10 +6,10 @@ using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -69,34 +69,198 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task OverdueExpirationFailure_RehydratingScheduler_LogsError()
+    public async Task RehydrationFailure_Retrying_LoadsAndSchedulesActiveGiveaway()
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var giveawayId = await SeedGiveawayAsync(
-            dbFactory,
-            hostId,
-            DateTime.UtcNow.AddMinutes(-10),
-            DateTime.UtcNow.AddMinutes(-5)
+        var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
+        var schedule = new PointsGiveawaySchedule(
+            42,
+            7,
+            "streamer",
+            now.UtcDateTime,
+            now.AddHours(1).UtcDateTime,
+            null
         );
+        var operations = new RecordingSchedulerOperations { Active = [schedule] };
+        operations.LoadOutcomes.Enqueue(Failure<IReadOnlyList<PointsGiveawaySchedule>>());
         var logger = new RecordingLogger<PointsGiveawayScheduler>();
-        var scheduler = new PointsGiveawayScheduler(
-            dbFactory,
-            new ServiceCollection().BuildServiceProvider(),
-            TimeProvider.System,
+        var scheduler = CreateScheduler(
+            operations,
+            new StaticTimeProvider(now),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
             logger
         );
 
         await scheduler.RehydrateAsync(CancellationToken.None);
 
+        operations.LoadAttempts.ShouldBe(2);
+        scheduler.IsScheduled(schedule.GiveawayId).ShouldBeTrue();
         logger.Entries.ShouldContain(entry =>
             entry.Level == LogLevel.Error
-            && entry.Message.Contains(
-                $"Failed to expire overdue points giveaway {giveawayId}",
-                StringComparison.Ordinal
-            )
-            && entry.Exception is InvalidOperationException
+            && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
+            && entry.Exception == null
         );
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Information
+            && entry.Message.Contains("recovered on attempt 2", StringComparison.Ordinal)
+        );
+
+        await scheduler.StopAsync(CancellationToken.None);
+    }
+
+    [Test]
+    public async Task CancellationDuringFailedRehydration_StopsWithoutRetryOrFailureReport()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var operations = new RecordingSchedulerOperations
+        {
+            BeforeLoadResult = cancellation.Cancel,
+        };
+        operations.LoadOutcomes.Enqueue(Failure<IReadOnlyList<PointsGiveawaySchedule>>());
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = CreateScheduler(
+            operations,
+            new StaticTimeProvider(
+                new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero)
+            ),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            logger
+        );
+
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            scheduler.RehydrateAsync(cancellation.Token)
+        );
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        operations.LoadAttempts.ShouldBe(1);
+        logger.Entries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task OverdueExpirationFailure_RehydratingScheduler_RetriesUntilExpired()
+    {
+        var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
+        var schedule = new PointsGiveawaySchedule(
+            42,
+            7,
+            "streamer",
+            now.AddMinutes(-10).UtcDateTime,
+            now.AddMinutes(-5).UtcDateTime,
+            null
+        );
+        var operations = new RecordingSchedulerOperations { Active = [schedule] };
+        operations.ExpirationOutcomes.Enqueue(Failure<PointsGiveawayExpirationOutcome>());
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = CreateScheduler(
+            operations,
+            new StaticTimeProvider(now),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            logger
+        );
+
+        await scheduler.RehydrateAsync(CancellationToken.None);
+
+        operations.ExpirationAttempts.ShouldBe(2);
+        scheduler.IsScheduled(schedule.GiveawayId).ShouldBeFalse();
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Error
+            && entry.Message.Contains("Expire failed", StringComparison.Ordinal)
+            && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
+            && entry.Exception == null
+        );
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Information
+            && entry.Message.Contains("Expire recovered", StringComparison.Ordinal)
+        );
+    }
+
+    [Test]
+    public async Task DrawFailure_RunningSchedule_RetriesUntilDrawCompletes()
+    {
+        var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
+        var operations = new RecordingSchedulerOperations();
+        operations.DrawOutcomes.Enqueue(Failure<PointsGiveawayDrawOutcome>());
+        operations.DrawOutcomes.Enqueue(
+            Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerOperationFailure>.Success(
+                PointsGiveawayDrawOutcome.NoEntrants(new PointsSettings { HostId = 7 })
+            )
+        );
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = CreateScheduler(
+            operations,
+            new AutoAdvanceTimeProvider(now),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            logger
+        );
+
+        await scheduler.ExecuteScheduleAsync(ScheduleEndingAfter(now), CancellationToken.None);
+
+        operations.DrawAttempts.ShouldBe(2);
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Error
+            && entry.Message.Contains("Draw failed", StringComparison.Ordinal)
+            && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
+            && entry.Exception == null
+        );
+        logger.Entries.ShouldContain(entry =>
+            entry.Level == LogLevel.Information
+            && entry.Message.Contains("Draw recovered", StringComparison.Ordinal)
+        );
+    }
+
+    [Test]
+    public async Task NotificationFailure_AfterDraw_DoesNotRetryOrFailDurableSchedule()
+    {
+        var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
+        var operations = new RecordingSchedulerOperations();
+        operations.DrawNotificationOutcomes.Enqueue(
+            Result<Option<string>, PointsGiveawaySchedulerOperationFailure>.Success(
+                Option<string>.Some("draw secret message")
+            )
+        );
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = CreateScheduler(
+            operations,
+            new AutoAdvanceTimeProvider(now),
+            new ThrowingSchedulerNotification("delivery secret"),
+            logger
+        );
+
+        await scheduler.ExecuteScheduleAsync(ScheduleEndingAfter(now), CancellationToken.None);
+
+        operations.DrawAttempts.ShouldBe(1);
+        operations.DrawNotificationAttempts.ShouldBe(1);
+        var failure = logger.Entries.Single(entry => entry.Level == LogLevel.Error);
+        failure.Exception.ShouldBeNull();
+        failure.Message.ShouldContain("DrawResult notification failed");
+        failure.Message.ShouldContain("delivery is not retried");
+        failure.Message.ShouldContain("durable schedule processing continues");
+        failure.Message.ShouldNotContain("draw secret message");
+        failure.Message.ShouldNotContain("delivery secret");
+    }
+
+    [Test]
+    public async Task MissingOptionalChatDelivery_RunningSchedule_CompletesReplyOnlyPolicy()
+    {
+        var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
+        var operations = new RecordingSchedulerOperations();
+        operations.DrawNotificationOutcomes.Enqueue(
+            Result<Option<string>, PointsGiveawaySchedulerOperationFailure>.Success(
+                Option<string>.Some("draw result")
+            )
+        );
+        var logger = new RecordingLogger<PointsGiveawayScheduler>();
+        var scheduler = CreateScheduler(
+            operations,
+            new AutoAdvanceTimeProvider(now),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            logger
+        );
+
+        await scheduler.ExecuteScheduleAsync(ScheduleEndingAfter(now), CancellationToken.None);
+
+        operations.DrawAttempts.ShouldBe(1);
+        operations.DrawNotificationAttempts.ShouldBe(1);
+        logger.Entries.ShouldBeEmpty();
     }
 
     [Test]
@@ -330,8 +494,8 @@ public sealed class PointsGiveawaySchedulerTests
         await SeedSettingsAsync(dbFactory, hostId);
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
-        var first = await service.DrawAsync(giveawayId, CancellationToken.None);
-        var second = await service.DrawAsync(giveawayId, CancellationToken.None);
+        var first = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
+        var second = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
         first.Success.ShouldBeTrue();
         second.Success.ShouldBeFalse();
@@ -347,15 +511,37 @@ public sealed class PointsGiveawaySchedulerTests
 
     private static PointsGiveawayScheduler CreateScheduler(SqliteBlokeBotDbFactory dbFactory)
     {
-        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
-        var services = new ServiceCollection().AddSingleton(service).BuildServiceProvider();
+        var timeProvider = TimeProvider.System;
+        var formatter = new PointsGiveawayMessageFormatter();
+        var changes = new PointsChangeNotifier(TestEventBus.Create<AppEventKind>());
         return new PointsGiveawayScheduler(
-            dbFactory,
-            services,
-            TimeProvider.System,
+            new PointsGiveawaySchedulerOperations(
+                dbFactory,
+                CreateDrawService(dbFactory, changes),
+                formatter,
+                changes,
+                timeProvider
+            ),
+            new ReplyOnlyPointsGiveawaySchedulerNotification(),
+            new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
+            timeProvider,
             NullLogger<PointsGiveawayScheduler>.Instance
         );
     }
+
+    private static PointsGiveawayScheduler CreateScheduler(
+        IPointsGiveawaySchedulerOperations operations,
+        TimeProvider timeProvider,
+        IPointsGiveawaySchedulerNotification notification,
+        ILogger<PointsGiveawayScheduler> logger
+    ) =>
+        new(
+            operations,
+            notification,
+            new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
+            timeProvider,
+            logger
+        );
 
     private static PointsGiveawayService CreateGiveawayService(
         SqliteBlokeBotDbFactory dbFactory,
@@ -373,11 +559,8 @@ public sealed class PointsGiveawaySchedulerTests
         );
         return new PointsGiveawayService(
             dbFactory,
-            new PointsGiveawayDrawService(
+            CreateDrawService(
                 dbFactory,
-                new PointBalanceService(dbFactory),
-                new FixedPointsRandom(),
-                new PointsGiveawayMessageFormatter(),
                 new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
             ),
             new PointsGiveawayEligibilityPolicy(status),
@@ -386,6 +569,34 @@ public sealed class PointsGiveawaySchedulerTests
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
     }
+
+    private static PointsGiveawayDrawService CreateDrawService(
+        SqliteBlokeBotDbFactory dbFactory,
+        PointsChangeNotifier changes
+    ) =>
+        new(
+            dbFactory,
+            new PointBalanceService(dbFactory),
+            new FixedPointsRandom(),
+            changes
+        );
+
+    private static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now) =>
+        new(
+            42,
+            7,
+            "streamer",
+            now.AddHours(-3).UtcDateTime,
+            now.AddHours(1).UtcDateTime,
+            null
+        );
+
+    private static Result<TValue, PointsGiveawaySchedulerOperationFailure> Failure<TValue>() =>
+        Result<TValue, PointsGiveawaySchedulerOperationFailure>.Error(
+            new PointsGiveawaySchedulerOperationFailure(
+                new InvalidOperationException("operation secret")
+            )
+        );
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
@@ -451,6 +662,174 @@ public sealed class PointsGiveawaySchedulerTests
         db.PointsGiveaways.Add(giveaway);
         await db.SaveChangesAsync();
         return giveaway.Id;
+    }
+
+    private sealed class RecordingSchedulerOperations : IPointsGiveawaySchedulerOperations
+    {
+        public IReadOnlyList<PointsGiveawaySchedule> Active { get; init; } = [];
+
+        public Action? BeforeLoadResult { get; init; }
+
+        public Queue<
+            Result<
+                IReadOnlyList<PointsGiveawaySchedule>,
+                PointsGiveawaySchedulerOperationFailure
+            >
+        > LoadOutcomes
+        { get; } = [];
+
+        public Queue<Result<Option<string>, PointsGiveawaySchedulerOperationFailure>>
+            UpdateOutcomes
+        { get; } = [];
+
+        public Queue<
+            Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerOperationFailure>
+        > DrawOutcomes
+        { get; } = [];
+
+        public Queue<Result<Option<string>, PointsGiveawaySchedulerOperationFailure>>
+            DrawNotificationOutcomes
+        { get; } = [];
+
+        public Queue<
+            Result<
+                PointsGiveawayExpirationOutcome,
+                PointsGiveawaySchedulerOperationFailure
+            >
+        > ExpirationOutcomes
+        { get; } = [];
+
+        public int LoadAttempts { get; private set; }
+
+        public int UpdateAttempts { get; private set; }
+
+        public int DrawAttempts { get; private set; }
+
+        public int DrawNotificationAttempts { get; private set; }
+
+        public int ExpirationAttempts { get; private set; }
+
+        public IO<
+            IReadOnlyList<PointsGiveawaySchedule>,
+            PointsGiveawaySchedulerOperationFailure
+        > LoadActive() =>
+            IO<
+                IReadOnlyList<PointsGiveawaySchedule>,
+                PointsGiveawaySchedulerOperationFailure
+            >.Create(_ =>
+            {
+                LoadAttempts++;
+                BeforeLoadResult?.Invoke();
+                return ValueTask.FromResult(Next(LoadOutcomes, Active));
+            });
+
+        public IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildUpdate(
+            int giveawayId,
+            DateTime endsAtUtc
+        ) =>
+            IO<Option<string>, PointsGiveawaySchedulerOperationFailure>.Create(_ =>
+            {
+                UpdateAttempts++;
+                return ValueTask.FromResult(Next(UpdateOutcomes, Option<string>.None));
+            });
+
+        public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerOperationFailure> Draw(
+            int giveawayId
+        ) =>
+            IO<
+                PointsGiveawayDrawOutcome,
+                PointsGiveawaySchedulerOperationFailure
+            >.Create(_ =>
+            {
+                DrawAttempts++;
+                return ValueTask.FromResult(
+                    Next(DrawOutcomes, PointsGiveawayDrawOutcome.Missing())
+                );
+            });
+
+        public IO<Option<string>, PointsGiveawaySchedulerOperationFailure> BuildDrawNotification(
+            PointsGiveawayDrawOutcome outcome
+        ) =>
+            IO<Option<string>, PointsGiveawaySchedulerOperationFailure>.Create(_ =>
+            {
+                DrawNotificationAttempts++;
+                return ValueTask.FromResult(
+                    Next(DrawNotificationOutcomes, Option<string>.None)
+                );
+            });
+
+        public IO<
+            PointsGiveawayExpirationOutcome,
+            PointsGiveawaySchedulerOperationFailure
+        > Expire(int giveawayId) =>
+            IO<
+                PointsGiveawayExpirationOutcome,
+                PointsGiveawaySchedulerOperationFailure
+            >.Create(_ =>
+            {
+                ExpirationAttempts++;
+                return ValueTask.FromResult(
+                    Next(ExpirationOutcomes, PointsGiveawayExpirationOutcome.Expired)
+                );
+            });
+
+        private static Result<TValue, PointsGiveawaySchedulerOperationFailure> Next<TValue>(
+            Queue<Result<TValue, PointsGiveawaySchedulerOperationFailure>> outcomes,
+            TValue defaultValue
+        ) =>
+            outcomes.TryDequeue(out var outcome)
+                ? outcome
+                : Result<TValue, PointsGiveawaySchedulerOperationFailure>.Success(defaultValue);
+    }
+
+    private sealed class ThrowingSchedulerNotification(string failureMessage)
+        : IPointsGiveawaySchedulerNotification
+    {
+        public ValueTask SendAsync(
+            PointsGiveawaySchedule schedule,
+            string message,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromException(new InvalidOperationException(failureMessage));
+    }
+
+    private class StaticTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        protected DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+
+        public override long GetTimestamp() => UtcNow.UtcTicks;
+
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    }
+
+    private sealed class AutoAdvanceTimeProvider(DateTimeOffset utcNow)
+        : StaticTimeProvider(utcNow)
+    {
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period
+        )
+        {
+            if (dueTime > TimeSpan.Zero)
+                UtcNow = UtcNow.Add(dueTime);
+
+            callback(state);
+            return CompletedTimer.Instance;
+        }
+    }
+
+    private sealed class CompletedTimer : ITimer
+    {
+        internal static CompletedTimer Instance { get; } = new();
+
+        public bool Change(TimeSpan dueTime, TimeSpan period) => false;
+
+        public void Dispose() { }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 
     private sealed class RecordingGiveawayScheduler : IPointsGiveawayScheduler
