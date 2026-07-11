@@ -230,9 +230,35 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBlokeBotSiteAccess(this IServiceCollection services)
+    public static IServiceCollection AddBlokeBotSiteAccess(
+        this IServiceCollection services,
+        AccessListProfileEnrichmentMode profileEnrichment
+    )
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddTransient<AccessListProfileResolver>();
+        switch (profileEnrichment)
+        {
+            case AccessListProfileEnrichmentMode.Disabled:
+                services.AddSingleton<
+                    IAccessListProfileEnrichmentPolicy,
+                    DisabledAccessListProfileEnrichmentPolicy
+                >();
+                break;
+            case AccessListProfileEnrichmentMode.Twitch:
+                services.AddSingleton<
+                    IAccessListProfileEnrichmentPolicy,
+                    TwitchAccessListProfileEnrichmentPolicy
+                >();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(profileEnrichment),
+                    profileEnrichment,
+                    "Unknown access-list profile-enrichment mode."
+                );
+        }
         services.AddSingleton<SiteAccessChangeNotifier>();
         services.AddScoped<SiteAccessService>();
         return services;

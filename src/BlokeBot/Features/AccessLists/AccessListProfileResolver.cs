@@ -1,11 +1,7 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Features.AccessLists;
 
 public sealed class AccessListProfileResolver(
-    IServiceProvider services,
-    TwitchHelixApiClient helix,
-    TwitchBotSettings settings
+    IAccessListProfileEnrichmentPolicy enrichment
 )
 {
     public async Task<IReadOnlyList<AccessListEntryProfile>> ResolveAsync(
@@ -20,32 +16,6 @@ public sealed class AccessListProfileResolver(
         if (entries.Length == 0)
             return [];
 
-        var appTokens = services.GetService<TwitchAppAccessTokenProvider>();
-        var clientId = settings.Identity.ClientId;
-        if (appTokens is null || string.IsNullOrWhiteSpace(clientId))
-            return entries.Select(login => new AccessListEntryProfile(login, null)).ToArray();
-
-        var token = await appTokens.GetAccessTokenAsync(ct);
-        var users = await helix.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(clientId, token),
-            entries,
-            ct
-        );
-        var profileImages = users.ToDictionary(
-            user => TwitchLogin.Normalize(user.Login),
-            user => user.ProfileImageUrl,
-            StringComparer.OrdinalIgnoreCase
-        );
-
-        return entries
-            .Select(login =>
-            {
-                profileImages.TryGetValue(TwitchLogin.Normalize(login), out var profileImageUrl);
-                return new AccessListEntryProfile(
-                    login,
-                    string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl
-                );
-            })
-            .ToArray();
+        return await enrichment.EnrichAsync(entries, ct);
     }
 }

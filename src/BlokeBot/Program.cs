@@ -8,6 +8,7 @@ using BlokeBot.BotRuntime;
 using BlokeBot.BotStatus;
 using BlokeBot.Components;
 using BlokeBot.Eventing;
+using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
 using BlokeBot.Features.Commands;
@@ -74,7 +75,11 @@ builder
             ? CustomAnnouncementDeliveryMode.TwitchChat
             : CustomAnnouncementDeliveryMode.Disabled
     )
-    .AddBlokeBotSiteAccess()
+    .AddBlokeBotSiteAccess(
+        botRuntimeConfigured
+            ? AccessListProfileEnrichmentMode.Twitch
+            : AccessListProfileEnrichmentMode.Disabled
+    )
     .AddBlokeBotAdmin()
     .AddBlokeBotHostedChannels()
     .AddBlokeBotHosts()
