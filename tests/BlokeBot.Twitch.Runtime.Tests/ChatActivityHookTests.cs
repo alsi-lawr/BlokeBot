@@ -46,14 +46,10 @@ public sealed class ChatActivityHookTests
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
         var session = new TwitchEventSubConnectionSession(
-            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
             dispatcher,
-            null!,
-            null!,
             new RecordingCommandResponseSender(recorder),
-            null!,
             new TwitchBotRuntimeStatusStore(),
             [new RecordingChatMessageObserver(recorder)],
             NullLogger<TwitchEventSubConnectionSession>.Instance
@@ -73,7 +69,7 @@ public sealed class ChatActivityHookTests
         recorder.Events.ShouldBe(["activity", "dispatch", "response"]);
     }
 
-    private static TwitchCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
+    internal static TwitchCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
     {
         var services = new ServiceCollection();
         services.AddSingleton(recorder);
@@ -123,7 +119,7 @@ public sealed class ChatActivityHookTests
         }
     }
 
-    private sealed class RuntimeHookRecorder
+    internal sealed class RuntimeHookRecorder
     {
         public List<string> Events { get; } = [];
     }

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net.WebSockets;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -16,14 +17,10 @@ internal interface ITwitchEventSubConnectionSession
 }
 
 internal sealed class TwitchEventSubConnectionSession(
-    TwitchBotSettings settings,
     ITwitchBotChannelProvider channels,
-    ITwitchBotAccountProvider botAccounts,
+    TwitchEventSubChannelSessionFactory channelSessions,
     TwitchCommandDispatcher dispatcher,
-    TwitchHelixChatClient helix,
-    ITwitchChatMessageSender sender,
     ITwitchCommandResponseSender responses,
-    ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
     TwitchBotRuntimeStatusStore status,
     IEnumerable<ITwitchChatMessageObserver> messageObservers,
     ILogger<TwitchEventSubConnectionSession> log
@@ -31,7 +28,6 @@ internal sealed class TwitchEventSubConnectionSession(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Uri DefaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
-    private readonly TwitchBotSettings opts = settings;
     private ILogger<TwitchEventSubConnectionSession> Log { get; } = log;
 
     public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
@@ -58,6 +54,7 @@ internal sealed class TwitchEventSubConnectionSession(
             _ => throw new UnreachableException("Unknown EventSub connection target."),
         };
         var socket = new ClientWebSocket();
+        TwitchEventSubChannelSession? channelSession = null;
         try
         {
             await socket.ConnectAsync(endpoint, cancellationToken);
@@ -81,195 +78,37 @@ internal sealed class TwitchEventSubConnectionSession(
                     "EventSub session welcome did not include a session ID."
                 );
 
-            var activeSubscriptions = new Dictionary<string, ActiveEventSubSubscription>(
-                StringComparer.OrdinalIgnoreCase
-            );
-            await SyncChatSubscriptionsAsync(
-                activeSubscriptions,
-                sessionId,
-                cancellationToken
-            );
+            channelSession = channelSessions.Create(sessionId);
+            var desiredChannels = await GetDesiredChannelsAsync(cancellationToken);
             return new TwitchRuntimeSessionEstablishment.Established
             {
                 Session = new EstablishedSession(
                     this,
                     socket,
-                    activeSubscriptions,
-                    sessionId
+                    channelSession,
+                    desiredChannels
                 ),
             };
         }
-        catch
+        catch (Exception establishmentException)
         {
-            socket.Dispose();
+            var cleanupException = await DisposeResourcesAsync(channelSession, socket);
+            if (cleanupException is not null)
+            {
+                throw new AggregateException(
+                    "EventSub establishment and cleanup both failed.",
+                    establishmentException,
+                    cleanupException
+                );
+            }
+
             throw;
         }
     }
 
-    private async Task SyncChatSubscriptionsAsync(
-        Dictionary<string, ActiveEventSubSubscription> activeSubscriptions,
-        string sessionId,
+    private async Task<IReadOnlyList<string>> GetDesiredChannelsAsync(
         CancellationToken cancellationToken
-    )
-    {
-        var desiredChannels = TwitchChannelList.Normalize(
-            await channels.GetChannelsAsync(cancellationToken)
-        );
-        var desiredAccounts = new Dictionary<string, TwitchBotAccount>(
-            StringComparer.OrdinalIgnoreCase
-        );
-        var startedChannels = new List<string>();
-        var stoppedChannels = new List<string>();
-
-        foreach (var channel in desiredChannels)
-        {
-            try
-            {
-                desiredAccounts[channel] = await botAccounts.GetBotAccountAsync(
-                    channel,
-                    cancellationToken
-                );
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Log.LogWarning(
-                    ex,
-                    "Bot account is not available for EventSub channel #{Channel}; skipping subscription.",
-                    channel
-                );
-            }
-        }
-
-        foreach (
-            var channel in activeSubscriptions
-                .Keys.Except(desiredAccounts.Keys, StringComparer.OrdinalIgnoreCase)
-                .ToArray()
-        )
-        {
-            await TryDeleteSubscriptionAsync(
-                channel,
-                activeSubscriptions[channel],
-                cancellationToken
-            );
-            activeSubscriptions.Remove(channel);
-            stoppedChannels.Add(channel);
-            Log.LogInformation(
-                "Unsubscribed from EventSub chat messages for #{Channel}.",
-                channel
-            );
-        }
-
-        foreach (var (channel, botAccount) in desiredAccounts.ToArray())
-        {
-            if (
-                activeSubscriptions.TryGetValue(channel, out var active)
-                && string.Equals(
-                    active.BotLogin,
-                    botAccount.Login,
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                continue;
-            }
-
-            if (activeSubscriptions.Remove(channel, out var replaced))
-            {
-                await TryDeleteSubscriptionAsync(channel, replaced, cancellationToken);
-            }
-
-            try
-            {
-                var identities = await helix.ResolveChatIdentitiesAsync(
-                    channel,
-                    botAccount.Login,
-                    botAccount.AccessToken,
-                    cancellationToken
-                );
-                activeSubscriptions[channel] = new ActiveEventSubSubscription(
-                    await helix.CreateChatMessageSubscriptionAsync(
-                        botAccount.AccessToken,
-                        identities.BroadcasterId,
-                        identities.BotUserId,
-                        sessionId,
-                        cancellationToken
-                    ),
-                    botAccount.Login,
-                    botAccount.AccessToken
-                );
-                await SendStartupMessageAsync(channel, cancellationToken);
-                startedChannels.Add(channel);
-                Log.LogInformation(
-                    "Subscribed to EventSub chat messages for #{Channel} as {BotUsername}.",
-                    channel,
-                    botAccount.Login
-                );
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                stoppedChannels.Add(channel);
-                Log.LogWarning(
-                    ex,
-                    "Could not subscribe to EventSub chat messages for #{Channel} as {BotUsername}.",
-                    channel,
-                    botAccount.Login
-                );
-            }
-        }
-
-        status.SetAuthorized(desiredAccounts.Count > 0);
-        status.SetConnected(activeSubscriptions.Count > 0, activeSubscriptions.Keys.ToArray());
-        foreach (var channel in stoppedChannels)
-            await lifecycleNotifier.ChannelStoppedAsync(channel, cancellationToken);
-
-        foreach (var channel in startedChannels)
-            await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
-    }
-
-    private async Task TryDeleteSubscriptionAsync(
-        string channel,
-        ActiveEventSubSubscription subscription,
-        CancellationToken cancellationToken
-    )
-    {
-        try
-        {
-            await helix.DeleteEventSubSubscriptionAsync(
-                subscription.AccessToken,
-                subscription.SubscriptionId,
-                cancellationToken
-            );
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Log.LogWarning(
-                ex,
-                "Could not delete EventSub chat subscription for #{Channel}; removing local subscription state.",
-                channel
-            );
-        }
-    }
-
-    private async Task SendStartupMessageAsync(string channel, CancellationToken cancellationToken)
-    {
-        var startupMessage = opts.StartupMessage;
-        if (string.IsNullOrWhiteSpace(startupMessage))
-            return;
-
-        await sender.SendAsync(channel, startupMessage, cancellationToken);
-    }
+    ) => TwitchChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken));
 
     internal async Task DispatchChatMessageAsync(
         TwitchEventSubChatMessageEvent chatEvent,
@@ -386,17 +225,55 @@ internal sealed class TwitchEventSubConnectionSession(
         return endpoint;
     }
 
+    private static async ValueTask<Exception?> DisposeResourcesAsync(
+        TwitchEventSubChannelSession? channelSession,
+        ClientWebSocket socket
+    )
+    {
+        Exception? failure = null;
+        if (channelSession is not null)
+        {
+            try
+            {
+                await channelSession.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        }
+
+        try
+        {
+            socket.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failure =
+                failure is null
+                    ? exception
+                    : new AggregateException(
+                        "EventSub session resource cleanup failed.",
+                        failure,
+                        exception
+                    );
+        }
+
+        return failure;
+    }
+
     private sealed class EstablishedSession(
         TwitchEventSubConnectionSession owner,
         ClientWebSocket socket,
-        Dictionary<string, ActiveEventSubSubscription> activeSubscriptions,
-        string sessionId
+        TwitchEventSubChannelSession channelSession,
+        IReadOnlyList<string> initialChannels
     ) : ITwitchRuntimeEstablishedSession
     {
         public async Task<TwitchRuntimeReconnectRequest> ListenAsync(
             CancellationToken cancellationToken
         )
         {
+            channelSession.Start(initialChannels, cancellationToken);
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -419,10 +296,9 @@ internal sealed class TwitchEventSubConnectionSession(
                         );
 
                     case TwitchEventSubMessageType.SessionKeepalive:
-                        await owner.SyncChatSubscriptionsAsync(
-                            activeSubscriptions,
-                            sessionId,
-                            cancellationToken
+                        channelSession.TriggerReconciliation(
+                            await owner.GetDesiredChannelsAsync(cancellationToken),
+                            TwitchEventSubChannelRecoveryTrigger.Keepalive
                         );
                         break;
 
@@ -469,16 +345,11 @@ internal sealed class TwitchEventSubConnectionSession(
             }
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
-            socket.Dispose();
-            return ValueTask.CompletedTask;
+            var failure = await DisposeResourcesAsync(channelSession, socket);
+            if (failure is not null)
+                ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }
-
-    private sealed record ActiveEventSubSubscription(
-        string SubscriptionId,
-        string BotLogin,
-        string AccessToken
-    );
 }
