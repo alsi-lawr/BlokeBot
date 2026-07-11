@@ -1,19 +1,35 @@
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.Points.Giveaways;
 
-public sealed class PointsGiveawayEligibilityPolicy(HostBotStatusService botStatus)
+public sealed class PointsGiveawayEligibilityPolicy(
+    HostBotStatusService botStatus,
+    ILogger<PointsGiveawayEligibilityPolicy> log
+)
 {
-    public async Task<bool> IsStreamLiveAsync(string hostLogin, CancellationToken ct)
+    public async Task<HostStreamLivenessOutcome> GetStreamLivenessAsync(
+        string hostLogin,
+        CancellationToken ct
+    )
     {
         try
         {
-            return await botStatus.IsStreamLiveAsync(hostLogin, ct);
+            return await botStatus.GetStreamLivenessAsync(hostLogin, ct);
         }
-        catch
+        catch (OperationCanceledException)
         {
-            return false;
+            throw;
+        }
+        catch (Exception exception)
+        {
+            log.LogCritical(
+                "Points giveaway stream-liveness evaluation failed unexpectedly for host {HostLogin} with {FailureType}; the operation will be escalated.",
+                hostLogin,
+                exception.GetType().FullName
+            );
+            throw new PointsGiveawayStreamLivenessException(hostLogin, exception);
         }
     }
 
@@ -61,4 +77,12 @@ public sealed class PointsGiveawayEligibilityPolicy(HostBotStatusService botStat
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(x => x.StartsWith("subscriber/", StringComparison.OrdinalIgnoreCase));
     }
+}
+
+internal sealed class PointsGiveawayStreamLivenessException(
+    string hostLogin,
+    Exception innerException
+) : Exception("Points giveaway stream-liveness evaluation failed unexpectedly.", innerException)
+{
+    internal string HostLogin { get; } = hostLogin;
 }

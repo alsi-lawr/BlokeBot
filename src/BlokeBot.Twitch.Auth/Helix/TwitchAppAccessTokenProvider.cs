@@ -43,7 +43,7 @@ public sealed class TwitchAppAccessTokenProvider(
             );
 
             if (string.IsNullOrWhiteSpace(payload?.AccessToken))
-                throw new InvalidOperationException("Twitch did not return an app access token.");
+                throw new TwitchAppAccessTokenResponseException();
 
             accessToken = payload.AccessToken;
             expiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, payload.ExpiresIn));

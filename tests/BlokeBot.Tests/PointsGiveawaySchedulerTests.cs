@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Net;
+using System.Text;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
@@ -8,6 +10,7 @@ using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Features.Replies;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -786,6 +789,40 @@ public sealed class PointsGiveawaySchedulerTests
         );
 
         outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamOffline);
+        outcome.StreamLivenessFailure.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task UnavailableStreamStatus_RequestingStartOutcome_RetainsCauseAndDistinctReply()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateGiveawayService(
+            dbFactory,
+            new RecordingGiveawayScheduler(),
+            new UnavailableHostBotAppAccessTokenSource()
+        );
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable);
+        var unavailable = outcome.StreamLivenessFailure.ShouldNotBeNull();
+        unavailable.Reason.ShouldBe(
+            HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable
+        );
+        unavailable.Cause.ShouldBeOfType<HostBotAppAccessTokenUnavailableException>();
+        var result = new PointsGiveawayMessageFormatter().Reply(
+            outcome,
+            new ReplyDeliveryMap()
+        );
+        result.Success.ShouldBeFalse();
+        result.Message.ShouldBe("Stream status could not be checked right now.");
+        result.Message.ShouldNotBe(outcome.Settings.StreamOfflineReply);
     }
 
     [Test]
@@ -946,14 +983,15 @@ public sealed class PointsGiveawaySchedulerTests
 
     private static PointsGiveawayService CreateGiveawayService(
         SqliteBlokeBotDbFactory dbFactory,
-        IPointsGiveawayScheduler scheduler
+        IPointsGiveawayScheduler scheduler,
+        IHostBotAppAccessTokenSource? appTokens = null
     )
     {
         var httpClientFactory = new FakeHttpClientFactory();
         var options = TwitchBotSettings.FromOptions(new TwitchBotOptions());
         var helix = new TwitchHelixApiClient(httpClientFactory);
         var status = new HostBotStatusService(
-            new UnavailableHostBotAppAccessTokenSource(),
+            appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new UnavailableHostBotAccountTokenStatusProvider(),
             helix,
             options
@@ -961,7 +999,10 @@ public sealed class PointsGiveawaySchedulerTests
         return new PointsGiveawayService(
             dbFactory,
             CreateDrawService(dbFactory),
-            new PointsGiveawayEligibilityPolicy(status),
+            new PointsGiveawayEligibilityPolicy(
+                status,
+                NullLogger<PointsGiveawayEligibilityPolicy>.Instance
+            ),
             new PointsGiveawayMessageFormatter(),
             scheduler,
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
@@ -1440,7 +1481,33 @@ public sealed class PointsGiveawaySchedulerTests
 
     private sealed class FakeHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new();
+        private readonly Handler handler = new();
+
+        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+
+        private sealed class Handler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken
+            ) =>
+                Task.FromResult(
+                    new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            """{"data":[]}""",
+                            Encoding.UTF8,
+                            "application/json"
+                        ),
+                    }
+                );
+        }
+    }
+
+    private sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-token");
     }
 
     private sealed class UnavailableHostBotAccountTokenStatusProvider

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
@@ -7,6 +8,9 @@ namespace BlokeBot.Features.Points.Giveaways;
 
 public sealed class PointsGiveawayMessageFormatter
 {
+    private const string StreamLivenessUnavailableReply =
+        "Stream status could not be checked right now.";
+
     public PointOperationResult Reply(
         PointsGiveawayStartOutcome outcome,
         ReplyDeliveryMap delivery
@@ -40,6 +44,10 @@ public sealed class PointsGiveawayMessageFormatter
                 delivery,
                 PointsReplyKeys.StreamOffline
             ),
+            PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable => new PointOperationResult(
+                false,
+                StreamLivenessUnavailableReply
+            ),
             PointsGiveawayStartOutcomeKind.FollowerEligibilityUnavailable => Reply(
                 false,
                 outcome.Settings.FollowerEligibilityUnavailableReply,
@@ -47,13 +55,7 @@ public sealed class PointsGiveawayMessageFormatter
                 delivery,
                 PointsReplyKeys.FollowerEligibilityUnavailable
             ),
-            _ => Reply(
-                false,
-                outcome.Settings.GiveawayNotActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
+            _ => throw new UnreachableException("Unknown giveaway start outcome."),
         };
 
     public PointOperationResult Reply(

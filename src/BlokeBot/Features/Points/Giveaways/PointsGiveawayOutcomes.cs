@@ -1,3 +1,4 @@
+using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 
@@ -9,13 +10,15 @@ public enum PointsGiveawayStartOutcomeKind
     AlreadyActive,
     Cooldown,
     StreamOffline,
+    StreamLivenessUnavailable,
     FollowerEligibilityUnavailable,
 }
 
 public sealed record PointsGiveawayStartOutcome(
     PointsGiveawayStartOutcomeKind Kind,
     PointsSettings Settings,
-    TimeSpan? TimeLeft = null
+    TimeSpan? TimeLeft = null,
+    HostStreamLivenessOutcome.Unavailable? StreamLivenessFailure = null
 )
 {
     public bool Success => Kind == PointsGiveawayStartOutcomeKind.Started;

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
@@ -74,11 +75,24 @@ public sealed class PointsGiveawayService(
             );
         }
 
-        if (!await eligibility.IsStreamLiveAsync(hostLogin, ct))
-            return new PointsGiveawayStartOutcome(
-                PointsGiveawayStartOutcomeKind.StreamOffline,
-                settings
-            );
+        switch (await eligibility.GetStreamLivenessAsync(hostLogin, ct))
+        {
+            case HostStreamLivenessOutcome.Live:
+                break;
+            case HostStreamLivenessOutcome.Offline:
+                return new PointsGiveawayStartOutcome(
+                    PointsGiveawayStartOutcomeKind.StreamOffline,
+                    settings
+                );
+            case HostStreamLivenessOutcome.Unavailable unavailable:
+                return new PointsGiveawayStartOutcome(
+                    PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable,
+                    settings,
+                    StreamLivenessFailure: unavailable
+                );
+            default:
+                throw new UnreachableException("Unknown stream-liveness outcome.");
+        }
 
         if (!await eligibility.IsFollowerEligibilityAvailableAsync(hostLogin, settings, ct))
             return new PointsGiveawayStartOutcome(

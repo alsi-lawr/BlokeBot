@@ -2,6 +2,8 @@ using System.Net;
 using System.Text;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Features.Points.Giveaways;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using TUnit.Core;
 
@@ -127,19 +129,27 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task AppTokensUnavailable_CheckingStreamStatus_ThrowsExistingConfigurationError()
+    public async Task AppTokensUnavailable_CheckingStreamLiveness_RetainsConfigurationCause()
     {
         var service = CreateService(UnavailableTokenStatus());
 
-        var error = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.IsStreamLiveAsync("streamer", CancellationToken.None)
+        var outcome = await service.GetStreamLivenessAsync(
+            "streamer",
+            CancellationToken.None
         );
 
+        var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
+        unavailable.Reason.ShouldBe(
+            HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable
+        );
+        var error = unavailable.Cause.ShouldBeOfType<
+            HostBotAppAccessTokenUnavailableException
+        >();
         error.Message.ShouldBe("The Twitch bot runner is not set up yet.");
     }
 
     [Test]
-    public async Task ConfiguredAppTokens_CheckingStreamStatus_UsesTwitchAppTokenSource()
+    public async Task ConfiguredAppTokens_CheckingStreamLiveness_ReportsLive()
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory { StreamIsLive = true };
         var settings = Settings();
@@ -152,13 +162,96 @@ public sealed class HostBotStatusTests
             settings
         );
 
-        var isLive = await service.IsStreamLiveAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetStreamLivenessAsync(
+            "streamer",
+            CancellationToken.None
+        );
 
-        isLive.ShouldBeTrue();
+        outcome.ShouldBeOfType<HostStreamLivenessOutcome.Live>();
         httpClientFactory.TokenRequestCount.ShouldBe(1);
         httpClientFactory.StreamRequestCount.ShouldBe(1);
         httpClientFactory.StreamRequestClientId.ShouldBe("client");
         httpClientFactory.StreamRequestAccessToken.ShouldBe("app-token");
+    }
+
+    [Test]
+    public async Task OfflineStream_CheckingStreamLiveness_ReportsOffline()
+    {
+        var httpClientFactory = new HostBotStatusHttpClientFactory();
+        var service = CreateStreamService(httpClientFactory);
+
+        var outcome = await service.GetStreamLivenessAsync(
+            "streamer",
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<HostStreamLivenessOutcome.Offline>();
+    }
+
+    [Test]
+    public async Task ProviderRequestFailure_CheckingStreamLiveness_RetainsUnavailableCause()
+    {
+        var expected = new HttpRequestException("provider secret");
+        var httpClientFactory = new HostBotStatusHttpClientFactory
+        {
+            StreamFailure = expected,
+        };
+        var service = CreateStreamService(httpClientFactory);
+
+        var outcome = await service.GetStreamLivenessAsync(
+            "streamer",
+            CancellationToken.None
+        );
+
+        var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
+        unavailable.Reason.ShouldBe(
+            HostStreamLivenessUnavailableReason.ProviderRequestFailed
+        );
+        unavailable.Cause.ShouldBeSameAs(expected);
+    }
+
+    [Test]
+    public async Task CallerCancellation_CheckingStreamLiveness_Propagates()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var expected = new OperationCanceledException(cancellation.Token);
+        var service = CreateStreamService(
+            new HostBotStatusHttpClientFactory(),
+            new ThrowingHostBotAppAccessTokenSource(expected)
+        );
+
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            service.GetStreamLivenessAsync("streamer", cancellation.Token)
+        );
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+    }
+
+    [Test]
+    public async Task UnexpectedFailure_CheckingGiveawayLiveness_LogsAndEscalates()
+    {
+        var expected = new NullReferenceException("unexpected secret");
+        var logger = new RecordingLogger<PointsGiveawayEligibilityPolicy>();
+        var policy = new PointsGiveawayEligibilityPolicy(
+            CreateStreamService(
+                new HostBotStatusHttpClientFactory(),
+                new ThrowingHostBotAppAccessTokenSource(expected)
+            ),
+            logger
+        );
+
+        var thrown = await Should.ThrowAsync<PointsGiveawayStreamLivenessException>(() =>
+            policy.GetStreamLivenessAsync("streamer", CancellationToken.None)
+        );
+
+        thrown.HostLogin.ShouldBe("streamer");
+        thrown.InnerException.ShouldBeSameAs(expected);
+        var diagnostic = logger.Entries.Single();
+        diagnostic.Level.ShouldBe(LogLevel.Critical);
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic.Message.ShouldContain(typeof(NullReferenceException).FullName!);
+        diagnostic.Message.ShouldNotContain("unexpected secret");
     }
 
     private static HostBotStatusService CreateService(
@@ -174,6 +267,17 @@ public sealed class HostBotStatusTests
             Settings()
         );
     }
+
+    private static HostBotStatusService CreateStreamService(
+        HostBotStatusHttpClientFactory httpClientFactory,
+        IHostBotAppAccessTokenSource? appTokens = null
+    ) =>
+        new(
+            appTokens ?? new StaticHostBotAppAccessTokenSource(),
+            new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
+            new TwitchHelixApiClient(httpClientFactory),
+            Settings()
+        );
 
     private static TwitchBotSettings Settings() =>
         TwitchBotSettings.FromOptions(
@@ -258,6 +362,19 @@ public sealed class HostBotStatusTests
         ) => Task.FromResult(status);
     }
 
+    private sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            Task.FromResult("app-token");
+    }
+
+    private sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
+        : IHostBotAppAccessTokenSource
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            throw failure;
+    }
+
     private sealed class HostBotStatusHttpClientFactory : IHttpClientFactory
     {
         private readonly Handler handler = new();
@@ -272,6 +389,12 @@ public sealed class HostBotStatusTests
         {
             get => handler.StreamIsLive;
             init => handler.StreamIsLive = value;
+        }
+
+        public Exception? StreamFailure
+        {
+            get => handler.StreamFailure;
+            init => handler.StreamFailure = value;
         }
 
         public string? LastModerationUserId => handler.LastModerationUserId;
@@ -292,6 +415,8 @@ public sealed class HostBotStatusTests
 
             public bool StreamIsLive { get; set; }
 
+            public Exception? StreamFailure { get; set; }
+
             public string? LastModerationUserId { get; private set; }
 
             public string? StreamRequestAccessToken { get; private set; }
@@ -305,8 +430,17 @@ public sealed class HostBotStatusTests
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            ) =>
-                Task.FromResult(
+            )
+            {
+                if (
+                    request.RequestUri?.AbsolutePath == "/helix/streams"
+                    && StreamFailure is { } failure
+                )
+                {
+                    return Task.FromException<HttpResponseMessage>(failure);
+                }
+
+                return Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
                         "/oauth2/token" => TokenResponse(),
@@ -320,6 +454,7 @@ public sealed class HostBotStatusTests
                         _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                     }
                 );
+            }
 
             private HttpResponseMessage ModerationChannelsResponse(HttpRequestMessage request)
             {
@@ -381,5 +516,32 @@ public sealed class HostBotStatusTests
                 return null;
             }
         }
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull => NullLoggerScope.Instance;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+    }
+
+    private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
+
+    private sealed class NullLoggerScope : IDisposable
+    {
+        public static readonly NullLoggerScope Instance = new();
+
+        public void Dispose() { }
     }
 }

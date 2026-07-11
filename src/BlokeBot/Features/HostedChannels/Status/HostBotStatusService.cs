@@ -145,10 +145,71 @@ public sealed class HostBotStatusService(
             ? HostBotReadinessOutcome.Ready()
             : HostBotReadinessOutcome.MissingFollowerReadScope(flags);
 
-    public async Task<bool> IsStreamLiveAsync(string channelLogin, CancellationToken ct)
+    public async Task<HostStreamLivenessOutcome> GetStreamLivenessAsync(
+        string channelLogin,
+        CancellationToken ct
+    )
     {
-        var token = await appTokens.GetAccessTokenAsync(ct);
-        return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct);
+        try
+        {
+            var token = await appTokens.GetAccessTokenAsync(ct);
+            return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct)
+                ? new HostStreamLivenessOutcome.Live()
+                : new HostStreamLivenessOutcome.Offline();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HostBotAppAccessTokenUnavailableException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable,
+                exception
+            );
+        }
+        catch (TwitchAppAccessTokenResponseException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderResponseInvalid,
+                exception
+            );
+        }
+        catch (HttpRequestException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                exception
+            );
+        }
+        catch (IOException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                exception
+            );
+        }
+        catch (JsonException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderResponseInvalid,
+                exception
+            );
+        }
+        catch (TimeoutException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderTimedOut,
+                exception
+            );
+        }
+        catch (OperationCanceledException exception)
+        {
+            return Unavailable(
+                HostStreamLivenessUnavailableReason.ProviderTimedOut,
+                exception
+            );
+        }
     }
 
     public async Task<FollowerCheckResult> IsFollowerAsync(
@@ -272,4 +333,9 @@ public sealed class HostBotStatusService(
 
     private TwitchHelixRequestContext HelixContext(string token) =>
         new(settings.Identity.ClientId, token);
+
+    private static HostStreamLivenessOutcome.Unavailable Unavailable(
+        HostStreamLivenessUnavailableReason reason,
+        Exception cause
+    ) => new() { Reason = reason, Cause = cause };
 }
