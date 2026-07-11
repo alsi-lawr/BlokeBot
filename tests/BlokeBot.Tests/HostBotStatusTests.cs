@@ -1,5 +1,7 @@
 using System.Net;
+using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Giveaways;
@@ -207,7 +209,27 @@ public sealed class HostBotStatusTests
         unavailable.Reason.ShouldBe(
             HostStreamLivenessUnavailableReason.ProviderRequestFailed
         );
+        unavailable.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
         unavailable.Cause.ShouldBeSameAs(expected);
+
+        var publicProperties = typeof(HostStreamLivenessOutcome.Unavailable).GetProperties(
+            BindingFlags.Instance | BindingFlags.Public
+        );
+        publicProperties.ShouldNotContain(property =>
+            typeof(Exception).IsAssignableFrom(property.PropertyType)
+        );
+        publicProperties.Select(property => property.Name).ShouldNotContain("Cause");
+        string
+            .Join(
+                " | ",
+                publicProperties.Select(property => property.GetValue(unavailable)?.ToString())
+            )
+            .ShouldNotContain("provider secret");
+        unavailable.ToString().ShouldNotContain("provider secret");
+        JsonSerializer.Serialize(unavailable).ShouldNotContain("provider secret");
+        typeof(HostStreamLivenessOutcome.Unavailable)
+            .GetConstructors(BindingFlags.Instance | BindingFlags.Public)
+            .ShouldBeEmpty();
     }
 
     [Test]

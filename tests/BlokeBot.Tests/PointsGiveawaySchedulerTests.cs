@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
@@ -797,10 +798,11 @@ public sealed class PointsGiveawaySchedulerTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var expected = new HttpRequestException("provider secret");
         var service = CreateGiveawayService(
             dbFactory,
             new RecordingGiveawayScheduler(),
-            new UnavailableHostBotAppAccessTokenSource()
+            new ThrowingHostBotAppAccessTokenSource(expected)
         );
 
         var outcome = await service.StartOutcomeAsync(
@@ -813,9 +815,13 @@ public sealed class PointsGiveawaySchedulerTests
         outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable);
         var unavailable = outcome.StreamLivenessFailure.ShouldNotBeNull();
         unavailable.Reason.ShouldBe(
-            HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable
+            HostStreamLivenessUnavailableReason.ProviderRequestFailed
         );
-        unavailable.Cause.ShouldBeOfType<HostBotAppAccessTokenUnavailableException>();
+        unavailable.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+        unavailable.Cause.ShouldBeSameAs(expected);
+        unavailable.ToString().ShouldNotContain("provider secret");
+        outcome.ToString().ShouldNotContain("provider secret");
+        JsonSerializer.Serialize(outcome).ShouldNotContain("provider secret");
         var result = new PointsGiveawayMessageFormatter().Reply(
             outcome,
             new ReplyDeliveryMap()
@@ -1508,6 +1514,13 @@ public sealed class PointsGiveawaySchedulerTests
     {
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
             Task.FromResult("app-token");
+    }
+
+    private sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
+        : IHostBotAppAccessTokenSource
+    {
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+            throw failure;
     }
 
     private sealed class UnavailableHostBotAccountTokenStatusProvider

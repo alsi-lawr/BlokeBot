@@ -18,8 +18,21 @@ public abstract record HostStreamLivenessOutcome
 
     public sealed record Unavailable : HostStreamLivenessOutcome
     {
-        public required HostStreamLivenessUnavailableReason Reason { get; init; }
+        internal Unavailable(
+            HostStreamLivenessUnavailableReason reason,
+            Exception cause
+        )
+        {
+            ArgumentNullException.ThrowIfNull(cause);
+            Reason = reason;
+            FailureType = cause.GetType().FullName ?? cause.GetType().Name;
+            Cause = cause;
+        }
 
-        public required Exception Cause { get; init; }
+        public HostStreamLivenessUnavailableReason Reason { get; }
+
+        public string FailureType { get; }
+
+        internal Exception Cause { get; }
     }
 }

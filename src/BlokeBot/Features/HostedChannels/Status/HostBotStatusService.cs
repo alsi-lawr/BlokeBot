@@ -337,5 +337,5 @@ public sealed class HostBotStatusService(
     private static HostStreamLivenessOutcome.Unavailable Unavailable(
         HostStreamLivenessUnavailableReason reason,
         Exception cause
-    ) => new() { Reason = reason, Cause = cause };
+    ) => new(reason, cause);
 }
