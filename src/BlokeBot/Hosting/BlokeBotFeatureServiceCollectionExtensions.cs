@@ -218,8 +218,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBlokeBotAdmin(this IServiceCollection services)
+    public static IServiceCollection AddBlokeBotAdmin(
+        this IServiceCollection services,
+        BotAccountAuthorizationMode botAccountAuthorization
+    )
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddSingleton(sp =>
             BotAdminSettings.FromOptions(sp.GetRequiredService<IOptions<BlokeBotOptions>>().Value)
         );
@@ -227,6 +232,32 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<AdminHostManagementService>();
         services.AddSingleton<HostedChannelDirectoryService>();
         services.AddSingleton<BotAccountAuthorizationService>();
+        switch (botAccountAuthorization)
+        {
+            case BotAccountAuthorizationMode.Disabled:
+                services.AddSingleton<
+                    IBotAccountAuthorizationPolicy,
+                    DisabledBotAccountAuthorizationPolicy
+                >();
+                break;
+            case BotAccountAuthorizationMode.Twitch:
+                services.AddSingleton<BotAccountTokenStatusResolver>(serviceProvider =>
+                {
+                    var status = serviceProvider.GetRequiredService<TwitchTokenStatusService>();
+                    return status.GetUserAccessTokenStatusAsync;
+                });
+                services.AddSingleton<
+                    IBotAccountAuthorizationPolicy,
+                    ConfiguredBotAccountAuthorizationPolicy
+                >();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(botAccountAuthorization),
+                    botAccountAuthorization,
+                    "Unknown bot-account authorization mode."
+                );
+        }
         return services;
     }
 
@@ -276,11 +307,40 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddBlokeBotHostedChannels(this IServiceCollection services)
+    public static IServiceCollection AddBlokeBotHostedChannels(
+        this IServiceCollection services,
+        HostBotAppAccessTokenMode appAccessToken
+    )
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddSingleton<ChannelBotAuthorizationService>();
         services.AddSingleton<HostBotAccountOAuthService>();
         services.AddSingleton<HostBotAccountAuthorizationService>();
+        services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()
+        );
+        switch (appAccessToken)
+        {
+            case HostBotAppAccessTokenMode.Unavailable:
+                services.AddSingleton<
+                    IHostBotAppAccessTokenSource,
+                    UnavailableHostBotAppAccessTokenSource
+                >();
+                break;
+            case HostBotAppAccessTokenMode.Twitch:
+                services.AddSingleton<
+                    IHostBotAppAccessTokenSource,
+                    TwitchHostBotAppAccessTokenSource
+                >();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(appAccessToken),
+                    appAccessToken,
+                    "Unknown host-bot app-access-token mode."
+                );
+        }
         services.AddSingleton<HostedChannelChangeNotifier>();
         services.AddSingleton<HostedChannelRuntimeControlService>();
         services.AddSingleton<HostedChannelRuntimeLifecycleService>();

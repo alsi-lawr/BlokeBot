@@ -80,8 +80,16 @@ builder
             ? AccessListProfileEnrichmentMode.Twitch
             : AccessListProfileEnrichmentMode.Disabled
     )
-    .AddBlokeBotAdmin()
-    .AddBlokeBotHostedChannels()
+    .AddBlokeBotAdmin(
+        botRuntimeConfigured
+            ? BotAccountAuthorizationMode.Twitch
+            : BotAccountAuthorizationMode.Disabled
+    )
+    .AddBlokeBotHostedChannels(
+        botRuntimeConfigured
+            ? HostBotAppAccessTokenMode.Twitch
+            : HostBotAppAccessTokenMode.Unavailable
+    )
     .AddBlokeBotHosts()
     .AddBlokeBotGuessing()
     .AddBlokeBotPoints()

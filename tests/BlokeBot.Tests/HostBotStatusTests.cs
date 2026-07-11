@@ -1,11 +1,7 @@
 using System.Net;
 using System.Text;
-using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
-using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
-using BlokeBot.Persistence.Models;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using TUnit.Core;
 
@@ -14,14 +10,11 @@ namespace BlokeBot.Tests;
 public sealed class HostBotStatusTests
 {
     [Test]
-    public async Task MissingTokenProvider_CheckingReadiness_ReportsTokenUnavailable()
+    public async Task UnavailableToken_CheckingReadiness_ReportsTokenUnavailable()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory(),
-            includeTokenProvider: false
-        );
+        var service = CreateService(UnavailableTokenStatus());
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.TokenUnavailable);
     }
@@ -29,14 +22,9 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task RejectedToken_CheckingReadiness_ReportsInvalidToken()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory
-            {
-                ValidationStatusCode = HttpStatusCode.Unauthorized,
-            }
-        );
+        var service = CreateService(InvalidTokenStatus());
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.InvalidToken);
     }
@@ -44,14 +32,11 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task MissingModeratorScope_CheckingReadiness_ReportsScopeFailure()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory
-            {
-                GrantedScopes = [TwitchScopes.ModeratorReadFollowers],
-            }
+        var service = CreateService(
+            AuthorizedTokenStatus([TwitchScopes.ModeratorReadFollowers])
         );
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.MissingModeratorCheckScope);
     }
@@ -59,19 +44,13 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task BotNotModerator_CheckingReadiness_ReportsNotModerator()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory
-            {
-                GrantedScopes =
-                [
-                    TwitchScopes.UserReadModeratedChannels,
-                    TwitchScopes.ModeratorReadFollowers,
-                ],
-                BotIsModerator = false,
-            }
-        );
+        var httpClientFactory = new HostBotStatusHttpClientFactory
+        {
+            BotIsModerator = false,
+        };
+        var service = CreateService(AuthorizedTokenStatus(RequiredScopes()), httpClientFactory);
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.NotModerator);
     }
@@ -79,15 +58,11 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task MissingFollowerScope_CheckingReadiness_ReportsScopeFailure()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory
-            {
-                GrantedScopes = [TwitchScopes.UserReadModeratedChannels],
-                BotIsModerator = true,
-            }
+        var service = CreateService(
+            AuthorizedTokenStatus([TwitchScopes.UserReadModeratedChannels])
         );
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.MissingFollowerReadScope);
     }
@@ -95,20 +70,10 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task FullyAuthorizedBot_CheckingReadiness_ReportsReadyAndFollowerAccess()
     {
-        await using var fixture = await CreateFixtureAsync(
-            new HostBotStatusHttpClientFactory
-            {
-                GrantedScopes =
-                [
-                    TwitchScopes.UserReadModeratedChannels,
-                    TwitchScopes.ModeratorReadFollowers,
-                ],
-                BotIsModerator = true,
-            }
-        );
+        var service = CreateService(AuthorizedTokenStatus(RequiredScopes()));
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
-        var status = await fixture.Service.GetStatusAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var status = await service.GetStatusAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
         status.CanReadFollowers.ShouldBeTrue();
@@ -117,20 +82,19 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task CustomBotOverride_CheckingReadiness_UsesCustomBotModeratorIdentity()
     {
-        var httpClientFactory = new HostBotStatusHttpClientFactory
-        {
-            GrantedScopes =
-            [
-                TwitchScopes.UserReadModeratedChannels,
-                TwitchScopes.ModeratorReadFollowers,
-            ],
-            BotIsModerator = true,
-        };
-        await using var fixture = await CreateFixtureAsync(httpClientFactory);
-        var hostId = await SeedHostAsync(fixture.DbFactory, "streamer");
-        await SeedHostBotOverrideAsync(fixture.DbFactory, hostId);
+        var httpClientFactory = new HostBotStatusHttpClientFactory();
+        var service = CreateService(
+            AuthorizedTokenStatus(
+                RequiredScopes(),
+                botLogin: "custombot",
+                validationLogin: "custombot",
+                validationUserId: "custom-id",
+                accessToken: "custom-token"
+            ),
+            httpClientFactory
+        );
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
         httpClientFactory.LastModerationUserId.ShouldBe("custom-id");
@@ -141,47 +105,78 @@ public sealed class HostBotStatusTests
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory
         {
-            GrantedScopes =
-            [
-                TwitchScopes.UserReadModeratedChannels,
-                TwitchScopes.ModeratorReadFollowers,
-            ],
             BotIsModerator = false,
-            CustomTokenLogin = "streamer",
-            CustomTokenUserId = "channel-id",
         };
-        await using var fixture = await CreateFixtureAsync(httpClientFactory);
-        var hostId = await SeedHostAsync(fixture.DbFactory, "streamer");
-        await SeedHostBotOverrideAsync(
-            fixture.DbFactory,
-            hostId,
-            login: "streamer",
-            userId: "channel-id",
-            displayName: "Streamer"
+        var service = CreateService(
+            AuthorizedTokenStatus(
+                RequiredScopes(),
+                botLogin: "streamer",
+                validationLogin: "streamer",
+                validationUserId: "channel-id",
+                accessToken: "custom-token"
+            ),
+            httpClientFactory
         );
 
-        var outcome = await fixture.Service.GetReadinessAsync("streamer", CancellationToken.None);
-        var status = await fixture.Service.GetStatusAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var status = await service.GetStatusAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
         status.CanReadFollowers.ShouldBeTrue();
         httpClientFactory.LastModerationUserId.ShouldBeNull();
     }
 
-    private static async Task<HostBotStatusFixture> CreateFixtureAsync(
-        HostBotStatusHttpClientFactory httpClientFactory,
-        bool includeTokenProvider = true
+    [Test]
+    public async Task AppTokensUnavailable_CheckingStreamStatus_ThrowsExistingConfigurationError()
+    {
+        var service = CreateService(UnavailableTokenStatus());
+
+        var error = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.IsStreamLiveAsync("streamer", CancellationToken.None)
+        );
+
+        error.Message.ShouldBe("The Twitch bot runner is not set up yet.");
+    }
+
+    [Test]
+    public async Task ConfiguredAppTokens_CheckingStreamStatus_UsesTwitchAppTokenSource()
+    {
+        var httpClientFactory = new HostBotStatusHttpClientFactory { StreamIsLive = true };
+        var settings = Settings();
+        var service = new HostBotStatusService(
+            new TwitchHostBotAppAccessTokenSource(
+                new TwitchAppAccessTokenProvider(httpClientFactory, settings.Identity)
+            ),
+            new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
+            new TwitchHelixApiClient(httpClientFactory),
+            settings
+        );
+
+        var isLive = await service.IsStreamLiveAsync("streamer", CancellationToken.None);
+
+        isLive.ShouldBeTrue();
+        httpClientFactory.TokenRequestCount.ShouldBe(1);
+        httpClientFactory.StreamRequestCount.ShouldBe(1);
+        httpClientFactory.StreamRequestClientId.ShouldBe("client");
+        httpClientFactory.StreamRequestAccessToken.ShouldBe("app-token");
+    }
+
+    private static HostBotStatusService CreateService(
+        ActiveBotAccountTokenStatus tokenStatus,
+        HostBotStatusHttpClientFactory? httpClientFactory = null
     )
     {
-        var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var services = new ServiceCollection();
-        if (includeTokenProvider)
-            services.AddSingleton<ITwitchAccessTokenProvider>(
-                new StaticTokenProvider("user-token")
-            );
+        var http = httpClientFactory ?? new HostBotStatusHttpClientFactory();
+        return new(
+            new UnavailableHostBotAppAccessTokenSource(),
+            new StaticHostBotAccountTokenStatusProvider(tokenStatus),
+            new TwitchHelixApiClient(http),
+            Settings()
+        );
+    }
 
-        var provider = services.BuildServiceProvider();
-        var options = TwitchBotSettings.FromOptions(
+    private static TwitchBotSettings Settings() =>
+        TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions
@@ -189,113 +184,83 @@ public sealed class HostBotStatusTests
                     BotUsername = "bot",
                     ClientId = "client",
                     ClientSecret = "secret",
-                    Scopes =
-                    [
-                        TwitchScopes.UserReadModeratedChannels,
-                        TwitchScopes.ModeratorReadFollowers,
-                    ],
+                    RedirectUri = "https://localhost/oauth/callback",
+                    Scopes = RequiredScopes(),
+                    TokenCachePath = "tokens.json",
                 },
             }
         );
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
-        var helix = new TwitchHelixApiClient(httpClientFactory);
-        var hostBotAccounts = new HostBotAccountAuthorizationService(
-            dbFactory,
-            new HostBotAccountOAuthService(options, oauth, helix),
-            oauth,
-            helix,
-            new TwitchTokenStatusService(provider, oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
-            options
+
+    private static string[] RequiredScopes() =>
+        [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
+
+    private static ActiveBotAccountTokenStatus UnavailableTokenStatus() =>
+        new(
+            "bot",
+            null,
+            TwitchTokenStatusState.Unavailable,
+            null,
+            null,
+            RequiredScopes(),
+            [],
+            RequiredScopes()
         );
-        return new HostBotStatusFixture(
-            new HostBotStatusService(provider, hostBotAccounts, helix, options),
-            dbFactory
+
+    private static ActiveBotAccountTokenStatus InvalidTokenStatus() =>
+        new(
+            "bot",
+            null,
+            TwitchTokenStatusState.Invalid,
+            "user-token",
+            null,
+            RequiredScopes(),
+            [],
+            RequiredScopes()
         );
-    }
 
-    private sealed class HostBotStatusFixture : IAsyncDisposable
-    {
-        public HostBotStatusFixture(HostBotStatusService service, SqliteBlokeBotDbFactory dbFactory)
-        {
-            Service = service;
-            DbFactory = dbFactory;
-        }
-
-        public SqliteBlokeBotDbFactory DbFactory { get; }
-
-        public HostBotStatusService Service { get; }
-
-        public async ValueTask DisposeAsync() => await DbFactory.DisposeAsync();
-    }
-
-    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
-    {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var host = new BotHost
-        {
-            CreatedAtUtc = DateTime.UtcNow,
-            DisplayName = login,
-            Login = login,
-        };
-        db.Hosts.Add(host);
-        await db.SaveChangesAsync();
-        return host.Id;
-    }
-
-    private static async Task SeedHostBotOverrideAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        int hostId,
-        string login = "custombot",
-        string userId = "custom-id",
-        string displayName = "CustomBot"
+    private static ActiveBotAccountTokenStatus AuthorizedTokenStatus(
+        IReadOnlyList<string> grantedScopes,
+        string botLogin = "bot",
+        string validationLogin = "bot",
+        string validationUserId = "bot-id",
+        string accessToken = "user-token"
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync();
-        db.HostBotAccountSettings.Add(
-            new HostBotAccountSettings
-            {
-                AccessToken = "custom-token",
-                AuthorizedAtUtc = DateTime.UtcNow,
-                AuthorizedScopes = string.Join(
-                    ' ',
-                    TwitchScopes.UserReadModeratedChannels,
-                    TwitchScopes.ModeratorReadFollowers
-                ),
-                DisplayName = displayName,
-                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
-                HostId = hostId,
-                Login = login,
-                OverrideEnabled = true,
-                RefreshToken = "custom-refresh",
-                TwitchUserId = userId,
-                UpdatedAtUtc = DateTime.UtcNow,
-            }
+        var requiredScopes = RequiredScopes();
+        var granted = grantedScopes.ToArray();
+        var missing = requiredScopes.Except(granted, StringComparer.Ordinal).ToArray();
+        return new(
+            botLogin,
+            null,
+            missing.Length == 0
+                ? TwitchTokenStatusState.Ready
+                : TwitchTokenStatusState.MissingScopes,
+            accessToken,
+            new TwitchTokenValidation(
+                validationUserId,
+                validationLogin,
+                granted.ToHashSet(StringComparer.Ordinal)
+            ),
+            requiredScopes,
+            granted,
+            missing
         );
-        await db.SaveChangesAsync();
     }
 
-    private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
+    private sealed class StaticHostBotAccountTokenStatusProvider(
+        ActiveBotAccountTokenStatus status
+    ) : IHostBotAccountTokenStatusProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(accessToken);
+        public Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
+            string channelLogin,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(status);
     }
 
     private sealed class HostBotStatusHttpClientFactory : IHttpClientFactory
     {
         private readonly Handler handler = new();
-
-        public HttpStatusCode ValidationStatusCode
-        {
-            get => handler.ValidationStatusCode;
-            init => handler.ValidationStatusCode = value;
-        }
-
-        public IReadOnlyList<string> GrantedScopes
-        {
-            get => handler.GrantedScopes;
-            init => handler.GrantedScopes = value;
-        }
 
         public bool BotIsModerator
         {
@@ -303,73 +268,58 @@ public sealed class HostBotStatusTests
             init => handler.BotIsModerator = value;
         }
 
-        public string CustomTokenLogin
+        public bool StreamIsLive
         {
-            get => handler.CustomTokenLogin;
-            init => handler.CustomTokenLogin = value;
-        }
-
-        public string CustomTokenUserId
-        {
-            get => handler.CustomTokenUserId;
-            init => handler.CustomTokenUserId = value;
+            get => handler.StreamIsLive;
+            init => handler.StreamIsLive = value;
         }
 
         public string? LastModerationUserId => handler.LastModerationUserId;
+
+        public string? StreamRequestAccessToken => handler.StreamRequestAccessToken;
+
+        public string? StreamRequestClientId => handler.StreamRequestClientId;
+
+        public int StreamRequestCount => handler.StreamRequestCount;
+
+        public int TokenRequestCount => handler.TokenRequestCount;
 
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
 
         private sealed class Handler : HttpMessageHandler
         {
-            public HttpStatusCode ValidationStatusCode { get; set; } = HttpStatusCode.OK;
-
-            public IReadOnlyList<string> GrantedScopes { get; set; } =
-            [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
-
             public bool BotIsModerator { get; set; } = true;
 
-            public string CustomTokenLogin { get; set; } = "custombot";
-
-            public string CustomTokenUserId { get; set; } = "custom-id";
+            public bool StreamIsLive { get; set; }
 
             public string? LastModerationUserId { get; private set; }
+
+            public string? StreamRequestAccessToken { get; private set; }
+
+            public string? StreamRequestClientId { get; private set; }
+
+            public int StreamRequestCount { get; private set; }
+
+            public int TokenRequestCount { get; private set; }
 
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            )
-            {
-                var response = request.RequestUri?.AbsolutePath switch
-                {
-                    "/oauth2/validate" => ValidationResponse(request),
-                    "/helix/users" => JsonResponse(
-                        """
-                        {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"},{"id":"bot-id","login":"bot","display_name":"Bot"}]}
-                        """
-                    ),
-                    "/helix/moderation/channels" => ModerationChannelsResponse(request),
-                    _ => new HttpResponseMessage(HttpStatusCode.NotFound),
-                };
-                return Task.FromResult(response);
-            }
-
-            private HttpResponseMessage ValidationResponse(HttpRequestMessage request)
-            {
-                if (ValidationStatusCode != HttpStatusCode.OK)
-                    return new HttpResponseMessage(ValidationStatusCode);
-
-                return request.Headers.Authorization?.Parameter == "custom-token"
-                    ? JsonResponse(
-                        $$"""
-                        {"user_id":"{{CustomTokenUserId}}","login":"{{CustomTokenLogin}}","scopes":[{{FormatScopes()}}]}
-                        """
-                    )
-                    : JsonResponse(
-                        $$"""
-                        {"user_id":"bot-id","login":"bot","scopes":[{{FormatScopes()}}]}
-                        """
-                    );
-            }
+            ) =>
+                Task.FromResult(
+                    request.RequestUri?.AbsolutePath switch
+                    {
+                        "/oauth2/token" => TokenResponse(),
+                        "/helix/users" => JsonResponse(
+                            """
+                            {"data":[{"id":"channel-id","login":"streamer","display_name":"Streamer"}]}
+                            """
+                        ),
+                        "/helix/moderation/channels" => ModerationChannelsResponse(request),
+                        "/helix/streams" => StreamResponse(request),
+                        _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+                    }
+                );
 
             private HttpResponseMessage ModerationChannelsResponse(HttpRequestMessage request)
             {
@@ -383,8 +333,19 @@ public sealed class HostBotStatusTests
                 );
             }
 
-            private string FormatScopes() =>
-                string.Join(',', GrantedScopes.Select(scope => $"\"{scope}\""));
+            private HttpResponseMessage StreamResponse(HttpRequestMessage request)
+            {
+                StreamRequestCount++;
+                StreamRequestAccessToken = request.Headers.Authorization?.Parameter;
+                StreamRequestClientId = request.Headers.GetValues("Client-Id").Single();
+                return JsonResponse(StreamIsLive ? """{"data":[{}]}""" : """{"data":[]}""");
+            }
+
+            private HttpResponseMessage TokenResponse()
+            {
+                TokenRequestCount++;
+                return JsonResponse("""{"access_token":"app-token","expires_in":3600}""");
+            }
 
             private static HttpResponseMessage JsonResponse(string json) =>
                 new(HttpStatusCode.OK)

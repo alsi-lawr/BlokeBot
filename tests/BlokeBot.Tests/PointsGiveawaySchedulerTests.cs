@@ -363,20 +363,14 @@ public sealed class PointsGiveawaySchedulerTests
     )
     {
         var httpClientFactory = new FakeHttpClientFactory();
-        var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var options = TwitchBotSettings.FromOptions(new TwitchBotOptions());
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
         var helix = new TwitchHelixApiClient(httpClientFactory);
-        var hostBotAccounts = new HostBotAccountAuthorizationService(
-            dbFactory,
-            new HostBotAccountOAuthService(options, oauth, helix),
-            oauth,
+        var status = new HostBotStatusService(
+            new UnavailableHostBotAppAccessTokenSource(),
+            new UnavailableHostBotAccountTokenStatusProvider(),
             helix,
-            new TwitchTokenStatusService(serviceProvider, oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
             options
         );
-        var status = new HostBotStatusService(serviceProvider, hostBotAccounts, helix, options);
         return new PointsGiveawayService(
             dbFactory,
             new PointsGiveawayDrawService(
@@ -478,6 +472,28 @@ public sealed class PointsGiveawaySchedulerTests
     private sealed class FakeHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
+    }
+
+    private sealed class UnavailableHostBotAccountTokenStatusProvider
+        : IHostBotAccountTokenStatusProvider
+    {
+        public Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
+            string channelLogin,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult(
+                new ActiveBotAccountTokenStatus(
+                    string.Empty,
+                    null,
+                    TwitchTokenStatusState.Unavailable,
+                    null,
+                    null,
+                    [],
+                    [],
+                    []
+                )
+            );
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>

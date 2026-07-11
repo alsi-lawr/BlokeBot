@@ -4,8 +4,8 @@ using BlokeBot.Features.HostedChannels.Authorization;
 namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed class HostBotStatusService(
-    IServiceProvider services,
-    HostBotAccountAuthorizationService botAccounts,
+    IHostBotAppAccessTokenSource appTokens,
+    IHostBotAccountTokenStatusProvider botAccounts,
     TwitchHelixApiClient helix,
     TwitchBotSettings settings
 )
@@ -147,7 +147,7 @@ public sealed class HostBotStatusService(
 
     public async Task<bool> IsStreamLiveAsync(string channelLogin, CancellationToken ct)
     {
-        var token = await GetAppTokenAsync(ct);
+        var token = await appTokens.GetAccessTokenAsync(ct);
         return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct);
     }
 
@@ -239,15 +239,6 @@ public sealed class HostBotStatusService(
         HostBotChannelStatusFlags flags,
         HostBotChannelStatusFlags required
     ) => (flags & required) == required;
-
-    private async Task<string> GetAppTokenAsync(CancellationToken ct)
-    {
-        var appTokens = services.GetService<TwitchAppAccessTokenProvider>();
-        if (appTokens is null)
-            throw new InvalidOperationException("The Twitch bot runner is not set up yet.");
-
-        return await appTokens.GetAccessTokenAsync(ct);
-    }
 
     private async Task<ActiveBotAccountTokenStatus> GetValidatedUserAccessTokenAsync(
         string channelLogin,

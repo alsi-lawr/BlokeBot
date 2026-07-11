@@ -38,6 +38,7 @@
     else
     {
         <BotAccountAuthorizationSection Status="@botAccountStatus"
+                                        Disabled="@(botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
                                         Clear="@ClearBotAccountAuthorizationAsync"
                                         Refresh="@RefreshBotAccountAuthorizationAsync"
                                         Collapsible="true"

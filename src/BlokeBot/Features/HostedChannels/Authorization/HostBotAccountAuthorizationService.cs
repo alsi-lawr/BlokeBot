@@ -13,7 +13,7 @@ public sealed class HostBotAccountAuthorizationService(
     TwitchTokenStatusService globalTokenStatus,
     HostedChannelChangeNotifier changes,
     TwitchBotSettings botSettings
-) : ITwitchBotAccountProvider
+) : ITwitchBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
     private static readonly TimeSpan RefreshSkew = TimeSpan.FromMinutes(1);
 

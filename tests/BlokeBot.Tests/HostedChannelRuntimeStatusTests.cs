@@ -6,7 +6,6 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using TUnit.Core;
 
@@ -20,9 +19,6 @@ public sealed class HostedChannelRuntimeStatusTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         var httpClientFactory = new CountingHttpClientFactory();
-        using var services = new ServiceCollection()
-            .AddSingleton<ITwitchAccessTokenProvider>(new StaticTokenProvider("saved-token"))
-            .BuildServiceProvider();
         var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
@@ -35,21 +31,16 @@ public sealed class HostedChannelRuntimeStatusTests
                 },
             }
         );
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
         var helix = new TwitchHelixApiClient(httpClientFactory);
-        var hostBotAccounts = new HostBotAccountAuthorizationService(
-            dbFactory,
-            new HostBotAccountOAuthService(options, oauth, helix),
-            oauth,
-            helix,
-            new TwitchTokenStatusService(services, oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
-            options
-        );
         var service = new HostedChannelRuntimeStatusService(
             dbFactory,
             ChannelAuthorizationService(dbFactory, "channel:bot"),
-            new HostBotStatusService(services, hostBotAccounts, helix, options)
+            new HostBotStatusService(
+                new UnavailableHostBotAppAccessTokenSource(),
+                new RejectingHostBotAccountTokenStatusProvider(),
+                helix,
+                options
+            )
         );
 
         var summary = await service.LoadHostRuntimeSummaryAsync(hostId, CancellationToken.None);
@@ -105,10 +96,14 @@ public sealed class HostedChannelRuntimeStatusTests
         return host.Id;
     }
 
-    private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
+    private sealed class RejectingHostBotAccountTokenStatusProvider
+        : IHostBotAccountTokenStatusProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(accessToken);
+        public Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
+            string channelLogin,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException("Remote bot status should not be queried.");
     }
 
     private sealed class CountingHttpClientFactory : IHttpClientFactory

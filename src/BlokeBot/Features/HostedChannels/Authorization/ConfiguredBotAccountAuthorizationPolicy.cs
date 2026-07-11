@@ -1,0 +1,128 @@
+using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Identity;
+
+namespace BlokeBot.Features.HostedChannels.Authorization;
+
+internal sealed class ConfiguredBotAccountAuthorizationPolicy(
+    TwitchBotSettings settings,
+    ITwitchAccessTokenCache tokenCache,
+    TwitchHelixApiClient helix,
+    BotAccountTokenStatusResolver tokenStatus,
+    HostedChannelChangeNotifier changes
+) : IBotAccountAuthorizationPolicy
+{
+    public async Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct)
+    {
+        var configuredBotLogin = settings.Identity.BotUsername;
+        var status = await tokenStatus(settings.Identity.Scopes, ct);
+
+        if (status.State == TwitchTokenStatusState.Unavailable)
+        {
+            return new(
+                configuredBotLogin,
+                null,
+                null,
+                BotAccountAuthorizationState.NotAuthorized,
+                status.RequiredScopes,
+                status.GrantedScopes,
+                status.MissingScopes,
+                "No bot account is connected yet."
+            );
+        }
+
+        if (status.State == TwitchTokenStatusState.Invalid)
+        {
+            return new(
+                configuredBotLogin,
+                null,
+                null,
+                BotAccountAuthorizationState.NotAuthorized,
+                status.RequiredScopes,
+                status.GrantedScopes,
+                status.MissingScopes,
+                "BlokeBot could not check the connected bot account."
+            );
+        }
+
+        if (status.Validation is null)
+        {
+            return new(
+                configuredBotLogin,
+                null,
+                null,
+                BotAccountAuthorizationState.Unknown,
+                status.RequiredScopes,
+                status.GrantedScopes,
+                status.MissingScopes,
+                "BlokeBot could not check the bot account right now."
+            );
+        }
+
+        var authorizedLogin = LoginName.Parse(status.Validation.Login).Value;
+        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(status, ct);
+        if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
+        {
+            return new(
+                configuredBotLogin,
+                authorizedLogin,
+                authorizedProfileImageUrl,
+                BotAccountAuthorizationState.WrongAccount,
+                status.RequiredScopes,
+                status.GrantedScopes,
+                status.MissingScopes,
+                "The connected Twitch account is not the expected bot account."
+            );
+        }
+
+        if (status.MissingScopes.Count > 0)
+        {
+            return new(
+                configuredBotLogin,
+                authorizedLogin,
+                authorizedProfileImageUrl,
+                BotAccountAuthorizationState.MissingScopes,
+                status.RequiredScopes,
+                status.GrantedScopes,
+                status.MissingScopes,
+                "The bot account needs more Twitch access."
+            );
+        }
+
+        return new(
+            configuredBotLogin,
+            authorizedLogin,
+            authorizedProfileImageUrl,
+            BotAccountAuthorizationState.Ready,
+            status.RequiredScopes,
+            status.GrantedScopes,
+            [],
+            "The bot account is ready."
+        );
+    }
+
+    public async Task ClearAsync(CancellationToken ct)
+    {
+        var tokenCachePath = settings.Identity.TokenCachePath;
+        if (!string.IsNullOrWhiteSpace(tokenCachePath) && File.Exists(tokenCachePath))
+            File.Delete(tokenCachePath);
+
+        await tokenCache.ClearAsync(ct);
+        await changes.NotifyChangedAsync();
+    }
+
+    private async Task<string?> LoadAuthorizedProfileImageUrlAsync(
+        TwitchTokenStatus status,
+        CancellationToken ct
+    )
+    {
+        if (string.IsNullOrWhiteSpace(status.AccessToken))
+            return null;
+
+        var user = await helix.GetCurrentUserAsync(
+            new TwitchHelixRequestContext(settings.Identity.ClientId, status.AccessToken),
+            ct
+        );
+
+        return string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl;
+    }
+}
