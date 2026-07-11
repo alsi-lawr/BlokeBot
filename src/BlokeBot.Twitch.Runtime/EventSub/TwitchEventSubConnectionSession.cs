@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -54,9 +55,7 @@ internal sealed class TwitchEventSubConnectionSession(
         {
             TwitchRuntimeConnectionTarget.Initial => DefaultEndpoint,
             TwitchRuntimeConnectionTarget.EventSubReconnect reconnect => reconnect.Uri,
-            _ => throw new InvalidOperationException(
-                "Unknown EventSub connection target."
-            ),
+            _ => throw new UnreachableException("Unknown EventSub connection target."),
         };
         var socket = new ClientWebSocket();
         try

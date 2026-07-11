@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 
@@ -35,7 +37,7 @@ internal sealed class TwitchIrcConnectionSession(
     )
     {
         if (target is not TwitchRuntimeConnectionTarget.Initial)
-            throw new InvalidOperationException(
+            throw new UnreachableException(
                 "IRC sessions can only establish the default Twitch endpoint."
             );
 
@@ -364,9 +366,44 @@ internal sealed class TwitchIrcConnectionSession(
 
         public async ValueTask DisposeAsync()
         {
-            await writer.DisposeAsync();
-            reader.Dispose();
-            tcp.Dispose();
+            Exception? failure = null;
+            try
+            {
+                await writer.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+
+            try
+            {
+                reader.Dispose();
+            }
+            catch (Exception exception)
+            {
+                failure = CombineCleanupFailures(failure, exception);
+            }
+
+            try
+            {
+                tcp.Dispose();
+            }
+            catch (Exception exception)
+            {
+                failure = CombineCleanupFailures(failure, exception);
+            }
+
+            if (failure is not null)
+                ExceptionDispatchInfo.Capture(failure).Throw();
         }
+
+        private static Exception CombineCleanupFailures(
+            Exception? previous,
+            Exception current
+        ) =>
+            previous is null
+                ? current
+                : new AggregateException("IRC session cleanup failed.", previous, current);
     }
 }

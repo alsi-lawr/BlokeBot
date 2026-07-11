@@ -24,68 +24,95 @@ internal static class TwitchRuntimeSessionRunner
     )
     {
         var target = initialTarget;
+        var currentAttempt = 1;
         TwitchRuntimeSessionHandoff handoff = new TwitchRuntimeSessionHandoff.None();
         try
         {
-            while (!stoppingToken.IsCancellationRequested)
+            try
             {
-                var outcome = await establishSession(target, stoppingToken);
-                switch (outcome)
+                while (!stoppingToken.IsCancellationRequested)
                 {
-                    case TwitchRuntimeSessionOutcome.Idle:
-                        var idleHandoff = handoff;
-                        handoff = new TwitchRuntimeSessionHandoff.None();
-                        await DisposeHandoffAsync(idleHandoff);
-                        if (!await WaitForChannelsAsync(idleWait, stoppingToken))
-                            return;
-                        break;
-                    case TwitchRuntimeSessionOutcome.Established established:
-                        var completedHandoff = handoff;
-                        handoff = new TwitchRuntimeSessionHandoff.None();
-                        await DisposeHandoffAsync(completedHandoff);
-                        target = initialTarget;
-                        var nextTarget = await ListenAsync(
-                            runtime,
-                            established,
-                            classify,
-                            health,
-                            status,
-                            stoppingToken
-                        );
-                        switch (nextTarget)
-                        {
-                            case TwitchRuntimeListenOutcome.Reconnect reconnect:
-                                target = reconnect.Target;
-                                break;
-                            case TwitchRuntimeListenOutcome.ProtocolHandoff protocol:
-                                target = protocol.Target;
-                                handoff = new TwitchRuntimeSessionHandoff.Pending
-                                {
-                                    Session = protocol.PreviousSession,
-                                };
-                                break;
-                            case TwitchRuntimeListenOutcome.Canceled:
-                            case TwitchRuntimeListenOutcome.Unhealthy:
+                    var outcome = await establishSession(target, stoppingToken);
+                    switch (outcome)
+                    {
+                        case TwitchRuntimeSessionOutcome.Idle:
+                            var idleHandoff = handoff;
+                            handoff = new TwitchRuntimeSessionHandoff.None();
+                            await DisposeHandoffAsync(idleHandoff);
+                            target = initialTarget;
+                            if (!await WaitForChannelsAsync(idleWait, stoppingToken))
                                 return;
-                            default:
-                                throw new UnreachableException(
-                                    "Unknown runtime listening outcome."
-                                );
-                        }
-                        break;
-                    case TwitchRuntimeSessionOutcome.Canceled:
-                    case TwitchRuntimeSessionOutcome.Unhealthy:
-                        return;
-                    default:
-                        throw new UnreachableException(
-                            "Unknown runtime session establishment outcome."
-                        );
+                            break;
+                        case TwitchRuntimeSessionOutcome.Established established:
+                            var completedHandoff = handoff;
+                            handoff = new TwitchRuntimeSessionHandoff.None();
+                            await DisposeHandoffAsync(completedHandoff);
+                            currentAttempt = established.Attempt;
+                            target = initialTarget;
+                            var nextTarget = await ListenAsync(
+                                runtime,
+                                established,
+                                classify,
+                                health,
+                                status,
+                                stoppingToken
+                            );
+                            switch (nextTarget)
+                            {
+                                case TwitchRuntimeListenOutcome.Reconnect reconnect:
+                                    target = reconnect.Target;
+                                    break;
+                                case TwitchRuntimeListenOutcome.ProtocolHandoff protocol:
+                                    target = protocol.Target;
+                                    handoff = new TwitchRuntimeSessionHandoff.Pending
+                                    {
+                                        Session = protocol.PreviousSession,
+                                        Attempt = protocol.Attempt,
+                                    };
+                                    break;
+                                case TwitchRuntimeListenOutcome.Canceled:
+                                case TwitchRuntimeListenOutcome.Unhealthy:
+                                    return;
+                                default:
+                                    throw new UnreachableException(
+                                        "Unknown runtime listening outcome."
+                                    );
+                            }
+                            break;
+                        case TwitchRuntimeSessionOutcome.Canceled:
+                        case TwitchRuntimeSessionOutcome.Unhealthy:
+                            return;
+                        default:
+                            throw new UnreachableException(
+                                "Unknown runtime session establishment outcome."
+                            );
+                    }
                 }
             }
+            finally
+            {
+                await DisposeHandoffAsync(handoff);
+            }
         }
-        finally
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            await DisposeHandoffAsync(handoff);
+            return;
+        }
+        catch (Exception exception)
+        {
+            status.SetConnected(false, []);
+            var attempt =
+                exception is TwitchRuntimeSessionCleanupException cleanup
+                    ? cleanup.Attempt
+                    : currentAttempt;
+            var report = CreateUnhealthyReport(
+                runtime,
+                classify,
+                attempt,
+                exception,
+                CancellationToken.None
+            );
+            health.Report(report);
         }
     }
 
@@ -203,18 +230,46 @@ internal static class TwitchRuntimeSessionRunner
             {
                 Target = reconnect.Target,
                 PreviousSession = session,
+                Attempt = established.Attempt,
             };
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            await session.DisposeAsync();
-            return new TwitchRuntimeListenOutcome.Canceled();
+            try
+            {
+                await session.DisposeAsync();
+                return new TwitchRuntimeListenOutcome.Canceled();
+            }
+            catch (Exception cleanupException)
+            {
+                status.SetConnected(false, []);
+                var report = new TwitchRuntimeSessionHealthReport.Unhealthy
+                {
+                    Runtime = runtime,
+                    Classification = TwitchRuntimeSessionFailureClassification.Unexpected,
+                    Attempt = established.Attempt,
+                    Exception = new TwitchRuntimeSessionCleanupException(
+                        established.Attempt,
+                        "Runtime session cleanup failed during cancellation.",
+                        cleanupException
+                    ),
+                };
+                health.Report(report);
+                return new TwitchRuntimeListenOutcome.Unhealthy { Report = report };
+            }
         }
         catch (Exception exception)
         {
-            await session.DisposeAsync();
+            if (exception is TwitchAccessTokenUnavailableException)
+                status.SetAuthorized(false);
+
+            var failure = await IncludeCleanupFailureAsync(
+                session,
+                established.Attempt,
+                exception
+            );
             status.SetConnected(false, []);
-            var classification = classify(exception, stoppingToken);
+            var classification = classify(failure, stoppingToken);
             if (TwitchRuntimeSessionFailureClassifier.IsRetryable(classification))
             {
                 health.Report(
@@ -223,7 +278,7 @@ internal static class TwitchRuntimeSessionRunner
                         Runtime = runtime,
                         Classification = classification,
                         Attempt = established.Attempt,
-                        Exception = exception,
+                        Exception = failure,
                     }
                 );
                 return new TwitchRuntimeListenOutcome.Reconnect
@@ -232,28 +287,69 @@ internal static class TwitchRuntimeSessionRunner
                 };
             }
 
-            if (exception is TwitchAccessTokenUnavailableException)
-                status.SetAuthorized(false);
-
             var report = new TwitchRuntimeSessionHealthReport.Unhealthy
             {
                 Runtime = runtime,
                 Classification = classification,
                 Attempt = established.Attempt,
-                Exception = exception,
+                Exception = failure,
             };
             health.Report(report);
             return new TwitchRuntimeListenOutcome.Unhealthy { Report = report };
         }
     }
 
-    private static ValueTask DisposeHandoffAsync(TwitchRuntimeSessionHandoff handoff) =>
-        handoff switch
+    private static async ValueTask<Exception> IncludeCleanupFailureAsync(
+        ITwitchRuntimeEstablishedSession session,
+        int attempt,
+        Exception listeningException
+    )
+    {
+        try
         {
-            TwitchRuntimeSessionHandoff.None => ValueTask.CompletedTask,
-            TwitchRuntimeSessionHandoff.Pending pending => pending.Session.DisposeAsync(),
-            _ => throw new UnreachableException("Unknown runtime session handoff."),
-        };
+            await session.DisposeAsync();
+            return listeningException;
+        }
+        catch (Exception cleanupException)
+        {
+            return new AggregateException(
+                "Runtime session listening and cleanup both failed.",
+                listeningException,
+                new TwitchRuntimeSessionCleanupException(
+                    attempt,
+                    "Runtime session cleanup failed after a listening failure.",
+                    cleanupException
+                )
+            );
+        }
+    }
+
+    private static async ValueTask DisposeHandoffAsync(
+        TwitchRuntimeSessionHandoff handoff
+    )
+    {
+        switch (handoff)
+        {
+            case TwitchRuntimeSessionHandoff.None:
+                return;
+            case TwitchRuntimeSessionHandoff.Pending pending:
+                try
+                {
+                    await pending.Session.DisposeAsync();
+                    return;
+                }
+                catch (Exception exception)
+                {
+                    throw new TwitchRuntimeSessionCleanupException(
+                        pending.Attempt,
+                        "EventSub protocol handoff cleanup failed.",
+                        exception
+                    );
+                }
+            default:
+                throw new UnreachableException("Unknown runtime session handoff.");
+        }
+    }
 
     private static async ValueTask<bool> WaitForChannelsAsync(
         ITwitchRuntimeIdleWait idleWait,
@@ -391,6 +487,8 @@ internal abstract record TwitchRuntimeListenOutcome
 
         internal required ITwitchRuntimeEstablishedSession PreviousSession { get; init; }
 
+        internal required int Attempt { get; init; }
+
         private protected override void Seal() { }
     }
 
@@ -422,8 +520,19 @@ internal abstract record TwitchRuntimeSessionHandoff
     {
         internal required ITwitchRuntimeEstablishedSession Session { get; init; }
 
+        internal required int Attempt { get; init; }
+
         private protected override void Seal() { }
     }
+}
+
+internal sealed class TwitchRuntimeSessionCleanupException(
+    int attempt,
+    string message,
+    Exception innerException
+) : Exception(message, innerException)
+{
+    internal int Attempt { get; } = attempt;
 }
 
 internal interface ITwitchRuntimeIdleWait

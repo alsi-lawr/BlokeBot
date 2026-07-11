@@ -459,6 +459,48 @@ public sealed class RuntimeSessionResilienceTests
     }
 
     [Test]
+    public async Task EventSubProtocolHandoff_FollowedByIdle_ResetsExpiredTargetBeforeRecheck()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var harness = CreateHarness(TwitchBotRuntime.EventSub, attemptLimit: 3);
+        var reconnectEndpoint = new Uri("wss://example.test/expired-reconnect");
+        var previousSession = new ScriptedEstablishedSession();
+        previousSession.Enqueue(_ =>
+            Task.FromResult(
+                new TwitchRuntimeReconnectRequest
+                {
+                    Target = new TwitchRuntimeConnectionTarget.EventSubReconnect
+                    {
+                        Uri = reconnectEndpoint,
+                    },
+                }
+            )
+        );
+        harness.Session.Enqueue((_, _) => EstablishedAsync(previousSession));
+        harness.Session.Enqueue((target, _) =>
+        {
+            target
+                .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
+                .Uri.ShouldBe(reconnectEndpoint);
+            return IdleAsync();
+        });
+        harness.Session.Enqueue((target, attemptToken) =>
+        {
+            target.ShouldBeOfType<TwitchRuntimeConnectionTarget.Initial>();
+            cancellation.Cancel();
+            return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
+        });
+
+        await harness.RunRuntimeAsync(cancellation.Token);
+
+        harness.Session.CallCount.ShouldBe(3);
+        previousSession.DisposeCount.ShouldBe(1);
+        harness.IdleWait.CallCount.ShouldBe(1);
+        harness.Session.Targets[2].ShouldBeOfType<TwitchRuntimeConnectionTarget.Initial>();
+        harness.Health.Reports.ShouldBeEmpty();
+    }
+
+    [Test]
     [Arguments(TwitchBotRuntime.Irc)]
     [Arguments(TwitchBotRuntime.EventSub)]
     public async Task TerminalListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect(
@@ -508,6 +550,47 @@ public sealed class RuntimeSessionResilienceTests
             attempt: 1,
             failure
         );
+    }
+
+    [Test]
+    [Arguments(TwitchBotRuntime.Irc)]
+    [Arguments(TwitchBotRuntime.EventSub)]
+    public async Task ListeningAndCleanupFailure_RunningRuntime_ReportsCombinedUnhealthyWithoutHostFault(
+        TwitchBotRuntime runtime
+    )
+    {
+        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var listeningFailure = new IOException("established session disconnected");
+        var cleanupFailure = new IOException("session cleanup failed");
+        var listening = new ScriptedEstablishedSession
+        {
+            DisposeException = cleanupFailure,
+        };
+        listening.Enqueue(_ => FailedListeningAsync(listeningFailure));
+        harness.Session.Enqueue((_, _) =>
+        {
+            harness.Status.SetConnected(true, ["channel"]);
+            return EstablishedAsync(listening);
+        });
+
+        await harness.RunRuntimeAsync(CancellationToken.None);
+
+        harness.Session.CallCount.ShouldBe(1);
+        listening.DisposeCount.ShouldBe(1);
+        harness.Status.Current.IsConnected.ShouldBeFalse();
+        var report = harness.Health.Reports.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
+        report.Runtime.ShouldBe(runtime);
+        report.Classification.ShouldBe(
+            TwitchRuntimeSessionFailureClassification.Unexpected
+        );
+        report.Attempt.ShouldBe(1);
+        var combined = report.Exception.ShouldBeOfType<AggregateException>();
+        combined.InnerExceptions[0].ShouldBeSameAs(listeningFailure);
+        var cleanup = combined.InnerExceptions[1]
+            .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
+        cleanup.Attempt.ShouldBe(1);
+        cleanup.InnerException.ShouldBeSameAs(cleanupFailure);
     }
 
     [Test]
@@ -809,6 +892,8 @@ public sealed class RuntimeSessionResilienceTests
 
         internal int DisposeCount { get; private set; }
 
+        internal Exception? DisposeException { get; init; }
+
         internal void Enqueue(
             Func<CancellationToken, Task<TwitchRuntimeReconnectRequest>> listener
         ) => listeners.Enqueue(listener);
@@ -824,7 +909,9 @@ public sealed class RuntimeSessionResilienceTests
         public ValueTask DisposeAsync()
         {
             DisposeCount++;
-            return ValueTask.CompletedTask;
+            return DisposeException is { } exception
+                ? new ValueTask(Task.FromException(exception))
+                : ValueTask.CompletedTask;
         }
     }
 
