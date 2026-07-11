@@ -1,0 +1,125 @@
+using Shouldly;
+using TUnit.Core;
+
+namespace BlokeBot.Functional.Tests;
+
+public sealed class ResultTests
+{
+    [Test]
+    public void Success_CreatingAndMatching_UsesSuccessBranchOnly()
+    {
+        var errorInvoked = false;
+        var result = Result<int, TestError>.Success(21);
+
+        var matched = result.Match(
+            value => value * 2,
+            _ =>
+            {
+                errorInvoked = true;
+                return 0;
+            }
+        );
+
+        matched.ShouldBe(42);
+        errorInvoked.ShouldBeFalse();
+    }
+
+    [Test]
+    public void Error_CreatingAndMatching_UsesErrorBranchOnly()
+    {
+        var successInvoked = false;
+        var expected = new TestError("invalid");
+        var result = Result<int, TestError>.Error(expected);
+
+        var matched = result.Match(
+            _ =>
+            {
+                successInvoked = true;
+                return new TestError("unexpected");
+            },
+            error => error
+        );
+
+        matched.ShouldBe(expected);
+        successInvoked.ShouldBeFalse();
+    }
+
+    [Test]
+    public void Success_Mapping_TransformsValue()
+    {
+        var mapped = Result<int, TestError>.Success(21).Map(value => value * 2);
+
+        mapped.Match(value => value, _ => 0).ShouldBe(42);
+    }
+
+    [Test]
+    public void Error_Mapping_PreservesErrorWithoutInvokingMap()
+    {
+        var mapInvoked = false;
+        var expected = new TestError("invalid");
+
+        var mapped = Result<int, TestError>.Error(expected).Map(
+            _ =>
+            {
+                mapInvoked = true;
+                return 42;
+            }
+        );
+
+        mapped.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
+        mapInvoked.ShouldBeFalse();
+    }
+
+    [Test]
+    public void Success_Binding_ComposesResult()
+    {
+        var bound = Result<int, TestError>.Success(21).Bind(value =>
+            Result<string, TestError>.Success((value * 2).ToString())
+        );
+
+        bound.Match(value => value, _ => string.Empty).ShouldBe("42");
+    }
+
+    [Test]
+    public void Success_BindingToError_ReturnsBoundError()
+    {
+        var expected = new TestError("invalid");
+
+        var bound = Result<int, TestError>.Success(21).Bind(_ =>
+            Result<string, TestError>.Error(expected)
+        );
+
+        bound.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
+    }
+
+    [Test]
+    public void Error_Binding_PreservesErrorWithoutInvokingBind()
+    {
+        var bindInvoked = false;
+        var expected = new TestError("invalid");
+
+        var bound = Result<int, TestError>.Error(expected).Bind(
+            _ =>
+            {
+                bindInvoked = true;
+                return Result<string, TestError>.Success("unexpected");
+            }
+        );
+
+        bound.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
+        bindInvoked.ShouldBeFalse();
+    }
+
+    [Test]
+    public void EquivalentResults_Comparing_HaveValueSemantics()
+    {
+        Result<int, TestError>.Success(42).ShouldBe(Result<int, TestError>.Success(42));
+        Result<int, TestError>.Success(42).ShouldNotBe(Result<int, TestError>.Success(41));
+        Result<int, TestError>
+            .Error(new TestError("invalid"))
+            .ShouldBe(Result<int, TestError>.Error(new TestError("invalid")));
+        Result<int, int>.Success(42).ShouldNotBe(Result<int, int>.Error(42));
+    }
+
+    private sealed record TestError(string Code);
+}
