@@ -46,8 +46,8 @@ internal static class TwitchRuntimeSessionRunner
                         case TwitchRuntimeSessionOutcome.Established established:
                             var completedHandoff = handoff;
                             handoff = new TwitchRuntimeSessionHandoff.None();
-                            await DisposeHandoffAsync(completedHandoff);
                             currentAttempt = established.Attempt;
+                            await CompleteHandoffAsync(completedHandoff, established);
                             target = initialTarget;
                             var nextTarget = await ListenAsync(
                                 runtime,
@@ -348,6 +348,45 @@ internal static class TwitchRuntimeSessionRunner
                 }
             default:
                 throw new UnreachableException("Unknown runtime session handoff.");
+        }
+    }
+
+    private static async ValueTask CompleteHandoffAsync(
+        TwitchRuntimeSessionHandoff handoff,
+        TwitchRuntimeSessionOutcome.Established replacement
+    )
+    {
+        try
+        {
+            await DisposeHandoffAsync(handoff);
+        }
+        catch (Exception handoffException)
+        {
+            try
+            {
+                await replacement.Session.DisposeAsync();
+            }
+            catch (Exception replacementException)
+            {
+                var attempt =
+                    handoffException is TwitchRuntimeSessionCleanupException cleanup
+                        ? cleanup.Attempt
+                        : replacement.Attempt;
+                throw new TwitchRuntimeSessionCleanupException(
+                    attempt,
+                    "EventSub protocol handoff and replacement session cleanup both failed.",
+                    new AggregateException(
+                        handoffException,
+                        new TwitchRuntimeSessionCleanupException(
+                            replacement.Attempt,
+                            "Replacement runtime session cleanup failed after EventSub protocol handoff cleanup.",
+                            replacementException
+                        )
+                    )
+                );
+            }
+
+            throw;
         }
     }
 

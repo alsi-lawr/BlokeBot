@@ -459,6 +459,101 @@ public sealed class RuntimeSessionResilienceTests
     }
 
     [Test]
+    public async Task EventSubProtocolHandoff_OldCleanupFailsAfterReplacementEstablishment_DisposesReplacementAndReportsBothFailures()
+    {
+        const int previousAttempt = 3;
+        const int replacementAttempt = 2;
+        var reconnectEndpoint = new Uri("wss://example.test/reconnect");
+        var previousCleanupFailure = new IOException("previous session cleanup failed");
+        var replacementCleanupFailure = new IOException(
+            "replacement session cleanup failed"
+        );
+        var previousSession = new ScriptedEstablishedSession
+        {
+            DisposeException = previousCleanupFailure,
+        };
+        previousSession.Enqueue(_ =>
+            Task.FromResult(
+                new TwitchRuntimeReconnectRequest
+                {
+                    Target = new TwitchRuntimeConnectionTarget.EventSubReconnect
+                    {
+                        Uri = reconnectEndpoint,
+                    },
+                }
+            )
+        );
+        var replacementSession = new ScriptedEstablishedSession
+        {
+            DisposeException = replacementCleanupFailure,
+        };
+        var outcomes = new Queue<TwitchRuntimeSessionOutcome>(
+            [
+                new TwitchRuntimeSessionOutcome.Established
+                {
+                    Session = previousSession,
+                    Attempt = previousAttempt,
+                },
+                new TwitchRuntimeSessionOutcome.Established
+                {
+                    Session = replacementSession,
+                    Attempt = replacementAttempt,
+                },
+            ]
+        );
+        var health = new RecordingHealthReporter();
+        var status = new TwitchBotRuntimeStatusStore();
+        var idleWait = new RecordingIdleWait();
+        var targets = new List<TwitchRuntimeConnectionTarget>();
+
+        await TwitchRuntimeSessionRunner.RunUntilStoppedAsync(
+            TwitchBotRuntime.EventSub,
+            new TwitchRuntimeConnectionTarget.Initial(),
+            (target, _) =>
+            {
+                targets.Add(target);
+                status.SetConnected(true, ["channel"]);
+                return Task.FromResult(outcomes.Dequeue());
+            },
+            TwitchEventSubSessionFailureClassifier.Classify,
+            health,
+            status,
+            idleWait,
+            CancellationToken.None
+        );
+
+        targets.Count.ShouldBe(2);
+        targets[0].ShouldBeOfType<TwitchRuntimeConnectionTarget.Initial>();
+        targets[1]
+            .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
+            .Uri.ShouldBe(reconnectEndpoint);
+        previousSession.ListenCount.ShouldBe(1);
+        previousSession.DisposeCount.ShouldBe(1);
+        replacementSession.ListenCount.ShouldBe(0);
+        replacementSession.DisposeCount.ShouldBe(1);
+        status.Current.IsConnected.ShouldBeFalse();
+        var report = health.Reports.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
+        report.Runtime.ShouldBe(TwitchBotRuntime.EventSub);
+        report.Classification.ShouldBe(
+            TwitchRuntimeSessionFailureClassification.Unexpected
+        );
+        report.Attempt.ShouldBe(previousAttempt);
+        var cleanup = report.Exception
+            .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
+        cleanup.Attempt.ShouldBe(previousAttempt);
+        var combined = cleanup.InnerException.ShouldBeOfType<AggregateException>();
+        var previousCleanup = combined.InnerExceptions[0]
+            .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
+        previousCleanup.Attempt.ShouldBe(previousAttempt);
+        previousCleanup.InnerException.ShouldBeSameAs(previousCleanupFailure);
+        var replacementCleanup = combined.InnerExceptions[1]
+            .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
+        replacementCleanup.Attempt.ShouldBe(replacementAttempt);
+        replacementCleanup.InnerException.ShouldBeSameAs(replacementCleanupFailure);
+    }
+
+    [Test]
     public async Task EventSubProtocolHandoff_FollowedByIdle_ResetsExpiredTargetBeforeRecheck()
     {
         using var cancellation = new CancellationTokenSource();
