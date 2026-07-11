@@ -14,12 +14,16 @@ public static class ComponentRefreshEventSubscriptions
         where TKey : notnull =>
         events.Subscribe(
             key,
-            _ =>
-                invokeAsync(async () =>
+            ObserverIdentity.For(RequireTargetType(stateHasChanged)),
+            async (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await invokeAsync(async () =>
                 {
                     await reloadAsync();
                     stateHasChanged();
-                })
+                });
+            }
         );
 
     public static EventSubscriptionSet SubscribeForComponentRefresh<TKey>(
@@ -32,11 +36,22 @@ public static class ComponentRefreshEventSubscriptions
         where TKey : notnull =>
         events.Subscribe(
             keys,
-            _ =>
-                invokeAsync(async () =>
+            ObserverIdentity.For(RequireTargetType(stateHasChanged)),
+            async (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await invokeAsync(async () =>
                 {
                     await reloadAsync();
                     stateHasChanged();
-                })
+                });
+            }
+        );
+
+    private static Type RequireTargetType(Action callback) =>
+        callback.Target?.GetType()
+        ?? throw new ArgumentException(
+            "Component refresh callbacks must target a component instance.",
+            nameof(callback)
         );
 }

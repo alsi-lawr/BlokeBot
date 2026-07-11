@@ -207,7 +207,7 @@ public sealed class HostBotAccountAuthorizationService(
         }
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<bool> SetWhisperResponsesEnabledAsync(
@@ -230,7 +230,7 @@ public sealed class HostBotAccountAuthorizationService(
         settings.WhisperResponsesEnabled = enabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return true;
     }
 
@@ -272,7 +272,7 @@ public sealed class HostBotAccountAuthorizationService(
         settings.TwitchUserId = grant.UserId;
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
 
         return BotAccountAuthorizationResult.Success("The bot account is ready.");
     }
@@ -290,7 +290,7 @@ public sealed class HostBotAccountAuthorizationService(
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     private async Task<HostBotAccountSettings?> EnsureSettingsAsync(

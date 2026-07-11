@@ -77,7 +77,7 @@ internal static class BotOAuthEndpoints
                     try
                     {
                         await oauth.CompleteAuthorizationAsync(code, state, ct);
-                        await changes.NotifyChangedAsync();
+                        await changes.NotifyChangedAsync(ct);
                         return Results.Content(
                             """
                             <!doctype html>

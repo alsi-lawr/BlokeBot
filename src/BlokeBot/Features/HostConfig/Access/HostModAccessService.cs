@@ -41,7 +41,7 @@ public sealed class HostModAccessService(
             return;
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
@@ -98,7 +98,7 @@ public sealed class HostModAccessService(
             ct
         );
         if (deleted > 0)
-            await changes.NotifyChangedAsync();
+            await changes.NotifyChangedAsync(ct);
     }
 
     public async Task SetModsEnabledAsync(int hostId, bool enabled, CancellationToken ct)
@@ -107,7 +107,7 @@ public sealed class HostModAccessService(
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         settings.ModsEnabled = enabled;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task SetAllowModsByDefaultAsync(
@@ -120,7 +120,7 @@ public sealed class HostModAccessService(
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         settings.AllowModsByDefault = allowByDefault;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public static async Task<HostModAccessSettings> EnsureSettingsAsync(

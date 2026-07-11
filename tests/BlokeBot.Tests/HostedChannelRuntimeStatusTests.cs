@@ -58,7 +58,7 @@ public sealed class HostedChannelRuntimeStatusTests
     ) =>
         new(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             ChannelOAuthService(scopes)
         );
 

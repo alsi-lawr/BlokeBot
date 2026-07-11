@@ -36,7 +36,7 @@ public sealed class SiteAccessService(
             return;
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<bool> CanCreateHostAsync(string login, CancellationToken ct)
@@ -79,7 +79,7 @@ public sealed class SiteAccessService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await AccessListStore.RemoveAsync(db.SiteAccessEntries, kind, login, ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task SetWhitelistEnabledAsync(bool enabled, CancellationToken ct)
@@ -88,7 +88,7 @@ public sealed class SiteAccessService(
         var settings = await EnsureSettingsAsync(db, ct);
         settings.WhitelistEnabled = enabled;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     private static async Task<SiteAccessSettings> EnsureSettingsAsync(

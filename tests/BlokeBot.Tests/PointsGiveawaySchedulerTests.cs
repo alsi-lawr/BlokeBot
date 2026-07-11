@@ -378,12 +378,12 @@ public sealed class PointsGiveawaySchedulerTests
                 new PointBalanceService(dbFactory),
                 new FixedPointsRandom(),
                 new PointsGiveawayMessageFormatter(),
-                new PointsChangeNotifier(new EventBus<AppEventKind>())
+                new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
             ),
             new PointsGiveawayEligibilityPolicy(status),
             new PointsGiveawayMessageFormatter(),
             scheduler,
-            new PointsChangeNotifier(new EventBus<AppEventKind>())
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
     }
 

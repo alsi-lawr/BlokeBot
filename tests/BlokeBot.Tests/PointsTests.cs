@@ -107,7 +107,7 @@ public sealed class PointsTests
         var service = new PointsDashboardService(
             new PointBalanceService(dbFactory),
             null!,
-            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new FixedPointTargetUserLookup([])
         );
 
@@ -134,7 +134,7 @@ public sealed class PointsTests
         var service = new PointsDashboardService(
             new PointBalanceService(dbFactory),
             null!,
-            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new FixedPointTargetUserLookup(["viewer"])
         );
 
@@ -188,7 +188,7 @@ public sealed class PointsTests
         var service = new PointsDashboardService(
             balances,
             null!,
-            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new FixedPointTargetUserLookup([])
         );
         await balances.AddAsync(
@@ -231,7 +231,7 @@ public sealed class PointsTests
         var service = new PointsDashboardService(
             new PointBalanceService(dbFactory),
             null!,
-            new PointsChangeNotifier(new EventBus<AppEventKind>()),
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new FixedPointTargetUserLookup([])
         );
 
@@ -572,7 +572,7 @@ public sealed class PointsTests
         SqliteBlokeBotDbFactory dbFactory
     )
     {
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         return new PointsConfigurationService(
             dbFactory,
             new CommandAliasRegistry(),

@@ -46,7 +46,7 @@ public sealed class PointsDashboardService(
             );
 
         var result = await balances.AddAsync(hostId, target, amount, actorLogin, "dashboard", ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return result.Success
             ? result with
             {
@@ -81,7 +81,7 @@ public sealed class PointsDashboardService(
             );
 
         var result = await balances.TransferAsync(hostId, fromLogin, target, amount, ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return result.Success
             ? result with
             {
@@ -116,7 +116,7 @@ public sealed class PointsDashboardService(
             "dashboard",
             ct
         );
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return result.Success
             ? result with
             {
@@ -143,7 +143,7 @@ public sealed class PointsDashboardService(
             ct
         );
         if (result.Success)
-            await changes.NotifyChangedAsync();
+            await changes.NotifyChangedAsync(ct);
 
         return result.Success
             ? result with

@@ -34,7 +34,7 @@ public sealed class HostCustomCommandSettingsService(
 
         host.TimeZoneId = normalized;
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged);
+        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
     }
 
     public static string NormalizeTimeZoneId(string timeZoneId)

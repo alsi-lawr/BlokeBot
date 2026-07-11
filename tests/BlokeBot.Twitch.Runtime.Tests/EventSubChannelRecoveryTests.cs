@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Threading.Channels;
 using BlokeBot.Commands;
+using BlokeBot.Eventing;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
@@ -418,6 +419,11 @@ public sealed class EventSubChannelRecoveryTests
             new UnusedCommandResponseSender(),
             new TwitchBotRuntimeStatusStore(),
             [observer],
+            RuntimeTestObserverFanOut.Continue<
+                TwitchEventSubMessageObserverBoundary,
+                TwitchChatMessage,
+                TwitchChatObserverDeadLetter
+            >(TwitchBotObserverBoundaries.EventSubMessages),
             NullLogger<TwitchEventSubConnectionSession>.Instance
         );
         await connection.DispatchChatMessageAsync(

@@ -24,7 +24,7 @@ public sealed class GuessingPointRewardTests
         var service = new GuessingConfigurationService(
             dbFactory,
             new CommandAliasRegistry(),
-            new GuessingChangeNotifier(new EventBus<AppEventKind>())
+            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
         var config = await service.LoadConfigurationAsync(
             seed.HostId,
@@ -92,9 +92,9 @@ public sealed class GuessingPointRewardTests
     private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
         new(
             dbFactory,
-            new GuessingChangeNotifier(new EventBus<AppEventKind>()),
+            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
-            new PointsChangeNotifier(new EventBus<AppEventKind>())
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
     private static async Task<RoundSeed> SeedRoundAsync(

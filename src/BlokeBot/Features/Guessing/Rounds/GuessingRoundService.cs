@@ -104,9 +104,9 @@ public sealed class GuessingRoundService(
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         if (awardedAnyPoints)
-            await pointsChanges.NotifyChangedAsync();
+            await pointsChanges.NotifyChangedAsync(ct);
 
         var message = MessageTemplateFormatter.Format(
             winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
@@ -180,7 +180,7 @@ public sealed class GuessingRoundService(
             }
         );
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new GuessingOperationResult(
             true,
             FormatRoundStarted(
@@ -242,7 +242,7 @@ public sealed class GuessingRoundService(
         round.Status = GuessRoundStatus.Closed;
         round.ClosedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new GuessingOperationResult(true, settings.GuessingStoppedReply);
     }
 

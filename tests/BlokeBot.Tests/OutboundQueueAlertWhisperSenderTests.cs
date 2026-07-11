@@ -245,7 +245,7 @@ public sealed class OutboundQueueAlertWhisperSenderTests
                     new ServiceCollection().BuildServiceProvider(),
                     oauth
                 ),
-                new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 options
             );
             var quota = new HostWhisperQuotaService(dbFactory, new FixedTimeProvider(Now));

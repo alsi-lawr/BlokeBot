@@ -94,7 +94,7 @@ public sealed class PointsConfigurationService(
         );
         await SaveAliasesAsync(db, hostId, config.Aliases, ct);
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     private static void Apply(PointsSettings settings, PointsConfiguration config)

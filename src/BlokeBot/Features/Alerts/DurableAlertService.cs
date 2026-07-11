@@ -73,7 +73,7 @@ public sealed class DurableAlertService(
         };
         db.DurableAlerts.Add(alert);
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.AlertsChanged);
+        await events.PublishAsync(AppEventKind.AlertsChanged, ct);
         return new DurableAlertCreateResult(alert, Created: true);
     }
 
@@ -99,7 +99,7 @@ public sealed class DurableAlertService(
         alert.AcknowledgedAtUtc = UtcNow();
         alert.AcknowledgedByLogin = actor;
         await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.AlertsChanged);
+        await events.PublishAsync(AppEventKind.AlertsChanged, ct);
         return true;
     }
 

@@ -108,7 +108,7 @@ public sealed class CustomCommandConfigurationService(
 
         await graphWriter.WriteAsync(hostId, config, normalizedAliases, ct);
         await hostSettings.SetTimeZoneIdAsync(hostId, normalizedTimeZone, ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged);
+        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
     }
 
     private async Task<Dictionary<CustomCommandEditor, string[]>> NormalizeAliasesAsync(

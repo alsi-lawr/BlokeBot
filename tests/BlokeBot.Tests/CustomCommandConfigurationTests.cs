@@ -413,7 +413,7 @@ public sealed class CustomCommandConfigurationTests
         SqliteBlokeBotDbFactory dbFactory
     )
     {
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         return new CustomCommandConfigurationService(
             dbFactory,
             new CustomCommandAliasRegistry(),

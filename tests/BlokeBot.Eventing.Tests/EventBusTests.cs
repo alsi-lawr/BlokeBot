@@ -7,54 +7,115 @@ namespace BlokeBot.Eventing.Tests;
 public sealed class EventBusTests
 {
     [Test]
-    public async Task FailingSubscriber_PublishingEvent_NotifiesRemainingSubscribers()
+    public async Task FailingSubscriber_PublishingEvent_ReturnsFailuresAndNotifiesRemainingSubscribers()
     {
-        var events = new EventBus<string>();
+        var failure = new InvalidOperationException("subscriber failed");
+        var reporter = new RecordingReporter();
+        var events = CreateBus(reporter);
         var received = new List<string>();
+        var correlations = new List<ObserverCorrelationId>();
 
         events.Subscribe(
             "changed",
-            _ =>
+            ObserverIdentity.Named("first"),
+            (notification, _) =>
             {
                 received.Add("first");
-                return Task.CompletedTask;
+                correlations.Add(notification.CorrelationId);
+                return ValueTask.CompletedTask;
             }
         );
         events.Subscribe(
             "changed",
-            _ => Task.FromException(new InvalidOperationException("subscriber failed"))
+            ObserverIdentity.Named("failing"),
+            (notification, _) =>
+            {
+                received.Add("failing");
+                correlations.Add(notification.CorrelationId);
+                return ValueTask.FromException(failure);
+            }
         );
         events.Subscribe(
             "changed",
-            _ =>
+            ObserverIdentity.Named("third"),
+            (notification, _) =>
             {
                 received.Add("third");
-                return Task.CompletedTask;
+                correlations.Add(notification.CorrelationId);
+                return ValueTask.CompletedTask;
             }
         );
 
-        await events.PublishAsync("changed");
+        var outcome = await events.PublishAsync("changed", CancellationToken.None);
 
-        received.ShouldBe(["first", "third"]);
+        received.ShouldBe(["first", "failing", "third"]);
+        correlations.Distinct().ShouldHaveSingleItem()
+            .ShouldBe(ObserverCorrelationId.Named("event-correlation"));
+        var handled = outcome.ShouldBeOfType<
+            ObserverFanOutOutcome.CompletedWithFailures
+        >();
+        var summary = handled.Failures.ShouldHaveSingleItem();
+        summary.Boundary.ShouldBe(ObserverBoundary.Named("Test.EventBus"));
+        summary.Event.ShouldBe(ObserverEventIdentity.Named("Event.changed"));
+        summary.Observer.ShouldBe(ObserverIdentity.Named("failing"));
+        summary.CorrelationId.ShouldBe(ObserverCorrelationId.Named("event-correlation"));
+        summary.Attempt.ShouldBe(1);
+        summary.Classification.ShouldBe(ObserverFailureClassification.Terminal);
+        reporter.Reports.ShouldHaveSingleItem().Exception.ShouldBeSameAs(failure);
+    }
+
+    [Test]
+    public async Task PublishCancellation_WhileDispatching_PropagatesWithoutReportingOrLaterSubscriber()
+    {
+        var reporter = new RecordingReporter();
+        var events = CreateBus(reporter);
+        var laterCalled = false;
+        using var cancellation = new CancellationTokenSource();
+        events.Subscribe(
+            "changed",
+            ObserverIdentity.Named("cancelling"),
+            (_, token) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromCanceled(token);
+            }
+        );
+        events.Subscribe(
+            "changed",
+            ObserverIdentity.Named("later"),
+            (_, _) =>
+            {
+                laterCalled = true;
+                return ValueTask.CompletedTask;
+            }
+        );
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            events.PublishAsync("changed", cancellation.Token).AsTask()
+        );
+
+        laterCalled.ShouldBeFalse();
+        reporter.Reports.ShouldBeEmpty();
     }
 
     [Test]
     public async Task DisposedSubscription_PublishingEvent_DoesNotNotifyHandler()
     {
-        var events = new EventBus<string>();
+        var events = CreateBus(new RecordingReporter());
         var received = 0;
         var subscription = events.Subscribe(
             "changed",
-            _ =>
+            ObserverIdentity.Named("subscriber"),
+            (_, _) =>
             {
                 received++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
 
-        await events.PublishAsync("changed");
+        await events.PublishAsync("changed", CancellationToken.None);
         subscription.Dispose();
-        await events.PublishAsync("changed");
+        await events.PublishAsync("changed", CancellationToken.None);
 
         received.ShouldBe(1);
     }
@@ -62,29 +123,31 @@ public sealed class EventBusTests
     [Test]
     public async Task SubscriptionSet_Disposing_UnsubscribesEveryHandler()
     {
-        var events = new EventBus<string>();
+        var events = CreateBus(new RecordingReporter());
         var received = 0;
         using var subscriptions = new EventSubscriptionSet([
             events.Subscribe(
                 "changed",
-                _ =>
+                ObserverIdentity.Named("first"),
+                (_, _) =>
                 {
                     received++;
-                    return Task.CompletedTask;
+                    return ValueTask.CompletedTask;
                 }
             ),
             events.Subscribe(
                 "changed",
-                _ =>
+                ObserverIdentity.Named("second"),
+                (_, _) =>
                 {
                     received++;
-                    return Task.CompletedTask;
+                    return ValueTask.CompletedTask;
                 }
             ),
         ]);
 
         subscriptions.Dispose();
-        await events.PublishAsync("changed");
+        await events.PublishAsync("changed", CancellationToken.None);
 
         received.ShouldBe(0);
     }
@@ -92,24 +155,71 @@ public sealed class EventBusTests
     [Test]
     public async Task MultipleSubscribedKeys_PublishingEvents_NotifiesUntilDisposed()
     {
-        var events = new EventBus<string>();
+        var events = CreateBus(new RecordingReporter());
         var received = new List<string>();
         var subscription = events.Subscribe(
             ["first", "second"],
-            notification =>
+            ObserverIdentity.Named("multi-key"),
+            (notification, _) =>
             {
                 received.Add(notification.Key);
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
 
-        await events.PublishAsync("first");
-        await events.PublishAsync("second");
-        await events.PublishAsync("third");
+        await events.PublishAsync("first", CancellationToken.None);
+        await events.PublishAsync("second", CancellationToken.None);
+        await events.PublishAsync("third", CancellationToken.None);
         subscription.Dispose();
-        await events.PublishAsync("first");
+        await events.PublishAsync("first", CancellationToken.None);
 
         received.ShouldBe(["first", "second"]);
     }
 
+    private static EventBus<string> CreateBus(RecordingReporter reporter)
+    {
+        var fanOut = new ObserverFanOut<
+            EventBusObserverBoundary<string>,
+            EventNotification<string>,
+            EventBusDeadLetter
+        >(
+            new ObserverFailurePolicy<
+                EventBusObserverBoundary<string>,
+                EventBusDeadLetter
+            >.ContinueAndReport
+            {
+                Boundary = ObserverBoundary.Named("Test.EventBus"),
+            },
+            reporter,
+            new FixedCorrelationIdProvider("event-correlation")
+        );
+        return new EventBus<string>(
+            fanOut,
+            new EventBusEventIdentity<string>
+            {
+                Project = key => ObserverEventIdentity.Named($"Event.{key}"),
+            }
+        );
+    }
+
+    private sealed class RecordingReporter : IObserverFailureDiagnosticReporter
+    {
+        internal List<ObserverFailureDiagnosticReport> Reports { get; } = [];
+
+        public ValueTask ReportAsync(
+            ObserverFailureDiagnosticReport report,
+            CancellationToken cancellationToken
+        )
+        {
+            Reports.Add(report);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FixedCorrelationIdProvider(string correlationId)
+        : IObserverCorrelationIdProvider
+    {
+        public ObserverCorrelationId Next() =>
+            ObserverCorrelationId.Named(correlationId);
+    }
 }

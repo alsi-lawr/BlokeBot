@@ -154,11 +154,21 @@ public static class TwitchBotServiceCollectionExtensions
         RegisterLifecycleNotifier(services, lifecycleNotifier);
         services.AddTwitchAuth();
         services.AddTwitchHelix();
-        services.AddContinueAndReportObserverPolicy(TwitchBotObserverPolicyKeys.IrcMessages);
-        services.AddContinueAndReportObserverPolicy(TwitchBotObserverPolicyKeys.EventSubMessages);
-        services.AddContinueAndReportObserverPolicy(
-            TwitchBotObserverPolicyKeys.OutboundQueueAlerts
-        );
+        services.AddContinueAndReportObserverFanOut<
+            TwitchIrcMessageObserverBoundary,
+            TwitchChatMessage,
+            TwitchChatObserverDeadLetter
+        >(TwitchBotObserverBoundaries.IrcMessages);
+        services.AddContinueAndReportObserverFanOut<
+            TwitchEventSubMessageObserverBoundary,
+            TwitchChatMessage,
+            TwitchChatObserverDeadLetter
+        >(TwitchBotObserverBoundaries.EventSubMessages);
+        services.AddContinueAndReportObserverFanOut<
+            TwitchOutboundQueueAlertObserverBoundary,
+            TwitchOutboundQueueBacklog,
+            TwitchOutboundQueueAlertDeadLetter
+        >(TwitchBotObserverBoundaries.OutboundQueueAlerts);
         services.TryAddSingleton<TwitchOutboundDuplicateCooldown>();
         services.TryAddSingleton<TwitchOutboundQueueBacklogMonitor>();
         services.TryAddSingleton<TwitchOutboundQueueAlertDispatcher>();

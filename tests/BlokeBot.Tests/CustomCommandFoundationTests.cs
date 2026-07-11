@@ -70,7 +70,7 @@ public sealed class CustomCommandFoundationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = new HostCustomCommandSettingsService(
             dbFactory,
-            new EventBus<AppEventKind>()
+            TestEventBus.Create<AppEventKind>()
         );
 
         await service.SetTimeZoneIdAsync(hostId, "UTC", CancellationToken.None);

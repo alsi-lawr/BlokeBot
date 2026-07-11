@@ -212,7 +212,7 @@ public sealed class AuthSessionTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var modAccess = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
         await modAccess.AddEntryAsync(
             hostId,
@@ -243,7 +243,7 @@ public sealed class AuthSessionTests
         string botUsername = "botaccount"
     )
     {
-        var appEvents = new EventBus<AppEventKind>();
+        var appEvents = TestEventBus.Create<AppEventKind>();
         var admins = new BotAdminService(
             BotAdminSettings.FromOptions(
                 new BlokeBotOptions { BotAdmins = botAdmins ?? [] }

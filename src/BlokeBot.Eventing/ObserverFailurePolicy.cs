@@ -1,22 +1,125 @@
 namespace BlokeBot.Eventing;
 
-public readonly record struct ObserverFailurePolicyKey
+public readonly record struct ObserverBoundary
 {
-    public required string Value { get; init; }
+    private ObserverBoundary(string value) => Value = value;
 
-    public static ObserverFailurePolicyKey Named(string value)
+    public string Value { get; }
+
+    public static ObserverBoundary Named(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        return new ObserverFailurePolicyKey { Value = value };
+        return new ObserverBoundary(value);
     }
 
     public override string ToString() => Value;
 }
 
-/// <summary>
-/// Explicitly selects attempt-once, structured-reporting isolation for one fan-out boundary.
-/// </summary>
-public sealed record ContinueAndReportObserverPolicy
+public readonly record struct ObserverEventIdentity
 {
-    public required ObserverFailurePolicyKey Boundary { get; init; }
+    private ObserverEventIdentity(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static ObserverEventIdentity Named(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        return new ObserverEventIdentity(value);
+    }
+
+    public override string ToString() => Value;
+}
+
+public readonly record struct ObserverIdentity
+{
+    private ObserverIdentity(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static ObserverIdentity Named(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        return new ObserverIdentity(value);
+    }
+
+    public static ObserverIdentity For(Type observerType)
+    {
+        ArgumentNullException.ThrowIfNull(observerType);
+        return Named(observerType.FullName ?? observerType.Name);
+    }
+
+    public override string ToString() => Value;
+}
+
+public readonly record struct ObserverCorrelationId
+{
+    private ObserverCorrelationId(string value) => Value = value;
+
+    public string Value { get; }
+
+    public static ObserverCorrelationId Named(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        return new ObserverCorrelationId(value);
+    }
+
+    public override string ToString() => Value;
+}
+
+public interface IObserverDeadLetterPayload;
+
+public interface IDurableObserverDeadLetterSink<TBoundary, TDeadLetter>
+    where TDeadLetter : IObserverDeadLetterPayload
+{
+    ValueTask StoreAsync(
+        ObserverDeadLetter<TDeadLetter> deadLetter,
+        CancellationToken cancellationToken
+    );
+}
+
+public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
+    where TDeadLetter : IObserverDeadLetterPayload
+{
+    private protected ObserverFailurePolicy() { }
+
+    public required ObserverBoundary Boundary { get; init; }
+
+    private protected abstract void Seal();
+
+    public sealed record ContinueAndReport
+        : ObserverFailurePolicy<TBoundary, TDeadLetter>
+    {
+        private protected override void Seal() { }
+    }
+
+    public sealed record BoundedRetry : ObserverFailurePolicy<TBoundary, TDeadLetter>
+    {
+        private int attemptLimit;
+
+        /// <summary>
+        /// Gets the total invocation limit, including the first attempt.
+        /// </summary>
+        public required int AttemptLimit
+        {
+            get => attemptLimit;
+            init
+            {
+                ArgumentOutOfRangeException.ThrowIfLessThan(value, 2);
+                attemptLimit = value;
+            }
+        }
+
+        private protected override void Seal() { }
+    }
+
+    public sealed record DeadLetter : ObserverFailurePolicy<TBoundary, TDeadLetter>
+    {
+        public required IDurableObserverDeadLetterSink<TBoundary, TDeadLetter> Sink
+        {
+            get;
+            init;
+        }
+
+        private protected override void Seal() { }
+    }
 }

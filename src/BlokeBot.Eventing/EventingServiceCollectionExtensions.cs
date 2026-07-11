@@ -1,40 +1,71 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Eventing;
 
-/// <summary>
-/// Adds eventing services and their explicit observer policies.
-/// </summary>
 public static class EventingServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers the only selected observer policy for one named fan-out boundary.
-    /// </summary>
-    public static IServiceCollection AddContinueAndReportObserverPolicy(
+    public static IServiceCollection AddObserverFanOut<
+        TBoundary,
+        TEvent,
+        TDeadLetter
+    >(
         this IServiceCollection services,
-        ObserverFailurePolicyKey boundary
+        ObserverFailurePolicy<TBoundary, TDeadLetter> policy
     )
+        where TDeadLetter : IObserverDeadLetterPayload
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentException.ThrowIfNullOrWhiteSpace(boundary.Value);
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentException.ThrowIfNullOrWhiteSpace(policy.Boundary.Value);
 
-        services.AddKeyedSingleton(
-            boundary,
-            new ContinueAndReportObserverPolicy { Boundary = boundary }
-        );
+        services.TryAddSingleton<
+            IObserverFailureDiagnosticReporter,
+            ObserverFailureDiagnosticLogger
+        >();
+        services.TryAddSingleton<
+            IObserverCorrelationIdProvider,
+            ObserverCorrelationIdProvider
+        >();
+        services.AddSingleton(policy);
+        services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>();
         return services;
     }
 
-    /// <summary>
-    /// Registers an event bus with its required observer policy.
-    /// </summary>
+    public static IServiceCollection AddContinueAndReportObserverFanOut<
+        TBoundary,
+        TEvent,
+        TDeadLetter
+    >(
+        this IServiceCollection services,
+        ObserverBoundary boundary
+    )
+        where TDeadLetter : IObserverDeadLetterPayload =>
+        services.AddObserverFanOut<TBoundary, TEvent, TDeadLetter>(
+            new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
+            {
+                Boundary = boundary,
+            }
+        );
+
     public static IServiceCollection AddEventBus<TKey>(
         this IServiceCollection services,
-        ObserverFailurePolicyKey observerPolicy
+        ObserverBoundary boundary,
+        Func<TKey, ObserverEventIdentity> eventIdentity
     )
         where TKey : notnull
     {
-        services.AddContinueAndReportObserverPolicy(observerPolicy);
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(eventIdentity);
+
+        services.AddContinueAndReportObserverFanOut<
+            EventBusObserverBoundary<TKey>,
+            EventNotification<TKey>,
+            EventBusDeadLetter
+        >(boundary);
+        services.AddSingleton(
+            new EventBusEventIdentity<TKey> { Project = eventIdentity }
+        );
         services.AddSingleton<EventBus<TKey>>();
         return services;
     }

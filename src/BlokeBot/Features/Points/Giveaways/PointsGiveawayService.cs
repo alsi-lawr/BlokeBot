@@ -109,7 +109,7 @@ public sealed class PointsGiveawayService(
                 reply
             )
         );
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new PointsGiveawayStartOutcome(PointsGiveawayStartOutcomeKind.Started, settings);
     }
 
@@ -185,7 +185,7 @@ public sealed class PointsGiveawayService(
             }
         );
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new PointsGiveawayJoinOutcome(
             PointsGiveawayJoinOutcomeKind.Joined,
             settings,
@@ -232,7 +232,7 @@ public sealed class PointsGiveawayService(
         giveaway.CompletedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         scheduler.Cancel(giveaway.Id);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new PointsGiveawayCancelOutcome(PointsGiveawayCancelOutcomeKind.Cancelled, settings);
     }
 
@@ -287,7 +287,7 @@ public sealed class PointsGiveawayService(
         if (expired == 0)
             return false;
 
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return true;
     }
 

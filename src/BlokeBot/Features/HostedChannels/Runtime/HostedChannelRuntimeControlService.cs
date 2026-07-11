@@ -57,7 +57,7 @@ public sealed class HostedChannelRuntimeControlService(
         host.BotRuntimeState = BotChannelRuntimeState.Starting;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return HostedChannelRuntimeControlResult.Success("Bot starting.");
     }
 
@@ -80,7 +80,7 @@ public sealed class HostedChannelRuntimeControlService(
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return HostedChannelRuntimeControlResult.Success("Bot stopping.");
     }
 

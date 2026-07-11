@@ -107,7 +107,7 @@ public sealed class AccessListPolicyTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         (
@@ -128,7 +128,7 @@ public sealed class AccessListPolicyTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
@@ -162,7 +162,7 @@ public sealed class AccessListPolicyTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         await service.AddEntryAsync(
@@ -208,7 +208,7 @@ public sealed class AccessListPolicyTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         await service.AddEntryAsync(
@@ -231,7 +231,7 @@ public sealed class AccessListPolicyTests
         var secondHostId = await SeedHostAsync(dbFactory, "second");
         var service = new HostModAccessService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         await service.AddEntryAsync(
@@ -254,14 +254,15 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.AccessListPolicy"),
+            (_, _) =>
             {
                 eventCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var service = new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(events));
@@ -289,7 +290,7 @@ public sealed class AccessListPolicyTests
         string[]? botAdmins = null
     )
     {
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         return new SiteAccessService(
             dbFactory,
             new BotAdminService(

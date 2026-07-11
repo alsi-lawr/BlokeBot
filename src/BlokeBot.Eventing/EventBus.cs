@@ -1,23 +1,38 @@
-using Microsoft.Extensions.Logging;
-
 namespace BlokeBot.Eventing;
 
 public sealed class EventBus<TKey>
     where TKey : notnull
 {
     private readonly object gate = new();
-    private readonly Dictionary<TKey, List<Func<EventNotification<TKey>, Task>>> subscriptions = [];
-    private readonly ILogger<EventBus<TKey>>? log;
+    private readonly Dictionary<TKey, List<RegisteredObserver>> subscriptions = [];
+    private readonly ObserverFanOut<
+        EventBusObserverBoundary<TKey>,
+        EventNotification<TKey>,
+        EventBusDeadLetter
+    > fanOut;
+    private readonly EventBusEventIdentity<TKey> eventIdentity;
 
-    public EventBus() { }
-
-    public EventBus(ILogger<EventBus<TKey>> log)
+    internal EventBus(
+        ObserverFanOut<
+            EventBusObserverBoundary<TKey>,
+            EventNotification<TKey>,
+            EventBusDeadLetter
+        > fanOut,
+        EventBusEventIdentity<TKey> eventIdentity
+    )
     {
-        this.log = log;
+        this.fanOut = fanOut;
+        this.eventIdentity = eventIdentity;
     }
 
-    public IDisposable Subscribe(TKey key, Func<EventNotification<TKey>, Task> handler)
+    public IDisposable Subscribe(
+        TKey key,
+        ObserverIdentity observer,
+        Func<EventNotification<TKey>, CancellationToken, ValueTask> handler
+    )
     {
+        ArgumentNullException.ThrowIfNull(handler);
+        var registration = new RegisteredObserver(observer, handler);
         lock (gate)
         {
             if (!subscriptions.TryGetValue(key, out var handlers))
@@ -26,62 +41,84 @@ public sealed class EventBus<TKey>
                 subscriptions[key] = handlers;
             }
 
-            handlers.Add(handler);
+            handlers.Add(registration);
         }
 
-        return new Subscription(this, key, handler);
+        return new Subscription(this, key, registration);
     }
 
     public EventSubscriptionSet Subscribe(
         IEnumerable<TKey> keys,
-        Func<EventNotification<TKey>, Task> handler
+        ObserverIdentity observer,
+        Func<EventNotification<TKey>, CancellationToken, ValueTask> handler
     )
     {
         ArgumentNullException.ThrowIfNull(keys);
         ArgumentNullException.ThrowIfNull(handler);
 
-        return new EventSubscriptionSet(keys.Select(key => Subscribe(key, handler)));
+        return new EventSubscriptionSet(
+            keys.Select(key => Subscribe(key, observer, handler))
+        );
     }
 
-    public async Task PublishAsync(TKey key)
+    public ValueTask<ObserverFanOutOutcome> PublishAsync(
+        TKey key,
+        CancellationToken cancellationToken
+    )
     {
-        Func<EventNotification<TKey>, Task>[] handlers;
+        RegisteredObserver[] handlers;
         lock (gate)
         {
-            handlers = subscriptions.TryGetValue(key, out var current) ? [.. current] : [];
+            handlers = subscriptions.TryGetValue(key, out var current)
+                ? [.. current]
+                : [];
         }
 
-        var notification = new EventNotification<TKey>(key);
-        foreach (var handler in handlers)
-        {
-            try
+        var identity = eventIdentity.Project(key);
+        return fanOut.DispatchAsync(
+            handlers,
+            correlationId =>
             {
-                await handler(notification);
-            }
-            catch (Exception ex)
-            {
-                log?.LogError(ex, "Event subscriber failed for {EventKey}.", key);
-            }
-        }
+                var notification = new EventNotification<TKey>(key, correlationId);
+                return new ObserverDispatch<
+                    EventNotification<TKey>,
+                    EventBusDeadLetter
+                >
+                {
+                    Event = notification,
+                    EventIdentity = identity,
+                    DeadLetter = new EventBusDeadLetter(identity),
+                };
+            },
+            registration => registration.Identity,
+            (registration, notification, token) =>
+                registration.Handler(notification, token),
+            cancellationToken
+        );
     }
 
-    private void Unsubscribe(TKey key, Func<EventNotification<TKey>, Task> handler)
+    private void Unsubscribe(TKey key, RegisteredObserver observer)
     {
         lock (gate)
         {
             if (!subscriptions.TryGetValue(key, out var handlers))
                 return;
 
-            handlers.Remove(handler);
+            handlers.Remove(observer);
             if (handlers.Count == 0)
                 subscriptions.Remove(key);
         }
     }
 
+    private sealed record RegisteredObserver(
+        ObserverIdentity Identity,
+        Func<EventNotification<TKey>, CancellationToken, ValueTask> Handler
+    );
+
     private sealed class Subscription(
         EventBus<TKey> owner,
         TKey key,
-        Func<EventNotification<TKey>, Task> handler
+        RegisteredObserver observer
     ) : IDisposable
     {
         private bool disposed;
@@ -92,7 +129,19 @@ public sealed class EventBus<TKey>
                 return;
 
             disposed = true;
-            owner.Unsubscribe(key, handler);
+            owner.Unsubscribe(key, observer);
         }
     }
 }
+
+internal sealed class EventBusObserverBoundary<TKey>
+    where TKey : notnull;
+
+internal sealed record EventBusEventIdentity<TKey>
+    where TKey : notnull
+{
+    internal required Func<TKey, ObserverEventIdentity> Project { get; init; }
+}
+
+internal sealed record EventBusDeadLetter(ObserverEventIdentity Event)
+    : IObserverDeadLetterPayload;

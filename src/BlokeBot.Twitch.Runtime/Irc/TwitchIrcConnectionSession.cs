@@ -3,6 +3,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
 using System.Text;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -25,9 +26,18 @@ internal sealed class TwitchIrcConnectionSession(
     ITwitchCommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
     IEnumerable<ITwitchChatMessageObserver> messageObservers,
+    ObserverFanOut<
+        TwitchIrcMessageObserverBoundary,
+        TwitchChatMessage,
+        TwitchChatObserverDeadLetter
+    > messageObserverFanOut,
     ILogger<TwitchIrcConnectionSession> log
 ) : ITwitchIrcConnectionSession
 {
+    private static readonly ObserverEventIdentity ChatMessageEvent =
+        ObserverEventIdentity.Named("TwitchChatMessage");
+    private readonly ITwitchChatMessageObserver[] messageObservers =
+        [.. messageObservers];
     private readonly TwitchBotSettings opts = settings;
     private ILogger<TwitchIrcConnectionSession> Log { get; } = log;
 
@@ -147,21 +157,20 @@ internal sealed class TwitchIrcConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        foreach (var observer in messageObservers)
-        {
-            try
-            {
-                await observer.MessageReceivedAsync(message, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Log.LogWarning(ex, "Twitch IRC chat message observer failed.");
-            }
-        }
+        _ = await messageObserverFanOut.DispatchAsync(
+            messageObservers,
+            _ =>
+                new ObserverDispatch<TwitchChatMessage, TwitchChatObserverDeadLetter>
+                {
+                    Event = message,
+                    EventIdentity = ChatMessageEvent,
+                    DeadLetter = new TwitchChatObserverDeadLetter(message.Channel),
+                },
+            observer => ObserverIdentity.For(observer.GetType()),
+            static (observer, chatMessage, token) =>
+                observer.MessageReceivedAsync(chatMessage, token),
+            cancellationToken
+        );
     }
 
     private async Task SyncJoinedChannelsAsync(

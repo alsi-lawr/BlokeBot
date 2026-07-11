@@ -24,7 +24,7 @@ public sealed class HostedChannelRuntimeLifecycleService(
         host.BotRuntimeState = BotChannelRuntimeState.Started;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task MarkStoppedAsync(string channel, CancellationToken ct)
@@ -41,6 +41,6 @@ public sealed class HostedChannelRuntimeLifecycleService(
         host.BotRuntimeState = BotChannelRuntimeState.Stopped;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 }

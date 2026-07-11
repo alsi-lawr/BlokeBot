@@ -19,14 +19,15 @@ public sealed class BotAccountAuthorizationPolicyTests
         try
         {
             var cache = new RecordingAccessTokenCache();
-            var events = new EventBus<AppEventKind>();
+            var events = TestEventBus.Create<AppEventKind>();
             var eventCount = 0;
             using var subscription = events.Subscribe(
                 AppEventKind.HostedChannelsChanged,
-                _ =>
+                ObserverIdentity.Named("Test.BotAccountAuthorizationPolicy"),
+                (_, _) =>
                 {
                     eventCount++;
-                    return Task.CompletedTask;
+                    return ValueTask.CompletedTask;
                 }
             );
             BotAccountTokenStatusResolver tokenStatus = (_, _) =>

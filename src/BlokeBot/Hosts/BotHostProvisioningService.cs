@@ -69,7 +69,7 @@ public sealed class BotHostProvisioningService(
         foreach (var seeder in seeders)
             await seeder.SeedAsync(host.Id, ct);
 
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return host.Id;
     }
 }

@@ -15,14 +15,15 @@ public sealed class HostLifecycleTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostedChannelGraphAsync(dbFactory);
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.HostRemoval"),
+            (_, _) =>
             {
                 eventCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
@@ -54,14 +55,15 @@ public sealed class HostLifecycleTests
     public async Task MissingHost_Removing_ReturnsFalseWithoutEvent()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.MissingHostRemoval"),
+            (_, _) =>
             {
                 eventCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var service = new BotHostRemovalService(dbFactory, new HostedChannelChangeNotifier(events));
@@ -76,14 +78,15 @@ public sealed class HostLifecycleTests
     public async Task NewHost_Provisioning_PublishesHostedChannelChange()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var eventCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.HostProvisioning"),
+            (_, _) =>
             {
                 eventCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var service = new BotHostProvisioningService(

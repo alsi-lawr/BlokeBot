@@ -92,9 +92,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotAlerts(this IServiceCollection services)
     {
-        services.AddContinueAndReportObserverPolicy(
-            ObserverFailurePolicyKey.Named("BlokeBot.OutboundQueueAlertSubscribers")
-        );
+        services.AddContinueAndReportObserverFanOut<
+            OutboundQueueAlertSubscriberBoundary,
+            OutboundQueueAlertNotification,
+            OutboundQueueAlertSubscriberDeadLetter
+        >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers);
         services.TryAddSingleton<DurableAlertService>();
         services.TryAddSingleton<OutboundQueueAlertSubscriberDispatcher>();
         services.TryAddEnumerable(

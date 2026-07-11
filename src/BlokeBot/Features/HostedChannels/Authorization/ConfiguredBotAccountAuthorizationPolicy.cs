@@ -107,7 +107,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
             File.Delete(tokenCachePath);
 
         await tokenCache.ClearAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     private async Task<string?> LoadAuthorizedProfileImageUrlAsync(

@@ -109,7 +109,7 @@ public sealed class WhisperResponseTests
             oauth,
             helixUsers,
             new TwitchTokenStatusService(new ServiceCollection().BuildServiceProvider(), oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             options
         );
         var chat = new RecordingChatSender();
@@ -168,7 +168,7 @@ public sealed class WhisperResponseTests
             oauth,
             helixUsers,
             new TwitchTokenStatusService(new ServiceCollection().BuildServiceProvider(), oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             options
         );
         var chat = new RecordingChatSender();

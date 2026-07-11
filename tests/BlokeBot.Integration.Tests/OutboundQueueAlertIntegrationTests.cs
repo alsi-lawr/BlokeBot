@@ -1,5 +1,6 @@
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
+using BlokeBot.Hosting;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,16 +23,17 @@ public sealed class OutboundQueueAlertIntegrationTests
         var clock = new ManualTimerTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var alertCreated = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
         using var subscription = events.Subscribe(
             AppEventKind.AlertsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.AlertCreated"),
+            (_, _) =>
             {
                 alertCreated.TrySetResult();
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var subscriber = new RecordingAlertSubscriber();
@@ -42,7 +44,11 @@ public sealed class OutboundQueueAlertIntegrationTests
             alertService,
             new OutboundQueueAlertSubscriberDispatcher(
                 subscribers,
-                NullLogger<OutboundQueueAlertSubscriberDispatcher>.Instance
+                TestObserverFanOut.Continue<
+                    OutboundQueueAlertSubscriberBoundary,
+                    OutboundQueueAlertNotification,
+                    OutboundQueueAlertSubscriberDeadLetter
+                >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers)
             ),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
@@ -87,7 +93,11 @@ public sealed class OutboundQueueAlertIntegrationTests
             new TwitchOutboundQueueBacklogMonitor(),
             new TwitchOutboundQueueAlertDispatcher(
                 [observer],
-                NullLogger<TwitchOutboundQueueAlertDispatcher>.Instance
+                TestObserverFanOut.Continue<
+                    TwitchOutboundQueueAlertObserverBoundary,
+                    TwitchOutboundQueueBacklog,
+                    TwitchOutboundQueueAlertDeadLetter
+                >(TwitchBotObserverBoundaries.OutboundQueueAlerts)
             ),
             NullLogger<TwitchOutboundMessageQueue>.Instance
         );

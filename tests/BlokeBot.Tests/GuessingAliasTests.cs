@@ -235,7 +235,7 @@ public sealed class GuessingAliasTests
         }
         var service = new GuessingVoteService(
             dbFactory,
-            new GuessingChangeNotifier(new EventBus<AppEventKind>())
+            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
         var result = await service.RecordGuessAsync(
@@ -255,15 +255,15 @@ public sealed class GuessingAliasTests
         new(
             dbFactory,
             new CommandAliasRegistry(),
-            new GuessingChangeNotifier(new EventBus<AppEventKind>())
+            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
     private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
         new(
             dbFactory,
-            new GuessingChangeNotifier(new EventBus<AppEventKind>()),
+            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
-            new PointsChangeNotifier(new EventBus<AppEventKind>())
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
     private static CommandStrategyContext<GuessCommandKind, AppCommandRouteState> CommandContext(

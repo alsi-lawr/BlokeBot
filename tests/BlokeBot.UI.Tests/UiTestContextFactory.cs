@@ -26,7 +26,7 @@ internal static class UiTestContextFactory
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
 
         context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(dbFactory);
         context.Services.AddSingleton(events);

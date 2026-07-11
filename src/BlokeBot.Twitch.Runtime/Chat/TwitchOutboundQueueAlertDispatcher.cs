@@ -1,35 +1,51 @@
-using Microsoft.Extensions.Logging;
+using BlokeBot.Eventing;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchOutboundQueueAlertDispatcher(
     IEnumerable<ITwitchOutboundQueueAlertObserver> observers,
-    ILogger<TwitchOutboundQueueAlertDispatcher> log
+    ObserverFanOut<
+        TwitchOutboundQueueAlertObserverBoundary,
+        TwitchOutboundQueueBacklog,
+        TwitchOutboundQueueAlertDeadLetter
+    > fanOut
 )
 {
-    private readonly ITwitchOutboundQueueAlertObserver[] observers = observers.ToArray();
+    private static readonly ObserverEventIdentity BacklogEvent =
+        ObserverEventIdentity.Named("TwitchOutboundQueueBacklog");
+    private readonly ITwitchOutboundQueueAlertObserver[] observers = [.. observers];
 
     public bool HasObservers => observers.Length > 0;
 
-    public async Task NotifyAsync(IReadOnlyList<TwitchOutboundQueueBacklog> alerts)
+    public async Task NotifyAsync(
+        IReadOnlyList<TwitchOutboundQueueBacklog> alerts,
+        CancellationToken cancellationToken
+    )
     {
         foreach (var alert in alerts)
         {
-            foreach (var observer in observers)
-            {
-                try
-                {
-                    await observer.QueueBackedUpAsync(alert, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    log.LogWarning(
-                        ex,
-                        "Twitch outbound queue alert observer failed for #{Channel}.",
-                        alert.Channel
-                    );
-                }
-            }
+            _ = await fanOut.DispatchAsync(
+                observers,
+                _ =>
+                    new ObserverDispatch<
+                        TwitchOutboundQueueBacklog,
+                        TwitchOutboundQueueAlertDeadLetter
+                    >
+                    {
+                        Event = alert,
+                        EventIdentity = BacklogEvent,
+                        DeadLetter = new TwitchOutboundQueueAlertDeadLetter(
+                            alert.Channel,
+                            alert.PendingCount,
+                            alert.OldestPendingAge,
+                            alert.OldestPendingAt
+                        ),
+                    },
+                observer => ObserverIdentity.For(observer.GetType()),
+                static (observer, backlog, token) =>
+                    observer.QueueBackedUpAsync(backlog, token),
+                cancellationToken
+            );
         }
     }
 }

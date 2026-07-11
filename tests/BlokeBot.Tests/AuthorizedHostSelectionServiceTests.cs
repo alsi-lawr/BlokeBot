@@ -25,7 +25,7 @@ public sealed class AuthorizedHostSelectionServiceTests
         await SeedHostAsync(dbFactory, "streamer", "Streamer");
         await SeedHostAsync(dbFactory, "allowed", "Allowed");
         var blockedHostId = await SeedHostAsync(dbFactory, "blocked", "Blocked");
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var modAccess = new HostModAccessService(
             dbFactory,
             new HostedChannelChangeNotifier(events)

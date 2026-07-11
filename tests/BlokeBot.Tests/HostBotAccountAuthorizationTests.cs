@@ -291,7 +291,7 @@ public sealed class HostBotAccountAuthorizationTests
             oauth,
             helix,
             new TwitchTokenStatusService(serviceProvider, oauth),
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>()),
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             options
         );
     }

@@ -69,7 +69,7 @@ public sealed class PointsGiveawayDrawService(
         if (entrants.Count == 0)
         {
             await tx.CommitAsync(ct);
-            await changes.NotifyChangedAsync();
+            await changes.NotifyChangedAsync(ct);
             return PointsGiveawayDrawOutcome.NoEntrants(settings);
         }
 
@@ -104,7 +104,7 @@ public sealed class PointsGiveawayDrawService(
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return PointsGiveawayDrawOutcome.WithWinners(settings, winnerPayouts);
     }
 

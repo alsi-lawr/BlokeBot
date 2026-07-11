@@ -19,7 +19,7 @@ public sealed class BotHostRemovalService(
             return false;
 
         await transaction.CommitAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return true;
     }
 }

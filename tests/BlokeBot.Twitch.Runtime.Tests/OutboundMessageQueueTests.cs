@@ -1,4 +1,5 @@
 using BlokeBot.Twitch.Runtime;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -203,7 +204,7 @@ public sealed class OutboundMessageQueueTests
         var recording = new RecordingQueueAlertObserver();
         var dispatcher = new TwitchOutboundQueueAlertDispatcher(
             [new ThrowingQueueAlertObserver(), recording],
-            NullLogger<TwitchOutboundQueueAlertDispatcher>.Instance
+            QueueAlertFanOut()
         );
         var alert = new TwitchOutboundQueueBacklog(
             "channel",
@@ -212,7 +213,7 @@ public sealed class OutboundMessageQueueTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
 
-        await dispatcher.NotifyAsync([alert]);
+        await dispatcher.NotifyAsync([alert], CancellationToken.None);
 
         recording.Alerts.ShouldBe([alert]);
     }
@@ -229,10 +230,21 @@ public sealed class OutboundMessageQueueTests
             new TwitchOutboundQueueBacklogMonitor(),
             new TwitchOutboundQueueAlertDispatcher(
                 observers ?? [],
-                NullLogger<TwitchOutboundQueueAlertDispatcher>.Instance
+                QueueAlertFanOut()
             ),
             NullLogger<TwitchOutboundMessageQueue>.Instance
         );
+
+    private static ObserverFanOut<
+        TwitchOutboundQueueAlertObserverBoundary,
+        TwitchOutboundQueueBacklog,
+        TwitchOutboundQueueAlertDeadLetter
+    > QueueAlertFanOut() =>
+        RuntimeTestObserverFanOut.Continue<
+            TwitchOutboundQueueAlertObserverBoundary,
+            TwitchOutboundQueueBacklog,
+            TwitchOutboundQueueAlertDeadLetter
+        >(TwitchBotObserverBoundaries.OutboundQueueAlerts);
 
     private sealed class RecordingQueueAlertObserver : ITwitchOutboundQueueAlertObserver
     {

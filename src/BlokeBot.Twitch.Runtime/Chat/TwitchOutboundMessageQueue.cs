@@ -107,7 +107,7 @@ internal sealed class TwitchOutboundMessageQueue(
                 }
             }
 
-            await alertDispatcher.NotifyAsync(queueAlerts);
+            await alertDispatcher.NotifyAsync(queueAlerts, CancellationToken.None);
 
             if (item is null)
             {

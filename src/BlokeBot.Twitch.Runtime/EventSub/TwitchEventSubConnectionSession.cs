@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -23,11 +24,20 @@ internal sealed class TwitchEventSubConnectionSession(
     ITwitchCommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
     IEnumerable<ITwitchChatMessageObserver> messageObservers,
+    ObserverFanOut<
+        TwitchEventSubMessageObserverBoundary,
+        TwitchChatMessage,
+        TwitchChatObserverDeadLetter
+    > messageObserverFanOut,
     ILogger<TwitchEventSubConnectionSession> log
 ) : ITwitchEventSubConnectionSession
 {
+    private static readonly ObserverEventIdentity ChatMessageEvent =
+        ObserverEventIdentity.Named("TwitchChatMessage");
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Uri DefaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
+    private readonly ITwitchChatMessageObserver[] messageObservers =
+        [.. messageObservers];
     private ILogger<TwitchEventSubConnectionSession> Log { get; } = log;
 
     public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
@@ -141,21 +151,20 @@ internal sealed class TwitchEventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        foreach (var observer in messageObservers)
-        {
-            try
-            {
-                await observer.MessageReceivedAsync(message, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                Log.LogWarning(ex, "Twitch EventSub chat message observer failed.");
-            }
-        }
+        _ = await messageObserverFanOut.DispatchAsync(
+            messageObservers,
+            _ =>
+                new ObserverDispatch<TwitchChatMessage, TwitchChatObserverDeadLetter>
+                {
+                    Event = message,
+                    EventIdentity = ChatMessageEvent,
+                    DeadLetter = new TwitchChatObserverDeadLetter(message.Channel),
+                },
+            observer => ObserverIdentity.For(observer.GetType()),
+            static (observer, chatMessage, token) =>
+                observer.MessageReceivedAsync(chatMessage, token),
+            cancellationToken
+        );
     }
 
     private static IReadOnlyDictionary<string, string> CreateTags(

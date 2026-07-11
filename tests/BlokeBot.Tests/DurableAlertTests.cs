@@ -2,6 +2,7 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
 using BlokeBot.Hosts;
+using BlokeBot.Hosting;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
@@ -21,7 +22,7 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
+        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
 
         await alerts.CreateAsync(
             hostId,
@@ -93,7 +94,7 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
+        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
         var subscriber = new RecordingAlertSubscriber();
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
@@ -132,7 +133,7 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
+        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
         var subscriber = new RecordingAlertSubscriber();
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
@@ -175,7 +176,7 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, new EventBus<AppEventKind>());
+        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
         var recording = new RecordingAlertSubscriber();
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
@@ -222,7 +223,11 @@ public sealed class DurableAlertTests
     ) =>
         new(
             subscribers,
-            NullLogger<OutboundQueueAlertSubscriberDispatcher>.Instance
+            TestObserverFanOut.Continue<
+                OutboundQueueAlertSubscriberBoundary,
+                OutboundQueueAlertNotification,
+                OutboundQueueAlertSubscriberDeadLetter
+            >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers)
         );
 
     private sealed class RecordingAlertSubscriber : IOutboundQueueAlertSubscriber

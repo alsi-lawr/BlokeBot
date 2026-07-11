@@ -170,7 +170,7 @@ public sealed class ChannelBotAuthorizationTests
     }
 
     private static HostedChannelChangeNotifier ChangeNotifier() =>
-        new(new EventBus<AppEventKind>());
+        new(TestEventBus.Create<AppEventKind>());
 
     private static IConfiguration ConfigurationWithScopes(params string[] scopes)
     {

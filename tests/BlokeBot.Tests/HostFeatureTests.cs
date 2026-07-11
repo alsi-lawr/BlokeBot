@@ -18,14 +18,15 @@ public sealed class HostFeatureTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var publishCount = 0;
         using var subscription = events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.HostFeature"),
+            (_, _) =>
             {
                 publishCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var service = new HostFeatureService(dbFactory, new HostedChannelChangeNotifier(events));
@@ -64,7 +65,7 @@ public sealed class HostFeatureTests
         await SeedAliasAsync(dbFactory, hostId, AppCommandKind.Points, "points");
         var features = new HostFeatureService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
         var aliases = new AppCommandAliasResolver(dbFactory);
         var guessing = new GuessingCommandRouteResolver(aliases, features);
@@ -140,7 +141,7 @@ public sealed class HostFeatureTests
         }
         var features = new HostFeatureService(
             dbFactory,
-            new HostedChannelChangeNotifier(new EventBus<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
         var resolver = new GuessingCommandRouteResolver(
             new AppCommandAliasResolver(dbFactory),

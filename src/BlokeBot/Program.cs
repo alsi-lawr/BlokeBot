@@ -65,7 +65,8 @@ builder.Services.AddBlokeBotPersistence(
         ?? new BlokeBotOptions().DatabasePath
 );
 builder.Services.AddEventBus<AppEventKind>(
-    ObserverFailurePolicyKey.Named("BlokeBot.ApplicationEvents")
+    ObserverBoundary.Named("BlokeBot.ApplicationEvents"),
+    eventKind => ObserverEventIdentity.Named($"BlokeBot.{eventKind}")
 );
 builder
     .Services.AddBlokeBotAppCommands()

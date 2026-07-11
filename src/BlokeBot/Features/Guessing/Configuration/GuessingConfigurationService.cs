@@ -48,7 +48,7 @@ public sealed class GuessingConfigurationService(
             }
         );
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new GuessingOperationResult(true, $"Created {normalizedName}.");
     }
 
@@ -98,7 +98,7 @@ public sealed class GuessingConfigurationService(
             await db.SaveChangesAsync(ct);
         }
 
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return new GuessingOperationResult(true, $"Deleted {profile.Name}.");
     }
 
@@ -235,7 +235,7 @@ public sealed class GuessingConfigurationService(
         }
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     private static void Apply(BotReplySettings settings, ReplySettingsEditor editor)

@@ -15,14 +15,15 @@ public sealed class HostedChannelLifecycleNotifierTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedStartingHostAsync(dbFactory);
-        var events = new EventBus<AppEventKind>();
+        var events = TestEventBus.Create<AppEventKind>();
         var changeCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
-            _ =>
+            ObserverIdentity.Named("Test.HostedChannelLifecycleNotifier"),
+            (_, _) =>
             {
                 changeCount++;
-                return Task.CompletedTask;
+                return ValueTask.CompletedTask;
             }
         );
         var notifier = new HostedChannelLifecycleNotifier(

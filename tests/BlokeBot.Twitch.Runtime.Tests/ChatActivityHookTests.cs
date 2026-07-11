@@ -1,4 +1,5 @@
 using BlokeBot.Commands;
+using BlokeBot.Eventing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -22,7 +23,12 @@ public sealed class ChatActivityHookTests
             null!,
             new RecordingCommandResponseSender(recorder),
             new TwitchBotRuntimeStatusStore(),
-            [new RecordingChatMessageObserver(recorder)],
+            [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
+            RuntimeTestObserverFanOut.Continue<
+                TwitchIrcMessageObserverBoundary,
+                TwitchChatMessage,
+                TwitchChatObserverDeadLetter
+            >(TwitchBotObserverBoundaries.IrcMessages),
             NullLogger<TwitchIrcConnectionSession>.Instance
         );
 
@@ -51,7 +57,12 @@ public sealed class ChatActivityHookTests
             dispatcher,
             new RecordingCommandResponseSender(recorder),
             new TwitchBotRuntimeStatusStore(),
-            [new RecordingChatMessageObserver(recorder)],
+            [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
+            RuntimeTestObserverFanOut.Continue<
+                TwitchEventSubMessageObserverBoundary,
+                TwitchChatMessage,
+                TwitchChatObserverDeadLetter
+            >(TwitchBotObserverBoundaries.EventSubMessages),
             NullLogger<TwitchEventSubConnectionSession>.Instance
         );
 
@@ -103,6 +114,14 @@ public sealed class ChatActivityHookTests
             recorder.Events.Add("activity");
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class ThrowingChatMessageObserver : ITwitchChatMessageObserver
+    {
+        public ValueTask MessageReceivedAsync(
+            TwitchChatMessage message,
+            CancellationToken cancellationToken
+        ) => ValueTask.FromException(new InvalidOperationException("Observer failed."));
     }
 
     private sealed class RecordingCommandResponseSender(RuntimeHookRecorder recorder)

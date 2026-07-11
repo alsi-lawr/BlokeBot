@@ -89,7 +89,7 @@ public sealed class GuessingVoteService(
         );
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         var answerReplyTarget = await AnswerReplyTargetAsync(db, round.GuessRoundProfileId, ct);
         return new GuessingOperationResult(
             true,

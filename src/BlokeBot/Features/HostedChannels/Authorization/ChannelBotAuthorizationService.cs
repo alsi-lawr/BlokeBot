@@ -24,7 +24,7 @@ public sealed class ChannelBotAuthorizationService(
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public async Task<ChannelBotAuthorizationResult> AuthorizeAsync(
@@ -57,7 +57,7 @@ public sealed class ChannelBotAuthorizationService(
         host.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
         host.ChannelBotAuthorizedScopes = TwitchScopeSet.Format(grant.Scopes);
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
         return ChannelBotAuthorizationResult.Success("The bot can chat in this channel.");
     }
 
@@ -71,7 +71,7 @@ public sealed class ChannelBotAuthorizationService(
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 
     public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes) =>

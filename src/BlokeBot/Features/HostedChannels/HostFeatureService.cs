@@ -63,6 +63,6 @@ public sealed class HostFeatureService(
             : host.EnabledFeatures & ~feature;
 
         await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync();
+        await changes.NotifyChangedAsync(ct);
     }
 }
