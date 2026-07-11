@@ -16,14 +16,19 @@ public static class TwitchBotServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configuration">The configuration section that contains bot settings.</param>
+    /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
-        IConfiguration configuration
+        IConfiguration configuration,
+        Action<TwitchBotAccountProviderSelection> selectAccountProvider
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(selectAccountProvider);
+
+        var accountProvider = SelectAccountProvider(selectAccountProvider);
 
         var options = configuration.Get<TwitchBotOptions>()
             ?? throw new OptionsValidationException(
@@ -41,7 +46,7 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.BindRequired(configuration);
 
-        return AddTwitchBotCore(services, settings, policies);
+        return AddTwitchBotCore(services, settings, policies, accountProvider);
     }
 
     /// <summary>
@@ -66,16 +71,21 @@ public static class TwitchBotServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configure">The options configuration callback.</param>
     /// <param name="policyOptions">Every required boundary-specific policy.</param>
+    /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
         Action<TwitchBotOptions> configure,
-        TwitchBotPolicyOptions policyOptions
+        TwitchBotPolicyOptions policyOptions,
+        Action<TwitchBotAccountProviderSelection> selectAccountProvider
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
         ArgumentNullException.ThrowIfNull(policyOptions);
+        ArgumentNullException.ThrowIfNull(selectAccountProvider);
+
+        var accountProvider = SelectAccountProvider(selectAccountProvider);
 
         var options = new TwitchBotOptions();
         configure(options);
@@ -86,17 +96,19 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.FromOptions(policyOptions);
 
-        return AddTwitchBotCore(services, settings, policies);
+        return AddTwitchBotCore(services, settings, policies, accountProvider);
     }
 
     private static ITwitchBotBuilder AddTwitchBotCore(
         IServiceCollection services,
         TwitchBotSettings settings,
-        TwitchBotPolicies policies
+        TwitchBotPolicies policies,
+        TwitchBotAccountProviderRegistration accountProvider
     )
     {
         RegisterSettings(services, settings);
         RegisterPolicies(services, policies);
+        RegisterAccountProvider(services, accountProvider);
         services.AddTwitchAuth();
         services.AddTwitchHelix();
         services.AddContinueAndReportObserverPolicy(TwitchBotObserverPolicyKeys.IrcMessages);
@@ -113,7 +125,6 @@ public static class TwitchBotServiceCollectionExtensions
             ITwitchBotChannelLifecycleNotifier,
             NoOpTwitchBotChannelLifecycleNotifier
         >();
-        services.TryAddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
         services.TryAddSingleton<ITwitchCommandResponseSender, TwitchChatCommandResponseSender>();
         services.AddSingleton<TwitchBotRuntimeStatusStore>();
@@ -126,6 +137,49 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddHostedService<TwitchBotRuntimeHostedService>();
 
         return services.AddTwitchCommands();
+    }
+
+    private static TwitchBotAccountProviderRegistration SelectAccountProvider(
+        Action<TwitchBotAccountProviderSelection> select
+    )
+    {
+        var selection = new TwitchBotAccountProviderSelection();
+        select(selection);
+        return selection.RequireSingle();
+    }
+
+    private static void RegisterAccountProvider(
+        IServiceCollection services,
+        TwitchBotAccountProviderRegistration registration
+    )
+    {
+        switch (registration.Kind)
+        {
+            case TwitchBotAccountProviderKind.Default:
+                services.AddSingleton<
+                    ITwitchBotAccountProvider,
+                    DefaultTwitchBotAccountProvider
+                >();
+                return;
+            case TwitchBotAccountProviderKind.HostedChannel:
+                services.AddSingleton<ITwitchBotAccountProvider>(serviceProvider =>
+                    (ITwitchBotAccountProvider)
+                        serviceProvider.GetRequiredService(registration.ProviderType)
+                );
+                return;
+            case TwitchBotAccountProviderKind.Custom:
+                services.AddSingleton(
+                    typeof(ITwitchBotAccountProvider),
+                    registration.ProviderType
+                );
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(registration),
+                    registration.Kind,
+                    "Unknown Twitch bot account-provider policy."
+                );
+        }
     }
 
     private static void RegisterSettings(

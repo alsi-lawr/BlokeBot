@@ -144,7 +144,10 @@ builder.Services.AddAuthorization(options =>
 if (botRuntimeConfigured)
 {
     builder
-        .Services.AddTwitchBot(botSection)
+        .Services.AddTwitchBot(
+            botSection,
+            selection => selection.UseBlokeBotHostedChannelProvider()
+        )
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CustomCommandModule>();

@@ -116,6 +116,41 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
+    public async Task DifferentChannels_ResolvingConcurrently_DoesNotRetainAccountAcrossChannels()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var customHostId = await SeedHostAsync(dbFactory, "custom-channel");
+        await SeedHostAsync(dbFactory, "global-channel");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.SetOverrideEnabledAsync(customHostId, true, CancellationToken.None);
+        await AuthorizeCustomBotAsync(service, customHostId);
+
+        var lookups = Enumerable
+            .Range(0, 8)
+            .SelectMany(_ =>
+                new[]
+                {
+                    ResolveAsync("custom-channel"),
+                    ResolveAsync("global-channel"),
+                }
+            )
+            .ToArray();
+
+        var results = await Task.WhenAll(lookups);
+
+        foreach (var result in results)
+        {
+            var expected = result.Channel == "custom-channel"
+                ? new TwitchBotAccount("custombot", "override-token")
+                : new TwitchBotAccount("bot", "global-token");
+            result.Account.ShouldBe(expected);
+        }
+
+        async Task<(string Channel, TwitchBotAccount Account)> ResolveAsync(string channel) =>
+            (channel, await service.GetBotAccountAsync(channel, CancellationToken.None));
+    }
+
+    [Test]
     public async Task OverrideDisabled_EnablingWhispers_RejectsWithoutPersisting()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
