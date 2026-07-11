@@ -20,7 +20,7 @@ public sealed class CommandStrategyDispatcherTests
         var services = BuildServices(new TestResolver(TestKind.Public, "state"));
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "!dynamic value"),
             ReplyTo(replies),
             CancellationToken.None
@@ -36,7 +36,7 @@ public sealed class CommandStrategyDispatcherTests
         var services = BuildServices(new TestResolver(TestKind.Moderator, "state"));
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("viewer", "!mod"),
             ReplyTo(replies),
             CancellationToken.None
@@ -108,10 +108,10 @@ public sealed class CommandStrategyDispatcherTests
             new Dictionary<string, string>()
         );
 
-    private static Func<string, CancellationToken, ValueTask> ReplyTo(List<string> replies) =>
-        (message, _) =>
+    private static TwitchCommandResponder ReplyTo(List<string> replies) =>
+        (response, _) =>
         {
-            replies.Add(message);
+            replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
 }

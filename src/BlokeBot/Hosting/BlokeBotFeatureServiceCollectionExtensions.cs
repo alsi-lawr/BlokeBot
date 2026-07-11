@@ -262,7 +262,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
         services.AddSingleton<HostWhisperQuotaService>();
-        services.AddSingleton<ITwitchCommandResponseSender, HostWhisperCommandResponseSender>();
+        services.AddSingleton<HostWhisperCommandResponseSender>();
         services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<ITwitchBotChannelLifecycleNotifier, HostedChannelLifecycleNotifier>();
         return services;

@@ -19,9 +19,17 @@ internal sealed class TwitchBotBuilder(IServiceCollection services) : ITwitchBot
     public ITwitchBotBuilder AddCommandModule<TModule>()
         where TModule : class, ITwitchCommandModule
     {
-        Services.TryAddTransient<TModule>();
-        Services.Configure<TwitchCommandRegistrationOptions>(options =>
-            options.ModuleTypes.Add(typeof(TModule))
+        Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ITwitchCommandModule, TModule>()
+        );
+        return this;
+    }
+
+    public ITwitchBotBuilder AddCommandFilter<TFilter>()
+        where TFilter : class, ITwitchCommandFilter
+    {
+        Services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<ITwitchCommandFilter, TFilter>()
         );
         return this;
     }

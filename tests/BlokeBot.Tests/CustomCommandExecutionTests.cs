@@ -24,14 +24,14 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("viewer", "Streamer", "!HELLO"),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("viewer", "Disabled", "!hello"),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
 
@@ -54,24 +54,24 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("viewer", "streamer", "!secret"),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message(
                 "moderator",
                 "streamer",
                 "!secret",
                 new Dictionary<string, string> { ["mod"] = "1" }
             ),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("streamer", "streamer", "!secret"),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
 
@@ -96,13 +96,13 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message(
                 "Viewer",
                 "Streamer",
                 "!echo one two three four five six seven eight nine ten"
             ),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
 
@@ -143,11 +143,11 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await DispatchAsync(dispatcher, "viewer", "streamer", "!first", replies);
-        await DispatchAsync(dispatcher, "viewer", "streamer", "!first", replies);
-        await DispatchAsync(dispatcher, "viewer", "streamer", "!seq", replies);
-        await DispatchAsync(dispatcher, "viewer", "streamer", "!seq", replies);
-        await DispatchAsync(dispatcher, "viewer", "streamer", "!random", replies);
+        await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!first", replies);
+        await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!first", replies);
+        await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!seq", replies);
+        await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!seq", replies);
+        await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!random", replies);
 
         replies.ShouldBe(["First A", "First A", "Seq A", "Seq B", "Random only"]);
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -175,9 +175,9 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("viewer", "streamer", "!death"),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
 
@@ -217,17 +217,17 @@ public sealed class CustomCommandExecutionTests
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
 
-        await DispatchAsync(dispatcher, "alice", "streamer", "!global", replies);
-        await DispatchAsync(dispatcher, "bob", "streamer", "!global", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!global", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!global", replies);
         clock.Advance(TimeSpan.FromSeconds(5));
-        await DispatchAsync(dispatcher, "bob", "streamer", "!global", replies);
-        await DispatchAsync(dispatcher, "alice", "streamer", "!usercd", replies);
-        await DispatchAsync(dispatcher, "alice", "streamer", "!usercd", replies);
-        await DispatchAsync(dispatcher, "bob", "streamer", "!usercd", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!global", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!usercd", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!usercd", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!usercd", replies);
         clock.Advance(TimeSpan.FromSeconds(9));
-        await DispatchAsync(dispatcher, "alice", "streamer", "!usercd", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!usercd", replies);
         clock.Advance(TimeSpan.FromSeconds(1));
-        await DispatchAsync(dispatcher, "alice", "streamer", "!usercd", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!usercd", replies);
 
         replies.ShouldBe(["global alice", "global bob", "user alice", "user bob", "user alice"]);
     }
@@ -376,23 +376,23 @@ public sealed class CustomCommandExecutionTests
             tags ?? new Dictionary<string, string>()
         );
 
-    private static async Task DispatchAsync(
+    private static async Task DispatchMessageAsync(
         TwitchCommandDispatcher dispatcher,
         string login,
         string channel,
         string text,
         List<string> replies
     ) =>
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message(login, channel, text),
-            ReplyTo(replies),
+            RecordMessages(replies),
             CancellationToken.None
         );
 
-    private static Func<string, CancellationToken, ValueTask> ReplyTo(List<string> replies) =>
-        (message, _) =>
+    private static TwitchCommandResponder RecordMessages(List<string> replies) =>
+        (response, _) =>
         {
-            replies.Add(message);
+            replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
 

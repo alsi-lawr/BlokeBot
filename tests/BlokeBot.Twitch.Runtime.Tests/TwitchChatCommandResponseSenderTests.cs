@@ -1,0 +1,74 @@
+using BlokeBot.Commands;
+using Microsoft.Extensions.Logging.Abstractions;
+using Shouldly;
+using TUnit.Core;
+
+namespace BlokeBot.Twitch.Runtime.Tests;
+
+public sealed class TwitchChatCommandResponseSenderTests
+{
+    [Test]
+    public async Task ChatResponse_SendingStandalone_DeliversToSourceChannel()
+    {
+        var chat = new RecordingChatSender();
+        var sender = new TwitchChatCommandResponseSender(
+            chat,
+            NullLogger<TwitchChatCommandResponseSender>.Instance
+        );
+
+        await sender.SendAsync(
+            SourceMessage(),
+            TwitchCommandResponse.Chat("public response"),
+            CancellationToken.None
+        );
+
+        chat.Channels.ShouldBe(["streamer"]);
+        chat.Messages.ShouldBe(["public response"]);
+    }
+
+    [Test]
+    public async Task WhisperResponse_SendingStandalone_FallsBackToSourceChannel()
+    {
+        var chat = new RecordingChatSender();
+        var sender = new TwitchChatCommandResponseSender(
+            chat,
+            NullLogger<TwitchChatCommandResponseSender>.Instance
+        );
+
+        await sender.SendAsync(
+            SourceMessage(),
+            TwitchCommandResponse.Whisper("private response"),
+            CancellationToken.None
+        );
+
+        chat.Channels.ShouldBe(["streamer"]);
+        chat.Messages.ShouldBe(["private response"]);
+    }
+
+    private static TwitchChatMessage SourceMessage() =>
+        new(
+            "viewer",
+            "streamer",
+            "!points",
+            ":viewer!u@h PRIVMSG #streamer :!points",
+            new Dictionary<string, string>()
+        );
+
+    private sealed class RecordingChatSender : ITwitchChatMessageSender
+    {
+        public List<string> Channels { get; } = [];
+
+        public List<string> Messages { get; } = [];
+
+        public Task SendAsync(
+            string channel,
+            string message,
+            CancellationToken cancellationToken
+        )
+        {
+            Channels.Add(channel);
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+}

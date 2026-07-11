@@ -1,76 +1,51 @@
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlokeBot.Commands;
 
 public sealed class TwitchCommandDispatcher
 {
-    private readonly object gate = new();
-    private readonly TwitchCommandRegistry registry;
-    private readonly IServiceProvider services;
-    private TwitchCommandPlan? plan;
+    private readonly TwitchCommandPlan plan;
 
-    internal TwitchCommandDispatcher(TwitchCommandRegistry registry, IServiceProvider services)
+    internal TwitchCommandDispatcher(TwitchCommandRegistry registry)
     {
-        this.registry = registry;
-        this.services = services;
+        plan = registry.Plan;
     }
-
-    public async ValueTask DispatchAsync(
-        TwitchChatMessage message,
-        Func<string, CancellationToken, ValueTask> reply,
-        CancellationToken cancellationToken
-    ) =>
-        await DispatchResponsesAsync(
-            message,
-            (response, ct) => reply(response.Message, ct),
-            cancellationToken
-        );
 
     public async ValueTask DispatchResponsesAsync(
         TwitchChatMessage message,
-        Func<TwitchCommandResponse, CancellationToken, ValueTask> respond,
+        TwitchCommandResponder respond,
         CancellationToken cancellationToken
     )
     {
-        var commandPlan = GetPlan();
         if (!TryParseCommand(message.Text, out var route, out var args))
             return;
 
-        var context = new TwitchCommandContext(message, route, services, respond, true);
-
-        foreach (var filterType in commandPlan.Filters)
+        var context = new TwitchCommandContext
         {
-            var filter =
-                (ITwitchCommandFilter?)services.GetService(filterType)
-                ?? (ITwitchCommandFilter)ActivatorUtilities.CreateInstance(services, filterType);
+            Message = message,
+            CommandName = route,
+            Responder = respond,
+        };
+
+        foreach (var filter in plan.Filters)
+        {
             if (!await filter.AllowAsync(context, cancellationToken))
                 return;
         }
 
-        var matched = commandPlan.Routes.TryGetValue(route, out var handler);
+        var matched = plan.Routes.TryGetValue(route, out var handler);
         if (matched && handler is not null)
         {
             await handler(context, args, cancellationToken);
             return;
         }
 
-        foreach (var dynamicHandler in commandPlan.DynamicHandlers)
+        foreach (var dynamicHandler in plan.DynamicHandlers)
         {
             if (await dynamicHandler(context, args, cancellationToken))
                 return;
         }
 
-        if (commandPlan.FallbackHandler is not null)
-            await commandPlan.FallbackHandler(context, args, cancellationToken);
-    }
-
-    private TwitchCommandPlan GetPlan()
-    {
-        if (plan is not null)
-            return plan;
-
-        lock (gate)
-            return plan ??= registry.Build(services);
+        if (plan.FallbackHandler is not null)
+            await plan.FallbackHandler(context, args, cancellationToken);
     }
 
     private static bool TryParseCommand(

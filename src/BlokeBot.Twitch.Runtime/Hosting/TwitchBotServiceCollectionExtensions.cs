@@ -17,18 +17,22 @@ public static class TwitchBotServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configuration">The configuration section that contains bot settings.</param>
     /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
+    /// <param name="selectResponseSender">Selects exactly one command-response sender policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
         IConfiguration configuration,
-        Action<TwitchBotAccountProviderSelection> selectAccountProvider
+        Action<TwitchBotAccountProviderSelection> selectAccountProvider,
+        Action<TwitchCommandResponseSenderSelection> selectResponseSender
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(selectAccountProvider);
+        ArgumentNullException.ThrowIfNull(selectResponseSender);
 
         var accountProvider = SelectAccountProvider(selectAccountProvider);
+        var responseSender = SelectResponseSender(selectResponseSender);
 
         var options = configuration.Get<TwitchBotOptions>()
             ?? throw new OptionsValidationException(
@@ -46,7 +50,13 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.BindRequired(configuration);
 
-        return AddTwitchBotCore(services, settings, policies, accountProvider);
+        return AddTwitchBotCore(
+            services,
+            settings,
+            policies,
+            accountProvider,
+            responseSender
+        );
     }
 
     /// <summary>
@@ -72,20 +82,24 @@ public static class TwitchBotServiceCollectionExtensions
     /// <param name="configure">The options configuration callback.</param>
     /// <param name="policyOptions">Every required boundary-specific policy.</param>
     /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
+    /// <param name="selectResponseSender">Selects exactly one command-response sender policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
         Action<TwitchBotOptions> configure,
         TwitchBotPolicyOptions policyOptions,
-        Action<TwitchBotAccountProviderSelection> selectAccountProvider
+        Action<TwitchBotAccountProviderSelection> selectAccountProvider,
+        Action<TwitchCommandResponseSenderSelection> selectResponseSender
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
         ArgumentNullException.ThrowIfNull(policyOptions);
         ArgumentNullException.ThrowIfNull(selectAccountProvider);
+        ArgumentNullException.ThrowIfNull(selectResponseSender);
 
         var accountProvider = SelectAccountProvider(selectAccountProvider);
+        var responseSender = SelectResponseSender(selectResponseSender);
 
         var options = new TwitchBotOptions();
         configure(options);
@@ -96,19 +110,27 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.FromOptions(policyOptions);
 
-        return AddTwitchBotCore(services, settings, policies, accountProvider);
+        return AddTwitchBotCore(
+            services,
+            settings,
+            policies,
+            accountProvider,
+            responseSender
+        );
     }
 
     private static ITwitchBotBuilder AddTwitchBotCore(
         IServiceCollection services,
         TwitchBotSettings settings,
         TwitchBotPolicies policies,
-        TwitchBotAccountProviderRegistration accountProvider
+        TwitchBotAccountProviderRegistration accountProvider,
+        TwitchCommandResponseSenderRegistration responseSender
     )
     {
         RegisterSettings(services, settings);
         RegisterPolicies(services, policies);
         RegisterAccountProvider(services, accountProvider);
+        RegisterResponseSender(services, responseSender);
         services.AddTwitchAuth();
         services.AddTwitchHelix();
         services.AddContinueAndReportObserverPolicy(TwitchBotObserverPolicyKeys.IrcMessages);
@@ -126,7 +148,6 @@ public static class TwitchBotServiceCollectionExtensions
             NoOpTwitchBotChannelLifecycleNotifier
         >();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
-        services.TryAddSingleton<ITwitchCommandResponseSender, TwitchChatCommandResponseSender>();
         services.AddSingleton<TwitchBotRuntimeStatusStore>();
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<TwitchBotRuntimeStatusStore>()
@@ -144,6 +165,15 @@ public static class TwitchBotServiceCollectionExtensions
     )
     {
         var selection = new TwitchBotAccountProviderSelection();
+        select(selection);
+        return selection.RequireSingle();
+    }
+
+    private static TwitchCommandResponseSenderRegistration SelectResponseSender(
+        Action<TwitchCommandResponseSenderSelection> select
+    )
+    {
+        var selection = new TwitchCommandResponseSenderSelection();
         select(selection);
         return selection.RequireSingle();
     }
@@ -178,6 +208,34 @@ public static class TwitchBotServiceCollectionExtensions
                     nameof(registration),
                     registration.Kind,
                     "Unknown Twitch bot account-provider policy."
+                );
+        }
+    }
+
+    private static void RegisterResponseSender(
+        IServiceCollection services,
+        TwitchCommandResponseSenderRegistration registration
+    )
+    {
+        switch (registration.Kind)
+        {
+            case TwitchCommandResponseSenderKind.StandalonePublicChat:
+                services.AddSingleton<
+                    ITwitchCommandResponseSender,
+                    TwitchChatCommandResponseSender
+                >();
+                return;
+            case TwitchCommandResponseSenderKind.HostedWhisper:
+                services.AddSingleton<ITwitchCommandResponseSender>(serviceProvider =>
+                    (ITwitchCommandResponseSender)
+                        serviceProvider.GetRequiredService(registration.SenderType)
+                );
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(registration),
+                    registration.Kind,
+                    "Unknown Twitch command-response sender policy."
                 );
         }
     }

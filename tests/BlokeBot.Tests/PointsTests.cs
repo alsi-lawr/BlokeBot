@@ -532,9 +532,9 @@ public sealed class PointsTests
             channel,
             commandName,
             args,
-            (string message, CancellationToken _) =>
+            (TwitchCommandResponse response, CancellationToken _) =>
             {
-                replies.Add(message);
+                replies.Add(response.Message);
                 return ValueTask.CompletedTask;
             }
         );

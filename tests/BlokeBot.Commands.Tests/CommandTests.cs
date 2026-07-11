@@ -10,7 +10,7 @@ public sealed class CommandTests
     [Test]
     public async Task CallbackCommand_DispatchingCaseInsensitiveRoute_PassesArgumentsAndReplies()
     {
-        List<string> replies = [];
+        List<TwitchCommandResponse> responses = [];
         IReadOnlyList<string> capturedArgs = [];
 
         var dispatcher = BuildDispatcher(builder =>
@@ -26,13 +26,13 @@ public sealed class CommandTests
             )
         );
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "!DEATHS 12 extra"),
-            ReplyTo(replies),
+            RecordResponses(responses),
             CancellationToken.None
         );
 
-        replies.ShouldBe(["alice:12:extra"]);
+        responses.ShouldBe([TwitchCommandResponse.Chat("alice:12:extra")]);
         capturedArgs.ShouldBe(["12", "extra"]);
     }
 
@@ -53,12 +53,12 @@ public sealed class CommandTests
             )
         );
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "!missing"),
             (_, _) => ValueTask.CompletedTask,
             CancellationToken.None
         );
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "known"),
             (_, _) => ValueTask.CompletedTask,
             CancellationToken.None
@@ -72,21 +72,23 @@ public sealed class CommandTests
     {
         var calls = 0;
         var dispatcher = BuildDispatcher(builder =>
-            builder.AddCommands(commands =>
-                commands
-                    .UseFilter<DenyAllFilter>()
-                    .Map(
-                        "known",
-                        (_, _, _) =>
-                        {
-                            calls++;
-                            return ValueTask.CompletedTask;
-                        }
+            builder
+                .AddCommandFilter<DenyAllFilter>()
+                .AddCommands(commands =>
+                    commands
+                        .UseFilter<DenyAllFilter>()
+                        .Map(
+                            "known",
+                            (_, _, _) =>
+                            {
+                                calls++;
+                                return ValueTask.CompletedTask;
+                            }
+                        )
                     )
-            )
         );
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "!known"),
             (_, _) => ValueTask.CompletedTask,
             CancellationToken.None
@@ -98,16 +100,16 @@ public sealed class CommandTests
     [Test]
     public async Task RegisteredCommandModule_Dispatching_ExecutesModuleHandler()
     {
-        List<string> replies = [];
+        List<TwitchCommandResponse> responses = [];
         var dispatcher = BuildDispatcher(builder => builder.AddCommandModule<TestModule>());
 
-        await dispatcher.DispatchAsync(
+        await dispatcher.DispatchResponsesAsync(
             Message("alice", "!module value"),
-            ReplyTo(replies),
+            RecordResponses(responses),
             CancellationToken.None
         );
 
-        replies.ShouldBe(["value"]);
+        responses.ShouldBe([TwitchCommandResponse.Chat("value")]);
     }
 
     private static TwitchCommandDispatcher BuildDispatcher(Action<ITwitchBotBuilder> configure)
@@ -127,10 +129,12 @@ public sealed class CommandTests
             new Dictionary<string, string>()
         );
 
-    private static Func<string, CancellationToken, ValueTask> ReplyTo(List<string> replies) =>
-        (message, _) =>
+    private static TwitchCommandResponder RecordResponses(
+        List<TwitchCommandResponse> responses
+    ) =>
+        (response, _) =>
         {
-            replies.Add(message);
+            responses.Add(response);
             return ValueTask.CompletedTask;
         };
 }

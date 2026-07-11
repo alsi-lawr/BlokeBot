@@ -4,8 +4,6 @@ namespace BlokeBot.Tests;
 
 internal static class TestCommandContext
 {
-    private static readonly IServiceProvider Services = new EmptyServiceProvider();
-
     public static TwitchCommandContext Create(
         string login,
         string channel,
@@ -16,7 +14,7 @@ internal static class TestCommandContext
             channel,
             commandName,
             [],
-            (string _, CancellationToken _) => ValueTask.CompletedTask
+            (_, _) => ValueTask.CompletedTask
         );
 
     public static TwitchCommandContext Create(
@@ -24,29 +22,14 @@ internal static class TestCommandContext
         string channel,
         string commandName,
         IReadOnlyList<string> args,
-        Func<string, CancellationToken, ValueTask> reply
+        TwitchCommandResponder respond
     ) =>
-        new(
-            Message(login, channel, commandName, args),
-            commandName,
-            Services,
-            reply
-        );
-
-    public static TwitchCommandContext Create(
-        string login,
-        string channel,
-        string commandName,
-        IReadOnlyList<string> args,
-        Func<TwitchCommandResponse, CancellationToken, ValueTask> respond
-    ) =>
-        new(
-            Message(login, channel, commandName, args),
-            commandName,
-            Services,
-            respond,
-            resolveReplyTarget: false
-        );
+        new()
+        {
+            Message = Message(login, channel, commandName, args),
+            CommandName = commandName,
+            Responder = respond,
+        };
 
     private static TwitchChatMessage Message(
         string login,
@@ -65,10 +48,5 @@ internal static class TestCommandContext
             $":{login}!u@h PRIVMSG #{channel} :{text}",
             new Dictionary<string, string>()
         );
-    }
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public object? GetService(Type serviceType) => null;
     }
 }

@@ -24,6 +24,7 @@ using BlokeBot.Features.HostConfig.Page;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Features.HostedChannels.Whispers;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
@@ -146,7 +147,8 @@ if (botRuntimeConfigured)
     builder
         .Services.AddTwitchBot(
             botSection,
-            selection => selection.UseBlokeBotHostedChannelProvider()
+            accountProvider => accountProvider.UseBlokeBotHostedChannelProvider(),
+            responseSender => responseSender.UseBlokeBotHostedWhisperSender()
         )
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()

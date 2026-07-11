@@ -17,11 +17,13 @@ public static class TwitchCommandServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        services.AddOptions<TwitchCommandRegistrationOptions>();
         services.TryAddSingleton<TwitchCommandRegistry>();
-        services.TryAddSingleton<TwitchCommandDispatcher>(sp => new TwitchCommandDispatcher(
-            sp.GetRequiredService<TwitchCommandRegistry>(),
-            sp
-        ));
+        services.TryAddSingleton(serviceProvider =>
+            new TwitchCommandDispatcher(
+                serviceProvider.GetRequiredService<TwitchCommandRegistry>()
+            )
+        );
 
         return new TwitchBotBuilder(services);
     }

@@ -26,4 +26,12 @@ public interface ITwitchBotBuilder
     /// <returns>The same builder for chained registration.</returns>
     ITwitchBotBuilder AddCommandModule<TModule>()
         where TModule : class, ITwitchCommandModule;
+
+    /// <summary>
+    /// Registers a command filter for explicit use by a command plan.
+    /// </summary>
+    /// <typeparam name="TFilter">The filter type.</typeparam>
+    /// <returns>The same builder for chained registration.</returns>
+    ITwitchBotBuilder AddCommandFilter<TFilter>()
+        where TFilter : class, ITwitchCommandFilter;
 }

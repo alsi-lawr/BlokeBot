@@ -1,17 +1,12 @@
 namespace BlokeBot.Commands;
 
-internal sealed record TwitchCommandPlan(
-    IReadOnlyDictionary<string, TwitchCommandHandler> routes,
-    IReadOnlyList<TwitchDynamicCommandHandler> dynamicHandlers,
-    IReadOnlyList<Type> filters,
-    TwitchCommandHandler? fallbackHandler
-)
+internal sealed record TwitchCommandPlan
 {
-    public IReadOnlyDictionary<string, TwitchCommandHandler> Routes { get; } = routes;
+    public required IReadOnlyDictionary<string, TwitchCommandHandler> Routes { get; init; }
 
-    public IReadOnlyList<TwitchDynamicCommandHandler> DynamicHandlers { get; } = dynamicHandlers;
+    public required IReadOnlyList<TwitchDynamicCommandHandler> DynamicHandlers { get; init; }
 
-    public IReadOnlyList<Type> Filters { get; } = filters;
+    public required IReadOnlyList<ITwitchCommandFilter> Filters { get; init; }
 
-    public TwitchCommandHandler? FallbackHandler { get; } = fallbackHandler;
+    public TwitchCommandHandler? FallbackHandler { get; init; }
 }

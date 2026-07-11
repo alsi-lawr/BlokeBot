@@ -1,54 +1,24 @@
 namespace BlokeBot.Commands;
 
 /// <summary>
-/// Provides command handlers with message, reply, and service access.
+/// Provides command handlers with message and typed response access.
 /// </summary>
 public sealed record TwitchCommandContext
 {
-    private readonly Func<TwitchCommandResponse, CancellationToken, ValueTask> respond;
-
-    internal TwitchCommandContext(
-        TwitchChatMessage message,
-        string commandName,
-        IServiceProvider services,
-        Func<string, CancellationToken, ValueTask> reply
-    )
-        : this(
-            message,
-            commandName,
-            services,
-            (response, cancellationToken) => reply(response.Message, cancellationToken),
-            false
-        ) { }
-
-    internal TwitchCommandContext(
-        TwitchChatMessage message,
-        string commandName,
-        IServiceProvider services,
-        Func<TwitchCommandResponse, CancellationToken, ValueTask> respond,
-        bool resolveReplyTarget
-    )
-    {
-        Message = message;
-        CommandName = commandName;
-        Services = services;
-        this.respond = respond;
-    }
-
     /// <summary>
     /// Gets the received chat message.
     /// </summary>
-    public TwitchChatMessage Message { get; }
+    public required TwitchChatMessage Message { get; init; }
 
     /// <summary>
     /// Gets the command name that matched the received chat message.
     /// </summary>
-    public string CommandName { get; }
+    public required string CommandName { get; init; }
 
     /// <summary>
-    /// Gets the service provider for command-specific service resolution.
+    /// Sets the focused response collaborator for this dispatch.
     /// </summary>
-    public IServiceProvider Services { get; }
+    public required TwitchCommandResponder Responder { private get; init; }
 
     /// <summary>
     /// Sends a chat reply to the configured channel.
@@ -57,10 +27,10 @@ public sealed record TwitchCommandContext
     /// <param name="cancellationToken">A token that cancels the reply operation.</param>
     /// <returns>A task that completes when the reply is sent.</returns>
     public ValueTask ReplyAsync(string message, CancellationToken cancellationToken) =>
-        respond(TwitchCommandResponse.Chat(message), cancellationToken);
+        Responder(TwitchCommandResponse.Chat(message), cancellationToken);
 
     public ValueTask RespondAsync(
         TwitchCommandResponse response,
         CancellationToken cancellationToken
-    ) => respond(response, cancellationToken);
+    ) => Responder(response, cancellationToken);
 }

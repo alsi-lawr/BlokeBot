@@ -1,26 +1,25 @@
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Commands;
 
-internal sealed class TwitchCommandRegistry(
-    IOptions<TwitchCommandRegistrationOptions> registrations
-)
+internal sealed class TwitchCommandRegistry
 {
-    public TwitchCommandPlan Build(IServiceProvider services)
+    public TwitchCommandRegistry(
+        IOptions<TwitchCommandRegistrationOptions> registrations,
+        IEnumerable<ITwitchCommandModule> modules,
+        IEnumerable<ITwitchCommandFilter> filters
+    )
     {
-        var builder = new TwitchCommandPlanBuilder();
+        var builder = new TwitchCommandPlanBuilder(filters);
 
         foreach (var callback in registrations.Value.CommandCallbacks)
             callback(builder);
 
-        foreach (var moduleType in registrations.Value.ModuleTypes)
-        {
-            var module = (ITwitchCommandModule)
-                ActivatorUtilities.CreateInstance(services, moduleType);
+        foreach (var module in modules)
             module.AddCommands(builder);
-        }
 
-        return builder.Build();
+        Plan = builder.Build();
     }
+
+    public TwitchCommandPlan Plan { get; }
 }
