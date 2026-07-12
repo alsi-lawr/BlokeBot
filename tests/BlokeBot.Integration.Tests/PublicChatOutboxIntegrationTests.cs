@@ -25,8 +25,7 @@ public sealed class PublicChatOutboxIntegrationTests
         );
 
         var receipt = await queue.EnqueueAsync(
-            "streamer",
-            "alpha beta gamma",
+            Command("streamer", "alpha beta gamma"),
             CancellationToken.None
         );
 
@@ -61,8 +60,7 @@ public sealed class PublicChatOutboxIntegrationTests
             clock
         );
         var receipt = await originalQueue.EnqueueAsync(
-            "streamer",
-            "survives restart",
+            Command("streamer", "survives restart"),
             CancellationToken.None
         );
 
@@ -125,9 +123,18 @@ public sealed class PublicChatOutboxIntegrationTests
                 DuplicateChatMessageCooldownSeconds = 0,
             }
         );
-        _ = await queue.EnqueueAsync("streamer", "first", CancellationToken.None);
-        _ = await queue.EnqueueAsync("streamer", "second", CancellationToken.None);
-        _ = await queue.EnqueueAsync("streamer", "third", CancellationToken.None);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "first"),
+            CancellationToken.None
+        );
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "second"),
+            CancellationToken.None
+        );
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "third"),
+            CancellationToken.None
+        );
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
@@ -302,7 +309,10 @@ public sealed class PublicChatOutboxIntegrationTests
         var blockingOutbox = new BlockingBeginSendPublicChatOutbox(persistedOutbox);
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(blockingOutbox, transport, clock);
-        _ = await queue.EnqueueAsync("streamer", "recover me", CancellationToken.None);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "recover me"),
+            CancellationToken.None
+        );
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
@@ -435,7 +445,12 @@ public sealed class PublicChatOutboxIntegrationTests
         );
 
         await Should.ThrowAsync<DbUpdateException>(() =>
-            queue.EnqueueAsync("streamer", "not accepted", CancellationToken.None).AsTask()
+            queue
+                .EnqueueAsync(
+                    Command("streamer", "not accepted"),
+                    CancellationToken.None
+                )
+                .AsTask()
         );
         transport.DeliveryCount.ShouldBe(0);
     }

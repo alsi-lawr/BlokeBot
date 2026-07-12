@@ -64,10 +64,16 @@ public sealed class PublicChatQueueAlertIntegrationTests
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        _ = await queue.EnqueueAsync("streamer", "first", CancellationToken.None);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "first"),
+            CancellationToken.None
+        );
         _ = await transport.ReadAsync();
         _ = await outbox.ReadDeliveryAsync();
-        _ = await queue.EnqueueAsync("streamer", "second", CancellationToken.None);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "second"),
+            CancellationToken.None
+        );
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         _ = await notifications.Reader.ReadAsync();

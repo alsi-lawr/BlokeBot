@@ -30,16 +30,19 @@ internal sealed class PublicChatMessageQueue(
     private int running;
 
     public async ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
-        string channel,
-        string message,
+        PublicChatEnqueueCommand command,
         CancellationToken cancellationToken
     )
     {
-        if (string.IsNullOrWhiteSpace(channel) || string.IsNullOrWhiteSpace(message))
+        ArgumentNullException.ThrowIfNull(command);
+        if (
+            string.IsNullOrWhiteSpace(command.Channel)
+            || string.IsNullOrWhiteSpace(command.Message)
+        )
             return PublicChatOutboxReceipt.Empty;
 
         var parts = TwitchChatMessageSplitter
-            .Split(message, MaxMessageLength)
+            .Split(command.Message, MaxMessageLength)
             .ToImmutableArray();
         if (parts.IsDefaultOrEmpty)
             return PublicChatOutboxReceipt.Empty;
@@ -49,14 +52,17 @@ internal sealed class PublicChatMessageQueue(
                 new PublicChatOutboxItem
                 {
                     Message = part,
-                    DeduplicationKey = PublicChatMessageDeduplication.Key(channel, part),
+                    DeduplicationKey = PublicChatMessageDeduplication.Key(
+                        command.Channel,
+                        part
+                    ),
                 }
             )
             .ToImmutableArray();
         var receipt = await outbox.EnqueueAsync(
             new PublicChatOutboxBatch
             {
-                Channel = channel,
+                Channel = command.Channel,
                 Items = items,
                 EnqueuedAt = UtcNow(),
             },

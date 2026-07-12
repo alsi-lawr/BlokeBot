@@ -42,6 +42,12 @@ internal static class PublicChatIntegrationTestSupport
 
     public static DateTimeOffset Utc(int hour, int minute, int second) =>
         new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+
+    public static PublicChatEnqueueCommand Command(
+        string channel,
+        string message
+    ) =>
+        new() { Channel = channel, Message = message };
 }
 
 internal sealed class RecordingPublicChatTransport : IPublicChatTransport

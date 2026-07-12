@@ -10,6 +10,9 @@ internal sealed class TwitchChatMessageSender(
         CancellationToken cancellationToken
     )
     {
-        _ = await queue.EnqueueAsync(channel, message, cancellationToken);
+        _ = await queue.EnqueueAsync(
+            new PublicChatEnqueueCommand { Channel = channel, Message = message },
+            cancellationToken
+        );
     }
 }

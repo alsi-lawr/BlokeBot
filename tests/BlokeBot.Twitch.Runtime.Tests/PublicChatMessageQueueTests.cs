@@ -40,8 +40,7 @@ public sealed class PublicChatMessageQueueTests
         );
 
         var receipt = await queue.EnqueueAsync(
-            "channel",
-            "alpha beta gamma",
+            Command("channel", "alpha beta gamma"),
             CancellationToken.None
         );
 
@@ -75,10 +74,13 @@ public sealed class PublicChatMessageQueueTests
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        _ = await queue.EnqueueAsync("channel", "same", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "same"), CancellationToken.None);
         (await transport.ReadAsync()).Message.ShouldBe("same");
-        _ = await queue.EnqueueAsync("channel", "same", CancellationToken.None);
-        _ = await queue.EnqueueAsync("channel", "different", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "same"), CancellationToken.None);
+        _ = await queue.EnqueueAsync(
+            Command("channel", "different"),
+            CancellationToken.None
+        );
 
         (await transport.ReadAsync()).Message.ShouldBe("different");
         await clock.WaitForTimerRegistrationAsync();
@@ -112,10 +114,10 @@ public sealed class PublicChatMessageQueueTests
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        _ = await queue.EnqueueAsync("channel", "first", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "first"), CancellationToken.None);
         (await transport.ReadAsync()).Message.ShouldBe("first");
-        _ = await queue.EnqueueAsync("channel", "second", CancellationToken.None);
-        _ = await queue.EnqueueAsync("channel", "third", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "second"), CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "third"), CancellationToken.None);
 
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
@@ -132,7 +134,7 @@ public sealed class PublicChatMessageQueueTests
         (await transport.ReadAsync()).Message.ShouldBe("third");
         observer.Alerts.Count.ShouldBe(1);
 
-        _ = await queue.EnqueueAsync("channel", "fourth", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "fourth"), CancellationToken.None);
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         _ = await observer.ReadAsync();
@@ -230,11 +232,10 @@ public sealed class PublicChatMessageQueueTests
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        _ = await queue.EnqueueAsync("channel", "first", CancellationToken.None);
+        _ = await queue.EnqueueAsync(Command("channel", "first"), CancellationToken.None);
         _ = await transport.ReadAsync();
         _ = await queue.EnqueueAsync(
-            "channel",
-            "second secret chat payload",
+            Command("channel", "second secret chat payload"),
             CancellationToken.None
         );
         await clock.WaitForTimerRegistrationAsync();
@@ -264,7 +265,9 @@ public sealed class PublicChatMessageQueueTests
         var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
 
         await Should.ThrowAsync<IOException>(() =>
-            queue.EnqueueAsync("channel", "message", CancellationToken.None).AsTask()
+            queue
+                .EnqueueAsync(Command("channel", "message"), CancellationToken.None)
+                .AsTask()
         );
 
         outbox.PendingMessages.ShouldBeEmpty();
@@ -279,7 +282,7 @@ public sealed class PublicChatMessageQueueTests
         var transport = new RecordingTransport();
         var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
 
-        var receipt = await queue.EnqueueAsync("channel", "message", caller.Token);
+        var receipt = await queue.EnqueueAsync(Command("channel", "message"), caller.Token);
 
         receipt.MessageIds.Length.ShouldBe(1);
         caller.IsCancellationRequested.ShouldBeTrue();
@@ -314,6 +317,12 @@ public sealed class PublicChatMessageQueueTests
             transport,
             logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
+
+    private static PublicChatEnqueueCommand Command(
+        string channel,
+        string message
+    ) =>
+        new() { Channel = channel, Message = message };
 
     private static ObserverFanOut<
         PublicChatQueueAlertObserverBoundary,
