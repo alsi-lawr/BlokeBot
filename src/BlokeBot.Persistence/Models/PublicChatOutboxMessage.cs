@@ -27,6 +27,14 @@ public sealed class PublicChatOutboxMessage
     public DateTime? SendStartedAtUtc { get; set; }
 
     public DateTime? CompletedAtUtc { get; set; }
+
+    public PublicChatOutboxFailurePhase? FailurePhase { get; set; }
+
+    public string? FailureType { get; set; }
+
+    public int? HttpStatusCode { get; set; }
+
+    public string? RejectionCode { get; set; }
 }
 
 public enum PublicChatOutboxStatus
@@ -43,6 +51,24 @@ public enum PublicChatOutboxStatus
     [PersistedToken("Delivered")]
     Delivered,
 
-    [PersistedToken("Faulted")]
-    Faulted,
+    [PersistedToken("SafePreSendTransient")]
+    SafePreSendTransient,
+
+    [PersistedToken("Rejected")]
+    Rejected,
+
+    [PersistedToken("Ambiguous")]
+    Ambiguous,
+
+    [PersistedToken("Unexpected")]
+    Unexpected,
+}
+
+public enum PublicChatOutboxFailurePhase
+{
+    [PersistedToken("Preparation")]
+    Preparation,
+
+    [PersistedToken("Send")]
+    Send,
 }

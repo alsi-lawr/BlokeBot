@@ -4,8 +4,13 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface IPublicChatTransport
 {
-    ValueTask SendAsync(
+    ValueTask<PublicChatPreparationOutcome> PrepareAsync(
         PublicChatClaimedMessage message,
+        CancellationToken cancellationToken
+    );
+
+    ValueTask<PublicChatTransportSendResult> SendAsync(
+        PublicChatPreparedSend prepared,
         CancellationToken cancellationToken
     );
 }
@@ -17,45 +22,66 @@ internal sealed class TwitchHelixPublicChatTransport(
     ILogger<TwitchHelixPublicChatTransport> log
 ) : IPublicChatTransport
 {
-    public async ValueTask SendAsync(
+    public async ValueTask<PublicChatPreparationOutcome> PrepareAsync(
         PublicChatClaimedMessage message,
         CancellationToken cancellationToken
     )
     {
-        var botAccount = await botAccounts.GetBotAccountAsync(
-            message.Channel,
-            cancellationToken
-        );
-        var identities = await helix.ResolveChatIdentitiesAsync(
-            message.Channel,
-            botAccount.Login,
-            botAccount.AccessToken,
-            cancellationToken
-        );
-        var appAccessToken = await appTokens.GetAccessTokenAsync(cancellationToken);
-        var result = await helix.SendChatMessageAsync(
-            appAccessToken,
-            identities.BroadcasterId,
-            identities.BotUserId,
-            message.Message,
-            cancellationToken
-        );
-
-        if (result.IsSent)
+        try
         {
-            log.LogInformation(
-                "Sent public chat outbox message {OutboxMessageId} via Helix in #{Channel}.",
-                message.Id,
-                message.Channel
+            var botAccount = await botAccounts.GetBotAccountAsync(
+                message.Channel,
+                cancellationToken
             );
-            return;
+            var identities = await helix.ResolveChatIdentitiesAsync(
+                message.Channel,
+                botAccount.Login,
+                botAccount.AccessToken,
+                cancellationToken
+            );
+            var appAccessToken = await appTokens.GetAccessTokenAsync(cancellationToken);
+            return new PublicChatPreparationOutcome.Ready
+            {
+                Send = new PublicChatPreparedSend
+                {
+                    Message = message,
+                    AppAccessToken = appAccessToken,
+                    BroadcasterId = identities.BroadcasterId,
+                    BotUserId = identities.BotUserId,
+                },
+            };
         }
+        catch (Exception exception)
+        {
+            return PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                exception,
+                cancellationToken
+            );
+        }
+    }
 
-        log.LogWarning(
-            "Twitch rejected public chat outbox message {OutboxMessageId} in #{Channel} with code {Code}.",
-            message.Id,
-            message.Channel,
-            result.DropReason?.Code
+    public async ValueTask<PublicChatTransportSendResult> SendAsync(
+        PublicChatPreparedSend prepared,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await helix.SendChatMessageAsync(
+            prepared.AppAccessToken,
+            prepared.BroadcasterId,
+            prepared.BotUserId,
+            prepared.Message.Message,
+            cancellationToken
         );
+        var classified = PublicChatDeliveryClassifier.ClassifySendResult(result);
+        classified.Match(
+            _ =>
+                log.LogInformation(
+                    "Sent public chat outbox message {OutboxMessageId} via Helix in #{Channel}.",
+                    prepared.Message.Id,
+                    prepared.Message.Channel
+                ),
+            static _ => { }
+        );
+        return classified;
     }
 }

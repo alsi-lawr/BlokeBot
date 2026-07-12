@@ -292,6 +292,291 @@ public sealed class PublicChatMessageQueueTests
         await StopAsync(stopping, worker);
     }
 
+    [Test]
+    public async Task SentResult_Processing_RecordsDeliveredAfterOneSendAttempt()
+    {
+        var outbox = new InMemoryOutbox();
+        var transport = SuccessfulScriptedTransport();
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(
+            InMemoryOutbox.RowStatus.Delivered
+        );
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(1);
+        snapshot.Message.ShouldBeNull();
+        transport.PrepareCount.ShouldBe(1);
+        transport.SendCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task SafePreparationFailure_Processing_RetainsNonClaimablePayloadWithoutSendAttempt()
+    {
+        var failure = new IOException("secret preparation detail");
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+                ValueTask.FromResult(
+                    PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                        failure,
+                        cancellationToken
+                    )
+                ),
+            static (_, _) =>
+                throw new InvalidOperationException("A safe preparation failure cannot send.")
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(
+            InMemoryOutbox.RowStatus.SafePreSendTransient
+        );
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(0);
+        snapshot.Message.ShouldBe("message");
+        transport.SendCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task UnexpectedPreparationFailure_Processing_RedactsTerminalWithoutSendAttempt()
+    {
+        var failure = new InvalidOperationException("secret preparation detail");
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+                ValueTask.FromResult(
+                    PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                        failure,
+                        cancellationToken
+                    )
+                ),
+            static (_, _) =>
+                throw new InvalidOperationException("An unexpected preparation cannot send.")
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(
+            InMemoryOutbox.RowStatus.Unexpected
+        );
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(0);
+        snapshot.Message.ShouldBeNull();
+        transport.SendCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task UnexpectedPreparationFailure_Reporting_UsesOnlyRedactedStructuredContext()
+    {
+        var outbox = new InMemoryOutbox();
+        var logger = new RecordingLogger<PublicChatMessageQueue>();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+                ValueTask.FromResult(
+                    PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                        new InvalidOperationException("secret provider response"),
+                        cancellationToken
+                    )
+                ),
+            static (_, _) =>
+                throw new InvalidOperationException("Unexpected preparation cannot send.")
+        );
+        var queue = CreateQueue(
+            new TwitchBotOptions(),
+            outbox,
+            transport,
+            logger: logger
+        );
+        _ = await queue.EnqueueAsync(
+            Command("channel", "secret chat payload"),
+            CancellationToken.None
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        _ = await outbox.ReadCompletionAsync();
+        await StopAsync(stopping, worker);
+
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldContain("Unexpected");
+        entry.Message.ShouldContain(typeof(InvalidOperationException).FullName!);
+        entry.Message.ShouldNotContain("secret provider response");
+        entry.Message.ShouldNotContain("secret chat payload");
+    }
+
+    [Test]
+    public async Task ExplicitRejection_Processing_RecordsRedactedTerminalAfterSendBoundary()
+    {
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            Ready,
+            static (_, _) =>
+                ValueTask.FromResult<PublicChatTransportSendResult>(
+                    new PublicChatTransportSendResult.Rejected
+                    {
+                        Reason = new PublicChatRejectionReason.ProviderCode(
+                            new PublicChatProviderRejectionCode("followers_only")
+                        ),
+                    }
+                )
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(
+            InMemoryOutbox.RowStatus.Rejected
+        );
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(1);
+        snapshot.Message.ShouldBeNull();
+        transport.SendCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PostBoundaryTransientFailure_Processing_IsAmbiguousWithoutRetry()
+    {
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            Ready,
+            static (_, _) =>
+                ValueTask.FromException<PublicChatTransportSendResult>(
+                    new IOException("secret response detail")
+                )
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(
+            InMemoryOutbox.RowStatus.Ambiguous
+        );
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(1);
+        snapshot.Message.ShouldBeNull();
+        transport.SendCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CallerCanceledDuringPreparation_Processing_ReleasesPendingWithoutAttempt()
+    {
+        using var stopping = new CancellationTokenSource();
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+            {
+                stopping.Cancel();
+                return ValueTask.FromException<PublicChatPreparationOutcome>(
+                    new OperationCanceledException(cancellationToken)
+                );
+            },
+            static (_, _) =>
+                throw new InvalidOperationException("Canceled preparation cannot send.")
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+
+        await queue.RunAsync(stopping.Token);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.Status.ShouldBe(InMemoryOutbox.RowStatus.Pending);
+        snapshot.AttemptCount.ShouldBe(0);
+        snapshot.Message.ShouldBe("message");
+        transport.SendCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CallerCanceledAfterSendBoundary_Processing_PersistsAmbiguousAndPropagatesToWorker()
+    {
+        using var stopping = new CancellationTokenSource();
+        var outbox = new InMemoryOutbox();
+        var transport = new ScriptedTransport(
+            Ready,
+            (_, cancellationToken) =>
+            {
+                stopping.Cancel();
+                return ValueTask.FromException<PublicChatTransportSendResult>(
+                    new OperationCanceledException(cancellationToken)
+                );
+            }
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+
+        await queue.RunAsync(stopping.Token);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.Status.ShouldBe(InMemoryOutbox.RowStatus.Ambiguous);
+        snapshot.AttemptCount.ShouldBe(1);
+        snapshot.Message.ShouldBeNull();
+        transport.SendCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task SafePreparationFailure_MonitoringOutstandingBacklog_StillRaisesAlert()
+    {
+        var clock = new ManualTimeProvider(Utc(12, 0, 0));
+        var outbox = new InMemoryOutbox();
+        var observer = new RecordingQueueAlertObserver();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+                ValueTask.FromResult(
+                    PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                        new IOException("preparation failed"),
+                        cancellationToken
+                    )
+                ),
+            static (_, _) =>
+                throw new InvalidOperationException("A safe preparation failure cannot send.")
+        );
+        var queue = CreateQueue(
+            new TwitchBotOptions
+            {
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
+                {
+                    StuckAfterSeconds = 5,
+                },
+            },
+            outbox,
+            transport,
+            clock,
+            [observer]
+        );
+        _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+        _ = await outbox.ReadCompletionAsync();
+
+        await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(5));
+        var alert = await observer.ReadAsync();
+        await StopAsync(stopping, worker);
+
+        alert.Channel.ShouldBe("channel");
+        alert.PendingCount.ShouldBe(1);
+        alert.OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));
+    }
+
     private static PublicChatMessageQueue CreateQueue(
         TwitchBotOptions options,
         IPublicChatOutbox outbox,
@@ -324,6 +609,40 @@ public sealed class PublicChatMessageQueueTests
     ) =>
         new() { Channel = channel, Message = message };
 
+    private static PublicChatPreparedSend Prepared(
+        PublicChatClaimedMessage message
+    ) =>
+        new()
+        {
+            Message = message,
+            AppAccessToken = "app-token",
+            BroadcasterId = "broadcaster-id",
+            BotUserId = "bot-user-id",
+        };
+
+    private static ValueTask<PublicChatPreparationOutcome> Ready(
+        PublicChatClaimedMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<PublicChatPreparationOutcome>(
+            new PublicChatPreparationOutcome.Ready { Send = Prepared(message) }
+        );
+    }
+
+    private static ScriptedTransport SuccessfulScriptedTransport() =>
+        new(
+            Ready,
+            static (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult<PublicChatTransportSendResult>(
+                    new PublicChatTransportSendResult.Sent()
+                );
+            }
+        );
+
     private static ObserverFanOut<
         PublicChatQueueAlertObserverBoundary,
         PublicChatQueueBacklog,
@@ -354,19 +673,69 @@ public sealed class PublicChatMessageQueueTests
 
         public List<PublicChatClaimedMessage> Deliveries { get; } = [];
 
-        public ValueTask SendAsync(
+        public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
             PublicChatClaimedMessage message,
+            CancellationToken cancellationToken
+        ) =>
+            ValueTask.FromResult<PublicChatPreparationOutcome>(
+                new PublicChatPreparationOutcome.Ready
+                {
+                    Send = Prepared(message),
+                }
+            );
+
+        public ValueTask<PublicChatTransportSendResult> SendAsync(
+            PublicChatPreparedSend prepared,
             CancellationToken cancellationToken
         )
         {
+            var message = prepared.Message;
             Deliveries.Add(message);
             if (!delivered.Writer.TryWrite(message))
                 throw new InvalidOperationException("The transport delivery could not be observed.");
 
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult<PublicChatTransportSendResult>(
+                new PublicChatTransportSendResult.Sent()
+            );
         }
 
         public ValueTask<PublicChatClaimedMessage> ReadAsync() => delivered.Reader.ReadAsync();
+    }
+
+    private sealed class ScriptedTransport(
+        Func<
+            PublicChatClaimedMessage,
+            CancellationToken,
+            ValueTask<PublicChatPreparationOutcome>
+        > prepare,
+        Func<
+            PublicChatPreparedSend,
+            CancellationToken,
+            ValueTask<PublicChatTransportSendResult>
+        > send
+    ) : IPublicChatTransport
+    {
+        public int PrepareCount { get; private set; }
+
+        public int SendCount { get; private set; }
+
+        public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
+            PublicChatClaimedMessage message,
+            CancellationToken cancellationToken
+        )
+        {
+            PrepareCount++;
+            return prepare(message, cancellationToken);
+        }
+
+        public ValueTask<PublicChatTransportSendResult> SendAsync(
+            PublicChatPreparedSend prepared,
+            CancellationToken cancellationToken
+        )
+        {
+            SendCount++;
+            return send(prepared, cancellationToken);
+        }
     }
 
     private sealed class RecordingQueueAlertObserver : IPublicChatQueueAlertObserver
@@ -404,6 +773,8 @@ public sealed class PublicChatMessageQueueTests
     {
         private readonly object gate = new();
         private readonly List<Row> rows = [];
+        private readonly Channel<RowStatus> completions =
+            Channel.CreateUnbounded<RowStatus>();
         private long nextId = 1;
 
         public Action? AfterEnqueue { get; init; }
@@ -423,6 +794,26 @@ public sealed class PublicChatMessageQueueTests
                 }
             }
         }
+
+        public OutboxSnapshot SingleSnapshot
+        {
+            get
+            {
+                lock (gate)
+                {
+                    var row = rows.ShouldHaveSingleItem();
+                    return new OutboxSnapshot
+                    {
+                        Status = row.Status,
+                        AttemptCount = row.AttemptCount,
+                        Message = row.Message,
+                    };
+                }
+            }
+        }
+
+        public ValueTask<RowStatus> ReadCompletionAsync() =>
+            completions.Reader.ReadAsync();
 
         public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
             PublicChatOutboxBatch batch,
@@ -557,17 +948,36 @@ public sealed class PublicChatMessageQueueTests
             }
         }
 
-        public ValueTask<PublicChatClaimUpdate> MarkDeliveredAsync(
+        public ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
             PublicChatClaimedMessage message,
-            DateTimeOffset deliveredAt,
+            PublicChatDeliveryOutcome outcome,
+            DateTimeOffset recordedAt,
             CancellationToken cancellationToken
-        ) => Complete(message, RowStatus.Delivered, deliveredAt, cancellationToken);
+        ) =>
+            outcome.Match(
+                _ => CompleteSending(message, RowStatus.Delivered, recordedAt, cancellationToken),
+                _ => CompleteClaimedRetainingMessage(
+                    message,
+                    RowStatus.SafePreSendTransient,
+                    recordedAt,
+                    cancellationToken
+                ),
+                _ => CompleteSending(message, RowStatus.Rejected, recordedAt, cancellationToken),
+                _ => CompleteSending(message, RowStatus.Ambiguous, recordedAt, cancellationToken),
+                _ => CompleteClaimedRedacted(
+                    message,
+                    RowStatus.Unexpected,
+                    recordedAt,
+                    cancellationToken
+                )
+            );
 
-        public ValueTask<PublicChatClaimUpdate> MarkFaultedAsync(
+        public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
             PublicChatClaimedMessage message,
-            DateTimeOffset faultedAt,
+            PublicChatFailureDiagnostic.Send diagnostic,
+            DateTimeOffset interruptedAt,
             CancellationToken cancellationToken
-        ) => Complete(message, RowStatus.Faulted, faultedAt, cancellationToken);
+        ) => CompleteSending(message, RowStatus.Ambiguous, interruptedAt, cancellationToken);
 
         public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
             PublicChatClaimedMessage message,
@@ -599,7 +1009,13 @@ public sealed class PublicChatMessageQueueTests
             lock (gate)
             {
                 IReadOnlyList<PublicChatPendingMessage> pending = rows
-                    .Where(row => row.Status is RowStatus.Pending or RowStatus.Claimed or RowStatus.Sending)
+                    .Where(row =>
+                        row.Status
+                            is RowStatus.Pending
+                                or RowStatus.Claimed
+                                or RowStatus.Sending
+                                or RowStatus.SafePreSendTransient
+                    )
                     .OrderBy(row => row.EnqueuedAt)
                     .ThenBy(row => row.Id)
                     .Select(row => new PublicChatPendingMessage(row.Channel, row.EnqueuedAt))
@@ -608,7 +1024,7 @@ public sealed class PublicChatMessageQueueTests
             }
         }
 
-        private ValueTask<PublicChatClaimUpdate> Complete(
+        private ValueTask<PublicChatClaimUpdate> CompleteSending(
             PublicChatClaimedMessage message,
             RowStatus status,
             DateTimeOffset completedAt,
@@ -628,6 +1044,63 @@ public sealed class PublicChatMessageQueueTests
                 row.CompletedAt = completedAt;
                 row.Message = null;
                 row.ClaimToken = null;
+                NotifyCompletion(status);
+                return ValueTask.FromResult<PublicChatClaimUpdate>(
+                    new PublicChatClaimUpdate.Applied()
+                );
+            }
+        }
+
+        private ValueTask<PublicChatClaimUpdate> CompleteClaimedRetainingMessage(
+            PublicChatClaimedMessage message,
+            RowStatus status,
+            DateTimeOffset completedAt,
+            CancellationToken cancellationToken
+        ) =>
+            CompleteClaimed(
+                message,
+                status,
+                completedAt,
+                static _ => { },
+                cancellationToken
+            );
+
+        private ValueTask<PublicChatClaimUpdate> CompleteClaimedRedacted(
+            PublicChatClaimedMessage message,
+            RowStatus status,
+            DateTimeOffset completedAt,
+            CancellationToken cancellationToken
+        ) =>
+            CompleteClaimed(
+                message,
+                status,
+                completedAt,
+                static row => row.Message = null,
+                cancellationToken
+            );
+
+        private ValueTask<PublicChatClaimUpdate> CompleteClaimed(
+            PublicChatClaimedMessage message,
+            RowStatus status,
+            DateTimeOffset completedAt,
+            Action<Row> applyCase,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var row = Owned(message, RowStatus.Claimed);
+                if (row is null)
+                    return ValueTask.FromResult<PublicChatClaimUpdate>(
+                        new PublicChatClaimUpdate.OwnershipLost()
+                    );
+
+                row.Status = status;
+                row.CompletedAt = completedAt;
+                applyCase(row);
+                row.ClaimToken = null;
+                NotifyCompletion(status);
                 return ValueTask.FromResult<PublicChatClaimUpdate>(
                     new PublicChatClaimUpdate.Applied()
                 );
@@ -640,6 +1113,16 @@ public sealed class PublicChatMessageQueueTests
                 && row.Status == status
                 && row.ClaimToken == message.ClaimToken
             );
+
+        private void NotifyCompletion(RowStatus status)
+        {
+            if (!completions.Writer.TryWrite(status))
+            {
+                throw new InvalidOperationException(
+                    "The public chat outcome could not be observed."
+                );
+            }
+        }
 
         private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
             left >= right ? left : right;
@@ -689,13 +1172,25 @@ public sealed class PublicChatMessageQueueTests
 
         private sealed record Candidate(Row Row, DateTimeOffset EligibleAt);
 
-        private enum RowStatus
+        internal sealed record OutboxSnapshot
+        {
+            internal required RowStatus Status { get; init; }
+
+            internal required int AttemptCount { get; init; }
+
+            internal required string? Message { get; init; }
+        }
+
+        internal enum RowStatus
         {
             Pending,
             Claimed,
             Sending,
             Delivered,
-            Faulted,
+            SafePreSendTransient,
+            Rejected,
+            Ambiguous,
+            Unexpected,
         }
     }
 

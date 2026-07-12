@@ -48,6 +48,17 @@ internal static class PublicChatIntegrationTestSupport
         string message
     ) =>
         new() { Channel = channel, Message = message };
+
+    public static PublicChatPreparedSend Prepared(
+        PublicChatClaimedMessage message
+    ) =>
+        new()
+        {
+            Message = message,
+            AppAccessToken = "app-token",
+            BroadcasterId = "broadcaster-id",
+            BotUserId = "bot-user-id",
+        };
 }
 
 internal sealed class RecordingPublicChatTransport : IPublicChatTransport
@@ -58,25 +69,80 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
 
     public int DeliveryCount => Volatile.Read(ref deliveryCount);
 
-    public ValueTask SendAsync(
+    public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
         PublicChatClaimedMessage message,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<PublicChatPreparationOutcome>(
+            new PublicChatPreparationOutcome.Ready
+            {
+                Send = PublicChatIntegrationTestSupport.Prepared(message),
+            }
+        );
+    }
+
+    public ValueTask<PublicChatTransportSendResult> SendAsync(
+        PublicChatPreparedSend prepared,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         Interlocked.Increment(ref deliveryCount);
-        if (!deliveries.Writer.TryWrite(message))
+        if (!deliveries.Writer.TryWrite(prepared.Message))
         {
             throw new InvalidOperationException(
                 "The public chat delivery could not be observed."
             );
         }
 
-        return ValueTask.CompletedTask;
+        return ValueTask.FromResult<PublicChatTransportSendResult>(
+            new PublicChatTransportSendResult.Sent()
+        );
     }
 
     public ValueTask<PublicChatClaimedMessage> ReadAsync() =>
         deliveries.Reader.ReadAsync();
+}
+
+internal sealed class ScriptedPublicChatTransport(
+    Func<
+        PublicChatClaimedMessage,
+        CancellationToken,
+        ValueTask<PublicChatPreparationOutcome>
+    > prepare,
+    Func<
+        PublicChatPreparedSend,
+        CancellationToken,
+        ValueTask<PublicChatTransportSendResult>
+    > send
+) : IPublicChatTransport
+{
+    private int prepareCount;
+    private int sendCount;
+
+    public int PrepareCount => Volatile.Read(ref prepareCount);
+
+    public int SendCount => Volatile.Read(ref sendCount);
+
+    public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
+        PublicChatClaimedMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        Interlocked.Increment(ref prepareCount);
+        return prepare(message, cancellationToken);
+    }
+
+    public ValueTask<PublicChatTransportSendResult> SendAsync(
+        PublicChatPreparedSend prepared,
+        CancellationToken cancellationToken
+    )
+    {
+        Interlocked.Increment(ref sendCount);
+        return send(prepared, cancellationToken);
+    }
 }
 
 internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inner)
@@ -84,6 +150,8 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
 {
     private readonly Channel<PublicChatClaimedMessage> deliveries =
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
+    private readonly Channel<PublicChatDeliveryOutcome> outcomes =
+        Channel.CreateUnbounded<PublicChatDeliveryOutcome>();
 
     public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
         PublicChatOutboxBatch batch,
@@ -118,35 +186,52 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
             cancellationToken
         );
 
-    public async ValueTask<PublicChatClaimUpdate> MarkDeliveredAsync(
+    public async ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset deliveredAt,
+        PublicChatDeliveryOutcome outcome,
+        DateTimeOffset recordedAt,
         CancellationToken cancellationToken
     )
     {
-        var result = await inner.MarkDeliveredAsync(
+        var result = await inner.RecordDeliveryOutcomeAsync(
             message,
-            deliveredAt,
+            outcome,
+            recordedAt,
             cancellationToken
         );
-        if (
-            result is PublicChatClaimUpdate.Applied
-            && !deliveries.Writer.TryWrite(message)
-        )
+        if (result is PublicChatClaimUpdate.Applied)
         {
-            throw new InvalidOperationException(
-                "The public chat completion could not be observed."
+            if (!outcomes.Writer.TryWrite(outcome))
+            {
+                throw new InvalidOperationException(
+                    "The public chat outcome could not be observed."
+                );
+            }
+
+            outcome.Match(
+                _ => NotifyDelivery(message),
+                static _ => { },
+                static _ => { },
+                static _ => { },
+                static _ => { }
             );
         }
 
         return result;
     }
 
-    public ValueTask<PublicChatClaimUpdate> MarkFaultedAsync(
+    public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset faultedAt,
+        PublicChatFailureDiagnostic.Send diagnostic,
+        DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    ) => inner.MarkFaultedAsync(message, faultedAt, cancellationToken);
+    ) =>
+        inner.RecordPostBoundaryInterruptionAsync(
+            message,
+            diagnostic,
+            interruptedAt,
+            cancellationToken
+        );
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
@@ -159,6 +244,19 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
 
     public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync() =>
         deliveries.Reader.ReadAsync();
+
+    public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync() =>
+        outcomes.Reader.ReadAsync();
+
+    private void NotifyDelivery(PublicChatClaimedMessage message)
+    {
+        if (!deliveries.Writer.TryWrite(message))
+        {
+            throw new InvalidOperationException(
+                "The public chat completion could not be observed."
+            );
+        }
+    }
 }
 
 internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
@@ -207,17 +305,31 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         );
     }
 
-    public ValueTask<PublicChatClaimUpdate> MarkDeliveredAsync(
+    public ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset deliveredAt,
+        PublicChatDeliveryOutcome outcome,
+        DateTimeOffset recordedAt,
         CancellationToken cancellationToken
-    ) => inner.MarkDeliveredAsync(message, deliveredAt, cancellationToken);
+    ) =>
+        inner.RecordDeliveryOutcomeAsync(
+            message,
+            outcome,
+            recordedAt,
+            cancellationToken
+        );
 
-    public ValueTask<PublicChatClaimUpdate> MarkFaultedAsync(
+    public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset faultedAt,
+        PublicChatFailureDiagnostic.Send diagnostic,
+        DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    ) => inner.MarkFaultedAsync(message, faultedAt, cancellationToken);
+    ) =>
+        inner.RecordPostBoundaryInterruptionAsync(
+            message,
+            diagnostic,
+            interruptedAt,
+            cancellationToken
+        );
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,

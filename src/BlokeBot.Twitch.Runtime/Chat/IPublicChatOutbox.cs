@@ -99,15 +99,17 @@ internal interface IPublicChatOutbox
         CancellationToken cancellationToken
     );
 
-    ValueTask<PublicChatClaimUpdate> MarkDeliveredAsync(
+    ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset deliveredAt,
+        PublicChatDeliveryOutcome outcome,
+        DateTimeOffset recordedAt,
         CancellationToken cancellationToken
     );
 
-    ValueTask<PublicChatClaimUpdate> MarkFaultedAsync(
+    ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
         PublicChatClaimedMessage message,
-        DateTimeOffset faultedAt,
+        PublicChatFailureDiagnostic.Send diagnostic,
+        DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
     );
 

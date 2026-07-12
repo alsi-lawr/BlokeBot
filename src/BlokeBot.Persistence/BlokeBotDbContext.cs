@@ -86,11 +86,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.BotTwitchUserId).HasMaxLength(64);
             b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.BotTwitchUserId,
-                    x.DayUtc,
-                })
+            {
+                x.HostId,
+                x.BotTwitchUserId,
+                x.DayUtc,
+            })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -119,12 +119,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.ReplyKey).HasMaxLength(128);
             b.Property(x => x.Target).HasMaxLength(32);
             b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.Feature,
-                    x.ScopeId,
-                    x.ReplyKey,
-                })
+            {
+                x.HostId,
+                x.Feature,
+                x.ScopeId,
+                x.ReplyKey,
+            })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -187,11 +187,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.Kind,
-                    x.Login,
-                })
+            {
+                x.HostId,
+                x.Kind,
+                x.Login,
+            })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -473,11 +473,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.AcknowledgedByLogin).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.AcknowledgedAtUtc });
             b.HasIndex(x => new
-                {
-                    x.HostId,
-                    x.Source,
-                    x.SourceKey,
-                })
+            {
+                x.HostId,
+                x.Source,
+                x.SourceKey,
+            })
                 .IsUnique()
                 .HasFilter("\"AcknowledgedAtUtc\" IS NULL");
             b.HasOne<BotHost>()
@@ -509,29 +509,87 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                         "length(DeduplicationKey) = 64"
                     );
                     t.HasCheckConstraint(
+                        "CK_public_chat_outbox_FailurePhase",
+                        KindInOrNull(
+                            "FailurePhase",
+                            PublicChatOutboxFailurePhases
+                        )
+                    );
+                    t.HasCheckConstraint(
                         "CK_public_chat_outbox_State",
                         "(Status = 'Pending' AND length(Message) > 0 "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL "
-                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL) OR "
+                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
+                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
+                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(Status = 'Claimed' AND length(Message) > 0 "
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
-                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL) OR "
+                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
+                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
+                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(Status = 'Sending' AND length(Message) > 0 "
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
-                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL) OR "
-                            + "(Status IN ('Delivered', 'Faulted') AND Message IS NULL "
+                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL "
+                            + "AND AttemptCount > 0 "
+                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
+                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
+                            + "(Status = 'Delivered' AND Message IS NULL "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL "
-                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL)"
+                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL "
+                            + "AND AttemptCount > 0 "
+                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
+                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
+                            + "(Status = 'SafePreSendTransient' AND length(Message) > 0 "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
+                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Preparation' "
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
+                            + "(Status = 'Rejected' AND Message IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
+                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
+                            + "AND AttemptCount > 0 "
+                            + "AND FailureType IS NULL AND HttpStatusCode IS NULL "
+                            + "AND (RejectionCode IS NULL OR length(RejectionCode) > 0)) OR "
+                            + "(Status = 'Ambiguous' AND Message IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
+                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
+                            + "AND AttemptCount > 0 "
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
+                            + "(Status = 'Unexpected' AND Message IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
+                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Preparation' "
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL)"
                     );
                 }
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Channel).HasMaxLength(128);
             b.Property(x => x.DeduplicationKey).HasMaxLength(64);
+            b.Property(x => x.FailurePhase)
+                .HasConversion(
+                    phase =>
+                        phase.HasValue
+                            ? PersistedEnumTokens<PublicChatOutboxFailurePhase>.Format(
+                                phase.Value
+                            )
+                            : null,
+                    value =>
+                        value == null
+                            ? null
+                            : PersistedEnumTokens<PublicChatOutboxFailurePhase>.Parse(
+                                value
+                            )
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.FailureType).HasMaxLength(512);
+            b.Property(x => x.RejectionCode).HasMaxLength(128);
             b.Property(x => x.Status)
                 .HasConversion(
                     status => PersistedEnumTokens<PublicChatOutboxStatus>.Format(status),
@@ -787,6 +845,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     private static readonly string[] PublicChatOutboxStatuses =
         PersistedEnumTokens<PublicChatOutboxStatus>.Values.ToArray();
 
+    private static readonly string[] PublicChatOutboxFailurePhases =
+        PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ToArray();
+
     private static string KindIn(string columnName, IEnumerable<string> values) =>
         $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
+
+    private static string KindInOrNull(
+        string columnName,
+        IEnumerable<string> values
+    ) => $"{columnName} IS NULL OR {KindIn(columnName, values)}";
 }

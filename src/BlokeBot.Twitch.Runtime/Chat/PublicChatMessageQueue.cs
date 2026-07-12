@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Channels;
 using BlokeBot.Eventing;
 using Microsoft.Extensions.Hosting;
@@ -105,7 +106,17 @@ internal sealed class PublicChatMessageQueue(
                         );
                         break;
                     case PublicChatClaimOutcome.Empty:
-                        _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
+                        if (nextBacklogAlert is { } emptyAlertDelay)
+                        {
+                            await WaitForSignalOrDelayAsync(
+                                emptyAlertDelay,
+                                cancellationToken
+                            );
+                        }
+                        else
+                        {
+                            _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
+                        }
                         break;
                     case PublicChatClaimOutcome.Contended:
                         await Task.Delay(
@@ -133,6 +144,47 @@ internal sealed class PublicChatMessageQueue(
         CancellationToken cancellationToken
     )
     {
+        PublicChatPreparationOutcome preparation;
+        try
+        {
+            preparation = await transport.PrepareAsync(message, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await ReleaseClaimAfterCancellationAsync(message);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            preparation = PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                exception,
+                cancellationToken
+            );
+        }
+
+        await preparation.Match(
+            ready => ProcessPreparedSendAsync(ready.Send, cancellationToken),
+            transient =>
+                RecordOutcomeAsync(
+                    message,
+                    PublicChatDeliveryClassifier.MapPreparationFailure(transient),
+                    CancellationToken.None
+                ),
+            unexpected =>
+                RecordOutcomeAsync(
+                    message,
+                    PublicChatDeliveryClassifier.MapPreparationFailure(unexpected),
+                    CancellationToken.None
+                )
+        );
+    }
+
+    private async Task ProcessPreparedSendAsync(
+        PublicChatPreparedSend prepared,
+        CancellationToken cancellationToken
+    )
+    {
+        var message = prepared.Message;
         var sendStartedAt = UtcNow();
         PublicChatClaimUpdate beginSend;
         try
@@ -150,10 +202,7 @@ internal sealed class PublicChatMessageQueue(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _ = await ApplyClaimUpdateAsync(
-                () => outbox.ReleaseClaimAsync(message, CancellationToken.None),
-                CancellationToken.None
-            );
+            await ReleaseClaimAfterCancellationAsync(message);
             throw;
         }
         switch (beginSend)
@@ -172,44 +221,168 @@ internal sealed class PublicChatMessageQueue(
                 );
         }
 
+        PublicChatDeliveryOutcome outcome;
         try
         {
-            await transport.SendAsync(message, cancellationToken);
+            var sendResult = await transport.SendAsync(prepared, cancellationToken);
+            outcome = PublicChatDeliveryClassifier.MapSendResult(sendResult);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception)
+            when (cancellationToken.IsCancellationRequested)
         {
-            _ = await ApplyClaimUpdateAsync(
-                () => outbox.MarkFaultedAsync(message, UtcNow(), CancellationToken.None),
-                CancellationToken.None
+            var diagnostic = PublicChatDeliveryClassifier.PostBoundaryInterruption(
+                exception
             );
+            await RecordPostBoundaryInterruptionAsync(message, diagnostic);
+            LogFailure(LogLevel.Warning, message, "Ambiguous", diagnostic);
             throw;
         }
         catch (Exception exception)
         {
-            _ = await ApplyClaimUpdateAsync(
-                () => outbox.MarkFaultedAsync(message, UtcNow(), cancellationToken),
+            outcome = PublicChatDeliveryClassifier.ClassifyPostBoundaryFailure(
+                exception,
                 cancellationToken
             );
-            log.LogWarning(
-                "Public chat transport failed for outbox message {OutboxMessageId} in #{Channel} with {FailureType}.",
-                message.Id,
-                message.Channel,
-                exception.GetType().FullName
-            );
-            return;
         }
 
-        var completed = await ApplyClaimUpdateAsync(
-            () => outbox.MarkDeliveredAsync(message, UtcNow(), cancellationToken),
-            cancellationToken
-        );
-        if (completed is PublicChatClaimUpdate.OwnershipLost)
+        await RecordOutcomeAsync(message, outcome, CancellationToken.None);
+    }
+
+    private async Task ReleaseClaimAfterCancellationAsync(
+        PublicChatClaimedMessage message
+    )
+    {
+        try
         {
-            log.LogWarning(
-                "Public chat outbox message {OutboxMessageId} lost claim ownership after delivery.",
-                message.Id
+            _ = await ApplyClaimUpdateAsync(
+                () => outbox.ReleaseClaimAsync(message, CancellationToken.None),
+                CancellationToken.None
             );
         }
+        catch (Exception exception)
+        {
+            log.LogError(
+                "Releasing canceled public chat outbox claim {OutboxMessageId} failed with {FailureType}; lease recovery will return the unsent row to pending.",
+                message.Id,
+                exception.GetType().FullName ?? exception.GetType().Name
+            );
+        }
+    }
+
+    private async Task RecordPostBoundaryInterruptionAsync(
+        PublicChatClaimedMessage message,
+        PublicChatFailureDiagnostic.Send diagnostic
+    )
+    {
+        try
+        {
+            _ = await ApplyClaimUpdateAsync(
+                () =>
+                    outbox.RecordPostBoundaryInterruptionAsync(
+                        message,
+                        diagnostic,
+                        UtcNow(),
+                        CancellationToken.None
+                    ),
+                CancellationToken.None
+            );
+        }
+        catch (Exception exception)
+        {
+            log.LogError(
+                "Recording interrupted public chat send {OutboxMessageId} failed with {FailureType}; sending-lease recovery will retain it as ambiguous.",
+                message.Id,
+                exception.GetType().FullName ?? exception.GetType().Name
+            );
+        }
+    }
+
+    private async Task RecordOutcomeAsync(
+        PublicChatClaimedMessage message,
+        PublicChatDeliveryOutcome outcome,
+        CancellationToken cancellationToken
+    )
+    {
+        var recorded = await ApplyClaimUpdateAsync(
+            () =>
+                outbox.RecordDeliveryOutcomeAsync(
+                    message,
+                    outcome,
+                    UtcNow(),
+                    cancellationToken
+                ),
+            cancellationToken
+        );
+        if (recorded is PublicChatClaimUpdate.OwnershipLost)
+        {
+            log.LogWarning(
+                "Public chat outbox message {OutboxMessageId} lost claim ownership while recording {OutcomeType}.",
+                message.Id,
+                outcome.GetType().Name
+            );
+        }
+
+        LogOutcome(message, outcome);
+    }
+
+    private void LogOutcome(
+        PublicChatClaimedMessage message,
+        PublicChatDeliveryOutcome outcome
+    ) =>
+        outcome.Match(
+            static _ => { },
+            transient =>
+                LogFailure(
+                    LogLevel.Warning,
+                    message,
+                    "SafePreSendTransient",
+                    transient.Diagnostic
+                ),
+            rejection =>
+                log.LogWarning(
+                    "Twitch rejected public chat outbox message {OutboxMessageId} in #{Channel} with code {RejectionCode}.",
+                    message.Id,
+                    message.Channel,
+                    rejection.Reason.Match(code => code.Value, () => "Unspecified")
+                ),
+            ambiguous =>
+                LogFailure(
+                    LogLevel.Warning,
+                    message,
+                    "Ambiguous",
+                    ambiguous.Diagnostic
+                ),
+            unexpected =>
+                LogFailure(
+                    LogLevel.Error,
+                    message,
+                    "Unexpected",
+                    unexpected.Diagnostic
+                )
+        );
+
+    private void LogFailure(
+        LogLevel level,
+        PublicChatClaimedMessage message,
+        string classification,
+        PublicChatFailureDiagnostic diagnostic
+    )
+    {
+        var phase = diagnostic.Match(_ => "Preparation", _ => "Send");
+        var status = diagnostic.HttpStatus.Match(
+            code => code.Value.ToString(CultureInfo.InvariantCulture),
+            () => "Unavailable"
+        );
+        log.Log(
+            level,
+            "Public chat outbox message {OutboxMessageId} in #{Channel} classified as {Classification} during {Phase} with {FailureType} and HTTP status {HttpStatusCode}.",
+            message.Id,
+            message.Channel,
+            classification,
+            phase,
+            diagnostic.FailureType.Value,
+            status
+        );
     }
 
     private async Task<TimeSpan?> ObserveBacklogAsync(

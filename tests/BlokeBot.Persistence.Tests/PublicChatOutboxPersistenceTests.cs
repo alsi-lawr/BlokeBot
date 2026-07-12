@@ -14,6 +14,8 @@ public sealed class PublicChatOutboxPersistenceTests
     private const string PreviousMigration =
         "20260710183928_TypedCustomCommandVariants";
     private const string OutboxMigration = "20260712140027_PublicChatOutbox";
+    private const string ClassifiedOutboxMigration =
+        "20260712184117_ClassifyPublicChatDeliveryOutcomes";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -48,13 +50,29 @@ public sealed class PublicChatOutboxPersistenceTests
         row.NextAttemptAtUtc.ShouldBe(now.AddSeconds(5));
         row.Status.ShouldBe(PublicChatOutboxStatus.Pending);
         row.AttemptCount.ShouldBe(0);
+        row.FailurePhase.ShouldBeNull();
+        row.FailureType.ShouldBeNull();
+        row.HttpStatusCode.ShouldBeNull();
+        row.RejectionCode.ShouldBeNull();
         var persistedStatus = await readDb.Database.SqlQueryRaw<string>(
                 "SELECT Status AS Value FROM public_chat_outbox"
             )
             .SingleAsync();
         persistedStatus.ShouldBe("Pending");
         PersistedEnumTokens<PublicChatOutboxStatus>.Values.ShouldBe(
-            ["Claimed", "Delivered", "Faulted", "Pending", "Sending"]
+            [
+                "Ambiguous",
+                "Claimed",
+                "Delivered",
+                "Pending",
+                "Rejected",
+                "SafePreSendTransient",
+                "Sending",
+                "Unexpected",
+            ]
+        );
+        PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ShouldBe(
+            ["Preparation", "Send"]
         );
     }
 
@@ -73,6 +91,31 @@ public sealed class PublicChatOutboxPersistenceTests
                      Status, AttemptCount)
                 VALUES
                     ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Unknown', 0)
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public_chat_outbox
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                     Status, AttemptCount, SendStartedAtUtc, CompletedAtUtc,
+                     FailurePhase, RejectionCode)
+                VALUES
+                    ('streamer', NULL, {DeduplicationKey}, {now}, {now}, 'Rejected', 0,
+                     {now}, {now}, 'Send', 'followers_only')
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public_chat_outbox
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                     Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
+                VALUES
+                    ('streamer', 'must be redacted', {DeduplicationKey}, {now}, {now},
+                     'Unexpected', 0, {now}, 'Preparation', 'System.InvalidOperationException')
                 """
             )
         );
@@ -132,6 +175,9 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("CK_public_chat_outbox_AttemptCount");
         tableSql.ShouldContain("CK_public_chat_outbox_Channel");
         tableSql.ShouldContain("CK_public_chat_outbox_DeduplicationKey");
+        tableSql.ShouldContain("CK_public_chat_outbox_FailurePhase");
+        tableSql.ShouldContain("SafePreSendTransient");
+        tableSql.ShouldContain("AttemptCount > 0");
 
         var indexSql = await db.Database.SqlQueryRaw<string>(
                 """
@@ -173,7 +219,7 @@ public sealed class PublicChatOutboxPersistenceTests
     }
 
     [Test]
-    public async Task OutboxMigration_ApplyingAndReverting_CreatesRoundTrippableSchema()
+    public async Task ClassifiedOutboxMigration_UpgradingAndReverting_MapsTransitionalFaults()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -187,27 +233,34 @@ public sealed class PublicChatOutboxPersistenceTests
 
         await migrator.MigrateAsync(OutboxMigration);
         (await TableCountAsync(db)).ShouldBe(1);
-        db.PublicChatOutboxMessages.Add(
-            new PublicChatOutboxMessage
-            {
-                Channel = "streamer",
-                Message = "migrated",
-                DeduplicationKey = DeduplicationKey,
-                CreatedAtUtc = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc),
-                NextAttemptAtUtc = new DateTime(
-                    2026,
-                    7,
-                    12,
-                    12,
-                    0,
-                    0,
-                    DateTimeKind.Utc
-                ),
-            }
+        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                 Status, AttemptCount, SendStartedAtUtc, CompletedAtUtc)
+            VALUES
+                ('streamer', NULL, {DeduplicationKey}, {now}, {now}, 'Faulted', 1,
+                 {now}, {now.AddSeconds(1)})
+            """
         );
-        await db.SaveChangesAsync();
+
+        await migrator.MigrateAsync(ClassifiedOutboxMigration);
         db.ChangeTracker.Clear();
-        (await db.PublicChatOutboxMessages.SingleAsync()).Message.ShouldBe("migrated");
+        var upgraded = await db.PublicChatOutboxMessages.SingleAsync();
+        upgraded.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
+        upgraded.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Send);
+        upgraded.FailureType.ShouldBe(
+            "BlokeBot.Twitch.Runtime.PublicChatUnclassifiedPostBoundaryFailure"
+        );
+        upgraded.Message.ShouldBeNull();
+
+        await migrator.MigrateAsync(OutboxMigration);
+        var revertedStatus = await db.Database.SqlQueryRaw<string>(
+                "SELECT Status AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        revertedStatus.ShouldBe("Faulted");
 
         await migrator.MigrateAsync(PreviousMigration);
         db.ChangeTracker.Clear();

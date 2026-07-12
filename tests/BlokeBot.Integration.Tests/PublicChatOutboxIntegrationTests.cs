@@ -167,8 +167,9 @@ public sealed class PublicChatOutboxIntegrationTests
                 CancellationToken.None
             ))
             .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        (await outbox.MarkDeliveredAsync(
+        (await outbox.RecordDeliveryOutcomeAsync(
                 first,
+                new PublicChatDeliveryOutcome.Sent(),
                 now.AddSeconds(2),
                 CancellationToken.None
             ))
@@ -394,7 +395,7 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
-    public async Task SendingClaimExpired_AfterRestart_BecomesRedactedFaultWithoutRetry()
+    public async Task SendingClaimExpired_AfterRestart_BecomesRedactedAmbiguousWithoutRetry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var outbox = new EfPublicChatOutbox(dbFactory);
@@ -423,13 +424,296 @@ public sealed class PublicChatOutboxIntegrationTests
         afterRestart.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Status.ShouldBe(PublicChatOutboxStatus.Faulted);
+        row.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
         row.Message.ShouldBeNull();
         row.AttemptCount.ShouldBe(1);
         row.SendStartedAtUtc.ShouldBe(now.UtcDateTime);
         row.CompletedAtUtc.ShouldBe(now.AddSeconds(2).UtcDateTime);
         row.ClaimToken.ShouldBeNull();
         row.ClaimSlot.ShouldBeNull();
+        row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Send);
+        row.FailureType.ShouldBe(typeof(PublicChatSendLeaseExpired).FullName);
+        row.HttpStatusCode.ShouldBeNull();
+        row.RejectionCode.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task ClassifiedTerminalOutcomes_RestartingOutbox_AreRedactedAndNeverReclaimed()
+    {
+        TerminalScenario[] scenarios =
+        [
+            new()
+            {
+                ExpectedStatus = PublicChatOutboxStatus.Rejected,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Send,
+                ExpectedFailureType = null,
+                ExpectedRejectionCode = "followers_only",
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        Ready,
+                        static (_, _) =>
+                            ValueTask.FromResult<PublicChatTransportSendResult>(
+                                new PublicChatTransportSendResult.Rejected
+                                {
+                                    Reason = new PublicChatRejectionReason.ProviderCode(
+                                        new PublicChatProviderRejectionCode(
+                                            "followers_only"
+                                        )
+                                    ),
+                                }
+                            )
+                    ),
+            },
+            new()
+            {
+                ExpectedStatus = PublicChatOutboxStatus.Rejected,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Send,
+                ExpectedFailureType = null,
+                ExpectedRejectionCode = null,
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        Ready,
+                        static (_, _) =>
+                            ValueTask.FromResult<PublicChatTransportSendResult>(
+                                new PublicChatTransportSendResult.Rejected
+                                {
+                                    Reason = new PublicChatRejectionReason.Unspecified(),
+                                }
+                            )
+                    ),
+            },
+            new()
+            {
+                ExpectedStatus = PublicChatOutboxStatus.Ambiguous,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Send,
+                ExpectedFailureType = typeof(IOException).FullName,
+                ExpectedRejectionCode = null,
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        Ready,
+                        static (_, _) =>
+                            ValueTask.FromException<PublicChatTransportSendResult>(
+                                new IOException("secret provider response")
+                            )
+                    ),
+            },
+            new()
+            {
+                ExpectedStatus = PublicChatOutboxStatus.Unexpected,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Preparation,
+                ExpectedFailureType = typeof(InvalidOperationException).FullName,
+                ExpectedRejectionCode = null,
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        static (_, cancellationToken) =>
+                            ValueTask.FromResult(
+                                PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                                    new InvalidOperationException(
+                                        "secret provider response"
+                                    ),
+                                    cancellationToken
+                                )
+                            ),
+                        static (_, _) =>
+                            throw new InvalidOperationException(
+                                "Unexpected preparation cannot send."
+                            )
+                    ),
+            },
+        ];
+
+        foreach (var scenario in scenarios)
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+            var outbox = new CompletionObservingPublicChatOutbox(
+                new EfPublicChatOutbox(dbFactory)
+            );
+            var transport = scenario.CreateTransport();
+            var queue = CreateQueue(outbox, transport, clock);
+            _ = await queue.EnqueueAsync(
+                Command("streamer", "secret chat payload"),
+                CancellationToken.None
+            );
+            using var stopping = new CancellationTokenSource();
+            var worker = queue.RunAsync(stopping.Token);
+
+            _ = await outbox.ReadOutcomeAsync();
+            await StopAsync(stopping, worker);
+
+            await using (var db = await dbFactory.CreateDbContextAsync())
+            {
+                var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+                row.Status.ShouldBe(scenario.ExpectedStatus);
+                row.Message.ShouldBeNull();
+                row.FailurePhase.ShouldBe(scenario.ExpectedPhase);
+                row.FailureType.ShouldBe(scenario.ExpectedFailureType);
+                row.RejectionCode.ShouldBe(scenario.ExpectedRejectionCode);
+                row.HttpStatusCode.ShouldBeNull();
+                row.ClaimToken.ShouldBeNull();
+                row.ClaimSlot.ShouldBeNull();
+                row.CompletedAtUtc.ShouldNotBeNull();
+                string.Join(
+                        "|",
+                        row.FailureType,
+                        row.RejectionCode,
+                        row.Status,
+                        row.FailurePhase
+                    )
+                    .ShouldNotContain("secret");
+            }
+
+            var afterRestart = await new EfPublicChatOutbox(dbFactory).TryClaimNextAsync(
+                clock.GetUtcNow(),
+                clock.GetUtcNow().AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            );
+            afterRestart.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        }
+    }
+
+    [Test]
+    public async Task SafePreparationFailure_PersistingClassification_RetainsPayloadWithoutClaimability()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory)
+        );
+        var transport = new ScriptedPublicChatTransport(
+            static (_, cancellationToken) =>
+                ValueTask.FromResult(
+                    PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                        new HttpRequestException(
+                            "secret provider response",
+                            null,
+                            System.Net.HttpStatusCode.ServiceUnavailable
+                        ),
+                        cancellationToken
+                    )
+                ),
+            static (_, _) =>
+                throw new InvalidOperationException(
+                    "A safe preparation failure cannot send."
+                )
+        );
+        var queue = CreateQueue(outbox, transport, clock);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "retained payload"),
+            CancellationToken.None
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        _ = await outbox.ReadOutcomeAsync();
+        await StopAsync(stopping, worker);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+        row.Message.ShouldBe("retained payload");
+        row.AttemptCount.ShouldBe(0);
+        row.SendStartedAtUtc.ShouldBeNull();
+        row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
+        row.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+        row.HttpStatusCode.ShouldBe(503);
+        row.RejectionCode.ShouldBeNull();
+
+        var afterRestart = await new EfPublicChatOutbox(dbFactory).TryClaimNextAsync(
+            clock.GetUtcNow(),
+            clock.GetUtcNow().AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+        afterRestart.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+    }
+
+    [Test]
+    public async Task CallerCanceledDuringPreparation_PersistingState_ReleasesPendingWithoutAttempt()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        using var stopping = new CancellationTokenSource();
+        var transport = new ScriptedPublicChatTransport(
+            (_, cancellationToken) =>
+            {
+                stopping.Cancel();
+                return ValueTask.FromException<PublicChatPreparationOutcome>(
+                    new OperationCanceledException(cancellationToken)
+                );
+            },
+            static (_, _) =>
+                throw new InvalidOperationException("Canceled preparation cannot send.")
+        );
+        var queue = CreateQueue(
+            new EfPublicChatOutbox(dbFactory),
+            transport,
+            new ManualTestTimeProvider(Utc(12, 0, 0))
+        );
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "still pending"),
+            CancellationToken.None
+        );
+
+        await queue.RunAsync(stopping.Token);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Pending);
+        row.Message.ShouldBe("still pending");
+        row.AttemptCount.ShouldBe(0);
+        row.SendStartedAtUtc.ShouldBeNull();
+        row.CompletedAtUtc.ShouldBeNull();
+        row.ClaimToken.ShouldBeNull();
+        transport.SendCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CallerCanceledAfterSendBoundary_PersistingState_IsAmbiguousAndNeverReclaimed()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        using var stopping = new CancellationTokenSource();
+        var transport = new ScriptedPublicChatTransport(
+            Ready,
+            (_, cancellationToken) =>
+            {
+                stopping.Cancel();
+                return ValueTask.FromException<PublicChatTransportSendResult>(
+                    new OperationCanceledException(cancellationToken)
+                );
+            }
+        );
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var queue = CreateQueue(new EfPublicChatOutbox(dbFactory), transport, clock);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "redact after boundary"),
+            CancellationToken.None
+        );
+
+        await queue.RunAsync(stopping.Token);
+
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+            row.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
+            row.Message.ShouldBeNull();
+            row.AttemptCount.ShouldBe(1);
+            row.SendStartedAtUtc.ShouldNotBeNull();
+            row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Send);
+            row.FailureType.ShouldBe(typeof(OperationCanceledException).FullName);
+            row.RejectionCode.ShouldBeNull();
+        }
+
+        var afterRestart = await new EfPublicChatOutbox(dbFactory).TryClaimNextAsync(
+            clock.GetUtcNow(),
+            clock.GetUtcNow().AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+        afterRestart.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
     }
 
     [Test]
@@ -508,11 +792,40 @@ public sealed class PublicChatOutboxIntegrationTests
                 CancellationToken.None
             ))
             .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        (await outbox.MarkDeliveredAsync(
+        (await outbox.RecordDeliveryOutcomeAsync(
                 message,
+                new PublicChatDeliveryOutcome.Sent(),
                 deliveredAt,
                 CancellationToken.None
             ))
             .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+    }
+
+    private static ValueTask<PublicChatPreparationOutcome> Ready(
+        PublicChatClaimedMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ValueTask.FromResult<PublicChatPreparationOutcome>(
+            new PublicChatPreparationOutcome.Ready { Send = Prepared(message) }
+        );
+    }
+
+    private sealed record TerminalScenario
+    {
+        internal required PublicChatOutboxStatus ExpectedStatus { get; init; }
+
+        internal required PublicChatOutboxFailurePhase ExpectedPhase { get; init; }
+
+        internal required string? ExpectedFailureType { get; init; }
+
+        internal required string? ExpectedRejectionCode { get; init; }
+
+        internal required Func<ScriptedPublicChatTransport> CreateTransport
+        {
+            get;
+            init;
+        }
     }
 }
