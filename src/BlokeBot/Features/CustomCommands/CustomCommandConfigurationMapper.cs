@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using BlokeBot.Announcements;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.CustomCommands;
@@ -58,6 +60,13 @@ internal static class CustomCommandConfigurationMapper
             Name = announcement.Name,
             Enabled = announcement.Enabled,
             MessageLibraryEntryId = announcement.MessageLibraryEntryId,
+            RetryDelaySeconds = ToWholeSeconds(
+                RequireRetryUntilExpiredThenSkip(announcement.DeliveryPolicy).RetryDelay.Value
+            ),
+            OccurrenceLifetimeSeconds = ToWholeSeconds(
+                RequireRetryUntilExpiredThenSkip(announcement.DeliveryPolicy)
+                    .OccurrenceLifetime.Value
+            ),
             Schedule = announcement.Schedule switch
             {
                 IntervalCustomAnnouncementSchedule schedule =>
@@ -84,6 +93,35 @@ internal static class CustomCommandConfigurationMapper
             LastSentAtUtc = announcement.LastSentAtUtc,
             ChatMessagesSinceLastSent = announcement.ChatMessagesSinceLastSent,
         };
+
+    public static CustomAnnouncementDeliveryPolicy CreateDeliveryPolicy(
+        int hostId,
+        CustomAnnouncementEditor editor
+    ) =>
+        new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+        {
+            HostId = hostId,
+            RetryDelay = new AnnouncementRetryDelay(
+                TimeSpan.FromSeconds(editor.RetryDelaySeconds)
+            ),
+            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+                TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
+            ),
+        };
+
+    public static void ApplyDeliveryPolicy(
+        CustomAnnouncementDeliveryPolicy policy,
+        CustomAnnouncementEditor editor
+    )
+    {
+        var retry = RequireRetryUntilExpiredThenSkip(policy);
+        retry.RetryDelay = new AnnouncementRetryDelay(
+            TimeSpan.FromSeconds(editor.RetryDelaySeconds)
+        );
+        retry.OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+            TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
+        );
+    }
 
     public static CustomCommandAction CreateAction(
         int hostId,
@@ -190,4 +228,19 @@ internal static class CustomCommandConfigurationMapper
                     IntervalAfterChatCustomAnnouncementScheduleEditor
                 )
                 or (WeeklyCustomAnnouncementSchedule, WeeklyCustomAnnouncementScheduleEditor);
+
+    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+        RequireRetryUntilExpiredThenSkip(CustomAnnouncementDeliveryPolicy policy) =>
+        policy as RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+        ?? throw new UnreachableException("Unknown custom announcement delivery policy.");
+
+    private static int ToWholeSeconds(TimeSpan value)
+    {
+        if (value.Ticks % TimeSpan.TicksPerSecond != 0)
+            throw new InvalidOperationException(
+                "Announcement delivery timing must use whole seconds."
+            );
+
+        return checked((int)(value.Ticks / TimeSpan.TicksPerSecond));
+    }
 }

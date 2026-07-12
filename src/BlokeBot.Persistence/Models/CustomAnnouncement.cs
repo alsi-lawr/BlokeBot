@@ -12,6 +12,8 @@ public sealed class CustomAnnouncement
 
     public int MessageLibraryEntryId { get; set; }
 
+    public int DeliveryPolicyId { get; set; }
+
     public DateTime? LastSentAtUtc { get; set; }
 
     public int ChatMessagesSinceLastSent { get; set; }

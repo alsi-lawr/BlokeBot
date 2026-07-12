@@ -79,6 +79,8 @@ public sealed class CustomCommandConfigurationTests
                         Name = "Reminder",
                         Enabled = false,
                         MessageLibraryEntryId = -1,
+                        RetryDelaySeconds = 3,
+                        OccurrenceLifetimeSeconds = 45,
                         Schedule = new WeeklyCustomAnnouncementScheduleEditor
                         {
                             Day = DayOfWeek.Friday,
@@ -118,6 +120,8 @@ public sealed class CustomCommandConfigurationTests
         announcement.Name.ShouldBe("Reminder");
         announcement.Enabled.ShouldBeFalse();
         announcement.MessageLibraryEntryId.ShouldBe(entry.Id);
+        announcement.RetryDelaySeconds.ShouldBe(3);
+        announcement.OccurrenceLifetimeSeconds.ShouldBe(45);
         var schedule = announcement.Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
         schedule.Day.ShouldBe(DayOfWeek.Friday);
         schedule.Time.ShouldBe(new TimeOnly(19, 30));
@@ -182,6 +186,8 @@ public sealed class CustomCommandConfigurationTests
                 Id = -11,
                 Name = "Announcement",
                 MessageLibraryEntryId = -1,
+                RetryDelaySeconds = 2,
+                OccurrenceLifetimeSeconds = 30,
             }
         );
         await service.SaveConfigurationAsync(hostId, draft, CancellationToken.None);
@@ -251,6 +257,8 @@ public sealed class CustomCommandConfigurationTests
                 Id = -11,
                 Name = "Announcement",
                 MessageLibraryEntryId = -1,
+                RetryDelaySeconds = 2,
+                OccurrenceLifetimeSeconds = 30,
             }
         );
         await service.SaveConfigurationAsync(hostId, draft, CancellationToken.None);
@@ -268,6 +276,7 @@ public sealed class CustomCommandConfigurationTests
         (await db.CustomCommandAliases.CountAsync()).ShouldBe(0);
         (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
         (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(0);
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
         (await db.CustomCounters.CountAsync()).ShouldBe(0);
         (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(0);
     }
@@ -348,6 +357,45 @@ public sealed class CustomCommandConfigurationTests
         afterChatError.Message.ShouldContain("at least 1 chat message");
     }
 
+    [Test]
+    public async Task InvalidAnnouncementDeliveryTiming_Saving_RejectsWithoutPersistence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory);
+        var missing = ConfigurationWithAnnouncement(
+            new IntervalCustomAnnouncementScheduleEditor()
+        );
+        missing.Announcements.Single().RetryDelaySeconds = 0;
+        var missingError = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SaveConfigurationAsync(hostId, missing, CancellationToken.None)
+        );
+        missingError.Message.ShouldContain("retry delay must be positive");
+
+        var excessive = ConfigurationWithAnnouncement(
+            new IntervalCustomAnnouncementScheduleEditor()
+        );
+        excessive.Announcements.Single().OccurrenceLifetimeSeconds = 61;
+        var excessiveError = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SaveConfigurationAsync(hostId, excessive, CancellationToken.None)
+        );
+        excessiveError.Message.ShouldContain("no greater than 60");
+
+        var inconsistent = ConfigurationWithAnnouncement(
+            new IntervalCustomAnnouncementScheduleEditor()
+        );
+        inconsistent.Announcements.Single().RetryDelaySeconds = 30;
+        inconsistent.Announcements.Single().OccurrenceLifetimeSeconds = 30;
+        var inconsistentError = await Should.ThrowAsync<InvalidOperationException>(() =>
+            service.SaveConfigurationAsync(hostId, inconsistent, CancellationToken.None)
+        );
+        inconsistentError.Message.ShouldContain("less than its occurrence lifetime");
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
+    }
+
     private static CustomCommandConfiguration ConfigurationWithCommands(
         params (string Name, string Aliases)[] commands
     )
@@ -403,6 +451,8 @@ public sealed class CustomCommandConfigurationTests
                 Id = -3,
                 Name = "Announcement",
                 MessageLibraryEntryId = -1,
+                RetryDelaySeconds = 2,
+                OccurrenceLifetimeSeconds = 30,
                 Schedule = schedule,
             }
         );

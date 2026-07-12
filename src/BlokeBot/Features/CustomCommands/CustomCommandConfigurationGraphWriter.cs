@@ -31,6 +31,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .ToListAsync(ct);
         var announcements = await db
             .CustomAnnouncements.Include(x => x.Schedule)
+            .Include(x => x.DeliveryPolicy)
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
 
@@ -231,7 +232,16 @@ public sealed class CustomCommandConfigurationGraphWriter(
             var announcement =
                 editor.Id > 0
                     ? existingById[editor.Id]
-                    : new CustomAnnouncement { HostId = hostId, CreatedAtUtc = now };
+                    : new CustomAnnouncement
+                    {
+                        HostId = hostId,
+                        CreatedAtUtc = now,
+                        DeliveryPolicy =
+                            CustomCommandConfigurationMapper.CreateDeliveryPolicy(
+                                hostId,
+                                editor
+                            ),
+                    };
             if (editor.Id <= 0)
                 db.CustomAnnouncements.Add(announcement);
 
@@ -247,6 +257,10 @@ public sealed class CustomCommandConfigurationGraphWriter(
             CustomCommandConfigurationMapper.ApplySchedule(
                 announcement.Schedule,
                 editor.Schedule
+            );
+            CustomCommandConfigurationMapper.ApplyDeliveryPolicy(
+                announcement.DeliveryPolicy,
+                editor
             );
             announcement.UpdatedAtUtc = now;
             result[editor] = announcement;
@@ -314,9 +328,15 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .ToHashSet();
 
         db.CustomCommands.RemoveRange(existingCommands.Where(x => !retainedCommandIds.Contains(x.Id)));
-        db.CustomAnnouncements.RemoveRange(
-            existingAnnouncements.Where(x => !retainedAnnouncementIds.Contains(x.Id))
-        );
+        var removedAnnouncements = existingAnnouncements
+            .Where(x => !retainedAnnouncementIds.Contains(x.Id))
+            .ToArray();
+        var removedDeliveryPolicies = removedAnnouncements
+            .Select(x => x.DeliveryPolicy)
+            .ToArray();
+        db.CustomAnnouncements.RemoveRange(removedAnnouncements);
+        await db.SaveChangesAsync(ct);
+        db.CustomAnnouncementDeliveryPolicies.RemoveRange(removedDeliveryPolicies);
         await db.SaveChangesAsync(ct);
     }
 

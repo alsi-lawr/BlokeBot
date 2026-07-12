@@ -41,6 +41,7 @@ public sealed class CustomCommandConfigurationService(
         var announcements = await db
             .CustomAnnouncements.AsNoTracking()
             .Include(x => x.Schedule)
+            .Include(x => x.DeliveryPolicy)
             .Where(x => x.HostId == hostId)
             .OrderBy(x => x.Name)
             .ToListAsync(ct);

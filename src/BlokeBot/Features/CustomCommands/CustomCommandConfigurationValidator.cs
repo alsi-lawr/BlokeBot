@@ -1,3 +1,4 @@
+using BlokeBot.Announcements;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.CustomCommands;
@@ -85,6 +86,17 @@ internal static class CustomCommandConfigurationValidator
                     $"Choose a saved reply for announcement '{announcement.Name.Trim()}'."
                 );
 
+            var retryDelay = RequireRetryDelay(announcement.RetryDelaySeconds);
+            var occurrenceLifetime = RequireOccurrenceLifetime(
+                announcement.OccurrenceLifetimeSeconds
+            );
+            if (retryDelay.Value >= occurrenceLifetime.Value)
+            {
+                throw new InvalidOperationException(
+                    "Announcement retry delay must be less than its occurrence lifetime."
+                );
+            }
+
             switch (announcement.Schedule)
             {
                 case IntervalCustomAnnouncementScheduleEditor interval
@@ -117,6 +129,36 @@ internal static class CustomCommandConfigurationValidator
                         $"Choose when announcement '{announcement.Name.Trim()}' should be sent."
                     );
             }
+        }
+    }
+
+    private static AnnouncementRetryDelay RequireRetryDelay(int seconds)
+    {
+        try
+        {
+            return new AnnouncementRetryDelay(TimeSpan.FromSeconds(seconds));
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw new InvalidOperationException(
+                "Announcement retry delay must be positive.",
+                exception
+            );
+        }
+    }
+
+    private static AnnouncementOccurrenceLifetime RequireOccurrenceLifetime(int seconds)
+    {
+        try
+        {
+            return new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(seconds));
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            throw new InvalidOperationException(
+                "Announcement occurrence lifetime must be positive and no greater than 60 seconds.",
+                exception
+            );
         }
     }
 

@@ -403,12 +403,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasOne(x => x.DeliveryPolicy)
                 .WithOne(x => x.Announcement)
-                .HasForeignKey<CustomAnnouncementDeliveryPolicy>(x =>
-                    new { x.HostId, x.CustomAnnouncementId }
+                .HasForeignKey<CustomAnnouncement>(x =>
+                    new { x.HostId, x.DeliveryPolicyId }
                 )
-                .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
+                .HasPrincipalKey<CustomAnnouncementDeliveryPolicy>(x =>
+                    new { x.HostId, x.Id }
+                )
                 .IsRequired()
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             b.Navigation(x => x.DeliveryPolicy).IsRequired();
         });
 
@@ -432,8 +434,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     );
                 }
             );
-            b.HasKey(x => x.CustomAnnouncementId);
-            b.HasIndex(x => new { x.HostId, x.CustomAnnouncementId }).IsUnique();
+            b.HasKey(x => x.Id);
+            b.HasAlternateKey(x => new { x.HostId, x.Id });
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
             b.Property<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
                 .HasConversion<string>()
                 .HasMaxLength(48);

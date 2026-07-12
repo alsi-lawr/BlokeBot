@@ -226,6 +226,8 @@ public partial class CustomCommandSettingsPage
                 Id = NextTemporaryId(),
                 Name = "New announcement",
                 MessageLibraryEntryId = config.MessageEntries[0].Id,
+                RetryDelaySeconds = 0,
+                OccurrenceLifetimeSeconds = 0,
                 Schedule = new IntervalCustomAnnouncementScheduleEditor
                 {
                     IntervalMinutes = 30,

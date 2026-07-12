@@ -1,3 +1,4 @@
+using BlokeBot.Announcements;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
@@ -199,6 +200,9 @@ public sealed class PersistenceInvariantTests
             secondProfile
         );
         await db.SaveChangesAsync();
+        var wrongMessagePolicy = DeliveryPolicy(firstHostId);
+        db.Add(wrongMessagePolicy);
+        await db.SaveChangesAsync();
 
         await Should.ThrowAsync<SqliteException>(() =>
             db.Database.ExecuteSqlInterpolatedAsync(
@@ -232,10 +236,11 @@ public sealed class PersistenceInvariantTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_announcements
-                    (HostId, Name, Enabled, MessageLibraryEntryId, LastSentAtUtc,
+                    (HostId, Name, Enabled, MessageLibraryEntryId, DeliveryPolicyId, LastSentAtUtc,
                      ChatMessagesSinceLastSent, CreatedAtUtc, UpdatedAtUtc)
                 VALUES
-                    ({firstHostId}, 'wrong-message', 1, {secondEntry.Id}, NULL, 0,
+                    ({firstHostId}, 'wrong-message', 1, {secondEntry.Id},
+                     {wrongMessagePolicy.Id}, NULL, 0,
                      {DateTime.UtcNow}, {DateTime.UtcNow})
                 """
             )
@@ -289,12 +294,16 @@ public sealed class PersistenceInvariantTests
         db.AddRange(command, announcement);
         await db.SaveChangesAsync();
 
+        var deliveryPolicy = announcement.DeliveryPolicy;
         db.RemoveRange(command, announcement);
+        await db.SaveChangesAsync();
+        db.Remove(deliveryPolicy);
         await db.SaveChangesAsync();
 
         (await db.CustomCommandActions.CountAsync()).ShouldBe(0);
         (await db.CustomCommandAliases.CountAsync()).ShouldBe(0);
         (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(0);
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
         (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(1);
     }
 
@@ -329,7 +338,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task LegacyVariantConfiguration_ApplyingTypedVariantMigration_PreservesData()
+    public async Task AnnouncementPolicySchema_ApplyingDirectReplacement_DropsOnlyAnnouncements()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -374,10 +383,12 @@ public sealed class PersistenceInvariantTests
         var counterAction = action.ShouldBeOfType<CounterCustomCommandAction>();
         counterAction.MessageLibraryEntryId.ShouldBe(entry.Id);
         counterAction.CounterId.ShouldBe(counter.Id);
-        var schedule = await db.CustomAnnouncementSchedules.SingleAsync();
-        var weekly = schedule.ShouldBeOfType<WeeklyCustomAnnouncementSchedule>();
-        weekly.Day.ShouldBe(DayOfWeek.Friday);
-        weekly.Time.ShouldBe(new TimeOnly(19, 30));
+        (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
+        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(0);
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
+        (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(1);
+        (await db.CustomCounters.CountAsync()).ShouldBe(1);
+        (await db.CustomCommands.CountAsync()).ShouldBe(1);
     }
 
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>
@@ -436,8 +447,21 @@ public sealed class PersistenceInvariantTests
             HostId = hostId,
             Name = name,
             MessageLibraryEntry = entry,
+            DeliveryPolicy = DeliveryPolicy(hostId),
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
+        };
+
+    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy DeliveryPolicy(
+        int hostId
+    ) =>
+        new()
+        {
+            HostId = hostId,
+            RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
+            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+                TimeSpan.FromSeconds(30)
+            ),
         };
 
     private static void AssertTokens<TEnum>(IReadOnlyList<string> expected)

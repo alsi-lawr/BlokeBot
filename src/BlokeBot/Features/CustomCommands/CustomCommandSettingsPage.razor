@@ -277,6 +277,24 @@
                                             }
                                         </select>
                                     </div>
+                                    <div class="space-y-2">
+                                        <label class="label" for="@($"announcement-{announcement.Id}-retry-delay")">Retry delay (seconds)</label>
+                                        <input id="@($"announcement-{announcement.Id}-retry-delay")"
+                                               class="input"
+                                               type="number"
+                                               min="1"
+                                               max="59"
+                                               @bind="announcement.RetryDelaySeconds" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="label" for="@($"announcement-{announcement.Id}-occurrence-lifetime")">Occurrence lifetime (seconds)</label>
+                                        <input id="@($"announcement-{announcement.Id}-occurrence-lifetime")"
+                                               class="input"
+                                               type="number"
+                                               min="1"
+                                               max="60"
+                                               @bind="announcement.OccurrenceLifetimeSeconds" />
+                                    </div>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">

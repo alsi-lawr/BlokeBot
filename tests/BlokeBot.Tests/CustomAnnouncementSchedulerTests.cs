@@ -1,3 +1,4 @@
+using BlokeBot.Announcements;
 using BlokeBot.Features.CustomCommands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -423,6 +424,14 @@ public sealed class CustomAnnouncementSchedulerTests
             Enabled = true,
             MessageLibraryEntryId = entry.Id,
             Schedule = schedule,
+            DeliveryPolicy = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+            {
+                HostId = hostId,
+                RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
+                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+                    TimeSpan.FromSeconds(30)
+                ),
+            },
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
         };

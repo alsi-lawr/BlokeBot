@@ -11,7 +11,7 @@ public abstract class CustomAnnouncementDeliveryPolicy
 {
     private protected CustomAnnouncementDeliveryPolicy() { }
 
-    public int CustomAnnouncementId { get; set; }
+    public int Id { get; set; }
 
     public int HostId { get; set; }
 

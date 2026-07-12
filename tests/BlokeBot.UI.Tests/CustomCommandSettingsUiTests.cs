@@ -1,3 +1,4 @@
+using BlokeBot.Announcements;
 using BlokeBot.Features.CustomCommands;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
@@ -31,6 +32,12 @@ public sealed class CustomCommandSettingsUiTests
         cut.Markup.ShouldContain("On a timer, after chat activity");
         cut.Markup.ShouldNotContain("Schedule type");
         cut.Find($"#announcement-{seeded.AnnouncementId}-required-chat-messages");
+        cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay")
+            .GetAttribute("value")
+            .ShouldBe("2");
+        cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime")
+            .GetAttribute("value")
+            .ShouldBe("30");
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
 
@@ -107,6 +114,14 @@ public sealed class CustomCommandSettingsUiTests
             HostId = host.Id,
             Name = "Announcement",
             MessageLibraryEntryId = entry.Id,
+            DeliveryPolicy = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+            {
+                HostId = host.Id,
+                RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
+                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
+                    TimeSpan.FromSeconds(30)
+                ),
+            },
             Schedule = new IntervalAfterChatCustomAnnouncementSchedule
             {
                 HostId = host.Id,
