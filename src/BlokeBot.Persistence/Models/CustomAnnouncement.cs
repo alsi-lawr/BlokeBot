@@ -23,4 +23,6 @@ public sealed class CustomAnnouncement
     public CustomMessageLibraryEntry? MessageLibraryEntry { get; set; }
 
     public CustomAnnouncementSchedule Schedule { get; set; } = null!;
+
+    public CustomAnnouncementDeliveryPolicy DeliveryPolicy { get; set; } = null!;
 }

@@ -1,3 +1,4 @@
+using BlokeBot.Announcements;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -23,6 +24,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<CustomAnnouncement> CustomAnnouncements => Set<CustomAnnouncement>();
     public DbSet<CustomAnnouncementSchedule> CustomAnnouncementSchedules =>
         Set<CustomAnnouncementSchedule>();
+    public DbSet<CustomAnnouncementDeliveryPolicy> CustomAnnouncementDeliveryPolicies =>
+        Set<CustomAnnouncementDeliveryPolicy>();
     public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
     public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
         Set<PublicChatOutboxMessage>();
@@ -398,6 +401,62 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 )
                 .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne(x => x.DeliveryPolicy)
+                .WithOne(x => x.Announcement)
+                .HasForeignKey<CustomAnnouncementDeliveryPolicy>(x =>
+                    new { x.HostId, x.CustomAnnouncementId }
+                )
+                .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+            b.Navigation(x => x.DeliveryPolicy).IsRequired();
+        });
+
+        modelBuilder.Entity<CustomAnnouncementDeliveryPolicy>(b =>
+        {
+            b.ToTable(
+                "custom_announcement_delivery_policies",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_custom_announcement_delivery_policies_PolicyType",
+                        KindIn("PolicyType", CustomAnnouncementDeliveryPolicyTypes)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcement_delivery_policies_Payload",
+                        "PolicyType = 'RetryUntilExpiredThenSkip' "
+                            + "AND RetryDelayTicks IS NOT NULL AND RetryDelayTicks > 0 "
+                            + "AND OccurrenceLifetimeTicks IS NOT NULL "
+                            + $"AND OccurrenceLifetimeTicks <= {TimeSpan.FromSeconds(60).Ticks} "
+                            + "AND RetryDelayTicks < OccurrenceLifetimeTicks"
+                    );
+                }
+            );
+            b.HasKey(x => x.CustomAnnouncementId);
+            b.HasIndex(x => new { x.HostId, x.CustomAnnouncementId }).IsUnique();
+            b.Property<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
+                .HasConversion<string>()
+                .HasMaxLength(48);
+            b.HasDiscriminator<CustomAnnouncementDeliveryPolicyKind>("PolicyType")
+                .HasValue<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(
+                    CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip
+                );
+        });
+
+        modelBuilder.Entity<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>(b =>
+        {
+            b.Property(x => x.RetryDelay)
+                .HasConversion(
+                    value => value.Value.Ticks,
+                    value => new AnnouncementRetryDelay(TimeSpan.FromTicks(value))
+                )
+                .HasColumnName("RetryDelayTicks");
+            b.Property(x => x.OccurrenceLifetime)
+                .HasConversion(
+                    value => value.Value.Ticks,
+                    value => new AnnouncementOccurrenceLifetime(TimeSpan.FromTicks(value))
+                )
+                .HasColumnName("OccurrenceLifetimeTicks");
         });
 
         modelBuilder.Entity<CustomAnnouncementSchedule>(b =>
@@ -877,6 +936,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         IntervalCustomAnnouncementSchedule.Discriminator,
         IntervalAfterChatCustomAnnouncementSchedule.Discriminator,
         WeeklyCustomAnnouncementSchedule.Discriminator,
+    ];
+
+    private static readonly string[] CustomAnnouncementDeliveryPolicyTypes =
+    [
+        nameof(CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip),
     ];
 
     private static readonly string[] CustomCommandActionTypes =
