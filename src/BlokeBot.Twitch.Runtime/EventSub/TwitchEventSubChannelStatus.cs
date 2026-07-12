@@ -4,6 +4,7 @@ public enum TwitchEventSubChannelPhase
 {
     AccountResolution,
     SubscriptionSetup,
+    SubscriptionDeletion,
     Reconciliation,
 }
 

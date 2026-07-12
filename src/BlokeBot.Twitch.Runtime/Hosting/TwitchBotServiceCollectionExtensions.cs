@@ -182,6 +182,7 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddSingleton<ITwitchEventSubChannelStatusAccessor>(serviceProvider =>
             serviceProvider.GetRequiredService<TwitchEventSubChannelStatusStore>()
         );
+        services.TryAddSingleton<TwitchEventSubSubscriptionReconciliationStore>();
         services.TryAddSingleton<
             ITwitchEventSubChannelDiagnosticReporter,
             TwitchEventSubChannelDiagnosticLogger

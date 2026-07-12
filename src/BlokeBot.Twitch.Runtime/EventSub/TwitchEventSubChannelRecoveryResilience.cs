@@ -57,6 +57,9 @@ internal static class TwitchEventSubChannelFailureClassifier
         CancellationToken cancellationToken
     )
     {
+        if (exception is TwitchEventSubSubscriptionDeletionUnresolvedException deletion)
+            return deletion.Failure;
+
         var (phase, failure) = exception switch
         {
             TwitchEventSubChannelOperationException operation =>

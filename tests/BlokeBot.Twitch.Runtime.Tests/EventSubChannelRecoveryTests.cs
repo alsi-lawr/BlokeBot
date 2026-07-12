@@ -447,9 +447,63 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
-    public async Task Reconciliation_DeleteFailure_RetainsActiveEvidenceForCs015()
+    public async Task Reconciliation_TransientDeleteFailure_RecoversThroughOwnedPolicy()
     {
-        var failure = new IOException("remote delete failed");
+        var failure = new IOException("remote delete failed once");
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        operations.EnqueueDeleteFailure("channel", failure);
+        harness.Diagnostics.Clear();
+
+        harness.Session.TriggerReconciliation(
+            [],
+            TwitchEventSubChannelRecoveryTrigger.Explicit
+        );
+        await harness.Session.DrainAsync();
+
+        operations.DeleteCount("channel").ShouldBe(2);
+        operations.CompleteStopCount("channel").ShouldBe(1);
+        harness.Session.ActiveChannels.ShouldBeEmpty();
+        harness.PendingDeletions.PendingDeletions.ShouldBeEmpty();
+        harness.Status.Current.Channels.ShouldBeEmpty();
+        var reports = harness.Diagnostics.Reports;
+        AssertFailure(
+            reports[0].ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>(),
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            TwitchEventSubChannelFailureClassification.Transient,
+            typeof(IOException),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Explicit,
+            TwitchEventSubChannelNextAction.BeginRecoveryCycle,
+            Now
+        );
+        AssertFailure(
+            reports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            TwitchEventSubChannelFailureClassification.Transient,
+            typeof(IOException),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Explicit,
+            TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
+            Now
+        );
+        var diagnostics = harness.Diagnostics.DiagnosticReports;
+        diagnostics[0]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .Failure.Exception.ShouldBeSameAs(failure);
+        diagnostics[1]
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
+            .Failure.Exception.ShouldBeSameAs(failure);
+    }
+
+    [Test]
+    public async Task Reconciliation_TransientDeleteExhaustion_RetainsPendingEvidence()
+    {
+        var failure = new IOException("remote delete secret");
         var operations = new ScriptedChannelOperations();
         await using var harness = CreateHarness(operations, attemptLimit: 2);
         harness.Session.Start(["channel"], CancellationToken.None);
@@ -475,7 +529,7 @@ public sealed class EventSubChannelRecoveryTests
         AssertFailure(
             degraded,
             "channel",
-            TwitchEventSubChannelPhase.Reconciliation,
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
             TwitchEventSubChannelFailureClassification.Transient,
             typeof(IOException),
             attempt: 2,
@@ -483,6 +537,70 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
             Now
         );
+        operations.CompleteStopCount("channel").ShouldBe(0);
+        var pending = harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem();
+        pending.Subscription.Channel.ShouldBe("channel");
+        pending.Subscription.SubscriptionId.ShouldBe("session-id-channel");
+        pending.Subscription.AccessToken.ShouldBe("channel-secret");
+        var unresolved = pending.State.ShouldBeOfType<
+            TwitchEventSubPendingDeletionState.Unresolved
+        >();
+        unresolved.Failure.Classification.ShouldBe(
+            TwitchEventSubChannelFailureClassification.Transient
+        );
+        unresolved.Failure.Exception.ShouldBeSameAs(failure);
+        pending.ToString().ShouldNotContain("channel-secret");
+        pending.ToString().ShouldNotContain("remote delete secret");
+        degraded.ToString().ShouldNotContain("remote delete secret");
+    }
+
+    [Test]
+    public async Task Reconciliation_TerminalDeleteFailure_DegradesOnlyOwningChannel()
+    {
+        var failure = new InvalidOperationException("terminal delete secret");
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+        harness.Session.Start(["bad", "good"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        operations.EnqueueDeleteFailure("bad", failure);
+        harness.Diagnostics.Clear();
+
+        harness.Session.TriggerReconciliation(
+            ["good"],
+            TwitchEventSubChannelRecoveryTrigger.Explicit
+        );
+        await harness.Session.DrainAsync();
+
+        operations.DeleteCount("bad").ShouldBe(1);
+        operations.CompleteStopCount("bad").ShouldBe(0);
+        harness.Session.ActiveChannels.ShouldBe(["bad", "good"]);
+        var states = harness.Status.Current.Channels.ToDictionary(state => state.Channel);
+        states["good"].ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>();
+        var degraded = states["bad"].ShouldBeOfType<
+            TwitchEventSubChannelStatus.Degraded
+        >();
+        AssertFailure(
+            degraded,
+            "bad",
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            TwitchEventSubChannelFailureClassification.Terminal,
+            typeof(InvalidOperationException),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Explicit,
+            TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
+            Now
+        );
+        degraded.ToString().ShouldNotContain("terminal delete secret");
+        harness.RuntimeStatus.Current.IsConnected.ShouldBeTrue();
+        harness.RuntimeStatus.Current.ConnectedChannels.ShouldBe(["good"]);
+        var pending = harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem();
+        pending.Subscription.Channel.ShouldBe("bad");
+        pending.State.ShouldBeOfType<TwitchEventSubPendingDeletionState.Unresolved>()
+            .Failure.Exception.ShouldBeSameAs(failure);
+        harness.Diagnostics.DiagnosticReports
+            .OfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .ShouldHaveSingleItem()
+            .Failure.Exception.ShouldBeSameAs(failure);
     }
 
     [Test]
@@ -502,6 +620,7 @@ public sealed class EventSubChannelRecoveryTests
         operations.DeleteCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(1);
         harness.Session.ActiveChannels.ShouldBeEmpty();
+        harness.PendingDeletions.PendingDeletions.ShouldBeEmpty();
         harness.Status.Current.Channels.ShouldBeEmpty();
         harness.RuntimeStatus.Current.IsConnected.ShouldBeFalse();
     }
@@ -528,6 +647,91 @@ public sealed class EventSubChannelRecoveryTests
         operations.CompleteStopCount("channel").ShouldBe(2);
         harness.Session.ActiveChannels.ShouldBeEmpty();
         harness.Status.Current.Channels.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task Reconciliation_DeleteCancellation_PreservesScheduledEvidence()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+        harness.Session.Start(["channel"], cancellation.Token);
+        await harness.Session.DrainAsync();
+        operations.EnqueueBeforeDelete("channel", cancellation.Cancel);
+        operations.EnqueueDeleteFailure(
+            "channel",
+            new OperationCanceledException(cancellation.Token)
+        );
+
+        harness.Session.TriggerReconciliation(
+            [],
+            TwitchEventSubChannelRecoveryTrigger.Explicit
+        );
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            harness.Session.DrainAsync()
+        );
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        operations.DeleteCount("channel").ShouldBe(1);
+        operations.CompleteStopCount("channel").ShouldBe(0);
+        harness.Session.ActiveChannels.ShouldBe(["channel"]);
+        harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem()
+            .State.ShouldBeOfType<TwitchEventSubPendingDeletionState.Scheduled>();
+        harness.Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>();
+    }
+
+    [Test]
+    public async Task Startup_PendingDeletionFromReplacedSession_ReconcilesBeforeRemoval()
+    {
+        var sharedStatus = new TwitchEventSubChannelStatusStore();
+        var sharedRuntimeStatus = new TwitchBotRuntimeStatusStore();
+        var sharedPendingDeletions = new TwitchEventSubSubscriptionReconciliationStore();
+        var oldOperations = new ScriptedChannelOperations();
+        await using var old = CreateHarness(
+            oldOperations,
+            attemptLimit: 2,
+            sharedStatus,
+            sharedRuntimeStatus,
+            sharedPendingDeletions
+        );
+        old.Session.Start(["channel"], CancellationToken.None);
+        await old.Session.DrainAsync();
+        oldOperations.EnqueueDeleteFailure(
+            "channel",
+            new InvalidOperationException("old session delete secret")
+        );
+        old.Session.TriggerReconciliation(
+            [],
+            TwitchEventSubChannelRecoveryTrigger.Explicit
+        );
+        await old.Session.DrainAsync();
+        sharedPendingDeletions.PendingDeletions.ShouldHaveSingleItem();
+        sharedPendingDeletions.HasPendingReconciliation.ShouldBeTrue();
+        await old.DisposeAsync();
+
+        var replacementOperations = new ScriptedChannelOperations();
+        await using var replacement = CreateHarness(
+            replacementOperations,
+            attemptLimit: 2,
+            sharedStatus,
+            sharedRuntimeStatus,
+            sharedPendingDeletions
+        );
+        replacement.Session.Start([], CancellationToken.None);
+        await replacement.Session.DrainAsync();
+
+        replacementOperations.DeleteCount("channel").ShouldBe(1);
+        var deleted = replacementOperations.DeleteAttempts("channel")
+            .ShouldHaveSingleItem();
+        deleted.SubscriptionId.ShouldBe("session-id-channel");
+        deleted.AccessToken.ShouldBe("channel-secret");
+        replacementOperations.CompleteStopCount("channel").ShouldBe(1);
+        sharedPendingDeletions.PendingDeletions.ShouldBeEmpty();
+        sharedPendingDeletions.HasPendingReconciliation.ShouldBeFalse();
+        replacement.Session.ActiveChannels.ShouldBeEmpty();
+        sharedStatus.Current.Channels.ShouldBeEmpty();
+        sharedRuntimeStatus.Current.ConnectedChannels.ShouldBeEmpty();
     }
 
     [Test]
@@ -581,6 +785,24 @@ public sealed class EventSubChannelRecoveryTests
         oldOperations.CreateCount("old").ShouldBe(1);
         old.Session.ActiveChannels.ShouldBe(["old"]);
         replacement.Session.ActiveChannels.ShouldBe(["replacement"]);
+    }
+
+    [Test]
+    public void SubscriptionDeletionOutcome_Inspecting_IsClosed()
+    {
+        var unionType = typeof(TwitchEventSubSubscriptionDeletionOutcome);
+        var directCases = unionType
+            .GetNestedTypes(BindingFlags.NonPublic)
+            .Where(type => type.BaseType == unionType)
+            .OrderBy(type => type.Name)
+            .ToArray();
+
+        unionType.IsAbstract.ShouldBeTrue();
+        unionType
+            .GetConstructors(BindingFlags.Instance | BindingFlags.Public)
+            .ShouldBeEmpty();
+        directCases.Select(type => type.Name).ShouldBe(["Deleted", "Unresolved"]);
+        directCases.ShouldAllBe(type => type.IsSealed);
     }
 
     [Test]
@@ -667,6 +889,17 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelPhase.Reconciliation,
             CancellationToken.None
         );
+        var deletionCause = new IOException("delete failed");
+        var deletionFailure = TwitchEventSubChannelFailureClassifier.Classify(
+            deletionCause,
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            CancellationToken.None
+        );
+        var preservedDeletion = TwitchEventSubChannelFailureClassifier.Classify(
+            new TwitchEventSubSubscriptionDeletionUnresolvedException(deletionFailure),
+            TwitchEventSubChannelPhase.Reconciliation,
+            CancellationToken.None
+        );
 
         cancellation.Classification.ShouldBe(
             TwitchEventSubChannelFailureClassification.Cancellation
@@ -684,13 +917,16 @@ public sealed class EventSubChannelRecoveryTests
         unexpected.Classification.ShouldBe(
             TwitchEventSubChannelFailureClassification.Unexpected
         );
+        preservedDeletion.ShouldBe(deletionFailure);
+        preservedDeletion.Exception.ShouldBeSameAs(deletionCause);
     }
 
     private static RecoveryHarness CreateHarness(
         ScriptedChannelOperations operations,
         int attemptLimit,
         TwitchEventSubChannelStatusStore? sharedStatus = null,
-        TwitchBotRuntimeStatusStore? sharedRuntimeStatus = null
+        TwitchBotRuntimeStatusStore? sharedRuntimeStatus = null,
+        TwitchEventSubSubscriptionReconciliationStore? sharedPendingDeletions = null
     )
     {
         var clock = new FixedTimeProvider(Now);
@@ -714,6 +950,9 @@ public sealed class EventSubChannelRecoveryTests
         );
         var status = sharedStatus ?? new TwitchEventSubChannelStatusStore();
         var runtimeStatus = sharedRuntimeStatus ?? new TwitchBotRuntimeStatusStore();
+        var pendingDeletions =
+            sharedPendingDeletions
+            ?? new TwitchEventSubSubscriptionReconciliationStore();
         var diagnostics = new RecordingDiagnostics();
         return new RecoveryHarness(
             new TwitchEventSubChannelSession(
@@ -723,6 +962,7 @@ public sealed class EventSubChannelRecoveryTests
                     attemptBuilder.Build(),
                     recoveryBuilder.Build()
                 ),
+                pendingDeletions,
                 status.CreateScope(),
                 runtimeStatus,
                 diagnostics,
@@ -730,6 +970,7 @@ public sealed class EventSubChannelRecoveryTests
             ),
             status,
             runtimeStatus,
+            pendingDeletions,
             diagnostics,
             clock
         );
@@ -788,6 +1029,7 @@ public sealed class EventSubChannelRecoveryTests
         TwitchEventSubChannelSession session,
         TwitchEventSubChannelStatusStore status,
         TwitchBotRuntimeStatusStore runtimeStatus,
+        TwitchEventSubSubscriptionReconciliationStore pendingDeletions,
         RecordingDiagnostics diagnostics,
         FixedTimeProvider clock
     ) : IAsyncDisposable
@@ -797,6 +1039,9 @@ public sealed class EventSubChannelRecoveryTests
         internal TwitchEventSubChannelStatusStore Status { get; } = status;
 
         internal TwitchBotRuntimeStatusStore RuntimeStatus { get; } = runtimeStatus;
+
+        internal TwitchEventSubSubscriptionReconciliationStore PendingDeletions { get; } =
+            pendingDeletions;
 
         internal RecordingDiagnostics Diagnostics { get; } = diagnostics;
 
@@ -820,9 +1065,14 @@ public sealed class EventSubChannelRecoveryTests
         private readonly Dictionary<string, Queue<Exception>> deleteFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly Dictionary<string, Queue<Action>> beforeDelete = new(
+            StringComparer.OrdinalIgnoreCase
+        );
         private readonly Dictionary<string, int> deleteCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly Dictionary<string, List<ActiveEventSubSubscription>> deleteAttempts =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> startupDeliveryCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -862,8 +1112,18 @@ public sealed class EventSubChannelRecoveryTests
         internal void EnqueueDeleteFailure(string channel, Exception exception) =>
             GetQueue(deleteFailures, channel).Enqueue(exception);
 
+        internal void EnqueueBeforeDelete(string channel, Action action) =>
+            GetQueue(beforeDelete, channel).Enqueue(action);
+
         internal int DeleteCount(string channel) =>
             deleteCounts.GetValueOrDefault(channel);
+
+        internal IReadOnlyList<ActiveEventSubSubscription> DeleteAttempts(
+            string channel
+        ) =>
+            deleteAttempts.TryGetValue(channel, out var attempts)
+                ? attempts.ToArray()
+                : [];
 
         internal int StartupDeliveryCount(string channel) =>
             startupDeliveryCounts.GetValueOrDefault(channel);
@@ -950,16 +1210,58 @@ public sealed class EventSubChannelRecoveryTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask DeleteSubscriptionAsync(
+        public ValueTask<TwitchEventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
             ActiveEventSubSubscription subscription,
             CancellationToken cancellationToken
         )
         {
             deleteCounts[subscription.Channel] = DeleteCount(subscription.Channel) + 1;
-            return deleteFailures.TryGetValue(subscription.Channel, out var failures)
-                && failures.Count > 0
-                ? ValueTask.FromException(failures.Dequeue())
-                : ValueTask.CompletedTask;
+            if (!deleteAttempts.TryGetValue(subscription.Channel, out var attempts))
+            {
+                attempts = [];
+                deleteAttempts[subscription.Channel] = attempts;
+            }
+
+            attempts.Add(subscription);
+            if (
+                beforeDelete.TryGetValue(subscription.Channel, out var actions)
+                && actions.Count > 0
+            )
+            {
+                actions.Dequeue()();
+            }
+
+            if (
+                !deleteFailures.TryGetValue(subscription.Channel, out var failures)
+                || failures.Count == 0
+            )
+            {
+                return ValueTask.FromResult<TwitchEventSubSubscriptionDeletionOutcome>(
+                    new TwitchEventSubSubscriptionDeletionOutcome.Deleted()
+                );
+            }
+
+            var exception = failures.Dequeue();
+            if (
+                exception is OperationCanceledException
+                && cancellationToken.IsCancellationRequested
+            )
+            {
+                return ValueTask.FromException<TwitchEventSubSubscriptionDeletionOutcome>(
+                    exception
+                );
+            }
+
+            return ValueTask.FromResult<TwitchEventSubSubscriptionDeletionOutcome>(
+                new TwitchEventSubSubscriptionDeletionOutcome.Unresolved
+                {
+                    Failure = TwitchEventSubChannelFailureClassifier.Classify(
+                        exception,
+                        TwitchEventSubChannelPhase.SubscriptionDeletion,
+                        cancellationToken
+                    ),
+                }
+            );
         }
 
         public ValueTask CompleteStopAsync(

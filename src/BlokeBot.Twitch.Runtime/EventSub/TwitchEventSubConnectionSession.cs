@@ -48,7 +48,11 @@ internal sealed class TwitchEventSubConnectionSession(
         var channelLogins = TwitchChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
-        if (channelLogins.Length == 0)
+        if (
+            channelLogins.Length == 0
+            && !channelSessions.HasPendingReconciliation
+            && target is TwitchRuntimeConnectionTarget.Initial
+        )
         {
             status.SetConnected(false, []);
             Log.LogWarning(
