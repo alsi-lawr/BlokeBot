@@ -25,6 +25,9 @@ public sealed class TwitchBotPolicyTests
         new PublicChatRetryOptionsValidator()
             .Validate("public chat retry", options.PublicChatRetry)
             .Failed.ShouldBeFalse();
+        new PublicChatDeliveryLifetimeOptionsValidator()
+            .Validate("public chat lifetime", options.PublicChatDeliveryLifetime)
+            .Failed.ShouldBeFalse();
         new PublicChatTerminalRetentionOptionsValidator()
             .Validate("public chat retention", options.PublicChatTerminalRetention)
             .Failed.ShouldBeFalse();
@@ -115,10 +118,22 @@ public sealed class TwitchBotPolicyTests
     }
 
     [Test]
+    public void PublicChatLifetime_Validating_RequiresPositiveAtMostSixtySeconds()
+    {
+        ValidateLifetime(null).Failed.ShouldBeTrue();
+        ValidateLifetime(TimeSpan.Zero).Failed.ShouldBeTrue();
+        ValidateLifetime(TimeSpan.FromTicks(-1)).Failed.ShouldBeTrue();
+        ValidateLifetime(TimeSpan.FromSeconds(60).Add(TimeSpan.FromTicks(1)))
+            .Failed.ShouldBeTrue();
+        ValidateLifetime(TimeSpan.FromSeconds(60)).Failed.ShouldBeFalse();
+    }
+
+    [Test]
     [Arguments("IrcSession")]
     [Arguments("EventSubSession")]
     [Arguments("EventSubChannelRecovery")]
     [Arguments("PublicChatRetry")]
+    [Arguments("PublicChatDeliveryLifetime")]
     [Arguments("PublicChatTerminalRetention")]
     public void RequiredPolicySectionMissing_Binding_FailsWithBoundaryName(string sectionName)
     {
@@ -177,6 +192,7 @@ public sealed class TwitchBotPolicyTests
             DelayBackoffType.Exponential
         );
         policies.PublicChatRetry.MaximumDelay.ShouldBe(TimeSpan.FromSeconds(30));
+        policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
         policies.PublicChatTerminalRetention.Duration.ShouldBe(TimeSpan.FromDays(7));
     }
 
@@ -189,10 +205,12 @@ public sealed class TwitchBotPolicyTests
         options.IrcSession.AttemptLimit = 99;
         options.IrcSession.Delay = TimeSpan.FromHours(1);
         options.PublicChatTerminalRetention.Duration = TimeSpan.FromDays(99);
+        options.PublicChatDeliveryLifetime.MaximumAge = TimeSpan.FromSeconds(1);
 
         policies.IrcSession.AttemptLimit.ShouldBe(5);
         policies.IrcSession.Delay.ShouldBe(TimeSpan.FromSeconds(3));
         policies.PublicChatTerminalRetention.Duration.ShouldBe(TimeSpan.FromDays(7));
+        policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
     }
 
     private static TwitchBotPolicyOptions ValidOptions() =>
@@ -229,6 +247,10 @@ public sealed class TwitchBotPolicyTests
                 MaximumDelay = TimeSpan.FromSeconds(30),
                 DelayBackoffType = DelayBackoffType.Exponential,
             },
+            PublicChatDeliveryLifetime = new PublicChatDeliveryLifetimeOptions
+            {
+                MaximumAge = TimeSpan.FromSeconds(30),
+            },
             PublicChatTerminalRetention = new PublicChatTerminalRetentionOptions
             {
                 Duration = TimeSpan.FromDays(7),
@@ -257,6 +279,13 @@ public sealed class TwitchBotPolicyTests
             ["TwitchBot:Policies:PublicChatRetry:Delay"] = "00:00:01",
             ["TwitchBot:Policies:PublicChatRetry:MaximumDelay"] = "00:00:30",
             ["TwitchBot:Policies:PublicChatRetry:DelayBackoffType"] = "Exponential",
+            ["TwitchBot:Policies:PublicChatDeliveryLifetime:MaximumAge"] = "00:00:30",
             ["TwitchBot:Policies:PublicChatTerminalRetention:Duration"] = "7.00:00:00",
         };
+
+    private static ValidateOptionsResult ValidateLifetime(TimeSpan? maximumAge) =>
+        new PublicChatDeliveryLifetimeOptionsValidator().Validate(
+            "public chat lifetime",
+            new PublicChatDeliveryLifetimeOptions { MaximumAge = maximumAge }
+        );
 }

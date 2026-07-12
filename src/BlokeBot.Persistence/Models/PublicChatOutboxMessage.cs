@@ -12,6 +12,8 @@ public sealed class PublicChatOutboxMessage
 
     public DateTime CreatedAtUtc { get; set; }
 
+    public DateTime ExpiresAtUtc { get; set; }
+
     public DateTime? NextAttemptAtUtc { get; set; }
 
     public PublicChatOutboxStatus Status { get; set; } = PublicChatOutboxStatus.Pending;
@@ -67,6 +69,9 @@ public enum PublicChatOutboxStatus
 
     [PersistedToken("Unexpected")]
     Unexpected,
+
+    [PersistedToken("Expired")]
+    Expired,
 }
 
 public sealed class PublicChatSendReceipt

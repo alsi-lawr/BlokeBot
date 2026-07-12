@@ -1188,6 +1188,7 @@ public sealed class PublicChatMessageQueueTests
 
         public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
             PublicChatClaimedMessage message,
+            DateTimeOffset releasedAt,
             CancellationToken cancellationToken
         )
         {
@@ -1440,6 +1441,7 @@ public sealed class PublicChatMessageQueueTests
                     Channel = Channel,
                     Message = Message!,
                     EnqueuedAt = EnqueuedAt,
+                    ExpiresAt = EnqueuedAt.AddMinutes(1),
                     Attempt = AttemptCount + 1,
                     ClaimToken = token,
                     ClaimExpiresAt = ClaimExpiresAt,

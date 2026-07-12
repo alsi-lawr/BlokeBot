@@ -37,6 +37,8 @@ internal sealed record PublicChatClaimedMessage
 
     public required DateTimeOffset EnqueuedAt { get; init; }
 
+    public required DateTimeOffset ExpiresAt { get; init; }
+
     public required int Attempt { get; init; }
 
     public required PublicChatClaimToken ClaimToken { get; init; }
@@ -75,6 +77,8 @@ internal abstract record PublicChatClaimUpdate
     public sealed record OwnershipLost : PublicChatClaimUpdate;
 
     public sealed record Contended : PublicChatClaimUpdate;
+
+    public sealed record Expired : PublicChatClaimUpdate;
 }
 
 internal interface IPublicChatOutbox
@@ -115,6 +119,7 @@ internal interface IPublicChatOutbox
 
     ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
+        DateTimeOffset releasedAt,
         CancellationToken cancellationToken
     );
 

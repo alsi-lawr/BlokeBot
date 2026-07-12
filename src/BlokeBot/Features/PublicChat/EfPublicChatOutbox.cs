@@ -10,6 +10,7 @@ namespace BlokeBot.Features.PublicChat;
 internal sealed class EfPublicChatOutbox(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PublicChatRetryPolicy retryPolicy,
+    PublicChatDeliveryLifetimePolicy lifetimePolicy,
     PublicChatTerminalRetentionPolicy retentionPolicy
 ) : IPublicChatOutbox
 {
@@ -18,6 +19,8 @@ internal sealed class EfPublicChatOutbox(
     private const int CleanupBatchSize = 100;
     private readonly PublicChatRetryPolicy safePreSendRetryPolicy =
         retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
+    private readonly PublicChatDeliveryLifetimePolicy deliveryLifetimePolicy =
+        lifetimePolicy ?? throw new ArgumentNullException(nameof(lifetimePolicy));
     private readonly PublicChatTerminalRetentionPolicy terminalRetentionPolicy =
         retentionPolicy ?? throw new ArgumentNullException(nameof(retentionPolicy));
 
@@ -39,6 +42,7 @@ internal sealed class EfPublicChatOutbox(
         }
 
         var createdAtUtc = batch.EnqueuedAt.UtcDateTime;
+        var expiresAtUtc = batch.EnqueuedAt.Add(deliveryLifetimePolicy.MaximumAge).UtcDateTime;
         var rows = batch.Items
             .Select(item =>
                 new PublicChatOutboxMessage
@@ -47,6 +51,7 @@ internal sealed class EfPublicChatOutbox(
                     Message = item.Message,
                     DeduplicationKey = item.DeduplicationKey.Value,
                     CreatedAtUtc = createdAtUtc,
+                    ExpiresAtUtc = expiresAtUtc,
                     NextAttemptAtUtc = createdAtUtc,
                 }
             )
@@ -97,12 +102,25 @@ internal sealed class EfPublicChatOutbox(
             await using var transaction = await db.Database.BeginTransactionAsync(
                 cancellationToken
             );
+            var expired = await ExpireOwnedClaimAsync(
+                db,
+                message,
+                sendStartedAt.UtcDateTime,
+                cancellationToken
+            );
+            if (expired == 1)
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return new PublicChatClaimUpdate.Expired();
+            }
+
             var changed = await db
                 .PublicChatOutboxMessages.Where(row =>
                     row.Id == message.Id
                     && row.Status == PublicChatOutboxStatus.Claimed
                     && row.ClaimToken == message.ClaimToken.Value
                     && row.ClaimExpiresAtUtc > sendStartedAt.UtcDateTime
+                    && row.ExpiresAtUtc > sendStartedAt.UtcDateTime
                 )
                 .ExecuteUpdateAsync(
                     update =>
@@ -209,18 +227,32 @@ internal sealed class EfPublicChatOutbox(
 
     public async ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
+        DateTimeOffset releasedAt,
         CancellationToken cancellationToken
     )
     {
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            if (
+                await ExpireOwnedClaimAsync(
+                    db,
+                    message,
+                    releasedAt.UtcDateTime,
+                    cancellationToken
+                ) == 1
+            )
+            {
+                return new PublicChatClaimUpdate.Expired();
+            }
+
             var initialClaimReleased = await db
                 .PublicChatOutboxMessages.Where(row =>
                     row.Id == message.Id
                     && row.Status == PublicChatOutboxStatus.Claimed
                     && row.ClaimToken == message.ClaimToken.Value
                     && row.SafePreSendFailureCount == 0
+                    && row.ExpiresAtUtc > releasedAt.UtcDateTime
                 )
                 .ExecuteUpdateAsync(
                     update =>
@@ -246,6 +278,7 @@ internal sealed class EfPublicChatOutbox(
                     && row.Status == PublicChatOutboxStatus.Claimed
                     && row.ClaimToken == message.ClaimToken.Value
                     && row.SafePreSendFailureCount > 0
+                    && row.ExpiresAtUtc > releasedAt.UtcDateTime
                 )
                 .ExecuteUpdateAsync(
                     update =>
@@ -306,6 +339,7 @@ internal sealed class EfPublicChatOutbox(
     {
         var nowUtc = now.UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        await ExpireUnsentBatchAsync(db, nowUtc, cancellationToken);
         await RecoverExpiredAsync(db, nowUtc, cancellationToken);
         await ScheduleMigratedSafePreSendRetriesAsync(db, now, cancellationToken);
         await ExhaustConfiguredSafePreSendRetriesAsync(db, nowUtc, cancellationToken);
@@ -327,6 +361,7 @@ internal sealed class EfPublicChatOutbox(
             Max(sendInterval, duplicateCooldown),
             cancellationToken
         );
+        var nextExpiryAt = await NextUnsentExpiryAtAsync(db, cancellationToken);
         var nextMaintenanceAt = nextTerminalPurgeAt switch
         {
             { } terminalPurgeAt when nextSendReceiptPurgeAt is { } receiptPurgeAt =>
@@ -334,6 +369,10 @@ internal sealed class EfPublicChatOutbox(
             { } terminalPurgeAt => terminalPurgeAt,
             null => nextSendReceiptPurgeAt,
         };
+        if (nextExpiryAt is { } expiryAt)
+            nextMaintenanceAt = nextMaintenanceAt is { } maintenanceAt
+                ? Min(maintenanceAt, expiryAt)
+                : expiryAt;
 
         var activeClaim = await db
             .PublicChatOutboxMessages.AsNoTracking()
@@ -361,11 +400,15 @@ internal sealed class EfPublicChatOutbox(
         var claimable = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
-                row.Status == PublicChatOutboxStatus.Pending
-                || (
-                    row.Status == PublicChatOutboxStatus.SafePreSendTransient
-                    && row.SafePreSendFailureCount < safePreSendRetryPolicy.AttemptLimit
+                (
+                    row.Status == PublicChatOutboxStatus.Pending
+                    || (
+                        row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                        && row.SafePreSendFailureCount
+                            < safePreSendRetryPolicy.AttemptLimit
+                    )
                 )
+                && row.ExpiresAtUtc > nowUtc
             )
             .ToArrayAsync(cancellationToken);
         if (claimable.Length == 0)
@@ -432,6 +475,7 @@ internal sealed class EfPublicChatOutbox(
         var changed = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Id == candidate.Row.Id
+                && row.ExpiresAtUtc > nowUtc
                 && (
                     row.Status == PublicChatOutboxStatus.Pending
                     || (
@@ -470,6 +514,119 @@ internal sealed class EfPublicChatOutbox(
         }
 
         return new PublicChatClaimOutcome.Claimed(MapClaimed(claimed));
+    }
+
+    private static async Task ExpireUnsentBatchAsync(
+        BlokeBotDbContext db,
+        DateTime nowUtc,
+        CancellationToken cancellationToken
+    )
+    {
+        var ids = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .Where(row =>
+                row.ExpiresAtUtc <= nowUtc
+                && (
+                    row.Status == PublicChatOutboxStatus.Pending
+                    || row.Status == PublicChatOutboxStatus.Claimed
+                    || row.Status == PublicChatOutboxStatus.SafePreSendScheduling
+                    || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                )
+            )
+            .OrderBy(row => row.ExpiresAtUtc)
+            .ThenBy(row => row.Id)
+            .Select(row => row.Id)
+            .Take(CleanupBatchSize)
+            .ToArrayAsync(cancellationToken);
+        if (ids.Length == 0)
+            return;
+
+        _ = await db
+            .PublicChatOutboxMessages.Where(row =>
+                ids.Contains(row.Id)
+                && row.ExpiresAtUtc <= nowUtc
+                && (
+                    row.Status == PublicChatOutboxStatus.Pending
+                    || row.Status == PublicChatOutboxStatus.Claimed
+                    || row.Status == PublicChatOutboxStatus.SafePreSendScheduling
+                    || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                )
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(row => row.Status, PublicChatOutboxStatus.Expired)
+                        .SetProperty(row => row.Message, (string?)null)
+                        .SetProperty(row => row.DeduplicationKey, (string?)null)
+                        .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.ClaimToken, (Guid?)null)
+                        .SetProperty(row => row.ClaimSlot, (int?)null)
+                        .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.SendStartedAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.CompletedAtUtc, nowUtc)
+                        .SetProperty(
+                            row => row.FailurePhase,
+                            (PublicChatOutboxFailurePhase?)null
+                        )
+                        .SetProperty(row => row.FailureType, (string?)null)
+                        .SetProperty(row => row.HttpStatusCode, (int?)null)
+                        .SetProperty(row => row.RejectionCode, (string?)null),
+                cancellationToken
+            );
+    }
+
+    private static Task<int> ExpireOwnedClaimAsync(
+        BlokeBotDbContext db,
+        PublicChatClaimedMessage message,
+        DateTime nowUtc,
+        CancellationToken cancellationToken
+    ) =>
+        db.PublicChatOutboxMessages
+            .Where(row =>
+                row.Id == message.Id
+                && row.Status == PublicChatOutboxStatus.Claimed
+                && row.ClaimToken == message.ClaimToken.Value
+                && row.ExpiresAtUtc <= nowUtc
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(row => row.Status, PublicChatOutboxStatus.Expired)
+                        .SetProperty(row => row.Message, (string?)null)
+                        .SetProperty(row => row.DeduplicationKey, (string?)null)
+                        .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.ClaimToken, (Guid?)null)
+                        .SetProperty(row => row.ClaimSlot, (int?)null)
+                        .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.SendStartedAtUtc, (DateTime?)null)
+                        .SetProperty(row => row.CompletedAtUtc, nowUtc)
+                        .SetProperty(
+                            row => row.FailurePhase,
+                            (PublicChatOutboxFailurePhase?)null
+                        )
+                        .SetProperty(row => row.FailureType, (string?)null)
+                        .SetProperty(row => row.HttpStatusCode, (int?)null)
+                        .SetProperty(row => row.RejectionCode, (string?)null),
+                cancellationToken
+            );
+
+    private static async Task<DateTimeOffset?> NextUnsentExpiryAtAsync(
+        BlokeBotDbContext db,
+        CancellationToken cancellationToken
+    )
+    {
+        var expiresAtUtc = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .Where(row =>
+                row.Status == PublicChatOutboxStatus.Pending
+                || row.Status == PublicChatOutboxStatus.Claimed
+                || row.Status == PublicChatOutboxStatus.SafePreSendScheduling
+                || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+            )
+            .OrderBy(row => row.ExpiresAtUtc)
+            .Select(row => (DateTime?)row.ExpiresAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        return expiresAtUtc is { } value ? ToDateTimeOffset(value) : null;
     }
 
     private static async Task RecoverExpiredAsync(
@@ -573,6 +730,7 @@ internal sealed class EfPublicChatOutbox(
             .Where(row =>
                 row.Status == PublicChatOutboxStatus.SafePreSendTransient
                 && row.SafePreSendFailureCount >= safePreSendRetryPolicy.AttemptLimit
+                && row.ExpiresAtUtc > nowUtc
             )
             .ExecuteUpdateAsync(
                 update =>
@@ -703,6 +861,7 @@ internal sealed class EfPublicChatOutbox(
             || row.Status == PublicChatOutboxStatus.Rejected
             || row.Status == PublicChatOutboxStatus.Ambiguous
             || row.Status == PublicChatOutboxStatus.Unexpected
+            || row.Status == PublicChatOutboxStatus.Expired
         );
 
     private async Task ScheduleMigratedSafePreSendRetriesAsync(
@@ -713,10 +872,14 @@ internal sealed class EfPublicChatOutbox(
     {
         var rows = await db
             .PublicChatOutboxMessages.AsNoTracking()
-            .Where(row => row.Status == PublicChatOutboxStatus.SafePreSendScheduling)
+            .Where(row =>
+                row.Status == PublicChatOutboxStatus.SafePreSendScheduling
+                && row.ExpiresAtUtc > now.UtcDateTime
+            )
             .Select(row => new
             {
                 row.Id,
+                row.ExpiresAtUtc,
                 row.NextAttemptAtUtc,
                 row.SafePreSendFailureCount,
             })
@@ -751,7 +914,10 @@ internal sealed class EfPublicChatOutbox(
                                     )
                                     .SetProperty(
                                         candidate => candidate.NextAttemptAtUtc,
-                                        scheduled.NextAttemptAtUtc.UtcDateTime
+                                        Min(
+                                            scheduled.NextAttemptAtUtc,
+                                            ToDateTimeOffset(row.ExpiresAtUtc)
+                                        ).UtcDateTime
                                     ),
                             cancellationToken
                         ),
@@ -863,17 +1029,42 @@ internal sealed class EfPublicChatOutbox(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var previousFailureCount = await db
+            var persisted = await db
                 .PublicChatOutboxMessages.AsNoTracking()
                 .Where(row =>
                     row.Id == message.Id
                     && row.Status == PublicChatOutboxStatus.Claimed
                     && row.ClaimToken == message.ClaimToken.Value
                 )
-                .Select(row => (int?)row.SafePreSendFailureCount)
+                .Select(row => new
+                {
+                    row.SafePreSendFailureCount,
+                    row.ExpiresAtUtc,
+                })
                 .SingleOrDefaultAsync(cancellationToken);
-            if (previousFailureCount is not { } persistedFailureCount)
+            if (persisted is null)
                 return new PublicChatClaimUpdate.OwnershipLost();
+            if (persisted.ExpiresAtUtc <= recordedAt.UtcDateTime)
+            {
+                return Changed(
+                    await ExpireOwnedClaimAsync(
+                        db,
+                        message,
+                        recordedAt.UtcDateTime,
+                        cancellationToken
+                    )
+                ) switch
+                {
+                    PublicChatClaimUpdate.Applied => new PublicChatClaimUpdate.Expired(),
+                    PublicChatClaimUpdate.OwnershipLost =>
+                        new PublicChatClaimUpdate.OwnershipLost(),
+                    _ => throw new UnreachableException(
+                        "An owned public chat expiry returned an invalid transition."
+                    ),
+                };
+            }
+
+            var persistedFailureCount = persisted.SafePreSendFailureCount;
 
             var decision = PublicChatSafePreSendRetrySchedule.Create(
                 safePreSendRetryPolicy,
@@ -889,6 +1080,7 @@ internal sealed class EfPublicChatOutbox(
                             && row.Status == PublicChatOutboxStatus.Claimed
                             && row.ClaimToken == message.ClaimToken.Value
                             && row.SafePreSendFailureCount == persistedFailureCount
+                            && row.ExpiresAtUtc > recordedAt.UtcDateTime
                         )
                         .ExecuteUpdateAsync(
                             update =>
@@ -903,7 +1095,10 @@ internal sealed class EfPublicChatOutbox(
                                     )
                                     .SetProperty(
                                         row => row.NextAttemptAtUtc,
-                                        scheduled.NextAttemptAtUtc.UtcDateTime
+                                        Min(
+                                            scheduled.NextAttemptAtUtc,
+                                            ToDateTimeOffset(persisted.ExpiresAtUtc)
+                                        ).UtcDateTime
                                     )
                                     .SetProperty(row => row.ClaimToken, (Guid?)null)
                                     .SetProperty(row => row.ClaimSlot, (int?)null)
@@ -941,6 +1136,7 @@ internal sealed class EfPublicChatOutbox(
                             && row.Status == PublicChatOutboxStatus.Claimed
                             && row.ClaimToken == message.ClaimToken.Value
                             && row.SafePreSendFailureCount == persistedFailureCount
+                            && row.ExpiresAtUtc > recordedAt.UtcDateTime
                         )
                         .ExecuteUpdateAsync(
                             update =>
@@ -1111,20 +1307,34 @@ internal sealed class EfPublicChatOutbox(
         );
     }
 
-    private ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
+    private async ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Preparation diagnostic,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
     )
     {
-        return ExecuteStateTransitionAsync(
+        await using var expiryDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (
+            await ExpireOwnedClaimAsync(
+                expiryDb,
+                message,
+                recordedAt.UtcDateTime,
+                cancellationToken
+            ) == 1
+        )
+        {
+            return new PublicChatClaimUpdate.Expired();
+        }
+
+        return await ExecuteStateTransitionAsync(
             (db, ct) =>
                 db.PublicChatOutboxMessages
                     .Where(row =>
                         row.Id == message.Id
                         && row.Status == PublicChatOutboxStatus.Claimed
                         && row.ClaimToken == message.ClaimToken.Value
+                        && row.ExpiresAtUtc > recordedAt.UtcDateTime
                     )
                     .ExecuteUpdateAsync(
                         update =>
@@ -1248,6 +1458,7 @@ internal sealed class EfPublicChatOutbox(
             Channel = row.Channel,
             Message = row.Message,
             EnqueuedAt = ToDateTimeOffset(row.CreatedAtUtc),
+            ExpiresAt = ToDateTimeOffset(row.ExpiresAtUtc),
             Attempt = row.AttemptCount + 1,
             ClaimToken = new PublicChatClaimToken(row.ClaimToken.Value),
             ClaimExpiresAt = ToDateTimeOffset(row.ClaimExpiresAtUtc.Value),

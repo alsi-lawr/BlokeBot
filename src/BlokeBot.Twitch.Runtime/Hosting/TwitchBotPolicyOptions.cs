@@ -105,6 +105,20 @@ public sealed record PublicChatRetryOptions
 }
 
 /// <summary>
+/// Mutable configuration transport for the public-chat delivery lifetime.
+/// </summary>
+public sealed record PublicChatDeliveryLifetimeOptions
+{
+    [Required]
+    [Range(
+        typeof(TimeSpan),
+        PolicyDuration.Minimum,
+        PolicyDuration.MaximumPublicChatAge
+    )]
+    public required TimeSpan? MaximumAge { get; set; }
+}
+
+/// <summary>
 /// Mutable configuration transport for redacted public-chat terminal-record retention.
 /// </summary>
 public sealed record PublicChatTerminalRetentionOptions
@@ -139,6 +153,12 @@ public sealed partial class PublicChatRetryOptionsValidator
 }
 
 [OptionsValidator]
+public sealed partial class PublicChatDeliveryLifetimeOptionsValidator
+    : IValidateOptions<PublicChatDeliveryLifetimeOptions>
+{
+}
+
+[OptionsValidator]
 public sealed partial class PublicChatTerminalRetentionOptionsValidator
     : IValidateOptions<PublicChatTerminalRetentionOptions>
 {
@@ -147,5 +167,6 @@ public sealed partial class PublicChatTerminalRetentionOptionsValidator
 internal static class PolicyDuration
 {
     internal const string Minimum = "00:00:00.0000001";
+    internal const string MaximumPublicChatAge = "00:01:00";
     internal const string Maximum = "10675199.02:48:05.4775807";
 }

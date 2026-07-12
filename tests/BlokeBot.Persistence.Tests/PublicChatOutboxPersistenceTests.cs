@@ -26,6 +26,8 @@ public sealed class PublicChatOutboxPersistenceTests
         "20260712214026_RetainRedactedTerminalDeliveries";
     private const string BoundedReceiptLifecycleMigration =
         "20260712220945_BoundDeliveryReceiptLifecycle";
+    private const string ExpiryMigration =
+        "20260712224508_ExpireStalePublicDeliveries";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -43,6 +45,7 @@ public sealed class PublicChatOutboxPersistenceTests
                     Message = "durable message",
                     DeduplicationKey = DeduplicationKey,
                     CreatedAtUtc = now,
+                    ExpiresAtUtc = now.AddSeconds(30),
                     NextAttemptAtUtc = now.AddSeconds(5),
                 }
             );
@@ -57,6 +60,7 @@ public sealed class PublicChatOutboxPersistenceTests
         row.Message.ShouldBe("durable message");
         row.DeduplicationKey.ShouldBe(DeduplicationKey);
         row.CreatedAtUtc.ShouldBe(now);
+        row.ExpiresAtUtc.ShouldBe(now.AddSeconds(30));
         row.NextAttemptAtUtc.ShouldBe(now.AddSeconds(5));
         row.Status.ShouldBe(PublicChatOutboxStatus.Pending);
         row.AttemptCount.ShouldBe(0);
@@ -74,6 +78,7 @@ public sealed class PublicChatOutboxPersistenceTests
             [
                 "Ambiguous",
                 "Claimed",
+                "Expired",
                 "Pending",
                 "Rejected",
                 "SafePreSendExhausted",
@@ -99,10 +104,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Unknown', 0)
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now}, 'Unknown', 0)
                 """
             )
         );
@@ -110,10 +117,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount, SafePreSendFailureCount, FailurePhase, FailureType)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now},
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now},
                      'SafePreSendScheduling', 0, 2, 'Preparation', 'System.IO.IOException')
                 """
             )
@@ -122,10 +131,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount, SafePreSendFailureCount)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Pending', 0,
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now}, 'Pending', 0,
                      -1)
                 """
             )
@@ -134,11 +145,13 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount, SendStartedAtUtc, CompletedAtUtc,
                      FailurePhase, RejectionCode)
                 VALUES
-                    ('streamer', NULL, {DeduplicationKey}, {now}, {now}, 'Rejected', 0,
+                    ('streamer', NULL, {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now}, 'Rejected', 0,
                      {now}, {now}, 'Send', 'followers_only')
                 """
             )
@@ -147,10 +160,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
                 VALUES
-                    ('streamer', 'must be redacted', {DeduplicationKey}, {now}, {now},
+                    ('streamer', 'must be redacted', {DeduplicationKey}, {now},
+                     {now.AddSeconds(30)}, {now},
                      'Unexpected', 0, {now}, 'Preparation', 'System.InvalidOperationException')
                 """
             )
@@ -159,10 +174,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount, ClaimToken)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Pending', 0,
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now}, 'Pending', 0,
                      {Guid.NewGuid()})
                 """
             )
@@ -171,10 +188,12 @@ public sealed class PublicChatOutboxPersistenceTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO public_chat_outbox
-                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                     NextAttemptAtUtc,
                      Status, AttemptCount)
                 VALUES
-                    ('   ', 'message', {DeduplicationKey}, {now}, {now}, 'Pending', 0)
+                    ('   ', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                     {now}, 'Pending', 0)
                 """
             )
         );
@@ -220,6 +239,7 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldNotContain("'Delivered'");
         tableSql.ShouldContain("DeduplicationKey IS NULL");
         tableSql.ShouldContain("NextAttemptAtUtc IS NULL");
+        tableSql.ShouldContain("'Expired'");
 
         var receiptTableSql = await db.Database.SqlQueryRaw<string>(
                 """
@@ -252,6 +272,12 @@ public sealed class PublicChatOutboxPersistenceTests
         indexSql.ShouldContain(value =>
             value.Contains(
                 "IX_public_chat_outbox_Status_ClaimExpiresAtUtc",
+                StringComparison.Ordinal
+            )
+        );
+        indexSql.ShouldContain(value =>
+            value.Contains(
+                "IX_public_chat_outbox_Status_ExpiresAtUtc",
                 StringComparison.Ordinal
             )
         );
@@ -360,8 +386,8 @@ public sealed class PublicChatOutboxPersistenceTests
 
         await migrator.MigrateAsync(RetryOutboxMigration);
         db.ChangeTracker.Clear();
-        var upgraded = await db.PublicChatOutboxMessages.SingleAsync();
-        upgraded.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+        var upgraded = await ReadSafeRetryMigrationRowAsync(db);
+        upgraded.Status.ShouldBe("SafePreSendTransient");
         upgraded.Message.ShouldBe("safe to retry");
         upgraded.AttemptCount.ShouldBe(0);
         upgraded.SafePreSendFailureCount.ShouldBe(1);
@@ -370,13 +396,13 @@ public sealed class PublicChatOutboxPersistenceTests
 
         await migrator.MigrateAsync(ScheduledRetryOutboxMigration);
         db.ChangeTracker.Clear();
-        var schemaUpgraded = await db.PublicChatOutboxMessages.SingleAsync();
-        schemaUpgraded.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+        var schemaUpgraded = await ReadSafeRetryMigrationRowAsync(db);
+        schemaUpgraded.Status.ShouldBe("SafePreSendTransient");
 
         await migrator.MigrateAsync(MarkedRetryOutboxMigration);
         db.ChangeTracker.Clear();
-        var pendingSchedule = await db.PublicChatOutboxMessages.SingleAsync();
-        pendingSchedule.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendScheduling);
+        var pendingSchedule = await ReadSafeRetryMigrationRowAsync(db);
+        pendingSchedule.Status.ShouldBe("SafePreSendScheduling");
         pendingSchedule.Message.ShouldBe("safe to retry");
         pendingSchedule.SafePreSendFailureCount.ShouldBe(1);
         pendingSchedule.NextAttemptAtUtc.ShouldBe(failedAt.AddSeconds(1));
@@ -426,8 +452,14 @@ public sealed class PublicChatOutboxPersistenceTests
 
         await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
         db.ChangeTracker.Clear();
-        var retained = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        retained.Status.ShouldBe(PublicChatOutboxStatus.Rejected);
+        var retained = await db.Database.SqlQueryRaw<RetainedTerminalMigrationRow>(
+                """
+                SELECT Status, Message, DeduplicationKey, NextAttemptAtUtc
+                FROM public_chat_outbox
+                """
+            )
+            .SingleAsync();
+        retained.Status.ShouldBe("Rejected");
         retained.Message.ShouldBeNull();
         retained.DeduplicationKey.ShouldBeNull();
         retained.NextAttemptAtUtc.ShouldBeNull();
@@ -496,10 +528,167 @@ public sealed class PublicChatOutboxPersistenceTests
         (await ReadOutboxSequenceAsync(db)).ShouldBe(41);
     }
 
+    [Test]
+    public async Task ExpiryMigration_Upgrading_RedactsLegacyUnsentWorkAndPreservesTerminalAndReceipts()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(BoundedReceiptLifecycleMigration);
+        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Id, Channel, Message, DeduplicationKey, CreatedAtUtc,
+                 NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount,
+                 ClaimToken, ClaimSlot, ClaimExpiresAtUtc, CompletedAtUtc,
+                 FailurePhase, FailureType)
+            VALUES
+                (1, 'streamer', 'pending secret', {DeduplicationKey}, {now}, {now},
+                 'Pending', 0, 0, NULL, NULL, NULL, NULL, NULL, NULL),
+                (2, 'streamer', 'claimed secret', {DeduplicationKey}, {now.AddSeconds(1)},
+                 {now.AddSeconds(1)}, 'Claimed', 0, 0, {Guid.NewGuid()}, 1,
+                 {now.AddMinutes(5)}, NULL, NULL, NULL),
+                (3, 'streamer', 'scheduling secret', {DeduplicationKey},
+                 {now.AddSeconds(2)}, {now.AddSeconds(2)}, 'SafePreSendScheduling',
+                 0, 1, NULL, NULL, NULL, NULL, 'Preparation', 'secret.Exception'),
+                (4, 'streamer', 'retry secret', {DeduplicationKey}, {now.AddSeconds(3)},
+                 {now.AddSeconds(3)}, 'SafePreSendTransient', 0, 1, NULL, NULL,
+                 NULL, NULL, 'Preparation', 'secret.Exception'),
+                (5, 'streamer', NULL, NULL, {now.AddSeconds(4)}, NULL, 'Unexpected',
+                 0, 0, NULL, NULL, NULL, {now.AddSeconds(5)}, 'Preparation',
+                 'safe.Exception');
+
+            INSERT INTO public_chat_send_receipts
+                (OutboxMessageId, AttemptedAtUtc, CompletedAtUtc,
+                 DeliveredDeduplicationKey, DeliveredAtUtc)
+            VALUES
+                (100, {now}, {now.AddSeconds(1)}, {DeduplicationKey},
+                 {now.AddSeconds(1)});
+            """
+        );
+
+        await migrator.MigrateAsync(ExpiryMigration);
+        db.ChangeTracker.Clear();
+
+        var rows = await db.PublicChatOutboxMessages.AsNoTracking()
+            .OrderBy(row => row.Id)
+            .ToArrayAsync();
+        rows.Length.ShouldBe(5);
+        foreach (var expired in rows.Take(4))
+        {
+            expired.Status.ShouldBe(PublicChatOutboxStatus.Expired);
+            expired.ExpiresAtUtc.ShouldBe(expired.CreatedAtUtc);
+            expired.Message.ShouldBeNull();
+            expired.DeduplicationKey.ShouldBeNull();
+            expired.NextAttemptAtUtc.ShouldBeNull();
+            expired.ClaimToken.ShouldBeNull();
+            expired.ClaimSlot.ShouldBeNull();
+            expired.ClaimExpiresAtUtc.ShouldBeNull();
+            expired.SendStartedAtUtc.ShouldBeNull();
+            expired.CompletedAtUtc.ShouldNotBeNull();
+            expired.FailurePhase.ShouldBeNull();
+            expired.FailureType.ShouldBeNull();
+            expired.HttpStatusCode.ShouldBeNull();
+            expired.RejectionCode.ShouldBeNull();
+        }
+        rows[4].Status.ShouldBe(PublicChatOutboxStatus.Unexpected);
+        rows[4].FailureType.ShouldBe("safe.Exception");
+        rows[4].CompletedAtUtc.ShouldBe(now.AddSeconds(5));
+        rows[4].ExpiresAtUtc.ShouldBe(rows[4].CreatedAtUtc);
+
+        var receipt = await db.PublicChatSendReceipts.AsNoTracking().SingleAsync();
+        receipt.OutboxMessageId.ShouldBe(100);
+        receipt.DeliveredDeduplicationKey.ShouldBe(DeduplicationKey);
+        receipt.DeliveredAtUtc.ShouldBe(now.AddSeconds(1));
+
+        await migrator.MigrateAsync(BoundedReceiptLifecycleMigration);
+        var downgradedStatuses = await db.Database.SqlQueryRaw<string>(
+                "SELECT Status AS Value FROM public_chat_outbox ORDER BY Id"
+            )
+            .ToArrayAsync();
+        downgradedStatuses.ShouldBe(["Unexpected"]);
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ExpiryMigration_Upgrading_PreservesSendingWorkAsPotentiallyStarted()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(BoundedReceiptLifecycleMigration);
+        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        var claimToken = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Id, Channel, Message, DeduplicationKey, CreatedAtUtc,
+                 NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount,
+                 ClaimToken, ClaimSlot, ClaimExpiresAtUtc, SendStartedAtUtc)
+            VALUES
+                (1, 'streamer', 'possibly sent', {DeduplicationKey}, {now}, {now},
+                 'Sending', 1, 0, {claimToken}, 1, {now.AddMinutes(5)}, {now});
+
+            INSERT INTO public_chat_send_receipts
+                (OutboxMessageId, AttemptedAtUtc)
+            VALUES (1, {now});
+            """
+        );
+
+        await migrator.MigrateAsync(ExpiryMigration);
+        db.ChangeTracker.Clear();
+
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Sending);
+        row.Message.ShouldBe("possibly sent");
+        row.DeduplicationKey.ShouldBe(DeduplicationKey);
+        row.ExpiresAtUtc.ShouldBe(now);
+        row.SendStartedAtUtc.ShouldBe(now);
+        row.CompletedAtUtc.ShouldBeNull();
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+    }
+
     private sealed record DowngradedTerminalRow(
         string DeduplicationKey,
         DateTime NextAttemptAtUtc
     );
+
+    private sealed record SafeRetryMigrationRow(
+        string Status,
+        string Message,
+        int AttemptCount,
+        int SafePreSendFailureCount,
+        DateTime NextAttemptAtUtc,
+        DateTime? CompletedAtUtc
+    );
+
+    private sealed record RetainedTerminalMigrationRow(
+        string Status,
+        string? Message,
+        string? DeduplicationKey,
+        DateTime? NextAttemptAtUtc
+    );
+
+    private static Task<SafeRetryMigrationRow> ReadSafeRetryMigrationRowAsync(
+        BlokeBotDbContext db
+    ) =>
+        db.Database.SqlQueryRaw<SafeRetryMigrationRow>(
+                """
+                SELECT Status, Message, AttemptCount, SafePreSendFailureCount,
+                       NextAttemptAtUtc, CompletedAtUtc
+                FROM public_chat_outbox
+                """
+            )
+            .SingleAsync();
 
     private static Task<long> ReadOutboxSequenceAsync(BlokeBotDbContext db) =>
         db.Database.SqlQueryRaw<long>(
@@ -520,11 +709,13 @@ public sealed class PublicChatOutboxPersistenceTests
         db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO public_chat_outbox
-                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
+                 NextAttemptAtUtc,
                  Status, AttemptCount, SafePreSendFailureCount, ClaimToken, ClaimSlot,
                  ClaimExpiresAtUtc)
             VALUES
-                ('streamer', {message}, {DeduplicationKey}, {now}, {now}, 'Claimed', 0,
+                ('streamer', {message}, {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                 {now}, 'Claimed', 0,
                  0, {claimToken}, 1, {now.AddMinutes(5)})
             """
         );

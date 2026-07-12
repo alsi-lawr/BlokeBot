@@ -208,6 +208,8 @@ internal sealed class PublicChatMessageQueue(
         {
             case PublicChatClaimUpdate.Applied:
                 break;
+            case PublicChatClaimUpdate.Expired:
+                return;
             case PublicChatClaimUpdate.OwnershipLost:
                 return;
             case PublicChatClaimUpdate.Contended:
@@ -254,7 +256,12 @@ internal sealed class PublicChatMessageQueue(
         try
         {
             _ = await ApplyClaimUpdateAsync(
-                () => outbox.ReleaseClaimAsync(message, CancellationToken.None),
+                () =>
+                    outbox.ReleaseClaimAsync(
+                        message,
+                        UtcNow(),
+                        CancellationToken.None
+                    ),
                 CancellationToken.None
             );
         }
@@ -321,7 +328,8 @@ internal sealed class PublicChatMessageQueue(
             );
         }
 
-        LogOutcome(message, outcome);
+        if (recorded is not PublicChatClaimUpdate.Expired)
+            LogOutcome(message, outcome);
     }
 
     private void LogOutcome(
@@ -469,6 +477,7 @@ internal sealed class PublicChatMessageQueue(
             {
                 case PublicChatClaimUpdate.Applied:
                 case PublicChatClaimUpdate.OwnershipLost:
+                case PublicChatClaimUpdate.Expired:
                     return result;
                 case PublicChatClaimUpdate.Contended:
                     await WaitForSignalOrScheduledWakeAsync(

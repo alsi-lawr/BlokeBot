@@ -599,7 +599,14 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
                             + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
                             + "AND FailurePhase = 'Preparation' "
-                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL)"
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
+                            + "(Status = 'Expired' AND Message IS NULL "
+                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
+                            + "AND CompletedAtUtc IS NOT NULL "
+                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
+                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL)"
                     );
                 }
             );
@@ -638,6 +645,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 x.Id,
             });
             b.HasIndex(x => new { x.Status, x.ClaimExpiresAtUtc });
+            b.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
             b.HasIndex(x => x.ClaimToken)
                 .IsUnique()
                 .HasFilter("\"ClaimToken\" IS NOT NULL");

@@ -31,7 +31,7 @@ public sealed class PublicChatOutboxIntegrationTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = Utc(12, 0, 0);
-        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var queue = CreateQueue(
             outbox,
             new RecordingPublicChatTransport(),
@@ -70,7 +70,7 @@ public sealed class PublicChatOutboxIntegrationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var originalQueue = CreateQueue(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             new RecordingPublicChatTransport(),
             clock
         );
@@ -80,7 +80,7 @@ public sealed class PublicChatOutboxIntegrationTests
         );
 
         var restartedOutbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var restartedTransport = new RecordingPublicChatTransport();
         var restartedQueue = CreateQueue(
@@ -111,7 +111,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var next = await new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             clock.GetUtcNow(),
             clock.GetUtcNow().AddMinutes(5),
@@ -123,12 +123,328 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
+    public async Task EnqueuedMessage_Persisting_UsesCreatedTimeAndRequiredLifetimeOnce()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(17)),
+            StandardRetentionPolicy
+        );
+
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "short lived"),
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.CreatedAtUtc.ShouldBe(now.UtcDateTime);
+        row.ExpiresAtUtc.ShouldBe(now.AddSeconds(17).UtcDateTime);
+    }
+
+    [Test]
+    public async Task ClaimedMessage_BeginningAtExactExpiry_RedactsWithoutSendReceipt()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var expiry = now.AddSeconds(5);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "secret stale payload"),
+            CancellationToken.None
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+
+        (await outbox.BeginSendAsync(
+                claimed,
+                expiry,
+                expiry.AddMinutes(5),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Expired>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        AssertExpired(row, expiry);
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task PendingMessage_ClaimingAfterExpiry_RedactsAtObservedTime()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var observedAt = now.AddSeconds(5).AddTicks(1);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "already stale"),
+            CancellationToken.None
+        );
+
+        (await outbox.TryClaimNextAsync(
+                observedAt,
+                observedAt.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            ))
+            .ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), observedAt);
+    }
+
+    [Test]
+    public async Task ClaimedMessage_BeginningImmediatelyBeforeExpiry_PreservesSendOutcome()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var expiry = now.AddSeconds(5);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "begins in time"),
+            CancellationToken.None
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+
+        (await outbox.BeginSendAsync(
+                claimed,
+                expiry.AddTicks(-1),
+                expiry.AddMinutes(5),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        _ = await outbox.TryClaimNextAsync(
+            expiry,
+            expiry.AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+        (await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                new PublicChatDeliveryOutcome.Sent(),
+                expiry.AddSeconds(1),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task SafeRetryBeyondExpiry_Scheduling_UsesExpiryAndThenRedacts()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var expiry = now.AddSeconds(5);
+        var retryPolicy = CreateRetryPolicy(
+            3,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(30),
+            DelayBackoffType.Constant
+        );
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            retryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "retry expires"),
+            CancellationToken.None
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+
+        (await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                SafePreSendTransientOutcome(),
+                now,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        await using (var scheduledDb = await dbFactory.CreateDbContextAsync())
+        {
+            var scheduled = await scheduledDb.PublicChatOutboxMessages.SingleAsync();
+            scheduled.NextAttemptAtUtc.ShouldBe(expiry.UtcDateTime);
+        }
+
+        (await outbox.TryClaimNextAsync(
+                expiry.AddTicks(-1),
+                expiry.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>()
+            .AvailableAt.ShouldBe(expiry);
+        _ = await outbox.TryClaimNextAsync(
+            expiry,
+            expiry.AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), expiry);
+    }
+
+    [Test]
+    public async Task CanceledClaim_ReleasedAtExpiry_BecomesTerminalInsteadOfPending()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var expiry = now.AddSeconds(5);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "cancel expires"),
+            CancellationToken.None
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+
+        (await outbox.ReleaseClaimAsync(claimed, expiry, CancellationToken.None))
+            .ShouldBeOfType<PublicChatClaimUpdate.Expired>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), expiry);
+    }
+
+    [Test]
+    public async Task PendingMessage_ConcurrentClaimsAtExpiry_ExpireWithoutClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var expiry = now.AddSeconds(5);
+        var first = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        var second = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await first.EnqueueAsync(
+            Batch("streamer", now, "concurrent stale"),
+            CancellationToken.None
+        );
+
+        var outcomes = await Task.WhenAll(
+            first.TryClaimNextAsync(
+                    expiry,
+                    expiry.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask(),
+            second.TryClaimNextAsync(
+                    expiry,
+                    expiry.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+
+        foreach (var outcome in outcomes)
+            outcome.ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), expiry);
+    }
+
+    [Test]
+    public async Task PendingMessage_IdleWorker_WakesAtDurableExpiryWithoutTransport()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            seed.PublicChatSendReceipts.Add(
+                new PublicChatSendReceipt
+                {
+                    OutboxMessageId = 999,
+                    AttemptedAtUtc = now.UtcDateTime,
+                    CompletedAtUtc = now.UtcDateTime,
+                }
+            );
+            await seed.SaveChangesAsync();
+        }
+        var clock = new ManualTestTimeProvider(now);
+        var persisted = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            Lifetime(TimeSpan.FromSeconds(5)),
+            StandardRetentionPolicy
+        );
+        _ = await persisted.EnqueueAsync(
+            Batch("streamer", now, "idle stale"),
+            CancellationToken.None
+        );
+        var observed = new CompletionObservingPublicChatOutbox(persisted);
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(
+            observed,
+            transport,
+            clock,
+            new TwitchBotOptions { ChatMessageSendIntervalSeconds = 60 }
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await observed.ReadClaimOutcomeAsync())
+            .ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>()
+            .AvailableAt.ShouldBe(now.AddSeconds(5));
+        _ = await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(5));
+        _ = await observed.ReadClaimOutcomeAsync();
+
+        transport.DeliveryCount.ShouldBe(0);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+            AssertExpired(
+                await db.PublicChatOutboxMessages.SingleAsync(),
+                now.AddSeconds(5)
+            );
+        await StopAsync(stopping, worker);
+    }
+
+    [Test]
     public async Task SuccessfulSend_IdleWorkerPurgesReceiptExactlyAtOperationalExpiry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var queue = CreateQueue(
             outbox,
@@ -192,7 +508,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outbox = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         );
 
         (await outbox.TryClaimNextAsync(
@@ -251,7 +567,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outbox = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         );
         var enqueueReceipt = await outbox.EnqueueAsync(
             Batch("streamer", now, "identity after migrated success"),
@@ -288,7 +604,7 @@ public sealed class PublicChatOutboxIntegrationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(
@@ -331,7 +647,7 @@ public sealed class PublicChatOutboxIntegrationTests
     public async Task PreviousCompletion_ClaimingNext_AppliesGlobalSendInterval()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await outbox.EnqueueAsync(
             Batch("streamer", now, "first", "second"),
@@ -376,7 +692,7 @@ public sealed class PublicChatOutboxIntegrationTests
     public async Task DuplicateAndDistinctMessages_Claiming_DelaysOnlyDuplicateFromCompletion()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await outbox.EnqueueAsync(
             Batch("streamer", now, "same", "same", "different"),
@@ -428,8 +744,8 @@ public sealed class PublicChatOutboxIntegrationTests
     public async Task ConcurrentStores_ClaimingPendingMessage_GrantOneGlobalClaim()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var firstStore = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
-        var secondStore = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var firstStore = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
+        var secondStore = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await firstStore.EnqueueAsync(
             Batch("streamer", now, "only once"),
@@ -484,7 +800,7 @@ public sealed class PublicChatOutboxIntegrationTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
-        var persistedOutbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var persistedOutbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var blockingOutbox = new BlockingBeginSendPublicChatOutbox(persistedOutbox);
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(blockingOutbox, transport, clock);
@@ -511,7 +827,7 @@ public sealed class PublicChatOutboxIntegrationTests
         }
 
         var restartedOutbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var restartedTransport = new RecordingPublicChatTransport();
         var restartedQueue = CreateQueue(
@@ -538,7 +854,7 @@ public sealed class PublicChatOutboxIntegrationTests
     public async Task ClaimedLeaseExpired_AfterRestart_IsReclaimedWithoutStartingAttempt()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await outbox.EnqueueAsync(
             Batch("streamer", now, "safe to reclaim"),
@@ -555,7 +871,7 @@ public sealed class PublicChatOutboxIntegrationTests
         ).ShouldBeOfType<PublicChatClaimOutcome.Claimed>().Message;
 
         var reclaimed = await ClaimAsync(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             now.AddSeconds(2),
             TimeSpan.Zero
         );
@@ -575,7 +891,7 @@ public sealed class PublicChatOutboxIntegrationTests
     public async Task SendingClaimExpired_AfterRestart_BecomesRedactedAmbiguousWithoutRetry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy);
+        var outbox = new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await outbox.EnqueueAsync(
             Batch("streamer", now, "may have sent"),
@@ -593,7 +909,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var afterRestart = await new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             now.AddSeconds(2),
             now.AddMinutes(5),
@@ -714,7 +1030,7 @@ public sealed class PublicChatOutboxIntegrationTests
             await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
             var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
             var outbox = new CompletionObservingPublicChatOutbox(
-                new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+                new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
             );
             var transport = scenario.CreateTransport();
             var queue = CreateQueue(outbox, transport, clock);
@@ -756,7 +1072,7 @@ public sealed class PublicChatOutboxIntegrationTests
             var afterRestart = await new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
-                StandardRetentionPolicy
+                StandardLifetimePolicy, StandardRetentionPolicy
             ).TryClaimNextAsync(
                 clock.GetUtcNow(),
                 clock.GetUtcNow().AddMinutes(5),
@@ -768,7 +1084,7 @@ public sealed class PublicChatOutboxIntegrationTests
 
             var restartedTransport = new RecordingPublicChatTransport();
             var restartedQueue = CreateQueue(
-                new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+                new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
                 restartedTransport,
                 clock,
                 new TwitchBotOptions
@@ -797,7 +1113,7 @@ public sealed class PublicChatOutboxIntegrationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var transport = new ScriptedPublicChatTransport(
             static (_, cancellationToken) =>
@@ -847,7 +1163,7 @@ public sealed class PublicChatOutboxIntegrationTests
             await new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
                 clock.GetUtcNow(),
                 clock.GetUtcNow().AddMinutes(5),
@@ -861,7 +1177,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var retry = await new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             beforeRetry.AvailableAt,
             beforeRetry.AvailableAt.AddMinutes(5),
@@ -891,7 +1207,7 @@ public sealed class PublicChatOutboxIntegrationTests
             DelayBackoffType.Constant
         );
         var now = Utc(12, 0, 0);
-        var schedulingStore = new EfPublicChatOutbox(dbFactory, schedulingPolicy, StandardRetentionPolicy);
+        var schedulingStore = new EfPublicChatOutbox(dbFactory, schedulingPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         _ = await schedulingStore.EnqueueAsync(
             Batch("streamer", now, "must not prepare again"),
             CancellationToken.None
@@ -906,8 +1222,8 @@ public sealed class PublicChatOutboxIntegrationTests
             .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
         var retryAt = now.AddSeconds(1);
-        var firstRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy, StandardRetentionPolicy);
-        var secondRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy, StandardRetentionPolicy);
+        var firstRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
+        var secondRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var concurrentClaims = await Task.WhenAll(
             firstRestartStore
                 .TryClaimNextAsync(
@@ -964,7 +1280,7 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
-    public async Task MigratedSafePreSendRetry_NormalizingConcurrently_SchedulesOnceAndClaimsOnceAtDueTime()
+    public async Task MigratedSafePreSendRetry_ConcurrentStores_NeverReviveExpiredLegacyWork()
     {
         var failedAt = Utc(12, 0, 0);
         await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
@@ -974,10 +1290,10 @@ public sealed class PublicChatOutboxIntegrationTests
             TimeSpan.FromSeconds(30),
             DelayBackoffType.Exponential
         );
-        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy);
-        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy);
+        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
+        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
 
-        var normalization = await Task.WhenAll(
+        var outcomes = await Task.WhenAll(
             firstStore
                 .TryClaimNextAsync(
                     failedAt,
@@ -997,84 +1313,21 @@ public sealed class PublicChatOutboxIntegrationTests
                 )
                 .AsTask()
         );
-        normalization.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
-        foreach (var outcome in normalization)
-        {
-            (outcome
-                    is PublicChatClaimOutcome.AwaitingAvailability
-                        or PublicChatClaimOutcome.Contended)
-                .ShouldBeTrue();
-        }
-
-        var dueAt = failedAt.AddSeconds(5);
-        var normalized = (
-            await firstStore.TryClaimNextAsync(
-                failedAt,
-                failedAt.AddMinutes(5),
-                TimeSpan.Zero,
-                TimeSpan.Zero,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
-        normalized.AvailableAt.ShouldBe(dueAt);
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-            row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
-            row.SafePreSendFailureCount.ShouldBe(1);
-            row.NextAttemptAtUtc.ShouldBe(dueAt.UtcDateTime);
-            row.CompletedAtUtc.ShouldBeNull();
-        }
-
-        var afterSecondRestart = (
-            await new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy).TryClaimNextAsync(
-                failedAt.AddSeconds(4),
-                failedAt.AddMinutes(5),
-                TimeSpan.Zero,
-                TimeSpan.Zero,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
-        afterSecondRestart.AvailableAt.ShouldBe(dueAt);
-
-        var dueClaims = await Task.WhenAll(
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy)
-                .TryClaimNextAsync(
-                    dueAt,
-                    dueAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask(),
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy)
-                .TryClaimNextAsync(
-                    dueAt,
-                    dueAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask()
-        );
-        dueClaims.OfType<PublicChatClaimOutcome.Claimed>().ShouldHaveSingleItem();
-        dueClaims.Count(outcome =>
-                outcome
-                    is PublicChatClaimOutcome.AwaitingAvailability
-                        or PublicChatClaimOutcome.Contended
-            )
-            .ShouldBe(1);
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-            row.Status.ShouldBe(PublicChatOutboxStatus.Claimed);
-            row.SafePreSendFailureCount.ShouldBe(1);
-            row.NextAttemptAtUtc.ShouldBe(dueAt.UtcDateTime);
-        }
+        outcomes.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Expired);
+        row.ExpiresAtUtc.ShouldBe(failedAt.UtcDateTime);
+        row.Message.ShouldBeNull();
+        row.DeduplicationKey.ShouldBeNull();
+        row.NextAttemptAtUtc.ShouldBeNull();
+        row.CompletedAtUtc.ShouldNotBeNull();
+        row.FailurePhase.ShouldBeNull();
+        row.FailureType.ShouldBeNull();
     }
 
     [Test]
-    public async Task MigratedSafePreSendRetry_WithAttemptLimitOne_TerminalizesRedactedWithoutClaim()
+    public async Task MigratedSafePreSendRetry_AttemptPolicyCannotReviveExpiredLegacyWork()
     {
         var failedAt = Utc(12, 0, 0);
         await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
@@ -1088,7 +1341,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outcome = await new EfPublicChatOutbox(
             dbFactory,
             retryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             failedAt,
             failedAt.AddMinutes(5),
@@ -1100,15 +1353,16 @@ public sealed class PublicChatOutboxIntegrationTests
         outcome.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendExhausted);
+        row.Status.ShouldBe(PublicChatOutboxStatus.Expired);
         row.Message.ShouldBeNull();
         row.AttemptCount.ShouldBe(0);
         row.SafePreSendFailureCount.ShouldBe(1);
-        row.CompletedAtUtc.ShouldBe(failedAt.UtcDateTime);
+        row.CompletedAtUtc.ShouldNotBeNull();
         row.SendStartedAtUtc.ShouldBeNull();
         row.ClaimToken.ShouldBeNull();
         row.ClaimSlot.ShouldBeNull();
-        row.FailureType.ShouldBe(typeof(IOException).FullName);
+        row.FailurePhase.ShouldBeNull();
+        row.FailureType.ShouldBeNull();
     }
 
     [Test]
@@ -1123,7 +1377,7 @@ public sealed class PublicChatOutboxIntegrationTests
         );
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var initialOutbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var initialQueue = CreateQueue(
             initialOutbox,
@@ -1154,7 +1408,7 @@ public sealed class PublicChatOutboxIntegrationTests
         }
 
         var restartedOutbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var restartedTransport = new RecordingPublicChatTransport();
         var restartedQueue = CreateQueue(restartedOutbox, restartedTransport, clock);
@@ -1188,7 +1442,7 @@ public sealed class PublicChatOutboxIntegrationTests
         );
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
         );
         var transport = new ScriptedPublicChatTransport(
             static (_, cancellationToken) =>
@@ -1241,7 +1495,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var afterExhaustion = await new EfPublicChatOutbox(
             dbFactory,
             retryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             clock.GetUtcNow(),
             clock.GetUtcNow().AddMinutes(5),
@@ -1262,8 +1516,8 @@ public sealed class PublicChatOutboxIntegrationTests
             TimeSpan.FromSeconds(5),
             DelayBackoffType.Exponential
         );
-        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy);
-        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy);
+        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
+        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         var now = Utc(12, 0, 0);
         _ = await firstStore.EnqueueAsync(
             Batch("streamer", now, "safe concurrent retry"),
@@ -1332,7 +1586,7 @@ public sealed class PublicChatOutboxIntegrationTests
             DelayBackoffType.Exponential
         );
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
-        var persistedOutbox = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy);
+        var persistedOutbox = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
         _ = await persistedOutbox.EnqueueAsync(
             Batch("streamer", clock.GetUtcNow(), "retain safe retry"),
             CancellationToken.None
@@ -1353,7 +1607,7 @@ public sealed class PublicChatOutboxIntegrationTests
 
         using var stopping = new CancellationTokenSource();
         var queue = CreateQueue(
-            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             new ScriptedPublicChatTransport(
                 (_, cancellationToken) =>
                 {
@@ -1387,7 +1641,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var retry = await new EfPublicChatOutbox(
             dbFactory,
             retryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             clock.GetUtcNow(),
             clock.GetUtcNow().AddMinutes(5),
@@ -1415,7 +1669,7 @@ public sealed class PublicChatOutboxIntegrationTests
                 throw new InvalidOperationException("Canceled preparation cannot send.")
         );
         var queue = CreateQueue(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             transport,
             new ManualTestTimeProvider(Utc(12, 0, 0))
         );
@@ -1454,7 +1708,7 @@ public sealed class PublicChatOutboxIntegrationTests
         );
         var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var queue = CreateQueue(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             transport,
             clock
         );
@@ -1480,7 +1734,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var afterRestart = await new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         ).TryClaimNextAsync(
             clock.GetUtcNow(),
             clock.GetUtcNow().AddMinutes(5),
@@ -1499,7 +1753,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outbox = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
-            StandardRetentionPolicy
+            StandardLifetimePolicy, StandardRetentionPolicy
         );
         _ = await outbox.EnqueueAsync(
             Batch("streamer", now, "atomic success"),
@@ -1581,6 +1835,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outbox = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
+            StandardLifetimePolicy,
             Retention(duration)
         );
 
@@ -1605,7 +1860,8 @@ public sealed class PublicChatOutboxIntegrationTests
             await new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
-                Retention(duration)
+                StandardLifetimePolicy,
+            Retention(duration)
             ).TryClaimNextAsync(
                 now.AddTicks(1),
                 now.AddMinutes(5),
@@ -1617,6 +1873,36 @@ public sealed class PublicChatOutboxIntegrationTests
         await using var verification = await dbFactory.CreateDbContextAsync();
         (await verification.PublicChatOutboxMessages.AsNoTracking().ToArrayAsync())
             .ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ExpiredTerminal_RetentionAtExactCutoff_PurgesWithOtherTerminalRows()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var duration = TimeSpan.FromMinutes(10);
+        await SeedTerminalRowsAsync(
+            dbFactory,
+            TerminalRow(PublicChatOutboxStatus.Expired, now - duration)
+        );
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardLifetimePolicy,
+            Retention(duration)
+        );
+
+        (await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -1640,6 +1926,7 @@ public sealed class PublicChatOutboxIntegrationTests
         var outbox = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
+            StandardLifetimePolicy,
             Retention(TimeSpan.FromMinutes(10))
         );
 
@@ -1706,7 +1993,8 @@ public sealed class PublicChatOutboxIntegrationTests
             var outbox = new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
-                Retention(TimeSpan.FromMinutes(10))
+                StandardLifetimePolicy,
+            Retention(TimeSpan.FromMinutes(10))
             );
 
             _ = await outbox.TryClaimNextAsync(
@@ -1760,11 +2048,13 @@ public sealed class PublicChatOutboxIntegrationTests
         var firstStore = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
+            StandardLifetimePolicy,
             Retention(TimeSpan.FromMinutes(10))
         );
         var secondStore = new EfPublicChatOutbox(
             dbFactory,
             StandardRetryPolicy,
+            StandardLifetimePolicy,
             Retention(TimeSpan.FromMinutes(10))
         );
 
@@ -1818,7 +2108,7 @@ public sealed class PublicChatOutboxIntegrationTests
         await dbFactory.DisposeAsync();
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy),
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy),
             transport,
             new ManualTestTimeProvider(Utc(12, 0, 0))
         );
@@ -1918,6 +2208,29 @@ public sealed class PublicChatOutboxIntegrationTests
     private static PublicChatTerminalRetentionPolicy Retention(TimeSpan duration) =>
         new() { Duration = duration };
 
+    private static PublicChatDeliveryLifetimePolicy Lifetime(TimeSpan maximumAge) =>
+        new() { MaximumAge = maximumAge };
+
+    private static void AssertExpired(
+        PublicChatOutboxMessage row,
+        DateTimeOffset completedAt
+    )
+    {
+        row.Status.ShouldBe(PublicChatOutboxStatus.Expired);
+        row.Message.ShouldBeNull();
+        row.DeduplicationKey.ShouldBeNull();
+        row.NextAttemptAtUtc.ShouldBeNull();
+        row.ClaimToken.ShouldBeNull();
+        row.ClaimSlot.ShouldBeNull();
+        row.ClaimExpiresAtUtc.ShouldBeNull();
+        row.SendStartedAtUtc.ShouldBeNull();
+        row.CompletedAtUtc.ShouldBe(completedAt.UtcDateTime);
+        row.FailurePhase.ShouldBeNull();
+        row.FailureType.ShouldBeNull();
+        row.HttpStatusCode.ShouldBeNull();
+        row.RejectionCode.ShouldBeNull();
+    }
+
     private static async Task SeedTerminalRowsAsync(
         SqliteBlokeBotDbFactory dbFactory,
         params PublicChatOutboxMessage[] rows
@@ -1937,6 +2250,7 @@ public sealed class PublicChatOutboxIntegrationTests
         {
             Channel = "streamer",
             CreatedAtUtc = completedAt.AddHours(-1).UtcDateTime,
+            ExpiresAtUtc = completedAt.AddMinutes(-59).UtcDateTime,
             CompletedAtUtc = completedAt.UtcDateTime,
             Status = status,
         };
@@ -1963,6 +2277,8 @@ public sealed class PublicChatOutboxIntegrationTests
                 row.FailurePhase = PublicChatOutboxFailurePhase.Preparation;
                 row.FailureType = typeof(InvalidOperationException).FullName;
                 break;
+            case PublicChatOutboxStatus.Expired:
+                break;
             default:
                 throw new UnreachableException(
                     $"{status} is not a terminal public chat status."
@@ -1985,6 +2301,7 @@ public sealed class PublicChatOutboxIntegrationTests
                 .Key("streamer", "must survive terminal cleanup")
                 .Value,
             CreatedAtUtc = now.AddHours(-1).UtcDateTime,
+            ExpiresAtUtc = now.AddHours(2).UtcDateTime,
             NextAttemptAtUtc = now.AddHours(1).UtcDateTime,
             Status = status,
         };

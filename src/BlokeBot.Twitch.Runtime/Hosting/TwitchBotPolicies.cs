@@ -28,6 +28,8 @@ public sealed record TwitchBotPolicyOptions
 
     public required PublicChatRetryOptions PublicChatRetry { get; init; }
 
+    public required PublicChatDeliveryLifetimeOptions PublicChatDeliveryLifetime { get; init; }
+
     public required PublicChatTerminalRetentionOptions PublicChatTerminalRetention { get; init; }
 }
 
@@ -81,6 +83,11 @@ public sealed record PublicChatRetryPolicy
     public required DelayBackoffType DelayBackoffType { get; init; }
 }
 
+public sealed record PublicChatDeliveryLifetimePolicy
+{
+    public required TimeSpan MaximumAge { get; init; }
+}
+
 public sealed record PublicChatTerminalRetentionPolicy
 {
     public required TimeSpan Duration { get; init; }
@@ -95,6 +102,8 @@ public sealed record TwitchBotPolicies
     public required EventSubChannelRecoveryPolicy EventSubChannelRecovery { get; init; }
 
     public required PublicChatRetryPolicy PublicChatRetry { get; init; }
+
+    public required PublicChatDeliveryLifetimePolicy PublicChatDeliveryLifetime { get; init; }
 
     public required PublicChatTerminalRetentionPolicy PublicChatTerminalRetention { get; init; }
 
@@ -118,6 +127,10 @@ public sealed record TwitchBotPolicies
                 PublicChatRetry = BindRequired<PublicChatRetryOptions>(
                     policies.GetSection(nameof(PublicChatRetry))
                 ),
+                PublicChatDeliveryLifetime =
+                    BindRequired<PublicChatDeliveryLifetimeOptions>(
+                        policies.GetSection(nameof(PublicChatDeliveryLifetime))
+                    ),
                 PublicChatTerminalRetention = BindRequired<PublicChatTerminalRetentionOptions>(
                     policies.GetSection(nameof(PublicChatTerminalRetention))
                 ),
@@ -159,6 +172,11 @@ public sealed record TwitchBotPolicies
             options.PublicChatTerminalRetention,
             new PublicChatTerminalRetentionOptionsValidator()
         );
+        var lifetime = Validate(
+            $"{boundary}.{nameof(options.PublicChatDeliveryLifetime)}",
+            options.PublicChatDeliveryLifetime,
+            new PublicChatDeliveryLifetimeOptionsValidator()
+        );
 
         return new TwitchBotPolicies
         {
@@ -192,6 +210,10 @@ public sealed record TwitchBotPolicies
                 Delay = publicChat.Delay!.Value,
                 MaximumDelay = publicChat.MaximumDelay!.Value,
                 DelayBackoffType = publicChat.DelayBackoffType!.Value,
+            },
+            PublicChatDeliveryLifetime = new PublicChatDeliveryLifetimePolicy
+            {
+                MaximumAge = lifetime.MaximumAge!.Value,
             },
             PublicChatTerminalRetention = new PublicChatTerminalRetentionPolicy
             {

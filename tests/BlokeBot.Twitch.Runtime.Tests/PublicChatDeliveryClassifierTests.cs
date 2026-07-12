@@ -241,6 +241,7 @@ public sealed class PublicChatDeliveryClassifierTests
                 Channel = "streamer",
                 Message = message,
                 EnqueuedAt = DateTimeOffset.UnixEpoch,
+                ExpiresAt = DateTimeOffset.UnixEpoch.AddSeconds(30),
                 Attempt = 1,
                 ClaimToken = new PublicChatClaimToken(Guid.NewGuid()),
                 ClaimExpiresAt = DateTimeOffset.UnixEpoch.AddMinutes(5),

@@ -19,6 +19,9 @@ internal static class PublicChatIntegrationTestSupport
     public static PublicChatTerminalRetentionPolicy StandardRetentionPolicy { get; } =
         new() { Duration = TimeSpan.FromDays(7) };
 
+    public static PublicChatDeliveryLifetimePolicy StandardLifetimePolicy { get; } =
+        new() { MaximumAge = TimeSpan.FromSeconds(30) };
+
     public static PublicChatMessageQueue CreateQueue(
         IPublicChatOutbox outbox,
         IPublicChatTransport transport,
@@ -269,8 +272,9 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
+        DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    ) => inner.ReleaseClaimAsync(message, cancellationToken);
+    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         CancellationToken cancellationToken
@@ -370,8 +374,9 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
+        DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    ) => inner.ReleaseClaimAsync(message, cancellationToken);
+    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         CancellationToken cancellationToken

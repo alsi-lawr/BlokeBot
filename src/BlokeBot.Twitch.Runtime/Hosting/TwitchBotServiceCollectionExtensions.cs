@@ -350,6 +350,7 @@ public static class TwitchBotServiceCollectionExtensions
             TwitchBotResiliencePipeline.PublicChatDelivery,
             policies.PublicChatRetry
         );
+        services.AddSingleton(policies.PublicChatDeliveryLifetime);
         services.AddSingleton(policies.PublicChatTerminalRetention);
         services.AddResiliencePipeline(
             TwitchBotResiliencePipeline.IrcSession,
