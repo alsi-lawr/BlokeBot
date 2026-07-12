@@ -98,7 +98,7 @@ internal sealed class PublicChatMessageQueue(
                         break;
                     case PublicChatClaimOutcome.AwaitingAvailability waiting:
                         var availabilityDelay = waiting.AvailableAt - UtcNow();
-                        await WaitForSignalOrDelayAsync(
+                        await WaitForSignalOrScheduledWakeAsync(
                             nextBacklogAlert is { } alertDelay
                                 ? Min(availabilityDelay, alertDelay)
                                 : availabilityDelay,
@@ -108,7 +108,7 @@ internal sealed class PublicChatMessageQueue(
                     case PublicChatClaimOutcome.Empty:
                         if (nextBacklogAlert is { } emptyAlertDelay)
                         {
-                            await WaitForSignalOrDelayAsync(
+                            await WaitForSignalOrScheduledWakeAsync(
                                 emptyAlertDelay,
                                 cancellationToken
                             );
@@ -119,9 +119,8 @@ internal sealed class PublicChatMessageQueue(
                         }
                         break;
                     case PublicChatClaimOutcome.Contended:
-                        await Task.Delay(
+                        await WaitForSignalOrScheduledWakeAsync(
                             ClaimContentionDelay,
-                            timeProvider,
                             cancellationToken
                         );
                         break;
@@ -421,7 +420,7 @@ internal sealed class PublicChatMessageQueue(
         }
     }
 
-    private async Task WaitForSignalOrDelayAsync(
+    private async Task WaitForSignalOrScheduledWakeAsync(
         TimeSpan delay,
         CancellationToken cancellationToken
     )
@@ -429,19 +428,16 @@ internal sealed class PublicChatMessageQueue(
         if (delay <= TimeSpan.Zero)
             return;
 
-        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken
+        using var wakeTimer = timeProvider.CreateTimer(
+            static state =>
+            {
+                _ = ((ChannelWriter<bool>)state!).TryWrite(true);
+            },
+            wakeSignals.Writer,
+            delay,
+            Timeout.InfiniteTimeSpan
         );
-        var delayTask = Task.Delay(delay, timeProvider, waitCancellation.Token);
-        var signalTask = wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
-        try
-        {
-            await await Task.WhenAny(delayTask, signalTask);
-        }
-        finally
-        {
-            await waitCancellation.CancelAsync();
-        }
+        _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
     }
 
     private async ValueTask<PublicChatClaimUpdate> ApplyClaimUpdateAsync(
@@ -458,9 +454,8 @@ internal sealed class PublicChatMessageQueue(
                 case PublicChatClaimUpdate.OwnershipLost:
                     return result;
                 case PublicChatClaimUpdate.Contended:
-                    await Task.Delay(
+                    await WaitForSignalOrScheduledWakeAsync(
                         ClaimContentionDelay,
-                        timeProvider,
                         cancellationToken
                     );
                     break;

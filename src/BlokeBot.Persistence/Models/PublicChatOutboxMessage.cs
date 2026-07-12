@@ -18,6 +18,8 @@ public sealed class PublicChatOutboxMessage
 
     public int AttemptCount { get; set; }
 
+    public int SafePreSendFailureCount { get; set; }
+
     public Guid? ClaimToken { get; set; }
 
     public int? ClaimSlot { get; set; }
@@ -53,6 +55,9 @@ public enum PublicChatOutboxStatus
 
     [PersistedToken("SafePreSendTransient")]
     SafePreSendTransient,
+
+    [PersistedToken("SafePreSendExhausted")]
+    SafePreSendExhausted,
 
     [PersistedToken("Rejected")]
     Rejected,

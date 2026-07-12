@@ -2,11 +2,20 @@ using System.Threading.Channels;
 using BlokeBot.Eventing;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
+using Polly;
 
 namespace BlokeBot.Integration.Tests;
 
 internal static class PublicChatIntegrationTestSupport
 {
+    public static PublicChatRetryPolicy StandardRetryPolicy { get; } =
+        CreateRetryPolicy(
+            3,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(30),
+            DelayBackoffType.Exponential
+        );
+
     public static PublicChatMessageQueue CreateQueue(
         IPublicChatOutbox outbox,
         IPublicChatTransport transport,
@@ -58,6 +67,20 @@ internal static class PublicChatIntegrationTestSupport
             AppAccessToken = "app-token",
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
+        };
+
+    public static PublicChatRetryPolicy CreateRetryPolicy(
+        int attemptLimit,
+        TimeSpan delay,
+        TimeSpan maximumDelay,
+        DelayBackoffType delayBackoffType
+    ) =>
+        new()
+        {
+            AttemptLimit = attemptLimit,
+            Delay = delay,
+            MaximumDelay = maximumDelay,
+            DelayBackoffType = delayBackoffType,
         };
 }
 
@@ -350,6 +373,8 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     private readonly List<ManualTimer> timers = [];
     private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
     private DateTimeOffset now = initialNow;
+    private int timerRegistrationCount;
+    private int observedTimerRegistrationCount;
     private bool waitingForTimerRegistration;
 
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
@@ -391,8 +416,11 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     {
         lock (gate)
         {
-            if (timers.Count > 0)
+            if (timerRegistrationCount > observedTimerRegistrationCount)
+            {
+                observedTimerRegistrationCount = timerRegistrationCount;
                 return ValueTask.FromResult(true);
+            }
 
             if (waitingForTimerRegistration)
                 throw new InvalidOperationException("Only one timer observer is supported.");
@@ -407,11 +435,15 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
         lock (gate)
         {
             if (!timers.Contains(timer))
+            {
                 timers.Add(timer);
+                timerRegistrationCount++;
+            }
             if (!waitingForTimerRegistration)
                 return;
 
             waitingForTimerRegistration = false;
+            observedTimerRegistrationCount = timerRegistrationCount;
             if (!timerRegistrations.Writer.TryWrite(true))
             {
                 throw new InvalidOperationException(

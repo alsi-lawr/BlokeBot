@@ -43,7 +43,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
             NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory)
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy)
         );
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(

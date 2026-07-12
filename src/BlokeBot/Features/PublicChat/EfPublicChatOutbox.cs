@@ -8,10 +8,13 @@ using Microsoft.EntityFrameworkCore;
 namespace BlokeBot.Features.PublicChat;
 
 internal sealed class EfPublicChatOutbox(
-    IDbContextFactory<BlokeBotDbContext> dbFactory
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    PublicChatRetryPolicy retryPolicy
 ) : IPublicChatOutbox
 {
     private static readonly TimeSpan ClaimAvailabilityPoll = TimeSpan.FromMilliseconds(250);
+    private readonly PublicChatRetryPolicy safePreSendRetryPolicy =
+        retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
 
     public async ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
         PublicChatOutboxBatch batch,
@@ -109,7 +112,14 @@ internal sealed class EfPublicChatOutbox(
                                 .SetProperty(
                                     row => row.AttemptCount,
                                     row => row.AttemptCount + 1
-                                ),
+                                )
+                                .SetProperty(
+                                    row => row.FailurePhase,
+                                    (PublicChatOutboxFailurePhase?)null
+                                )
+                                .SetProperty(row => row.FailureType, (string?)null)
+                                .SetProperty(row => row.HttpStatusCode, (int?)null)
+                                .SetProperty(row => row.RejectionCode, (string?)null),
                         ct
                     ),
             cancellationToken
@@ -172,35 +182,69 @@ internal sealed class EfPublicChatOutbox(
         );
     }
 
-    public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
+    public async ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
         CancellationToken cancellationToken
-    ) =>
-        ExecuteStateTransitionAsync(
-            (db, ct) =>
-                db.PublicChatOutboxMessages
-                    .Where(row =>
-                        row.Id == message.Id
-                        && row.Status == PublicChatOutboxStatus.Claimed
-                        && row.ClaimToken == message.ClaimToken.Value
-                    )
-                    .ExecuteUpdateAsync(
-                        update =>
-                            update
-                                .SetProperty(
-                                    row => row.Status,
-                                    PublicChatOutboxStatus.Pending
-                                )
-                                .SetProperty(row => row.ClaimToken, (Guid?)null)
-                                .SetProperty(row => row.ClaimSlot, (int?)null)
-                                .SetProperty(
-                                    row => row.ClaimExpiresAtUtc,
-                                    (DateTime?)null
-                                ),
-                        ct
-                    ),
-            cancellationToken
-        );
+    )
+    {
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var initialClaimReleased = await db
+                .PublicChatOutboxMessages.Where(row =>
+                    row.Id == message.Id
+                    && row.Status == PublicChatOutboxStatus.Claimed
+                    && row.ClaimToken == message.ClaimToken.Value
+                    && row.SafePreSendFailureCount == 0
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(
+                                row => row.Status,
+                                PublicChatOutboxStatus.Pending
+                            )
+                            .SetProperty(row => row.ClaimToken, (Guid?)null)
+                            .SetProperty(row => row.ClaimSlot, (int?)null)
+                            .SetProperty(
+                                row => row.ClaimExpiresAtUtc,
+                                (DateTime?)null
+                            ),
+                    cancellationToken
+                );
+            if (initialClaimReleased == 1)
+                return new PublicChatClaimUpdate.Applied();
+
+            var retryClaimReleased = await db
+                .PublicChatOutboxMessages.Where(row =>
+                    row.Id == message.Id
+                    && row.Status == PublicChatOutboxStatus.Claimed
+                    && row.ClaimToken == message.ClaimToken.Value
+                    && row.SafePreSendFailureCount > 0
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(
+                                row => row.Status,
+                                PublicChatOutboxStatus.SafePreSendTransient
+                            )
+                            .SetProperty(row => row.ClaimToken, (Guid?)null)
+                            .SetProperty(row => row.ClaimSlot, (int?)null)
+                            .SetProperty(
+                                row => row.ClaimExpiresAtUtc,
+                                (DateTime?)null
+                            ),
+                    cancellationToken
+                );
+            return Changed(retryClaimReleased);
+        }
+        catch (Exception exception) when (IsSqliteContention(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new PublicChatClaimUpdate.Contended();
+        }
+    }
 
     public async ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         CancellationToken cancellationToken
@@ -258,11 +302,14 @@ internal sealed class EfPublicChatOutbox(
             );
         }
 
-        var pending = await db
+        var claimable = await db
             .PublicChatOutboxMessages.AsNoTracking()
-            .Where(row => row.Status == PublicChatOutboxStatus.Pending)
+            .Where(row =>
+                row.Status == PublicChatOutboxStatus.Pending
+                || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+            )
             .ToArrayAsync(cancellationToken);
-        if (pending.Length == 0)
+        if (claimable.Length == 0)
             return new PublicChatClaimOutcome.Empty();
 
         var previousAttemptAt = await db
@@ -286,7 +333,7 @@ internal sealed class EfPublicChatOutbox(
                 group => group.Max(row => row.CompletedAtUtc)!.Value,
                 StringComparer.Ordinal
             );
-        var candidate = pending
+        var candidate = claimable
             .Select(row =>
                 new ClaimCandidate(
                     row,
@@ -314,7 +361,10 @@ internal sealed class EfPublicChatOutbox(
         var changed = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Id == candidate.Row.Id
-                && row.Status == PublicChatOutboxStatus.Pending
+                && (
+                    row.Status == PublicChatOutboxStatus.Pending
+                    || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                )
             )
             .ExecuteUpdateAsync(
                 update =>
@@ -384,11 +434,30 @@ internal sealed class EfPublicChatOutbox(
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.Claimed
                 && row.ClaimExpiresAtUtc <= nowUtc
+                && row.SafePreSendFailureCount == 0
             )
             .ExecuteUpdateAsync(
                 update =>
                     update
                         .SetProperty(row => row.Status, PublicChatOutboxStatus.Pending)
+                        .SetProperty(row => row.ClaimToken, (Guid?)null)
+                        .SetProperty(row => row.ClaimSlot, (int?)null)
+                        .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
+                cancellationToken
+            );
+        await db
+            .PublicChatOutboxMessages.Where(row =>
+                row.Status == PublicChatOutboxStatus.Claimed
+                && row.ClaimExpiresAtUtc <= nowUtc
+                && row.SafePreSendFailureCount > 0
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(
+                            row => row.Status,
+                            PublicChatOutboxStatus.SafePreSendTransient
+                        )
                         .SetProperty(row => row.ClaimToken, (Guid?)null)
                         .SetProperty(row => row.ClaimSlot, (int?)null)
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
@@ -432,54 +501,156 @@ internal sealed class EfPublicChatOutbox(
             cancellationToken
         );
 
-    private ValueTask<PublicChatClaimUpdate> RecordSafePreSendTransientAsync(
+    private async ValueTask<PublicChatClaimUpdate> RecordSafePreSendTransientAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Preparation diagnostic,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
     )
     {
-        return ExecuteStateTransitionAsync(
-            (db, ct) =>
-                db.PublicChatOutboxMessages
-                    .Where(row =>
-                        row.Id == message.Id
-                        && row.Status == PublicChatOutboxStatus.Claimed
-                        && row.ClaimToken == message.ClaimToken.Value
-                    )
-                    .ExecuteUpdateAsync(
-                        update =>
-                            update
-                                .SetProperty(
-                                    row => row.Status,
-                                    PublicChatOutboxStatus.SafePreSendTransient
-                                )
-                                .SetProperty(row => row.ClaimToken, (Guid?)null)
-                                .SetProperty(row => row.ClaimSlot, (int?)null)
-                                .SetProperty(
-                                    row => row.ClaimExpiresAtUtc,
-                                    (DateTime?)null
-                                )
-                                .SetProperty(
-                                    row => row.CompletedAtUtc,
-                                    recordedAt.UtcDateTime
-                                )
-                                .SetProperty(
-                                    row => row.FailurePhase,
-                                    PublicChatOutboxFailurePhase.Preparation
-                                )
-                                .SetProperty(
-                                    row => row.FailureType,
-                                    diagnostic.FailureType.Value
-                                )
-                                .SetProperty(
-                                    row => row.HttpStatusCode,
-                                    HttpStatusCode(diagnostic.HttpStatus)
-                                ),
-                        ct
-                    ),
-            cancellationToken
-        );
+        ArgumentNullException.ThrowIfNull(diagnostic);
+
+        try
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var previousFailureCount = await db
+                .PublicChatOutboxMessages.AsNoTracking()
+                .Where(row =>
+                    row.Id == message.Id
+                    && row.Status == PublicChatOutboxStatus.Claimed
+                    && row.ClaimToken == message.ClaimToken.Value
+                )
+                .Select(row => (int?)row.SafePreSendFailureCount)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (previousFailureCount is not { } persistedFailureCount)
+                return new PublicChatClaimUpdate.OwnershipLost();
+
+            var decision = PublicChatSafePreSendRetrySchedule.Create(
+                safePreSendRetryPolicy,
+                new PublicChatSafePreSendFailureCount(persistedFailureCount),
+                recordedAt
+            );
+            return decision switch
+            {
+                PublicChatSafePreSendRetryDecision.Scheduled scheduled => Changed(
+                    await db
+                        .PublicChatOutboxMessages.Where(row =>
+                            row.Id == message.Id
+                            && row.Status == PublicChatOutboxStatus.Claimed
+                            && row.ClaimToken == message.ClaimToken.Value
+                            && row.SafePreSendFailureCount == persistedFailureCount
+                        )
+                        .ExecuteUpdateAsync(
+                            update =>
+                                update
+                                    .SetProperty(
+                                        row => row.Status,
+                                        PublicChatOutboxStatus.SafePreSendTransient
+                                    )
+                                    .SetProperty(
+                                        row => row.SafePreSendFailureCount,
+                                        scheduled.FailureCount.Value
+                                    )
+                                    .SetProperty(
+                                        row => row.NextAttemptAtUtc,
+                                        scheduled.NextAttemptAtUtc.UtcDateTime
+                                    )
+                                    .SetProperty(row => row.ClaimToken, (Guid?)null)
+                                    .SetProperty(row => row.ClaimSlot, (int?)null)
+                                    .SetProperty(
+                                        row => row.ClaimExpiresAtUtc,
+                                        (DateTime?)null
+                                    )
+                                    .SetProperty(
+                                        row => row.CompletedAtUtc,
+                                        (DateTime?)null
+                                    )
+                                    .SetProperty(
+                                        row => row.FailurePhase,
+                                        PublicChatOutboxFailurePhase.Preparation
+                                    )
+                                    .SetProperty(
+                                        row => row.FailureType,
+                                        diagnostic.FailureType.Value
+                                    )
+                                    .SetProperty(
+                                        row => row.HttpStatusCode,
+                                        HttpStatusCode(diagnostic.HttpStatus)
+                                    )
+                                    .SetProperty(
+                                        row => row.RejectionCode,
+                                        (string?)null
+                                    ),
+                            cancellationToken
+                        )
+                ),
+                PublicChatSafePreSendRetryDecision.Exhausted exhausted => Changed(
+                    await db
+                        .PublicChatOutboxMessages.Where(row =>
+                            row.Id == message.Id
+                            && row.Status == PublicChatOutboxStatus.Claimed
+                            && row.ClaimToken == message.ClaimToken.Value
+                            && row.SafePreSendFailureCount == persistedFailureCount
+                        )
+                        .ExecuteUpdateAsync(
+                            update =>
+                                update
+                                    .SetProperty(
+                                        row => row.Status,
+                                        PublicChatOutboxStatus.SafePreSendExhausted
+                                    )
+                                    .SetProperty(row => row.Message, (string?)null)
+                                    .SetProperty(
+                                        row => row.SafePreSendFailureCount,
+                                        exhausted.FailureCount.Value
+                                    )
+                                    .SetProperty(
+                                        row => row.NextAttemptAtUtc,
+                                        recordedAt.UtcDateTime
+                                    )
+                                    .SetProperty(row => row.ClaimToken, (Guid?)null)
+                                    .SetProperty(row => row.ClaimSlot, (int?)null)
+                                    .SetProperty(
+                                        row => row.ClaimExpiresAtUtc,
+                                        (DateTime?)null
+                                    )
+                                    .SetProperty(
+                                        row => row.SendStartedAtUtc,
+                                        (DateTime?)null
+                                    )
+                                    .SetProperty(
+                                        row => row.CompletedAtUtc,
+                                        recordedAt.UtcDateTime
+                                    )
+                                    .SetProperty(
+                                        row => row.FailurePhase,
+                                        PublicChatOutboxFailurePhase.Preparation
+                                    )
+                                    .SetProperty(
+                                        row => row.FailureType,
+                                        diagnostic.FailureType.Value
+                                    )
+                                    .SetProperty(
+                                        row => row.HttpStatusCode,
+                                        HttpStatusCode(diagnostic.HttpStatus)
+                                    )
+                                    .SetProperty(
+                                        row => row.RejectionCode,
+                                        (string?)null
+                                    ),
+                            cancellationToken
+                        )
+                ),
+                _ => throw new UnreachableException(
+                    $"Unknown public chat safe pre-send retry decision {decision.GetType().Name}."
+                ),
+            };
+        }
+        catch (Exception exception) when (IsSqliteContention(exception))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new PublicChatClaimUpdate.Contended();
+        }
     }
 
     private ValueTask<PublicChatClaimUpdate> RecordRejectionAsync(

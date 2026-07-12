@@ -501,6 +501,10 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                         "AttemptCount >= 0"
                     );
                     t.HasCheckConstraint(
+                        "CK_public_chat_outbox_SafePreSendFailureCount",
+                        "SafePreSendFailureCount >= 0"
+                    );
+                    t.HasCheckConstraint(
                         "CK_public_chat_outbox_Channel",
                         "length(trim(Channel)) > 0"
                     );
@@ -521,14 +525,19 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL "
                             + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
+                            + "AND AttemptCount = 0 AND SafePreSendFailureCount = 0 "
                             + "AND FailurePhase IS NULL AND FailureType IS NULL "
                             + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(Status = 'Claimed' AND length(Message) > 0 "
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
                             + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
+                            + "AND AttemptCount = 0 AND ((SafePreSendFailureCount = 0 "
                             + "AND FailurePhase IS NULL AND FailureType IS NULL "
                             + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
+                            + "(SafePreSendFailureCount > 0 "
+                            + "AND FailurePhase = 'Preparation' "
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL))) OR "
                             + "(Status = 'Sending' AND length(Message) > 0 "
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
@@ -546,7 +555,16 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "(Status = 'SafePreSendTransient' AND length(Message) > 0 "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Preparation' "
+                            + "AND CompletedAtUtc IS NULL AND AttemptCount = 0 "
+                            + "AND SafePreSendFailureCount > 0 "
+                            + "AND FailurePhase = 'Preparation' "
+                            + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
+                            + "(Status = 'SafePreSendExhausted' AND Message IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
+                            + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
+                            + "AND SafePreSendFailureCount > 0 "
+                            + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
                             + "(Status = 'Rejected' AND Message IS NULL "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
@@ -564,7 +582,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "(Status = 'Unexpected' AND Message IS NULL "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
-                            + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Preparation' "
+                            + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
+                            + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL)"
                     );
                 }

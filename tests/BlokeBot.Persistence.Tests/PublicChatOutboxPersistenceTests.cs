@@ -16,6 +16,8 @@ public sealed class PublicChatOutboxPersistenceTests
     private const string OutboxMigration = "20260712140027_PublicChatOutbox";
     private const string ClassifiedOutboxMigration =
         "20260712184117_ClassifyPublicChatDeliveryOutcomes";
+    private const string RetryOutboxMigration =
+        "20260712194125_RetrySafePreSendFailures";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -50,6 +52,7 @@ public sealed class PublicChatOutboxPersistenceTests
         row.NextAttemptAtUtc.ShouldBe(now.AddSeconds(5));
         row.Status.ShouldBe(PublicChatOutboxStatus.Pending);
         row.AttemptCount.ShouldBe(0);
+        row.SafePreSendFailureCount.ShouldBe(0);
         row.FailurePhase.ShouldBeNull();
         row.FailureType.ShouldBeNull();
         row.HttpStatusCode.ShouldBeNull();
@@ -66,6 +69,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 "Delivered",
                 "Pending",
                 "Rejected",
+                "SafePreSendExhausted",
                 "SafePreSendTransient",
                 "Sending",
                 "Unexpected",
@@ -91,6 +95,18 @@ public sealed class PublicChatOutboxPersistenceTests
                      Status, AttemptCount)
                 VALUES
                     ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Unknown', 0)
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public_chat_outbox
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                     Status, AttemptCount, SafePreSendFailureCount)
+                VALUES
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Pending', 0,
+                     -1)
                 """
             )
         );
@@ -173,10 +189,12 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("CK_public_chat_outbox_Status");
         tableSql.ShouldContain("CK_public_chat_outbox_State");
         tableSql.ShouldContain("CK_public_chat_outbox_AttemptCount");
+        tableSql.ShouldContain("CK_public_chat_outbox_SafePreSendFailureCount");
         tableSql.ShouldContain("CK_public_chat_outbox_Channel");
         tableSql.ShouldContain("CK_public_chat_outbox_DeduplicationKey");
         tableSql.ShouldContain("CK_public_chat_outbox_FailurePhase");
         tableSql.ShouldContain("SafePreSendTransient");
+        tableSql.ShouldContain("SafePreSendExhausted");
         tableSql.ShouldContain("AttemptCount > 0");
 
         var indexSql = await db.Database.SqlQueryRaw<string>(
@@ -246,14 +264,28 @@ public sealed class PublicChatOutboxPersistenceTests
         );
 
         await migrator.MigrateAsync(ClassifiedOutboxMigration);
-        db.ChangeTracker.Clear();
-        var upgraded = await db.PublicChatOutboxMessages.SingleAsync();
-        upgraded.Status.ShouldBe(PublicChatOutboxStatus.Ambiguous);
-        upgraded.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Send);
-        upgraded.FailureType.ShouldBe(
+        var upgradedStatus = await db.Database.SqlQueryRaw<string>(
+                "SELECT Status AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        upgradedStatus.ShouldBe("Ambiguous");
+        var upgradedFailurePhase = await db.Database.SqlQueryRaw<string>(
+                "SELECT FailurePhase AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        upgradedFailurePhase.ShouldBe("Send");
+        var upgradedFailureType = await db.Database.SqlQueryRaw<string>(
+                "SELECT FailureType AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        upgradedFailureType.ShouldBe(
             "BlokeBot.Twitch.Runtime.PublicChatUnclassifiedPostBoundaryFailure"
         );
-        upgraded.Message.ShouldBeNull();
+        var upgradedMessage = await db.Database.SqlQueryRaw<string?>(
+                "SELECT Message AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        upgradedMessage.ShouldBeNull();
 
         await migrator.MigrateAsync(OutboxMigration);
         var revertedStatus = await db.Database.SqlQueryRaw<string>(
@@ -267,6 +299,48 @@ public sealed class PublicChatOutboxPersistenceTests
         (await TableCountAsync(db)).ShouldBe(0);
     }
 
+    [Test]
+    public async Task SafePreSendRetryMigration_UpgradingAndReverting_PreservesClassifiedSafeWork()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(ClassifiedOutboxMigration);
+        var failedAt = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                 Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
+            VALUES
+                ('streamer', 'safe to retry', {DeduplicationKey}, {failedAt}, {failedAt},
+                 'SafePreSendTransient', 0, {failedAt.AddSeconds(1)}, 'Preparation',
+                 'System.IO.IOException')
+            """
+        );
+
+        await migrator.MigrateAsync(RetryOutboxMigration);
+        db.ChangeTracker.Clear();
+        var upgraded = await db.PublicChatOutboxMessages.SingleAsync();
+        upgraded.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+        upgraded.Message.ShouldBe("safe to retry");
+        upgraded.AttemptCount.ShouldBe(0);
+        upgraded.SafePreSendFailureCount.ShouldBe(1);
+        upgraded.NextAttemptAtUtc.ShouldBe(failedAt.AddSeconds(1));
+        upgraded.CompletedAtUtc.ShouldBeNull();
+
+        await migrator.MigrateAsync(ClassifiedOutboxMigration);
+        var revertedStatus = await db.Database.SqlQueryRaw<string>(
+                "SELECT Status AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        revertedStatus.ShouldBe("SafePreSendTransient");
+    }
+
     private static Task<int> InsertClaimedAsync(
         BlokeBotDbContext db,
         string message,
@@ -277,10 +351,11 @@ public sealed class PublicChatOutboxPersistenceTests
             $"""
             INSERT INTO public_chat_outbox
                 (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
-                 Status, AttemptCount, ClaimToken, ClaimSlot, ClaimExpiresAtUtc)
+                 Status, AttemptCount, SafePreSendFailureCount, ClaimToken, ClaimSlot,
+                 ClaimExpiresAtUtc)
             VALUES
                 ('streamer', {message}, {DeduplicationKey}, {now}, {now}, 'Claimed', 0,
-                 {claimToken}, 1, {now.AddMinutes(5)})
+                 0, {claimToken}, 1, {now.AddMinutes(5)})
             """
         );
 
