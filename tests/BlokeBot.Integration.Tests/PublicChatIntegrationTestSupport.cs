@@ -16,6 +16,9 @@ internal static class PublicChatIntegrationTestSupport
             DelayBackoffType.Exponential
         );
 
+    public static PublicChatTerminalRetentionPolicy StandardRetentionPolicy { get; } =
+        new() { Duration = TimeSpan.FromDays(7) };
+
     public static PublicChatMessageQueue CreateQueue(
         IPublicChatOutbox outbox,
         IPublicChatTransport transport,

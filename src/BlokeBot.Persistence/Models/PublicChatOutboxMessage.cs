@@ -8,11 +8,11 @@ public sealed class PublicChatOutboxMessage
 
     public string? Message { get; set; }
 
-    public required string DeduplicationKey { get; set; }
+    public string? DeduplicationKey { get; set; }
 
     public DateTime CreatedAtUtc { get; set; }
 
-    public DateTime NextAttemptAtUtc { get; set; }
+    public DateTime? NextAttemptAtUtc { get; set; }
 
     public PublicChatOutboxStatus Status { get; set; } = PublicChatOutboxStatus.Pending;
 
@@ -50,9 +50,6 @@ public enum PublicChatOutboxStatus
     [PersistedToken("Sending")]
     Sending,
 
-    [PersistedToken("Delivered")]
-    Delivered,
-
     [PersistedToken("SafePreSendTransient")]
     SafePreSendTransient,
 
@@ -70,6 +67,19 @@ public enum PublicChatOutboxStatus
 
     [PersistedToken("Unexpected")]
     Unexpected,
+}
+
+public sealed class PublicChatSendReceipt
+{
+    public long OutboxMessageId { get; set; }
+
+    public DateTime AttemptedAtUtc { get; set; }
+
+    public DateTime? CompletedAtUtc { get; set; }
+
+    public string? DeliveredDeduplicationKey { get; set; }
+
+    public DateTime? DeliveredAtUtc { get; set; }
 }
 
 public enum PublicChatOutboxFailurePhase

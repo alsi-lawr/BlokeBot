@@ -22,6 +22,8 @@ public sealed class PublicChatOutboxPersistenceTests
         "20260712212036_ScheduleMigratedSafePreSendRetries";
     private const string MarkedRetryOutboxMigration =
         "20260712212037_MarkMigratedSafePreSendRetriesForScheduling";
+    private const string RetainedTerminalOutboxMigration =
+        "20260712214026_RetainRedactedTerminalDeliveries";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -70,7 +72,6 @@ public sealed class PublicChatOutboxPersistenceTests
             [
                 "Ambiguous",
                 "Claimed",
-                "Delivered",
                 "Pending",
                 "Rejected",
                 "SafePreSendExhausted",
@@ -214,6 +215,20 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("SafePreSendScheduling");
         tableSql.ShouldContain("SafePreSendExhausted");
         tableSql.ShouldContain("AttemptCount > 0");
+        tableSql.ShouldNotContain("'Delivered'");
+        tableSql.ShouldContain("DeduplicationKey IS NULL");
+        tableSql.ShouldContain("NextAttemptAtUtc IS NULL");
+
+        var receiptTableSql = await db.Database.SqlQueryRaw<string>(
+                """
+                SELECT sql AS Value
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'public_chat_send_receipts'
+                """
+            )
+            .SingleAsync();
+        receiptTableSql.ShouldContain("CK_public_chat_send_receipts_Delivery");
+        receiptTableSql.ShouldContain("DeliveredDeduplicationKey");
 
         var indexSql = await db.Database.SqlQueryRaw<string>(
                 """
@@ -380,6 +395,77 @@ public sealed class PublicChatOutboxPersistenceTests
             .SingleAsync();
         revertedStatus.ShouldBe("SafePreSendTransient");
     }
+
+    [Test]
+    public async Task TerminalRetentionMigration_UpgradingAndReverting_DeletesDeliveredAndRedactsTerminalRows()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(MarkedRetryOutboxMigration);
+        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                 Status, AttemptCount, SafePreSendFailureCount, SendStartedAtUtc,
+                 CompletedAtUtc, FailurePhase, RejectionCode)
+            VALUES
+                ('streamer', NULL, {DeduplicationKey}, {now}, {now}, 'Delivered', 1, 0,
+                 {now}, {now.AddSeconds(1)}, NULL, NULL),
+                ('streamer', NULL, {DeduplicationKey}, {now}, {now}, 'Rejected', 1, 0,
+                 {now.AddSeconds(2)}, {now.AddSeconds(3)}, 'Send', 'followers_only')
+            """
+        );
+
+        await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
+        db.ChangeTracker.Clear();
+        var retained = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        retained.Status.ShouldBe(PublicChatOutboxStatus.Rejected);
+        retained.Message.ShouldBeNull();
+        retained.DeduplicationKey.ShouldBeNull();
+        retained.NextAttemptAtUtc.ShouldBeNull();
+        var sendReceipts = await db
+            .PublicChatSendReceipts.AsNoTracking()
+            .OrderBy(receipt => receipt.OutboxMessageId)
+            .ToArrayAsync();
+        sendReceipts.Length.ShouldBe(2);
+        sendReceipts[0].DeliveredDeduplicationKey.ShouldBe(DeduplicationKey);
+        sendReceipts[0].DeliveredAtUtc.ShouldBe(now.AddSeconds(1));
+        sendReceipts[1].DeliveredDeduplicationKey.ShouldBeNull();
+        sendReceipts[1].CompletedAtUtc.ShouldBe(now.AddSeconds(3));
+
+        await migrator.MigrateAsync(MarkedRetryOutboxMigration);
+        var downgraded = await db.Database.SqlQueryRaw<DowngradedTerminalRow>(
+                """
+                SELECT DeduplicationKey, NextAttemptAtUtc
+                FROM public_chat_outbox
+                """
+            )
+            .SingleAsync();
+        downgraded.DeduplicationKey.ShouldBe(
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        );
+        downgraded.NextAttemptAtUtc.ShouldBe(now.AddSeconds(3));
+        var receiptTableCount = await db.Database.SqlQueryRaw<int>(
+                """
+                SELECT COUNT(*) AS Value
+                FROM sqlite_master
+                WHERE type = 'table' AND name = 'public_chat_send_receipts'
+                """
+            )
+            .SingleAsync();
+        receiptTableCount.ShouldBe(0);
+    }
+
+    private sealed record DowngradedTerminalRow(
+        string DeduplicationKey,
+        DateTime NextAttemptAtUtc
+    );
 
     private static Task<int> InsertClaimedAsync(
         BlokeBotDbContext db,

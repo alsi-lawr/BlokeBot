@@ -193,7 +193,7 @@ public sealed class PublicChatMessageQueueTests
 
         _ = await queue.EnqueueAsync(Command("channel", "first"), CancellationToken.None);
         (await transport.ReadAsync()).Message.ShouldBe("first");
-        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
+        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.SentAndDeleted);
         _ = await queue.EnqueueAsync(Command("channel", "second"), CancellationToken.None);
         _ = await queue.EnqueueAsync(Command("channel", "third"), CancellationToken.None);
 
@@ -207,11 +207,11 @@ public sealed class PublicChatMessageQueueTests
         await clock.WaitForTimerAtAsync(Utc(12, 0, 10));
         clock.Advance(TimeSpan.FromSeconds(5));
         (await transport.ReadAsync()).Message.ShouldBe("second");
-        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
+        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.SentAndDeleted);
         await clock.WaitForTimerAtAsync(Utc(12, 0, 20));
         clock.Advance(TimeSpan.FromSeconds(10));
         (await transport.ReadAsync()).Message.ShouldBe("third");
-        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
+        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.SentAndDeleted);
         observer.Alerts.Count.ShouldBe(1);
 
         _ = await queue.EnqueueAsync(Command("channel", "fourth"), CancellationToken.None);
@@ -221,7 +221,7 @@ public sealed class PublicChatMessageQueueTests
         await clock.WaitForTimerAtAsync(Utc(12, 0, 30));
         clock.Advance(TimeSpan.FromSeconds(5));
         (await transport.ReadAsync()).Message.ShouldBe("fourth");
-        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
+        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.SentAndDeleted);
         observer.Alerts.Count.ShouldBe(2);
         await StopAsync(stopping, worker);
     }
@@ -377,7 +377,7 @@ public sealed class PublicChatMessageQueueTests
     }
 
     [Test]
-    public async Task SentResult_Processing_RecordsDeliveredAfterOneSendAttempt()
+    public async Task SentResult_Processing_DeletesAfterOneSendAttempt()
     {
         var outbox = new InMemoryOutbox(StandardRetryPolicy);
         var transport = SuccessfulScriptedTransport();
@@ -387,7 +387,7 @@ public sealed class PublicChatMessageQueueTests
         var worker = queue.RunAsync(stopping.Token);
 
         (await outbox.ReadCompletionAsync()).ShouldBe(
-            InMemoryOutbox.RowStatus.Delivered
+            InMemoryOutbox.RowStatus.SentAndDeleted
         );
         await StopAsync(stopping, worker);
 
@@ -476,7 +476,7 @@ public sealed class PublicChatMessageQueueTests
         );
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(1));
-        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
+        (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.SentAndDeleted);
         await StopAsync(stopping, worker);
 
         var snapshot = outbox.SingleSnapshot;
@@ -963,11 +963,13 @@ public sealed class PublicChatMessageQueueTests
     {
         private readonly object gate = new();
         private readonly List<Row> rows = [];
+        private readonly List<Delivery> deliveries = [];
         private readonly Channel<RowStatus> completions =
             Channel.CreateUnbounded<RowStatus>();
         private readonly PublicChatRetryPolicy safePreSendRetryPolicy =
             retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
         private long nextId = 1;
+        private OutboxSnapshot? lastDeletedSnapshot;
 
         public Action? AfterEnqueue { get; init; }
 
@@ -993,18 +995,24 @@ public sealed class PublicChatMessageQueueTests
             {
                 lock (gate)
                 {
+                    if (rows.Count == 0)
+                        return lastDeletedSnapshot.ShouldNotBeNull();
+
                     var row = rows.ShouldHaveSingleItem();
-                    return new OutboxSnapshot
-                    {
-                        Status = row.Status,
-                        AttemptCount = row.AttemptCount,
-                        SafePreSendFailureCount = row.SafePreSendFailureCount,
-                        NextAttemptAt = row.NextAttemptAt,
-                        Message = row.Message,
-                    };
+                    return Snapshot(row);
                 }
             }
         }
+
+        private static OutboxSnapshot Snapshot(Row row) =>
+            new()
+            {
+                Status = row.Status,
+                AttemptCount = row.AttemptCount,
+                SafePreSendFailureCount = row.SafePreSendFailureCount,
+                NextAttemptAt = row.NextAttemptAt,
+                Message = row.Message,
+            };
 
         public ValueTask<RowStatus> ReadCompletionAsync() =>
             completions.Reader.ReadAsync();
@@ -1062,6 +1070,12 @@ public sealed class PublicChatMessageQueueTests
                     .Where(row => row.CompletedAt is not null && row.AttemptCount > 0)
                     .Select(row => row.CompletedAt!.Value)
                     .DefaultIfEmpty(DateTimeOffset.MinValue)
+                    .Append(
+                        deliveries
+                            .Select(delivery => delivery.CompletedAt)
+                            .DefaultIfEmpty(DateTimeOffset.MinValue)
+                            .Max()
+                    )
                     .Max();
                 var claimable = rows
                     .Where(row =>
@@ -1072,13 +1086,11 @@ public sealed class PublicChatMessageQueueTests
                         var eligibleAt = row.NextAttemptAt;
                         if (previousAttempt != DateTimeOffset.MinValue)
                             eligibleAt = Max(eligibleAt, previousAttempt + sendInterval);
-                        var previousDelivery = rows
-                            .Where(other =>
-                                other.Status == RowStatus.Delivered
-                                && other.Item.DeduplicationKey
-                                    == row.Item.DeduplicationKey
+                        var previousDelivery = deliveries
+                            .Where(delivery =>
+                                delivery.DeduplicationKey == row.Item.DeduplicationKey
                             )
-                            .Select(other => other.CompletedAt!.Value)
+                            .Select(delivery => delivery.CompletedAt)
                             .DefaultIfEmpty(DateTimeOffset.MinValue)
                             .Max();
                         if (previousDelivery != DateTimeOffset.MinValue)
@@ -1151,7 +1163,7 @@ public sealed class PublicChatMessageQueueTests
             CancellationToken cancellationToken
         ) =>
             outcome.Match(
-                _ => CompleteSending(message, RowStatus.Delivered, recordedAt, cancellationToken),
+                _ => DeleteSending(message, recordedAt, cancellationToken),
                 _ => RecordSafePreSendTransient(
                     message,
                     recordedAt,
@@ -1242,6 +1254,35 @@ public sealed class PublicChatMessageQueueTests
                 row.Message = null;
                 row.ClaimToken = null;
                 NotifyCompletion(status);
+                return ValueTask.FromResult<PublicChatClaimUpdate>(
+                    new PublicChatClaimUpdate.Applied()
+                );
+            }
+        }
+
+        private ValueTask<PublicChatClaimUpdate> DeleteSending(
+            PublicChatClaimedMessage message,
+            DateTimeOffset completedAt,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var row = Owned(message, RowStatus.Sending);
+                if (row is null)
+                    return ValueTask.FromResult<PublicChatClaimUpdate>(
+                        new PublicChatClaimUpdate.OwnershipLost()
+                    );
+
+                row.Status = RowStatus.SentAndDeleted;
+                row.CompletedAt = completedAt;
+                row.Message = null;
+                row.ClaimToken = null;
+                lastDeletedSnapshot = Snapshot(row);
+                deliveries.Add(new Delivery(row.Item.DeduplicationKey, completedAt));
+                rows.Remove(row);
+                NotifyCompletion(RowStatus.SentAndDeleted);
                 return ValueTask.FromResult<PublicChatClaimUpdate>(
                     new PublicChatClaimUpdate.Applied()
                 );
@@ -1408,6 +1449,11 @@ public sealed class PublicChatMessageQueueTests
 
         private sealed record Candidate(Row Row, DateTimeOffset EligibleAt);
 
+        private sealed record Delivery(
+            PublicChatDeduplicationKey DeduplicationKey,
+            DateTimeOffset CompletedAt
+        );
+
         internal sealed record OutboxSnapshot
         {
             internal required RowStatus Status { get; init; }
@@ -1426,8 +1472,7 @@ public sealed class PublicChatMessageQueueTests
             Pending,
             Claimed,
             Sending,
-            Delivered,
-            SafePreSendTransient,
+            SentAndDeleted, SafePreSendTransient,
             SafePreSendExhausted,
             Rejected,
             Ambiguous,

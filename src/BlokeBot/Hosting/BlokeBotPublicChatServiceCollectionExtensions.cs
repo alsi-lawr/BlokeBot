@@ -16,7 +16,8 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
                 serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
                 serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
                     TwitchBotResiliencePipeline.PublicChatDelivery
-                )
+                ),
+                serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>()
             )
         );
         return services;

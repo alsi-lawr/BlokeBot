@@ -26,6 +26,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
     public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
         Set<PublicChatOutboxMessage>();
+    public DbSet<PublicChatSendReceipt> PublicChatSendReceipts =>
+        Set<PublicChatSendReceipt>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
@@ -510,7 +512,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     );
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_DeduplicationKey",
-                        "length(DeduplicationKey) = 64"
+                        "DeduplicationKey IS NULL OR length(DeduplicationKey) = 64"
                     );
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_FailurePhase",
@@ -526,13 +528,17 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimExpiresAtUtc IS NULL "
                             + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
                             + "AND AttemptCount = 0 AND SafePreSendFailureCount = 0 "
+                            + "AND length(DeduplicationKey) = 64 "
+                            + "AND NextAttemptAtUtc IS NOT NULL "
                             + "AND FailurePhase IS NULL AND FailureType IS NULL "
                             + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(Status = 'Claimed' AND length(Message) > 0 "
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
                             + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL "
-                            + "AND AttemptCount = 0 AND ((SafePreSendFailureCount = 0 "
+                            + "AND AttemptCount = 0 AND length(DeduplicationKey) = 64 "
+                            + "AND NextAttemptAtUtc IS NOT NULL "
+                            + "AND ((SafePreSendFailureCount = 0 "
                             + "AND FailurePhase IS NULL AND FailureType IS NULL "
                             + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(SafePreSendFailureCount > 0 "
@@ -542,20 +548,16 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
                             + "AND ClaimExpiresAtUtc IS NOT NULL "
                             + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL "
-                            + "AND AttemptCount > 0 "
-                            + "AND FailurePhase IS NULL AND FailureType IS NULL "
-                            + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
-                            + "(Status = 'Delivered' AND Message IS NULL "
-                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
-                            + "AND ClaimExpiresAtUtc IS NULL "
-                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL "
-                            + "AND AttemptCount > 0 "
+                            + "AND AttemptCount > 0 AND length(DeduplicationKey) = 64 "
+                            + "AND NextAttemptAtUtc IS NOT NULL "
                             + "AND FailurePhase IS NULL AND FailureType IS NULL "
                             + "AND HttpStatusCode IS NULL AND RejectionCode IS NULL) OR "
                             + "(Status = 'SafePreSendTransient' AND length(Message) > 0 "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
                             + "AND CompletedAtUtc IS NULL AND AttemptCount = 0 "
+                            + "AND length(DeduplicationKey) = 64 "
+                            + "AND NextAttemptAtUtc IS NOT NULL "
                             + "AND SafePreSendFailureCount > 0 "
                             + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
@@ -563,6 +565,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
                             + "AND CompletedAtUtc IS NULL AND AttemptCount = 0 "
+                            + "AND length(DeduplicationKey) = 64 "
+                            + "AND NextAttemptAtUtc IS NOT NULL "
                             + "AND SafePreSendFailureCount = 1 "
                             + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
@@ -571,6 +575,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
                             + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
                             + "AND SafePreSendFailureCount > 0 "
+                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
                             + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
                             + "(Status = 'Rejected' AND Message IS NULL "
@@ -578,6 +583,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
                             + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
                             + "AND AttemptCount > 0 "
+                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
                             + "AND FailureType IS NULL AND HttpStatusCode IS NULL "
                             + "AND (RejectionCode IS NULL OR length(RejectionCode) > 0)) OR "
                             + "(Status = 'Ambiguous' AND Message IS NULL "
@@ -585,11 +591,13 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NOT NULL "
                             + "AND CompletedAtUtc IS NOT NULL AND FailurePhase = 'Send' "
                             + "AND AttemptCount > 0 "
+                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL) OR "
                             + "(Status = 'Unexpected' AND Message IS NULL "
                             + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
                             + "AND ClaimExpiresAtUtc IS NULL AND SendStartedAtUtc IS NULL "
                             + "AND CompletedAtUtc IS NOT NULL AND AttemptCount = 0 "
+                            + "AND DeduplicationKey IS NULL AND NextAttemptAtUtc IS NULL "
                             + "AND FailurePhase = 'Preparation' "
                             + "AND length(FailureType) > 0 AND RejectionCode IS NULL)"
                     );
@@ -636,6 +644,25 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasIndex(x => x.ClaimSlot)
                 .IsUnique()
                 .HasFilter("\"ClaimSlot\" IS NOT NULL");
+        });
+
+        modelBuilder.Entity<PublicChatSendReceipt>(b =>
+        {
+            b.ToTable(
+                "public_chat_send_receipts",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_public_chat_send_receipts_Delivery",
+                        "(DeliveredDeduplicationKey IS NULL AND DeliveredAtUtc IS NULL) OR "
+                            + "(length(DeliveredDeduplicationKey) = 64 "
+                            + "AND DeliveredAtUtc IS NOT NULL)"
+                    )
+            );
+            b.HasKey(x => x.OutboxMessageId);
+            b.Property(x => x.OutboxMessageId).ValueGeneratedNever();
+            b.Property(x => x.DeliveredDeduplicationKey).HasMaxLength(64);
+            b.HasIndex(x => x.AttemptedAtUtc);
+            b.HasIndex(x => x.DeliveredAtUtc);
         });
 
         modelBuilder.Entity<PointsSettings>(b =>
