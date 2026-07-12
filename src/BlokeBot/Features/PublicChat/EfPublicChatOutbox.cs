@@ -257,6 +257,7 @@ internal sealed class EfPublicChatOutbox(
                 row.Status == PublicChatOutboxStatus.Pending
                 || row.Status == PublicChatOutboxStatus.Claimed
                 || row.Status == PublicChatOutboxStatus.Sending
+                || row.Status == PublicChatOutboxStatus.SafePreSendScheduling
                 || row.Status == PublicChatOutboxStatus.SafePreSendTransient
             )
             .OrderBy(row => row.CreatedAtUtc)
@@ -281,6 +282,7 @@ internal sealed class EfPublicChatOutbox(
         var nowUtc = now.UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await RecoverExpiredAsync(db, nowUtc, cancellationToken);
+        await ScheduleMigratedSafePreSendRetriesAsync(db, now, cancellationToken);
         await ExhaustConfiguredSafePreSendRetriesAsync(db, nowUtc, cancellationToken);
 
         var activeClaim = await db
@@ -495,6 +497,83 @@ internal sealed class EfPublicChatOutbox(
                         .SetProperty(row => row.CompletedAtUtc, nowUtc),
                 cancellationToken
             );
+
+    private async Task ScheduleMigratedSafePreSendRetriesAsync(
+        BlokeBotDbContext db,
+        DateTimeOffset now,
+        CancellationToken cancellationToken
+    )
+    {
+        var rows = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .Where(row => row.Status == PublicChatOutboxStatus.SafePreSendScheduling)
+            .Select(row => new
+            {
+                row.Id,
+                row.NextAttemptAtUtc,
+                row.SafePreSendFailureCount,
+            })
+            .ToArrayAsync(cancellationToken);
+        foreach (var row in rows)
+        {
+            var decision = PublicChatSafePreSendRetrySchedule.CreateForPersistedFailure(
+                safePreSendRetryPolicy,
+                new PublicChatSafePreSendFailureCount(row.SafePreSendFailureCount),
+                ToDateTimeOffset(row.NextAttemptAtUtc)
+            );
+            _ = decision switch
+            {
+                PublicChatSafePreSendRetryDecision.Scheduled scheduled =>
+                    await db
+                        .PublicChatOutboxMessages.Where(candidate =>
+                            candidate.Id == row.Id
+                            && candidate.Status
+                                == PublicChatOutboxStatus.SafePreSendScheduling
+                        )
+                        .ExecuteUpdateAsync(
+                            update =>
+                                update
+                                    .SetProperty(
+                                        candidate => candidate.Status,
+                                        PublicChatOutboxStatus.SafePreSendTransient
+                                    )
+                                    .SetProperty(
+                                        candidate => candidate.NextAttemptAtUtc,
+                                        scheduled.NextAttemptAtUtc.UtcDateTime
+                                    ),
+                            cancellationToken
+                        ),
+                PublicChatSafePreSendRetryDecision.Exhausted =>
+                    await db
+                        .PublicChatOutboxMessages.Where(candidate =>
+                            candidate.Id == row.Id
+                            && candidate.Status
+                                == PublicChatOutboxStatus.SafePreSendScheduling
+                        )
+                        .ExecuteUpdateAsync(
+                            update =>
+                                update
+                                    .SetProperty(
+                                        candidate => candidate.Status,
+                                        PublicChatOutboxStatus.SafePreSendExhausted
+                                    )
+                                    .SetProperty(candidate => candidate.Message, (string?)null)
+                                    .SetProperty(
+                                        candidate => candidate.NextAttemptAtUtc,
+                                        now.UtcDateTime
+                                    )
+                                    .SetProperty(
+                                        candidate => candidate.CompletedAtUtc,
+                                        now.UtcDateTime
+                                    ),
+                            cancellationToken
+                        ),
+                _ => throw new UnreachableException(
+                    $"Unknown migrated public chat retry decision {decision.GetType().Name}."
+                ),
+            };
+        }
+    }
 
     private ValueTask<PublicChatClaimUpdate> RecordDeliveredAsync(
         PublicChatClaimedMessage message,

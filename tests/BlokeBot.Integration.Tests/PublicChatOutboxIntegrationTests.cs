@@ -1,8 +1,11 @@
 using System.Collections.Immutable;
 using BlokeBot.Features.PublicChat;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Polly;
 using Shouldly;
 using TUnit.Core;
@@ -12,6 +15,11 @@ namespace BlokeBot.Integration.Tests;
 
 public sealed class PublicChatOutboxIntegrationTests
 {
+    private const string ClassifiedOutboxMigration =
+        "20260712184117_ClassifyPublicChatDeliveryOutcomes";
+    private const string MigratedDeduplicationKey =
+        "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+
     [Test]
     public async Task SplitMessage_Enqueueing_PersistsWholeBatchBeforeAcknowledgement()
     {
@@ -778,6 +786,153 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
+    public async Task MigratedSafePreSendRetry_NormalizingConcurrently_SchedulesOnceAndClaimsOnceAtDueTime()
+    {
+        var failedAt = Utc(12, 0, 0);
+        await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
+        var retryPolicy = CreateRetryPolicy(
+            3,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            DelayBackoffType.Exponential
+        );
+        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy);
+        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy);
+
+        var normalization = await Task.WhenAll(
+            firstStore
+                .TryClaimNextAsync(
+                    failedAt,
+                    failedAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask(),
+            secondStore
+                .TryClaimNextAsync(
+                    failedAt,
+                    failedAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+        normalization.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
+        foreach (var outcome in normalization)
+        {
+            (outcome
+                    is PublicChatClaimOutcome.AwaitingAvailability
+                        or PublicChatClaimOutcome.Contended)
+                .ShouldBeTrue();
+        }
+
+        var dueAt = failedAt.AddSeconds(5);
+        var normalized = (
+            await firstStore.TryClaimNextAsync(
+                failedAt,
+                failedAt.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        normalized.AvailableAt.ShouldBe(dueAt);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+            row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+            row.SafePreSendFailureCount.ShouldBe(1);
+            row.NextAttemptAtUtc.ShouldBe(dueAt.UtcDateTime);
+            row.CompletedAtUtc.ShouldBeNull();
+        }
+
+        var afterSecondRestart = (
+            await new EfPublicChatOutbox(dbFactory, retryPolicy).TryClaimNextAsync(
+                failedAt.AddSeconds(4),
+                failedAt.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        afterSecondRestart.AvailableAt.ShouldBe(dueAt);
+
+        var dueClaims = await Task.WhenAll(
+            new EfPublicChatOutbox(dbFactory, retryPolicy)
+                .TryClaimNextAsync(
+                    dueAt,
+                    dueAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask(),
+            new EfPublicChatOutbox(dbFactory, retryPolicy)
+                .TryClaimNextAsync(
+                    dueAt,
+                    dueAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+        dueClaims.OfType<PublicChatClaimOutcome.Claimed>().ShouldHaveSingleItem();
+        dueClaims.Count(outcome =>
+                outcome
+                    is PublicChatClaimOutcome.AwaitingAvailability
+                        or PublicChatClaimOutcome.Contended
+            )
+            .ShouldBe(1);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+            row.Status.ShouldBe(PublicChatOutboxStatus.Claimed);
+            row.SafePreSendFailureCount.ShouldBe(1);
+            row.NextAttemptAtUtc.ShouldBe(dueAt.UtcDateTime);
+        }
+    }
+
+    [Test]
+    public async Task MigratedSafePreSendRetry_WithAttemptLimitOne_TerminalizesRedactedWithoutClaim()
+    {
+        var failedAt = Utc(12, 0, 0);
+        await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
+        var retryPolicy = CreateRetryPolicy(
+            1,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(30),
+            DelayBackoffType.Exponential
+        );
+
+        var outcome = await new EfPublicChatOutbox(
+            dbFactory,
+            retryPolicy
+        ).TryClaimNextAsync(
+            failedAt,
+            failedAt.AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendExhausted);
+        row.Message.ShouldBeNull();
+        row.AttemptCount.ShouldBe(0);
+        row.SafePreSendFailureCount.ShouldBe(1);
+        row.CompletedAtUtc.ShouldBe(failedAt.UtcDateTime);
+        row.SendStartedAtUtc.ShouldBeNull();
+        row.ClaimToken.ShouldBeNull();
+        row.ClaimSlot.ShouldBeNull();
+        row.FailureType.ShouldBe(typeof(IOException).FullName);
+    }
+
+    [Test]
     public async Task SafePreparationFailure_RestartingQueue_DeliversOnceAfterConfiguredRetryTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -1257,6 +1412,29 @@ public sealed class PublicChatOutboxIntegrationTests
                 CancellationToken.None
             )
         );
+
+    private static async Task<SqliteBlokeBotDbFactory> CreateMigratedSafePreSendRetryAsync(
+        DateTimeOffset failedAt
+    )
+    {
+        var dbFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(ClassifiedOutboxMigration);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                 Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
+            VALUES
+                ('streamer', 'migrated safe retry', {MigratedDeduplicationKey},
+                 {failedAt.UtcDateTime}, {failedAt.UtcDateTime}, 'SafePreSendTransient', 0,
+                 {failedAt.UtcDateTime}, 'Preparation', {typeof(IOException).FullName})
+            """
+        );
+        await migrator.MigrateAsync();
+        return dbFactory;
+    }
 
     private sealed record TerminalScenario
     {

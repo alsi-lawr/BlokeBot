@@ -18,6 +18,10 @@ public sealed class PublicChatOutboxPersistenceTests
         "20260712184117_ClassifyPublicChatDeliveryOutcomes";
     private const string RetryOutboxMigration =
         "20260712194125_RetrySafePreSendFailures";
+    private const string ScheduledRetryOutboxMigration =
+        "20260712212036_ScheduleMigratedSafePreSendRetries";
+    private const string MarkedRetryOutboxMigration =
+        "20260712212037_MarkMigratedSafePreSendRetriesForScheduling";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -70,6 +74,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 "Pending",
                 "Rejected",
                 "SafePreSendExhausted",
+                "SafePreSendScheduling",
                 "SafePreSendTransient",
                 "Sending",
                 "Unexpected",
@@ -95,6 +100,18 @@ public sealed class PublicChatOutboxPersistenceTests
                      Status, AttemptCount)
                 VALUES
                     ('streamer', 'message', {DeduplicationKey}, {now}, {now}, 'Unknown', 0)
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public_chat_outbox
+                    (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                     Status, AttemptCount, SafePreSendFailureCount, FailurePhase, FailureType)
+                VALUES
+                    ('streamer', 'message', {DeduplicationKey}, {now}, {now},
+                     'SafePreSendScheduling', 0, 2, 'Preparation', 'System.IO.IOException')
                 """
             )
         );
@@ -194,6 +211,7 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("CK_public_chat_outbox_DeduplicationKey");
         tableSql.ShouldContain("CK_public_chat_outbox_FailurePhase");
         tableSql.ShouldContain("SafePreSendTransient");
+        tableSql.ShouldContain("SafePreSendScheduling");
         tableSql.ShouldContain("SafePreSendExhausted");
         tableSql.ShouldContain("AttemptCount > 0");
 
@@ -333,6 +351,28 @@ public sealed class PublicChatOutboxPersistenceTests
         upgraded.NextAttemptAtUtc.ShouldBe(failedAt.AddSeconds(1));
         upgraded.CompletedAtUtc.ShouldBeNull();
 
+        await migrator.MigrateAsync(ScheduledRetryOutboxMigration);
+        db.ChangeTracker.Clear();
+        var schemaUpgraded = await db.PublicChatOutboxMessages.SingleAsync();
+        schemaUpgraded.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendTransient);
+
+        await migrator.MigrateAsync(MarkedRetryOutboxMigration);
+        db.ChangeTracker.Clear();
+        var pendingSchedule = await db.PublicChatOutboxMessages.SingleAsync();
+        pendingSchedule.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendScheduling);
+        pendingSchedule.Message.ShouldBe("safe to retry");
+        pendingSchedule.SafePreSendFailureCount.ShouldBe(1);
+        pendingSchedule.NextAttemptAtUtc.ShouldBe(failedAt.AddSeconds(1));
+        pendingSchedule.CompletedAtUtc.ShouldBeNull();
+
+        await migrator.MigrateAsync(ScheduledRetryOutboxMigration);
+        var revertedSchedulingStatus = await db.Database.SqlQueryRaw<string>(
+                "SELECT Status AS Value FROM public_chat_outbox"
+            )
+            .SingleAsync();
+        revertedSchedulingStatus.ShouldBe("SafePreSendTransient");
+
+        await migrator.MigrateAsync(RetryOutboxMigration);
         await migrator.MigrateAsync(ClassifiedOutboxMigration);
         var revertedStatus = await db.Database.SqlQueryRaw<string>(
                 "SELECT Status AS Value FROM public_chat_outbox"

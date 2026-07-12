@@ -22,6 +22,14 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
 
     public static async Task<SqliteBlokeBotDbFactory> CreateAsync()
     {
+        var factory = await CreateEmptyAsync();
+        await using var db = factory.CreateDbContext();
+        await db.Database.EnsureCreatedAsync();
+        return factory;
+    }
+
+    public static async Task<SqliteBlokeBotDbFactory> CreateEmptyAsync()
+    {
         var connectionString = new SqliteConnectionStringBuilder
         {
             DataSource = $"BlokeBotTests-{Guid.NewGuid():N}",
@@ -32,10 +40,7 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
         }.ToString();
         var keeperConnection = new SqliteConnection(connectionString);
         await keeperConnection.OpenAsync();
-        var factory = new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
-        await using var db = factory.CreateDbContext();
-        await db.Database.EnsureCreatedAsync();
-        return factory;
+        return new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
     }
 
     public BlokeBotDbContext CreateDbContext() => new(options);
