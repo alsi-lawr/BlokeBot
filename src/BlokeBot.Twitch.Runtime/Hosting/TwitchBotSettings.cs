@@ -13,9 +13,9 @@ public sealed record TwitchBotConnectionSettings
 }
 
 /// <summary>
-/// Immutable outbound queue alert settings consumed by the runtime.
+/// Immutable public chat queue alert settings consumed by the runtime.
 /// </summary>
-public sealed record TwitchOutboundQueueAlertSettings
+public sealed record PublicChatQueueAlertSettings
 {
     public required int StuckAfterSeconds { get; init; }
 }
@@ -35,7 +35,7 @@ public sealed record TwitchBotSettings
 
     public required string StartupMessage { get; init; }
 
-    public required TwitchOutboundQueueAlertSettings OutboundQueueAlerts { get; init; }
+    public required PublicChatQueueAlertSettings PublicChatQueueAlerts { get; init; }
 
     public required TwitchBotConnectionSettings Connection { get; init; }
 
@@ -90,9 +90,9 @@ public sealed record TwitchBotSettings
             DuplicateChatMessageCooldownSeconds = options.DuplicateChatMessageCooldownSeconds,
             MaxChatMessageLength = options.MaxChatMessageLength,
             StartupMessage = options.StartupMessage,
-            OutboundQueueAlerts = new TwitchOutboundQueueAlertSettings
+            PublicChatQueueAlerts = new PublicChatQueueAlertSettings
             {
-                StuckAfterSeconds = options.OutboundQueueAlerts.StuckAfterSeconds,
+                StuckAfterSeconds = options.PublicChatQueueAlerts.StuckAfterSeconds,
             },
             Connection = new TwitchBotConnectionSettings
             {

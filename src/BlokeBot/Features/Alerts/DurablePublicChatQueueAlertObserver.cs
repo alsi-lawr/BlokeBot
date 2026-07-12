@@ -7,17 +7,17 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.Alerts;
 
-internal sealed class DurableOutboundQueueAlertObserver(
+internal sealed class DurablePublicChatQueueAlertObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     DurableAlertService alerts,
-    ILogger<DurableOutboundQueueAlertObserver> log
-) : ITwitchOutboundQueueAlertObserver
+    ILogger<DurablePublicChatQueueAlertObserver> log
+) : IPublicChatQueueAlertObserver
 {
     private const string Source = "twitch-outbound-queue";
     private const string LinkPath = "/alerts";
 
     public async ValueTask QueueBackedUpAsync(
-        TwitchOutboundQueueBacklog backlog,
+        PublicChatQueueBacklog backlog,
         CancellationToken cancellationToken
     )
     {
@@ -29,7 +29,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
         if (host is null)
         {
             log.LogInformation(
-                "Skipped outbound queue durable alert for unknown channel #{Channel}.",
+                "Skipped public chat queue durable alert for unknown channel #{Channel}.",
                 channel
             );
             return;
@@ -57,7 +57,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
             .SingleOrDefaultAsync(ct);
     }
 
-    private static string Message(string hostLogin, TwitchOutboundQueueBacklog backlog) =>
+    private static string Message(string hostLogin, PublicChatQueueBacklog backlog) =>
         $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
 
     private static string SourceKey(string channel, DateTimeOffset oldestPendingAt) =>

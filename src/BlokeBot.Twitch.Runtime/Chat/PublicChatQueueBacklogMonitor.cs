@@ -1,11 +1,11 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchOutboundQueueBacklogMonitor
+internal sealed class PublicChatQueueBacklogMonitor
 {
     private readonly HashSet<string> alertedChannels = new(StringComparer.OrdinalIgnoreCase);
 
-    public IReadOnlyList<TwitchOutboundQueueBacklog> CaptureAlerts(
-        IReadOnlyList<TwitchOutboundPendingState> pending,
+    public IReadOnlyList<PublicChatQueueBacklog> CaptureAlerts(
+        IReadOnlyList<PublicChatPendingState> pending,
         DateTimeOffset now,
         TimeSpan threshold,
         bool enabled
@@ -14,7 +14,7 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
         if (!enabled || threshold <= TimeSpan.Zero)
             return [];
 
-        List<TwitchOutboundQueueBacklog>? alerts = null;
+        List<PublicChatQueueBacklog>? alerts = null;
         foreach (var group in PendingByChannel(pending))
         {
             if (alertedChannels.Contains(group.Channel))
@@ -28,7 +28,7 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
             alertedChannels.Add(group.Channel);
             alerts ??= [];
             alerts.Add(
-                new TwitchOutboundQueueBacklog(
+                new PublicChatQueueBacklog(
                     group.Channel,
                     group.Messages.Count,
                     age,
@@ -41,7 +41,7 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
     }
 
     public TimeSpan? NextAlertDelay(
-        IReadOnlyList<TwitchOutboundPendingState> pending,
+        IReadOnlyList<PublicChatPendingState> pending,
         DateTimeOffset now,
         TimeSpan threshold,
         bool enabled
@@ -67,7 +67,7 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
         return next;
     }
 
-    public void ResetDrainedChannels(IReadOnlyList<TwitchOutboundPendingState> pending)
+    public void ResetDrainedChannels(IReadOnlyList<PublicChatPendingState> pending)
     {
         if (alertedChannels.Count == 0)
             return;
@@ -86,7 +86,7 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
     }
 
     private static List<PendingChannelGroup> PendingByChannel(
-        IReadOnlyList<TwitchOutboundPendingState> pending
+        IReadOnlyList<PublicChatPendingState> pending
     ) =>
         pending
             .GroupBy(x => NormalizeChannel(x.Channel), StringComparer.OrdinalIgnoreCase)
@@ -100,11 +100,11 @@ internal sealed class TwitchOutboundQueueBacklogMonitor
 
     private sealed record PendingChannelGroup(
         string Channel,
-        List<TwitchOutboundPendingState> Messages
+        List<PublicChatPendingState> Messages
     );
 }
 
-internal readonly record struct TwitchOutboundPendingState(
+internal readonly record struct PublicChatPendingState(
     string Channel,
     DateTimeOffset EnqueuedAt
 );

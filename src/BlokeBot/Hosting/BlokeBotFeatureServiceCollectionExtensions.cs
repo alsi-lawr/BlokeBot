@@ -94,8 +94,8 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.TryAddSingleton<DurableAlertService>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
-                ITwitchOutboundQueueAlertObserver,
-                DurableOutboundQueueAlertObserver
+                IPublicChatQueueAlertObserver,
+                DurablePublicChatQueueAlertObserver
             >()
         );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);

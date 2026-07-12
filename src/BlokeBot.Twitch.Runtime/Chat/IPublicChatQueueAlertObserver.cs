@@ -1,16 +1,16 @@
 namespace BlokeBot.Twitch.Runtime;
 
-public sealed record TwitchOutboundQueueBacklog(
+public sealed record PublicChatQueueBacklog(
     string Channel,
     int PendingCount,
     TimeSpan OldestPendingAge,
     DateTimeOffset OldestPendingAt
 );
 
-public interface ITwitchOutboundQueueAlertObserver
+public interface IPublicChatQueueAlertObserver
 {
     ValueTask QueueBackedUpAsync(
-        TwitchOutboundQueueBacklog backlog,
+        PublicChatQueueBacklog backlog,
         CancellationToken cancellationToken
     );
 }

@@ -87,7 +87,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task RepeatedQueueIncident_Observing_PersistsAndNotifiesOnce()
+    public async Task RepeatedPublicChatQueueIncident_Observing_PersistsAndNotifiesOnce()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -106,12 +106,12 @@ public sealed class DurableAlertTests
             }
         );
         var alerts = new DurableAlertService(dbFactory, clock, events);
-        var observer = new DurableOutboundQueueAlertObserver(
+        var observer = new DurablePublicChatQueueAlertObserver(
             dbFactory,
             alerts,
-            NullLogger<DurableOutboundQueueAlertObserver>.Instance
+            NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
-        var backlog = new TwitchOutboundQueueBacklog(
+        var backlog = new PublicChatQueueBacklog(
             "streamer",
             3,
             TimeSpan.FromSeconds(31),
@@ -132,7 +132,7 @@ public sealed class DurableAlertTests
     }
 
     [Test]
-    public async Task LaterQueueIncident_Observing_CreatesNewAlertAndNotification()
+    public async Task LaterPublicChatQueueIncident_Observing_CreatesNewAlertAndNotification()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");
@@ -151,14 +151,14 @@ public sealed class DurableAlertTests
             }
         );
         var alerts = new DurableAlertService(dbFactory, clock, events);
-        var observer = new DurableOutboundQueueAlertObserver(
+        var observer = new DurablePublicChatQueueAlertObserver(
             dbFactory,
             alerts,
-            NullLogger<DurableOutboundQueueAlertObserver>.Instance
+            NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
 
         await observer.QueueBackedUpAsync(
-            new TwitchOutboundQueueBacklog(
+            new PublicChatQueueBacklog(
                 "streamer",
                 3,
                 TimeSpan.FromSeconds(31),
@@ -167,7 +167,7 @@ public sealed class DurableAlertTests
             CancellationToken.None
         );
         await observer.QueueBackedUpAsync(
-            new TwitchOutboundQueueBacklog(
+            new PublicChatQueueBacklog(
                 "streamer",
                 2,
                 TimeSpan.FromSeconds(31),

@@ -8,7 +8,7 @@ using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
-public sealed class OutboundMessageQueueTests
+public sealed class PublicChatMessageQueueTests
 {
     [Test]
     public void MessageWithMultipleBreakTypes_Splitting_PrefersLineSentenceThenWord()
@@ -27,7 +27,7 @@ public sealed class OutboundMessageQueueTests
     [Test]
     public async Task MessageOverLength_Queueing_SplitsAndSendsInOrder()
     {
-        var queue = CreateQueue(
+        var queue = CreatePublicChatQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
@@ -57,7 +57,7 @@ public sealed class OutboundMessageQueueTests
         var clock = new ManualTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var queue = CreateQueue(
+        var queue = CreatePublicChatQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
@@ -88,18 +88,18 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task RepeatedAndLaterBackups_MonitoringQueue_AlertsOncePerIncident()
+    public async Task RepeatedAndLaterBackups_MonitoringPublicChatQueue_AlertsOncePerIncident()
     {
         var clock = new ManualTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var observer = new RecordingQueueAlertObserver();
-        var queue = CreateQueue(
+        var observer = new RecordingPublicChatQueueAlertObserver();
+        var queue = CreatePublicChatQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 10,
                 DuplicateChatMessageCooldownSeconds = 0,
-                OutboundQueueAlerts = new TwitchOutboundQueueAlertOptions
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
                 {
                     StuckAfterSeconds = 5,
                 },
@@ -150,7 +150,7 @@ public sealed class OutboundMessageQueueTests
     [Test]
     public void DuplicateCooldownAtBoundary_CheckingNextAllowed_PrunesStaleEntries()
     {
-        var cooldown = new TwitchOutboundDuplicateCooldown();
+        var cooldown = new PublicChatDuplicateCooldown();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
         var first = new TwitchOutboundChatMessage("first", "same");
         var second = new TwitchOutboundChatMessage("second", "same");
@@ -170,9 +170,9 @@ public sealed class OutboundMessageQueueTests
     [Test]
     public void BacklogsAcrossChannels_CapturingAlerts_TracksIndependentlyAndResetsDrained()
     {
-        var monitor = new TwitchOutboundQueueBacklogMonitor();
+        var monitor = new PublicChatQueueBacklogMonitor();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 10, TimeSpan.Zero);
-        TwitchOutboundPendingState[] pending =
+        PublicChatPendingState[] pending =
         [
             new("first", now.AddSeconds(-10)),
             new("first", now.AddSeconds(-6)),
@@ -201,14 +201,14 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task FailingQueueAlertObserver_DispatchingAlert_NotifiesRemainingObservers()
+    public async Task FailingPublicChatQueueAlertObserver_DispatchingAlert_NotifiesRemainingObservers()
     {
-        var recording = new RecordingQueueAlertObserver();
-        var dispatcher = new TwitchOutboundQueueAlertDispatcher(
-            [new ThrowingQueueAlertObserver("Observer failed."), recording],
-            QueueAlertFanOut()
+        var recording = new RecordingPublicChatQueueAlertObserver();
+        var dispatcher = new PublicChatQueueAlertDispatcher(
+            [new ThrowingPublicChatQueueAlertObserver("Observer failed."), recording],
+            PublicChatQueueAlertFanOut()
         );
-        var alert = new TwitchOutboundQueueBacklog(
+        var alert = new PublicChatQueueBacklog(
             "channel",
             2,
             TimeSpan.FromSeconds(5),
@@ -221,35 +221,35 @@ public sealed class OutboundMessageQueueTests
     }
 
     [Test]
-    public async Task AlertHandlingEscalation_ProcessingQueue_SendsPendingAndLaterMessages()
+    public async Task AlertHandlingEscalation_ProcessingPublicChatQueue_SendsPendingAndLaterMessages()
     {
         var clock = new ManualTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var logger = new RecordingLogger<TwitchOutboundMessageQueue>();
-        var queue = new TwitchOutboundMessageQueue(
+        var logger = new RecordingLogger<PublicChatMessageQueue>();
+        var queue = new PublicChatMessageQueue(
             TwitchBotSettings.FromOptions(
                 new TwitchBotOptions
                 {
                     ChatMessageSendIntervalSeconds = 10,
                     DuplicateChatMessageCooldownSeconds = 0,
-                    OutboundQueueAlerts = new TwitchOutboundQueueAlertOptions
+                    PublicChatQueueAlerts = new PublicChatQueueAlertOptions
                     {
                         StuckAfterSeconds = 5,
                     },
                 }
             ),
             clock,
-            new TwitchOutboundDuplicateCooldown(),
-            new TwitchOutboundQueueBacklogMonitor(),
-            new TwitchOutboundQueueAlertDispatcher(
-                [new ThrowingQueueAlertObserver("observer secret payload")],
+            new PublicChatDuplicateCooldown(),
+            new PublicChatQueueBacklogMonitor(),
+            new PublicChatQueueAlertDispatcher(
+                [new ThrowingPublicChatQueueAlertObserver("observer secret payload")],
                 RuntimeTestObserverFanOut.EscalatingContinue<
-                    TwitchOutboundQueueAlertObserverBoundary,
-                    TwitchOutboundQueueBacklog,
-                    TwitchOutboundQueueAlertDeadLetter
+                    PublicChatQueueAlertObserverBoundary,
+                    PublicChatQueueBacklog,
+                    PublicChatQueueAlertDeadLetter
                 >(
-                    TwitchBotObserverBoundaries.OutboundQueueAlerts,
+                    TwitchBotObserverBoundaries.PublicChatQueueAlerts,
                     new IOException("reporter secret payload")
                 )
             ),
@@ -282,7 +282,7 @@ public sealed class OutboundMessageQueueTests
             entry.Level.ShouldBe(LogLevel.Error);
             entry.Exception.ShouldBeNull();
             entry.Message.ShouldContain("Continuing queued chat processing");
-            entry.Message.ShouldContain(TwitchBotObserverBoundaries.OutboundQueueAlerts.Value);
+            entry.Message.ShouldContain(TwitchBotObserverBoundaries.PublicChatQueueAlerts.Value);
             entry.Message.ShouldContain(nameof(ObserverFailureHandlingStage.Reporter));
             entry.Message.ShouldNotContain("observer secret payload");
             entry.Message.ShouldNotContain("reporter secret payload");
@@ -297,76 +297,84 @@ public sealed class OutboundMessageQueueTests
         }
     }
 
-    private static TwitchOutboundMessageQueue CreateQueue(
+    private static PublicChatMessageQueue CreatePublicChatQueue(
         TwitchBotOptions options,
         TimeProvider? timeProvider = null,
-        IEnumerable<ITwitchOutboundQueueAlertObserver>? observers = null
+        IEnumerable<IPublicChatQueueAlertObserver>? observers = null
     ) =>
         new(
             TwitchBotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
-            new TwitchOutboundDuplicateCooldown(),
-            new TwitchOutboundQueueBacklogMonitor(),
-            new TwitchOutboundQueueAlertDispatcher(
+            new PublicChatDuplicateCooldown(),
+            new PublicChatQueueBacklogMonitor(),
+            new PublicChatQueueAlertDispatcher(
                 observers ?? [],
-                QueueAlertFanOut()
+                PublicChatQueueAlertFanOut()
             ),
-            NullLogger<TwitchOutboundMessageQueue>.Instance
+            NullLogger<PublicChatMessageQueue>.Instance
         );
 
     private static ObserverFanOut<
-        TwitchOutboundQueueAlertObserverBoundary,
-        TwitchOutboundQueueBacklog,
-        TwitchOutboundQueueAlertDeadLetter
-    > QueueAlertFanOut() =>
+        PublicChatQueueAlertObserverBoundary,
+        PublicChatQueueBacklog,
+        PublicChatQueueAlertDeadLetter
+    > PublicChatQueueAlertFanOut() =>
         RuntimeTestObserverFanOut.Continue<
-            TwitchOutboundQueueAlertObserverBoundary,
-            TwitchOutboundQueueBacklog,
-            TwitchOutboundQueueAlertDeadLetter
-        >(TwitchBotObserverBoundaries.OutboundQueueAlerts);
+            PublicChatQueueAlertObserverBoundary,
+            PublicChatQueueBacklog,
+            PublicChatQueueAlertDeadLetter
+        >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
 
-    private sealed class RecordingQueueAlertObserver : ITwitchOutboundQueueAlertObserver
+    private sealed class RecordingPublicChatQueueAlertObserver : IPublicChatQueueAlertObserver
     {
         private readonly object gate = new();
-        private TaskCompletionSource? waiter;
-        private int waiterTarget;
+        private readonly Channel<int> observedCounts = Channel.CreateUnbounded<int>();
 
-        public List<TwitchOutboundQueueBacklog> Alerts { get; } = [];
+        public List<PublicChatQueueBacklog> Alerts { get; } = [];
 
         public ValueTask QueueBackedUpAsync(
-            TwitchOutboundQueueBacklog backlog,
+            PublicChatQueueBacklog backlog,
             CancellationToken cancellationToken
         )
         {
             lock (gate)
             {
                 Alerts.Add(backlog);
-                if (Alerts.Count >= waiterTarget)
-                    waiter?.TrySetResult();
+                if (!observedCounts.Writer.TryWrite(Alerts.Count))
+                {
+                    throw new InvalidOperationException(
+                        "The public chat queue alert observer could not publish its count."
+                    );
+                }
             }
 
             return ValueTask.CompletedTask;
         }
 
-        public Task WaitForCountAsync(int count)
+        public ValueTask WaitForCountAsync(int count)
         {
             lock (gate)
             {
                 if (Alerts.Count >= count)
-                    return Task.CompletedTask;
+                    return ValueTask.CompletedTask;
 
-                waiterTarget = count;
-                waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                return waiter.Task;
+                return WaitForCountCoreAsync(count);
             }
+        }
+
+        private async ValueTask WaitForCountCoreAsync(int count)
+        {
+            var observedCount = 0;
+            while (observedCount < count)
+                observedCount = await observedCounts.Reader.ReadAsync();
         }
     }
 
-    private sealed class ThrowingQueueAlertObserver(string failureMessage)
-        : ITwitchOutboundQueueAlertObserver
+    private sealed class ThrowingPublicChatQueueAlertObserver(string failureMessage)
+        : IPublicChatQueueAlertObserver
     {
         public ValueTask QueueBackedUpAsync(
-            TwitchOutboundQueueBacklog backlog,
+            PublicChatQueueBacklog backlog,
             CancellationToken cancellationToken
         ) => throw new InvalidOperationException(failureMessage);
     }

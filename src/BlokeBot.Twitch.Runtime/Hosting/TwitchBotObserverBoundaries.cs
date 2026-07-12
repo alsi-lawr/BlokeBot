@@ -11,7 +11,7 @@ public static class TwitchBotObserverBoundaries
     public static ObserverBoundary EventSubMessages { get; } =
         ObserverBoundary.Named("TwitchBot.EventSub.Messages");
 
-    public static ObserverBoundary OutboundQueueAlerts { get; } =
+    public static ObserverBoundary PublicChatQueueAlerts { get; } =
         ObserverBoundary.Named("TwitchBot.PublicChat.QueueAlerts");
 }
 
@@ -19,12 +19,12 @@ internal sealed class TwitchIrcMessageObserverBoundary;
 
 internal sealed class TwitchEventSubMessageObserverBoundary;
 
-internal sealed class TwitchOutboundQueueAlertObserverBoundary;
+internal sealed class PublicChatQueueAlertObserverBoundary;
 
 internal sealed record TwitchChatObserverDeadLetter(string Channel)
     : IObserverDeadLetterPayload;
 
-internal sealed record TwitchOutboundQueueAlertDeadLetter(
+internal sealed record PublicChatQueueAlertDeadLetter(
     string Channel,
     int PendingCount,
     TimeSpan OldestPendingAge,

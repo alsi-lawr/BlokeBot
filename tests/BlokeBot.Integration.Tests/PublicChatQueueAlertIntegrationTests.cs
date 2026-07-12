@@ -9,10 +9,10 @@ using TUnit.Core;
 
 namespace BlokeBot.Integration.Tests;
 
-public sealed class OutboundQueueAlertIntegrationTests
+public sealed class PublicChatQueueAlertIntegrationTests
 {
     [Test]
-    public async Task QueueBackup_DetectingIncident_PersistsAlertAndPublishesApplicationNotification()
+    public async Task PublicChatQueueBackup_DetectingIncident_PersistsAlertAndPublishesApplicationNotification()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
@@ -31,12 +31,12 @@ public sealed class OutboundQueueAlertIntegrationTests
             }
         );
         var alertService = new DurableAlertService(dbFactory, clock, events);
-        var durableObserver = new DurableOutboundQueueAlertObserver(
+        var durableObserver = new DurablePublicChatQueueAlertObserver(
             dbFactory,
             alertService,
-            NullLogger<DurableOutboundQueueAlertObserver>.Instance
+            NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
-        var queue = CreateQueue(clock, durableObserver);
+        var queue = CreatePublicChatQueue(clock, durableObserver);
 
         await queue.SendAsync("streamer", "first", SendAsync, CancellationToken.None);
         var second = queue.SendAsync("streamer", "second", SendAsync, CancellationToken.None);
@@ -55,9 +55,9 @@ public sealed class OutboundQueueAlertIntegrationTests
         await second;
     }
 
-    private static TwitchOutboundMessageQueue CreateQueue(
+    private static PublicChatMessageQueue CreatePublicChatQueue(
         TimeProvider clock,
-        ITwitchOutboundQueueAlertObserver observer
+        IPublicChatQueueAlertObserver observer
     ) =>
         new(
             TwitchBotSettings.FromOptions(
@@ -65,24 +65,24 @@ public sealed class OutboundQueueAlertIntegrationTests
                 {
                     ChatMessageSendIntervalSeconds = 10,
                     DuplicateChatMessageCooldownSeconds = 0,
-                    OutboundQueueAlerts = new TwitchOutboundQueueAlertOptions
+                    PublicChatQueueAlerts = new PublicChatQueueAlertOptions
                     {
                         StuckAfterSeconds = 5,
                     },
                 }
             ),
             clock,
-            new TwitchOutboundDuplicateCooldown(),
-            new TwitchOutboundQueueBacklogMonitor(),
-            new TwitchOutboundQueueAlertDispatcher(
+            new PublicChatDuplicateCooldown(),
+            new PublicChatQueueBacklogMonitor(),
+            new PublicChatQueueAlertDispatcher(
                 [observer],
                 TestObserverFanOut.Continue<
-                    TwitchOutboundQueueAlertObserverBoundary,
-                    TwitchOutboundQueueBacklog,
-                    TwitchOutboundQueueAlertDeadLetter
-                >(TwitchBotObserverBoundaries.OutboundQueueAlerts)
+                    PublicChatQueueAlertObserverBoundary,
+                    PublicChatQueueBacklog,
+                    PublicChatQueueAlertDeadLetter
+                >(TwitchBotObserverBoundaries.PublicChatQueueAlerts)
             ),
-            NullLogger<TwitchOutboundMessageQueue>.Instance
+            NullLogger<PublicChatMessageQueue>.Instance
         );
 
     private static Task SendAsync(

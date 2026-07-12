@@ -165,14 +165,14 @@ public static class TwitchBotServiceCollectionExtensions
             TwitchChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.EventSubMessages);
         services.AddContinueAndReportObserverFanOut<
-            TwitchOutboundQueueAlertObserverBoundary,
-            TwitchOutboundQueueBacklog,
-            TwitchOutboundQueueAlertDeadLetter
-        >(TwitchBotObserverBoundaries.OutboundQueueAlerts);
-        services.TryAddSingleton<TwitchOutboundDuplicateCooldown>();
-        services.TryAddSingleton<TwitchOutboundQueueBacklogMonitor>();
-        services.TryAddSingleton<TwitchOutboundQueueAlertDispatcher>();
-        services.TryAddSingleton<TwitchOutboundMessageQueue>();
+            PublicChatQueueAlertObserverBoundary,
+            PublicChatQueueBacklog,
+            PublicChatQueueAlertDeadLetter
+        >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
+        services.TryAddSingleton<PublicChatDuplicateCooldown>();
+        services.TryAddSingleton<PublicChatQueueBacklogMonitor>();
+        services.TryAddSingleton<PublicChatQueueAlertDispatcher>();
+        services.TryAddSingleton<PublicChatMessageQueue>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
         services.AddSingleton<TwitchBotRuntimeStatusStore>();
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>

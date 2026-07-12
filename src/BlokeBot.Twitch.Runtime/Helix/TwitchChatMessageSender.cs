@@ -6,7 +6,7 @@ internal sealed class TwitchChatMessageSender(
     TwitchAppAccessTokenProvider appTokens,
     ITwitchBotAccountProvider botAccounts,
     TwitchHelixChatClient helix,
-    TwitchOutboundMessageQueue queue,
+    PublicChatMessageQueue queue,
     ILogger<TwitchChatMessageSender> log
 ) : ITwitchChatMessageSender
 {

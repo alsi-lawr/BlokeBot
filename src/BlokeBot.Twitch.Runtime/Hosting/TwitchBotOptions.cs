@@ -38,9 +38,9 @@ public sealed record TwitchBotOptions
     public string StartupMessage { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets thresholds for alerts emitted by the outbound queue.
+    /// Gets thresholds for alerts emitted by the public chat queue.
     /// </summary>
-    public TwitchOutboundQueueAlertOptions OutboundQueueAlerts { get; set; } = new();
+    public PublicChatQueueAlertOptions PublicChatQueueAlerts { get; set; } = new();
 
     /// <summary>
     /// Gets the Twitch IRC connection settings.
@@ -55,7 +55,7 @@ public sealed record TwitchBotOptions
     public TwitchBotIdentityOptions Identity { get; set; } = new();
 }
 
-public sealed record TwitchOutboundQueueAlertOptions
+public sealed record PublicChatQueueAlertOptions
 {
     public int StuckAfterSeconds { get; set; } = 30;
 }
@@ -66,5 +66,5 @@ public static class TwitchBotOptionsValidation
         options.ChatMessageSendIntervalSeconds >= 0
         && options.DuplicateChatMessageCooldownSeconds >= 0
         && options.MaxChatMessageLength >= 0
-        && options.OutboundQueueAlerts.StuckAfterSeconds > 0;
+        && options.PublicChatQueueAlerts.StuckAfterSeconds > 0;
 }

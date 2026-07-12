@@ -3,13 +3,13 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchOutboundMessageQueue(
+internal sealed class PublicChatMessageQueue(
     TwitchBotSettings settings,
     TimeProvider timeProvider,
-    TwitchOutboundDuplicateCooldown duplicateCooldown,
-    TwitchOutboundQueueBacklogMonitor backlogMonitor,
-    TwitchOutboundQueueAlertDispatcher alertDispatcher,
-    ILogger<TwitchOutboundMessageQueue> log
+    PublicChatDuplicateCooldown duplicateCooldown,
+    PublicChatQueueBacklogMonitor backlogMonitor,
+    PublicChatQueueAlertDispatcher alertDispatcher,
+    ILogger<PublicChatMessageQueue> log
 )
 {
     private readonly object gate = new();
@@ -70,7 +70,7 @@ internal sealed class TwitchOutboundMessageQueue(
         {
             var delay = TimeSpan.Zero;
             PendingMessage? item = null;
-            IReadOnlyList<TwitchOutboundQueueBacklog> queueAlerts;
+            IReadOnlyList<PublicChatQueueBacklog> queueAlerts;
 
             lock (gate)
             {
@@ -205,7 +205,7 @@ internal sealed class TwitchOutboundMessageQueue(
         TimeSpan.FromSeconds(Math.Max(0, settings.DuplicateChatMessageCooldownSeconds));
 
     private TimeSpan QueueStuckThreshold =>
-        TimeSpan.FromSeconds(Math.Max(0, settings.OutboundQueueAlerts.StuckAfterSeconds));
+        TimeSpan.FromSeconds(Math.Max(0, settings.PublicChatQueueAlerts.StuckAfterSeconds));
 
     private void ReportAlertEscalation(
         ObserverFanOutEscalationException escalation,
@@ -243,7 +243,7 @@ internal sealed class TwitchOutboundMessageQueue(
                 .Distinct(StringComparer.Ordinal)
         );
         log.LogError(
-            "Outbound queue alert handling escalated for {AlertCount} alerts after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures at {Boundaries} for {Events}; stages {HandlingStages}, failure types {HandlingFailureTypes}, correlations {CorrelationIds}. Continuing queued chat processing.",
+            "Public chat queue alert handling escalated for {AlertCount} alerts after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures at {Boundaries} for {Events}; stages {HandlingStages}, failure types {HandlingFailureTypes}, correlations {CorrelationIds}. Continuing queued chat processing.",
             alertCount,
             escalation.Failures.Count,
             escalation.HandlingFailures.Count,
@@ -264,9 +264,9 @@ internal sealed class TwitchOutboundMessageQueue(
 
     private DateTimeOffset UtcNow() => timeProvider.GetUtcNow();
 
-    private TwitchOutboundPendingState[] PendingStatesLocked() =>
+    private PublicChatPendingState[] PendingStatesLocked() =>
         pending
-            .Select(x => new TwitchOutboundPendingState(x.Message.Channel, x.EnqueuedAt))
+            .Select(x => new PublicChatPendingState(x.Message.Channel, x.EnqueuedAt))
             .ToArray();
 
     private static TaskCompletionSource NewWakeSignal() =>

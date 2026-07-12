@@ -2,23 +2,23 @@ using BlokeBot.Eventing;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchOutboundQueueAlertDispatcher(
-    IEnumerable<ITwitchOutboundQueueAlertObserver> observers,
+internal sealed class PublicChatQueueAlertDispatcher(
+    IEnumerable<IPublicChatQueueAlertObserver> observers,
     ObserverFanOut<
-        TwitchOutboundQueueAlertObserverBoundary,
-        TwitchOutboundQueueBacklog,
-        TwitchOutboundQueueAlertDeadLetter
+        PublicChatQueueAlertObserverBoundary,
+        PublicChatQueueBacklog,
+        PublicChatQueueAlertDeadLetter
     > fanOut
 )
 {
     private static readonly ObserverEventIdentity BacklogEvent =
-        ObserverEventIdentity.Named("TwitchOutboundQueueBacklog");
-    private readonly ITwitchOutboundQueueAlertObserver[] observers = [.. observers];
+        ObserverEventIdentity.Named("PublicChatQueueBacklog");
+    private readonly IPublicChatQueueAlertObserver[] observers = [.. observers];
 
     public bool HasObservers => observers.Length > 0;
 
     public async Task NotifyAsync(
-        IReadOnlyList<TwitchOutboundQueueBacklog> alerts,
+        IReadOnlyList<PublicChatQueueBacklog> alerts,
         CancellationToken cancellationToken
     )
     {
@@ -28,13 +28,13 @@ internal sealed class TwitchOutboundQueueAlertDispatcher(
                 observers,
                 _ =>
                     new ObserverDispatch<
-                        TwitchOutboundQueueBacklog,
-                        TwitchOutboundQueueAlertDeadLetter
+                        PublicChatQueueBacklog,
+                        PublicChatQueueAlertDeadLetter
                     >
                     {
                         Event = alert,
                         EventIdentity = BacklogEvent,
-                        DeadLetter = new TwitchOutboundQueueAlertDeadLetter(
+                        DeadLetter = new PublicChatQueueAlertDeadLetter(
                             alert.Channel,
                             alert.PendingCount,
                             alert.OldestPendingAge,

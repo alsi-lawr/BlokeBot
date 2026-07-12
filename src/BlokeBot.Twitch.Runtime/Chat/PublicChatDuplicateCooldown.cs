@@ -1,9 +1,9 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchOutboundDuplicateCooldown
+internal sealed class PublicChatDuplicateCooldown
 {
     private readonly object gate = new();
-    private readonly Dictionary<TwitchOutboundMessageKey, DateTimeOffset> blockedUntil = [];
+    private readonly Dictionary<PublicChatMessageKey, DateTimeOffset> blockedUntil = [];
 
     internal int EntryCount
     {
@@ -26,7 +26,7 @@ internal sealed class TwitchOutboundDuplicateCooldown
             if (cooldown <= TimeSpan.Zero)
                 return now;
 
-            return blockedUntil.GetValueOrDefault(TwitchOutboundMessageKey.From(message), now);
+            return blockedUntil.GetValueOrDefault(PublicChatMessageKey.From(message), now);
         }
     }
 
@@ -42,7 +42,7 @@ internal sealed class TwitchOutboundDuplicateCooldown
             if (cooldown <= TimeSpan.Zero)
                 return;
 
-            blockedUntil[TwitchOutboundMessageKey.From(message)] = now + cooldown;
+            blockedUntil[PublicChatMessageKey.From(message)] = now + cooldown;
         }
     }
 
@@ -60,8 +60,8 @@ internal sealed class TwitchOutboundDuplicateCooldown
     }
 }
 
-internal readonly record struct TwitchOutboundMessageKey(string Channel, string Message)
+internal readonly record struct PublicChatMessageKey(string Channel, string Message)
 {
-    public static TwitchOutboundMessageKey From(TwitchOutboundChatMessage message) =>
+    public static PublicChatMessageKey From(TwitchOutboundChatMessage message) =>
         new(message.Channel.Trim().ToLowerInvariant(), message.Message.Trim());
 }
