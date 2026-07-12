@@ -1,6 +1,6 @@
+using System.Threading.Channels;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
-using BlokeBot.Hosting;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,11 +12,7 @@ namespace BlokeBot.Integration.Tests;
 public sealed class OutboundQueueAlertIntegrationTests
 {
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task QueueBackupWithOptionalSubscriber_DetectingIncident_PersistsAlertAndNotifiesWhenPresent(
-        bool includeSubscriber
-    )
+    public async Task QueueBackup_DetectingIncident_PersistsAlertAndPublishesApplicationNotification()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
@@ -24,32 +20,20 @@ public sealed class OutboundQueueAlertIntegrationTests
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
         var events = TestEventBus.Create<AppEventKind>();
-        var alertCreated = new TaskCompletionSource(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
+        var notificationCount = 0;
         using var subscription = events.Subscribe(
             AppEventKind.AlertsChanged,
             ObserverIdentity.Named("Test.AlertCreated"),
             (_, _) =>
             {
-                alertCreated.TrySetResult();
+                notificationCount++;
                 return ValueTask.CompletedTask;
             }
         );
-        var subscriber = new RecordingAlertSubscriber();
-        IOutboundQueueAlertSubscriber[] subscribers = includeSubscriber ? [subscriber] : [];
         var alertService = new DurableAlertService(dbFactory, clock, events);
         var durableObserver = new DurableOutboundQueueAlertObserver(
             dbFactory,
             alertService,
-            new OutboundQueueAlertSubscriberDispatcher(
-                subscribers,
-                TestObserverFanOut.Continue<
-                    OutboundQueueAlertSubscriberBoundary,
-                    OutboundQueueAlertNotification,
-                    OutboundQueueAlertSubscriberDeadLetter
-                >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers)
-            ),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
         var queue = CreateQueue(clock, durableObserver);
@@ -59,15 +43,14 @@ public sealed class OutboundQueueAlertIntegrationTests
 
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await alertCreated.Task;
+        await clock.WaitForTimerRegistrationAsync();
 
         var state = await alertService.LoadStateAsync(hostId, CancellationToken.None);
         var alert = state.Active.ShouldHaveSingleItem();
         alert.Source.ShouldBe("twitch-outbound-queue");
         alert.LinkPath.ShouldBe("/alerts");
-        subscriber.Notifications.Count.ShouldBe(includeSubscriber ? 1 : 0);
+        notificationCount.ShouldBe(1);
 
-        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         await second;
     }
@@ -122,26 +105,13 @@ public sealed class OutboundQueueAlertIntegrationTests
         return host.Id;
     }
 
-    private sealed class RecordingAlertSubscriber : IOutboundQueueAlertSubscriber
-    {
-        public List<OutboundQueueAlertNotification> Notifications { get; } = [];
-
-        public Task AlertCreatedAsync(
-            OutboundQueueAlertNotification notification,
-            CancellationToken ct
-        )
-        {
-            Notifications.Add(notification);
-            return Task.CompletedTask;
-        }
-    }
-
     private sealed class ManualTimerTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
         private readonly object gate = new();
         private readonly List<ManualTimer> timers = [];
+        private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
         private DateTimeOffset now = initialNow;
-        private TaskCompletionSource? timerRegistration;
+        private bool waitingForTimerRegistration;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -178,18 +148,22 @@ public sealed class OutboundQueueAlertIntegrationTests
                 timer.Fire();
         }
 
-        // This is an event barrier for CreateTimer; only Advance moves time.
-        public Task WaitForTimerRegistrationAsync()
+        public ValueTask<bool> WaitForTimerRegistrationAsync()
         {
             lock (gate)
             {
                 if (timers.Count > 0)
-                    return Task.CompletedTask;
+                    return ValueTask.FromResult(true);
 
-                timerRegistration = new TaskCompletionSource(
-                    TaskCreationOptions.RunContinuationsAsynchronously
-                );
-                return timerRegistration.Task;
+                if (waitingForTimerRegistration)
+                {
+                    throw new InvalidOperationException(
+                        "Only one timer-registration observer is supported."
+                    );
+                }
+
+                waitingForTimerRegistration = true;
+                return timerRegistrations.Reader.ReadAsync();
             }
         }
 
@@ -199,8 +173,16 @@ public sealed class OutboundQueueAlertIntegrationTests
             {
                 if (!timers.Contains(timer))
                     timers.Add(timer);
-                timerRegistration?.TrySetResult();
-                timerRegistration = null;
+                if (!waitingForTimerRegistration)
+                    return;
+
+                waitingForTimerRegistration = false;
+                if (!timerRegistrations.Writer.TryWrite(true))
+                {
+                    throw new InvalidOperationException(
+                        "The timer-registration observer could not be notified."
+                    );
+                }
             }
         }
 

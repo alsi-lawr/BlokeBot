@@ -10,7 +10,6 @@ namespace BlokeBot.Features.Alerts;
 internal sealed class DurableOutboundQueueAlertObserver(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     DurableAlertService alerts,
-    OutboundQueueAlertSubscriberDispatcher subscribers,
     ILogger<DurableOutboundQueueAlertObserver> log
 ) : ITwitchOutboundQueueAlertObserver
 {
@@ -36,7 +35,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
             return;
         }
 
-        var result = await alerts.CreateOrGetActiveAsync(
+        await alerts.CreateOrGetActiveAsync(
             host.Id,
             DurableAlertSeverity.Warning,
             Source,
@@ -44,20 +43,6 @@ internal sealed class DurableOutboundQueueAlertObserver(
             "Chat messages are delayed",
             Message(host.Login, backlog),
             LinkPath,
-            cancellationToken
-        );
-        if (!result.Created)
-            return;
-
-        await subscribers.AlertCreatedAsync(
-            new OutboundQueueAlertNotification(
-                result.Alert.Id,
-                host.Id,
-                host.Login,
-                host.TwitchUserId,
-                backlog.PendingCount,
-                backlog.OldestPendingAge
-            ),
             cancellationToken
         );
     }
@@ -68,7 +53,7 @@ internal sealed class DurableOutboundQueueAlertObserver(
         return await db
             .Hosts.AsNoTracking()
             .Where(x => x.Login == channel)
-            .Select(x => new QueueAlertHost(x.Id, x.Login, x.TwitchUserId))
+            .Select(x => new QueueAlertHost(x.Id, x.Login))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -86,5 +71,5 @@ internal sealed class DurableOutboundQueueAlertObserver(
         return $"{Math.Max(1, (int)Math.Round(age.TotalSeconds))} seconds";
     }
 
-    private sealed record QueueAlertHost(int Id, string Login, string? TwitchUserId);
+    private sealed record QueueAlertHost(int Id, string Login);
 }

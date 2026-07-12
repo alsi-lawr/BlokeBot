@@ -94,12 +94,21 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
-        var subscriber = new RecordingAlertSubscriber();
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.QueueAlertChanged"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var alerts = new DurableAlertService(dbFactory, clock, events);
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
             alerts,
-            Dispatcher(subscriber),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
         var backlog = new TwitchOutboundQueueBacklog(
@@ -119,10 +128,7 @@ public sealed class DurableAlertTests
         stored.Source.ShouldBe("twitch-outbound-queue");
         stored.SourceKey.ShouldStartWith("streamer:");
         stored.AcknowledgedAtUtc.ShouldBeNull();
-        subscriber.Notifications.Count.ShouldBe(1);
-        subscriber.Notifications[0].AlertId.ShouldBe(stored.Id);
-        subscriber.Notifications[0].HostId.ShouldBe(hostId);
-        subscriber.Notifications[0].HostLogin.ShouldBe("streamer");
+        notificationCount.ShouldBe(1);
     }
 
     [Test]
@@ -133,12 +139,21 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(
             new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
         );
-        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
-        var subscriber = new RecordingAlertSubscriber();
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        using var subscription = events.Subscribe(
+            AppEventKind.AlertsChanged,
+            ObserverIdentity.Named("Test.QueueAlertChanged"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return ValueTask.CompletedTask;
+            }
+        );
+        var alerts = new DurableAlertService(dbFactory, clock, events);
         var observer = new DurableOutboundQueueAlertObserver(
             dbFactory,
             alerts,
-            Dispatcher(subscriber),
             NullLogger<DurableOutboundQueueAlertObserver>.Instance
         );
 
@@ -165,39 +180,7 @@ public sealed class DurableAlertTests
         var alertsCreated = await db.DurableAlerts.ToArrayAsync(CancellationToken.None);
         alertsCreated.Length.ShouldBe(2);
         alertsCreated.Select(x => x.SourceKey).Distinct().Count().ShouldBe(2);
-        subscriber.Notifications.Count.ShouldBe(2);
-    }
-
-    [Test]
-    public async Task FailingAlertSubscriber_ObservingQueueIncident_PersistsAndNotifiesOthers()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(dbFactory, "streamer");
-        var clock = new FixedTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
-        var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
-        var recording = new RecordingAlertSubscriber();
-        var observer = new DurableOutboundQueueAlertObserver(
-            dbFactory,
-            alerts,
-            Dispatcher(new ThrowingAlertSubscriber(), recording),
-            NullLogger<DurableOutboundQueueAlertObserver>.Instance
-        );
-
-        await observer.QueueBackedUpAsync(
-            new TwitchOutboundQueueBacklog(
-                "streamer",
-                3,
-                TimeSpan.FromSeconds(31),
-                clock.GetUtcNow()
-            ),
-            CancellationToken.None
-        );
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.DurableAlerts.CountAsync()).ShouldBe(1);
-        recording.Notifications.Count.ShouldBe(1);
+        notificationCount.ShouldBe(2);
     }
 
     private static async Task<int> SeedHostAsync(
@@ -216,40 +199,6 @@ public sealed class DurableAlertTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
-    }
-
-    private static OutboundQueueAlertSubscriberDispatcher Dispatcher(
-        params IOutboundQueueAlertSubscriber[] subscribers
-    ) =>
-        new(
-            subscribers,
-            TestObserverFanOut.Continue<
-                OutboundQueueAlertSubscriberBoundary,
-                OutboundQueueAlertNotification,
-                OutboundQueueAlertSubscriberDeadLetter
-            >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers)
-        );
-
-    private sealed class RecordingAlertSubscriber : IOutboundQueueAlertSubscriber
-    {
-        public List<OutboundQueueAlertNotification> Notifications { get; } = [];
-
-        public Task AlertCreatedAsync(
-            OutboundQueueAlertNotification notification,
-            CancellationToken ct
-        )
-        {
-            Notifications.Add(notification);
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class ThrowingAlertSubscriber : IOutboundQueueAlertSubscriber
-    {
-        public Task AlertCreatedAsync(
-            OutboundQueueAlertNotification notification,
-            CancellationToken ct
-        ) => throw new InvalidOperationException("Subscriber failed.");
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

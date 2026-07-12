@@ -4,7 +4,6 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
-using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
@@ -92,19 +91,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
     public static IServiceCollection AddBlokeBotAlerts(this IServiceCollection services)
     {
-        services.AddContinueAndReportObserverFanOut<
-            OutboundQueueAlertSubscriberBoundary,
-            OutboundQueueAlertNotification,
-            OutboundQueueAlertSubscriberDeadLetter
-        >(BlokeBotObserverBoundaries.OutboundQueueAlertSubscribers);
         services.TryAddSingleton<DurableAlertService>();
-        services.TryAddSingleton<OutboundQueueAlertSubscriberDispatcher>();
-        services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<
-                IOutboundQueueAlertSubscriber,
-                OutboundQueueAlertWhisperSender
-            >()
-        );
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<
                 ITwitchOutboundQueueAlertObserver,
