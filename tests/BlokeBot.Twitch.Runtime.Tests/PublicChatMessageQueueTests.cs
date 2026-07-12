@@ -1,6 +1,7 @@
+using System.Collections.Immutable;
 using System.Threading.Channels;
-using BlokeBot.Twitch.Runtime;
 using BlokeBot.Eventing;
+using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -16,85 +17,84 @@ public sealed class PublicChatMessageQueueTests
         TwitchChatMessageSplitter
             .Split("first line\nsecond line", 12)
             .ShouldBe(["first line", "second line"]);
-
         TwitchChatMessageSplitter
             .Split("First sentence. Second one.", 20)
             .ShouldBe(["First sentence.", "Second one."]);
-
         TwitchChatMessageSplitter.Split("alpha beta gamma", 10).ShouldBe(["alpha", "beta gamma"]);
     }
 
     [Test]
-    public async Task MessageOverLength_Queueing_SplitsAndSendsInOrder()
+    public async Task MessageOverLength_Enqueueing_PersistsEveryPartBeforeDelivery()
     {
-        var queue = CreatePublicChatQueue(
+        var outbox = new InMemoryOutbox();
+        var transport = new RecordingTransport();
+        var queue = CreateQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 0,
                 MaxChatMessageLength = 10,
-            }
+            },
+            outbox,
+            transport
         );
-        List<string> sent = [];
 
-        await queue.SendAsync(
+        var receipt = await queue.EnqueueAsync(
             "channel",
             "alpha beta gamma",
-            (message, _) =>
-            {
-                sent.Add(message.Message);
-                return Task.CompletedTask;
-            },
             CancellationToken.None
         );
 
-        sent.ShouldBe(["alpha", "beta gamma"]);
+        receipt.MessageIds.Length.ShouldBe(2);
+        outbox.PendingMessages.ShouldBe(["alpha", "beta gamma"]);
+        transport.Deliveries.ShouldBeEmpty();
+
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+        (await transport.ReadAsync()).Message.ShouldBe("alpha");
+        (await transport.ReadAsync()).Message.ShouldBe("beta gamma");
+        await StopAsync(stopping, worker);
     }
 
     [Test]
-    public async Task DuplicateAndDistinctMessages_Queueing_DelaysOnlyDuplicate()
+    public async Task DuplicateAndDistinctMessages_Processing_DelaysOnlyDuplicate()
     {
-        var clock = new ManualTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
-        var queue = CreatePublicChatQueue(
+        var clock = new ManualTimeProvider(Utc(12, 0, 0));
+        var outbox = new InMemoryOutbox();
+        var transport = new RecordingTransport();
+        var queue = CreateQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 1,
             },
+            outbox,
+            transport,
             clock
         );
-        List<string> sent = [];
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
 
-        await queue.SendAsync("channel", "same", SendAsync, CancellationToken.None);
-        var duplicate = queue.SendAsync("channel", "same", SendAsync, CancellationToken.None);
-        var different = queue.SendAsync("channel", "different", SendAsync, CancellationToken.None);
+        _ = await queue.EnqueueAsync("channel", "same", CancellationToken.None);
+        (await transport.ReadAsync()).Message.ShouldBe("same");
+        _ = await queue.EnqueueAsync("channel", "same", CancellationToken.None);
+        _ = await queue.EnqueueAsync("channel", "different", CancellationToken.None);
 
-        await different;
-        duplicate.IsCompleted.ShouldBeFalse();
-
+        (await transport.ReadAsync()).Message.ShouldBe("different");
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(1));
-        await duplicate;
-        sent.ShouldBe(["same", "different", "same"]);
-        return;
-
-        Task SendAsync(TwitchOutboundChatMessage message, CancellationToken _)
-        {
-            sent.Add(message.Message);
-            return Task.CompletedTask;
-        }
+        (await transport.ReadAsync()).Message.ShouldBe("same");
+        await StopAsync(stopping, worker);
     }
 
     [Test]
     public async Task RepeatedAndLaterBackups_MonitoringPublicChatQueue_AlertsOncePerIncident()
     {
-        var clock = new ManualTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
-        var observer = new RecordingPublicChatQueueAlertObserver();
-        var queue = CreatePublicChatQueue(
+        var clock = new ManualTimeProvider(Utc(12, 0, 0));
+        var outbox = new InMemoryOutbox();
+        var transport = new RecordingTransport();
+        var observer = new RecordingQueueAlertObserver();
+        var queue = CreateQueue(
             new TwitchBotOptions
             {
                 ChatMessageSendIntervalSeconds = 10,
@@ -104,75 +104,51 @@ public sealed class PublicChatMessageQueueTests
                     StuckAfterSeconds = 5,
                 },
             },
+            outbox,
+            transport,
             clock,
             [observer]
         );
-        List<string> sent = [];
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
 
-        await queue.SendAsync("channel", "first", SendAsync, CancellationToken.None);
-        var second = queue.SendAsync("channel", "second", SendAsync, CancellationToken.None);
-        var third = queue.SendAsync("channel", "third", SendAsync, CancellationToken.None);
-
-        await clock.WaitForTimerRegistrationAsync();
-        clock.Advance(TimeSpan.FromSeconds(5));
-        await observer.WaitForCountAsync(1);
-
-        observer.Alerts[0].Channel.ShouldBe("channel");
-        observer.Alerts[0].OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));
-        observer.Alerts[0].PendingCount.ShouldBeGreaterThanOrEqualTo(1);
+        _ = await queue.EnqueueAsync("channel", "first", CancellationToken.None);
+        (await transport.ReadAsync()).Message.ShouldBe("first");
+        _ = await queue.EnqueueAsync("channel", "second", CancellationToken.None);
+        _ = await queue.EnqueueAsync("channel", "third", CancellationToken.None);
 
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await second;
+        var firstAlert = await observer.ReadAsync();
+        firstAlert.Channel.ShouldBe("channel");
+        firstAlert.OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));
+        firstAlert.PendingCount.ShouldBe(2);
+
+        await clock.WaitForTimerRegistrationAsync();
+        clock.Advance(TimeSpan.FromSeconds(5));
+        (await transport.ReadAsync()).Message.ShouldBe("second");
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(10));
-        await third;
+        (await transport.ReadAsync()).Message.ShouldBe("third");
         observer.Alerts.Count.ShouldBe(1);
 
-        var fourth = queue.SendAsync("channel", "fourth", SendAsync, CancellationToken.None);
+        _ = await queue.EnqueueAsync("channel", "fourth", CancellationToken.None);
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await observer.WaitForCountAsync(2);
+        _ = await observer.ReadAsync();
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await fourth;
-
-        sent.ShouldBe(["first", "second", "third", "fourth"]);
-        return;
-
-        Task SendAsync(TwitchOutboundChatMessage message, CancellationToken _)
-        {
-            sent.Add(message.Message);
-            return Task.CompletedTask;
-        }
-    }
-
-    [Test]
-    public void DuplicateCooldownAtBoundary_CheckingNextAllowed_PrunesStaleEntries()
-    {
-        var cooldown = new PublicChatDuplicateCooldown();
-        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
-        var first = new TwitchOutboundChatMessage("first", "same");
-        var second = new TwitchOutboundChatMessage("second", "same");
-        cooldown.RecordSent(first, now, TimeSpan.FromSeconds(5));
-        cooldown.RecordSent(second, now, TimeSpan.FromSeconds(5));
-        cooldown.EntryCount.ShouldBe(2);
-
-        cooldown
-            .NextAllowedAt(first, now.AddSeconds(4), TimeSpan.FromSeconds(5))
-            .ShouldBe(now.AddSeconds(5));
-        cooldown
-            .NextAllowedAt(first, now.AddSeconds(5), TimeSpan.FromSeconds(5))
-            .ShouldBe(now.AddSeconds(5));
-        cooldown.EntryCount.ShouldBe(0);
+        (await transport.ReadAsync()).Message.ShouldBe("fourth");
+        observer.Alerts.Count.ShouldBe(2);
+        await StopAsync(stopping, worker);
     }
 
     [Test]
     public void BacklogsAcrossChannels_CapturingAlerts_TracksIndependentlyAndResetsDrained()
     {
         var monitor = new PublicChatQueueBacklogMonitor();
-        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 10, TimeSpan.Zero);
-        PublicChatPendingState[] pending =
+        var now = Utc(12, 0, 10);
+        PublicChatPendingMessage[] pending =
         [
             new("first", now.AddSeconds(-10)),
             new("first", now.AddSeconds(-6)),
@@ -185,7 +161,7 @@ public sealed class PublicChatMessageQueueTests
             TimeSpan.FromSeconds(5),
             enabled: true
         );
-        firstIncidents.Select(x => x.Channel).ShouldBe(["first", "second"]);
+        firstIncidents.Select(alert => alert.Channel).ShouldBe(["first", "second"]);
         monitor
             .CaptureAlerts(pending, now, TimeSpan.FromSeconds(5), enabled: true)
             .ShouldBeEmpty();
@@ -197,22 +173,22 @@ public sealed class PublicChatMessageQueueTests
             TimeSpan.FromSeconds(5),
             enabled: true
         );
-        nextFirstIncident.Select(x => x.Channel).ShouldBe(["first"]);
+        nextFirstIncident.Select(alert => alert.Channel).ShouldBe(["first"]);
     }
 
     [Test]
     public async Task FailingPublicChatQueueAlertObserver_DispatchingAlert_NotifiesRemainingObservers()
     {
-        var recording = new RecordingPublicChatQueueAlertObserver();
+        var recording = new RecordingQueueAlertObserver();
         var dispatcher = new PublicChatQueueAlertDispatcher(
-            [new ThrowingPublicChatQueueAlertObserver("Observer failed."), recording],
-            PublicChatQueueAlertFanOut()
+            [new ThrowingQueueAlertObserver("Observer failed."), recording],
+            QueueAlertFanOut()
         );
         var alert = new PublicChatQueueBacklog(
             "channel",
             2,
             TimeSpan.FromSeconds(5),
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+            Utc(12, 0, 0)
         );
 
         await dispatcher.NotifyAsync([alert], CancellationToken.None);
@@ -221,114 +197,173 @@ public sealed class PublicChatMessageQueueTests
     }
 
     [Test]
-    public async Task AlertHandlingEscalation_ProcessingPublicChatQueue_SendsPendingAndLaterMessages()
+    public async Task AlertHandlingEscalation_ProcessingPublicChatQueue_ContinuesDelivery()
     {
-        var clock = new ManualTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
+        var clock = new ManualTimeProvider(Utc(12, 0, 0));
+        var outbox = new InMemoryOutbox();
+        var transport = new RecordingTransport();
         var logger = new RecordingLogger<PublicChatMessageQueue>();
-        var queue = new PublicChatMessageQueue(
-            TwitchBotSettings.FromOptions(
-                new TwitchBotOptions
+        var queue = CreateQueue(
+            new TwitchBotOptions
+            {
+                ChatMessageSendIntervalSeconds = 10,
+                DuplicateChatMessageCooldownSeconds = 0,
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
                 {
-                    ChatMessageSendIntervalSeconds = 10,
-                    DuplicateChatMessageCooldownSeconds = 0,
-                    PublicChatQueueAlerts = new PublicChatQueueAlertOptions
-                    {
-                        StuckAfterSeconds = 5,
-                    },
-                }
-            ),
+                    StuckAfterSeconds = 5,
+                },
+            },
+            outbox,
+            transport,
             clock,
-            new PublicChatDuplicateCooldown(),
-            new PublicChatQueueBacklogMonitor(),
-            new PublicChatQueueAlertDispatcher(
-                [new ThrowingPublicChatQueueAlertObserver("observer secret payload")],
-                RuntimeTestObserverFanOut.EscalatingContinue<
-                    PublicChatQueueAlertObserverBoundary,
-                    PublicChatQueueBacklog,
-                    PublicChatQueueAlertDeadLetter
-                >(
-                    TwitchBotObserverBoundaries.PublicChatQueueAlerts,
-                    new IOException("reporter secret payload")
-                )
+            [new ThrowingQueueAlertObserver("observer secret payload")],
+            RuntimeTestObserverFanOut.EscalatingContinue<
+                PublicChatQueueAlertObserverBoundary,
+                PublicChatQueueBacklog,
+                PublicChatQueueAlertDeadLetter
+            >(
+                TwitchBotObserverBoundaries.PublicChatQueueAlerts,
+                new IOException("reporter secret payload")
             ),
             logger
         );
-        var sent = new List<string>();
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
 
-        await queue.SendAsync("channel", "first", SendAsync, CancellationToken.None);
-        var second = queue.SendAsync(
+        _ = await queue.EnqueueAsync("channel", "first", CancellationToken.None);
+        _ = await transport.ReadAsync();
+        _ = await queue.EnqueueAsync(
             "channel",
             "second secret chat payload",
-            SendAsync,
             CancellationToken.None
         );
-        second.IsCompleted.ShouldBeFalse();
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(10));
-        await second;
+        (await transport.ReadAsync()).Message.ShouldBe("second secret chat payload");
 
-        var third = queue.SendAsync("channel", "third", SendAsync, CancellationToken.None);
-        third.IsCompleted.ShouldBeFalse();
-        await clock.WaitForTimerRegistrationAsync();
-        clock.Advance(TimeSpan.FromSeconds(10));
-        await third;
-
-        sent.ShouldBe(["first", "second secret chat payload", "third"]);
-        logger.Entries.Count.ShouldBe(2);
+        logger.Entries.ShouldNotBeEmpty();
         foreach (var entry in logger.Entries)
         {
-            entry.Level.ShouldBe(LogLevel.Error);
             entry.Exception.ShouldBeNull();
             entry.Message.ShouldContain("Continuing queued chat processing");
-            entry.Message.ShouldContain(TwitchBotObserverBoundaries.PublicChatQueueAlerts.Value);
-            entry.Message.ShouldContain(nameof(ObserverFailureHandlingStage.Reporter));
             entry.Message.ShouldNotContain("observer secret payload");
             entry.Message.ShouldNotContain("reporter secret payload");
             entry.Message.ShouldNotContain("second secret chat payload");
         }
-        return;
-
-        Task SendAsync(TwitchOutboundChatMessage message, CancellationToken _)
-        {
-            sent.Add(message.Message);
-            return Task.CompletedTask;
-        }
+        await StopAsync(stopping, worker);
     }
 
-    private static PublicChatMessageQueue CreatePublicChatQueue(
+    [Test]
+    public async Task PersistenceFailure_Enqueueing_IsObservableWithoutDelivery()
+    {
+        var outbox = new InMemoryOutbox
+        {
+            EnqueueFailure = new IOException("Persistence unavailable."),
+        };
+        var transport = new RecordingTransport();
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+
+        await Should.ThrowAsync<IOException>(() =>
+            queue.EnqueueAsync("channel", "message", CancellationToken.None).AsTask()
+        );
+
+        outbox.PendingMessages.ShouldBeEmpty();
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task CallerCanceledAfterCommit_Enqueueing_LeavesDeliveryRecoverable()
+    {
+        using var caller = new CancellationTokenSource();
+        var outbox = new InMemoryOutbox { AfterEnqueue = caller.Cancel };
+        var transport = new RecordingTransport();
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+
+        var receipt = await queue.EnqueueAsync("channel", "message", caller.Token);
+
+        receipt.MessageIds.Length.ShouldBe(1);
+        caller.IsCancellationRequested.ShouldBeTrue();
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+        (await transport.ReadAsync()).Message.ShouldBe("message");
+        await StopAsync(stopping, worker);
+    }
+
+    private static PublicChatMessageQueue CreateQueue(
         TwitchBotOptions options,
+        IPublicChatOutbox outbox,
+        IPublicChatTransport transport,
         TimeProvider? timeProvider = null,
-        IEnumerable<IPublicChatQueueAlertObserver>? observers = null
+        IEnumerable<IPublicChatQueueAlertObserver>? observers = null,
+        ObserverFanOut<
+            PublicChatQueueAlertObserverBoundary,
+            PublicChatQueueBacklog,
+            PublicChatQueueAlertDeadLetter
+        >? fanOut = null,
+        ILogger<PublicChatMessageQueue>? logger = null
     ) =>
         new(
             TwitchBotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
-            new PublicChatDuplicateCooldown(),
             new PublicChatQueueBacklogMonitor(),
             new PublicChatQueueAlertDispatcher(
                 observers ?? [],
-                PublicChatQueueAlertFanOut()
+                fanOut ?? QueueAlertFanOut()
             ),
-            NullLogger<PublicChatMessageQueue>.Instance
+            outbox,
+            transport,
+            logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
 
     private static ObserverFanOut<
         PublicChatQueueAlertObserverBoundary,
         PublicChatQueueBacklog,
         PublicChatQueueAlertDeadLetter
-    > PublicChatQueueAlertFanOut() =>
+    > QueueAlertFanOut() =>
         RuntimeTestObserverFanOut.Continue<
             PublicChatQueueAlertObserverBoundary,
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
 
-    private sealed class RecordingPublicChatQueueAlertObserver : IPublicChatQueueAlertObserver
+    private static async Task StopAsync(
+        CancellationTokenSource stopping,
+        Task worker
+    )
     {
-        private readonly object gate = new();
-        private readonly Channel<int> observedCounts = Channel.CreateUnbounded<int>();
+        await stopping.CancelAsync();
+        await worker;
+    }
+
+    private static DateTimeOffset Utc(int hour, int minute, int second) =>
+        new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+
+    private sealed class RecordingTransport : IPublicChatTransport
+    {
+        private readonly Channel<PublicChatClaimedMessage> delivered =
+            Channel.CreateUnbounded<PublicChatClaimedMessage>();
+
+        public List<PublicChatClaimedMessage> Deliveries { get; } = [];
+
+        public ValueTask SendAsync(
+            PublicChatClaimedMessage message,
+            CancellationToken cancellationToken
+        )
+        {
+            Deliveries.Add(message);
+            if (!delivered.Writer.TryWrite(message))
+                throw new InvalidOperationException("The transport delivery could not be observed.");
+
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<PublicChatClaimedMessage> ReadAsync() => delivered.Reader.ReadAsync();
+    }
+
+    private sealed class RecordingQueueAlertObserver : IPublicChatQueueAlertObserver
+    {
+        private readonly Channel<PublicChatQueueBacklog> alerts =
+            Channel.CreateUnbounded<PublicChatQueueBacklog>();
 
         public List<PublicChatQueueBacklog> Alerts { get; } = [];
 
@@ -337,46 +372,322 @@ public sealed class PublicChatMessageQueueTests
             CancellationToken cancellationToken
         )
         {
-            lock (gate)
-            {
-                Alerts.Add(backlog);
-                if (!observedCounts.Writer.TryWrite(Alerts.Count))
-                {
-                    throw new InvalidOperationException(
-                        "The public chat queue alert observer could not publish its count."
-                    );
-                }
-            }
+            Alerts.Add(backlog);
+            if (!alerts.Writer.TryWrite(backlog))
+                throw new InvalidOperationException("The queue alert could not be observed.");
 
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask WaitForCountAsync(int count)
-        {
-            lock (gate)
-            {
-                if (Alerts.Count >= count)
-                    return ValueTask.CompletedTask;
-
-                return WaitForCountCoreAsync(count);
-            }
-        }
-
-        private async ValueTask WaitForCountCoreAsync(int count)
-        {
-            var observedCount = 0;
-            while (observedCount < count)
-                observedCount = await observedCounts.Reader.ReadAsync();
-        }
+        public ValueTask<PublicChatQueueBacklog> ReadAsync() => alerts.Reader.ReadAsync();
     }
 
-    private sealed class ThrowingPublicChatQueueAlertObserver(string failureMessage)
+    private sealed class ThrowingQueueAlertObserver(string failureMessage)
         : IPublicChatQueueAlertObserver
     {
         public ValueTask QueueBackedUpAsync(
             PublicChatQueueBacklog backlog,
             CancellationToken cancellationToken
         ) => throw new InvalidOperationException(failureMessage);
+    }
+
+    private sealed class InMemoryOutbox : IPublicChatOutbox
+    {
+        private readonly object gate = new();
+        private readonly List<Row> rows = [];
+        private long nextId = 1;
+
+        public Action? AfterEnqueue { get; init; }
+
+        public Exception? EnqueueFailure { get; init; }
+
+        public IReadOnlyList<string> PendingMessages
+        {
+            get
+            {
+                lock (gate)
+                {
+                    return rows
+                        .Where(row => row.Status == RowStatus.Pending)
+                        .Select(row => row.Message!)
+                        .ToArray();
+                }
+            }
+        }
+
+        public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+            PublicChatOutboxBatch batch,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (EnqueueFailure is { } failure)
+                throw failure;
+
+            long[] ids;
+            lock (gate)
+            {
+                ids = batch.Items
+                    .Select(item =>
+                    {
+                        var id = nextId++;
+                        rows.Add(new Row(id, batch.Channel, item, batch.EnqueuedAt));
+                        return id;
+                    })
+                    .ToArray();
+            }
+
+            AfterEnqueue?.Invoke();
+            return ValueTask.FromResult(
+                new PublicChatOutboxReceipt(ImmutableArray.Create(ids))
+            );
+        }
+
+        public ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
+            DateTimeOffset now,
+            DateTimeOffset claimExpiresAt,
+            TimeSpan sendInterval,
+            TimeSpan duplicateCooldown,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var active = rows.FirstOrDefault(row =>
+                    row.Status is RowStatus.Claimed or RowStatus.Sending
+                );
+                if (active is not null)
+                {
+                    return ValueTask.FromResult<PublicChatClaimOutcome>(
+                        new PublicChatClaimOutcome.AwaitingAvailability(active.ClaimExpiresAt)
+                    );
+                }
+
+                var previousAttempt = rows
+                    .Where(row => row.CompletedAt is not null)
+                    .Select(row => row.CompletedAt!.Value)
+                    .DefaultIfEmpty(DateTimeOffset.MinValue)
+                    .Max();
+                var pending = rows
+                    .Where(row => row.Status == RowStatus.Pending)
+                    .Select(row =>
+                    {
+                        var eligibleAt = row.NextAttemptAt;
+                        if (previousAttempt != DateTimeOffset.MinValue)
+                            eligibleAt = Max(eligibleAt, previousAttempt + sendInterval);
+                        var previousDelivery = rows
+                            .Where(other =>
+                                other.Status == RowStatus.Delivered
+                                && other.Item.DeduplicationKey
+                                    == row.Item.DeduplicationKey
+                            )
+                            .Select(other => other.CompletedAt!.Value)
+                            .DefaultIfEmpty(DateTimeOffset.MinValue)
+                            .Max();
+                        if (previousDelivery != DateTimeOffset.MinValue)
+                        {
+                            eligibleAt = Max(
+                                eligibleAt,
+                                previousDelivery + duplicateCooldown
+                            );
+                        }
+
+                        return new Candidate(row, eligibleAt);
+                    })
+                    .OrderBy(candidate => candidate.EligibleAt)
+                    .ThenBy(candidate => candidate.Row.EnqueuedAt)
+                    .ThenBy(candidate => candidate.Row.Id)
+                    .FirstOrDefault();
+                if (pending is null)
+                {
+                    return ValueTask.FromResult<PublicChatClaimOutcome>(
+                        new PublicChatClaimOutcome.Empty()
+                    );
+                }
+
+                if (pending.EligibleAt > now)
+                {
+                    return ValueTask.FromResult<PublicChatClaimOutcome>(
+                        new PublicChatClaimOutcome.AwaitingAvailability(pending.EligibleAt)
+                    );
+                }
+
+                var token = new PublicChatClaimToken(Guid.NewGuid());
+                pending.Row.Status = RowStatus.Claimed;
+                pending.Row.ClaimToken = token;
+                pending.Row.ClaimExpiresAt = claimExpiresAt;
+                return ValueTask.FromResult<PublicChatClaimOutcome>(
+                    new PublicChatClaimOutcome.Claimed(pending.Row.Claimed(token))
+                );
+            }
+        }
+
+        public ValueTask<PublicChatClaimUpdate> BeginSendAsync(
+            PublicChatClaimedMessage message,
+            DateTimeOffset sendStartedAt,
+            DateTimeOffset claimExpiresAt,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var row = Owned(message, RowStatus.Claimed);
+                if (row is null)
+                    return ValueTask.FromResult<PublicChatClaimUpdate>(
+                        new PublicChatClaimUpdate.OwnershipLost()
+                    );
+
+                row.Status = RowStatus.Sending;
+                row.AttemptCount++;
+                row.ClaimExpiresAt = claimExpiresAt;
+                return ValueTask.FromResult<PublicChatClaimUpdate>(
+                    new PublicChatClaimUpdate.Applied()
+                );
+            }
+        }
+
+        public ValueTask<PublicChatClaimUpdate> MarkDeliveredAsync(
+            PublicChatClaimedMessage message,
+            DateTimeOffset deliveredAt,
+            CancellationToken cancellationToken
+        ) => Complete(message, RowStatus.Delivered, deliveredAt, cancellationToken);
+
+        public ValueTask<PublicChatClaimUpdate> MarkFaultedAsync(
+            PublicChatClaimedMessage message,
+            DateTimeOffset faultedAt,
+            CancellationToken cancellationToken
+        ) => Complete(message, RowStatus.Faulted, faultedAt, cancellationToken);
+
+        public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
+            PublicChatClaimedMessage message,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var row = Owned(message, RowStatus.Claimed);
+                if (row is null)
+                    return ValueTask.FromResult<PublicChatClaimUpdate>(
+                        new PublicChatClaimUpdate.OwnershipLost()
+                    );
+
+                row.Status = RowStatus.Pending;
+                row.ClaimToken = null;
+                return ValueTask.FromResult<PublicChatClaimUpdate>(
+                    new PublicChatClaimUpdate.Applied()
+                );
+            }
+        }
+
+        public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                IReadOnlyList<PublicChatPendingMessage> pending = rows
+                    .Where(row => row.Status is RowStatus.Pending or RowStatus.Claimed or RowStatus.Sending)
+                    .OrderBy(row => row.EnqueuedAt)
+                    .ThenBy(row => row.Id)
+                    .Select(row => new PublicChatPendingMessage(row.Channel, row.EnqueuedAt))
+                    .ToArray();
+                return ValueTask.FromResult(pending);
+            }
+        }
+
+        private ValueTask<PublicChatClaimUpdate> Complete(
+            PublicChatClaimedMessage message,
+            RowStatus status,
+            DateTimeOffset completedAt,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (gate)
+            {
+                var row = Owned(message, RowStatus.Sending);
+                if (row is null)
+                    return ValueTask.FromResult<PublicChatClaimUpdate>(
+                        new PublicChatClaimUpdate.OwnershipLost()
+                    );
+
+                row.Status = status;
+                row.CompletedAt = completedAt;
+                row.Message = null;
+                row.ClaimToken = null;
+                return ValueTask.FromResult<PublicChatClaimUpdate>(
+                    new PublicChatClaimUpdate.Applied()
+                );
+            }
+        }
+
+        private Row? Owned(PublicChatClaimedMessage message, RowStatus status) =>
+            rows.SingleOrDefault(row =>
+                row.Id == message.Id
+                && row.Status == status
+                && row.ClaimToken == message.ClaimToken
+            );
+
+        private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
+            left >= right ? left : right;
+
+        private sealed class Row(
+            long id,
+            string channel,
+            PublicChatOutboxItem item,
+            DateTimeOffset enqueuedAt
+        )
+        {
+            public long Id { get; } = id;
+
+            public string Channel { get; } = channel;
+
+            public PublicChatOutboxItem Item { get; } = item;
+
+            public string? Message { get; set; } = item.Message;
+
+            public DateTimeOffset EnqueuedAt { get; } = enqueuedAt;
+
+            public DateTimeOffset NextAttemptAt { get; } = enqueuedAt;
+
+            public RowStatus Status { get; set; }
+
+            public int AttemptCount { get; set; }
+
+            public PublicChatClaimToken? ClaimToken { get; set; }
+
+            public DateTimeOffset ClaimExpiresAt { get; set; }
+
+            public DateTimeOffset? CompletedAt { get; set; }
+
+            public PublicChatClaimedMessage Claimed(PublicChatClaimToken token) =>
+                new()
+                {
+                    Id = Id,
+                    Channel = Channel,
+                    Message = Message!,
+                    EnqueuedAt = EnqueuedAt,
+                    Attempt = AttemptCount + 1,
+                    ClaimToken = token,
+                    ClaimExpiresAt = ClaimExpiresAt,
+                    DeduplicationKey = Item.DeduplicationKey,
+                };
+        }
+
+        private sealed record Candidate(Row Row, DateTimeOffset EligibleAt);
+
+        private enum RowStatus
+        {
+            Pending,
+            Claimed,
+            Sending,
+            Delivered,
+            Faulted,
+        }
     }
 
     private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
@@ -394,21 +705,16 @@ public sealed class PublicChatMessageQueueTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+        ) => Entries.Add(new LogEntry(formatter(state, exception), exception));
     }
 
-    private sealed record LogEntry(
-        LogLevel Level,
-        string Message,
-        Exception? Exception
-    );
+    private sealed record LogEntry(string Message, Exception? Exception);
 
     private sealed class ManualTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
         private readonly object gate = new();
         private readonly List<ManualTimer> timers = [];
-        private readonly Channel<bool> timerRegistrations =
-            Channel.CreateUnbounded<bool>();
+        private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
         private DateTimeOffset now = initialNow;
         private bool waitingForTimerRegistration;
 
@@ -455,11 +761,7 @@ public sealed class PublicChatMessageQueueTests
                     return ValueTask.FromResult(true);
 
                 if (waitingForTimerRegistration)
-                {
-                    throw new InvalidOperationException(
-                        "Only one timer-registration observer is supported."
-                    );
-                }
+                    throw new InvalidOperationException("Only one timer observer is supported.");
 
                 waitingForTimerRegistration = true;
                 return timerRegistrations.Reader.ReadAsync();
@@ -477,11 +779,7 @@ public sealed class PublicChatMessageQueueTests
 
                 waitingForTimerRegistration = false;
                 if (!timerRegistrations.Writer.TryWrite(true))
-                {
-                    throw new InvalidOperationException(
-                        "The timer-registration observer could not be notified."
-                    );
-                }
+                    throw new InvalidOperationException("The timer observer could not be notified.");
             }
         }
 
@@ -511,10 +809,9 @@ public sealed class PublicChatMessageQueueTests
                         return false;
 
                     this.period = period;
-                    dueAt =
-                        dueTime == Timeout.InfiniteTimeSpan
-                            ? DateTimeOffset.MaxValue
-                            : owner.CurrentNowLocked.Add(dueTime);
+                    dueAt = dueTime == Timeout.InfiniteTimeSpan
+                        ? DateTimeOffset.MaxValue
+                        : owner.CurrentNowLocked.Add(dueTime);
                     owner.AddTimer(this);
                 }
 
@@ -556,9 +853,7 @@ public sealed class PublicChatMessageQueueTests
                         return;
 
                     if (period > TimeSpan.Zero && period != Timeout.InfiniteTimeSpan)
-                    {
                         dueAt = owner.CurrentNowLocked.Add(period);
-                    }
                     else
                     {
                         disposed = true;

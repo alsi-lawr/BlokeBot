@@ -1,0 +1,503 @@
+using System.Collections.Immutable;
+using BlokeBot.Features.PublicChat;
+using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch.Runtime;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+using TUnit.Core;
+using static BlokeBot.Integration.Tests.PublicChatIntegrationTestSupport;
+
+namespace BlokeBot.Integration.Tests;
+
+public sealed class PublicChatOutboxIntegrationTests
+{
+    [Test]
+    public async Task SplitMessage_Enqueueing_PersistsWholeBatchBeforeAcknowledgement()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var outbox = new EfPublicChatOutbox(dbFactory);
+        var queue = CreateQueue(
+            outbox,
+            new RecordingPublicChatTransport(),
+            new ManualTestTimeProvider(now),
+            new TwitchBotOptions { MaxChatMessageLength = 10 }
+        );
+
+        var receipt = await queue.EnqueueAsync(
+            "streamer",
+            "alpha beta gamma",
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var rows = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .OrderBy(row => row.Id)
+            .ToArrayAsync();
+        rows.Select(row => row.Id).ShouldBe(receipt.MessageIds);
+        rows.Select(row => row.Message).ShouldBe(["alpha", "beta gamma"]);
+        rows.Select(row => row.Status).ShouldAllBe(status =>
+            status == PublicChatOutboxStatus.Pending
+        );
+        rows.Select(row => row.CreatedAtUtc).ShouldAllBe(value =>
+            value == now.UtcDateTime
+        );
+        rows.Select(row => row.NextAttemptAtUtc).ShouldAllBe(value =>
+            value == now.UtcDateTime
+        );
+        rows.Select(row => row.AttemptCount).ShouldAllBe(attempts => attempts == 0);
+        rows.Select(row => row.ClaimToken).ShouldAllBe(token => token == null);
+    }
+
+    [Test]
+    public async Task PendingMessage_RestartingQueue_DeliversOnceAndCompletesRedacted()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var originalQueue = CreateQueue(
+            new EfPublicChatOutbox(dbFactory),
+            new RecordingPublicChatTransport(),
+            clock
+        );
+        var receipt = await originalQueue.EnqueueAsync(
+            "streamer",
+            "survives restart",
+            CancellationToken.None
+        );
+
+        var restartedOutbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory)
+        );
+        var restartedTransport = new RecordingPublicChatTransport();
+        var restartedQueue = CreateQueue(
+            restartedOutbox,
+            restartedTransport,
+            clock
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = restartedQueue.RunAsync(stopping.Token);
+
+        var delivery = await restartedTransport.ReadAsync();
+        var completion = await restartedOutbox.ReadDeliveryAsync();
+        await StopAsync(stopping, worker);
+
+        delivery.Id.ShouldBe(receipt.MessageIds.ShouldHaveSingleItem());
+        delivery.Message.ShouldBe("survives restart");
+        delivery.Attempt.ShouldBe(1);
+        completion.Id.ShouldBe(delivery.Id);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Delivered);
+        row.Message.ShouldBeNull();
+        row.AttemptCount.ShouldBe(1);
+        row.SendStartedAtUtc.ShouldNotBeNull();
+        row.CompletedAtUtc.ShouldNotBeNull();
+        row.ClaimToken.ShouldBeNull();
+        row.ClaimSlot.ShouldBeNull();
+
+        var next = await new EfPublicChatOutbox(dbFactory).TryClaimNextAsync(
+            clock.GetUtcNow(),
+            clock.GetUtcNow().AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+        next.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+    }
+
+    [Test]
+    public async Task MessagesWithSameCreationTime_Processing_PreservesIdentityOrder()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory)
+        );
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(
+            outbox,
+            transport,
+            clock,
+            new TwitchBotOptions
+            {
+                ChatMessageSendIntervalSeconds = 0,
+                DuplicateChatMessageCooldownSeconds = 0,
+            }
+        );
+        _ = await queue.EnqueueAsync("streamer", "first", CancellationToken.None);
+        _ = await queue.EnqueueAsync("streamer", "second", CancellationToken.None);
+        _ = await queue.EnqueueAsync("streamer", "third", CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        var delivered = new List<string>();
+        for (var index = 0; index < 3; index++)
+        {
+            delivered.Add((await transport.ReadAsync()).Message);
+            _ = await outbox.ReadDeliveryAsync();
+        }
+
+        await StopAsync(stopping, worker);
+        delivered.ShouldBe(["first", "second", "third"]);
+    }
+
+    [Test]
+    public async Task PreviousCompletion_ClaimingNext_AppliesGlobalSendInterval()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var outbox = new EfPublicChatOutbox(dbFactory);
+        var now = Utc(12, 0, 0);
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "first", "second"),
+            CancellationToken.None
+        );
+        var first = await ClaimAsync(outbox, now, TimeSpan.FromSeconds(10));
+        (await outbox.BeginSendAsync(
+                first,
+                now,
+                now.AddMinutes(5),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        (await outbox.MarkDeliveredAsync(
+                first,
+                now.AddSeconds(2),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        var waiting = (
+            await outbox.TryClaimNextAsync(
+                now.AddSeconds(11),
+                now.AddMinutes(5),
+                TimeSpan.FromSeconds(10),
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        waiting.AvailableAt.ShouldBe(now.AddSeconds(12));
+
+        var second = await ClaimAsync(
+            outbox,
+            now.AddSeconds(12),
+            TimeSpan.FromSeconds(10)
+        );
+        second.Message.ShouldBe("second");
+    }
+
+    [Test]
+    public async Task DuplicateAndDistinctMessages_Claiming_DelaysOnlyDuplicateFromCompletion()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var outbox = new EfPublicChatOutbox(dbFactory);
+        var now = Utc(12, 0, 0);
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "same", "same", "different"),
+            CancellationToken.None
+        );
+        var first = await ClaimAsync(
+            outbox,
+            now,
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(10)
+        );
+        first.Message.ShouldBe("same");
+        await BeginAndDeliverAsync(outbox, first, now, now.AddSeconds(2));
+
+        var distinct = await ClaimAsync(
+            outbox,
+            now.AddSeconds(2),
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(10)
+        );
+        distinct.Message.ShouldBe("different");
+        await BeginAndDeliverAsync(
+            outbox,
+            distinct,
+            now.AddSeconds(2),
+            now.AddSeconds(3)
+        );
+
+        var waiting = (
+            await outbox.TryClaimNextAsync(
+                now.AddSeconds(11),
+                now.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(10),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        waiting.AvailableAt.ShouldBe(now.AddSeconds(12));
+        var duplicate = await ClaimAsync(
+            outbox,
+            now.AddSeconds(12),
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(10)
+        );
+        duplicate.Message.ShouldBe("same");
+    }
+
+    [Test]
+    public async Task ConcurrentStores_ClaimingPendingMessage_GrantOneGlobalClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var firstStore = new EfPublicChatOutbox(dbFactory);
+        var secondStore = new EfPublicChatOutbox(dbFactory);
+        var now = Utc(12, 0, 0);
+        _ = await firstStore.EnqueueAsync(
+            Batch("streamer", now, "only once"),
+            CancellationToken.None
+        );
+        await using var firstContext = await dbFactory.CreateDbContextAsync();
+        await using var secondContext = await dbFactory.CreateDbContextAsync();
+        firstContext.ShouldNotBeSameAs(secondContext);
+        firstContext.Database.GetDbConnection().ShouldNotBeSameAs(
+            secondContext.Database.GetDbConnection()
+        );
+
+        var claims = await Task.WhenAll(
+            firstStore
+                .TryClaimNextAsync(
+                    now,
+                    now.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask(),
+            secondStore
+                .TryClaimNextAsync(
+                    now,
+                    now.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+
+        claims.OfType<PublicChatClaimOutcome.Claimed>().ShouldHaveSingleItem();
+        claims.Count(outcome =>
+                outcome
+                    is PublicChatClaimOutcome.AwaitingAvailability
+                        or PublicChatClaimOutcome.Contended
+            )
+            .ShouldBe(1);
+        await using var verification = await dbFactory.CreateDbContextAsync();
+        var claimed = await verification
+            .PublicChatOutboxMessages.AsNoTracking()
+            .SingleAsync();
+        claimed.Status.ShouldBe(PublicChatOutboxStatus.Claimed);
+        claimed.ClaimSlot.ShouldBe(1);
+        claimed.ClaimToken.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task WorkerCanceledBeforeSend_Restarting_ReleasesAndDeliversPendingMessage()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var persistedOutbox = new EfPublicChatOutbox(dbFactory);
+        var blockingOutbox = new BlockingBeginSendPublicChatOutbox(persistedOutbox);
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(blockingOutbox, transport, clock);
+        _ = await queue.EnqueueAsync("streamer", "recover me", CancellationToken.None);
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        _ = await blockingOutbox.ReadBeginAttemptAsync();
+        await StopAsync(stopping, worker);
+
+        transport.DeliveryCount.ShouldBe(0);
+        await using (var interruptedDb = await dbFactory.CreateDbContextAsync())
+        {
+            var interrupted = await interruptedDb
+                .PublicChatOutboxMessages.AsNoTracking()
+                .SingleAsync();
+            interrupted.Status.ShouldBe(PublicChatOutboxStatus.Pending);
+            interrupted.AttemptCount.ShouldBe(0);
+            interrupted.ClaimToken.ShouldBeNull();
+            interrupted.ClaimSlot.ShouldBeNull();
+        }
+
+        var restartedOutbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory)
+        );
+        var restartedTransport = new RecordingPublicChatTransport();
+        var restartedQueue = CreateQueue(
+            restartedOutbox,
+            restartedTransport,
+            clock
+        );
+        using var restartedStopping = new CancellationTokenSource();
+        var restartedWorker = restartedQueue.RunAsync(restartedStopping.Token);
+        var delivery = await restartedTransport.ReadAsync();
+        _ = await restartedOutbox.ReadDeliveryAsync();
+        await StopAsync(restartedStopping, restartedWorker);
+
+        delivery.Message.ShouldBe("recover me");
+        delivery.Attempt.ShouldBe(1);
+        await using var completedDb = await dbFactory.CreateDbContextAsync();
+        var completed = await completedDb
+            .PublicChatOutboxMessages.AsNoTracking()
+            .SingleAsync();
+        completed.Status.ShouldBe(PublicChatOutboxStatus.Delivered);
+        completed.AttemptCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ClaimedLeaseExpired_AfterRestart_IsReclaimedWithoutStartingAttempt()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var outbox = new EfPublicChatOutbox(dbFactory);
+        var now = Utc(12, 0, 0);
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "safe to reclaim"),
+            CancellationToken.None
+        );
+        var original = (
+            await outbox.TryClaimNextAsync(
+                now,
+                now.AddSeconds(1),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.Claimed>().Message;
+
+        var reclaimed = await ClaimAsync(
+            new EfPublicChatOutbox(dbFactory),
+            now.AddSeconds(2),
+            TimeSpan.Zero
+        );
+
+        reclaimed.Id.ShouldBe(original.Id);
+        reclaimed.Message.ShouldBe("safe to reclaim");
+        reclaimed.Attempt.ShouldBe(1);
+        reclaimed.ClaimToken.ShouldNotBe(original.ClaimToken);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Claimed);
+        row.AttemptCount.ShouldBe(0);
+        row.SendStartedAtUtc.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task SendingClaimExpired_AfterRestart_BecomesRedactedFaultWithoutRetry()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var outbox = new EfPublicChatOutbox(dbFactory);
+        var now = Utc(12, 0, 0);
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "may have sent"),
+            CancellationToken.None
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+        (await outbox.BeginSendAsync(
+                claimed,
+                now,
+                now.AddSeconds(1),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        var afterRestart = await new EfPublicChatOutbox(dbFactory).TryClaimNextAsync(
+            now.AddSeconds(2),
+            now.AddMinutes(5),
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            CancellationToken.None
+        );
+
+        afterRestart.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.Faulted);
+        row.Message.ShouldBeNull();
+        row.AttemptCount.ShouldBe(1);
+        row.SendStartedAtUtc.ShouldBe(now.UtcDateTime);
+        row.CompletedAtUtc.ShouldBe(now.AddSeconds(2).UtcDateTime);
+        row.ClaimToken.ShouldBeNull();
+        row.ClaimSlot.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task DatabaseUnavailable_Enqueueing_ReportsFailureWithoutDelivery()
+    {
+        var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await dbFactory.DisposeAsync();
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(
+            new EfPublicChatOutbox(dbFactory),
+            transport,
+            new ManualTestTimeProvider(Utc(12, 0, 0))
+        );
+
+        await Should.ThrowAsync<DbUpdateException>(() =>
+            queue.EnqueueAsync("streamer", "not accepted", CancellationToken.None).AsTask()
+        );
+        transport.DeliveryCount.ShouldBe(0);
+    }
+
+    private static PublicChatOutboxBatch Batch(
+        string channel,
+        DateTimeOffset enqueuedAt,
+        params string[] messages
+    ) =>
+        new()
+        {
+            Channel = channel,
+            EnqueuedAt = enqueuedAt,
+            Items = messages
+                .Select(message =>
+                    new PublicChatOutboxItem
+                    {
+                        Message = message,
+                        DeduplicationKey = PublicChatMessageDeduplication.Key(
+                            channel,
+                            message
+                        ),
+                    }
+                )
+                .ToImmutableArray(),
+        };
+
+    private static async Task<PublicChatClaimedMessage> ClaimAsync(
+        IPublicChatOutbox outbox,
+        DateTimeOffset now,
+        TimeSpan sendInterval,
+        TimeSpan duplicateCooldown = default
+    ) =>
+        (
+            await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                sendInterval,
+                duplicateCooldown,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.Claimed>().Message;
+
+    private static async Task BeginAndDeliverAsync(
+        IPublicChatOutbox outbox,
+        PublicChatClaimedMessage message,
+        DateTimeOffset sendStartedAt,
+        DateTimeOffset deliveredAt
+    )
+    {
+        (await outbox.BeginSendAsync(
+                message,
+                sendStartedAt,
+                sendStartedAt.AddMinutes(5),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        (await outbox.MarkDeliveredAsync(
+                message,
+                deliveredAt,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+    }
+}

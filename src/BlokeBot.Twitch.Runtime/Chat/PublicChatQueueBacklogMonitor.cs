@@ -5,7 +5,7 @@ internal sealed class PublicChatQueueBacklogMonitor
     private readonly HashSet<string> alertedChannels = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<PublicChatQueueBacklog> CaptureAlerts(
-        IReadOnlyList<PublicChatPendingState> pending,
+        IReadOnlyList<PublicChatPendingMessage> pending,
         DateTimeOffset now,
         TimeSpan threshold,
         bool enabled
@@ -41,7 +41,7 @@ internal sealed class PublicChatQueueBacklogMonitor
     }
 
     public TimeSpan? NextAlertDelay(
-        IReadOnlyList<PublicChatPendingState> pending,
+        IReadOnlyList<PublicChatPendingMessage> pending,
         DateTimeOffset now,
         TimeSpan threshold,
         bool enabled
@@ -67,7 +67,7 @@ internal sealed class PublicChatQueueBacklogMonitor
         return next;
     }
 
-    public void ResetDrainedChannels(IReadOnlyList<PublicChatPendingState> pending)
+    public void ResetDrainedChannels(IReadOnlyList<PublicChatPendingMessage> pending)
     {
         if (alertedChannels.Count == 0)
             return;
@@ -86,7 +86,7 @@ internal sealed class PublicChatQueueBacklogMonitor
     }
 
     private static List<PendingChannelGroup> PendingByChannel(
-        IReadOnlyList<PublicChatPendingState> pending
+        IReadOnlyList<PublicChatPendingMessage> pending
     ) =>
         pending
             .GroupBy(x => NormalizeChannel(x.Channel), StringComparer.OrdinalIgnoreCase)
@@ -100,11 +100,6 @@ internal sealed class PublicChatQueueBacklogMonitor
 
     private sealed record PendingChannelGroup(
         string Channel,
-        List<PublicChatPendingState> Messages
+        List<PublicChatPendingMessage> Messages
     );
 }
-
-internal readonly record struct PublicChatPendingState(
-    string Channel,
-    DateTimeOffset EnqueuedAt
-);

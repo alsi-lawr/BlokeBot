@@ -169,10 +169,11 @@ public static class TwitchBotServiceCollectionExtensions
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
-        services.TryAddSingleton<PublicChatDuplicateCooldown>();
         services.TryAddSingleton<PublicChatQueueBacklogMonitor>();
         services.TryAddSingleton<PublicChatQueueAlertDispatcher>();
+        services.TryAddSingleton<IPublicChatTransport, TwitchHelixPublicChatTransport>();
         services.TryAddSingleton<PublicChatMessageQueue>();
+        services.AddHostedService<PublicChatOutboxWorker>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
         services.AddSingleton<TwitchBotRuntimeStatusStore>();
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>

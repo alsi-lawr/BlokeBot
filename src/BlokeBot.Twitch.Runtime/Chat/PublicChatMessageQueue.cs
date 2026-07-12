@@ -1,4 +1,8 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Threading.Channels;
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -6,195 +10,286 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class PublicChatMessageQueue(
     TwitchBotSettings settings,
     TimeProvider timeProvider,
-    PublicChatDuplicateCooldown duplicateCooldown,
     PublicChatQueueBacklogMonitor backlogMonitor,
     PublicChatQueueAlertDispatcher alertDispatcher,
+    IPublicChatOutbox outbox,
+    IPublicChatTransport transport,
     ILogger<PublicChatMessageQueue> log
 )
 {
-    private readonly object gate = new();
-    private readonly List<PendingMessage> pending = [];
-    private TaskCompletionSource processorWakeSignal = NewWakeSignal();
-    private bool processing;
-    private DateTimeOffset lastSendAttemptAt = DateTimeOffset.MinValue;
+    private static readonly TimeSpan ClaimContentionDelay = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan ClaimLease = TimeSpan.FromMinutes(5);
+    private readonly Channel<bool> wakeSignals = Channel.CreateBounded<bool>(
+        new BoundedChannelOptions(1)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropWrite,
+        }
+    );
+    private int running;
 
-    public async Task SendAsync(
+    public async ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
         string channel,
         string message,
-        Func<TwitchOutboundChatMessage, CancellationToken, Task> send,
         CancellationToken cancellationToken
     )
     {
         if (string.IsNullOrWhiteSpace(channel) || string.IsNullOrWhiteSpace(message))
-            return;
+            return PublicChatOutboxReceipt.Empty;
 
-        foreach (var part in TwitchChatMessageSplitter.Split(message, MaxMessageLength))
-            await EnqueueAsync(channel, part, send, cancellationToken);
-    }
+        var parts = TwitchChatMessageSplitter
+            .Split(message, MaxMessageLength)
+            .ToImmutableArray();
+        if (parts.IsDefaultOrEmpty)
+            return PublicChatOutboxReceipt.Empty;
 
-    private async Task EnqueueAsync(
-        string channel,
-        string message,
-        Func<TwitchOutboundChatMessage, CancellationToken, Task> send,
-        CancellationToken cancellationToken
-    )
-    {
-        var item = new PendingMessage(
-            new TwitchOutboundChatMessage(channel, message),
-            send,
-            UtcNow(),
+        var items = parts
+            .Select(part =>
+                new PublicChatOutboxItem
+                {
+                    Message = part,
+                    DeduplicationKey = PublicChatMessageDeduplication.Key(channel, part),
+                }
+            )
+            .ToImmutableArray();
+        var receipt = await outbox.EnqueueAsync(
+            new PublicChatOutboxBatch
+            {
+                Channel = channel,
+                Items = items,
+                EnqueuedAt = UtcNow(),
+            },
             cancellationToken
         );
-        using var registration = cancellationToken.Register(item.Cancel);
-
-        lock (gate)
-        {
-            pending.Add(item);
-            if (!processing)
-            {
-                processing = true;
-                _ = Task.Run(ProcessAsync, CancellationToken.None);
-            }
-            else
-            {
-                processorWakeSignal.TrySetResult();
-            }
-        }
-
-        await item.Task;
+        _ = wakeSignals.Writer.TryWrite(true);
+        return receipt;
     }
 
-    private async Task ProcessAsync()
+    internal async Task RunAsync(CancellationToken cancellationToken)
     {
-        while (true)
-        {
-            var delay = TimeSpan.Zero;
-            PendingMessage? item = null;
-            IReadOnlyList<PublicChatQueueBacklog> queueAlerts;
-
-            lock (gate)
-            {
-                pending.RemoveAll(x => x.IsCanceled);
-                backlogMonitor.ResetDrainedChannels(PendingStatesLocked());
-                if (pending.Count == 0)
-                {
-                    processing = false;
-                    return;
-                }
-
-                var now = UtcNow();
-                queueAlerts = backlogMonitor.CaptureAlerts(
-                    PendingStatesLocked(),
-                    now,
-                    QueueStuckThreshold,
-                    alertDispatcher.HasObservers
-                );
-                (item, delay) = NextPendingMessage(now);
-                if (item is not null)
-                {
-                    pending.Remove(item);
-                    backlogMonitor.ResetDrainedChannels(PendingStatesLocked());
-                }
-                else if (
-                    backlogMonitor.NextAlertDelay(
-                        PendingStatesLocked(),
-                        now,
-                        QueueStuckThreshold,
-                        alertDispatcher.HasObservers
-                    ) is { } alertDelay
-                )
-                {
-                    delay = delay <= TimeSpan.Zero ? alertDelay : Min(delay, alertDelay);
-                }
-            }
-
-            try
-            {
-                await alertDispatcher.NotifyAsync(queueAlerts, CancellationToken.None);
-            }
-            catch (ObserverFanOutEscalationException escalation)
-            {
-                ReportAlertEscalation(escalation, queueAlerts.Count);
-            }
-
-            if (item is null)
-            {
-                await WaitForDelayOrNewMessageAsync(delay);
-                continue;
-            }
-
-            await SendPendingAsync(item);
-        }
-    }
-
-    private async Task WaitForDelayOrNewMessageAsync(TimeSpan delay)
-    {
-        Task wakeTask;
-        lock (gate)
-            wakeTask = processorWakeSignal.Task;
-
-        var completed = await Task.WhenAny(Task.Delay(delay, timeProvider), wakeTask);
-        if (completed != wakeTask)
-            return;
-
-        lock (gate)
-        {
-            if (ReferenceEquals(wakeTask, processorWakeSignal.Task))
-                processorWakeSignal = NewWakeSignal();
-        }
-    }
-
-    private (PendingMessage? Message, TimeSpan Delay) NextPendingMessage(DateTimeOffset now)
-    {
-        var nextMessage = pending
-            .Select(message => new PendingCandidate(message, NextSendAt(message, now)))
-            .OrderBy(candidate => candidate.SendAt)
-            .ThenBy(candidate => pending.IndexOf(candidate.Message))
-            .First();
-
-        return nextMessage.SendAt <= now
-            ? (nextMessage.Message, TimeSpan.Zero)
-            : (null, nextMessage.SendAt - now);
-    }
-
-    private DateTimeOffset NextSendAt(PendingMessage item, DateTimeOffset now)
-    {
-        var nextSendAt = lastSendAttemptAt + SendInterval;
-        nextSendAt = Max(
-            nextSendAt,
-            duplicateCooldown.NextAllowedAt(item.Message, now, DuplicateCooldown)
-        );
-
-        return Max(nextSendAt, now);
-    }
-
-    private async Task SendPendingAsync(PendingMessage item)
-    {
-        if (item.IsCanceled)
-            return;
+        if (Interlocked.Exchange(ref running, 1) != 0)
+            throw new InvalidOperationException("The public chat outbox worker is already running.");
 
         try
         {
-            await item.Send(item.Message, item.CancellationToken);
-            var now = UtcNow();
-            lock (gate)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                lastSendAttemptAt = now;
-                duplicateCooldown.RecordSent(item.Message, now, DuplicateCooldown);
+                var now = UtcNow();
+                var nextBacklogAlert = await ObserveBacklogAsync(now, cancellationToken);
+                var outcome = await outbox.TryClaimNextAsync(
+                    now,
+                    now + ClaimLease,
+                    SendInterval,
+                    DuplicateCooldown,
+                    cancellationToken
+                );
+                switch (outcome)
+                {
+                    case PublicChatClaimOutcome.Claimed claimed:
+                        await ProcessClaimAsync(claimed.Message, cancellationToken);
+                        break;
+                    case PublicChatClaimOutcome.AwaitingAvailability waiting:
+                        var availabilityDelay = waiting.AvailableAt - UtcNow();
+                        await WaitForSignalOrDelayAsync(
+                            nextBacklogAlert is { } alertDelay
+                                ? Min(availabilityDelay, alertDelay)
+                                : availabilityDelay,
+                            cancellationToken
+                        );
+                        break;
+                    case PublicChatClaimOutcome.Empty:
+                        _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
+                        break;
+                    case PublicChatClaimOutcome.Contended:
+                        await Task.Delay(
+                            ClaimContentionDelay,
+                            timeProvider,
+                            cancellationToken
+                        );
+                        break;
+                    default:
+                        throw new UnreachableException(
+                            $"Unknown public chat claim outcome {outcome.GetType().Name}."
+                        );
+                }
             }
-            item.Complete();
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        finally
         {
-            lock (gate)
-                lastSendAttemptAt = UtcNow();
+            Interlocked.Exchange(ref running, 0);
+        }
+    }
 
-            log.LogWarning(
-                ex,
-                "Twitch chat message send failed for #{Channel}.",
-                item.Message.Channel
+    private async Task ProcessClaimAsync(
+        PublicChatClaimedMessage message,
+        CancellationToken cancellationToken
+    )
+    {
+        var sendStartedAt = UtcNow();
+        PublicChatClaimUpdate beginSend;
+        try
+        {
+            beginSend = await ApplyClaimUpdateAsync(
+                () =>
+                    outbox.BeginSendAsync(
+                        message,
+                        sendStartedAt,
+                        sendStartedAt + ClaimLease,
+                        cancellationToken
+                    ),
+                cancellationToken
             );
-            item.Fail(ex);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = await ApplyClaimUpdateAsync(
+                () => outbox.ReleaseClaimAsync(message, CancellationToken.None),
+                CancellationToken.None
+            );
+            throw;
+        }
+        switch (beginSend)
+        {
+            case PublicChatClaimUpdate.Applied:
+                break;
+            case PublicChatClaimUpdate.OwnershipLost:
+                return;
+            case PublicChatClaimUpdate.Contended:
+                throw new UnreachableException(
+                    "Claim contention escaped the public chat transition retry boundary."
+                );
+            default:
+                throw new UnreachableException(
+                    $"Unknown public chat claim update {beginSend.GetType().Name}."
+                );
+        }
+
+        try
+        {
+            await transport.SendAsync(message, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = await ApplyClaimUpdateAsync(
+                () => outbox.MarkFaultedAsync(message, UtcNow(), CancellationToken.None),
+                CancellationToken.None
+            );
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _ = await ApplyClaimUpdateAsync(
+                () => outbox.MarkFaultedAsync(message, UtcNow(), cancellationToken),
+                cancellationToken
+            );
+            log.LogWarning(
+                "Public chat transport failed for outbox message {OutboxMessageId} in #{Channel} with {FailureType}.",
+                message.Id,
+                message.Channel,
+                exception.GetType().FullName
+            );
+            return;
+        }
+
+        var completed = await ApplyClaimUpdateAsync(
+            () => outbox.MarkDeliveredAsync(message, UtcNow(), cancellationToken),
+            cancellationToken
+        );
+        if (completed is PublicChatClaimUpdate.OwnershipLost)
+        {
+            log.LogWarning(
+                "Public chat outbox message {OutboxMessageId} lost claim ownership after delivery.",
+                message.Id
+            );
+        }
+    }
+
+    private async Task<TimeSpan?> ObserveBacklogAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken
+    )
+    {
+        var pending = await outbox.LoadOutstandingAsync(cancellationToken);
+        backlogMonitor.ResetDrainedChannels(pending);
+        var alerts = backlogMonitor.CaptureAlerts(
+            pending,
+            now,
+            QueueStuckThreshold,
+            alertDispatcher.HasObservers
+        );
+        await NotifyQueueAlertsAsync(alerts);
+        return backlogMonitor.NextAlertDelay(
+            pending,
+            now,
+            QueueStuckThreshold,
+            alertDispatcher.HasObservers
+        );
+    }
+
+    private async Task NotifyQueueAlertsAsync(
+        IReadOnlyList<PublicChatQueueBacklog> alerts
+    )
+    {
+        try
+        {
+            await alertDispatcher.NotifyAsync(alerts, CancellationToken.None);
+        }
+        catch (ObserverFanOutEscalationException escalation)
+        {
+            ReportAlertEscalation(escalation, alerts.Count);
+        }
+    }
+
+    private async Task WaitForSignalOrDelayAsync(
+        TimeSpan delay,
+        CancellationToken cancellationToken
+    )
+    {
+        if (delay <= TimeSpan.Zero)
+            return;
+
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
+        var delayTask = Task.Delay(delay, timeProvider, waitCancellation.Token);
+        var signalTask = wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
+        try
+        {
+            await await Task.WhenAny(delayTask, signalTask);
+        }
+        finally
+        {
+            await waitCancellation.CancelAsync();
+        }
+    }
+
+    private async ValueTask<PublicChatClaimUpdate> ApplyClaimUpdateAsync(
+        Func<ValueTask<PublicChatClaimUpdate>> update,
+        CancellationToken cancellationToken
+    )
+    {
+        while (true)
+        {
+            var result = await update();
+            switch (result)
+            {
+                case PublicChatClaimUpdate.Applied:
+                case PublicChatClaimUpdate.OwnershipLost:
+                    return result;
+                case PublicChatClaimUpdate.Contended:
+                    await Task.Delay(
+                        ClaimContentionDelay,
+                        timeProvider,
+                        cancellationToken
+                    );
+                    break;
+                default:
+                    throw new UnreachableException(
+                        $"Unknown public chat claim update {result.GetType().Name}."
+                    );
+            }
         }
     }
 
@@ -257,60 +352,15 @@ internal sealed class PublicChatMessageQueue(
 
     private int MaxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
 
-    private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
-        left >= right ? left : right;
-
-    private static TimeSpan Min(TimeSpan left, TimeSpan right) => left <= right ? left : right;
-
     private DateTimeOffset UtcNow() => timeProvider.GetUtcNow();
 
-    private PublicChatPendingState[] PendingStatesLocked() =>
-        pending
-            .Select(x => new PublicChatPendingState(x.Message.Channel, x.EnqueuedAt))
-            .ToArray();
+    private static TimeSpan Min(TimeSpan left, TimeSpan right) =>
+        left <= right ? left : right;
+}
 
-    private static TaskCompletionSource NewWakeSignal() =>
-        new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    private readonly record struct PendingCandidate(PendingMessage Message, DateTimeOffset SendAt);
-
-    private sealed class PendingMessage
-    {
-        private readonly TaskCompletionSource completion = new(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        private readonly CancellationToken cancellationToken;
-
-        public PendingMessage(
-            TwitchOutboundChatMessage message,
-            Func<TwitchOutboundChatMessage, CancellationToken, Task> send,
-            DateTimeOffset enqueuedAt,
-            CancellationToken cancellationToken
-        )
-        {
-            Message = message;
-            Send = send;
-            EnqueuedAt = enqueuedAt;
-            this.cancellationToken = cancellationToken;
-        }
-
-        public DateTimeOffset EnqueuedAt { get; }
-
-        public CancellationToken CancellationToken => cancellationToken;
-
-        public bool IsCanceled =>
-            completion.Task.IsCanceled || cancellationToken.IsCancellationRequested;
-
-        public TwitchOutboundChatMessage Message { get; }
-
-        public Func<TwitchOutboundChatMessage, CancellationToken, Task> Send { get; }
-
-        public Task Task => completion.Task;
-
-        public void Cancel() => completion.TrySetCanceled(cancellationToken);
-
-        public void Complete() => completion.TrySetResult();
-
-        public void Fail(Exception ex) => completion.TrySetException(ex);
-    }
+internal sealed class PublicChatOutboxWorker(PublicChatMessageQueue queue)
+    : BackgroundService
+{
+    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
+        queue.RunAsync(stoppingToken);
 }

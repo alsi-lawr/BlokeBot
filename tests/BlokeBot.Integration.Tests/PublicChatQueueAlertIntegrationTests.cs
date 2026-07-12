@@ -1,11 +1,13 @@
 using System.Threading.Channels;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
+using BlokeBot.Features.PublicChat;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
+using static BlokeBot.Integration.Tests.PublicChatIntegrationTestSupport;
 
 namespace BlokeBot.Integration.Tests;
 
@@ -16,17 +18,21 @@ public sealed class PublicChatQueueAlertIntegrationTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
-        var clock = new ManualTimerTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
         var events = TestEventBus.Create<AppEventKind>();
-        var notificationCount = 0;
+        var notifications = Channel.CreateUnbounded<bool>();
         using var subscription = events.Subscribe(
             AppEventKind.AlertsChanged,
             ObserverIdentity.Named("Test.AlertCreated"),
             (_, _) =>
             {
-                notificationCount++;
+                if (!notifications.Writer.TryWrite(true))
+                {
+                    throw new InvalidOperationException(
+                        "The alert notification could not be observed."
+                    );
+                }
+
                 return ValueTask.CompletedTask;
             }
         );
@@ -36,61 +42,51 @@ public sealed class PublicChatQueueAlertIntegrationTests
             alertService,
             NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
-        var queue = CreatePublicChatQueue(clock, durableObserver);
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory)
+        );
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(
+            outbox,
+            transport,
+            clock,
+            new TwitchBotOptions
+            {
+                ChatMessageSendIntervalSeconds = 10,
+                DuplicateChatMessageCooldownSeconds = 0,
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
+                {
+                    StuckAfterSeconds = 5,
+                },
+            },
+            [durableObserver]
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
 
-        await queue.SendAsync("streamer", "first", SendAsync, CancellationToken.None);
-        var second = queue.SendAsync("streamer", "second", SendAsync, CancellationToken.None);
-
+        _ = await queue.EnqueueAsync("streamer", "first", CancellationToken.None);
+        _ = await transport.ReadAsync();
+        _ = await outbox.ReadDeliveryAsync();
+        _ = await queue.EnqueueAsync("streamer", "second", CancellationToken.None);
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await clock.WaitForTimerRegistrationAsync();
+        _ = await notifications.Reader.ReadAsync();
 
         var state = await alertService.LoadStateAsync(hostId, CancellationToken.None);
         var alert = state.Active.ShouldHaveSingleItem();
         alert.Source.ShouldBe("twitch-outbound-queue");
         alert.LinkPath.ShouldBe("/alerts");
-        notificationCount.ShouldBe(1);
 
+        await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
-        await second;
+        (await transport.ReadAsync()).Message.ShouldBe("second");
+        _ = await outbox.ReadDeliveryAsync();
+        await StopAsync(stopping, worker);
     }
 
-    private static PublicChatMessageQueue CreatePublicChatQueue(
-        TimeProvider clock,
-        IPublicChatQueueAlertObserver observer
-    ) =>
-        new(
-            TwitchBotSettings.FromOptions(
-                new TwitchBotOptions
-                {
-                    ChatMessageSendIntervalSeconds = 10,
-                    DuplicateChatMessageCooldownSeconds = 0,
-                    PublicChatQueueAlerts = new PublicChatQueueAlertOptions
-                    {
-                        StuckAfterSeconds = 5,
-                    },
-                }
-            ),
-            clock,
-            new PublicChatDuplicateCooldown(),
-            new PublicChatQueueBacklogMonitor(),
-            new PublicChatQueueAlertDispatcher(
-                [observer],
-                TestObserverFanOut.Continue<
-                    PublicChatQueueAlertObserverBoundary,
-                    PublicChatQueueBacklog,
-                    PublicChatQueueAlertDeadLetter
-                >(TwitchBotObserverBoundaries.PublicChatQueueAlerts)
-            ),
-            NullLogger<PublicChatMessageQueue>.Instance
-        );
-
-    private static Task SendAsync(
-        TwitchOutboundChatMessage message,
-        CancellationToken cancellationToken
-    ) => Task.CompletedTask;
-
-    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
+    private static async Task<int> SeedHostAsync(
+        SqliteBlokeBotDbFactory dbFactory
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
@@ -98,177 +94,10 @@ public sealed class PublicChatQueueAlertIntegrationTests
             Login = "streamer",
             DisplayName = "Streamer",
             TwitchUserId = "streamer-id",
-            CreatedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = Utc(12, 0, 0).UtcDateTime,
         };
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
-    }
-
-    private sealed class ManualTimerTimeProvider(DateTimeOffset initialNow) : TimeProvider
-    {
-        private readonly object gate = new();
-        private readonly List<ManualTimer> timers = [];
-        private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
-        private DateTimeOffset now = initialNow;
-        private bool waitingForTimerRegistration;
-
-        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            lock (gate)
-                return now;
-        }
-
-        public override long GetTimestamp() => GetUtcNow().UtcTicks;
-
-        public override ITimer CreateTimer(
-            TimerCallback callback,
-            object? state,
-            TimeSpan dueTime,
-            TimeSpan period
-        )
-        {
-            var timer = new ManualTimer(this, callback, state);
-            timer.Change(dueTime, period);
-            return timer;
-        }
-
-        public void Advance(TimeSpan delta)
-        {
-            List<ManualTimer> due;
-            lock (gate)
-            {
-                now = now.Add(delta);
-                due = timers.Where(timer => timer.IsDue(now)).ToList();
-            }
-
-            foreach (var timer in due)
-                timer.Fire();
-        }
-
-        public ValueTask<bool> WaitForTimerRegistrationAsync()
-        {
-            lock (gate)
-            {
-                if (timers.Count > 0)
-                    return ValueTask.FromResult(true);
-
-                if (waitingForTimerRegistration)
-                {
-                    throw new InvalidOperationException(
-                        "Only one timer-registration observer is supported."
-                    );
-                }
-
-                waitingForTimerRegistration = true;
-                return timerRegistrations.Reader.ReadAsync();
-            }
-        }
-
-        private void AddTimer(ManualTimer timer)
-        {
-            lock (gate)
-            {
-                if (!timers.Contains(timer))
-                    timers.Add(timer);
-                if (!waitingForTimerRegistration)
-                    return;
-
-                waitingForTimerRegistration = false;
-                if (!timerRegistrations.Writer.TryWrite(true))
-                {
-                    throw new InvalidOperationException(
-                        "The timer-registration observer could not be notified."
-                    );
-                }
-            }
-        }
-
-        private void RemoveTimer(ManualTimer timer)
-        {
-            lock (gate)
-                timers.Remove(timer);
-        }
-
-        private DateTimeOffset CurrentNowLocked => now;
-
-        private sealed class ManualTimer(
-            ManualTimerTimeProvider owner,
-            TimerCallback callback,
-            object? state
-        ) : ITimer
-        {
-            private TimeSpan period;
-            private DateTimeOffset dueAt = DateTimeOffset.MaxValue;
-            private bool disposed;
-
-            public bool Change(TimeSpan dueTime, TimeSpan period)
-            {
-                lock (owner.gate)
-                {
-                    if (disposed)
-                        return false;
-
-                    this.period = period;
-                    dueAt =
-                        dueTime == Timeout.InfiniteTimeSpan
-                            ? DateTimeOffset.MaxValue
-                            : owner.CurrentNowLocked.Add(dueTime);
-                    owner.AddTimer(this);
-                }
-
-                if (dueTime != Timeout.InfiniteTimeSpan && dueTime <= TimeSpan.Zero)
-                    Fire();
-
-                return true;
-            }
-
-            public void Dispose()
-            {
-                lock (owner.gate)
-                {
-                    if (disposed)
-                        return;
-
-                    disposed = true;
-                    owner.RemoveTimer(this);
-                }
-            }
-
-            public ValueTask DisposeAsync()
-            {
-                Dispose();
-                return ValueTask.CompletedTask;
-            }
-
-            public bool IsDue(DateTimeOffset value)
-            {
-                lock (owner.gate)
-                    return !disposed && dueAt <= value;
-            }
-
-            public void Fire()
-            {
-                lock (owner.gate)
-                {
-                    if (disposed || dueAt > owner.CurrentNowLocked)
-                        return;
-
-                    if (period > TimeSpan.Zero && period != Timeout.InfiniteTimeSpan)
-                    {
-                        dueAt = owner.CurrentNowLocked.Add(period);
-                    }
-                    else
-                    {
-                        disposed = true;
-                        owner.RemoveTimer(this);
-                    }
-                }
-
-                callback(state);
-            }
-        }
     }
 }

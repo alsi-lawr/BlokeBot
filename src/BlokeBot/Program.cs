@@ -70,6 +70,7 @@ builder.Services.AddEventBus<AppEventKind>(
 );
 builder
     .Services.AddBlokeBotAppCommands()
+    .AddBlokeBotPublicChat()
     .AddBlokeBotAlerts()
     .AddBlokeBotCustomCommands(
         botRuntimeConfigured

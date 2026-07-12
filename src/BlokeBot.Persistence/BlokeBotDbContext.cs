@@ -24,6 +24,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<CustomAnnouncementSchedule> CustomAnnouncementSchedules =>
         Set<CustomAnnouncementSchedule>();
     public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
+    public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
+        Set<PublicChatOutboxMessage>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
@@ -484,6 +486,74 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<PublicChatOutboxMessage>(b =>
+        {
+            b.ToTable(
+                "public_chat_outbox",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_public_chat_outbox_Status",
+                        KindIn("Status", PublicChatOutboxStatuses)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_outbox_AttemptCount",
+                        "AttemptCount >= 0"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_outbox_Channel",
+                        "length(trim(Channel)) > 0"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_outbox_DeduplicationKey",
+                        "length(DeduplicationKey) = 64"
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_outbox_State",
+                        "(Status = 'Pending' AND length(Message) > 0 "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL "
+                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL) OR "
+                            + "(Status = 'Claimed' AND length(Message) > 0 "
+                            + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
+                            + "AND ClaimExpiresAtUtc IS NOT NULL "
+                            + "AND SendStartedAtUtc IS NULL AND CompletedAtUtc IS NULL) OR "
+                            + "(Status = 'Sending' AND length(Message) > 0 "
+                            + "AND ClaimToken IS NOT NULL AND ClaimSlot = 1 "
+                            + "AND ClaimExpiresAtUtc IS NOT NULL "
+                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NULL) OR "
+                            + "(Status IN ('Delivered', 'Faulted') AND Message IS NULL "
+                            + "AND ClaimToken IS NULL AND ClaimSlot IS NULL "
+                            + "AND ClaimExpiresAtUtc IS NULL "
+                            + "AND SendStartedAtUtc IS NOT NULL AND CompletedAtUtc IS NOT NULL)"
+                    );
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Channel).HasMaxLength(128);
+            b.Property(x => x.DeduplicationKey).HasMaxLength(64);
+            b.Property(x => x.Status)
+                .HasConversion(
+                    status => PersistedEnumTokens<PublicChatOutboxStatus>.Format(status),
+                    value => PersistedEnumTokens<PublicChatOutboxStatus>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => new
+            {
+                x.Status,
+                x.NextAttemptAtUtc,
+                x.CreatedAtUtc,
+                x.Id,
+            });
+            b.HasIndex(x => new { x.Status, x.ClaimExpiresAtUtc });
+            b.HasIndex(x => x.ClaimToken)
+                .IsUnique()
+                .HasFilter("\"ClaimToken\" IS NOT NULL");
+            b.HasIndex(x => x.ClaimSlot)
+                .IsUnique()
+                .HasFilter("\"ClaimSlot\" IS NOT NULL");
+        });
+
         modelBuilder.Entity<PointsSettings>(b =>
         {
             b.ToTable(
@@ -713,6 +783,9 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
     private static readonly string[] PointsGiveawayStatusKinds =
         PersistedEnumTokens<PointsGiveawayStatus>.Values.ToArray();
+
+    private static readonly string[] PublicChatOutboxStatuses =
+        PersistedEnumTokens<PublicChatOutboxStatus>.Values.ToArray();
 
     private static string KindIn(string columnName, IEnumerable<string> values) =>
         $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
