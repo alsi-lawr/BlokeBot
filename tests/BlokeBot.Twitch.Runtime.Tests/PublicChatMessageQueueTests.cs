@@ -1212,6 +1212,7 @@ public sealed class PublicChatMessageQueueTests
         }
 
         public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+            DateTimeOffset now,
             CancellationToken cancellationToken
         )
         {
@@ -1220,11 +1221,14 @@ public sealed class PublicChatMessageQueueTests
             {
                 IReadOnlyList<PublicChatPendingMessage> pending = rows
                     .Where(row =>
-                        row.Status
-                            is RowStatus.Pending
-                                or RowStatus.Claimed
-                                or RowStatus.Sending
-                                or RowStatus.SafePreSendTransient
+                        row.Status == RowStatus.Sending
+                        || (
+                            row.ExpiresAt > now
+                            && row.Status
+                                is RowStatus.Pending
+                                    or RowStatus.Claimed
+                                    or RowStatus.SafePreSendTransient
+                        )
                     )
                     .OrderBy(row => row.EnqueuedAt)
                     .ThenBy(row => row.Id)
@@ -1420,6 +1424,8 @@ public sealed class PublicChatMessageQueueTests
 
             public DateTimeOffset EnqueuedAt { get; } = enqueuedAt;
 
+            public DateTimeOffset ExpiresAt { get; } = enqueuedAt.AddMinutes(1);
+
             public DateTimeOffset NextAttemptAt { get; set; } = enqueuedAt;
 
             public RowStatus Status { get; set; }
@@ -1441,7 +1447,7 @@ public sealed class PublicChatMessageQueueTests
                     Channel = Channel,
                     Message = Message!,
                     EnqueuedAt = EnqueuedAt,
-                    ExpiresAt = EnqueuedAt.AddMinutes(1),
+                    ExpiresAt = ExpiresAt,
                     Attempt = AttemptCount + 1,
                     ClaimToken = token,
                     ClaimExpiresAt = ClaimExpiresAt,

@@ -277,8 +277,9 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
     ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+        DateTimeOffset now,
         CancellationToken cancellationToken
-    ) => inner.LoadOutstandingAsync(cancellationToken);
+    ) => inner.LoadOutstandingAsync(now, cancellationToken);
 
     public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync() =>
         deliveries.Reader.ReadAsync();
@@ -379,8 +380,9 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
     ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+        DateTimeOffset now,
         CancellationToken cancellationToken
-    ) => inner.LoadOutstandingAsync(cancellationToken);
+    ) => inner.LoadOutstandingAsync(now, cancellationToken);
 
     public ValueTask<PublicChatClaimedMessage> ReadBeginAttemptAsync() =>
         beginAttempts.Reader.ReadAsync();

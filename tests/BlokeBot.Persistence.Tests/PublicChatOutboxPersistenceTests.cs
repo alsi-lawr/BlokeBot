@@ -572,7 +572,7 @@ public sealed class PublicChatOutboxPersistenceTests
             """
         );
 
-        await migrator.MigrateAsync(ExpiryMigration);
+        await migrator.MigrateAsync();
         db.ChangeTracker.Clear();
 
         var rows = await db.PublicChatOutboxMessages.AsNoTracking()
@@ -613,6 +613,31 @@ public sealed class PublicChatOutboxPersistenceTests
             .ToArrayAsync();
         downgradedStatuses.ShouldBe(["Unexpected"]);
         (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+        (await ReadOutboxSequenceAsync(db)).ShouldBeGreaterThanOrEqualTo(100);
+
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
+                 Status, AttemptCount, SafePreSendFailureCount)
+            VALUES
+                ('streamer', 'after downgrade', {DeduplicationKey}, {now}, {now},
+                 'Pending', 0, 0)
+            """
+        );
+        var newOutboxId = await db.Database.SqlQueryRaw<long>(
+                "SELECT last_insert_rowid() AS Value"
+            )
+            .SingleAsync();
+        newOutboxId.ShouldBeGreaterThan(100);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_send_receipts
+                (OutboxMessageId, AttemptedAtUtc)
+            VALUES ({newOutboxId}, {now})
+            """
+        );
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(2);
     }
 
     [Test]

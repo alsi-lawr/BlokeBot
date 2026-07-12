@@ -305,18 +305,27 @@ internal sealed class EfPublicChatOutbox(
     }
 
     public async ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+        DateTimeOffset now,
         CancellationToken cancellationToken
     )
     {
+        var nowUtc = now.UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var rows = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
-                row.Status == PublicChatOutboxStatus.Pending
-                || row.Status == PublicChatOutboxStatus.Claimed
-                || row.Status == PublicChatOutboxStatus.Sending
-                || row.Status == PublicChatOutboxStatus.SafePreSendScheduling
-                || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                row.Status == PublicChatOutboxStatus.Sending
+                || (
+                    row.ExpiresAtUtc > nowUtc
+                    && (
+                        row.Status == PublicChatOutboxStatus.Pending
+                        || row.Status == PublicChatOutboxStatus.Claimed
+                        || row.Status
+                            == PublicChatOutboxStatus.SafePreSendScheduling
+                        || row.Status
+                            == PublicChatOutboxStatus.SafePreSendTransient
+                    )
+                )
             )
             .OrderBy(row => row.CreatedAtUtc)
             .ThenBy(row => row.Id)

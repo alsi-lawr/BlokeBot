@@ -124,6 +124,7 @@ internal interface IPublicChatOutbox
     );
 
     ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
+        DateTimeOffset now,
         CancellationToken cancellationToken
     );
 }

@@ -397,7 +397,7 @@ internal sealed class PublicChatMessageQueue(
         CancellationToken cancellationToken
     )
     {
-        var pending = await outbox.LoadOutstandingAsync(cancellationToken);
+        var pending = await outbox.LoadOutstandingAsync(now, cancellationToken);
         backlogMonitor.ResetDrainedChannels(pending);
         var alerts = backlogMonitor.CaptureAlerts(
             pending,

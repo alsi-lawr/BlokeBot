@@ -4,6 +4,7 @@ using BlokeBot.Features.Alerts;
 using BlokeBot.Features.PublicChat;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -88,6 +89,73 @@ public sealed class PublicChatQueueAlertIntegrationTests
         (await transport.ReadAsync()).Message.ShouldBe("second");
         _ = await outbox.ReadDeliveryAsync();
         await StopAsync(stopping, worker);
+    }
+
+    [Test]
+    public async Task ExpiredUnsentMessage_StartingWorker_DoesNotCreateBacklogAlert()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        var now = Utc(12, 0, 0);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            seed.PublicChatOutboxMessages.Add(
+                new PublicChatOutboxMessage
+                {
+                    Channel = "streamer",
+                    Message = "stale queue content",
+                    DeduplicationKey = PublicChatMessageDeduplication
+                        .Key("streamer", "stale queue content")
+                        .Value,
+                    CreatedAtUtc = now.AddMinutes(-10).UtcDateTime,
+                    ExpiresAtUtc = now.UtcDateTime,
+                    NextAttemptAtUtc = now.AddMinutes(-10).UtcDateTime,
+                }
+            );
+            await seed.SaveChangesAsync();
+        }
+        var clock = new ManualTestTimeProvider(now);
+        var events = TestEventBus.Create<AppEventKind>();
+        var alertService = new DurableAlertService(dbFactory, clock, events);
+        var durableObserver = new DurablePublicChatQueueAlertObserver(
+            dbFactory,
+            alertService,
+            NullLogger<DurablePublicChatQueueAlertObserver>.Instance
+        );
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(
+                dbFactory,
+                StandardRetryPolicy,
+                StandardLifetimePolicy,
+                StandardRetentionPolicy
+            )
+        );
+        var transport = new RecordingPublicChatTransport();
+        var queue = CreateQueue(
+            outbox,
+            transport,
+            clock,
+            new TwitchBotOptions
+            {
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
+                {
+                    StuckAfterSeconds = 5,
+                },
+            },
+            [durableObserver]
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        _ = await outbox.ReadClaimOutcomeAsync();
+        await StopAsync(stopping, worker);
+
+        var state = await alertService.LoadStateAsync(hostId, CancellationToken.None);
+        state.Active.ShouldBeEmpty();
+        transport.DeliveryCount.ShouldBe(0);
+        await using var verification = await dbFactory.CreateDbContextAsync();
+        var expired = await verification.PublicChatOutboxMessages.SingleAsync();
+        expired.Status.ShouldBe(PublicChatOutboxStatus.Expired);
     }
 
     private static async Task<int> SeedHostAsync(
