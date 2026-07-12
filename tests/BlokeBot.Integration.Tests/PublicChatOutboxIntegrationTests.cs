@@ -694,6 +694,90 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
+    public async Task PersistedSafePreSendRetry_RestartingWithAttemptLimitOne_ExhaustsWithoutClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var schedulingPolicy = CreateRetryPolicy(
+            2,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1),
+            DelayBackoffType.Constant
+        );
+        var boundedPolicy = CreateRetryPolicy(
+            1,
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(1),
+            DelayBackoffType.Constant
+        );
+        var now = Utc(12, 0, 0);
+        var schedulingStore = new EfPublicChatOutbox(dbFactory, schedulingPolicy);
+        _ = await schedulingStore.EnqueueAsync(
+            Batch("streamer", now, "must not prepare again"),
+            CancellationToken.None
+        );
+        var initial = await ClaimAsync(schedulingStore, now, TimeSpan.Zero);
+        (await schedulingStore.RecordDeliveryOutcomeAsync(
+                initial,
+                SafePreSendTransientOutcome(),
+                now,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        var retryAt = now.AddSeconds(1);
+        var firstRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy);
+        var secondRestartStore = new EfPublicChatOutbox(dbFactory, boundedPolicy);
+        var concurrentClaims = await Task.WhenAll(
+            firstRestartStore
+                .TryClaimNextAsync(
+                    retryAt,
+                    retryAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask(),
+            secondRestartStore
+                .TryClaimNextAsync(
+                    retryAt,
+                    retryAt.AddMinutes(5),
+                    TimeSpan.Zero,
+                    TimeSpan.Zero,
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+        concurrentClaims.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
+        foreach (var outcome in concurrentClaims)
+            (outcome is PublicChatClaimOutcome.Empty or PublicChatClaimOutcome.Contended)
+                .ShouldBeTrue();
+        (
+            await firstRestartStore.TryClaimNextAsync(
+                retryAt,
+                retryAt.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        row.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendExhausted);
+        row.Message.ShouldBeNull();
+        row.AttemptCount.ShouldBe(0);
+        row.SafePreSendFailureCount.ShouldBe(1);
+        row.NextAttemptAtUtc.ShouldBe(retryAt.UtcDateTime);
+        row.CompletedAtUtc.ShouldBe(retryAt.UtcDateTime);
+        row.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
+        row.FailureType.ShouldBe(typeof(IOException).FullName);
+        row.HttpStatusCode.ShouldBeNull();
+        row.RejectionCode.ShouldBeNull();
+        row.ClaimToken.ShouldBeNull();
+        row.ClaimSlot.ShouldBeNull();
+    }
+
+    [Test]
     public async Task SafePreparationFailure_RestartingQueue_DeliversOnceAfterConfiguredRetryTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

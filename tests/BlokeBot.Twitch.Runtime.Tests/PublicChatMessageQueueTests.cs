@@ -175,28 +175,28 @@ public sealed class PublicChatMessageQueueTests
         _ = await queue.EnqueueAsync(Command("channel", "second"), CancellationToken.None);
         _ = await queue.EnqueueAsync(Command("channel", "third"), CancellationToken.None);
 
-        await clock.WaitForTimerRegistrationAsync();
+        await clock.WaitForTimerAtAsync(Utc(12, 0, 5));
         clock.Advance(TimeSpan.FromSeconds(5));
         var firstAlert = await observer.ReadAsync();
         firstAlert.Channel.ShouldBe("channel");
         firstAlert.OldestPendingAge.ShouldBe(TimeSpan.FromSeconds(5));
         firstAlert.PendingCount.ShouldBe(2);
 
-        await clock.WaitForTimerRegistrationAsync();
+        await clock.WaitForTimerAtAsync(Utc(12, 0, 10));
         clock.Advance(TimeSpan.FromSeconds(5));
         (await transport.ReadAsync()).Message.ShouldBe("second");
         (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
-        await clock.WaitForTimerRegistrationAsync();
+        await clock.WaitForTimerAtAsync(Utc(12, 0, 20));
         clock.Advance(TimeSpan.FromSeconds(10));
         (await transport.ReadAsync()).Message.ShouldBe("third");
         (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
         observer.Alerts.Count.ShouldBe(1);
 
         _ = await queue.EnqueueAsync(Command("channel", "fourth"), CancellationToken.None);
-        await clock.WaitForTimerRegistrationAsync();
+        await clock.WaitForTimerAtAsync(Utc(12, 0, 25));
         clock.Advance(TimeSpan.FromSeconds(5));
         _ = await observer.ReadAsync();
-        await clock.WaitForTimerRegistrationAsync();
+        await clock.WaitForTimerAtAsync(Utc(12, 0, 30));
         clock.Advance(TimeSpan.FromSeconds(5));
         (await transport.ReadAsync()).Message.ShouldBe("fourth");
         (await outbox.ReadCompletionAsync()).ShouldBe(InMemoryOutbox.RowStatus.Delivered);
@@ -1437,11 +1437,9 @@ public sealed class PublicChatMessageQueueTests
     {
         private readonly object gate = new();
         private readonly List<ManualTimer> timers = [];
-        private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
+        private readonly Channel<ManualTimer> timerRegistrations =
+            Channel.CreateUnbounded<ManualTimer>();
         private DateTimeOffset now = initialNow;
-        private int timerRegistrationCount;
-        private int observedTimerRegistrationCount;
-        private bool waitingForTimerRegistration;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -1478,21 +1476,31 @@ public sealed class PublicChatMessageQueueTests
                 timer.Fire();
         }
 
-        public ValueTask<bool> WaitForTimerRegistrationAsync()
+        public async ValueTask WaitForTimerRegistrationAsync()
         {
-            lock (gate)
+            while (true)
             {
-                if (timerRegistrationCount > observedTimerRegistrationCount)
+                lock (gate)
                 {
-                    observedTimerRegistrationCount = timerRegistrationCount;
-                    return ValueTask.FromResult(true);
+                    if (timers.Count > 0)
+                        return;
                 }
 
-                if (waitingForTimerRegistration)
-                    throw new InvalidOperationException("Only one timer observer is supported.");
+                _ = await timerRegistrations.Reader.ReadAsync();
+            }
+        }
 
-                waitingForTimerRegistration = true;
-                return timerRegistrations.Reader.ReadAsync();
+        public async ValueTask WaitForTimerAtAsync(DateTimeOffset dueAt)
+        {
+            while (true)
+            {
+                lock (gate)
+                {
+                    if (timers.Any(timer => timer.IsScheduledAt(dueAt)))
+                        return;
+                }
+
+                _ = await timerRegistrations.Reader.ReadAsync();
             }
         }
 
@@ -1501,16 +1509,9 @@ public sealed class PublicChatMessageQueueTests
             lock (gate)
             {
                 if (!timers.Contains(timer))
-                {
                     timers.Add(timer);
-                    timerRegistrationCount++;
-                }
-                if (!waitingForTimerRegistration)
-                    return;
 
-                waitingForTimerRegistration = false;
-                observedTimerRegistrationCount = timerRegistrationCount;
-                if (!timerRegistrations.Writer.TryWrite(true))
+                if (!timerRegistrations.Writer.TryWrite(timer))
                     throw new InvalidOperationException("The timer observer could not be notified.");
             }
         }
@@ -1575,6 +1576,12 @@ public sealed class PublicChatMessageQueueTests
             {
                 lock (owner.gate)
                     return !disposed && dueAt <= value;
+            }
+
+            public bool IsScheduledAt(DateTimeOffset value)
+            {
+                lock (owner.gate)
+                    return !disposed && dueAt == value;
             }
 
             public void Fire()

@@ -425,19 +425,36 @@ internal sealed class PublicChatMessageQueue(
         CancellationToken cancellationToken
     )
     {
-        if (delay <= TimeSpan.Zero)
+        if (delay <= TimeSpan.Zero || wakeSignals.Reader.TryRead(out _))
             return;
 
+        var scheduledWakeSignals = Channel.CreateBounded<bool>(
+            new BoundedChannelOptions(1)
+            {
+                SingleReader = true,
+                SingleWriter = true,
+                FullMode = BoundedChannelFullMode.DropWrite,
+            }
+        );
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken
+        );
         using var wakeTimer = timeProvider.CreateTimer(
             static state =>
             {
                 _ = ((ChannelWriter<bool>)state!).TryWrite(true);
             },
-            wakeSignals.Writer,
+            scheduledWakeSignals.Writer,
             delay,
             Timeout.InfiniteTimeSpan
         );
-        _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
+        var scheduledWake = scheduledWakeSignals.Reader
+            .ReadAsync(waitCancellation.Token)
+            .AsTask();
+        var signal = wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
+        var completed = await Task.WhenAny(scheduledWake, signal);
+        await waitCancellation.CancelAsync();
+        _ = await completed;
     }
 
     private async ValueTask<PublicChatClaimUpdate> ApplyClaimUpdateAsync(

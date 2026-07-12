@@ -281,6 +281,7 @@ internal sealed class EfPublicChatOutbox(
         var nowUtc = now.UtcDateTime;
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await RecoverExpiredAsync(db, nowUtc, cancellationToken);
+        await ExhaustConfiguredSafePreSendRetriesAsync(db, nowUtc, cancellationToken);
 
         var activeClaim = await db
             .PublicChatOutboxMessages.AsNoTracking()
@@ -306,7 +307,10 @@ internal sealed class EfPublicChatOutbox(
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
                 row.Status == PublicChatOutboxStatus.Pending
-                || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                || (
+                    row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                    && row.SafePreSendFailureCount < safePreSendRetryPolicy.AttemptLimit
+                )
             )
             .ToArrayAsync(cancellationToken);
         if (claimable.Length == 0)
@@ -363,7 +367,11 @@ internal sealed class EfPublicChatOutbox(
                 row.Id == candidate.Row.Id
                 && (
                     row.Status == PublicChatOutboxStatus.Pending
-                    || row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                    || (
+                        row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                        && row.SafePreSendFailureCount
+                            < safePreSendRetryPolicy.AttemptLimit
+                    )
                 )
             )
             .ExecuteUpdateAsync(
@@ -464,6 +472,29 @@ internal sealed class EfPublicChatOutbox(
                 cancellationToken
             );
     }
+
+    private Task ExhaustConfiguredSafePreSendRetriesAsync(
+        BlokeBotDbContext db,
+        DateTime nowUtc,
+        CancellationToken cancellationToken
+    ) =>
+        db.PublicChatOutboxMessages
+            .Where(row =>
+                row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                && row.SafePreSendFailureCount >= safePreSendRetryPolicy.AttemptLimit
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(
+                            row => row.Status,
+                            PublicChatOutboxStatus.SafePreSendExhausted
+                        )
+                        .SetProperty(row => row.Message, (string?)null)
+                        .SetProperty(row => row.NextAttemptAtUtc, nowUtc)
+                        .SetProperty(row => row.CompletedAtUtc, nowUtc),
+                cancellationToken
+            );
 
     private ValueTask<PublicChatClaimUpdate> RecordDeliveredAsync(
         PublicChatClaimedMessage message,
