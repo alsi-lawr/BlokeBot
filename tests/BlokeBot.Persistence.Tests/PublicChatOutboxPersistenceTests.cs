@@ -24,6 +24,8 @@ public sealed class PublicChatOutboxPersistenceTests
         "20260712212037_MarkMigratedSafePreSendRetriesForScheduling";
     private const string RetainedTerminalOutboxMigration =
         "20260712214026_RetainRedactedTerminalDeliveries";
+    private const string BoundedReceiptLifecycleMigration =
+        "20260712220945_BoundDeliveryReceiptLifecycle";
     private const string DeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -462,10 +464,52 @@ public sealed class PublicChatOutboxPersistenceTests
         receiptTableCount.ShouldBe(0);
     }
 
+    [Test]
+    public async Task DeliveryReceiptLifecycleMigration_UpgradingAndReverting_PreservesHistoricalIdentitySequence()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(MarkedRetryOutboxMigration);
+        var now = new DateTime(2026, 7, 12, 12, 0, 0, DateTimeKind.Utc);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO public_chat_outbox
+                (Id, Channel, Message, DeduplicationKey, CreatedAtUtc,
+                 NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount,
+                 SendStartedAtUtc, CompletedAtUtc)
+            VALUES
+                (41, 'streamer', NULL, {DeduplicationKey}, {now}, {now},
+                 'Delivered', 1, 0, {now}, {now})
+            """
+        );
+        await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
+
+        await migrator.MigrateAsync(BoundedReceiptLifecycleMigration);
+        (await ReadOutboxSequenceAsync(db)).ShouldBe(41);
+
+        await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
+        (await ReadOutboxSequenceAsync(db)).ShouldBe(41);
+    }
+
     private sealed record DowngradedTerminalRow(
         string DeduplicationKey,
         DateTime NextAttemptAtUtc
     );
+
+    private static Task<long> ReadOutboxSequenceAsync(BlokeBotDbContext db) =>
+        db.Database.SqlQueryRaw<long>(
+                """
+                SELECT seq AS Value
+                FROM sqlite_sequence
+                WHERE name = 'public_chat_outbox'
+                """
+            )
+            .SingleAsync();
 
     private static Task<int> InsertClaimedAsync(
         BlokeBotDbContext db,

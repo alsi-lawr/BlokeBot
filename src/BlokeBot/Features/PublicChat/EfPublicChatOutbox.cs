@@ -321,6 +321,19 @@ internal sealed class EfPublicChatOutbox(
             now,
             cancellationToken
         );
+        var nextSendReceiptPurgeAt = await NextSendReceiptPurgeAtAsync(
+            db,
+            now,
+            Max(sendInterval, duplicateCooldown),
+            cancellationToken
+        );
+        var nextMaintenanceAt = nextTerminalPurgeAt switch
+        {
+            { } terminalPurgeAt when nextSendReceiptPurgeAt is { } receiptPurgeAt =>
+                Min(terminalPurgeAt, receiptPurgeAt),
+            { } terminalPurgeAt => terminalPurgeAt,
+            null => nextSendReceiptPurgeAt,
+        };
 
         var activeClaim = await db
             .PublicChatOutboxMessages.AsNoTracking()
@@ -339,7 +352,7 @@ internal sealed class EfPublicChatOutbox(
                 now + ClaimAvailabilityPoll
             );
             return new PublicChatClaimOutcome.AwaitingAvailability(
-                nextTerminalPurgeAt is { } purgeAt
+                nextMaintenanceAt is { } purgeAt
                     ? Min(claimAvailability, purgeAt)
                     : claimAvailability
             );
@@ -357,7 +370,7 @@ internal sealed class EfPublicChatOutbox(
             .ToArrayAsync(cancellationToken);
         if (claimable.Length == 0)
         {
-            return nextTerminalPurgeAt is { } purgeAt
+            return nextMaintenanceAt is { } purgeAt
                 ? new PublicChatClaimOutcome.AwaitingAvailability(purgeAt)
                 : new PublicChatClaimOutcome.Empty();
         }
@@ -409,7 +422,7 @@ internal sealed class EfPublicChatOutbox(
         {
             var candidateAvailableAt = ToDateTimeOffset(candidate.EligibleAtUtc);
             return new PublicChatClaimOutcome.AwaitingAvailability(
-                nextTerminalPurgeAt is { } purgeAt
+                nextMaintenanceAt is { } purgeAt
                     ? Min(candidateAvailableAt, purgeAt)
                     : candidateAvailableAt
             );
@@ -653,6 +666,32 @@ internal sealed class EfPublicChatOutbox(
             ToDateTimeOffset(completedAt),
             terminalRetentionPolicy.Duration
         );
+        return Min(exactPurgeAt, AddOrMaximum(now, MaximumMaintenanceWake));
+    }
+
+    private static async Task<DateTimeOffset?> NextSendReceiptPurgeAtAsync(
+        BlokeBotDbContext db,
+        DateTimeOffset now,
+        TimeSpan historyWindow,
+        CancellationToken cancellationToken
+    )
+    {
+        var completedAtUtc = await db
+            .PublicChatSendReceipts.AsNoTracking()
+            .Where(receipt =>
+                receipt.CompletedAtUtc != null
+                && !db.PublicChatOutboxMessages.Any(row =>
+                    row.Id == receipt.OutboxMessageId
+                    && row.Status == PublicChatOutboxStatus.Sending
+                )
+            )
+            .OrderBy(receipt => receipt.CompletedAtUtc)
+            .Select(receipt => receipt.CompletedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (completedAtUtc is not { } completedAt)
+            return null;
+
+        var exactPurgeAt = AddOrMaximum(ToDateTimeOffset(completedAt), historyWindow);
         return Min(exactPurgeAt, AddOrMaximum(now, MaximumMaintenanceWake));
     }
 

@@ -19,6 +19,10 @@ public sealed class PublicChatOutboxIntegrationTests
 {
     private const string ClassifiedOutboxMigration =
         "20260712184117_ClassifyPublicChatDeliveryOutcomes";
+    private const string MarkedRetryOutboxMigration =
+        "20260712212037_MarkMigratedSafePreSendRetriesForScheduling";
+    private const string RetainedTerminalOutboxMigration =
+        "20260712214026_RetainRedactedTerminalDeliveries";
     private const string MigratedDeduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
@@ -116,6 +120,166 @@ public sealed class PublicChatOutboxIntegrationTests
             CancellationToken.None
         );
         next.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+    }
+
+    [Test]
+    public async Task SuccessfulSend_IdleWorkerPurgesReceiptExactlyAtOperationalExpiry()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardRetentionPolicy)
+        );
+        var queue = CreateQueue(
+            outbox,
+            new RecordingPublicChatTransport(),
+            clock,
+            new TwitchBotOptions
+            {
+                ChatMessageSendIntervalSeconds = 5,
+                DuplicateChatMessageCooldownSeconds = 3,
+            }
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+        _ = (await outbox.ReadClaimOutcomeAsync())
+            .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "receipt expires while idle"),
+            CancellationToken.None
+        );
+        _ = (await outbox.ReadClaimOutcomeAsync())
+            .ShouldBeOfType<PublicChatClaimOutcome.Claimed>();
+        _ = await outbox.ReadOutcomeAsync();
+        var awaitingExpiry = (await outbox.ReadClaimOutcomeAsync())
+            .ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+        awaitingExpiry.AvailableAt.ShouldBe(clock.GetUtcNow().AddSeconds(5));
+        _ = await clock.WaitForTimerRegistrationAsync();
+
+        clock.Advance(TimeSpan.FromSeconds(4));
+        await using (var beforeExpiry = await dbFactory.CreateDbContextAsync())
+            (await beforeExpiry.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        _ = (await outbox.ReadClaimOutcomeAsync())
+            .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        await using (var atExpiry = await dbFactory.CreateDbContextAsync())
+            (await atExpiry.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
+
+        await StopAsync(stopping, worker);
+    }
+
+    [Test]
+    public async Task CompletedSendReceipts_MoreThanOneBatch_PurgeInBoundedPasses()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            seed.PublicChatSendReceipts.AddRange(
+                Enumerable.Range(1, 101).Select(index =>
+                    new PublicChatSendReceipt
+                    {
+                        OutboxMessageId = index,
+                        AttemptedAtUtc = now.AddSeconds(-6).UtcDateTime,
+                        CompletedAtUtc = now.AddSeconds(-5).UtcDateTime,
+                    }
+                )
+            );
+            await seed.SaveChangesAsync();
+        }
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardRetentionPolicy
+        );
+
+        (await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.Zero,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>()
+            .AvailableAt.ShouldBe(now);
+        await using (var afterFirstBatch = await dbFactory.CreateDbContextAsync())
+            (await afterFirstBatch.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+
+        (await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.Zero,
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+        await using var afterSecondBatch = await dbFactory.CreateDbContextAsync();
+        (await afterSecondBatch.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task DeliveredOnlyMigration_NextIdentityExceedsReceiptAndBeginSendDoesNotCollide()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        var now = Utc(12, 0, 0);
+        await using (var migrationDb = await dbFactory.CreateDbContextAsync())
+        {
+            var migrator = migrationDb.Database.GetService<IMigrator>();
+            await migrator.MigrateAsync(MarkedRetryOutboxMigration);
+            await migrationDb.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO public_chat_outbox
+                    (Id, Channel, Message, DeduplicationKey, CreatedAtUtc,
+                     NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount,
+                     SendStartedAtUtc, CompletedAtUtc)
+                VALUES
+                    (41, 'streamer', NULL, {MigratedDeduplicationKey},
+                     {now.UtcDateTime}, {now.UtcDateTime}, 'Delivered', 1, 0,
+                     {now.UtcDateTime}, {now.UtcDateTime})
+                """
+            );
+            await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
+        }
+        await using (var correctedMigrationDb = await dbFactory.CreateDbContextAsync())
+        {
+            var migrator = correctedMigrationDb.Database.GetService<IMigrator>();
+            await migrator.MigrateAsync();
+        }
+
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardRetentionPolicy
+        );
+        var enqueueReceipt = await outbox.EnqueueAsync(
+            Batch("streamer", now, "identity after migrated success"),
+            CancellationToken.None
+        );
+        var newId = enqueueReceipt.MessageIds.ShouldHaveSingleItem();
+        newId.ShouldBeGreaterThan(41);
+        var claimed = await ClaimAsync(
+            outbox,
+            now,
+            TimeSpan.Zero,
+            TimeSpan.FromDays(1)
+        );
+        (await outbox.BeginSendAsync(
+                claimed,
+                now,
+                now.AddMinutes(5),
+                CancellationToken.None
+            ))
+            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await using var verification = await dbFactory.CreateDbContextAsync();
+        (await verification
+                .PublicChatSendReceipts.AsNoTracking()
+                .OrderBy(receipt => receipt.OutboxMessageId)
+                .Select(receipt => receipt.OutboxMessageId)
+                .ToArrayAsync())
+            .ShouldBe([41L, newId]);
     }
 
     [Test]
@@ -592,8 +756,8 @@ public sealed class PublicChatOutboxIntegrationTests
             var afterRestart = await new EfPublicChatOutbox(
                 dbFactory,
                 StandardRetryPolicy,
-            StandardRetentionPolicy
-        ).TryClaimNextAsync(
+                StandardRetentionPolicy
+            ).TryClaimNextAsync(
                 clock.GetUtcNow(),
                 clock.GetUtcNow().AddMinutes(5),
                 TimeSpan.Zero,

@@ -178,26 +178,34 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
     private readonly Channel<PublicChatDeliveryOutcome> outcomes =
         Channel.CreateUnbounded<PublicChatDeliveryOutcome>();
+    private readonly Channel<PublicChatClaimOutcome> claims =
+        Channel.CreateUnbounded<PublicChatClaimOutcome>();
 
     public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
     ) => inner.EnqueueAsync(batch, cancellationToken);
 
-    public ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
+    public async ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
         DateTimeOffset now,
         DateTimeOffset claimExpiresAt,
         TimeSpan sendInterval,
         TimeSpan duplicateCooldown,
         CancellationToken cancellationToken
-    ) =>
-        inner.TryClaimNextAsync(
+    )
+    {
+        var outcome = await inner.TryClaimNextAsync(
             now,
             claimExpiresAt,
             sendInterval,
             duplicateCooldown,
             cancellationToken
         );
+        if (!claims.Writer.TryWrite(outcome))
+            throw new InvalidOperationException("The public chat claim could not be observed.");
+
+        return outcome;
+    }
 
     public ValueTask<PublicChatClaimUpdate> BeginSendAsync(
         PublicChatClaimedMessage message,
@@ -273,6 +281,9 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
 
     public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync() =>
         outcomes.Reader.ReadAsync();
+
+    public ValueTask<PublicChatClaimOutcome> ReadClaimOutcomeAsync() =>
+        claims.Reader.ReadAsync();
 
     private void NotifyDelivery(PublicChatClaimedMessage message)
     {
