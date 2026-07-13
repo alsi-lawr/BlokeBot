@@ -115,7 +115,7 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddAuth();
         services.AddHelix();
         services.AddContinueAndReportObserverFanOut<
-            TwitchIrcMessageObserverBoundary,
+            IrcMessageObserverBoundary,
             TwitchChatMessage,
             TwitchChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.IrcMessages);
@@ -153,8 +153,8 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<EventSubChannelSessionFactory>();
         services.TryAddSingleton<IEventSubConnectionSession, EventSubConnectionSession>();
         services.TryAddSingleton<EventSubRuntime>();
-        services.TryAddSingleton<ITwitchIrcConnectionSession, TwitchIrcConnectionSession>();
-        services.TryAddSingleton<TwitchIrcRuntime>();
+        services.TryAddSingleton<IIrcConnectionSession, IrcConnectionSession>();
+        services.TryAddSingleton<IrcRuntime>();
         services.AddHostedService<TwitchBotRuntimeHostedService>();
 
         return services.AddTwitchCommands();
@@ -222,7 +222,7 @@ public static class TwitchBotServiceCollectionExtensions
                 );
             }
         );
-        services.AddSingleton(serviceProvider => new TwitchIrcSessionResiliencePipeline(
+        services.AddSingleton(serviceProvider => new IrcSessionResiliencePipeline(
             serviceProvider
                 .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
                 .GetPipeline(TwitchBotResiliencePipeline.IrcSession)

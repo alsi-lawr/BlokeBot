@@ -15,7 +15,7 @@ public sealed class ChatActivityHookTests
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
-        var session = new TwitchIrcConnectionSession(
+        var session = new IrcConnectionSession(
             TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
@@ -26,11 +26,11 @@ public sealed class ChatActivityHookTests
             new TwitchBotRuntimeStatusStore(),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
-                TwitchIrcMessageObserverBoundary,
+                IrcMessageObserverBoundary,
                 TwitchChatMessage,
                 TwitchChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.IrcMessages),
-            NullLogger<TwitchIrcConnectionSession>.Instance
+            NullLogger<IrcConnectionSession>.Instance
         );
 
         await session.DispatchChatMessageAsync(
@@ -86,8 +86,8 @@ public sealed class ChatActivityHookTests
     {
         const string PrivateCommand = "!ping";
         var recorder = new RuntimeHookRecorder();
-        var logger = new RecordingLogger<TwitchIrcConnectionSession>();
-        var session = new TwitchIrcConnectionSession(
+        var logger = new RecordingLogger<IrcConnectionSession>();
+        var session = new IrcConnectionSession(
             TwitchBotSettings.FromOptions(new TwitchBotOptions()),
             null!,
             null!,
@@ -98,7 +98,7 @@ public sealed class ChatActivityHookTests
             new TwitchBotRuntimeStatusStore(),
             [],
             RuntimeTestObserverFanOut.Continue<
-                TwitchIrcMessageObserverBoundary,
+                IrcMessageObserverBoundary,
                 TwitchChatMessage,
                 TwitchChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.IrcMessages),

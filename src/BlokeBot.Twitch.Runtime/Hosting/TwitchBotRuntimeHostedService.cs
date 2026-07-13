@@ -6,12 +6,12 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class TwitchBotRuntimeHostedService : BackgroundService
 {
     private readonly TwitchBotSettings _settings;
-    private readonly TwitchIrcRuntime _irc;
+    private readonly IrcRuntime _irc;
     private readonly EventSubRuntime _eventSub;
 
     public TwitchBotRuntimeHostedService(
         TwitchBotSettings settings,
-        TwitchIrcRuntime irc,
+        IrcRuntime irc,
         EventSubRuntime eventSub
     )
     {

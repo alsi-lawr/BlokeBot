@@ -1,8 +1,8 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchIrcRuntime(
-    ITwitchIrcConnectionSession session,
-    TwitchIrcSessionResiliencePipeline resilience,
+internal sealed class IrcRuntime(
+    IIrcConnectionSession session,
+    IrcSessionResiliencePipeline resilience,
     ITwitchRuntimeSessionHealthReporter health,
     TwitchBotRuntimeStatusStore status,
     ITwitchRuntimeIdleWait idleWait
@@ -14,7 +14,7 @@ internal sealed class TwitchIrcRuntime(
             TwitchBotRuntime.Irc,
             new TwitchRuntimeConnectionTarget.Initial(),
             EstablishSessionAsync,
-            TwitchIrcSessionFailureClassifier.Classify,
+            IrcSessionFailureClassifier.Classify,
             health,
             status,
             idleWait,
@@ -31,7 +31,7 @@ internal sealed class TwitchIrcRuntime(
             TwitchBotRuntime.Irc,
             cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
-            TwitchIrcSessionFailureClassifier.Classify,
+            IrcSessionFailureClassifier.Classify,
             health,
             status,
             stoppingToken

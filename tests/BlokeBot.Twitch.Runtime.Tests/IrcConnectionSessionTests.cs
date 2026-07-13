@@ -5,7 +5,7 @@ using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
-public sealed class TwitchIrcConnectionSessionTests
+public sealed class IrcConnectionSessionTests
 {
     [Test]
     public async Task StartupMessageRejected_SynchronizingChannel_JoinsAndStartsLifecycleOnce()
@@ -15,8 +15,8 @@ public sealed class TwitchIrcConnectionSessionTests
         var lifecycle = new RecordingLifecycleNotifier();
         var chat = new RejectingChatSender();
         var status = new TwitchBotRuntimeStatusStore();
-        var logger = new RecordingLogger<TwitchIrcConnectionSession>();
-        var session = new TwitchIrcConnectionSession(
+        var logger = new RecordingLogger<IrcConnectionSession>();
+        var session = new IrcConnectionSession(
             TwitchBotSettings.FromOptions(
                 new TwitchBotOptions { StartupMessage = PrivateStartupMessage }
             ),

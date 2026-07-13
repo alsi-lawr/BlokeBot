@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal interface ITwitchIrcConnectionSession
+internal interface IIrcConnectionSession
 {
     Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
         TwitchRuntimeConnectionTarget target,
@@ -16,7 +16,7 @@ internal interface ITwitchIrcConnectionSession
     );
 }
 
-internal sealed class TwitchIrcConnectionSession(
+internal sealed class IrcConnectionSession(
     TwitchBotSettings settings,
     ITwitchBotChannelProvider channels,
     IAccessTokenProvider tokens,
@@ -27,19 +27,19 @@ internal sealed class TwitchIrcConnectionSession(
     TwitchBotRuntimeStatusStore status,
     IEnumerable<ITwitchChatMessageObserver> messageObservers,
     ObserverFanOut<
-        TwitchIrcMessageObserverBoundary,
+        IrcMessageObserverBoundary,
         TwitchChatMessage,
         TwitchChatObserverDeadLetter
     > messageObserverFanOut,
-    ILogger<TwitchIrcConnectionSession> log
-) : ITwitchIrcConnectionSession
+    ILogger<IrcConnectionSession> log
+) : IIrcConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
         "TwitchChatMessage"
     );
     private readonly ITwitchChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly TwitchBotSettings _opts = settings;
-    private ILogger<TwitchIrcConnectionSession> _log { get; } = log;
+    private ILogger<IrcConnectionSession> _log { get; } = log;
 
     public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
         TwitchRuntimeConnectionTarget target,
@@ -252,9 +252,9 @@ internal sealed class TwitchIrcConnectionSession(
             var line =
                 await reader.ReadLineAsync(cancellationToken)
                 ?? throw new IOException("Disconnected before IRC authentication completed.");
-            if (TwitchIrcProtocol.IsPing(line))
+            if (IrcProtocol.IsPing(line))
             {
-                await writer.WriteLineAsync(TwitchIrcProtocol.CreatePong(line));
+                await writer.WriteLineAsync(IrcProtocol.CreatePong(line));
                 continue;
             }
 
@@ -341,7 +341,7 @@ internal sealed class TwitchIrcConnectionSession(
     }
 
     private sealed class EstablishedSession(
-        TwitchIrcConnectionSession owner,
+        IrcConnectionSession owner,
         TcpClient tcp,
         StreamReader reader,
         StreamWriter writer,
@@ -359,15 +359,15 @@ internal sealed class TwitchIrcConnectionSession(
                 var line =
                     await reader.ReadLineAsync(cancellationToken)
                     ?? throw new IOException("Disconnected.");
-                if (TwitchIrcProtocol.IsPing(line))
+                if (IrcProtocol.IsPing(line))
                 {
-                    await writer.WriteLineAsync(TwitchIrcProtocol.CreatePong(line));
+                    await writer.WriteLineAsync(IrcProtocol.CreatePong(line));
                     continue;
                 }
 
                 owner.LogServerLine(line);
 
-                var parseResult = TwitchIrcProtocol.ParsePrivMsg(line);
+                var parseResult = IrcProtocol.ParsePrivMsg(line);
                 if (!parseResult.Success)
                 {
                     continue;

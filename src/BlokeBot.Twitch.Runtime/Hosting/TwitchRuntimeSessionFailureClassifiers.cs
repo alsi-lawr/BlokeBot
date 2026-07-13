@@ -7,7 +7,7 @@ using Polly.Timeout;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal static class TwitchIrcSessionFailureClassifier
+internal static class IrcSessionFailureClassifier
 {
     internal static TwitchRuntimeSessionFailureClassification Classify(
         Exception exception,

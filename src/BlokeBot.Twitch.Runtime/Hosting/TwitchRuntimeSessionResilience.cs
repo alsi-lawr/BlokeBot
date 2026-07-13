@@ -20,7 +20,7 @@ internal static class TwitchRuntimeSessionResilience
             policy.MaximumDelay,
             policy.DelayBackoffType,
             policy.AttemptTimeout,
-            TwitchIrcSessionFailureClassifier.Classify,
+            IrcSessionFailureClassifier.Classify,
             health
         );
     }
@@ -101,7 +101,7 @@ internal static class TwitchRuntimeSessionResilience
     }
 }
 
-internal sealed class TwitchIrcSessionResiliencePipeline(ResiliencePipeline pipeline)
+internal sealed class IrcSessionResiliencePipeline(ResiliencePipeline pipeline)
 {
     internal ValueTask<TwitchRuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<TwitchRuntimeSessionEstablishment>> operation,

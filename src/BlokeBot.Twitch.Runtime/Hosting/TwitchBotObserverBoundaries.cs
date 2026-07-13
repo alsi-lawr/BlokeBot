@@ -15,7 +15,7 @@ public static class TwitchBotObserverBoundaries
         ObserverBoundary.Named("TwitchBot.PublicChat.QueueAlerts");
 }
 
-internal sealed class TwitchIrcMessageObserverBoundary;
+internal sealed class IrcMessageObserverBoundary;
 
 internal sealed class EventSubMessageObserverBoundary;
 

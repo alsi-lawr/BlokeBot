@@ -726,19 +726,19 @@ public sealed class RuntimeSessionResilienceTests
             System.Net.HttpStatusCode.Unauthorized
         );
 
-        TwitchIrcSessionFailureClassifier
+        IrcSessionFailureClassifier
             .Classify(cancellation, canceled.Token)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Cancellation);
         EventSubSessionFailureClassifier
             .Classify(cancellation, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
-        TwitchIrcSessionFailureClassifier
+        IrcSessionFailureClassifier
             .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
         EventSubSessionFailureClassifier
             .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchIrcSessionFailureClassifier
+        IrcSessionFailureClassifier
             .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
         EventSubSessionFailureClassifier
@@ -749,7 +749,7 @@ public sealed class RuntimeSessionResilienceTests
     [Test]
     public void BoundaryClassifiers_ClassifyingTransportAndProtocolFaults_UseBoundaryCases()
     {
-        TwitchIrcSessionFailureClassifier
+        IrcSessionFailureClassifier
             .Classify(new SocketException((int)SocketError.ConnectionReset), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
         EventSubSessionFailureClassifier
@@ -758,7 +758,7 @@ public sealed class RuntimeSessionResilienceTests
                 CancellationToken.None
             )
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchIrcSessionFailureClassifier
+        IrcSessionFailureClassifier
             .Classify(new JsonException("invalid payload"), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
         EventSubSessionFailureClassifier
@@ -888,9 +888,9 @@ public sealed class RuntimeSessionResilienceTests
                     },
                     health
                 );
-                var irc = new TwitchIrcRuntime(
+                var irc = new IrcRuntime(
                     session,
-                    new TwitchIrcSessionResiliencePipeline(builder.Build()),
+                    new IrcSessionResiliencePipeline(builder.Build()),
                     health,
                     status,
                     idleWait
@@ -972,7 +972,7 @@ public sealed class RuntimeSessionResilienceTests
     }
 
     private sealed class ScriptedConnectionSession
-        : ITwitchIrcConnectionSession,
+        : IIrcConnectionSession,
             IEventSubConnectionSession
     {
         private readonly Queue<

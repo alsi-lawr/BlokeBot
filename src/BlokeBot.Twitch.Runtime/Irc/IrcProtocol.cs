@@ -5,7 +5,7 @@ namespace BlokeBot.Twitch.Runtime;
 /// <summary>
 /// Parses Twitch IRC protocol lines used by the bot runtime.
 /// </summary>
-public static class TwitchIrcProtocol
+public static class IrcProtocol
 {
     private static readonly IReadOnlyDictionary<string, string> _emptyTags = new ReadOnlyDictionary<
         string,
@@ -37,11 +37,11 @@ public static class TwitchIrcProtocol
     /// </summary>
     /// <param name="line">The raw IRC line.</param>
     /// <returns>The typed private message parse result.</returns>
-    public static TwitchIrcPrivMsgParseResult ParsePrivMsg(string line)
+    public static IrcPrivMsgParseResult ParsePrivMsg(string line)
     {
         if (!line.Contains(" PRIVMSG ", StringComparison.Ordinal))
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.NotPrivMsg, line);
+            return Failure(IrcPrivMsgParseStatus.NotPrivMsg, line);
         }
 
         var rest = line;
@@ -51,7 +51,7 @@ public static class TwitchIrcProtocol
             var tagEnd = rest.IndexOf(' ');
             if (tagEnd <= 1)
             {
-                return Failure(TwitchIrcPrivMsgParseStatus.MissingTagTerminator, line);
+                return Failure(IrcPrivMsgParseStatus.MissingTagTerminator, line);
             }
 
             tags = ParseTags(rest[1..tagEnd]);
@@ -60,20 +60,20 @@ public static class TwitchIrcProtocol
 
         if (!rest.StartsWith(':'))
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.MissingPrefix, line);
+            return Failure(IrcPrivMsgParseStatus.MissingPrefix, line);
         }
 
         var prefixEnd = rest.IndexOf(' ');
         if (prefixEnd <= 1)
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.MalformedPrefix, line);
+            return Failure(IrcPrivMsgParseStatus.MalformedPrefix, line);
         }
 
         var prefix = rest[1..prefixEnd];
         var bang = prefix.IndexOf('!');
         if (bang <= 0)
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.MissingUserLogin, line);
+            return Failure(IrcPrivMsgParseStatus.MissingUserLogin, line);
         }
 
         var login = prefix[..bang];
@@ -81,26 +81,23 @@ public static class TwitchIrcProtocol
         const string Marker = "PRIVMSG #";
         if (!commandRest.StartsWith(Marker, StringComparison.Ordinal))
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.MalformedCommand, line);
+            return Failure(IrcPrivMsgParseStatus.MalformedCommand, line);
         }
 
         var channelEnd = commandRest.IndexOf(" :", StringComparison.Ordinal);
         if (channelEnd <= Marker.Length)
         {
-            return Failure(TwitchIrcPrivMsgParseStatus.MissingChannelOrText, line);
+            return Failure(IrcPrivMsgParseStatus.MissingChannelOrText, line);
         }
 
         var channel = commandRest[Marker.Length..channelEnd];
         var text = commandRest[(channelEnd + 2)..];
         var message = new TwitchChatMessage(login, channel, text, line, tags);
 
-        return new TwitchIrcPrivMsgParseResult(TwitchIrcPrivMsgParseStatus.Parsed, message);
+        return new IrcPrivMsgParseResult(IrcPrivMsgParseStatus.Parsed, message);
     }
 
-    private static TwitchIrcPrivMsgParseResult Failure(
-        TwitchIrcPrivMsgParseStatus status,
-        string line
-    )
+    private static IrcPrivMsgParseResult Failure(IrcPrivMsgParseStatus status, string line)
     {
         return new(
             status,

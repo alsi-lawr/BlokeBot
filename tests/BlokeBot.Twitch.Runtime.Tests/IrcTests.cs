@@ -12,10 +12,10 @@ public sealed class IrcTests
         var line =
             "@badge-info=;display-name=Alice\\sA;color=#fff :alice!alice@alice.tmi.twitch.tv PRIVMSG #channel :!deaths 5";
 
-        var result = TwitchIrcProtocol.ParsePrivMsg(line);
+        var result = IrcProtocol.ParsePrivMsg(line);
 
         result.Success.ShouldBeTrue();
-        result.Status.ShouldBe(TwitchIrcPrivMsgParseStatus.Parsed);
+        result.Status.ShouldBe(IrcPrivMsgParseStatus.Parsed);
         var message = result.Message;
         message.Login.ShouldBe("alice");
         message.Channel.ShouldBe("channel");
@@ -28,31 +28,31 @@ public sealed class IrcTests
     [Test]
     public void NonPrivmsgLine_Parsing_ReturnsNotPrivmsg()
     {
-        var result = TwitchIrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
+        var result = IrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
 
         result.Success.ShouldBeFalse();
-        result.Status.ShouldBe(TwitchIrcPrivMsgParseStatus.NotPrivMsg);
+        result.Status.ShouldBe(IrcPrivMsgParseStatus.NotPrivMsg);
         result.Message.RawLine.ShouldBe("NOTICE #channel :hello");
     }
 
     [Test]
     public void MalformedPrivmsg_Parsing_ReturnsTypedFailureStatus()
     {
-        TwitchIrcProtocol
+        IrcProtocol
             .ParsePrivMsg(":missing-prefix PRIVMSG #channel :hello")
-            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MissingUserLogin);
-        TwitchIrcProtocol
+            .Status.ShouldBe(IrcPrivMsgParseStatus.MissingUserLogin);
+        IrcProtocol
             .ParsePrivMsg(":a!b@c PRIVMSG channel hello")
-            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MalformedCommand);
-        TwitchIrcProtocol
+            .Status.ShouldBe(IrcPrivMsgParseStatus.MalformedCommand);
+        IrcProtocol
             .ParsePrivMsg("@ :a!b@c PRIVMSG #channel :hello")
-            .Status.ShouldBe(TwitchIrcPrivMsgParseStatus.MissingTagTerminator);
+            .Status.ShouldBe(IrcPrivMsgParseStatus.MissingTagTerminator);
     }
 
     [Test]
     public void PingLine_Handling_RecognizesPingAndBuildsPong()
     {
-        TwitchIrcProtocol.IsPing("PING :tmi.twitch.tv").ShouldBeTrue();
-        TwitchIrcProtocol.CreatePong("PING :tmi.twitch.tv").ShouldBe("PONG :tmi.twitch.tv");
+        IrcProtocol.IsPing("PING :tmi.twitch.tv").ShouldBeTrue();
+        IrcProtocol.CreatePong("PING :tmi.twitch.tv").ShouldBe("PONG :tmi.twitch.tv");
     }
 }

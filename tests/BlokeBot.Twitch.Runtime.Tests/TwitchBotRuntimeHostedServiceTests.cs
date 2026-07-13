@@ -48,9 +48,9 @@ public sealed class TwitchBotRuntimeHostedServiceTests
         var health = new RecordingHealthReporter();
         var status = new TwitchBotRuntimeStatusStore();
         var idleWait = new RecordingIdleWait();
-        var irc = new TwitchIrcRuntime(
+        var irc = new IrcRuntime(
             ircSession,
-            new TwitchIrcSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
+            new IrcSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
             health,
             status,
             idleWait
@@ -100,7 +100,7 @@ public sealed class TwitchBotRuntimeHostedServiceTests
     }
 
     private sealed class CancelingConnectionSession(CancellationTokenSource stopping)
-        : ITwitchIrcConnectionSession,
+        : IIrcConnectionSession,
             IEventSubConnectionSession
     {
         internal int CallCount { get; private set; }
