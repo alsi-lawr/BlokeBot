@@ -1,4 +1,6 @@
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -16,7 +18,7 @@ internal static class RuntimeTestObserverFanOut
             {
                 Boundary = boundary,
             },
-            new TestReporter(),
+            NullLogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>.Instance,
             new TestCorrelationIdProvider()
         );
     }
@@ -25,7 +27,7 @@ internal static class RuntimeTestObserverFanOut
         TBoundary,
         TEvent,
         TDeadLetter
-    >(ObserverBoundary boundary, Exception reporterFailure)
+    >(ObserverBoundary boundary, Exception loggingFailure)
         where TDeadLetter : IObserverDeadLetterPayload
     {
         return new(
@@ -33,23 +35,11 @@ internal static class RuntimeTestObserverFanOut
             {
                 Boundary = boundary,
             },
-            new ThrowingReporter(reporterFailure),
+            new ThrowingLogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>(
+                loggingFailure
+            ),
             new TestCorrelationIdProvider()
         );
-    }
-
-    private sealed class TestReporter : IObserverFailureDiagnosticReporter
-    {
-        private readonly List<ObserverFailureDiagnosticReport> _reports = [];
-
-        public ValueTask ReportAsync(
-            ObserverFailureDiagnosticReport report,
-            CancellationToken cancellationToken
-        )
-        {
-            _reports.Add(report);
-            return ValueTask.CompletedTask;
-        }
     }
 
     private sealed class TestCorrelationIdProvider : IObserverCorrelationIdProvider
@@ -62,15 +52,36 @@ internal static class RuntimeTestObserverFanOut
         }
     }
 
-    private sealed class ThrowingReporter(Exception failure)
-        : IObserverFailureDiagnosticReporter
+    private sealed class ThrowingLogger<TCategory>(Exception failure)
+        : ILogger<TCategory>
     {
-        public ValueTask ReportAsync(
-            ObserverFailureDiagnosticReport report,
-            CancellationToken cancellationToken
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
         )
         {
-            return ValueTask.FromException(failure);
+            throw failure;
         }
+    }
+
+    private sealed class NullScope : IDisposable
+    {
+        internal static NullScope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 }

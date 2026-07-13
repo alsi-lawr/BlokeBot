@@ -1,5 +1,6 @@
 using System.Reflection;
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using TUnit.Core;
 
@@ -19,14 +20,14 @@ public sealed class ObserverFanOutTests
     {
         var failure = new InvalidOperationException("secret exception payload");
         var order = new List<string>();
-        var reporter = new RecordingReporter();
+        var logger = new RecordingLogger();
         var observers = new[]
         {
             Observer("first", () => order.Add("first")),
             FailingObserver("failing", failure, order),
             Observer("third", () => order.Add("third")),
         };
-        var fanOut = CreateFanOut(Continue(), reporter);
+        var fanOut = CreateFanOut(Continue(), logger);
 
         var outcome = await DispatchAsync(fanOut, observers, CancellationToken.None);
 
@@ -42,7 +43,10 @@ public sealed class ObserverFanOutTests
             ObserverFailureClassification.Terminal,
             typeof(InvalidOperationException)
         );
-        reporter.Reports.ShouldHaveSingleItem().Exception.ShouldBeSameAs(failure);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldNotContain(failure.Message);
+        entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
         handled.ToString().ShouldNotContain("secret exception payload");
         typeof(ObserverFailureSummary)
             .GetProperties(BindingFlags.Instance | BindingFlags.Public)
@@ -60,7 +64,7 @@ public sealed class ObserverFanOutTests
         var transient = new IOException("temporary observer failure");
         var order = new List<string>();
         var retryAttempt = 0;
-        var reporter = new RecordingReporter();
+        var logger = new RecordingLogger();
         var observers = new[]
         {
             Observer("first", () => order.Add("first")),
@@ -77,7 +81,7 @@ public sealed class ObserverFanOutTests
             ),
             Observer("third", () => order.Add("third")),
         };
-        var fanOut = CreateFanOut(Retry(attemptLimit: 3), reporter);
+        var fanOut = CreateFanOut(Retry(attemptLimit: 3), logger);
 
         var outcome = await DispatchAsync(fanOut, observers, CancellationToken.None);
 
@@ -93,7 +97,10 @@ public sealed class ObserverFanOutTests
             ObserverFailureClassification.Transient,
             typeof(IOException)
         );
-        reporter.Reports.ShouldHaveSingleItem().Exception.ShouldBeSameAs(transient);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldNotContain(transient.Message);
+        entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
     }
 
     [Test]
@@ -107,7 +114,7 @@ public sealed class ObserverFanOutTests
         };
         var attempts = 0;
         var laterCalled = false;
-        var reporter = new RecordingReporter();
+        var logger = new RecordingLogger();
         var observers = new[]
         {
             new TestObserver(
@@ -116,7 +123,7 @@ public sealed class ObserverFanOutTests
             ),
             Observer("later", () => laterCalled = true),
         };
-        var fanOut = CreateFanOut(Retry(attemptLimit: 3), reporter);
+        var fanOut = CreateFanOut(Retry(attemptLimit: 3), logger);
 
         var outcome = await DispatchAsync(fanOut, observers, CancellationToken.None);
 
@@ -129,15 +136,20 @@ public sealed class ObserverFanOutTests
         handled.Failures.ShouldAllBe(failure =>
             failure.Classification == ObserverFailureClassification.Transient
         );
-        reporter.Reports.Select(report => report.Exception).ShouldBe(failures);
+        logger.Entries.Count.ShouldBe(failures.Length);
+        foreach (var entry in logger.Entries)
+        {
+            entry.Exception.ShouldBeNull();
+            entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
+        }
     }
 
     [Test]
     public async Task BoundedRetry_TerminalFailure_DoesNotRetry()
     {
         var attempts = 0;
-        var reporter = new RecordingReporter();
-        var fanOut = CreateFanOut(Retry(attemptLimit: 4), reporter);
+        var logger = new RecordingLogger();
+        var fanOut = CreateFanOut(Retry(attemptLimit: 4), logger);
         var observer = new TestObserver(
             "terminal",
             _ =>
@@ -161,9 +173,9 @@ public sealed class ObserverFanOutTests
     public async Task DeadLetter_FailingObserver_StoresOneTypedRedactedRecord()
     {
         var observerFailure = new InvalidOperationException("private failure message");
-        var reporter = new RecordingReporter();
+        var logger = new RecordingLogger();
         var sink = new RecordingDeadLetterSink();
-        var fanOut = CreateFanOut(DeadLetter(sink), reporter);
+        var fanOut = CreateFanOut(DeadLetter(sink), logger);
 
         var outcome = await DispatchAsync(
             fanOut,
@@ -189,14 +201,14 @@ public sealed class ObserverFanOutTests
     }
 
     [Test]
-    public async Task ReporterFailure_AfterObserverFailure_ContinuesSiblingThenEscalatesOnce()
+    public async Task LoggingFailure_AfterObserverFailure_ContinuesSiblingThenEscalatesOnce()
     {
         var observerFailure = new InvalidOperationException("observer failed");
-        var reporterFailure = new IOException("reporter failed");
+        var loggerFailure = new IOException("logger failed");
         var laterCalled = false;
-        var reporter = new RecordingReporter();
-        reporter.EnqueueFailure(reporterFailure);
-        var fanOut = CreateFanOut(Continue(), reporter);
+        var logger = new RecordingLogger();
+        logger.EnqueueFailure(loggerFailure);
+        var fanOut = CreateFanOut(Continue(), logger);
 
         var exception = await Should.ThrowAsync<ObserverFanOutEscalationException>(() =>
             DispatchAsync(
@@ -211,29 +223,29 @@ public sealed class ObserverFanOutTests
         );
 
         laterCalled.ShouldBeTrue();
-        reporter.Attempts.ShouldBe(1);
-        exception.Causes.ShouldBe([observerFailure, reporterFailure]);
+        logger.Attempts.ShouldBe(1);
+        exception.Causes.ShouldBe([observerFailure, loggerFailure]);
         exception.Failures.ShouldHaveSingleItem().Observer.ShouldBe(
             ObserverIdentity.Named("failing")
         );
         var handlingFailure = exception.HandlingFailures.ShouldHaveSingleItem();
-        handlingFailure.Stage.ShouldBe(ObserverFailureHandlingStage.Reporter);
+        handlingFailure.Stage.ShouldBe(ObserverFailureHandlingStage.Logging);
         handlingFailure.FailureType.ShouldBe(typeof(IOException).FullName);
         exception.InnerException.ShouldBeNull();
     }
 
     [Test]
-    public async Task ReporterAndDeadLetterFailures_ContinueSiblingAndRetainEveryExactFailure()
+    public async Task LoggingAndDeadLetterFailures_ContinueSiblingAndRetainEveryExactFailure()
     {
         var observerFailure = new InvalidOperationException("observer failed");
-        var reporterFailure = new IOException("reporter failed");
+        var loggerFailure = new IOException("logger failed");
         var sinkFailure = new IOException("sink failed");
         var laterCalled = false;
-        var reporter = new RecordingReporter();
-        reporter.EnqueueFailure(reporterFailure);
+        var logger = new RecordingLogger();
+        logger.EnqueueFailure(loggerFailure);
         var sink = new RecordingDeadLetterSink();
         sink.EnqueueFailure(sinkFailure);
-        var fanOut = CreateFanOut(DeadLetter(sink), reporter);
+        var fanOut = CreateFanOut(DeadLetter(sink), logger);
 
         var exception = await Should.ThrowAsync<ObserverFanOutEscalationException>(() =>
             DispatchAsync(
@@ -248,13 +260,13 @@ public sealed class ObserverFanOutTests
         );
 
         laterCalled.ShouldBeTrue();
-        reporter.Attempts.ShouldBe(1);
+        logger.Attempts.ShouldBe(1);
         sink.Attempts.ShouldBe(1);
-        exception.Causes.ShouldBe([observerFailure, reporterFailure, sinkFailure]);
+        exception.Causes.ShouldBe([observerFailure, loggerFailure, sinkFailure]);
         exception.Failures.ShouldHaveSingleItem();
         exception.HandlingFailures.Select(failure => failure.Stage)
             .ShouldBe([
-                ObserverFailureHandlingStage.Reporter,
+                ObserverFailureHandlingStage.Logging,
                 ObserverFailureHandlingStage.DeadLetterSink,
             ]);
     }
@@ -264,9 +276,9 @@ public sealed class ObserverFanOutTests
     {
         using var cancellation = new CancellationTokenSource();
         var laterCalled = false;
-        var reporter = new RecordingReporter();
+        var logger = new RecordingLogger();
         var sink = new RecordingDeadLetterSink();
-        var fanOut = CreateFanOut(DeadLetter(sink), reporter);
+        var fanOut = CreateFanOut(DeadLetter(sink), logger);
         var cancelling = new TestObserver(
             "cancelling",
             token =>
@@ -286,7 +298,7 @@ public sealed class ObserverFanOutTests
         );
 
         laterCalled.ShouldBeFalse();
-        reporter.Attempts.ShouldBe(0);
+        logger.Attempts.ShouldBe(0);
         sink.Attempts.ShouldBe(0);
     }
 
@@ -340,10 +352,10 @@ public sealed class ObserverFanOutTests
 
     private static ObserverFanOut<TestBoundary, TestEvent, TestDeadLetter> CreateFanOut(
         ObserverFailurePolicy<TestBoundary, TestDeadLetter> policy,
-        RecordingReporter reporter
+        RecordingLogger logger
     )
     {
-        return new(policy, reporter, new FixedCorrelationIdProvider());
+        return new(policy, logger, new FixedCorrelationIdProvider());
     }
 
     private static ValueTask<ObserverFanOutOutcome> DispatchAsync(
@@ -431,33 +443,71 @@ public sealed class ObserverFanOutTests
         }
     }
 
-    private sealed class RecordingReporter : IObserverFailureDiagnosticReporter
+    private sealed class RecordingLogger
+        : ILogger<ObserverFanOut<TestBoundary, TestEvent, TestDeadLetter>>
     {
         private readonly Queue<Exception> _failures = [];
 
         internal int Attempts { get; private set; }
 
-        internal List<ObserverFailureDiagnosticReport> Reports { get; } = [];
+        internal List<LogEntry> Entries { get; } = [];
 
-        public ValueTask ReportAsync(
-            ObserverFailureDiagnosticReport report,
-            CancellationToken cancellationToken
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
         )
         {
             Attempts++;
             if (_failures.TryDequeue(out var failure))
             {
-                return ValueTask.FromException(failure);
+                throw failure;
             }
 
-            Reports.Add(report);
-            return ValueTask.CompletedTask;
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(
+                new LogEntry(
+                    logLevel,
+                    formatter(state, exception),
+                    exception,
+                    properties
+                )
+            );
         }
 
         internal void EnqueueFailure(Exception failure)
         {
             _failures.Enqueue(failure);
         }
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties
+    );
+
+    private sealed class NullScope : IDisposable
+    {
+        internal static NullScope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 
     private sealed class RecordingDeadLetterSink

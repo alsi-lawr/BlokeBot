@@ -1,4 +1,5 @@
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using TUnit.Core;
 
@@ -10,8 +11,8 @@ public sealed class EventBusTests
     public async Task FailingSubscriber_PublishingEvent_ReturnsFailuresAndNotifiesRemainingSubscribers()
     {
         var failure = new InvalidOperationException("subscriber failed");
-        var reporter = new RecordingReporter();
-        var events = CreateBus(reporter);
+        var logger = new RecordingLogger();
+        var events = CreateBus(logger);
         var received = new List<string>();
         var correlations = new List<ObserverCorrelationId>();
 
@@ -61,14 +62,17 @@ public sealed class EventBusTests
         summary.CorrelationId.ShouldBe(ObserverCorrelationId.Named("event-correlation"));
         summary.Attempt.ShouldBe(1);
         summary.Classification.ShouldBe(ObserverFailureClassification.Terminal);
-        reporter.Reports.ShouldHaveSingleItem().Exception.ShouldBeSameAs(failure);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldNotContain(failure.Message);
+        entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
     }
 
     [Test]
     public async Task PublishCancellation_WhileDispatching_PropagatesWithoutReportingOrLaterSubscriber()
     {
-        var reporter = new RecordingReporter();
-        var events = CreateBus(reporter);
+        var logger = new RecordingLogger();
+        var events = CreateBus(logger);
         var laterCalled = false;
         using var cancellation = new CancellationTokenSource();
         events.Subscribe(
@@ -95,13 +99,13 @@ public sealed class EventBusTests
         );
 
         laterCalled.ShouldBeFalse();
-        reporter.Reports.ShouldBeEmpty();
+        logger.Entries.ShouldBeEmpty();
     }
 
     [Test]
     public async Task DisposedSubscription_PublishingEvent_DoesNotNotifyHandler()
     {
-        var events = CreateBus(new RecordingReporter());
+        var events = CreateBus(new RecordingLogger());
         var received = 0;
         var subscription = events.Subscribe(
             "changed",
@@ -123,7 +127,7 @@ public sealed class EventBusTests
     [Test]
     public async Task SubscriptionSet_Disposing_UnsubscribesEveryHandler()
     {
-        var events = CreateBus(new RecordingReporter());
+        var events = CreateBus(new RecordingLogger());
         var received = 0;
         using var subscriptions = new EventSubscriptionSet([
             events.Subscribe(
@@ -155,7 +159,7 @@ public sealed class EventBusTests
     [Test]
     public async Task MultipleSubscribedKeys_PublishingEvents_NotifiesUntilDisposed()
     {
-        var events = CreateBus(new RecordingReporter());
+        var events = CreateBus(new RecordingLogger());
         var received = new List<string>();
         var subscription = events.Subscribe(
             ["first", "second"],
@@ -176,7 +180,7 @@ public sealed class EventBusTests
         received.ShouldBe(["first", "second"]);
     }
 
-    private static EventBus<string> CreateBus(RecordingReporter reporter)
+    private static EventBus<string> CreateBus(RecordingLogger logger)
     {
         var fanOut = new ObserverFanOut<
             EventBusObserverBoundary<string>,
@@ -190,7 +194,7 @@ public sealed class EventBusTests
             {
                 Boundary = ObserverBoundary.Named("Test.EventBus"),
             },
-            reporter,
+            logger,
             new FixedCorrelationIdProvider("event-correlation")
         );
         return new EventBus<string>(
@@ -202,18 +206,56 @@ public sealed class EventBusTests
         );
     }
 
-    private sealed class RecordingReporter : IObserverFailureDiagnosticReporter
+    private sealed class RecordingLogger
+        : ILogger<
+            ObserverFanOut<
+                EventBusObserverBoundary<string>,
+                EventNotification<string>,
+                EventBusDeadLetter
+            >
+        >
     {
-        internal List<ObserverFailureDiagnosticReport> Reports { get; } = [];
+        internal List<LogEntry> Entries { get; } = [];
 
-        public ValueTask ReportAsync(
-            ObserverFailureDiagnosticReport report,
-            CancellationToken cancellationToken
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
         )
         {
-            Reports.Add(report);
-            return ValueTask.CompletedTask;
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(
+                new LogEntry(formatter(state, exception), exception, properties)
+            );
         }
+    }
+
+    private sealed record LogEntry(
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties
+    );
+
+    private sealed class NullScope : IDisposable
+    {
+        internal static NullScope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 
     private sealed class FixedCorrelationIdProvider(string correlationId)

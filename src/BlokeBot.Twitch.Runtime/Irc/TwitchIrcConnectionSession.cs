@@ -107,9 +107,9 @@ internal sealed class TwitchIrcConnectionSession(
             }
 
             _log.LogInformation(
-                "Twitch IRC authentication sent for {BotUsername}; joining {Channels}.",
+                "Twitch IRC authentication sent for {BotUsername}; joining {ChannelCount} channels.",
                 _opts.Identity.BotUsername,
-                string.Join(", ", channelLogins.Select(channel => $"#{channel}"))
+                channelLogins.Length
             );
 
             return new TwitchRuntimeSessionEstablishment.Established
@@ -147,10 +147,9 @@ internal sealed class TwitchIrcConnectionSession(
             async (response, ct) =>
             {
                 _log.LogInformation(
-                    "Queueing Twitch {Target} response to #{Channel}: {Reply}",
+                    "Queueing Twitch {Target} response to #{Channel}.",
                     response.Target,
-                    message.Channel,
-                    response.Message
+                    message.Channel
                 );
                 await responses.SendAsync(message, response, ct);
             },
@@ -280,7 +279,7 @@ internal sealed class TwitchIrcConnectionSession(
     {
         if (line.Contains(" NOTICE ", StringComparison.Ordinal))
         {
-            _log.LogWarning("Twitch IRC notice: {Line}", line);
+            _log.LogWarning("Twitch IRC notice received.");
             return;
         }
 
@@ -295,35 +294,35 @@ internal sealed class TwitchIrcConnectionSession(
 
         if (line.Contains(" JOIN ", StringComparison.Ordinal))
         {
-            _log.LogInformation("Twitch IRC join event: {Line}", line);
+            _log.LogInformation("Twitch IRC join event received.");
             return;
         }
 
         if (line.Contains(" ROOMSTATE ", StringComparison.Ordinal))
         {
-            _log.LogInformation("Twitch IRC room state: {Line}", line);
+            _log.LogInformation("Twitch IRC room state received.");
             return;
         }
 
         if (line.Contains(" USERSTATE ", StringComparison.Ordinal))
         {
-            _log.LogInformation("Twitch IRC user state: {Line}", line);
+            _log.LogInformation("Twitch IRC user state received.");
             return;
         }
 
         if (line.Contains(" GLOBALUSERSTATE ", StringComparison.Ordinal))
         {
-            _log.LogInformation("Twitch IRC global user state: {Line}", line);
+            _log.LogInformation("Twitch IRC global user state received.");
             return;
         }
 
         if (line.Contains(" CLEARCHAT ", StringComparison.Ordinal))
         {
-            _log.LogWarning("Twitch IRC clear chat event: {Line}", line);
+            _log.LogWarning("Twitch IRC clear chat event received.");
             return;
         }
 
-        _log.LogTrace("Twitch IRC line: {Line}", line);
+        _log.LogTrace("Twitch IRC message received.");
     }
 
     private async ValueTask<Stream> OpenStreamAsync(
@@ -382,10 +381,9 @@ internal sealed class TwitchIrcConnectionSession(
 
                 var message = parseResult.Message;
                 owner._log.LogDebug(
-                    "Received Twitch chat message from {Login} in #{Channel}: {Text}",
+                    "Received Twitch chat message from {Login} in #{Channel}.",
                     message.Login,
-                    message.Channel,
-                    message.Text
+                    message.Channel
                 );
 
                 await owner.DispatchChatMessageAsync(message, cancellationToken);

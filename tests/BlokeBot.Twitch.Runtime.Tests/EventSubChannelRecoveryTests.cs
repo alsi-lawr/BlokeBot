@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
 using BlokeBot.Twitch.Auth;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 using Polly.Timeout;
@@ -154,10 +155,11 @@ public sealed class EventSubChannelRecoveryTests
             _now
         );
         degraded.ToString().ShouldNotContain("raw payload");
-        var diagnostic = harness.Diagnostics.DiagnosticReports
-            .ShouldHaveSingleItem()
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>();
-        diagnostic.Failure.Exception.ShouldBeSameAs(failure);
+        var diagnostic = harness.Diagnostics.Entries.ShouldHaveSingleItem();
+        diagnostic.Level.ShouldBe(LogLevel.Error);
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic.Message.ShouldNotContain(failure.Message);
+        diagnostic.Properties["FailureType"].ShouldBe(failure.GetType().FullName);
         typeof(TwitchEventSubChannelFailure)
             .GetProperties(BindingFlags.Instance | BindingFlags.Public)
             .Select(property => property.Name)
@@ -193,10 +195,11 @@ public sealed class EventSubChannelRecoveryTests
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
         harness.Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>();
-        harness.Diagnostics.DiagnosticReports
-            .OfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
-            .ShouldHaveSingleItem()
-            .Failure.Exception.ShouldBeSameAs(failure);
+        var diagnostic = harness.Diagnostics.Entries
+            .Where(entry => entry.Level == LogLevel.Error)
+            .ShouldHaveSingleItem();
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic.Message.ShouldNotContain(failure.Message);
     }
 
     [Test]
@@ -305,19 +308,16 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
             _now
         );
-        var failureReports = harness.Diagnostics.DiagnosticReports;
-        failureReports[0]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
-            .Failure.Exception.ShouldBeSameAs(initialFailure);
-        failureReports[1]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
-            .Failure.Exception.ShouldBeSameAs(initialFailure);
-        failureReports[2]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
-            .Failure.Exception.ShouldBeSameAs(firstRecoveryFailure);
-        failureReports[3]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
-            .Failure.Exception.ShouldBeSameAs(exhaustedFailure);
+        var failureReports = harness.Diagnostics.Entries;
+        failureReports.Count.ShouldBe(4);
+        foreach (var report in failureReports)
+        {
+            report.Exception.ShouldBeNull();
+            report.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
+            report.Message.ShouldNotContain(initialFailure.Message);
+            report.Message.ShouldNotContain(firstRecoveryFailure.Message);
+            report.Message.ShouldNotContain(exhaustedFailure.Message);
+        }
 
         harness.Clock.Advance(TimeSpan.FromMinutes(1));
         harness.Diagnostics.Clear();
@@ -347,34 +347,35 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             _now.AddMinutes(1)
         );
-        harness.Diagnostics.DiagnosticReports[0]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
-            .Failure.Exception.ShouldBeSameAs(exhaustedFailure);
+        var recoveryDiagnostic = harness.Diagnostics.Entries[0];
+        recoveryDiagnostic.Level.ShouldBe(LogLevel.Warning);
+        recoveryDiagnostic.Exception.ShouldBeNull();
+        recoveryDiagnostic.Message.ShouldNotContain(exhaustedFailure.Message);
     }
 
     [Test]
-    public async Task Diagnostics_ReporterFailure_EscalatesOutsideChannelRecovery()
+    public async Task Diagnostics_LoggingFailure_EscalatesOutsideChannelRecovery()
     {
         var operationFailure = new IOException("account lookup failed");
-        var reporterFailure = new InvalidOperationException("diagnostic sink failed");
+        var loggingFailure = new InvalidOperationException("logging failed");
         var operations = new ScriptedChannelOperations();
         operations.EnqueueAccountFailure("channel", operationFailure);
         var harness = CreateHarness(operations, attemptLimit: 2);
-        harness.Diagnostics.EnqueueFailure(reporterFailure);
+        harness.Diagnostics.EnqueueFailure(loggingFailure);
 
         harness.Session.Start(["channel"], CancellationToken.None);
         var taskFailure = await Should.ThrowAsync<
             TwitchEventSubChannelStatusPublicationException
         >(harness.Session.DrainAsync);
 
-        taskFailure.InnerException.ShouldBeSameAs(reporterFailure);
+        taskFailure.InnerException.ShouldBeSameAs(loggingFailure);
         harness.Status.Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>();
-        harness.Diagnostics.DiagnosticReports.ShouldBeEmpty();
+        harness.Diagnostics.Entries.ShouldBeEmpty();
         var cleanupFailure = await Should.ThrowAsync<
             TwitchEventSubChannelStatusPublicationException
         >(() => harness.DisposeAsync().AsTask());
-        cleanupFailure.InnerException.ShouldBeSameAs(reporterFailure);
+        cleanupFailure.InnerException.ShouldBeSameAs(loggingFailure);
     }
 
     [Test]
@@ -494,13 +495,10 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
             _now
         );
-        var diagnostics = harness.Diagnostics.DiagnosticReports;
-        diagnostics[0]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
-            .Failure.Exception.ShouldBeSameAs(failure);
-        diagnostics[1]
-            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
-            .Failure.Exception.ShouldBeSameAs(failure);
+        var diagnostics = harness.Diagnostics.Entries;
+        diagnostics.Count.ShouldBe(2);
+        diagnostics.ShouldAllBe(entry => entry.Exception == null);
+        diagnostics.ShouldAllBe(entry => !entry.Message.Contains(failure.Message));
     }
 
     [Test]
@@ -600,10 +598,11 @@ public sealed class EventSubChannelRecoveryTests
         pending.Subscription.Channel.ShouldBe("bad");
         pending.State.ShouldBeOfType<TwitchEventSubPendingDeletionState.Unresolved>()
             .Failure.Exception.ShouldBeSameAs(failure);
-        harness.Diagnostics.DiagnosticReports
-            .OfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
-            .ShouldHaveSingleItem()
-            .Failure.Exception.ShouldBeSameAs(failure);
+        var diagnostic = harness.Diagnostics.Entries
+            .Where(entry => entry.Level == LogLevel.Error)
+            .ShouldHaveSingleItem();
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic.Message.ShouldNotContain(failure.Message);
     }
 
     [Test]
@@ -1329,10 +1328,10 @@ public sealed class EventSubChannelRecoveryTests
         }
     }
 
-    private sealed class RecordingDiagnostics : ITwitchEventSubChannelDiagnosticReporter
+    private sealed class RecordingDiagnostics : ILogger<TwitchEventSubChannelSession>
     {
         private readonly object _gate = new();
-        private readonly List<TwitchEventSubChannelDiagnosticReport> _reports = [];
+        private readonly List<TwitchEventSubChannelStatus> _reports = [];
         private readonly Queue<Exception> _failures = [];
         private readonly Channel<TwitchEventSubChannelStatus> _transitions =
             Channel.CreateUnbounded<TwitchEventSubChannelStatus>();
@@ -1343,24 +1342,47 @@ public sealed class EventSubChannelRecoveryTests
             {
                 lock (_gate)
                 {
-                    return _reports.Select(report => report.Status).ToArray();
-                }
-            }
-        }
-
-        internal IReadOnlyList<TwitchEventSubChannelDiagnosticReport> DiagnosticReports
-        {
-            get
-            {
-                lock (_gate)
-                {
                     return _reports.ToArray();
                 }
             }
         }
 
-        public void Report(TwitchEventSubChannelDiagnosticReport report)
+        internal IReadOnlyList<LogEntry> Entries
         {
+            get
+            {
+                lock (_gate)
+                {
+                    return _entries.ToArray();
+                }
+            }
+        }
+
+        private readonly List<LogEntry> _entries = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return Scope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        )
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            var report = Status(logLevel, properties);
             lock (_gate)
             {
                 if (_failures.TryDequeue(out var failure))
@@ -1369,9 +1391,17 @@ public sealed class EventSubChannelRecoveryTests
                 }
 
                 _reports.Add(report);
+                _entries.Add(
+                    new LogEntry(
+                        logLevel,
+                        formatter(state, exception),
+                        exception,
+                        properties
+                    )
+                );
             }
 
-            _transitions.Writer.TryWrite(report.Status).ShouldBeTrue();
+            _transitions.Writer.TryWrite(report).ShouldBeTrue();
         }
 
         internal void EnqueueFailure(Exception failure)
@@ -1387,6 +1417,7 @@ public sealed class EventSubChannelRecoveryTests
             lock (_gate)
             {
                 _reports.Clear();
+                _entries.Clear();
             }
 
             while (_transitions.Reader.TryRead(out _)) { }
@@ -1396,6 +1427,92 @@ public sealed class EventSubChannelRecoveryTests
         {
             return _transitions.Reader.ReadAsync();
         }
+
+        private static TwitchEventSubChannelStatus Status(
+            LogLevel level,
+            IReadOnlyDictionary<string, object?> properties
+        )
+        {
+            var channel = Property<string>(properties, "Channel");
+            var phase = Property<TwitchEventSubChannelPhase>(properties, "Phase");
+            var attempt = Property<int>(properties, "Attempt");
+            var changedAt = Property<DateTimeOffset>(properties, "ChangedAt");
+            var trigger = Property<TwitchEventSubChannelRecoveryTrigger>(
+                properties,
+                "Trigger"
+            );
+            if (level == LogLevel.Information)
+            {
+                return new TwitchEventSubChannelStatus.Healthy
+                {
+                    Channel = channel,
+                    Phase = phase,
+                    Attempt = attempt,
+                    ChangedAt = changedAt,
+                    Trigger = trigger,
+                };
+            }
+
+            var failure = new TwitchEventSubChannelFailure
+            {
+                Classification = Property<TwitchEventSubChannelFailureClassification>(
+                    properties,
+                    "Classification"
+                ),
+                FailureType = Property<string>(properties, "FailureType"),
+            };
+            var nextAction = Property<TwitchEventSubChannelNextAction>(
+                properties,
+                "NextAction"
+            );
+            return level == LogLevel.Warning
+                ? new TwitchEventSubChannelStatus.Recovering
+                {
+                    Channel = channel,
+                    Phase = phase,
+                    Attempt = attempt,
+                    ChangedAt = changedAt,
+                    Trigger = trigger,
+                    Failure = failure,
+                    NextAction = nextAction,
+                }
+                : new TwitchEventSubChannelStatus.Degraded
+                {
+                    Channel = channel,
+                    Phase = phase,
+                    Attempt = attempt,
+                    ChangedAt = changedAt,
+                    Trigger = trigger,
+                    Failure = failure,
+                    NextAction = nextAction,
+                };
+        }
+
+        private static TValue Property<TValue>(
+            IReadOnlyDictionary<string, object?> properties,
+            string name
+        )
+        {
+            return properties[name] is TValue value
+                ? value
+                : throw new InvalidOperationException(
+                    $"Structured log property {name} was not a {typeof(TValue).Name}."
+                );
+        }
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties
+    );
+
+    private sealed class Scope : IDisposable
+    {
+        internal static Scope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 
     private sealed class RecordingChatObserver : ITwitchChatMessageObserver

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
@@ -150,7 +151,7 @@ internal sealed class TwitchEventSubChannelSessionFactory(
     TwitchEventSubSubscriptionReconciliationStore pendingDeletions,
     TwitchEventSubChannelStatusStore channelStatus,
     TwitchBotRuntimeStatusStore runtimeStatus,
-    ITwitchEventSubChannelDiagnosticReporter diagnostics,
+    ILogger<TwitchEventSubChannelSession> log,
     TimeProvider timeProvider
 )
 {
@@ -166,7 +167,7 @@ internal sealed class TwitchEventSubChannelSessionFactory(
             pendingDeletions,
             channelStatus.CreateScope(),
             runtimeStatus,
-            diagnostics,
+            log,
             timeProvider
         );
     }
@@ -179,7 +180,7 @@ internal sealed class TwitchEventSubChannelSession(
     TwitchEventSubSubscriptionReconciliationStore pendingDeletions,
     TwitchEventSubChannelStatusStore.TwitchEventSubChannelStatusScope statusScope,
     TwitchBotRuntimeStatusStore runtimeStatus,
-    ITwitchEventSubChannelDiagnosticReporter diagnostics,
+    ILogger<TwitchEventSubChannelSession> log,
     TimeProvider timeProvider
 ) : IAsyncDisposable
 {
@@ -1075,7 +1076,7 @@ internal sealed class TwitchEventSubChannelSession(
                 UpdateRuntimeStatusLocked();
             }
 
-            diagnostics.Report(report);
+            report.Log(log);
         }
         catch (Exception exception)
         {

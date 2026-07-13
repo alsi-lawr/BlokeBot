@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
@@ -17,7 +18,7 @@ internal static class TwitchRuntimeSessionRunner
             CancellationToken,
             TwitchRuntimeSessionFailureClassification
         > classify,
-        ITwitchRuntimeSessionHealthReporter health,
+        ILogger<TwitchRuntimeSessionHealthReport> log,
         TwitchBotRuntimeStatusStore status,
         ITwitchRuntimeIdleWait idleWait,
         CancellationToken stoppingToken
@@ -56,7 +57,7 @@ internal static class TwitchRuntimeSessionRunner
                                 runtime,
                                 established,
                                 classify,
-                                health,
+                                log,
                                 status,
                                 stoppingToken
                             );
@@ -115,7 +116,7 @@ internal static class TwitchRuntimeSessionRunner
                 exception,
                 CancellationToken.None
             );
-            health.Report(report);
+            report.Log(log);
         }
     }
 
@@ -132,7 +133,7 @@ internal static class TwitchRuntimeSessionRunner
             CancellationToken,
             TwitchRuntimeSessionFailureClassification
         > classify,
-        ITwitchRuntimeSessionHealthReporter health,
+        ILogger<TwitchRuntimeSessionHealthReport> log,
         TwitchBotRuntimeStatusStore status,
         CancellationToken stoppingToken
     )
@@ -184,7 +185,7 @@ internal static class TwitchRuntimeSessionRunner
                 exception,
                 stoppingToken
             );
-            health.Report(report);
+            report.Log(log);
             return new TwitchRuntimeSessionOutcome.Unhealthy
             {
                 Report = report,
@@ -224,7 +225,7 @@ internal static class TwitchRuntimeSessionRunner
             CancellationToken,
             TwitchRuntimeSessionFailureClassification
         > classify,
-        ITwitchRuntimeSessionHealthReporter health,
+        ILogger<TwitchRuntimeSessionHealthReport> log,
         TwitchBotRuntimeStatusStore status,
         CancellationToken stoppingToken
     )
@@ -261,7 +262,7 @@ internal static class TwitchRuntimeSessionRunner
                         cleanupException
                     ),
                 };
-                health.Report(report);
+                report.Log(log);
                 return new TwitchRuntimeListenOutcome.Unhealthy { Report = report };
             }
         }
@@ -281,15 +282,14 @@ internal static class TwitchRuntimeSessionRunner
             var classification = classify(failure, stoppingToken);
             if (TwitchRuntimeSessionFailureClassifier.IsRetryable(classification))
             {
-                health.Report(
-                    new TwitchRuntimeSessionHealthReport.ReconnectScheduled
-                    {
-                        Runtime = runtime,
-                        Classification = classification,
-                        Attempt = established.Attempt,
-                        Exception = failure,
-                    }
-                );
+                var reconnectReport = new TwitchRuntimeSessionHealthReport.ReconnectScheduled
+                {
+                    Runtime = runtime,
+                    Classification = classification,
+                    Attempt = established.Attempt,
+                    Exception = failure,
+                };
+                reconnectReport.Log(log);
                 return new TwitchRuntimeListenOutcome.Reconnect
                 {
                     Target = new TwitchRuntimeConnectionTarget.Initial(),
@@ -303,7 +303,7 @@ internal static class TwitchRuntimeSessionRunner
                 Attempt = established.Attempt,
                 Exception = failure,
             };
-            health.Report(report);
+            report.Log(log);
             return new TwitchRuntimeListenOutcome.Unhealthy { Report = report };
         }
     }

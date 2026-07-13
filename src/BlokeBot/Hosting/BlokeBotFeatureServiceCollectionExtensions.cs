@@ -376,10 +376,6 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
         services.AddSingleton<HostWhisperQuotaService>();
-        services.AddSingleton<
-            IPrivateDeliveryFailureHandler,
-            PrivateDeliveryFailureTelemetryHandler
-        >();
         services.AddSingleton<HostWhisperCommandResponseSender>();
         services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<HostedChannelLifecycleNotifier>();

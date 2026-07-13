@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Logging;
+
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchEventSubRuntime(
     ITwitchEventSubConnectionSession session,
     TwitchEventSubSessionResiliencePipeline resilience,
-    ITwitchRuntimeSessionHealthReporter health,
+    ILogger<TwitchRuntimeSessionHealthReport> log,
     TwitchBotRuntimeStatusStore status,
     ITwitchRuntimeIdleWait idleWait
 )
@@ -15,7 +17,7 @@ internal sealed class TwitchEventSubRuntime(
             new TwitchRuntimeConnectionTarget.Initial(),
             EstablishSessionAsync,
             TwitchEventSubSessionFailureClassifier.Classify,
-            health,
+            log,
             status,
             idleWait,
             stoppingToken
@@ -32,7 +34,7 @@ internal sealed class TwitchEventSubRuntime(
             cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
             TwitchEventSubSessionFailureClassifier.Classify,
-            health,
+            log,
             status,
             stoppingToken
         );

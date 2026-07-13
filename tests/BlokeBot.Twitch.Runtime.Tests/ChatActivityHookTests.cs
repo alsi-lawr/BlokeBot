@@ -1,6 +1,7 @@
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -80,6 +81,49 @@ public sealed class ChatActivityHookTests
         recorder.Events.ShouldBe(["activity", "dispatch", "response"]);
     }
 
+    [Test]
+    public async Task IrcCommandResponse_Logging_RedactsPrivateMessageContent()
+    {
+        const string PrivateCommand = "!ping";
+        var recorder = new RuntimeHookRecorder();
+        var logger = new RecordingLogger<TwitchIrcConnectionSession>();
+        var session = new TwitchIrcConnectionSession(
+            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
+            null!,
+            null!,
+            BuildDispatcher(recorder),
+            null!,
+            null!,
+            new RecordingCommandResponseSender(recorder),
+            new TwitchBotRuntimeStatusStore(),
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                TwitchIrcMessageObserverBoundary,
+                TwitchChatMessage,
+                TwitchChatObserverDeadLetter
+            >(TwitchBotObserverBoundaries.IrcMessages),
+            logger
+        );
+
+        await session.DispatchChatMessageAsync(
+            new TwitchChatMessage(
+                "viewer",
+                "streamer",
+                PrivateCommand,
+                ":viewer!u@h PRIVMSG #streamer :!ping",
+                new Dictionary<string, string>()
+            ),
+            CancellationToken.None
+        );
+
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Message.ShouldNotContain(PrivateCommand);
+        entry.Message.ShouldNotContain("pong");
+        entry.Properties["Channel"].ShouldBe("streamer");
+        entry.Properties.ShouldNotContainKey("Reply");
+        entry.Properties.ShouldNotContainKey("Text");
+    }
+
     internal static TwitchCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
     {
         var services = new ServiceCollection();
@@ -144,5 +188,47 @@ public sealed class ChatActivityHookTests
     internal sealed class RuntimeHookRecorder
     {
         public List<string> Events { get; } = [];
+    }
+
+    private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
+    {
+        internal List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return Scope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        )
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new LogEntry(formatter(state, exception), properties));
+        }
+    }
+
+    private sealed record LogEntry(
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties
+    );
+
+    private sealed class Scope : IDisposable
+    {
+        internal static Scope Instance { get; } = new();
+
+        public void Dispose() { }
     }
 }

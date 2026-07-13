@@ -12,6 +12,9 @@ indent_size = 2
 # Naming violations must be visible in both the IDE and builds.
 dotnet_diagnostic.IDE1006.severity = warning
 
+# Logging templates must remain stable so providers can retain structured properties.
+dotnet_diagnostic.CA2254.severity = warning
+
 # Naming rules
 dotnet_naming_rule.interfaces_should_have_i_prefix.severity = warning
 dotnet_naming_rule.interfaces_should_have_i_prefix.symbols = interfaces

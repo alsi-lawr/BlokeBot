@@ -1,4 +1,5 @@
 using BlokeBot.Eventing;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace BlokeBot.Testing;
 
@@ -53,24 +54,9 @@ public static class TestObserverFanOut
             {
                 Boundary = boundary,
             },
-            new TestObserverFailureReporter(),
+            NullLogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>.Instance,
             new TestObserverCorrelationIdProvider()
         );
-    }
-
-    private sealed class TestObserverFailureReporter
-        : IObserverFailureDiagnosticReporter
-    {
-        private readonly List<ObserverFailureDiagnosticReport> _reports = [];
-
-        public ValueTask ReportAsync(
-            ObserverFailureDiagnosticReport report,
-            CancellationToken cancellationToken
-        )
-        {
-            _reports.Add(report);
-            return ValueTask.CompletedTask;
-        }
     }
 
     private sealed class TestObserverCorrelationIdProvider

@@ -163,6 +163,54 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
 
     internal abstract TwitchEventSubChannelStatus Status { get; }
 
+    internal void Log(ILogger<TwitchEventSubChannelSession> log)
+    {
+        ArgumentNullException.ThrowIfNull(log);
+        switch (this)
+        {
+            case Healthy { ChannelStatus: var healthy }:
+                log.LogInformation(
+                    "EventSub channel {Channel} is healthy after {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}.",
+                    healthy.Channel,
+                    healthy.Phase,
+                    healthy.Attempt,
+                    healthy.ChangedAt,
+                    healthy.Trigger
+                );
+                return;
+            case Recovering { ChannelStatus: var recovering }:
+                log.LogWarning(
+                    "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
+                    recovering.Channel,
+                    recovering.Phase,
+                    recovering.Attempt,
+                    recovering.ChangedAt,
+                    recovering.Trigger,
+                    recovering.Failure.Classification,
+                    recovering.Failure.FailureType,
+                    recovering.NextAction
+                );
+                return;
+            case Degraded { ChannelStatus: var degraded }:
+                log.LogError(
+                    "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
+                    degraded.Channel,
+                    degraded.Phase,
+                    degraded.Attempt,
+                    degraded.ChangedAt,
+                    degraded.Trigger,
+                    degraded.Failure.Classification,
+                    degraded.Failure.FailureType,
+                    degraded.NextAction
+                );
+                return;
+            default:
+                throw new UnreachableException(
+                    "Unknown EventSub channel diagnostic report."
+                );
+        }
+    }
+
     private protected abstract void Seal();
 
     internal sealed record Healthy : TwitchEventSubChannelDiagnosticReport
@@ -206,71 +254,5 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
 
         private protected override void Seal() { }
-    }
-}
-
-internal interface ITwitchEventSubChannelDiagnosticReporter
-{
-    void Report(TwitchEventSubChannelDiagnosticReport report);
-}
-
-internal sealed class TwitchEventSubChannelDiagnosticLogger(
-    ILogger<TwitchEventSubChannelDiagnosticLogger> log
-) : ITwitchEventSubChannelDiagnosticReporter
-{
-    public void Report(TwitchEventSubChannelDiagnosticReport report)
-    {
-        switch (report)
-        {
-            case TwitchEventSubChannelDiagnosticReport.Healthy
-            {
-                ChannelStatus: var healthy,
-            }:
-                log.LogInformation(
-                    "EventSub channel {Channel} is healthy after {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}.",
-                    healthy.Channel,
-                    healthy.Phase,
-                    healthy.Attempt,
-                    healthy.ChangedAt,
-                    healthy.Trigger
-                );
-                return;
-            case TwitchEventSubChannelDiagnosticReport.Recovering
-            {
-                ChannelStatus: var recovering,
-            }:
-                log.LogWarning(
-                    "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
-                    recovering.Channel,
-                    recovering.Phase,
-                    recovering.Attempt,
-                    recovering.ChangedAt,
-                    recovering.Trigger,
-                    recovering.Failure.Classification,
-                    recovering.Failure.FailureType,
-                    recovering.NextAction
-                );
-                return;
-            case TwitchEventSubChannelDiagnosticReport.Degraded
-            {
-                ChannelStatus: var degraded,
-            }:
-                log.LogError(
-                    "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
-                    degraded.Channel,
-                    degraded.Phase,
-                    degraded.Attempt,
-                    degraded.ChangedAt,
-                    degraded.Trigger,
-                    degraded.Failure.Classification,
-                    degraded.Failure.FailureType,
-                    degraded.NextAction
-                );
-                return;
-            default:
-                throw new UnreachableException(
-                    "Unknown EventSub channel diagnostic report."
-                );
-        }
     }
 }

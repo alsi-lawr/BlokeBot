@@ -352,8 +352,7 @@ internal sealed class TwitchEventSubConnectionSession(
 
                     case TwitchEventSubMessageType.Revocation:
                         owner._log.LogWarning(
-                            "EventSub subscription was revoked: {Payload}",
-                            json
+                            "EventSub subscription was revoked."
                         );
                         throw new InvalidOperationException(
                             "EventSub chat subscription was revoked."
@@ -361,9 +360,7 @@ internal sealed class TwitchEventSubConnectionSession(
 
                     case TwitchEventSubMessageType.Unknown:
                         owner._log.LogDebug(
-                            "Unhandled EventSub message type {MessageType}: {Payload}",
-                            rawMessageType,
-                            json
+                            "Unhandled EventSub message was ignored."
                         );
                         break;
                 }

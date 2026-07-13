@@ -521,36 +521,31 @@ internal sealed class PublicChatMessageQueue(
         int alertCount
     )
     {
-        var boundaries = string.Join(
-            ", ",
+        var boundaries =
             escalation.Failures
                 .Select(failure => failure.Boundary.Value)
                 .Distinct(StringComparer.Ordinal)
-        );
-        var events = string.Join(
-            ", ",
+                .ToArray();
+        var events =
             escalation.Failures
                 .Select(failure => failure.Event.Value)
                 .Distinct(StringComparer.Ordinal)
-        );
-        var correlations = string.Join(
-            ", ",
+                .ToArray();
+        var correlations =
             escalation.Failures
                 .Select(failure => failure.CorrelationId.Value)
                 .Distinct(StringComparer.Ordinal)
-        );
-        var handlingStages = string.Join(
-            ", ",
+                .ToArray();
+        var handlingStages =
             escalation.HandlingFailures
                 .Select(failure => failure.Stage)
                 .Distinct()
-        );
-        var handlingFailureTypes = string.Join(
-            ", ",
+                .ToArray();
+        var handlingFailureTypes =
             escalation.HandlingFailures
                 .Select(failure => failure.FailureType)
                 .Distinct(StringComparer.Ordinal)
-        );
+                .ToArray();
         log.LogError(
             "Public chat queue alert handling escalated for {AlertCount} alerts after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures at {Boundaries} for {Events}; stages {HandlingStages}, failure types {HandlingFailureTypes}, correlations {CorrelationIds}. Continuing queued chat processing.",
             alertCount,
