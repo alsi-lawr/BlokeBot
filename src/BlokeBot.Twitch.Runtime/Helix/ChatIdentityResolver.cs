@@ -95,12 +95,3 @@ internal abstract record ChatIdentityResolution
         private protected override void Seal() { }
     }
 }
-
-internal abstract class ChatIdentityResolutionException(string safeSummary) : Exception(safeSummary)
-{
-    internal sealed class MissingChannel()
-        : ChatIdentityResolutionException("The chat channel identity is unavailable.");
-
-    internal sealed class MissingBot()
-        : ChatIdentityResolutionException("The chat bot identity is unavailable.");
-}

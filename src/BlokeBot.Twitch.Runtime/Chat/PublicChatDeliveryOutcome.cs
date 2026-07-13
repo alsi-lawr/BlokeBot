@@ -150,6 +150,8 @@ internal abstract record PublicChatDeliveryOutcome
 
     internal abstract TResult Match<TResult>(
         Func<Sent, TResult> sent,
+        Func<MissingChannel, TResult> missingChannel,
+        Func<MissingBot, TResult> missingBot,
         Func<SafePreSendTransient, TResult> safePreSendTransient,
         Func<Rejection, TResult> rejection,
         Func<Ambiguous, TResult> ambiguous,
@@ -158,6 +160,8 @@ internal abstract record PublicChatDeliveryOutcome
 
     internal abstract void Match(
         Action<Sent> sent,
+        Action<MissingChannel> missingChannel,
+        Action<MissingBot> missingBot,
         Action<SafePreSendTransient> safePreSendTransient,
         Action<Rejection> rejection,
         Action<Ambiguous> ambiguous,
@@ -170,6 +174,8 @@ internal abstract record PublicChatDeliveryOutcome
     {
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -181,6 +187,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override void Match(
             Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -193,12 +201,76 @@ internal abstract record PublicChatDeliveryOutcome
         private protected override void Seal() { }
     }
 
+    internal sealed record MissingChannel : PublicChatDeliveryOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Rejection, TResult> rejection,
+            Func<Ambiguous, TResult> ambiguous,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return missingChannel(this);
+        }
+
+        internal override void Match(
+            Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
+            Action<SafePreSendTransient> safePreSendTransient,
+            Action<Rejection> rejection,
+            Action<Ambiguous> ambiguous,
+            Action<Unexpected> unexpected
+        )
+        {
+            missingChannel(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingBot : PublicChatDeliveryOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Rejection, TResult> rejection,
+            Func<Ambiguous, TResult> ambiguous,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return missingBot(this);
+        }
+
+        internal override void Match(
+            Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
+            Action<SafePreSendTransient> safePreSendTransient,
+            Action<Rejection> rejection,
+            Action<Ambiguous> ambiguous,
+            Action<Unexpected> unexpected
+        )
+        {
+            missingBot(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
     internal sealed record SafePreSendTransient : PublicChatDeliveryOutcome
     {
         internal required PublicChatFailureDiagnostic.Preparation Diagnostic { get; init; }
 
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -210,6 +282,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override void Match(
             Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -228,6 +302,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -239,6 +315,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override void Match(
             Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -257,6 +335,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -268,6 +348,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override void Match(
             Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -288,6 +370,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -299,6 +383,8 @@ internal abstract record PublicChatDeliveryOutcome
 
         internal override void Match(
             Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -339,6 +425,8 @@ internal abstract record PublicChatPreparationOutcome
 
     internal abstract TResult Match<TResult>(
         Func<Ready, TResult> ready,
+        Func<MissingChannel, TResult> missingChannel,
+        Func<MissingBot, TResult> missingBot,
         Func<SafePreSendTransient, TResult> safePreSendTransient,
         Func<Unexpected, TResult> unexpected
     );
@@ -351,11 +439,45 @@ internal abstract record PublicChatPreparationOutcome
 
         internal override TResult Match<TResult>(
             Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
         {
             return ready(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingChannel : PublicChatPreparationOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return missingChannel(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingBot : PublicChatPreparationOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return missingBot(this);
         }
 
         private protected override void Seal() { }
@@ -367,6 +489,8 @@ internal abstract record PublicChatPreparationOutcome
 
         internal override TResult Match<TResult>(
             Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
@@ -385,6 +509,8 @@ internal abstract record PublicChatPreparationOutcome
 
         internal override TResult Match<TResult>(
             Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )

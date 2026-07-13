@@ -88,27 +88,78 @@ public sealed class ChatIdentityResolverTests
             new UnusedLifecycleNotifier()
         );
 
-        var exception = await Should.ThrowAsync<ChatIdentityResolutionException.MissingChannel>(
-            () =>
-                operations
-                    .CreateSubscriptionAsync(
-                        "private-channel-login",
-                        new TwitchBotAccount("bot", "access-token"),
-                        "session-id",
-                        CancellationToken.None
-                    )
-                    .AsTask()
-        );
-        var failure = TwitchEventSubChannelFailureClassifier.Classify(
-            exception,
-            TwitchEventSubChannelPhase.SubscriptionSetup,
+        var outcome = await operations.CreateSubscriptionAsync(
+            "private-channel-login",
+            new TwitchBotAccount("bot", "access-token"),
+            "session-id",
             CancellationToken.None
         );
 
-        failure.Classification.ShouldBe(TwitchEventSubChannelFailureClassification.Terminal);
+        outcome.ShouldBeOfType<TwitchEventSubSubscriptionSetupOutcome.MissingChannel>();
         factory.EventSubRequestCount.ShouldBe(0);
-        exception.ToString().ShouldNotContain("private-channel-login");
-        exception.ToString().ShouldNotContain("access-token");
+        outcome.ToString().ShouldNotContain("private-channel-login");
+        outcome.ToString().ShouldNotContain("access-token");
+    }
+
+    [Test]
+    public async Task MissingBot_CreatingEventSubSubscription_IsTerminalWithoutCreateRequest()
+    {
+        var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"channel-id","login":"private-channel-login"}]}"""
+        );
+        var operations = new TwitchEventSubChannelOperations(
+            Settings(),
+            new UnusedAccountProvider(),
+            CreateResolver(factory),
+            new EventSubClient(factory),
+            new UnusedChatSender(),
+            new UnusedLifecycleNotifier()
+        );
+
+        var outcome = await operations.CreateSubscriptionAsync(
+            "private-channel-login",
+            new TwitchBotAccount("private-bot-login", "access-token"),
+            "session-id",
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<TwitchEventSubSubscriptionSetupOutcome.MissingBot>();
+        factory.EventSubRequestCount.ShouldBe(0);
+        outcome.ToString().ShouldNotContain("private-channel-login");
+        outcome.ToString().ShouldNotContain("private-bot-login");
+        outcome.ToString().ShouldNotContain("access-token");
+    }
+
+    [Test]
+    public async Task MissingChannel_PreparingPublicChat_IsTerminalWithoutTokenOrSendRequest()
+    {
+        var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"bot-id","login":"private-bot-login"}]}"""
+        );
+        var identity = Identity();
+        var transport = new TwitchHelixPublicChatTransport(
+            new TwitchAppAccessTokenProvider(factory, identity),
+            new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
+            identity,
+            CreateResolver(factory),
+            new ChatClient(factory),
+            NullLogger<TwitchHelixPublicChatTransport>.Instance
+        );
+
+        var result = await transport.PrepareAsync(
+            Message("private-channel-login"),
+            CancellationToken.None
+        );
+
+        var missingChannel = result.ShouldBeOfType<PublicChatPreparationOutcome.MissingChannel>();
+        PublicChatDeliveryClassifier
+            .MapPreparationFailure(missingChannel)
+            .ShouldBeOfType<PublicChatDeliveryOutcome.MissingChannel>();
+        factory.AppTokenRequestCount.ShouldBe(0);
+        factory.ChatRequestCount.ShouldBe(0);
+        missingChannel.ToString().ShouldNotContain("private-channel-login");
+        missingChannel.ToString().ShouldNotContain("private-bot-login");
+        missingChannel.ToString().ShouldNotContain("access-token");
     }
 
     [Test]
@@ -132,16 +183,15 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        var unexpected = result.ShouldBeOfType<PublicChatPreparationOutcome.Unexpected>();
-        unexpected.Cause.ShouldBeOfType<ChatIdentityResolutionException.MissingBot>();
+        var missingBot = result.ShouldBeOfType<PublicChatPreparationOutcome.MissingBot>();
         PublicChatDeliveryClassifier
-            .MapPreparationFailure(unexpected)
-            .ShouldBeOfType<PublicChatDeliveryOutcome.Unexpected>();
+            .MapPreparationFailure(missingBot)
+            .ShouldBeOfType<PublicChatDeliveryOutcome.MissingBot>();
         factory.AppTokenRequestCount.ShouldBe(0);
         factory.ChatRequestCount.ShouldBe(0);
-        unexpected.ToString().ShouldNotContain("private-channel-login");
-        unexpected.ToString().ShouldNotContain("private-bot-login");
-        unexpected.ToString().ShouldNotContain("access-token");
+        missingBot.ToString().ShouldNotContain("private-channel-login");
+        missingBot.ToString().ShouldNotContain("private-bot-login");
+        missingBot.ToString().ShouldNotContain("access-token");
     }
 
     private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory)

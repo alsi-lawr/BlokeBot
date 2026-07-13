@@ -170,7 +170,7 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
     {
         internal required TwitchEventSubChannelStatus.Recovering ChannelStatus { get; init; }
 
-        internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
+        internal required TwitchEventSubChannelFailureContext Failure { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
 
@@ -181,7 +181,7 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
     {
         internal required TwitchEventSubChannelStatus.Degraded ChannelStatus { get; init; }
 
-        internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
+        internal required TwitchEventSubChannelFailureContext Failure { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
 

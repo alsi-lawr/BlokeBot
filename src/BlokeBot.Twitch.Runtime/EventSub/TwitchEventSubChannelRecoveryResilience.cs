@@ -87,7 +87,6 @@ internal static class TwitchEventSubChannelFailureClassifier
             SocketException or WebSocketException or IOException =>
                 TwitchEventSubChannelFailureClassification.Transient,
             TwitchAccessTokenUnavailableException
-            or ChatIdentityResolutionException
             or AuthenticationException
             or InvalidDataException
             or InvalidOperationException
@@ -129,6 +128,101 @@ internal readonly record struct TwitchEventSubChannelFailureDetails(
     }
 }
 
+internal abstract record TwitchEventSubChannelFailureContext
+{
+    private protected TwitchEventSubChannelFailureContext() { }
+
+    internal abstract TwitchEventSubChannelPhase Phase { get; }
+
+    internal abstract TwitchEventSubChannelFailureClassification Classification { get; }
+
+    internal abstract string FailureType { get; }
+
+    internal abstract TResult Match<TResult>(
+        Func<ClassifiedException, TResult> classifiedException,
+        Func<MissingChannel, TResult> missingChannel,
+        Func<MissingBot, TResult> missingBot
+    );
+
+    internal TwitchEventSubChannelFailure ToPublicFailure()
+    {
+        return new() { Classification = Classification, FailureType = FailureType };
+    }
+
+    private protected abstract void Seal();
+
+    internal sealed record ClassifiedException(TwitchEventSubChannelFailureDetails Details)
+        : TwitchEventSubChannelFailureContext
+    {
+        internal override TwitchEventSubChannelPhase Phase => Details.Phase;
+
+        internal override TwitchEventSubChannelFailureClassification Classification =>
+            Details.Classification;
+
+        internal override string FailureType => Details.FailureType;
+
+        internal override TResult Match<TResult>(
+            Func<ClassifiedException, TResult> classifiedException,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return classifiedException(this);
+        }
+
+        private protected override void Seal() { }
+
+        public override string ToString()
+        {
+            return $"{nameof(ClassifiedException)} {{ Phase = {Phase}, Classification = {Classification}, FailureType = {FailureType} }}";
+        }
+    }
+
+    internal sealed record MissingChannel : TwitchEventSubChannelFailureContext
+    {
+        internal override TwitchEventSubChannelPhase Phase =>
+            TwitchEventSubChannelPhase.SubscriptionSetup;
+
+        internal override TwitchEventSubChannelFailureClassification Classification =>
+            TwitchEventSubChannelFailureClassification.Terminal;
+
+        internal override string FailureType => "MissingChannel";
+
+        internal override TResult Match<TResult>(
+            Func<ClassifiedException, TResult> classifiedException,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return missingChannel(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingBot : TwitchEventSubChannelFailureContext
+    {
+        internal override TwitchEventSubChannelPhase Phase =>
+            TwitchEventSubChannelPhase.SubscriptionSetup;
+
+        internal override TwitchEventSubChannelFailureClassification Classification =>
+            TwitchEventSubChannelFailureClassification.Terminal;
+
+        internal override string FailureType => "MissingBot";
+
+        internal override TResult Match<TResult>(
+            Func<ClassifiedException, TResult> classifiedException,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return missingBot(this);
+        }
+
+        private protected override void Seal() { }
+    }
+}
+
 internal sealed class TwitchEventSubChannelOperationException(
     TwitchEventSubChannelPhase phase,
     Exception innerException
@@ -144,16 +238,16 @@ internal sealed class TwitchEventSubChannelRecoveryPipeline(
     ResiliencePipeline recoveryPipeline
 )
 {
-    internal ValueTask ExecuteAttemptAsync(
-        Func<CancellationToken, ValueTask> operation,
+    internal ValueTask<TResult> ExecuteAttemptAsync<TResult>(
+        Func<CancellationToken, ValueTask<TResult>> operation,
         CancellationToken cancellationToken
     )
     {
         return attemptPipeline.ExecuteAsync(operation, cancellationToken);
     }
 
-    internal ValueTask ExecuteRecoveryAsync(
-        Func<CancellationToken, ValueTask> operation,
+    internal ValueTask<TResult> ExecuteRecoveryAsync<TResult>(
+        Func<CancellationToken, ValueTask<TResult>> operation,
         CancellationToken cancellationToken
     )
     {

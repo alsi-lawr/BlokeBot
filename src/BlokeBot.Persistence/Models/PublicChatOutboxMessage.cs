@@ -58,6 +58,12 @@ public enum PublicChatOutboxStatus
     [PersistedToken("SafePreSendExhausted")]
     SafePreSendExhausted,
 
+    [PersistedToken("MissingChannel")]
+    MissingChannel,
+
+    [PersistedToken("MissingBot")]
+    MissingBot,
+
     [PersistedToken("Rejected")]
     Rejected,
 

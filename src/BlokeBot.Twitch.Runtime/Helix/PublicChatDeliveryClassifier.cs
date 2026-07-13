@@ -70,6 +70,8 @@ internal static class PublicChatDeliveryClassifier
                 throw new InvalidOperationException(
                     "A ready public chat preparation is not a delivery failure."
                 ),
+            static _ => new PublicChatDeliveryOutcome.MissingChannel(),
+            static _ => new PublicChatDeliveryOutcome.MissingBot(),
             transient => new PublicChatDeliveryOutcome.SafePreSendTransient
             {
                 Diagnostic = transient.Diagnostic,

@@ -203,6 +203,20 @@ internal sealed class EfPublicChatOutbox(
         ArgumentNullException.ThrowIfNull(outcome);
         return outcome.Match(
             _ => RecordSentAsync(message, recordedAt, cancellationToken),
+            _ =>
+                RecordMissingIdentityAsync(
+                    message,
+                    PublicChatOutboxStatus.MissingChannel,
+                    recordedAt,
+                    cancellationToken
+                ),
+            _ =>
+                RecordMissingIdentityAsync(
+                    message,
+                    PublicChatOutboxStatus.MissingBot,
+                    recordedAt,
+                    cancellationToken
+                ),
             transient =>
                 RecordSafePreSendTransientAsync(
                     message,
@@ -840,6 +854,8 @@ internal sealed class EfPublicChatOutbox(
     {
         return db.PublicChatOutboxMessages.Where(row =>
             row.Status == PublicChatOutboxStatus.SafePreSendExhausted
+            || row.Status == PublicChatOutboxStatus.MissingChannel
+            || row.Status == PublicChatOutboxStatus.MissingBot
             || row.Status == PublicChatOutboxStatus.Rejected
             || row.Status == PublicChatOutboxStatus.Ambiguous
             || row.Status == PublicChatOutboxStatus.Unexpected
@@ -1060,6 +1076,70 @@ internal sealed class EfPublicChatOutbox(
             cancellationToken.ThrowIfCancellationRequested();
             return new PublicChatClaimUpdate.Contended();
         }
+    }
+
+    private async ValueTask<PublicChatClaimUpdate> RecordMissingIdentityAsync(
+        PublicChatClaimedMessage message,
+        PublicChatOutboxStatus status,
+        DateTimeOffset recordedAt,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            status
+            is not PublicChatOutboxStatus.MissingChannel
+                and not PublicChatOutboxStatus.MissingBot
+        )
+        {
+            throw new UnreachableException(
+                "A public chat identity outcome mapped to a non-identity status."
+            );
+        }
+
+        await using var expiryDb = await dbFactory.CreateDbContextAsync(cancellationToken);
+        if (
+            await ExpireOwnedClaimAsync(
+                expiryDb,
+                message,
+                recordedAt.UtcDateTime,
+                cancellationToken
+            ) == 1
+        )
+        {
+            return new PublicChatClaimUpdate.Expired();
+        }
+
+        return await ExecuteStateTransitionAsync(
+            (db, ct) =>
+                db
+                    .PublicChatOutboxMessages.Where(row =>
+                        row.Id == message.Id
+                        && row.Status == PublicChatOutboxStatus.Claimed
+                        && row.ClaimToken == message.ClaimToken.Value
+                        && row.ExpiresAtUtc > recordedAt.UtcDateTime
+                    )
+                    .ExecuteUpdateAsync(
+                        update =>
+                            update
+                                .SetProperty(row => row.Status, status)
+                                .SetProperty(row => row.Message, (string?)null)
+                                .SetProperty(row => row.DeduplicationKey, (string?)null)
+                                .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
+                                .SetProperty(row => row.ClaimToken, (Guid?)null)
+                                .SetProperty(row => row.ClaimSlot, (int?)null)
+                                .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                .SetProperty(row => row.CompletedAtUtc, recordedAt.UtcDateTime)
+                                .SetProperty(
+                                    row => row.FailurePhase,
+                                    PublicChatOutboxFailurePhase.Preparation
+                                )
+                                .SetProperty(row => row.FailureType, (string?)null)
+                                .SetProperty(row => row.HttpStatusCode, (int?)null)
+                                .SetProperty(row => row.RejectionCode, (string?)null),
+                        ct
+                    ),
+            cancellationToken
+        );
     }
 
     private ValueTask<PublicChatClaimUpdate> RecordRejectionAsync(

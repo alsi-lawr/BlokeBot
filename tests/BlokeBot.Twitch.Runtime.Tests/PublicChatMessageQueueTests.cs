@@ -554,6 +554,26 @@ public sealed class PublicChatMessageQueueTests
     }
 
     [Test]
+    public Task MissingChannelIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend()
+    {
+        return AssertMissingIdentityAsync(
+            new PublicChatPreparationOutcome.MissingChannel(),
+            InMemoryOutbox.RowStatus.MissingChannel,
+            nameof(PublicChatPreparationOutcome.MissingChannel)
+        );
+    }
+
+    [Test]
+    public Task MissingBotIdentity_Processing_IsRedactedTerminalWithoutRetryOrSend()
+    {
+        return AssertMissingIdentityAsync(
+            new PublicChatPreparationOutcome.MissingBot(),
+            InMemoryOutbox.RowStatus.MissingBot,
+            nameof(PublicChatPreparationOutcome.MissingBot)
+        );
+    }
+
+    [Test]
     public async Task ExplicitRejection_Processing_RecordsRedactedTerminalAfterSendBoundary()
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
@@ -728,6 +748,46 @@ public sealed class PublicChatMessageQueueTests
             transport,
             logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
+    }
+
+    private static async Task AssertMissingIdentityAsync(
+        PublicChatPreparationOutcome outcome,
+        InMemoryOutbox.RowStatus expectedStatus,
+        string expectedDiagnostic
+    )
+    {
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
+        var logger = new RecordingLogger<PublicChatMessageQueue>();
+        var transport = new ScriptedTransport(
+            (_, cancellationToken) =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(outcome);
+            },
+            static (_, _) =>
+                throw new InvalidOperationException("Missing identity preparation cannot send.")
+        );
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, logger: logger);
+        _ = await queue.EnqueueAsync(
+            Command("private-channel-login", "secret chat payload"),
+            CancellationToken.None
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        (await outbox.ReadCompletionAsync()).ShouldBe(expectedStatus);
+        await StopAsync(stopping, worker);
+
+        var snapshot = outbox.SingleSnapshot;
+        snapshot.AttemptCount.ShouldBe(0);
+        snapshot.Message.ShouldBeNull();
+        transport.PrepareCount.ShouldBe(1);
+        transport.SendCount.ShouldBe(0);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldContain(expectedDiagnostic);
+        entry.Message.ShouldNotContain("private-channel-login");
+        entry.Message.ShouldNotContain("secret chat payload");
     }
 
     private static PublicChatEnqueueCommand Command(string channel, string message)
@@ -1132,6 +1192,20 @@ public sealed class PublicChatMessageQueueTests
         {
             return outcome.Match(
                 _ => DeleteSending(message, recordedAt, cancellationToken),
+                _ =>
+                    CompleteClaimedRedacted(
+                        message,
+                        RowStatus.MissingChannel,
+                        recordedAt,
+                        cancellationToken
+                    ),
+                _ =>
+                    CompleteClaimedRedacted(
+                        message,
+                        RowStatus.MissingBot,
+                        recordedAt,
+                        cancellationToken
+                    ),
                 _ => RecordSafePreSendTransient(message, recordedAt, cancellationToken),
                 _ => CompleteSending(message, RowStatus.Rejected, recordedAt, cancellationToken),
                 _ => CompleteSending(message, RowStatus.Ambiguous, recordedAt, cancellationToken),
@@ -1467,6 +1541,8 @@ public sealed class PublicChatMessageQueueTests
             SentAndDeleted,
             SafePreSendTransient,
             SafePreSendExhausted,
+            MissingChannel,
+            MissingBot,
             Rejected,
             Ambiguous,
             Unexpected,

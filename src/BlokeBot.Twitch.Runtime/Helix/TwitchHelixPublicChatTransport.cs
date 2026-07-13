@@ -44,9 +44,13 @@ internal sealed class TwitchHelixPublicChatTransport(
             return await resolution.Match(
                 resolved => PrepareResolvedAsync(message, resolved, cancellationToken),
                 static _ =>
-                    TerminalIdentityFailure(new ChatIdentityResolutionException.MissingChannel()),
+                    ValueTask.FromResult<PublicChatPreparationOutcome>(
+                        new PublicChatPreparationOutcome.MissingChannel()
+                    ),
                 static _ =>
-                    TerminalIdentityFailure(new ChatIdentityResolutionException.MissingBot())
+                    ValueTask.FromResult<PublicChatPreparationOutcome>(
+                        new PublicChatPreparationOutcome.MissingBot()
+                    )
             );
         }
         catch (Exception exception)
@@ -100,17 +104,5 @@ internal sealed class TwitchHelixPublicChatTransport(
                 BotUserId = identities.BotUserId,
             },
         };
-    }
-
-    private static ValueTask<PublicChatPreparationOutcome> TerminalIdentityFailure(
-        ChatIdentityResolutionException exception
-    )
-    {
-        return ValueTask.FromResult(
-            PublicChatDeliveryClassifier.ClassifyPreparationFailure(
-                exception,
-                CancellationToken.None
-            )
-        );
     }
 }

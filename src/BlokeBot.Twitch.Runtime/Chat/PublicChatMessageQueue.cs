@@ -170,6 +170,18 @@ internal sealed class PublicChatMessageQueue(
 
         await preparation.Match(
             ready => ProcessPreparedSendAsync(ready.Send, cancellationToken),
+            missingChannel =>
+                RecordOutcomeAsync(
+                    message,
+                    PublicChatDeliveryClassifier.MapPreparationFailure(missingChannel),
+                    CancellationToken.None
+                ),
+            missingBot =>
+                RecordOutcomeAsync(
+                    message,
+                    PublicChatDeliveryClassifier.MapPreparationFailure(missingBot),
+                    CancellationToken.None
+                ),
             transient =>
                 RecordOutcomeAsync(
                     message,
@@ -330,6 +342,8 @@ internal sealed class PublicChatMessageQueue(
     {
         outcome.Match(
             static _ => { },
+            _ => LogMissingIdentity(message, nameof(PublicChatDeliveryOutcome.MissingChannel)),
+            _ => LogMissingIdentity(message, nameof(PublicChatDeliveryOutcome.MissingBot)),
             transient =>
                 LogFailure(LogLevel.Warning, message, "SafePreSendTransient", transient.Diagnostic),
             rejection =>
@@ -341,6 +355,15 @@ internal sealed class PublicChatMessageQueue(
                 ),
             ambiguous => LogFailure(LogLevel.Warning, message, "Ambiguous", ambiguous.Diagnostic),
             unexpected => LogFailure(LogLevel.Error, message, "Unexpected", unexpected.Diagnostic)
+        );
+    }
+
+    private void LogMissingIdentity(PublicChatClaimedMessage message, string identityOutcome)
+    {
+        log.LogWarning(
+            "Public chat outbox message {OutboxMessageId} reached terminal identity outcome {IdentityOutcome} during preparation.",
+            message.Id,
+            identityOutcome
         );
     }
 

@@ -56,6 +56,8 @@ public sealed class PublicChatOutboxPersistenceTests
             "Ambiguous",
             "Claimed",
             "Expired",
+            "MissingBot",
+            "MissingChannel",
             "Pending",
             "Rejected",
             "SafePreSendExhausted",
@@ -194,6 +196,8 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("CK_public_chat_outbox_FailurePhase");
         tableSql.ShouldContain("SafePreSendTransient");
         tableSql.ShouldContain("SafePreSendExhausted");
+        tableSql.ShouldContain("MissingChannel");
+        tableSql.ShouldContain("MissingBot");
         tableSql.ShouldContain("AttemptCount > 0");
         tableSql.ShouldNotContain("'Delivered'");
         tableSql.ShouldContain("DeduplicationKey IS NULL");

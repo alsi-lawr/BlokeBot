@@ -255,6 +255,8 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
                 static _ => { },
                 static _ => { },
                 static _ => { },
+                static _ => { },
+                static _ => { },
                 static _ => { }
             );
         }

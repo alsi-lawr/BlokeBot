@@ -963,6 +963,44 @@ public sealed class PublicChatOutboxIntegrationTests
         [
             new()
             {
+                ExpectedStatus = PublicChatOutboxStatus.MissingChannel,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Preparation,
+                ExpectedFailureType = null,
+                ExpectedRejectionCode = null,
+                ExpectedInitialSendCount = 0,
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        static (_, _) =>
+                            ValueTask.FromResult<PublicChatPreparationOutcome>(
+                                new PublicChatPreparationOutcome.MissingChannel()
+                            ),
+                        static (_, _) =>
+                            throw new InvalidOperationException(
+                                "Missing channel preparation cannot send."
+                            )
+                    ),
+            },
+            new()
+            {
+                ExpectedStatus = PublicChatOutboxStatus.MissingBot,
+                ExpectedPhase = PublicChatOutboxFailurePhase.Preparation,
+                ExpectedFailureType = null,
+                ExpectedRejectionCode = null,
+                ExpectedInitialSendCount = 0,
+                CreateTransport = () =>
+                    new ScriptedPublicChatTransport(
+                        static (_, _) =>
+                            ValueTask.FromResult<PublicChatPreparationOutcome>(
+                                new PublicChatPreparationOutcome.MissingBot()
+                            ),
+                        static (_, _) =>
+                            throw new InvalidOperationException(
+                                "Missing bot preparation cannot send."
+                            )
+                    ),
+            },
+            new()
+            {
                 ExpectedStatus = PublicChatOutboxStatus.Rejected,
                 ExpectedPhase = PublicChatOutboxFailurePhase.Send,
                 ExpectedFailureType = null,
@@ -1064,6 +1102,7 @@ public sealed class PublicChatOutboxIntegrationTests
 
             _ = await outbox.ReadOutcomeAsync();
             await StopAsync(stopping, worker);
+            transport.PrepareCount.ShouldBe(1);
             transport.SendCount.ShouldBe(scenario.ExpectedInitialSendCount);
 
             await using (var db = await dbFactory.CreateDbContextAsync())
@@ -1902,6 +1941,38 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
+    public async Task MissingIdentityTerminals_RetentionAtExactCutoff_PurgesBothCases()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 0);
+        var duration = TimeSpan.FromMinutes(10);
+        await SeedTerminalRowsAsync(
+            dbFactory,
+            TerminalRow(PublicChatOutboxStatus.MissingChannel, now - duration),
+            TerminalRow(PublicChatOutboxStatus.MissingBot, now - duration)
+        );
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardLifetimePolicy,
+            Retention(duration)
+        );
+
+        (
+            await outbox.TryClaimNextAsync(
+                now,
+                now.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task TerminalRetention_MoreThanOneBatch_CleansInBoundedPasses()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -2267,6 +2338,10 @@ public sealed class PublicChatOutboxIntegrationTests
                 row.SafePreSendFailureCount = 1;
                 row.FailurePhase = PublicChatOutboxFailurePhase.Preparation;
                 row.FailureType = typeof(IOException).FullName;
+                break;
+            case PublicChatOutboxStatus.MissingChannel:
+            case PublicChatOutboxStatus.MissingBot:
+                row.FailurePhase = PublicChatOutboxFailurePhase.Preparation;
                 break;
             case PublicChatOutboxStatus.Rejected:
                 row.AttemptCount = 1;
