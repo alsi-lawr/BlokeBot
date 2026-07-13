@@ -132,24 +132,6 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
             $"Twitch user @{login} was not found."
         );
     }
-
-    protected static bool TryParseSpend(
-        string value,
-        PointAmount sourceBalance,
-        out PointAmount amount
-    )
-    {
-        try
-        {
-            amount = PointAmountArgumentParser.ParseSpendAmount(value, sourceBalance);
-            return true;
-        }
-        catch
-        {
-            amount = PointAmount.Zero;
-            return false;
-        }
-    }
 }
 
 public sealed class PointsBalanceCommandStrategy(
@@ -246,46 +228,44 @@ public sealed class GivePointsCommandStrategy(
                 context.Command.Message.Login,
                 cancellationToken
             );
-            if (!TryParseSpend(context.Args[1], source.Balance, out var amount))
-            {
-                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
-            }
-            else
+            result = await PointAmountArgumentParser
+                .ParseSpend(context.Args[1], source.Balance)
+                .Match(
+                    TransferAsync,
+                    _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
+                );
+
+            async Task<PointOperationResult> TransferAsync(PointAmount amount)
             {
                 var target = LoginName.Parse(context.Args[0]).Value;
                 if (!await users.ExistsAsync(target, cancellationToken))
                 {
-                    result = UnknownUser(target);
+                    return UnknownUser(target);
                 }
-                else
-                {
-                    result = await balances.TransferAsync(
-                        resolution.HostId,
-                        context.Command.Message.Login,
-                        target,
-                        amount,
-                        cancellationToken
-                    );
-                    result =
-                        result.Success
-                            ? result with
-                            {
-                                Message = Format(
-                                    resolution.Settings.TransferReply,
-                                    resolution.Settings,
-                                    from: context.Command.Message.Login,
-                                    to: target,
-                                    amount: amount.ToDisplayString(),
-                                    balance: result.Balance?.ToDisplayString()
-                                ),
-                                Target = resolution.ReplyDelivery.TargetFor(
-                                    PointsReplyKeys.Transfer
-                                ),
-                            }
-                        : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                            ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
-                        : Invalid(resolution.Settings, resolution.ReplyDelivery);
-                }
+
+                var transfer = await balances.TransferAsync(
+                    resolution.HostId,
+                    context.Command.Message.Login,
+                    target,
+                    amount,
+                    cancellationToken
+                );
+                return transfer.Success
+                        ? transfer with
+                        {
+                            Message = Format(
+                                resolution.Settings.TransferReply,
+                                resolution.Settings,
+                                from: context.Command.Message.Login,
+                                to: target,
+                                amount: amount.ToDisplayString(),
+                                balance: transfer.Balance?.ToDisplayString()
+                            ),
+                            Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Transfer),
+                        }
+                    : transfer.FailureReason == PointOperationFailureReason.InsufficientBalance
+                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
+                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -312,24 +292,28 @@ public sealed class AddPointsCommandStrategy(
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
         PointOperationResult result;
-        if (
-            context.Args.Count != 2
-            || !PointAmount.TryParseAbsolute(context.Args[1], out var amount)
-            || amount.IsZero
-        )
+        if (context.Args.Count != 2)
         {
             result = Invalid(resolution.Settings, resolution.ReplyDelivery);
         }
         else
         {
-            var target = LoginName.Parse(context.Args[0]).Value;
-            if (!await users.ExistsAsync(target, cancellationToken))
+            result = await PointAmountArgumentParser
+                .ParseAbsolute(context.Args[1])
+                .Match(
+                    AddAsync,
+                    _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
+                );
+
+            async Task<PointOperationResult> AddAsync(PointAmount amount)
             {
-                result = UnknownUser(target);
-            }
-            else
-            {
-                result = await balances.AddAsync(
+                var target = LoginName.Parse(context.Args[0]).Value;
+                if (!await users.ExistsAsync(target, cancellationToken))
+                {
+                    return UnknownUser(target);
+                }
+
+                var addition = await balances.AddAsync(
                     resolution.HostId,
                     target,
                     amount,
@@ -337,15 +321,15 @@ public sealed class AddPointsCommandStrategy(
                     "chat command",
                     cancellationToken
                 );
-                result = result.Success
-                    ? result with
+                return addition.Success
+                    ? addition with
                     {
                         Message = Format(
                             resolution.Settings.AddReply,
                             resolution.Settings,
                             user: target,
                             amount: amount.ToDisplayString(),
-                            balance: result.Balance?.ToDisplayString()
+                            balance: addition.Balance?.ToDisplayString()
                         ),
                         Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Add),
                     }
@@ -387,13 +371,16 @@ public sealed class RemovePointsCommandStrategy(
                 target,
                 cancellationToken
             );
-            if (!TryParseSpend(context.Args[1], source.Balance, out var amount))
+            result = await PointAmountArgumentParser
+                .ParseSpend(context.Args[1], source.Balance)
+                .Match(
+                    RemoveAsync,
+                    _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
+                );
+
+            async Task<PointOperationResult> RemoveAsync(PointAmount amount)
             {
-                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
-            }
-            else
-            {
-                result = await balances.RemoveAsync(
+                var removal = await balances.RemoveAsync(
                     resolution.HostId,
                     target,
                     amount,
@@ -401,20 +388,19 @@ public sealed class RemovePointsCommandStrategy(
                     "chat command",
                     cancellationToken
                 );
-                result =
-                    result.Success
-                        ? result with
+                return removal.Success
+                        ? removal with
                         {
                             Message = Format(
                                 resolution.Settings.RemoveReply,
                                 resolution.Settings,
                                 user: target,
                                 amount: amount.ToDisplayString(),
-                                balance: result.Balance?.ToDisplayString()
+                                balance: removal.Balance?.ToDisplayString()
                             ),
                             Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Remove),
                         }
-                    : result.FailureReason == PointOperationFailureReason.InsufficientBalance
+                    : removal.FailureReason == PointOperationFailureReason.InsufficientBalance
                         ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
                     : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
@@ -444,23 +430,37 @@ public sealed class GambleCommandStrategy(
     )
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
-        PointOperationResult result;
         if (context.Args.Count != 1)
         {
-            result = Invalid(resolution.Settings, resolution.ReplyDelivery);
-        }
-        else
-        {
-            var source = await balances.GetBalanceAsync(
-                resolution.HostId,
-                context.Command.Message.Login,
+            await ReplyAsync(
+                context,
+                Invalid(resolution.Settings, resolution.ReplyDelivery),
                 cancellationToken
             );
-            if (!TryParseSpend(context.Args[0], source.Balance, out var stake))
-            {
-                result = Invalid(resolution.Settings, resolution.ReplyDelivery);
-            }
-            else if (source.Balance.Value < stake.Value)
+            return;
+        }
+
+        var source = await balances.GetBalanceAsync(
+            resolution.HostId,
+            context.Command.Message.Login,
+            cancellationToken
+        );
+        await PointAmountArgumentParser
+            .ParseSpend(context.Args[0], source.Balance)
+            .Match(
+                GambleAsync,
+                _ =>
+                    ReplyAsync(
+                        context,
+                        Invalid(resolution.Settings, resolution.ReplyDelivery),
+                        cancellationToken
+                    )
+            );
+
+        async ValueTask GambleAsync(PointAmount stake)
+        {
+            PointOperationResult result;
+            if (source.Balance.Value < stake.Value)
             {
                 result = Insufficient(resolution.Settings, resolution.ReplyDelivery);
             }
@@ -503,9 +503,9 @@ public sealed class GambleCommandStrategy(
                         ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
                     : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
-        }
 
-        await ReplyAsync(context, result, cancellationToken);
+            await ReplyAsync(context, result, cancellationToken);
+        }
     }
 
     private TimeSpan Cooldown(PointsSettings settings)

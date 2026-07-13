@@ -1,23 +1,28 @@
 using System.Globalization;
 using System.Numerics;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Features.Points.Balances;
 
-public enum PointAmountArgumentKind
+public enum PointAmountParseError
 {
-    Absolute,
-    Percentage,
-    All,
+    InvalidFormat,
+    AmountOutOfRange,
+    PercentageOutOfRange,
+    ZeroAmount,
 }
 
 public static class PointAmountArgumentParser
 {
-    public static PointAmount ParseAbsoluteOnly(string? value)
+    public static Result<PointAmount, PointAmountParseError> ParseAbsolute(string? value)
     {
-        return PointAmount.ParseAbsolute(value);
+        return PointAmount.ParseNonNegativeAbsolute(value).Bind(RejectZero);
     }
 
-    public static PointAmount ParseSpendAmount(string? value, PointAmount sourceBalance)
+    public static Result<PointAmount, PointAmountParseError> ParseSpend(
+        string? value,
+        PointAmount sourceBalance
+    )
     {
         var text = (value ?? string.Empty).Trim();
         if (text.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -25,40 +30,41 @@ public static class PointAmountArgumentParser
             return RejectZero(sourceBalance);
         }
 
-        if (text.EndsWith('%'))
+        if (!text.EndsWith('%'))
         {
-            var number = text[..^1].Trim();
-            if (
-                !decimal.TryParse(
-                    number,
-                    NumberStyles.Number,
-                    CultureInfo.InvariantCulture,
-                    out var percentage
-                )
-                || percentage <= 0
-                || percentage > 100
-            )
-            {
-                throw new FormatException(
-                    "Point percentage must be greater than 0 and no more than 100."
-                );
-            }
-
-            var scaled = sourceBalance.Value * new BigInteger(decimal.Floor(percentage * 1000));
-            var amount = new PointAmount(scaled / 100000);
-            return RejectZero(amount);
+            return ParseAbsolute(text);
         }
 
-        return RejectZero(PointAmount.ParseAbsolute(text));
+        var number = text[..^1].Trim();
+        if (
+            !decimal.TryParse(
+                number,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var percentage
+            )
+        )
+        {
+            return Result<PointAmount, PointAmountParseError>.Error(
+                PointAmountParseError.InvalidFormat
+            );
+        }
+
+        if (percentage <= 0 || percentage > 100)
+        {
+            return Result<PointAmount, PointAmountParseError>.Error(
+                PointAmountParseError.PercentageOutOfRange
+            );
+        }
+
+        var scaled = sourceBalance.Value * new BigInteger(decimal.Floor(percentage * 1000));
+        return RejectZero(new PointAmount(scaled / 100000));
     }
 
-    private static PointAmount RejectZero(PointAmount amount)
+    private static Result<PointAmount, PointAmountParseError> RejectZero(PointAmount amount)
     {
-        if (amount.IsZero)
-        {
-            throw new FormatException("Point amount must be greater than zero.");
-        }
-
-        return amount;
+        return amount.IsZero
+            ? Result<PointAmount, PointAmountParseError>.Error(PointAmountParseError.ZeroAmount)
+            : Result<PointAmount, PointAmountParseError>.Success(amount);
     }
 }

@@ -1,9 +1,11 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Numerics;
-using System.Text.RegularExpressions;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Features.Points.Balances;
 
-public readonly partial record struct PointAmount : IComparable<PointAmount>
+public readonly record struct PointAmount : IComparable<PointAmount>
 {
     private const int _displaySignificantFigures = 4;
     private static readonly string[] _compactSuffixes = ["", "K", "M", "B", "T"];
@@ -68,27 +70,53 @@ public readonly partial record struct PointAmount : IComparable<PointAmount>
 
     public static PointAmount ParseAbsolute(string? value)
     {
-        var text = (value ?? string.Empty).Trim();
-        if (!WholeNumberRegex().IsMatch(text))
-        {
-            throw new FormatException("Point amount must be a whole number.");
-        }
-
-        return new PointAmount(BigInteger.Parse(text));
+        return ParseNonNegativeAbsolute(value)
+            .Match(
+                static amount => amount,
+                error =>
+                    throw error switch
+                    {
+                        PointAmountParseError.InvalidFormat => new FormatException(
+                            "Point amount must be a whole number."
+                        ),
+                        PointAmountParseError.AmountOutOfRange => new ArgumentOutOfRangeException(
+                            nameof(value),
+                            "Point amounts cannot exceed 10^100."
+                        ),
+                        _ => new UnreachableException(
+                            "Non-negative absolute parsing returned an unsupported error."
+                        ),
+                    }
+            );
     }
 
-    public static bool TryParseAbsolute(string? value, out PointAmount amount)
+    internal static Result<PointAmount, PointAmountParseError> ParseNonNegativeAbsolute(
+        string? value
+    )
     {
-        try
+        var text = (value ?? string.Empty).Trim();
+        if (
+            !BigInteger.TryParse(
+                text,
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var parsed
+            )
+        )
         {
-            amount = ParseAbsolute(value);
-            return true;
+            return Result<PointAmount, PointAmountParseError>.Error(
+                PointAmountParseError.InvalidFormat
+            );
         }
-        catch
+
+        if (parsed > MaximumValue)
         {
-            amount = Zero;
-            return false;
+            return Result<PointAmount, PointAmountParseError>.Error(
+                PointAmountParseError.AmountOutOfRange
+            );
         }
+
+        return Result<PointAmount, PointAmountParseError>.Success(new PointAmount(parsed));
     }
 
     private static string FormatForDisplay(BigInteger value, int significantFigures)
@@ -157,7 +185,4 @@ public readonly partial record struct PointAmount : IComparable<PointAmount>
         var zeros = digits.Length - significantFigures;
         return kept * BigInteger.Pow(10, zeros);
     }
-
-    [GeneratedRegex("^[0-9]+$")]
-    private static partial Regex WholeNumberRegex();
 }

@@ -11,6 +11,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,10 +26,18 @@ public sealed class PointsTests
     [Test]
     public void InvalidNegativeOrOversizedAmount_ParsingOrConstructing_RejectsValue()
     {
-        PointAmount.TryParseAbsolute("100", out var amount).ShouldBeTrue();
-        amount.Value.ShouldBe(new BigInteger(100));
-
-        PointAmount.TryParseAbsolute("10.5", out _).ShouldBeFalse();
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("100")).ShouldBe("Amount:100");
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("10.5"))
+            .ShouldBe("Error:InvalidFormat");
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("-1"))
+            .ShouldBe("Error:InvalidFormat");
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("0")).ShouldBe("Error:ZeroAmount");
+        DescribeParse(
+                PointAmountArgumentParser.ParseAbsolute(
+                    (PointAmount.MaximumValue + BigInteger.One).ToString()
+                )
+            )
+            .ShouldBe("Error:AmountOutOfRange");
         Should.Throw<ArgumentOutOfRangeException>(() => new PointAmount(-1));
         Should.Throw<ArgumentOutOfRangeException>(() =>
             new PointAmount(PointAmount.MaximumValue + 1)
@@ -57,16 +66,17 @@ public sealed class PointsTests
     {
         var balance = PointAmount.ParseAbsolute("2500");
 
-        PointAmountArgumentParser.ParseSpendAmount("100", balance).ToString().ShouldBe("100");
-        PointAmountArgumentParser.ParseSpendAmount("10%", balance).ToString().ShouldBe("250");
-        PointAmountArgumentParser.ParseSpendAmount("all", balance).ToString().ShouldBe("2500");
-        Should.Throw<FormatException>(() =>
-            PointAmountArgumentParser.ParseSpendAmount("1%", PointAmount.ParseAbsolute("1"))
-        );
-        Should.Throw<FormatException>(() =>
-            PointAmountArgumentParser.ParseSpendAmount("101%", balance)
-        );
-        Should.Throw<FormatException>(() => PointAmountArgumentParser.ParseAbsoluteOnly("50%"));
+        DescribeParse(PointAmountArgumentParser.ParseSpend("100", balance)).ShouldBe("Amount:100");
+        DescribeParse(PointAmountArgumentParser.ParseSpend("10%", balance)).ShouldBe("Amount:250");
+        DescribeParse(PointAmountArgumentParser.ParseSpend("all", balance)).ShouldBe("Amount:2500");
+        DescribeParse(PointAmountArgumentParser.ParseSpend("1%", PointAmount.ParseAbsolute("1")))
+            .ShouldBe("Error:ZeroAmount");
+        DescribeParse(PointAmountArgumentParser.ParseSpend("101%", balance))
+            .ShouldBe("Error:PercentageOutOfRange");
+        DescribeParse(PointAmountArgumentParser.ParseSpend("not-a-number%", balance))
+            .ShouldBe("Error:InvalidFormat");
+        DescribeParse(PointAmountArgumentParser.ParseAbsolute("50%"))
+            .ShouldBe("Error:InvalidFormat");
     }
 
     [Test]
@@ -151,6 +161,52 @@ public sealed class PointsTests
         result.Success.ShouldBeTrue();
         balance.Login.ShouldBe("viewer");
         balance.Amount.ShouldBe("10");
+    }
+
+    [Test]
+    public async Task InvalidFormatOrRange_SubmittingPointAmounts_PreservesInvalidResponses()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var users = new FixedPointTargetUserLookup(["viewer"]);
+        var dashboard = new PointsDashboardService(
+            new PointBalanceService(dbFactory),
+            null!,
+            new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            users
+        );
+        List<string> replies = [];
+        var command = new AddPointsCommandStrategy(
+            new PointsCommandService(dbFactory),
+            new PointBalanceService(dbFactory),
+            users
+        );
+
+        var dashboardResult = await dashboard.AddAsync(
+            hostId,
+            "viewer",
+            "10.5",
+            "streamer",
+            CancellationToken.None
+        );
+        await command.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "moderator",
+                "streamer",
+                "addpoints",
+                ["viewer", (PointAmount.MaximumValue + BigInteger.One).ToString()],
+                replies
+            ),
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        dashboardResult.Success.ShouldBeFalse();
+        dashboardResult.FailureReason.ShouldBe(PointOperationFailureReason.InvalidAmount);
+        dashboardResult.Message.ShouldBe("Invalid amount.");
+        replies.ShouldBe(["That point amount is not valid."]);
+        (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
 
     [Test]
@@ -507,6 +563,11 @@ public sealed class PointsTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var settings = await db.PointsSettings.SingleAsync(CancellationToken.None);
         settings.GamblingCooldownSeconds.ShouldBe(42);
+    }
+
+    private static string DescribeParse(Result<PointAmount, PointAmountParseError> result)
+    {
+        return result.Match(static amount => $"Amount:{amount}", static error => $"Error:{error}");
     }
 
     private static CommandStrategyContext<PointsCommandKind, AppCommandRouteState> CommandContext(

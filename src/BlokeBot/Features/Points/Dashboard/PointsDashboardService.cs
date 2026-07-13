@@ -33,34 +33,40 @@ public sealed class PointsDashboardService(
         CancellationToken ct
     )
     {
-        if (!PointAmount.TryParseAbsolute(amountText, out var amount) || amount.IsZero)
-        {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InvalidAmount,
-                "Invalid amount."
-            );
-        }
+        return await PointAmountArgumentParser
+            .ParseAbsolute(amountText)
+            .Match(AddParsedAsync, _ => Task.FromResult(InvalidAmount()));
 
-        var target = LoginName.Parse(targetLogin).Value;
-        if (!await users.ExistsAsync(target, ct))
+        async Task<PointOperationResult> AddParsedAsync(PointAmount amount)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.UnknownUser,
-                $"Twitch user @{target} was not found."
-            );
-        }
-
-        var result = await balances.AddAsync(hostId, target, amount, actorLogin, "dashboard", ct);
-        await changes.NotifyChangedAsync(ct);
-        return result.Success
-            ? result with
+            var target = LoginName.Parse(targetLogin).Value;
+            if (!await users.ExistsAsync(target, ct))
             {
-                Message = "Points added.",
+                return PointOperationResult.Failure(
+                    PointOperationFailureReason.UnknownUser,
+                    $"Twitch user @{target} was not found."
+                );
             }
-            : result with
-            {
-                Message = "Could not add points.",
-            };
+
+            var result = await balances.AddAsync(
+                hostId,
+                target,
+                amount,
+                actorLogin,
+                "dashboard",
+                ct
+            );
+            await changes.NotifyChangedAsync(ct);
+            return result.Success
+                ? result with
+                {
+                    Message = "Points added.",
+                }
+                : result with
+                {
+                    Message = "Could not add points.",
+                };
+        }
     }
 
     public async Task<PointOperationResult> GiveAsync(
@@ -72,34 +78,33 @@ public sealed class PointsDashboardService(
     )
     {
         var source = await balances.GetBalanceAsync(hostId, fromLogin, ct);
-        if (!TryParseSpend(amountText, source.Balance, out var amount))
-        {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InvalidAmount,
-                "Invalid amount."
-            );
-        }
+        return await PointAmountArgumentParser
+            .ParseSpend(amountText, source.Balance)
+            .Match(GiveParsedAsync, _ => Task.FromResult(InvalidAmount()));
 
-        var target = LoginName.Parse(toLogin).Value;
-        if (!await users.ExistsAsync(target, ct))
+        async Task<PointOperationResult> GiveParsedAsync(PointAmount amount)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.UnknownUser,
-                $"Twitch user @{target} was not found."
-            );
-        }
-
-        var result = await balances.TransferAsync(hostId, fromLogin, target, amount, ct);
-        await changes.NotifyChangedAsync(ct);
-        return result.Success
-            ? result with
+            var target = LoginName.Parse(toLogin).Value;
+            if (!await users.ExistsAsync(target, ct))
             {
-                Message = "Points transferred.",
+                return PointOperationResult.Failure(
+                    PointOperationFailureReason.UnknownUser,
+                    $"Twitch user @{target} was not found."
+                );
             }
-            : result with
-            {
-                Message = "Could not transfer points.",
-            };
+
+            var result = await balances.TransferAsync(hostId, fromLogin, target, amount, ct);
+            await changes.NotifyChangedAsync(ct);
+            return result.Success
+                ? result with
+                {
+                    Message = "Points transferred.",
+                }
+                : result with
+                {
+                    Message = "Could not transfer points.",
+                };
+        }
     }
 
     public async Task<PointOperationResult> RemoveAsync(
@@ -111,32 +116,31 @@ public sealed class PointsDashboardService(
     )
     {
         var target = await balances.GetBalanceAsync(hostId, targetLogin, ct);
-        if (!TryParseSpend(amountText, target.Balance, out var amount))
-        {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InvalidAmount,
-                "Invalid amount."
-            );
-        }
+        return await PointAmountArgumentParser
+            .ParseSpend(amountText, target.Balance)
+            .Match(RemoveParsedAsync, _ => Task.FromResult(InvalidAmount()));
 
-        var result = await balances.RemoveAsync(
-            hostId,
-            targetLogin,
-            amount,
-            actorLogin,
-            "dashboard",
-            ct
-        );
-        await changes.NotifyChangedAsync(ct);
-        return result.Success
-            ? result with
-            {
-                Message = "Points removed.",
-            }
-            : result with
-            {
-                Message = "Could not remove points.",
-            };
+        async Task<PointOperationResult> RemoveParsedAsync(PointAmount amount)
+        {
+            var result = await balances.RemoveAsync(
+                hostId,
+                targetLogin,
+                amount,
+                actorLogin,
+                "dashboard",
+                ct
+            );
+            await changes.NotifyChangedAsync(ct);
+            return result.Success
+                ? result with
+                {
+                    Message = "Points removed.",
+                }
+                : result with
+                {
+                    Message = "Could not remove points.",
+                };
+        }
     }
 
     public async Task<PointOperationResult> RemoveBalanceAsync(
@@ -192,21 +196,11 @@ public sealed class PointsDashboardService(
         return giveaways.CancelAsync(hostId, ct);
     }
 
-    private static bool TryParseSpend(
-        string value,
-        PointAmount sourceBalance,
-        out PointAmount amount
-    )
+    private static PointOperationResult InvalidAmount()
     {
-        try
-        {
-            amount = PointAmountArgumentParser.ParseSpendAmount(value, sourceBalance);
-            return true;
-        }
-        catch
-        {
-            amount = PointAmount.Zero;
-            return false;
-        }
+        return PointOperationResult.Failure(
+            PointOperationFailureReason.InvalidAmount,
+            "Invalid amount."
+        );
     }
 }
