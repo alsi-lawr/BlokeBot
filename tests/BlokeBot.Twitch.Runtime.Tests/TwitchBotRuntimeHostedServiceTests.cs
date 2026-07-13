@@ -1,3 +1,4 @@
+using Polly;
 using Shouldly;
 using TUnit.Core;
 
@@ -6,82 +7,136 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class TwitchBotRuntimeHostedServiceTests
 {
     [Test]
-    public async Task IrcConfigured_RunningSelectedStrategy_RunsOnlyIrcStrategy()
+    public async Task IrcConfigured_RunningSelectedRuntime_RunsOnlyIrcAndPropagatesCancellation()
     {
-        var irc = new RecordingRuntimeStrategy(TwitchBotRuntime.Irc);
-        var eventSub = new RecordingRuntimeStrategy(TwitchBotRuntime.EventSub);
-        using var service = CreateService(TwitchBotRuntime.Irc, irc, eventSub);
+        using var stopping = new CancellationTokenSource();
+        using var harness = CreateHarness(TwitchBotRuntime.Irc, stopping);
 
-        await service.RunSelectedStrategyAsync(CancellationToken.None);
+        await harness.Service.RunSelectedRuntimeAsync(stopping.Token);
 
-        irc.RunCount.ShouldBe(1);
-        eventSub.RunCount.ShouldBe(0);
+        harness.IrcSession.CallCount.ShouldBe(1);
+        harness.EventSubSession.CallCount.ShouldBe(0);
+        stopping.IsCancellationRequested.ShouldBeTrue();
+        harness.IrcSession.ReceivedCancellationToken.IsCancellationRequested.ShouldBeTrue();
+        harness.Health.Reports.ShouldBeEmpty();
+        harness.IdleWait.CallCount.ShouldBe(0);
     }
 
     [Test]
-    public async Task EventSubConfigured_RunningSelectedStrategy_RunsOnlyEventSubStrategy()
+    public async Task EventSubConfigured_RunningSelectedRuntime_RunsOnlyEventSubAndPropagatesCancellation()
     {
-        var irc = new RecordingRuntimeStrategy(TwitchBotRuntime.Irc);
-        var eventSub = new RecordingRuntimeStrategy(TwitchBotRuntime.EventSub);
-        using var service = CreateService(TwitchBotRuntime.EventSub, irc, eventSub);
+        using var stopping = new CancellationTokenSource();
+        using var harness = CreateHarness(TwitchBotRuntime.EventSub, stopping);
 
-        await service.RunSelectedStrategyAsync(CancellationToken.None);
+        await harness.Service.RunSelectedRuntimeAsync(stopping.Token);
 
-        irc.RunCount.ShouldBe(0);
-        eventSub.RunCount.ShouldBe(1);
+        harness.IrcSession.CallCount.ShouldBe(0);
+        harness.EventSubSession.CallCount.ShouldBe(1);
+        stopping.IsCancellationRequested.ShouldBeTrue();
+        harness.EventSubSession.ReceivedCancellationToken.IsCancellationRequested.ShouldBeTrue();
+        harness.Health.Reports.ShouldBeEmpty();
+        harness.IdleWait.CallCount.ShouldBe(0);
     }
 
-    [Test]
-    public void SelectedRuntimeWithoutStrategy_ConstructingHostedService_RejectsMissingStrategy()
-    {
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            CreateService(
-                TwitchBotRuntime.Irc,
-                new RecordingRuntimeStrategy(TwitchBotRuntime.EventSub)
-            )
-        );
-
-        exception.Message.ShouldContain(nameof(TwitchBotRuntime.Irc));
-        exception.Message.ShouldContain("No runtime strategy");
-    }
-
-    [Test]
-    public void SelectedRuntimeWithDuplicateStrategies_ConstructingHostedService_RejectsConflict()
-    {
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            CreateService(
-                TwitchBotRuntime.Irc,
-                new RecordingRuntimeStrategy(TwitchBotRuntime.Irc),
-                new RecordingRuntimeStrategy(TwitchBotRuntime.Irc)
-            )
-        );
-
-        exception.Message.ShouldContain(nameof(TwitchBotRuntime.Irc));
-        exception.Message.ShouldContain("Multiple runtime strategies");
-    }
-
-    private static TwitchBotRuntimeHostedService CreateService(
+    private static RuntimeHarness CreateHarness(
         TwitchBotRuntime runtime,
-        params ITwitchBotRuntimeStrategy[] strategies
+        CancellationTokenSource stopping
     )
     {
-        return new(
-            TwitchBotSettings.FromOptions(new TwitchBotOptions { Runtime = runtime }),
-            strategies
+        var ircSession = new CancelingConnectionSession(stopping);
+        var eventSubSession = new CancelingConnectionSession(stopping);
+        var health = new RecordingHealthReporter();
+        var status = new TwitchBotRuntimeStatusStore();
+        var idleWait = new RecordingIdleWait();
+        var irc = new TwitchIrcRuntime(
+            ircSession,
+            new TwitchIrcSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
+            health,
+            status,
+            idleWait
+        );
+        var eventSub = new TwitchEventSubRuntime(
+            eventSubSession,
+            new TwitchEventSubSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
+            health,
+            status,
+            idleWait
+        );
+        return new RuntimeHarness(
+            new TwitchBotRuntimeHostedService(
+                TwitchBotSettings.FromOptions(new TwitchBotOptions { Runtime = runtime }),
+                irc,
+                eventSub
+            ),
+            ircSession,
+            eventSubSession,
+            health,
+            idleWait
         );
     }
 
-    private sealed class RecordingRuntimeStrategy(TwitchBotRuntime runtime)
-        : ITwitchBotRuntimeStrategy
+    private sealed class RuntimeHarness(
+        TwitchBotRuntimeHostedService service,
+        CancelingConnectionSession ircSession,
+        CancelingConnectionSession eventSubSession,
+        RecordingHealthReporter health,
+        RecordingIdleWait idleWait
+    ) : IDisposable
     {
-        public TwitchBotRuntime Runtime { get; } = runtime;
+        internal TwitchBotRuntimeHostedService Service { get; } = service;
 
-        public int RunCount { get; private set; }
+        internal CancelingConnectionSession IrcSession { get; } = ircSession;
 
-        public Task RunAsync(CancellationToken cancellationToken)
+        internal CancelingConnectionSession EventSubSession { get; } = eventSubSession;
+
+        internal RecordingHealthReporter Health { get; } = health;
+
+        internal RecordingIdleWait IdleWait { get; } = idleWait;
+
+        public void Dispose()
         {
-            RunCount++;
-            return Task.CompletedTask;
+            Service.Dispose();
+        }
+    }
+
+    private sealed class CancelingConnectionSession(CancellationTokenSource stopping)
+        : ITwitchIrcConnectionSession,
+            ITwitchEventSubConnectionSession
+    {
+        internal int CallCount { get; private set; }
+
+        internal CancellationToken ReceivedCancellationToken { get; private set; }
+
+        public Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
+            TwitchRuntimeConnectionTarget target,
+            CancellationToken cancellationToken
+        )
+        {
+            CallCount++;
+            ReceivedCancellationToken = cancellationToken;
+            stopping.Cancel();
+            return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(cancellationToken);
+        }
+    }
+
+    private sealed class RecordingHealthReporter : ITwitchRuntimeSessionHealthReporter
+    {
+        internal List<TwitchRuntimeSessionHealthReport> Reports { get; } = [];
+
+        public void Report(TwitchRuntimeSessionHealthReport report)
+        {
+            Reports.Add(report);
+        }
+    }
+
+    private sealed class RecordingIdleWait : ITwitchRuntimeIdleWait
+    {
+        internal int CallCount { get; private set; }
+
+        public ValueTask WaitAsync(CancellationToken cancellationToken)
+        {
+            CallCount++;
+            return ValueTask.CompletedTask;
         }
     }
 }

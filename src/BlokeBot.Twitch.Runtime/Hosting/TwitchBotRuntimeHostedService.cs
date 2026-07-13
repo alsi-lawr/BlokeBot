@@ -1,42 +1,41 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Hosting;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchBotRuntimeHostedService : BackgroundService
 {
-    private readonly ITwitchBotRuntimeStrategy _strategy;
+    private readonly TwitchBotSettings _settings;
+    private readonly TwitchIrcRuntime _irc;
+    private readonly TwitchEventSubRuntime _eventSub;
 
     public TwitchBotRuntimeHostedService(
         TwitchBotSettings settings,
-        IEnumerable<ITwitchBotRuntimeStrategy> strategies
+        TwitchIrcRuntime irc,
+        TwitchEventSubRuntime eventSub
     )
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(strategies);
+        ArgumentNullException.ThrowIfNull(irc);
+        ArgumentNullException.ThrowIfNull(eventSub);
 
-        var matches = strategies
-            .Where(candidate => candidate.Runtime == settings.Runtime)
-            .Take(2)
-            .ToArray();
-        _strategy = matches switch
-        {
-            [var selected] => selected,
-            [] => throw new InvalidOperationException(
-                $"No runtime strategy is registered for '{settings.Runtime}'."
-            ),
-            _ => throw new InvalidOperationException(
-                $"Multiple runtime strategies are registered for '{settings.Runtime}'."
-            ),
-        };
+        _settings = settings;
+        _irc = irc;
+        _eventSub = eventSub;
     }
 
-    internal Task RunSelectedStrategyAsync(CancellationToken cancellationToken)
+    internal Task RunSelectedRuntimeAsync(CancellationToken cancellationToken)
     {
-        return _strategy.RunAsync(cancellationToken);
+        return _settings.Runtime switch
+        {
+            TwitchBotRuntime.Irc => _irc.RunAsync(cancellationToken),
+            TwitchBotRuntime.EventSub => _eventSub.RunAsync(cancellationToken),
+            _ => throw new UnreachableException("Unknown validated Twitch bot runtime."),
+        };
     }
 
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return RunSelectedStrategyAsync(stoppingToken);
+        return RunSelectedRuntimeAsync(stoppingToken);
     }
 }

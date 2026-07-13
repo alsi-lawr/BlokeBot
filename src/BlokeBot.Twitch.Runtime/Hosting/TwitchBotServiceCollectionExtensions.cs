@@ -202,8 +202,6 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<TwitchEventSubRuntime>();
         services.TryAddSingleton<ITwitchIrcConnectionSession, TwitchIrcConnectionSession>();
         services.TryAddSingleton<TwitchIrcRuntime>();
-        services.AddSingleton<ITwitchBotRuntimeStrategy, TwitchEventSubRuntimeStrategy>();
-        services.AddSingleton<ITwitchBotRuntimeStrategy, TwitchIrcRuntimeStrategy>();
         services.AddHostedService<TwitchBotRuntimeHostedService>();
 
         return services.AddTwitchCommands();
