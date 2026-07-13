@@ -121,7 +121,8 @@ public sealed class PublicChatMessageQueueTests
             CancellationToken.None
         );
 
-        receipt.MessageIds.Length.ShouldBe(2);
+        receipt.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
+            .Receipt.MessageIds.Length.ShouldBe(2);
         outbox.PendingMessages.ShouldBe(["alpha", "beta gamma"]);
         transport.Deliveries.ShouldBeEmpty();
 
@@ -368,7 +369,8 @@ public sealed class PublicChatMessageQueueTests
 
         var receipt = await queue.EnqueueAsync(Command("channel", "message"), caller.Token);
 
-        receipt.MessageIds.Length.ShouldBe(1);
+        receipt.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
+            .Receipt.MessageIds.Length.ShouldBe(1);
         caller.IsCancellationRequested.ShouldBeTrue();
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -796,7 +798,12 @@ public sealed class PublicChatMessageQueueTests
         string channel,
         string message
     ) =>
-        new() { Channel = channel, Message = message };
+        new()
+        {
+            Channel = channel,
+            Message = message,
+            Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+        };
 
     private static PublicChatPreparedSend Prepared(
         PublicChatClaimedMessage message
@@ -1017,7 +1024,7 @@ public sealed class PublicChatMessageQueueTests
         public ValueTask<RowStatus> ReadCompletionAsync() =>
             completions.Reader.ReadAsync();
 
-        public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+        public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
             PublicChatOutboxBatch batch,
             CancellationToken cancellationToken
         )
@@ -1040,8 +1047,10 @@ public sealed class PublicChatMessageQueueTests
             }
 
             AfterEnqueue?.Invoke();
-            return ValueTask.FromResult(
-                new PublicChatOutboxReceipt(ImmutableArray.Create(ids))
+            return ValueTask.FromResult<PublicChatEnqueueOutcome>(
+                new PublicChatEnqueueOutcome.Accepted(
+                    new PublicChatOutboxReceipt(ImmutableArray.Create(ids))
+                )
             );
         }
 

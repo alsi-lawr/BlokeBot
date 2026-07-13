@@ -25,7 +25,12 @@ public sealed class HostWhisperCommandResponseSender(
     {
         if (response.Target != TwitchCommandResponseTarget.Whisper)
         {
-            await chat.SendAsync(sourceMessage.Channel, response.Message, cancellationToken);
+            await chat.SendAsync(
+                sourceMessage.Channel,
+                response.Message,
+                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                cancellationToken
+            );
             return;
         }
 
@@ -41,7 +46,12 @@ public sealed class HostWhisperCommandResponseSender(
             result.StatusCode?.ToString() ?? "n/a",
             result.Detail ?? "n/a"
         );
-        await chat.SendAsync(sourceMessage.Channel, response.Message, cancellationToken);
+        await chat.SendAsync(
+            sourceMessage.Channel,
+            response.Message,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
     }
 
     private async Task<HostWhisperSendResult> TrySendWhisperAsync(

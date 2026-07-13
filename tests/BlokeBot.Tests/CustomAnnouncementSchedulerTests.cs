@@ -3,6 +3,7 @@ using BlokeBot.Features.CustomCommands;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -24,7 +25,7 @@ public sealed class CustomAnnouncementSchedulerTests
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
             ["First", "Second"],
-            createdAtUtc: now.AddMinutes(-31).UtcDateTime
+            createdAtUtc: now.AddMinutes(-30).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -60,7 +61,7 @@ public sealed class CustomAnnouncementSchedulerTests
                 RequiredChatMessages = 2,
             },
             ["After chat"],
-            createdAtUtc: now.AddHours(-1).UtcDateTime
+            createdAtUtc: now.AddMinutes(-30).UtcDateTime
         );
         var activity = new CustomAnnouncementChatActivity(dbFactory, clock);
         var sender = new RecordingChatMessageSender();
@@ -95,7 +96,7 @@ public sealed class CustomAnnouncementSchedulerTests
     public async Task DueWeeklyAnnouncement_RunningRepeatedTick_SendsOnceAtScheduledLocalTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var now = new DateTimeOffset(2026, 7, 10, 12, 5, 0, TimeSpan.Zero);
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 20, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
         var hostId = await SeedHostAsync(
             dbFactory,
@@ -155,7 +156,7 @@ public sealed class CustomAnnouncementSchedulerTests
         var scheduler = CreateScheduler(dbFactory, clock, sender);
 
         await scheduler.RunTickAsync(CancellationToken.None);
-        clock.SetUtcNow(new DateTimeOffset(2026, 7, 17, 12, 5, 0, TimeSpan.Zero));
+        clock.SetUtcNow(new DateTimeOffset(2026, 7, 17, 12, 0, 20, TimeSpan.Zero));
         await scheduler.RunTickAsync(CancellationToken.None);
 
         sender.Messages.ShouldBe([new SentChatMessage("streamer", "Weekly")]);
@@ -217,7 +218,7 @@ public sealed class CustomAnnouncementSchedulerTests
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
             ["Message"],
-            now.AddHours(-1).UtcDateTime
+            now.AddMinutes(-30).UtcDateTime
         );
         var scheduler = CreateScheduler(
             dbFactory,
@@ -250,7 +251,7 @@ public sealed class CustomAnnouncementSchedulerTests
             hostId,
             new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
             ["   "],
-            now.AddHours(-1).UtcDateTime
+            now.AddMinutes(-30).UtcDateTime
         );
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -286,14 +287,14 @@ public sealed class CustomAnnouncementSchedulerTests
             firstHostId,
             new IntervalCustomAnnouncementSchedule(),
             ["First"],
-            now.AddHours(-1).UtcDateTime
+            now.AddMinutes(-30).UtcDateTime
         );
         var second = await SeedAnnouncementAsync(
             dbFactory,
             secondHostId,
             new IntervalCustomAnnouncementSchedule(),
             ["Second"],
-            now.AddHours(-1).UtcDateTime
+            now.AddMinutes(-30).UtcDateTime
         );
         var sender = new FailingChannelSender("first");
         var scheduler = CreateScheduler(dbFactory, clock, sender);
@@ -339,10 +340,358 @@ public sealed class CustomAnnouncementSchedulerTests
         sender.Messages.ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task DifferentPolicies_SafeTransientThenRestart_RetryAtPersistedOwnDelays()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var firstHostId = await SeedHostAsync(
+            dbFactory,
+            "first",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var secondHostId = await SeedHostAsync(
+            dbFactory,
+            "second",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var first = await SeedAnnouncementWithPolicyAsync(
+            dbFactory,
+            firstHostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["First"],
+            now.AddMinutes(-30).UtcDateTime,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(10)
+        );
+        var second = await SeedAnnouncementWithPolicyAsync(
+            dbFactory,
+            secondHostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Second"],
+            now.AddMinutes(-30).UtcDateTime,
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(20)
+        );
+        var sender = new ScriptedAnnouncementSender(
+            new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                new AnnouncementEnqueueFailureType("Busy")
+            ),
+            new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                new AnnouncementEnqueueFailureType("Busy")
+            ),
+            new AnnouncementEnqueueOutcome.Accepted(),
+            new AnnouncementEnqueueOutcome.Accepted()
+        );
+
+        await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
+
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var rows = await db
+                .CustomAnnouncements.Where(x => x.Id == first.AnnouncementId || x.Id == second.AnnouncementId)
+                .OrderBy(x => x.Id)
+                .ToArrayAsync();
+            rows[0].OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.RetryScheduled);
+            rows[0].OccurrenceNextAttemptAtUtc.ShouldBe(now.AddSeconds(2).UtcDateTime);
+            rows[0].OccurrenceExpiresAtUtc.ShouldBe(now.AddSeconds(10).UtcDateTime);
+            rows[1].OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.RetryScheduled);
+            rows[1].OccurrenceNextAttemptAtUtc.ShouldBe(now.AddSeconds(5).UtcDateTime);
+            rows[1].OccurrenceExpiresAtUtc.ShouldBe(now.AddSeconds(20).UtcDateTime);
+        }
+
+        clock.SetUtcNow(now.AddSeconds(2));
+        await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
+        sender.Calls.Count.ShouldBe(3);
+        clock.SetUtcNow(now.AddSeconds(5));
+        await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
+        sender.Calls.Count.ShouldBe(4);
+        sender.Calls.Select(x => x.Message).ShouldBe(
+            ["First", "Second", "First", "Second"]
+        );
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var completed = await verify
+            .CustomAnnouncements.Where(x => x.Id == first.AnnouncementId || x.Id == second.AnnouncementId)
+            .OrderBy(x => x.Id)
+            .ToArrayAsync();
+        completed.ShouldAllBe(x => x.OccurrenceStatus == AnnouncementOccurrenceStatus.Accepted);
+        completed.ShouldAllBe(x => x.OccurrenceAttemptCount == 2);
+    }
+
+    [Test]
+    public async Task SafeRetryAtExactExpiry_SkipsOccurrenceAndNextRecurrenceRemainsEligible()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var dueAt = now.AddSeconds(-5);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementWithPolicyAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Message"],
+            dueAt.AddMinutes(-30).UtcDateTime,
+            TimeSpan.FromSeconds(9),
+            TimeSpan.FromSeconds(10)
+        );
+        var sender = new ScriptedAnnouncementSender(
+            new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                new AnnouncementEnqueueFailureType("Busy")
+            ),
+            new AnnouncementEnqueueOutcome.Accepted()
+        );
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+        clock.SetUtcNow(now.AddSeconds(4));
+        await scheduler.RunTickAsync(CancellationToken.None);
+        sender.Calls.Count.ShouldBe(1);
+        clock.SetUtcNow(now.AddSeconds(5));
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var skipped = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+            skipped.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.SkippedExpired);
+            skipped.LastOccurrenceAtUtc.ShouldBe(dueAt.UtcDateTime);
+            skipped.Enabled.ShouldBeTrue();
+        }
+
+        clock.SetUtcNow(dueAt.AddMinutes(30));
+        await scheduler.RunTickAsync(CancellationToken.None);
+        sender.Calls.Count.ShouldBe(2);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
+            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
+    }
+
+    [Test]
+    public async Task AgedOccurrence_EnqueueCarriesOriginalAbsoluteExpiry()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 25, TimeSpan.Zero);
+        var dueAt = now.AddSeconds(-25);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        await SeedAnnouncementWithPolicyAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Message"],
+            dueAt.AddMinutes(-30).UtcDateTime,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(30)
+        );
+        var sender = new RecordingChatMessageSender();
+
+        await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
+
+        sender.Deadlines.ShouldBe([dueAt.AddSeconds(30)]);
+    }
+
+    [Test]
+    public async Task NonRetryableOutcomes_CompleteTerminallyAndNeverAttemptAgain()
+    {
+        var cases = new (AnnouncementEnqueueOutcome Outcome, AnnouncementOccurrenceStatus Status)[]
+        {
+            (new AnnouncementEnqueueOutcome.Rejected(), AnnouncementOccurrenceStatus.TerminalRejected),
+            (
+                new AnnouncementEnqueueOutcome.Ambiguous(
+                    new AnnouncementEnqueueFailureType("Ambiguous")
+                ),
+                AnnouncementOccurrenceStatus.TerminalAmbiguous
+            ),
+            (
+                new AnnouncementEnqueueOutcome.Unexpected(
+                    new AnnouncementEnqueueFailureType("Unexpected")
+                ),
+                AnnouncementOccurrenceStatus.TerminalUnexpected
+            ),
+        };
+
+        foreach (var testCase in cases)
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+            var clock = new ManualTimeProvider(now);
+            var hostId = await SeedHostAsync(
+                dbFactory,
+                $"host-{testCase.Status}",
+                changedAtUtc: now.AddHours(-1).UtcDateTime
+            );
+            var seed = await SeedAnnouncementAsync(
+                dbFactory,
+                hostId,
+                new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+                ["Message"],
+                now.AddMinutes(-30).UtcDateTime
+            );
+            var sender = new ScriptedAnnouncementSender(testCase.Outcome);
+            var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+            await scheduler.RunTickAsync(CancellationToken.None);
+            clock.SetUtcNow(now.AddSeconds(1));
+            await scheduler.RunTickAsync(CancellationToken.None);
+
+            sender.Calls.Count.ShouldBe(1);
+            await using var db = await dbFactory.CreateDbContextAsync();
+            var announcement = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+            announcement.OccurrenceStatus.ShouldBe(testCase.Status);
+            announcement.OccurrenceNextAttemptAtUtc.ShouldBeNull();
+        }
+    }
+
+    [Test]
+    public async Task InvalidTimeZoneAndBlankMessage_CompleteExplicitTerminalClassifications()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var invalidHostId = await SeedHostAsync(
+            dbFactory,
+            "invalid-zone",
+            timeZoneId: "Missing/Zone",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var blankHostId = await SeedHostAsync(
+            dbFactory,
+            "blank-message",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var invalid = await SeedAnnouncementAsync(
+            dbFactory,
+            invalidHostId,
+            new WeeklyCustomAnnouncementSchedule
+            {
+                Day = now.DayOfWeek,
+                Time = TimeOnly.FromDateTime(now.UtcDateTime),
+            },
+            ["Message"],
+            now.AddDays(-7).UtcDateTime
+        );
+        var blank = await SeedAnnouncementAsync(
+            dbFactory,
+            blankHostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["   "],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        var sender = new RecordingChatMessageSender();
+
+        await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBeEmpty();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomAnnouncements.SingleAsync(x => x.Id == invalid.AnnouncementId))
+            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalInvalidTimeZone);
+        var blankAnnouncement = await db.CustomAnnouncements.SingleAsync(x => x.Id == blank.AnnouncementId);
+        blankAnnouncement.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalMissingMessage);
+        blankAnnouncement.OccurrenceAttemptCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Cancellation_DuringEnqueueRemainsCancellationAndRestartDoesNotDuplicate()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Message"],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        using var cancellation = new CancellationTokenSource();
+        var cancellingSender = new CancellingAnnouncementSender(cancellation);
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            CreateScheduler(dbFactory, clock, cancellingSender)
+                .RunTickAsync(cancellation.Token)
+        );
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            (await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
+                .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
+        }
+
+        var replacement = new RecordingChatMessageSender();
+        await CreateScheduler(dbFactory, clock, replacement)
+            .RunTickAsync(CancellationToken.None);
+        replacement.Messages.ShouldBeEmpty();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
+            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalAmbiguous);
+    }
+
+    [Test]
+    public async Task UnexpectedCandidateFault_IsReportedRedactedAndOtherCandidateContinues()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(now);
+        var firstHostId = await SeedHostAsync(
+            dbFactory,
+            "first",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var secondHostId = await SeedHostAsync(
+            dbFactory,
+            "second",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var first = await SeedAnnouncementAsync(
+            dbFactory,
+            firstHostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["private first payload"],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        var second = await SeedAnnouncementAsync(
+            dbFactory,
+            secondHostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["second"],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        var sender = new ThrowingChannelAnnouncementSender("first");
+        var logger = new RecordingSchedulerLogger();
+
+        await CreateScheduler(dbFactory, clock, sender, logger)
+            .RunTickAsync(CancellationToken.None);
+
+        sender.AcceptedChannels.ShouldBe(["second"]);
+        var failure = logger.Entries.Single(x => x.Contains("candidate processing failed"));
+        failure.ShouldContain("FailureType: InvalidOperationException");
+        failure.ShouldNotContain("private first payload");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomAnnouncements.SingleAsync(x => x.Id == first.AnnouncementId))
+            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
+        (await db.CustomAnnouncements.SingleAsync(x => x.Id == second.AnnouncementId))
+            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
+    }
+
     private static CustomAnnouncementScheduler CreateScheduler(
         SqliteBlokeBotDbFactory dbFactory,
         TimeProvider clock,
-        ICustomAnnouncementSender sender
+        ICustomAnnouncementSender sender,
+        ILogger<CustomAnnouncementScheduler>? logger = null
     )
     {
         return new CustomAnnouncementScheduler(
@@ -359,7 +708,7 @@ public sealed class CustomAnnouncementSchedulerTests
                     },
                 }
             ),
-            NullLogger<CustomAnnouncementScheduler>.Instance
+            logger ?? NullLogger<CustomAnnouncementScheduler>.Instance
         );
     }
 
@@ -394,6 +743,25 @@ public sealed class CustomAnnouncementSchedulerTests
         CustomAnnouncementSchedule schedule,
         string[] variants,
         DateTime createdAtUtc
+    ) =>
+        await SeedAnnouncementWithPolicyAsync(
+            dbFactory,
+            hostId,
+            schedule,
+            variants,
+            createdAtUtc,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(30)
+        );
+
+    private static async Task<AnnouncementSeed> SeedAnnouncementWithPolicyAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        CustomAnnouncementSchedule schedule,
+        string[] variants,
+        DateTime createdAtUtc,
+        TimeSpan retryDelay,
+        TimeSpan occurrenceLifetime
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -427,9 +795,9 @@ public sealed class CustomAnnouncementSchedulerTests
             DeliveryPolicy = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
             {
                 HostId = hostId,
-                RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
+                RetryDelay = new AnnouncementRetryDelay(retryDelay),
                 OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                    TimeSpan.FromSeconds(30)
+                    occurrenceLifetime
                 ),
             },
             CreatedAtUtc = createdAtUtc,
@@ -447,20 +815,112 @@ public sealed class CustomAnnouncementSchedulerTests
 
     private sealed record SentChatMessage(string Channel, string Message);
 
+    private sealed record AnnouncementEnqueueCall(
+        string Channel,
+        string Message,
+        DateTimeOffset ExpiresAt
+    );
+
+    private sealed class ScriptedAnnouncementSender(
+        params AnnouncementEnqueueOutcome[] outcomes
+    ) : ICustomAnnouncementSender
+    {
+        private readonly Queue<AnnouncementEnqueueOutcome> remaining = new(outcomes);
+
+        public List<AnnouncementEnqueueCall> Calls { get; } = [];
+
+        public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
+            string channel,
+            string message,
+            DateTimeOffset expiresAt,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls.Add(new AnnouncementEnqueueCall(channel, message, expiresAt));
+            return ValueTask.FromResult(
+                remaining.Count > 0
+                    ? remaining.Dequeue()
+                    : throw new InvalidOperationException("No scripted enqueue outcome remains.")
+            );
+        }
+    }
+
+    private sealed class CancellingAnnouncementSender(CancellationTokenSource cancellation)
+        : ICustomAnnouncementSender
+    {
+        public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
+            string channel,
+            string message,
+            DateTimeOffset expiresAt,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellation.Cancel();
+            return ValueTask.FromCanceled<AnnouncementEnqueueOutcome>(
+                cancellationToken
+            );
+        }
+    }
+
+    private sealed class ThrowingChannelAnnouncementSender(string throwingChannel)
+        : ICustomAnnouncementSender
+    {
+        public List<string> AcceptedChannels { get; } = [];
+
+        public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
+            string channel,
+            string message,
+            DateTimeOffset expiresAt,
+            CancellationToken cancellationToken
+        )
+        {
+            if (channel == throwingChannel)
+                throw new InvalidOperationException("sensitive provider detail");
+
+            AcceptedChannels.Add(channel);
+            return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
+                new AnnouncementEnqueueOutcome.Accepted()
+            );
+        }
+    }
+
+    private sealed class RecordingSchedulerLogger : ILogger<CustomAnnouncementScheduler>
+    {
+        public List<string> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        ) => Entries.Add(formatter(state, exception));
+    }
+
     private sealed class RecordingChatMessageSender : ICustomAnnouncementSender
     {
         public List<SentChatMessage> Messages { get; } = [];
 
-        public bool IsEnabled => true;
+        public List<DateTimeOffset> Deadlines { get; } = [];
 
-        public Task SendAsync(
+        public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
             string channel,
             string message,
+            DateTimeOffset expiresAt,
             CancellationToken cancellationToken
         )
         {
             Messages.Add(new SentChatMessage(channel, message));
-            return Task.CompletedTask;
+            Deadlines.Add(expiresAt);
+            return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
+                new AnnouncementEnqueueOutcome.Accepted()
+            );
         }
     }
 
@@ -469,19 +929,26 @@ public sealed class CustomAnnouncementSchedulerTests
     {
         public List<SentChatMessage> Messages { get; } = [];
 
-        public bool IsEnabled => true;
-
-        public Task SendAsync(
+        public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
             string channel,
             string message,
+            DateTimeOffset expiresAt,
             CancellationToken cancellationToken
         )
         {
             if (channel == failingChannel)
-                throw new InvalidOperationException("Send failed.");
+            {
+                return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
+                    new AnnouncementEnqueueOutcome.Unexpected(
+                        new AnnouncementEnqueueFailureType("TestFailure")
+                    )
+                );
+            }
 
             Messages.Add(new SentChatMessage(channel, message));
-            return Task.CompletedTask;
+            return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
+                new AnnouncementEnqueueOutcome.Accepted()
+            );
         }
     }
 

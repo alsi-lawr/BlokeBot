@@ -210,6 +210,27 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
     }
 
     [Test]
+    public async Task InconsistentOccurrenceState_Updating_IsRejectedByDatabaseConstraint()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hostId = await CreateHostAsync(db);
+        var announcement = CreateAnnouncement(hostId);
+        db.Add(announcement);
+        await db.SaveChangesAsync();
+
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE custom_announcements
+                SET OccurrenceStatus = 'RetryScheduled', OccurrenceAttemptCount = 1
+                WHERE Id = {announcement.Id}
+                """
+            )
+        );
+    }
+
+    [Test]
     public void TimingValues_InvalidDurations_AreRejected()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>

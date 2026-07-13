@@ -62,7 +62,12 @@ internal static class PublicChatIntegrationTestSupport
         string channel,
         string message
     ) =>
-        new() { Channel = channel, Message = message };
+        new()
+        {
+            Channel = channel,
+            Message = message,
+            Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+        };
 
     public static PublicChatPreparedSend Prepared(
         PublicChatClaimedMessage message
@@ -184,7 +189,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
     private readonly Channel<PublicChatClaimOutcome> claims =
         Channel.CreateUnbounded<PublicChatClaimOutcome>();
 
-    public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+    public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
     ) => inner.EnqueueAsync(batch, cancellationToken);
@@ -308,7 +313,7 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
     private readonly Channel<bool> beginPermission = Channel.CreateUnbounded<bool>();
 
-    public ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+    public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
     ) => inner.EnqueueAsync(batch, cancellationToken);

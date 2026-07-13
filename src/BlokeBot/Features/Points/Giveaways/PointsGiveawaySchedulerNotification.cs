@@ -40,6 +40,11 @@ internal sealed class TwitchPointsGiveawaySchedulerNotification(
         schedule.Reply is { } reply
             ? reply(message, cancellationToken)
             : new ValueTask(
-                sender.SendAsync(schedule.HostLogin, message, cancellationToken)
+                sender.SendAsync(
+                    schedule.HostLogin,
+                    message,
+                    new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                    cancellationToken
+                )
             );
 }

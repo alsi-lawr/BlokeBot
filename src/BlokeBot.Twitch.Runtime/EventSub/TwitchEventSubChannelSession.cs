@@ -83,7 +83,12 @@ internal sealed class TwitchEventSubChannelOperations(
     )
     {
         if (!string.IsNullOrWhiteSpace(settings.StartupMessage))
-            await sender.SendAsync(channel, settings.StartupMessage, cancellationToken);
+            await sender.SendAsync(
+                channel,
+                settings.StartupMessage,
+                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                cancellationToken
+            );
     }
 
     public ValueTask NotifyChannelStartedAsync(

@@ -30,7 +30,7 @@ internal sealed class PublicChatMessageQueue(
     );
     private int running;
 
-    public async ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+    public async ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatEnqueueCommand command,
         CancellationToken cancellationToken
     )
@@ -40,13 +40,13 @@ internal sealed class PublicChatMessageQueue(
             string.IsNullOrWhiteSpace(command.Channel)
             || string.IsNullOrWhiteSpace(command.Message)
         )
-            return PublicChatOutboxReceipt.Empty;
+            return new PublicChatEnqueueOutcome.Rejected();
 
         var parts = TwitchChatMessageSplitter
             .Split(command.Message, MaxMessageLength)
             .ToImmutableArray();
         if (parts.IsDefaultOrEmpty)
-            return PublicChatOutboxReceipt.Empty;
+            return new PublicChatEnqueueOutcome.Rejected();
 
         var items = parts
             .Select(part =>
@@ -60,17 +60,20 @@ internal sealed class PublicChatMessageQueue(
                 }
             )
             .ToImmutableArray();
-        var receipt = await outbox.EnqueueAsync(
+        var outcome = await outbox.EnqueueAsync(
             new PublicChatOutboxBatch
             {
                 Channel = command.Channel,
                 Items = items,
                 EnqueuedAt = UtcNow(),
+                Deadline = command.Deadline,
             },
             cancellationToken
         );
-        _ = wakeSignals.Writer.TryWrite(true);
-        return receipt;
+        if (outcome is PublicChatEnqueueOutcome.Accepted)
+            _ = wakeSignals.Writer.TryWrite(true);
+
+        return outcome;
     }
 
     internal async Task RunAsync(CancellationToken cancellationToken)

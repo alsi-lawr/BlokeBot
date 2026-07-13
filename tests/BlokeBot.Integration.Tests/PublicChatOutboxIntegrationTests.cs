@@ -49,7 +49,11 @@ public sealed class PublicChatOutboxIntegrationTests
             .PublicChatOutboxMessages.AsNoTracking()
             .OrderBy(row => row.Id)
             .ToArrayAsync();
-        rows.Select(row => row.Id).ShouldBe(receipt.MessageIds);
+        rows.Select(row => row.Id)
+            .ShouldBe(
+                receipt.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
+                    .Receipt.MessageIds
+            );
         rows.Select(row => row.Message).ShouldBe(["alpha", "beta gamma"]);
         rows.Select(row => row.Status).ShouldAllBe(status =>
             status == PublicChatOutboxStatus.Pending
@@ -95,7 +99,10 @@ public sealed class PublicChatOutboxIntegrationTests
         var completion = await restartedOutbox.ReadDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        delivery.Id.ShouldBe(receipt.MessageIds.ShouldHaveSingleItem());
+        delivery.Id.ShouldBe(
+            receipt.ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
+                .Receipt.MessageIds.ShouldHaveSingleItem()
+        );
         delivery.Message.ShouldBe("survives restart");
         delivery.Attempt.ShouldBe(1);
         completion.Id.ShouldBe(delivery.Id);
@@ -143,6 +150,49 @@ public sealed class PublicChatOutboxIntegrationTests
         var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
         row.CreatedAtUtc.ShouldBe(now.UtcDateTime);
         row.ExpiresAtUtc.ShouldBe(now.AddSeconds(17).UtcDateTime);
+    }
+
+    [Test]
+    public async Task ProducerDeadline_Persisting_UsesEarlierAbsoluteBoundaryWithoutRestartingAge()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = Utc(12, 0, 25);
+        var occurrenceDueAt = Utc(12, 0, 0);
+        var producerExpiry = occurrenceDueAt.AddSeconds(30);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardLifetimePolicy,
+            StandardRetentionPolicy
+        );
+
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "aged occurrence") with
+            {
+                Deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
+                    producerExpiry
+                ),
+            },
+            CancellationToken.None
+        );
+        _ = await outbox.EnqueueAsync(
+            Batch("streamer", now, "configured cap") with
+            {
+                Deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
+                    now.AddMinutes(1)
+                ),
+            },
+            CancellationToken.None
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var rows = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .OrderBy(x => x.Id)
+            .ToArrayAsync();
+        rows[0].CreatedAtUtc.ShouldBe(now.UtcDateTime);
+        rows[0].ExpiresAtUtc.ShouldBe(producerExpiry.UtcDateTime);
+        rows[1].ExpiresAtUtc.ShouldBe(now.AddSeconds(30).UtcDateTime);
     }
 
     [Test]
@@ -573,7 +623,9 @@ public sealed class PublicChatOutboxIntegrationTests
             Batch("streamer", now, "identity after migrated success"),
             CancellationToken.None
         );
-        var newId = enqueueReceipt.MessageIds.ShouldHaveSingleItem();
+        var newId = enqueueReceipt
+            .ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
+            .Receipt.MessageIds.ShouldHaveSingleItem();
         newId.ShouldBeGreaterThan(41);
         var claimed = await ClaimAsync(
             outbox,
@@ -2113,14 +2165,12 @@ public sealed class PublicChatOutboxIntegrationTests
             new ManualTestTimeProvider(Utc(12, 0, 0))
         );
 
-        await Should.ThrowAsync<DbUpdateException>(() =>
-            queue
-                .EnqueueAsync(
-                    Command("streamer", "not accepted"),
-                    CancellationToken.None
-                )
-                .AsTask()
+        var outcome = await queue.EnqueueAsync(
+            Command("streamer", "not accepted"),
+            CancellationToken.None
         );
+        outcome.ShouldBeOfType<PublicChatEnqueueOutcome.Ambiguous>()
+            .Cause.ShouldBeOfType<DbUpdateException>();
         transport.DeliveryCount.ShouldBe(0);
     }
 
@@ -2133,6 +2183,7 @@ public sealed class PublicChatOutboxIntegrationTests
         {
             Channel = channel,
             EnqueuedAt = enqueuedAt,
+            Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             Items = messages
                 .Select(message =>
                     new PublicChatOutboxItem

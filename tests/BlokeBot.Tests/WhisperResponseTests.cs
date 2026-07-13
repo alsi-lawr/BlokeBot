@@ -297,7 +297,12 @@ public sealed class WhisperResponseTests
     {
         public List<SentChatMessage> Messages { get; } = [];
 
-        public Task SendAsync(string channel, string message, CancellationToken cancellationToken)
+        public Task SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            CancellationToken cancellationToken
+        )
         {
             Messages.Add(new SentChatMessage(channel, message));
             return Task.CompletedTask;

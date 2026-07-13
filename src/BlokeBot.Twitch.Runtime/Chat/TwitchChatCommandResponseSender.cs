@@ -22,6 +22,11 @@ internal sealed class TwitchChatCommandResponseSender(
             );
         }
 
-        await sender.SendAsync(sourceMessage.Channel, response.Message, cancellationToken);
+        await sender.SendAsync(
+            sourceMessage.Channel,
+            response.Message,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
     }
 }

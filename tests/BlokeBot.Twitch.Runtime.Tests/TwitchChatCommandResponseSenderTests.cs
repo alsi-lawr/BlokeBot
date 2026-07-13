@@ -24,6 +24,8 @@ public sealed class TwitchChatCommandResponseSenderTests
 
         chat.Channels.ShouldBe(["streamer"]);
         chat.Messages.ShouldBe(["public response"]);
+        chat.Deadlines.ShouldHaveSingleItem()
+            .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 
     [Test]
@@ -43,6 +45,8 @@ public sealed class TwitchChatCommandResponseSenderTests
 
         chat.Channels.ShouldBe(["streamer"]);
         chat.Messages.ShouldBe(["private response"]);
+        chat.Deadlines.ShouldHaveSingleItem()
+            .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 
     private static TwitchChatMessage SourceMessage() =>
@@ -60,14 +64,18 @@ public sealed class TwitchChatCommandResponseSenderTests
 
         public List<string> Messages { get; } = [];
 
+        public List<PublicChatDeliveryDeadline> Deadlines { get; } = [];
+
         public Task SendAsync(
             string channel,
             string message,
+            PublicChatDeliveryDeadline deadline,
             CancellationToken cancellationToken
         )
         {
             Channels.Add(channel);
             Messages.Add(message);
+            Deadlines.Add(deadline);
             return Task.CompletedTask;
         }
     }

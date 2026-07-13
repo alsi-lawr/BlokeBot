@@ -9,6 +9,8 @@ internal sealed record PublicChatOutboxBatch
     public required ImmutableArray<PublicChatOutboxItem> Items { get; init; }
 
     public required DateTimeOffset EnqueuedAt { get; init; }
+
+    public required PublicChatDeliveryDeadline Deadline { get; init; }
 }
 
 internal sealed record PublicChatOutboxItem
@@ -21,6 +23,23 @@ internal sealed record PublicChatOutboxItem
 internal readonly record struct PublicChatOutboxReceipt(ImmutableArray<long> MessageIds)
 {
     public static PublicChatOutboxReceipt Empty { get; } = new([]);
+}
+
+internal abstract record PublicChatEnqueueOutcome
+{
+    private PublicChatEnqueueOutcome() { }
+
+    internal sealed record Accepted(PublicChatOutboxReceipt Receipt)
+        : PublicChatEnqueueOutcome;
+
+    internal sealed record Rejected : PublicChatEnqueueOutcome;
+
+    internal sealed record SafePreEnqueueTransient(Exception Cause)
+        : PublicChatEnqueueOutcome;
+
+    internal sealed record Ambiguous(Exception Cause) : PublicChatEnqueueOutcome;
+
+    internal sealed record Unexpected(Exception Cause) : PublicChatEnqueueOutcome;
 }
 
 internal readonly record struct PublicChatClaimToken(Guid Value);
@@ -83,7 +102,7 @@ internal abstract record PublicChatClaimUpdate
 
 internal interface IPublicChatOutbox
 {
-    ValueTask<PublicChatOutboxReceipt> EnqueueAsync(
+    ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
     );

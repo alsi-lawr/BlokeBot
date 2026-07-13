@@ -226,7 +226,12 @@ internal sealed class TwitchIrcConnectionSession(
         if (string.IsNullOrWhiteSpace(startupMessage))
             return;
 
-        await sender.SendAsync(channel, startupMessage, cancellationToken);
+        await sender.SendAsync(
+            channel,
+            startupMessage,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
     }
 
     private async Task AwaitAuthenticationAsync(

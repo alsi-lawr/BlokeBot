@@ -380,10 +380,55 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<CustomAnnouncement>(b =>
         {
-            b.ToTable("custom_announcements");
+            b.ToTable(
+                "custom_announcements",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_OccurrenceStatus",
+                        KindIn("OccurrenceStatus", AnnouncementOccurrenceStatuses)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_OccurrenceState",
+                        "(OccurrenceStatus = 'None' AND OccurrenceDueAtUtc IS NULL "
+                            + "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL "
+                            + "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount = 0 "
+                            + "AND OccurrenceMessage IS NULL) OR "
+                            + "(OccurrenceStatus = 'Pending' AND OccurrenceDueAtUtc IS NOT NULL "
+                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
+                            + "AND OccurrenceNextAttemptAtUtc IS NOT NULL AND OccurrenceCompletedAtUtc IS NULL "
+                            + "AND OccurrenceAttemptCount = 0 AND OccurrenceMessage IS NULL) OR "
+                            + "(OccurrenceStatus = 'Attempting' AND OccurrenceDueAtUtc IS NOT NULL "
+                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
+                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NULL "
+                            + "AND OccurrenceAttemptCount > 0 AND length(OccurrenceMessage) > 0) OR "
+                            + "(OccurrenceStatus = 'RetryScheduled' AND OccurrenceDueAtUtc IS NOT NULL "
+                            + "AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
+                            + "AND OccurrenceNextAttemptAtUtc <= OccurrenceExpiresAtUtc "
+                            + "AND OccurrenceCompletedAtUtc IS NULL AND OccurrenceAttemptCount > 0 "
+                            + "AND length(OccurrenceMessage) > 0) OR "
+                            + "(OccurrenceStatus IN ('Accepted', 'SkippedExpired', 'TerminalRejected', "
+                            + "'TerminalAmbiguous', 'TerminalUnexpected', 'TerminalMissingMessage') "
+                            + "AND OccurrenceDueAtUtc IS NOT NULL AND OccurrenceExpiresAtUtc > OccurrenceDueAtUtc "
+                            + "AND OccurrenceNextAttemptAtUtc IS NULL AND OccurrenceCompletedAtUtc IS NOT NULL "
+                            + "AND OccurrenceAttemptCount >= 0 AND OccurrenceMessage IS NULL) OR "
+                            + "(OccurrenceStatus = 'TerminalInvalidTimeZone' AND OccurrenceDueAtUtc IS NULL "
+                            + "AND OccurrenceExpiresAtUtc IS NULL AND OccurrenceNextAttemptAtUtc IS NULL "
+                            + "AND OccurrenceCompletedAtUtc IS NOT NULL AND OccurrenceAttemptCount = 0 "
+                            + "AND OccurrenceMessage IS NULL)"
+                    );
+                }
+            );
             b.HasKey(x => x.Id);
             b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.OccurrenceStatus)
+                .HasConversion(
+                    value => PersistedEnumTokens<AnnouncementOccurrenceStatus>.Format(value),
+                    value => PersistedEnumTokens<AnnouncementOccurrenceStatus>.Parse(value)
+                )
+                .HasMaxLength(40);
+            b.Property(x => x.OccurrenceMessage).HasMaxLength(500);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -933,6 +978,9 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
     private static readonly string[] AccessKinds =
         PersistedEnumTokens<AccessListEntryKind>.Values.ToArray();
+
+    private static readonly string[] AnnouncementOccurrenceStatuses =
+        PersistedEnumTokens<AnnouncementOccurrenceStatus>.Values.ToArray();
 
     private static readonly string[] CommandAliasKinds =
         PersistedEnumTokens<AppCommandKind>.Values.ToArray();

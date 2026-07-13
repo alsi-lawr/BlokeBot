@@ -12,6 +12,9 @@ namespace BlokeBot.Persistence.Tests;
 
 public sealed class PersistenceInvariantTests
 {
+    private const string AnnouncementPolicySchemaMigration =
+        "20260712233825_ReplaceAnnouncementPolicySchema";
+
     [Test]
     public async Task TwoActiveGiveawaysForHost_Saving_ThrowsDatabaseError()
     {
@@ -311,6 +314,21 @@ public sealed class PersistenceInvariantTests
     public void PersistedEnums_FormattingAndParsing_UseExactRoundTrippableTokens()
     {
         AssertTokens<AccessListEntryKind>(["blacklist", "whitelist"]);
+        AssertTokens<AnnouncementOccurrenceStatus>(
+            [
+                "Accepted",
+                "Attempting",
+                "None",
+                "Pending",
+                "RetryScheduled",
+                "SkippedExpired",
+                "TerminalAmbiguous",
+                "TerminalInvalidTimeZone",
+                "TerminalMissingMessage",
+                "TerminalRejected",
+                "TerminalUnexpected",
+            ]
+        );
         AssertTokens<AppCommandKind>(
             [
                 "AddPoints",
@@ -389,6 +407,57 @@ public sealed class PersistenceInvariantTests
         (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(1);
         (await db.CustomCounters.CountAsync()).ShouldBe(1);
         (await db.CustomCommands.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task OccurrenceStateMigration_Applying_PreservesConfiguredAnnouncementAsIdle()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var db = new BlokeBotDbContext(options);
+        var migrator = db.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(AnnouncementPolicySchemaMigration);
+        var hostId = await SeedHostAsync(db);
+        var entry = MessageEntry(hostId, "message");
+        var policy = DeliveryPolicy(hostId);
+        db.AddRange(entry, policy);
+        await db.SaveChangesAsync();
+        var now = DateTime.UtcNow;
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO custom_announcements
+                (HostId, Name, Enabled, MessageLibraryEntryId, DeliveryPolicyId,
+                 LastSentAtUtc, ChatMessagesSinceLastSent, CreatedAtUtc, UpdatedAtUtc)
+            VALUES
+                ({hostId}, 'announcement', 1, {entry.Id}, {policy.Id},
+                 NULL, 0, {now}, {now})
+            """
+        );
+        var announcementId = await db.Database.SqlQueryRaw<int>(
+            "SELECT Id AS Value FROM custom_announcements"
+        ).SingleAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"""
+            INSERT INTO custom_announcement_schedules
+                (CustomAnnouncementId, HostId, ScheduleType, IntervalMinutes,
+                 RequiredChatMessages, WeeklyDay, WeeklyTime)
+            VALUES
+                ({announcementId}, {hostId}, 'Interval', 30, NULL, NULL, NULL)
+            """
+        );
+
+        await migrator.MigrateAsync();
+        db.ChangeTracker.Clear();
+
+        var announcement = await db.CustomAnnouncements.SingleAsync();
+        announcement.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.None);
+        announcement.OccurrenceDueAtUtc.ShouldBeNull();
+        announcement.OccurrenceMessage.ShouldBeNull();
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(1);
+        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(1);
     }
 
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>

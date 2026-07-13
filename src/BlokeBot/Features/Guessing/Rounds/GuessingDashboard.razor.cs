@@ -316,7 +316,12 @@ public partial class GuessingDashboard
 
         var result = await operation();
         if (result.Succeeded)
-            await Chat.SendAsync(Host!.Login, result.Message, CancellationToken.None);
+            await Chat.SendAsync(
+                Host!.Login,
+                result.Message,
+                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                CancellationToken.None
+            );
 
         PublishResult(result);
         await LoadAsync();
