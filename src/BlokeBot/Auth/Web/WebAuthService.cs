@@ -46,11 +46,23 @@ internal sealed class WebAuthService(
             accessToken,
             cancellationToken
         );
-        if (twitchUser is null)
-        {
-            return new AuthResult(false, null, "Twitch did not return the signed-in user.");
-        }
 
+        return await twitchUser.Match(
+            user => AuthenticateAsync(currentOptions, accessToken, user, cancellationToken),
+            () =>
+                Task.FromResult(
+                    new AuthResult(false, null, "Twitch did not return the signed-in user.")
+                )
+        );
+    }
+
+    private async Task<AuthResult> AuthenticateAsync(
+        WebAuthOptions currentOptions,
+        string accessToken,
+        UserIdentity twitchUser,
+        CancellationToken cancellationToken
+    )
+    {
         var twitchUserId = twitchUser.Id;
         var twitchLogin = twitchUser.Login;
         var userLogin = LoginName.Parse(twitchLogin).Value;

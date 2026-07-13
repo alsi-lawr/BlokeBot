@@ -1,5 +1,6 @@
 using BlokeBot.Auth.Users;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
 
@@ -15,7 +16,7 @@ internal sealed class AdminHostManagementService(
 {
     public async Task<AdminHostOperationResult> CreateHostAsync(string login, CancellationToken ct)
     {
-        TwitchHelixUser? user;
+        Option<UserIdentity> user;
         try
         {
             user = await users.FindByLoginAsync(login, ct);
@@ -35,22 +36,10 @@ internal sealed class AdminHostManagementService(
             );
         }
 
-        if (user is null || string.IsNullOrWhiteSpace(user.Login))
-        {
-            return new AdminHostOperationResult(false, "Twitch user not found.");
-        }
-
-        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
-            ? user.Login
-            : user.DisplayName;
-        await hostProvisioning.EnsureHostAsync(
-            user.Login,
-            user.Id,
-            displayName,
-            user.ProfileImageUrl,
-            ct
+        return await user.Match(
+            identity => CreateHostAsync(identity, ct),
+            () => Task.FromResult(new AdminHostOperationResult(false, "Twitch user not found."))
         );
-        return new AdminHostOperationResult(true, $"Added a channel for {displayName}.");
     }
 
     public async Task<AdminHostOperationResult> RemoveHostAsync(int hostId, CancellationToken ct)
@@ -101,6 +90,29 @@ internal sealed class AdminHostManagementService(
             result.Succeeded ? RuntimeStatusMessage(currentState) : result.Message,
             result.Succeeded && IsRuntimeTransitionPending(currentState) ? hostId : null
         );
+    }
+
+    private async Task<AdminHostOperationResult> CreateHostAsync(
+        UserIdentity user,
+        CancellationToken ct
+    )
+    {
+        if (string.IsNullOrWhiteSpace(user.Login))
+        {
+            return new AdminHostOperationResult(false, "Twitch user not found.");
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
+            ? user.Login
+            : user.DisplayName;
+        await hostProvisioning.EnsureHostAsync(
+            user.Login,
+            user.Id,
+            displayName,
+            user.ProfileImageUrl,
+            ct
+        );
+        return new AdminHostOperationResult(true, $"Added a channel for {displayName}.");
     }
 
     private static string RuntimeStatusMessage(BotChannelRuntimeState? state)
