@@ -46,12 +46,16 @@ internal sealed class IrcConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        if (target is not RuntimeConnectionTarget.Initial)
-        {
-            throw new UnreachableException(
-                "IRC sessions can only establish the default Twitch endpoint."
-            );
-        }
+        target
+            .Match<Action>(
+                static _ => static () => { },
+                static _ =>
+                    static () =>
+                        throw new UnreachableException(
+                            "IRC sessions can only establish the default Twitch endpoint."
+                        )
+            )
+            .Invoke();
 
         var channelLogins = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)

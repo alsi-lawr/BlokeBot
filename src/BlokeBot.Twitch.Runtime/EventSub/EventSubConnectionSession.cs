@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -48,10 +47,14 @@ internal sealed class EventSubConnectionSession(
         var channelLogins = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
+        var connectionTarget = target.Match(
+            static _ => (Endpoint: _defaultEndpoint, IsInitial: true),
+            static reconnect => (Endpoint: reconnect.Uri, IsInitial: false)
+        );
         if (
             channelLogins.Length == 0
             && !channelSessions.HasPendingReconciliation
-            && target is RuntimeConnectionTarget.Initial
+            && connectionTarget.IsInitial
         )
         {
             status.SetConnected(false, []);
@@ -61,17 +64,11 @@ internal sealed class EventSubConnectionSession(
             return new RuntimeSessionEstablishment.Idle();
         }
 
-        var endpoint = target switch
-        {
-            RuntimeConnectionTarget.Initial => _defaultEndpoint,
-            RuntimeConnectionTarget.EventSubReconnect reconnect => reconnect.Uri,
-            _ => throw new UnreachableException("Unknown EventSub connection target."),
-        };
         var socket = new ClientWebSocket();
         EventSubChannelSession? channelSession = null;
         try
         {
-            await socket.ConnectAsync(endpoint, cancellationToken);
+            await socket.ConnectAsync(connectionTarget.Endpoint, cancellationToken);
             _log.LogInformation("Connected to Twitch EventSub WebSocket.");
             var json =
                 await ReadTextMessageAsync(socket, cancellationToken)

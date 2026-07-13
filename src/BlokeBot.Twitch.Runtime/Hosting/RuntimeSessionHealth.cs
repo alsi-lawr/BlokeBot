@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -26,11 +25,47 @@ internal abstract record RuntimeSessionHealthReport
 
     internal Type FailureType => Exception.GetType();
 
-    internal sealed record RetryScheduled : RuntimeSessionHealthReport;
+    internal abstract TResult Match<TResult>(
+        Func<RetryScheduled, TResult> retryScheduled,
+        Func<ReconnectScheduled, TResult> reconnectScheduled,
+        Func<Unhealthy, TResult> unhealthy
+    );
 
-    internal sealed record ReconnectScheduled : RuntimeSessionHealthReport;
+    internal sealed record RetryScheduled : RuntimeSessionHealthReport
+    {
+        internal override TResult Match<TResult>(
+            Func<RetryScheduled, TResult> retryScheduled,
+            Func<ReconnectScheduled, TResult> reconnectScheduled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return retryScheduled(this);
+        }
+    }
 
-    internal sealed record Unhealthy : RuntimeSessionHealthReport;
+    internal sealed record ReconnectScheduled : RuntimeSessionHealthReport
+    {
+        internal override TResult Match<TResult>(
+            Func<RetryScheduled, TResult> retryScheduled,
+            Func<ReconnectScheduled, TResult> reconnectScheduled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return reconnectScheduled(this);
+        }
+    }
+
+    internal sealed record Unhealthy : RuntimeSessionHealthReport
+    {
+        internal override TResult Match<TResult>(
+            Func<RetryScheduled, TResult> retryScheduled,
+            Func<ReconnectScheduled, TResult> reconnectScheduled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return unhealthy(this);
+        }
+    }
 }
 
 internal interface IRuntimeSessionHealthReporter
@@ -43,37 +78,36 @@ internal sealed class RuntimeSessionHealthLogger(ILogger<RuntimeSessionHealthLog
 {
     public void Report(RuntimeSessionHealthReport report)
     {
-        switch (report)
-        {
-            case RuntimeSessionHealthReport.RetryScheduled retry:
-                log.LogWarning(
-                    "{Runtime} session attempt {Attempt} failed with {Classification} ({FailureType}); a bounded retry is scheduled.",
-                    retry.Runtime,
-                    retry.Attempt,
-                    retry.Classification,
-                    retry.FailureType.FullName
-                );
-                return;
-            case RuntimeSessionHealthReport.ReconnectScheduled reconnect:
-                log.LogWarning(
-                    "{Runtime} session established on attempt {Attempt} disconnected with {Classification} ({FailureType}); a fresh bounded establishment cycle is scheduled.",
-                    reconnect.Runtime,
-                    reconnect.Attempt,
-                    reconnect.Classification,
-                    reconnect.FailureType.FullName
-                );
-                return;
-            case RuntimeSessionHealthReport.Unhealthy unhealthy:
-                log.LogError(
-                    "{Runtime} session attempt {Attempt} failed with {Classification} ({FailureType}); the runtime session is unhealthy and no further retry is configured.",
-                    unhealthy.Runtime,
-                    unhealthy.Attempt,
-                    unhealthy.Classification,
-                    unhealthy.FailureType.FullName
-                );
-                return;
-        }
-
-        throw new UnreachableException("Unknown runtime session health report.");
+        report
+            .Match<Action>(
+                retry =>
+                    () =>
+                        log.LogWarning(
+                            "{Runtime} session attempt {Attempt} failed with {Classification} ({FailureType}); a bounded retry is scheduled.",
+                            retry.Runtime,
+                            retry.Attempt,
+                            retry.Classification,
+                            retry.FailureType.FullName
+                        ),
+                reconnect =>
+                    () =>
+                        log.LogWarning(
+                            "{Runtime} session established on attempt {Attempt} disconnected with {Classification} ({FailureType}); a fresh bounded establishment cycle is scheduled.",
+                            reconnect.Runtime,
+                            reconnect.Attempt,
+                            reconnect.Classification,
+                            reconnect.FailureType.FullName
+                        ),
+                unhealthy =>
+                    () =>
+                        log.LogError(
+                            "{Runtime} session attempt {Attempt} failed with {Classification} ({FailureType}); the runtime session is unhealthy and no further retry is configured.",
+                            unhealthy.Runtime,
+                            unhealthy.Attempt,
+                            unhealthy.Classification,
+                            unhealthy.FailureType.FullName
+                        )
+            )
+            .Invoke();
     }
 }

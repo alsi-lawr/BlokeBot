@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Twitch.Runtime;
 
 internal static class RuntimeSessionRunner
@@ -29,62 +27,15 @@ internal static class RuntimeSessionRunner
                 while (!stoppingToken.IsCancellationRequested)
                 {
                     var outcome = await establishSession(target, stoppingToken);
-                    switch (outcome)
+                    var shouldContinue = await outcome.Match(
+                        HandleIdleAsync,
+                        HandleEstablishedAsync,
+                        static _ => ValueTask.FromResult(false),
+                        static _ => ValueTask.FromResult(false)
+                    );
+                    if (!shouldContinue)
                     {
-                        case RuntimeSessionOutcome.Idle:
-                            var idleHandoff = handoff;
-                            handoff = new RuntimeSessionHandoff.None();
-                            await DisposeHandoffAsync(idleHandoff);
-                            target = initialTarget;
-                            if (!await WaitForChannelsAsync(idleWait, stoppingToken))
-                            {
-                                return;
-                            }
-
-                            break;
-                        case RuntimeSessionOutcome.Established established:
-                            var completedHandoff = handoff;
-                            handoff = new RuntimeSessionHandoff.None();
-                            currentAttempt = established.Attempt;
-                            await CompleteHandoffAsync(completedHandoff, established);
-                            target = initialTarget;
-                            var nextTarget = await ListenAsync(
-                                runtime,
-                                established,
-                                classify,
-                                health,
-                                status,
-                                stoppingToken
-                            );
-                            switch (nextTarget)
-                            {
-                                case RuntimeListenOutcome.Reconnect reconnect:
-                                    target = reconnect.Target;
-                                    break;
-                                case RuntimeListenOutcome.ProtocolHandoff protocol:
-                                    target = protocol.Target;
-                                    handoff = new RuntimeSessionHandoff.Pending
-                                    {
-                                        Session = protocol.PreviousSession,
-                                        Attempt = protocol.Attempt,
-                                    };
-                                    break;
-                                case RuntimeListenOutcome.Canceled:
-                                case RuntimeListenOutcome.Unhealthy:
-                                    return;
-                                default:
-                                    throw new UnreachableException(
-                                        "Unknown runtime listening outcome."
-                                    );
-                            }
-                            break;
-                        case RuntimeSessionOutcome.Canceled:
-                        case RuntimeSessionOutcome.Unhealthy:
-                            return;
-                        default:
-                            throw new UnreachableException(
-                                "Unknown runtime session establishment outcome."
-                            );
+                        return;
                     }
                 }
             }
@@ -112,6 +63,51 @@ internal static class RuntimeSessionRunner
             );
             health.Report(report);
         }
+
+        async ValueTask<bool> HandleIdleAsync(RuntimeSessionOutcome.Idle _)
+        {
+            var idleHandoff = handoff;
+            handoff = new RuntimeSessionHandoff.None();
+            await DisposeHandoffAsync(idleHandoff);
+            target = initialTarget;
+            return await WaitForChannelsAsync(idleWait, stoppingToken);
+        }
+
+        async ValueTask<bool> HandleEstablishedAsync(RuntimeSessionOutcome.Established established)
+        {
+            var completedHandoff = handoff;
+            handoff = new RuntimeSessionHandoff.None();
+            currentAttempt = established.Attempt;
+            await CompleteHandoffAsync(completedHandoff, established);
+            target = initialTarget;
+            var nextTarget = await ListenAsync(
+                runtime,
+                established,
+                classify,
+                health,
+                status,
+                stoppingToken
+            );
+            return nextTarget.Match(
+                reconnect =>
+                {
+                    target = reconnect.Target;
+                    return true;
+                },
+                protocol =>
+                {
+                    target = protocol.Target;
+                    handoff = new RuntimeSessionHandoff.Pending
+                    {
+                        Session = protocol.PreviousSession,
+                        Attempt = protocol.Attempt,
+                    };
+                    return true;
+                },
+                static _ => false,
+                static _ => false
+            );
+        }
     }
 
     internal static async Task<RuntimeSessionOutcome> EstablishOnceAsync(
@@ -134,25 +130,22 @@ internal static class RuntimeSessionRunner
             var establishment = await execute(RunAttemptAsync, stoppingToken);
             if (stoppingToken.IsCancellationRequested)
             {
-                if (establishment is RuntimeSessionEstablishment.Established connected)
-                {
-                    await connected.Session.DisposeAsync();
-                }
+                await establishment.Match(
+                    static _ => ValueTask.CompletedTask,
+                    connected => connected.Session.DisposeAsync()
+                );
 
                 return new RuntimeSessionOutcome.Canceled();
             }
 
-            return establishment switch
-            {
-                RuntimeSessionEstablishment.Idle => new RuntimeSessionOutcome.Idle(),
-                RuntimeSessionEstablishment.Established established =>
-                    new RuntimeSessionOutcome.Established
-                    {
-                        Session = established.Session,
-                        Attempt = attempt,
-                    },
-                _ => throw new UnreachableException("Unknown runtime session establishment."),
-            };
+            return establishment.Match<RuntimeSessionOutcome>(
+                static _ => new RuntimeSessionOutcome.Idle(),
+                established => new RuntimeSessionOutcome.Established
+                {
+                    Session = established.Session,
+                    Attempt = attempt,
+                }
+            );
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -308,28 +301,25 @@ internal static class RuntimeSessionRunner
         }
     }
 
-    private static async ValueTask DisposeHandoffAsync(RuntimeSessionHandoff handoff)
+    private static ValueTask DisposeHandoffAsync(RuntimeSessionHandoff handoff)
     {
-        switch (handoff)
+        return handoff.Match(static _ => ValueTask.CompletedTask, DisposePendingAsync);
+
+        static async ValueTask DisposePendingAsync(RuntimeSessionHandoff.Pending pending)
         {
-            case RuntimeSessionHandoff.None:
+            try
+            {
+                await pending.Session.DisposeAsync();
                 return;
-            case RuntimeSessionHandoff.Pending pending:
-                try
-                {
-                    await pending.Session.DisposeAsync();
-                    return;
-                }
-                catch (Exception exception)
-                {
-                    throw new RuntimeSessionCleanupException(
-                        pending.Attempt,
-                        "EventSub protocol handoff cleanup failed.",
-                        exception
-                    );
-                }
-            default:
-                throw new UnreachableException("Unknown runtime session handoff.");
+            }
+            catch (Exception exception)
+            {
+                throw new RuntimeSessionCleanupException(
+                    pending.Attempt,
+                    "EventSub protocol handoff cleanup failed.",
+                    exception
+                );
+            }
         }
     }
 
@@ -409,11 +399,33 @@ internal abstract record RuntimeConnectionTarget
 {
     private RuntimeConnectionTarget() { }
 
-    internal sealed record Initial : RuntimeConnectionTarget;
+    internal abstract TResult Match<TResult>(
+        Func<Initial, TResult> initial,
+        Func<EventSubReconnect, TResult> eventSubReconnect
+    );
+
+    internal sealed record Initial : RuntimeConnectionTarget
+    {
+        internal override TResult Match<TResult>(
+            Func<Initial, TResult> initial,
+            Func<EventSubReconnect, TResult> eventSubReconnect
+        )
+        {
+            return initial(this);
+        }
+    }
 
     internal sealed record EventSubReconnect : RuntimeConnectionTarget
     {
         internal required Uri Uri { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Initial, TResult> initial,
+            Func<EventSubReconnect, TResult> eventSubReconnect
+        )
+        {
+            return eventSubReconnect(this);
+        }
     }
 }
 
@@ -421,11 +433,33 @@ internal abstract record RuntimeSessionEstablishment
 {
     private RuntimeSessionEstablishment() { }
 
-    internal sealed record Idle : RuntimeSessionEstablishment;
+    internal abstract TResult Match<TResult>(
+        Func<Idle, TResult> idle,
+        Func<Established, TResult> established
+    );
+
+    internal sealed record Idle : RuntimeSessionEstablishment
+    {
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established
+        )
+        {
+            return idle(this);
+        }
+    }
 
     internal sealed record Established : RuntimeSessionEstablishment
     {
         internal required IRuntimeEstablishedSession Session { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established
+        )
+        {
+            return established(this);
+        }
     }
 }
 
@@ -443,20 +477,69 @@ internal abstract record RuntimeSessionOutcome
 {
     private RuntimeSessionOutcome() { }
 
-    internal sealed record Idle : RuntimeSessionOutcome;
+    internal abstract TResult Match<TResult>(
+        Func<Idle, TResult> idle,
+        Func<Established, TResult> established,
+        Func<Canceled, TResult> canceled,
+        Func<Unhealthy, TResult> unhealthy
+    );
+
+    internal sealed record Idle : RuntimeSessionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return idle(this);
+        }
+    }
 
     internal sealed record Established : RuntimeSessionOutcome
     {
         internal required IRuntimeEstablishedSession Session { get; init; }
 
         internal required int Attempt { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return established(this);
+        }
     }
 
-    internal sealed record Canceled : RuntimeSessionOutcome;
+    internal sealed record Canceled : RuntimeSessionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return canceled(this);
+        }
+    }
 
     internal sealed record Unhealthy : RuntimeSessionOutcome
     {
         internal required RuntimeSessionHealthReport.Unhealthy Report { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return unhealthy(this);
+        }
     }
 }
 
@@ -464,9 +547,26 @@ internal abstract record RuntimeListenOutcome
 {
     private RuntimeListenOutcome() { }
 
+    internal abstract TResult Match<TResult>(
+        Func<Reconnect, TResult> reconnect,
+        Func<ProtocolHandoff, TResult> protocolHandoff,
+        Func<Canceled, TResult> canceled,
+        Func<Unhealthy, TResult> unhealthy
+    );
+
     internal sealed record Reconnect : RuntimeListenOutcome
     {
         internal required RuntimeConnectionTarget Target { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Reconnect, TResult> reconnect,
+            Func<ProtocolHandoff, TResult> protocolHandoff,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return reconnect(this);
+        }
     }
 
     internal sealed record ProtocolHandoff : RuntimeListenOutcome
@@ -476,13 +576,44 @@ internal abstract record RuntimeListenOutcome
         internal required IRuntimeEstablishedSession PreviousSession { get; init; }
 
         internal required int Attempt { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Reconnect, TResult> reconnect,
+            Func<ProtocolHandoff, TResult> protocolHandoff,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return protocolHandoff(this);
+        }
     }
 
-    internal sealed record Canceled : RuntimeListenOutcome;
+    internal sealed record Canceled : RuntimeListenOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Reconnect, TResult> reconnect,
+            Func<ProtocolHandoff, TResult> protocolHandoff,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return canceled(this);
+        }
+    }
 
     internal sealed record Unhealthy : RuntimeListenOutcome
     {
         internal required RuntimeSessionHealthReport.Unhealthy Report { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Reconnect, TResult> reconnect,
+            Func<ProtocolHandoff, TResult> protocolHandoff,
+            Func<Canceled, TResult> canceled,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return unhealthy(this);
+        }
     }
 }
 
@@ -490,13 +621,35 @@ internal abstract record RuntimeSessionHandoff
 {
     private RuntimeSessionHandoff() { }
 
-    internal sealed record None : RuntimeSessionHandoff;
+    internal abstract TResult Match<TResult>(
+        Func<None, TResult> none,
+        Func<Pending, TResult> pending
+    );
+
+    internal sealed record None : RuntimeSessionHandoff
+    {
+        internal override TResult Match<TResult>(
+            Func<None, TResult> none,
+            Func<Pending, TResult> pending
+        )
+        {
+            return none(this);
+        }
+    }
 
     internal sealed record Pending : RuntimeSessionHandoff
     {
         internal required IRuntimeEstablishedSession Session { get; init; }
 
         internal required int Attempt { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<None, TResult> none,
+            Func<Pending, TResult> pending
+        )
+        {
+            return pending(this);
+        }
     }
 }
 
