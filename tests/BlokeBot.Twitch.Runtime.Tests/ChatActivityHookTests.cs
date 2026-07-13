@@ -52,7 +52,7 @@ public sealed class ChatActivityHookTests
     {
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
-        var session = new TwitchEventSubConnectionSession(
+        var session = new EventSubConnectionSession(
             null!,
             null!,
             dispatcher,
@@ -60,19 +60,19 @@ public sealed class ChatActivityHookTests
             new TwitchBotRuntimeStatusStore(),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
-                TwitchEventSubMessageObserverBoundary,
+                EventSubMessageObserverBoundary,
                 TwitchChatMessage,
                 TwitchChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.EventSubMessages),
-            NullLogger<TwitchEventSubConnectionSession>.Instance
+            NullLogger<EventSubConnectionSession>.Instance
         );
 
         await session.DispatchChatMessageAsync(
-            new TwitchEventSubChatMessageEvent
+            new EventSubChatMessageEvent
             {
                 BroadcasterUserLogin = "streamer",
                 ChatterUserLogin = "viewer",
-                Message = new TwitchEventSubChatMessage { Text = "!ping" },
+                Message = new EventSubChatMessage { Text = "!ping" },
             },
             "{}",
             CancellationToken.None

@@ -1,8 +1,8 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchEventSubRuntime(
-    ITwitchEventSubConnectionSession session,
-    TwitchEventSubSessionResiliencePipeline resilience,
+internal sealed class EventSubRuntime(
+    IEventSubConnectionSession session,
+    EventSubSessionResiliencePipeline resilience,
     ITwitchRuntimeSessionHealthReporter health,
     TwitchBotRuntimeStatusStore status,
     ITwitchRuntimeIdleWait idleWait
@@ -14,7 +14,7 @@ internal sealed class TwitchEventSubRuntime(
             TwitchBotRuntime.EventSub,
             new TwitchRuntimeConnectionTarget.Initial(),
             EstablishSessionAsync,
-            TwitchEventSubSessionFailureClassifier.Classify,
+            EventSubSessionFailureClassifier.Classify,
             health,
             status,
             idleWait,
@@ -31,7 +31,7 @@ internal sealed class TwitchEventSubRuntime(
             TwitchBotRuntime.EventSub,
             cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
-            TwitchEventSubSessionFailureClassifier.Classify,
+            EventSubSessionFailureClassifier.Classify,
             health,
             status,
             stoppingToken

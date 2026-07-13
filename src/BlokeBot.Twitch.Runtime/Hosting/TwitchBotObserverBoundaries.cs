@@ -17,7 +17,7 @@ public static class TwitchBotObserverBoundaries
 
 internal sealed class TwitchIrcMessageObserverBoundary;
 
-internal sealed class TwitchEventSubMessageObserverBoundary;
+internal sealed class EventSubMessageObserverBoundary;
 
 internal sealed class PublicChatQueueAlertObserverBoundary;
 

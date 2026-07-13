@@ -531,7 +531,7 @@ public sealed class RuntimeSessionResilienceTests
                 status.SetConnected(true, ["channel"]);
                 return Task.FromResult(outcomes.Dequeue());
             },
-            TwitchEventSubSessionFailureClassifier.Classify,
+            EventSubSessionFailureClassifier.Classify,
             health,
             status,
             idleWait,
@@ -729,19 +729,19 @@ public sealed class RuntimeSessionResilienceTests
         TwitchIrcSessionFailureClassifier
             .Classify(cancellation, canceled.Token)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Cancellation);
-        TwitchEventSubSessionFailureClassifier
+        EventSubSessionFailureClassifier
             .Classify(cancellation, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
         TwitchIrcSessionFailureClassifier
             .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchEventSubSessionFailureClassifier
+        EventSubSessionFailureClassifier
             .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
         TwitchIrcSessionFailureClassifier
             .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
-        TwitchEventSubSessionFailureClassifier
+        EventSubSessionFailureClassifier
             .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
     }
@@ -752,7 +752,7 @@ public sealed class RuntimeSessionResilienceTests
         TwitchIrcSessionFailureClassifier
             .Classify(new SocketException((int)SocketError.ConnectionReset), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchEventSubSessionFailureClassifier
+        EventSubSessionFailureClassifier
             .Classify(
                 new WebSocketException(WebSocketError.ConnectionClosedPrematurely),
                 CancellationToken.None
@@ -761,7 +761,7 @@ public sealed class RuntimeSessionResilienceTests
         TwitchIrcSessionFailureClassifier
             .Classify(new JsonException("invalid payload"), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
-        TwitchEventSubSessionFailureClassifier
+        EventSubSessionFailureClassifier
             .Classify(new TimeoutException("establishment timeout"), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Timeout);
     }
@@ -916,9 +916,9 @@ public sealed class RuntimeSessionResilienceTests
                     },
                     health
                 );
-                var eventSub = new TwitchEventSubRuntime(
+                var eventSub = new EventSubRuntime(
                     session,
-                    new TwitchEventSubSessionResiliencePipeline(builder.Build()),
+                    new EventSubSessionResiliencePipeline(builder.Build()),
                     health,
                     status,
                     idleWait
@@ -973,7 +973,7 @@ public sealed class RuntimeSessionResilienceTests
 
     private sealed class ScriptedConnectionSession
         : ITwitchIrcConnectionSession,
-            ITwitchEventSubConnectionSession
+            IEventSubConnectionSession
     {
         private readonly Queue<
             Func<

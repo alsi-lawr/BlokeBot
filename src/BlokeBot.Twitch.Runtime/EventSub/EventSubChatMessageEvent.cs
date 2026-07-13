@@ -2,10 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed record TwitchEventSubChatMessageEvent
+internal sealed record EventSubChatMessageEvent
 {
     [JsonPropertyName("badges")]
-    public IReadOnlyList<TwitchEventSubBadge> Badges { get; init; } = [];
+    public IReadOnlyList<EventSubBadge> Badges { get; init; } = [];
 
     [JsonPropertyName("broadcaster_user_login")]
     public string BroadcasterUserLogin { get; init; } = string.Empty;
@@ -17,7 +17,7 @@ internal sealed record TwitchEventSubChatMessageEvent
     public string ChatterUserId { get; init; } = string.Empty;
 
     [JsonPropertyName("message")]
-    public TwitchEventSubChatMessage? Message { get; init; }
+    public EventSubChatMessage? Message { get; init; }
 
     [JsonPropertyName("message_id")]
     public string MessageId { get; init; } = string.Empty;

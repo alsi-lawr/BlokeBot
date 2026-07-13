@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch.Runtime;
 
-public enum TwitchEventSubChannelPhase
+public enum EventSubChannelPhase
 {
     AccountResolution,
     SubscriptionSetup,
@@ -8,7 +8,7 @@ public enum TwitchEventSubChannelPhase
     Reconciliation,
 }
 
-public enum TwitchEventSubChannelFailureClassification
+public enum EventSubChannelFailureClassification
 {
     Cancellation,
     Timeout,
@@ -17,14 +17,14 @@ public enum TwitchEventSubChannelFailureClassification
     Unexpected,
 }
 
-public enum TwitchEventSubChannelRecoveryTrigger
+public enum EventSubChannelRecoveryTrigger
 {
     Startup,
     Keepalive,
     Explicit,
 }
 
-public enum TwitchEventSubChannelNextAction
+public enum EventSubChannelNextAction
 {
     BeginRecoveryCycle,
     ContinueRecoveryCycle,
@@ -32,26 +32,26 @@ public enum TwitchEventSubChannelNextAction
     NoFurtherAction,
 }
 
-public sealed record TwitchEventSubChannelFailure
+public sealed record EventSubChannelFailure
 {
-    public required TwitchEventSubChannelFailureClassification Classification { get; init; }
+    public required EventSubChannelFailureClassification Classification { get; init; }
 
     public required string FailureType { get; init; }
 }
 
-public abstract record TwitchEventSubChannelStatus
+public abstract record EventSubChannelStatus
 {
-    private TwitchEventSubChannelStatus() { }
+    private EventSubChannelStatus() { }
 
     public abstract string Channel { get; init; }
 
-    public abstract TwitchEventSubChannelPhase Phase { get; init; }
+    public abstract EventSubChannelPhase Phase { get; init; }
 
     public abstract int Attempt { get; init; }
 
     public abstract DateTimeOffset ChangedAt { get; init; }
 
-    public abstract TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+    public abstract EventSubChannelRecoveryTrigger Trigger { get; init; }
 
     public abstract TResult Match<TResult>(
         Func<Healthy, TResult> healthy,
@@ -59,17 +59,17 @@ public abstract record TwitchEventSubChannelStatus
         Func<Degraded, TResult> degraded
     );
 
-    public sealed record Healthy : TwitchEventSubChannelStatus
+    public sealed record Healthy : EventSubChannelStatus
     {
         public override required string Channel { get; init; }
 
-        public override required TwitchEventSubChannelPhase Phase { get; init; }
+        public override required EventSubChannelPhase Phase { get; init; }
 
         public override required int Attempt { get; init; }
 
         public override required DateTimeOffset ChangedAt { get; init; }
 
-        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required EventSubChannelRecoveryTrigger Trigger { get; init; }
 
         public override TResult Match<TResult>(
             Func<Healthy, TResult> healthy,
@@ -81,21 +81,21 @@ public abstract record TwitchEventSubChannelStatus
         }
     }
 
-    public sealed record Recovering : TwitchEventSubChannelStatus
+    public sealed record Recovering : EventSubChannelStatus
     {
         public override required string Channel { get; init; }
 
-        public override required TwitchEventSubChannelPhase Phase { get; init; }
+        public override required EventSubChannelPhase Phase { get; init; }
 
         public override required int Attempt { get; init; }
 
         public override required DateTimeOffset ChangedAt { get; init; }
 
-        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required EventSubChannelRecoveryTrigger Trigger { get; init; }
 
-        public required TwitchEventSubChannelFailure Failure { get; init; }
+        public required EventSubChannelFailure Failure { get; init; }
 
-        public required TwitchEventSubChannelNextAction NextAction { get; init; }
+        public required EventSubChannelNextAction NextAction { get; init; }
 
         public override TResult Match<TResult>(
             Func<Healthy, TResult> healthy,
@@ -107,21 +107,21 @@ public abstract record TwitchEventSubChannelStatus
         }
     }
 
-    public sealed record Degraded : TwitchEventSubChannelStatus
+    public sealed record Degraded : EventSubChannelStatus
     {
         public override required string Channel { get; init; }
 
-        public override required TwitchEventSubChannelPhase Phase { get; init; }
+        public override required EventSubChannelPhase Phase { get; init; }
 
         public override required int Attempt { get; init; }
 
         public override required DateTimeOffset ChangedAt { get; init; }
 
-        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required EventSubChannelRecoveryTrigger Trigger { get; init; }
 
-        public required TwitchEventSubChannelFailure Failure { get; init; }
+        public required EventSubChannelFailure Failure { get; init; }
 
-        public required TwitchEventSubChannelNextAction NextAction { get; init; }
+        public required EventSubChannelNextAction NextAction { get; init; }
 
         public override TResult Match<TResult>(
             Func<Healthy, TResult> healthy,
@@ -134,14 +134,14 @@ public abstract record TwitchEventSubChannelStatus
     }
 }
 
-public sealed record TwitchEventSubChannelStatusSnapshot
+public sealed record EventSubChannelStatusSnapshot
 {
-    public required IReadOnlyList<TwitchEventSubChannelStatus> Channels { get; init; }
+    public required IReadOnlyList<EventSubChannelStatus> Channels { get; init; }
 }
 
-public interface ITwitchEventSubChannelStatusAccessor
+public interface IEventSubChannelStatusAccessor
 {
     event Action? Changed;
 
-    TwitchEventSubChannelStatusSnapshot Current { get; }
+    EventSubChannelStatusSnapshot Current { get; }
 }

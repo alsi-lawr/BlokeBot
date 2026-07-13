@@ -8,17 +8,17 @@ using Polly.Timeout;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal static class TwitchEventSubChannelRecoveryResilience
+internal static class EventSubChannelRecoveryResilience
 {
     internal static void Configure(
-        ResiliencePipelineBuilder<TwitchEventSubChannelReconciliationOutcome> builder,
+        ResiliencePipelineBuilder<EventSubChannelReconciliationOutcome> builder,
         EventSubChannelRecoveryPolicy policy
     )
     {
         if (policy.AttemptLimit > 1)
         {
             builder.AddRetry(
-                new RetryStrategyOptions<TwitchEventSubChannelReconciliationOutcome>
+                new RetryStrategyOptions<EventSubChannelReconciliationOutcome>
                 {
                     MaxRetryAttempts = policy.AttemptLimit - 1,
                     Delay = policy.Delay,
@@ -27,18 +27,18 @@ internal static class TwitchEventSubChannelRecoveryResilience
                     ShouldHandle = args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
-                                ? TwitchEventSubChannelFailureClassifier.IsRecoverable(
-                                    TwitchEventSubChannelFailureClassifier
+                                ? EventSubChannelFailureClassifier.IsRecoverable(
+                                    EventSubChannelFailureClassifier
                                         .Classify(
                                             exception,
-                                            TwitchEventSubChannelPhase.Reconciliation,
+                                            EventSubChannelPhase.Reconciliation,
                                             args.Context.CancellationToken
                                         )
                                         .Classification
                                 )
                                 : args.Outcome.Result
-                                    is TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
-                                    && TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                                    is EventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
+                                    && EventSubChannelFailureClassifier.IsRecoverable(
                                         unresolved.Failure.Classification
                                     )
                         ),
@@ -58,43 +58,40 @@ internal static class TwitchEventSubChannelRecoveryResilience
     }
 }
 
-internal static class TwitchEventSubChannelFailureClassifier
+internal static class EventSubChannelFailureClassifier
 {
-    internal static TwitchEventSubChannelFailureDetails Classify(
+    internal static EventSubChannelFailureDetails Classify(
         Exception exception,
-        TwitchEventSubChannelPhase fallbackPhase,
+        EventSubChannelPhase fallbackPhase,
         CancellationToken cancellationToken
     )
     {
         var (phase, failure) = exception switch
         {
-            TwitchEventSubChannelOperationException operation => (
-                operation.Phase,
-                operation.Failure
-            ),
+            EventSubChannelOperationException operation => (operation.Phase, operation.Failure),
             _ => (fallbackPhase, exception),
         };
         var classification = failure switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
-                TwitchEventSubChannelFailureClassification.Cancellation,
-            OperationCanceledException => TwitchEventSubChannelFailureClassification.Timeout,
+                EventSubChannelFailureClassification.Cancellation,
+            OperationCanceledException => EventSubChannelFailureClassification.Timeout,
             TimeoutRejectedException or TimeoutException =>
-                TwitchEventSubChannelFailureClassification.Timeout,
+                EventSubChannelFailureClassification.Timeout,
             HttpRequestException http when IsTransientHttpStatus(http.StatusCode) =>
-                TwitchEventSubChannelFailureClassification.Transient,
-            HttpRequestException => TwitchEventSubChannelFailureClassification.Terminal,
+                EventSubChannelFailureClassification.Transient,
+            HttpRequestException => EventSubChannelFailureClassification.Terminal,
             SocketException or WebSocketException or IOException =>
-                TwitchEventSubChannelFailureClassification.Transient,
+                EventSubChannelFailureClassification.Transient,
             AccessTokenUnavailableException
             or AuthenticationException
             or InvalidDataException
             or InvalidOperationException
-            or JsonException => TwitchEventSubChannelFailureClassification.Terminal,
-            _ => TwitchEventSubChannelFailureClassification.Unexpected,
+            or JsonException => EventSubChannelFailureClassification.Terminal,
+            _ => EventSubChannelFailureClassification.Unexpected,
         };
 
-        return new TwitchEventSubChannelFailureDetails(
+        return new EventSubChannelFailureDetails(
             phase,
             classification,
             failure.GetType().FullName ?? failure.GetType().Name,
@@ -102,11 +99,11 @@ internal static class TwitchEventSubChannelFailureClassifier
         );
     }
 
-    internal static bool IsRecoverable(TwitchEventSubChannelFailureClassification classification)
+    internal static bool IsRecoverable(EventSubChannelFailureClassification classification)
     {
         return classification
-            is TwitchEventSubChannelFailureClassification.Timeout
-                or TwitchEventSubChannelFailureClassification.Transient;
+            is EventSubChannelFailureClassification.Timeout
+                or EventSubChannelFailureClassification.Transient;
     }
 
     private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode)
@@ -115,26 +112,26 @@ internal static class TwitchEventSubChannelFailureClassifier
     }
 }
 
-internal readonly record struct TwitchEventSubChannelFailureDetails(
-    TwitchEventSubChannelPhase Phase,
-    TwitchEventSubChannelFailureClassification Classification,
+internal readonly record struct EventSubChannelFailureDetails(
+    EventSubChannelPhase Phase,
+    EventSubChannelFailureClassification Classification,
     string FailureType,
     Exception Exception
 )
 {
-    internal TwitchEventSubChannelFailure ToPublicFailure()
+    internal EventSubChannelFailure ToPublicFailure()
     {
         return new() { Classification = Classification, FailureType = FailureType };
     }
 }
 
-internal abstract record TwitchEventSubChannelFailureContext
+internal abstract record EventSubChannelFailureContext
 {
-    private TwitchEventSubChannelFailureContext() { }
+    private EventSubChannelFailureContext() { }
 
-    internal abstract TwitchEventSubChannelPhase Phase { get; }
+    internal abstract EventSubChannelPhase Phase { get; }
 
-    internal abstract TwitchEventSubChannelFailureClassification Classification { get; }
+    internal abstract EventSubChannelFailureClassification Classification { get; }
 
     internal abstract string FailureType { get; }
 
@@ -145,17 +142,17 @@ internal abstract record TwitchEventSubChannelFailureContext
         Func<StartupMessageRejected, TResult> startupMessageRejected
     );
 
-    internal TwitchEventSubChannelFailure ToPublicFailure()
+    internal EventSubChannelFailure ToPublicFailure()
     {
         return new() { Classification = Classification, FailureType = FailureType };
     }
 
-    internal sealed record ClassifiedException(TwitchEventSubChannelFailureDetails Details)
-        : TwitchEventSubChannelFailureContext
+    internal sealed record ClassifiedException(EventSubChannelFailureDetails Details)
+        : EventSubChannelFailureContext
     {
-        internal override TwitchEventSubChannelPhase Phase => Details.Phase;
+        internal override EventSubChannelPhase Phase => Details.Phase;
 
-        internal override TwitchEventSubChannelFailureClassification Classification =>
+        internal override EventSubChannelFailureClassification Classification =>
             Details.Classification;
 
         internal override string FailureType => Details.FailureType;
@@ -176,13 +173,12 @@ internal abstract record TwitchEventSubChannelFailureContext
         }
     }
 
-    internal sealed record MissingChannel : TwitchEventSubChannelFailureContext
+    internal sealed record MissingChannel : EventSubChannelFailureContext
     {
-        internal override TwitchEventSubChannelPhase Phase =>
-            TwitchEventSubChannelPhase.SubscriptionSetup;
+        internal override EventSubChannelPhase Phase => EventSubChannelPhase.SubscriptionSetup;
 
-        internal override TwitchEventSubChannelFailureClassification Classification =>
-            TwitchEventSubChannelFailureClassification.Terminal;
+        internal override EventSubChannelFailureClassification Classification =>
+            EventSubChannelFailureClassification.Terminal;
 
         internal override string FailureType => "MissingChannel";
 
@@ -197,13 +193,12 @@ internal abstract record TwitchEventSubChannelFailureContext
         }
     }
 
-    internal sealed record MissingBot : TwitchEventSubChannelFailureContext
+    internal sealed record MissingBot : EventSubChannelFailureContext
     {
-        internal override TwitchEventSubChannelPhase Phase =>
-            TwitchEventSubChannelPhase.SubscriptionSetup;
+        internal override EventSubChannelPhase Phase => EventSubChannelPhase.SubscriptionSetup;
 
-        internal override TwitchEventSubChannelFailureClassification Classification =>
-            TwitchEventSubChannelFailureClassification.Terminal;
+        internal override EventSubChannelFailureClassification Classification =>
+            EventSubChannelFailureClassification.Terminal;
 
         internal override string FailureType => "MissingBot";
 
@@ -218,13 +213,12 @@ internal abstract record TwitchEventSubChannelFailureContext
         }
     }
 
-    internal sealed record StartupMessageRejected : TwitchEventSubChannelFailureContext
+    internal sealed record StartupMessageRejected : EventSubChannelFailureContext
     {
-        internal override TwitchEventSubChannelPhase Phase =>
-            TwitchEventSubChannelPhase.SubscriptionSetup;
+        internal override EventSubChannelPhase Phase => EventSubChannelPhase.SubscriptionSetup;
 
-        internal override TwitchEventSubChannelFailureClassification Classification =>
-            TwitchEventSubChannelFailureClassification.Terminal;
+        internal override EventSubChannelFailureClassification Classification =>
+            EventSubChannelFailureClassification.Terminal;
 
         internal override string FailureType => "PublicChatEnqueueRejected";
 
@@ -240,19 +234,19 @@ internal abstract record TwitchEventSubChannelFailureContext
     }
 }
 
-internal sealed class TwitchEventSubChannelOperationException(
-    TwitchEventSubChannelPhase phase,
+internal sealed class EventSubChannelOperationException(
+    EventSubChannelPhase phase,
     Exception innerException
 ) : Exception("EventSub channel operation failed.", innerException)
 {
-    internal TwitchEventSubChannelPhase Phase { get; } = phase;
+    internal EventSubChannelPhase Phase { get; } = phase;
 
     internal Exception Failure { get; } = innerException;
 }
 
-internal sealed class TwitchEventSubChannelRecoveryPipeline(
+internal sealed class EventSubChannelRecoveryPipeline(
     ResiliencePipeline attemptPipeline,
-    ResiliencePipeline<TwitchEventSubChannelReconciliationOutcome> recoveryPipeline
+    ResiliencePipeline<EventSubChannelReconciliationOutcome> recoveryPipeline
 )
 {
     internal ValueTask<TResult> ExecuteAttemptAsync<TResult>(
@@ -263,8 +257,8 @@ internal sealed class TwitchEventSubChannelRecoveryPipeline(
         return attemptPipeline.ExecuteAsync(operation, cancellationToken);
     }
 
-    internal ValueTask<TwitchEventSubChannelReconciliationOutcome> ExecuteRecoveryAsync(
-        Func<CancellationToken, ValueTask<TwitchEventSubChannelReconciliationOutcome>> operation,
+    internal ValueTask<EventSubChannelReconciliationOutcome> ExecuteRecoveryAsync(
+        Func<CancellationToken, ValueTask<EventSubChannelReconciliationOutcome>> operation,
         CancellationToken cancellationToken
     )
     {

@@ -55,9 +55,9 @@ public sealed class TwitchBotRuntimeHostedServiceTests
             status,
             idleWait
         );
-        var eventSub = new TwitchEventSubRuntime(
+        var eventSub = new EventSubRuntime(
             eventSubSession,
-            new TwitchEventSubSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
+            new EventSubSessionResiliencePipeline(new ResiliencePipelineBuilder().Build()),
             health,
             status,
             idleWait
@@ -101,7 +101,7 @@ public sealed class TwitchBotRuntimeHostedServiceTests
 
     private sealed class CancelingConnectionSession(CancellationTokenSource stopping)
         : ITwitchIrcConnectionSession,
-            ITwitchEventSubConnectionSession
+            IEventSubConnectionSession
     {
         internal int CallCount { get; private set; }
 

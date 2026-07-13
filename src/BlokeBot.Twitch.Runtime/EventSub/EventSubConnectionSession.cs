@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal interface ITwitchEventSubConnectionSession
+internal interface IEventSubConnectionSession
 {
     Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
         TwitchRuntimeConnectionTarget target,
@@ -17,20 +17,20 @@ internal interface ITwitchEventSubConnectionSession
     );
 }
 
-internal sealed class TwitchEventSubConnectionSession(
+internal sealed class EventSubConnectionSession(
     ITwitchBotChannelProvider channels,
-    TwitchEventSubChannelSessionFactory channelSessions,
+    EventSubChannelSessionFactory channelSessions,
     TwitchCommandDispatcher dispatcher,
     ITwitchCommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
     IEnumerable<ITwitchChatMessageObserver> messageObservers,
     ObserverFanOut<
-        TwitchEventSubMessageObserverBoundary,
+        EventSubMessageObserverBoundary,
         TwitchChatMessage,
         TwitchChatObserverDeadLetter
     > messageObserverFanOut,
-    ILogger<TwitchEventSubConnectionSession> log
-) : ITwitchEventSubConnectionSession
+    ILogger<EventSubConnectionSession> log
+) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
         "TwitchChatMessage"
@@ -38,7 +38,7 @@ internal sealed class TwitchEventSubConnectionSession(
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Uri _defaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
     private readonly ITwitchChatMessageObserver[] _messageObservers = [.. messageObservers];
-    private ILogger<TwitchEventSubConnectionSession> _log { get; } = log;
+    private ILogger<EventSubConnectionSession> _log { get; } = log;
 
     public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
         TwitchRuntimeConnectionTarget target,
@@ -68,7 +68,7 @@ internal sealed class TwitchEventSubConnectionSession(
             _ => throw new UnreachableException("Unknown EventSub connection target."),
         };
         var socket = new ClientWebSocket();
-        TwitchEventSubChannelSession? channelSession = null;
+        EventSubChannelSession? channelSession = null;
         try
         {
             await socket.ConnectAsync(endpoint, cancellationToken);
@@ -76,9 +76,9 @@ internal sealed class TwitchEventSubConnectionSession(
             var json =
                 await ReadTextMessageAsync(socket, cancellationToken)
                 ?? throw new IOException("EventSub WebSocket disconnected.");
-            var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(json, _jsonOptions);
-            var messageType = TwitchEventSubMessageTypes.Parse(envelope?.Metadata.MessageType);
-            if (messageType is not TwitchEventSubMessageType.SessionWelcome)
+            var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(json, _jsonOptions);
+            var messageType = EventSubMessageTypes.Parse(envelope?.Metadata.MessageType);
+            if (messageType is not EventSubMessageType.SessionWelcome)
             {
                 throw new InvalidOperationException(
                     "EventSub did not begin with a session welcome message."
@@ -124,7 +124,7 @@ internal sealed class TwitchEventSubConnectionSession(
     }
 
     internal async Task DispatchChatMessageAsync(
-        TwitchEventSubChatMessageEvent chatEvent,
+        EventSubChatMessageEvent chatEvent,
         string rawJson,
         CancellationToken cancellationToken
     )
@@ -172,7 +172,7 @@ internal sealed class TwitchEventSubConnectionSession(
     }
 
     private static IReadOnlyDictionary<string, string> CreateTags(
-        TwitchEventSubChatMessageEvent chatEvent
+        EventSubChatMessageEvent chatEvent
     )
     {
         var tags = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -242,7 +242,7 @@ internal sealed class TwitchEventSubConnectionSession(
     }
 
     private static async ValueTask<Exception?> DisposeResourcesAsync(
-        TwitchEventSubChannelSession? channelSession,
+        EventSubChannelSession? channelSession,
         ClientWebSocket socket
     )
     {
@@ -278,9 +278,9 @@ internal sealed class TwitchEventSubConnectionSession(
     }
 
     private sealed class EstablishedSession(
-        TwitchEventSubConnectionSession owner,
+        EventSubConnectionSession owner,
         ClientWebSocket socket,
-        TwitchEventSubChannelSession channelSession,
+        EventSubChannelSession channelSession,
         IReadOnlyList<string> initialChannels
     ) : ITwitchRuntimeEstablishedSession
     {
@@ -295,28 +295,25 @@ internal sealed class TwitchEventSubConnectionSession(
                 var json =
                     await ReadTextMessageAsync(socket, cancellationToken)
                     ?? throw new IOException("EventSub WebSocket disconnected.");
-                var envelope = JsonSerializer.Deserialize<TwitchEventSubEnvelope>(
-                    json,
-                    _jsonOptions
-                );
+                var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(json, _jsonOptions);
                 var rawMessageType = envelope?.Metadata.MessageType;
-                var messageType = TwitchEventSubMessageTypes.Parse(rawMessageType);
+                var messageType = EventSubMessageTypes.Parse(rawMessageType);
 
                 switch (messageType)
                 {
-                    case TwitchEventSubMessageType.SessionWelcome:
+                    case EventSubMessageType.SessionWelcome:
                         throw new InvalidOperationException(
                             "EventSub sent a duplicate session welcome message."
                         );
 
-                    case TwitchEventSubMessageType.SessionKeepalive:
+                    case EventSubMessageType.SessionKeepalive:
                         channelSession.TriggerReconciliation(
                             await owner.GetDesiredChannelsAsync(cancellationToken),
-                            TwitchEventSubChannelRecoveryTrigger.Keepalive
+                            EventSubChannelRecoveryTrigger.Keepalive
                         );
                         break;
 
-                    case TwitchEventSubMessageType.SessionReconnect:
+                    case EventSubMessageType.SessionReconnect:
                         owner._log.LogInformation("Twitch requested EventSub WebSocket reconnect.");
                         return new TwitchRuntimeReconnectRequest
                         {
@@ -328,7 +325,7 @@ internal sealed class TwitchEventSubConnectionSession(
                             },
                         };
 
-                    case TwitchEventSubMessageType.Notification:
+                    case EventSubMessageType.Notification:
                         if (envelope?.Payload.Event is { } chatEvent)
                         {
                             await owner.DispatchChatMessageAsync(
@@ -340,13 +337,13 @@ internal sealed class TwitchEventSubConnectionSession(
 
                         break;
 
-                    case TwitchEventSubMessageType.Revocation:
+                    case EventSubMessageType.Revocation:
                         owner._log.LogWarning("EventSub subscription was revoked.");
                         throw new InvalidOperationException(
                             "EventSub chat subscription was revoked."
                         );
 
-                    case TwitchEventSubMessageType.Unknown:
+                    case EventSubMessageType.Unknown:
                         owner._log.LogDebug("Unhandled EventSub message was ignored.");
                         break;
                 }

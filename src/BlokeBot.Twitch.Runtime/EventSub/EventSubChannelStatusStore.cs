@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelStatusAccessor
+internal sealed class EventSubChannelStatusStore : IEventSubChannelStatusAccessor
 {
     private readonly object _gate = new();
     private long _nextScopeId;
@@ -11,7 +11,7 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
 
     public event Action? Changed;
 
-    public TwitchEventSubChannelStatusSnapshot Current
+    public EventSubChannelStatusSnapshot Current
     {
         get
         {
@@ -21,9 +21,9 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
             }
         }
         private set;
-    } = new() { Channels = Array.Empty<TwitchEventSubChannelStatus>() };
+    } = new() { Channels = Array.Empty<EventSubChannelStatus>() };
 
-    internal TwitchEventSubChannelStatusScope CreateScope()
+    internal EventSubChannelStatusScope CreateScope()
     {
         lock (_gate)
         {
@@ -32,11 +32,11 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
                 _nextScopeId++;
             }
 
-            return new TwitchEventSubChannelStatusScope(this, _nextScopeId);
+            return new EventSubChannelStatusScope(this, _nextScopeId);
         }
     }
 
-    private void Activate(TwitchEventSubChannelStatusScope scope)
+    private void Activate(EventSubChannelStatusScope scope)
     {
         Action? changed;
         lock (_gate)
@@ -49,7 +49,7 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
         changed?.Invoke();
     }
 
-    private void Set(TwitchEventSubChannelStatusScope scope, TwitchEventSubChannelStatus status)
+    private void Set(EventSubChannelStatusScope scope, EventSubChannelStatus status)
     {
         Action? changed = null;
         lock (_gate)
@@ -65,7 +65,7 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
         changed?.Invoke();
     }
 
-    private void Remove(TwitchEventSubChannelStatusScope scope, string channel)
+    private void Remove(EventSubChannelStatusScope scope, string channel)
     {
         Action? changed = null;
         lock (_gate)
@@ -82,7 +82,7 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
         changed?.Invoke();
     }
 
-    private void Deactivate(TwitchEventSubChannelStatusScope scope)
+    private void Deactivate(EventSubChannelStatusScope scope)
     {
         Action? changed = null;
         lock (_gate)
@@ -93,9 +93,9 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
             }
 
             _activeScopeId = 0;
-            Current = new TwitchEventSubChannelStatusSnapshot
+            Current = new EventSubChannelStatusSnapshot
             {
-                Channels = Array.Empty<TwitchEventSubChannelStatus>(),
+                Channels = Array.Empty<EventSubChannelStatus>(),
             };
             changed = Changed;
         }
@@ -103,8 +103,8 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
         changed?.Invoke();
     }
 
-    private static TwitchEventSubChannelStatusSnapshot CreateSnapshot(
-        Dictionary<string, TwitchEventSubChannelStatus> states
+    private static EventSubChannelStatusSnapshot CreateSnapshot(
+        Dictionary<string, EventSubChannelStatus> states
     )
     {
         return new()
@@ -117,14 +117,12 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
         };
     }
 
-    internal sealed class TwitchEventSubChannelStatusScope(
-        TwitchEventSubChannelStatusStore owner,
-        long id
-    ) : IDisposable
+    internal sealed class EventSubChannelStatusScope(EventSubChannelStatusStore owner, long id)
+        : IDisposable
     {
         internal long Id { get; } = id;
 
-        internal Dictionary<string, TwitchEventSubChannelStatus> States { get; } =
+        internal Dictionary<string, EventSubChannelStatus> States { get; } =
             new(StringComparer.OrdinalIgnoreCase);
 
         internal void Activate()
@@ -132,7 +130,7 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
             owner.Activate(this);
         }
 
-        internal void Set(TwitchEventSubChannelStatus status)
+        internal void Set(EventSubChannelStatus status)
         {
             owner.Set(this, status);
         }
@@ -149,52 +147,51 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
     }
 }
 
-internal abstract record TwitchEventSubChannelDiagnosticReport
+internal abstract record EventSubChannelDiagnosticReport
 {
-    private TwitchEventSubChannelDiagnosticReport() { }
+    private EventSubChannelDiagnosticReport() { }
 
-    internal abstract TwitchEventSubChannelStatus Status { get; }
+    internal abstract EventSubChannelStatus Status { get; }
 
-    internal sealed record Healthy : TwitchEventSubChannelDiagnosticReport
+    internal sealed record Healthy : EventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Healthy ChannelStatus { get; init; }
+        internal required EventSubChannelStatus.Healthy ChannelStatus { get; init; }
 
-        internal override TwitchEventSubChannelStatus Status => ChannelStatus;
+        internal override EventSubChannelStatus Status => ChannelStatus;
     }
 
-    internal sealed record Recovering : TwitchEventSubChannelDiagnosticReport
+    internal sealed record Recovering : EventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Recovering ChannelStatus { get; init; }
+        internal required EventSubChannelStatus.Recovering ChannelStatus { get; init; }
 
-        internal required TwitchEventSubChannelFailureContext Failure { get; init; }
+        internal required EventSubChannelFailureContext Failure { get; init; }
 
-        internal override TwitchEventSubChannelStatus Status => ChannelStatus;
+        internal override EventSubChannelStatus Status => ChannelStatus;
     }
 
-    internal sealed record Degraded : TwitchEventSubChannelDiagnosticReport
+    internal sealed record Degraded : EventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Degraded ChannelStatus { get; init; }
+        internal required EventSubChannelStatus.Degraded ChannelStatus { get; init; }
 
-        internal required TwitchEventSubChannelFailureContext Failure { get; init; }
+        internal required EventSubChannelFailureContext Failure { get; init; }
 
-        internal override TwitchEventSubChannelStatus Status => ChannelStatus;
+        internal override EventSubChannelStatus Status => ChannelStatus;
     }
 }
 
-internal interface ITwitchEventSubChannelDiagnosticReporter
+internal interface IEventSubChannelDiagnosticReporter
 {
-    void Report(TwitchEventSubChannelDiagnosticReport report);
+    void Report(EventSubChannelDiagnosticReport report);
 }
 
-internal sealed class TwitchEventSubChannelDiagnosticLogger(
-    ILogger<TwitchEventSubChannelDiagnosticLogger> log
-) : ITwitchEventSubChannelDiagnosticReporter
+internal sealed class EventSubChannelDiagnosticLogger(ILogger<EventSubChannelDiagnosticLogger> log)
+    : IEventSubChannelDiagnosticReporter
 {
-    public void Report(TwitchEventSubChannelDiagnosticReport report)
+    public void Report(EventSubChannelDiagnosticReport report)
     {
         switch (report)
         {
-            case TwitchEventSubChannelDiagnosticReport.Healthy { ChannelStatus: var healthy }:
+            case EventSubChannelDiagnosticReport.Healthy { ChannelStatus: var healthy }:
                 log.LogInformation(
                     "EventSub channel {Channel} is healthy after {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}.",
                     healthy.Channel,
@@ -204,7 +201,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
                     healthy.Trigger
                 );
                 return;
-            case TwitchEventSubChannelDiagnosticReport.Recovering { ChannelStatus: var recovering }:
+            case EventSubChannelDiagnosticReport.Recovering { ChannelStatus: var recovering }:
                 log.LogWarning(
                     "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
                     recovering.Channel,
@@ -217,7 +214,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
                     recovering.NextAction
                 );
                 return;
-            case TwitchEventSubChannelDiagnosticReport.Degraded { ChannelStatus: var degraded }:
+            case EventSubChannelDiagnosticReport.Degraded { ChannelStatus: var degraded }:
                 log.LogError(
                     "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
                     degraded.Channel,

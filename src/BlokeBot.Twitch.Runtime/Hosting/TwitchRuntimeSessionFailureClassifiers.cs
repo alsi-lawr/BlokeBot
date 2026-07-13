@@ -42,7 +42,7 @@ internal static class TwitchIrcSessionFailureClassifier
     }
 }
 
-internal static class TwitchEventSubSessionFailureClassifier
+internal static class EventSubSessionFailureClassifier
 {
     internal static TwitchRuntimeSessionFailureClassification Classify(
         Exception exception,

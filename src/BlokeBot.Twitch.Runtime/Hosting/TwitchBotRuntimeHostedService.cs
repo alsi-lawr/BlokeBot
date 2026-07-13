@@ -7,12 +7,12 @@ internal sealed class TwitchBotRuntimeHostedService : BackgroundService
 {
     private readonly TwitchBotSettings _settings;
     private readonly TwitchIrcRuntime _irc;
-    private readonly TwitchEventSubRuntime _eventSub;
+    private readonly EventSubRuntime _eventSub;
 
     public TwitchBotRuntimeHostedService(
         TwitchBotSettings settings,
         TwitchIrcRuntime irc,
-        TwitchEventSubRuntime eventSub
+        EventSubRuntime eventSub
     )
     {
         ArgumentNullException.ThrowIfNull(settings);

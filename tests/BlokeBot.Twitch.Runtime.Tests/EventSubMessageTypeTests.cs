@@ -7,24 +7,24 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubMessageTypeTests
 {
     [Test]
-    [Arguments("session_welcome", TwitchEventSubMessageType.SessionWelcome)]
-    [Arguments("session_keepalive", TwitchEventSubMessageType.SessionKeepalive)]
-    [Arguments("session_reconnect", TwitchEventSubMessageType.SessionReconnect)]
-    [Arguments("notification", TwitchEventSubMessageType.Notification)]
-    [Arguments("revocation", TwitchEventSubMessageType.Revocation)]
-    [Arguments("mystery", TwitchEventSubMessageType.Unknown)]
-    [Arguments("", TwitchEventSubMessageType.Unknown)]
+    [Arguments("session_welcome", EventSubMessageType.SessionWelcome)]
+    [Arguments("session_keepalive", EventSubMessageType.SessionKeepalive)]
+    [Arguments("session_reconnect", EventSubMessageType.SessionReconnect)]
+    [Arguments("notification", EventSubMessageType.Notification)]
+    [Arguments("revocation", EventSubMessageType.Revocation)]
+    [Arguments("mystery", EventSubMessageType.Unknown)]
+    [Arguments("", EventSubMessageType.Unknown)]
     public void KnownUnknownOrEmptyMessageType_Parsing_ReturnsTypedValue(
         string raw,
-        TwitchEventSubMessageType expectedMessageType
+        EventSubMessageType expectedMessageType
     )
     {
-        TwitchEventSubMessageTypes.Parse(raw).ShouldBe(expectedMessageType);
+        EventSubMessageTypes.Parse(raw).ShouldBe(expectedMessageType);
     }
 
     [Test]
     public void MissingMessageType_Parsing_ReturnsUnknown()
     {
-        TwitchEventSubMessageTypes.Parse(null).ShouldBe(TwitchEventSubMessageType.Unknown);
+        EventSubMessageTypes.Parse(null).ShouldBe(EventSubMessageType.Unknown);
     }
 }

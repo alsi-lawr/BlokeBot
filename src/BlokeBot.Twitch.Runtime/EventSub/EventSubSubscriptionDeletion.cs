@@ -2,46 +2,46 @@ using System.Diagnostics;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal abstract record TwitchEventSubSubscriptionDeletionOutcome
+internal abstract record EventSubSubscriptionDeletionOutcome
 {
-    private TwitchEventSubSubscriptionDeletionOutcome() { }
+    private EventSubSubscriptionDeletionOutcome() { }
 
-    internal sealed record Deleted : TwitchEventSubSubscriptionDeletionOutcome;
+    internal sealed record Deleted : EventSubSubscriptionDeletionOutcome;
 
-    internal sealed record Unresolved : TwitchEventSubSubscriptionDeletionOutcome
+    internal sealed record Unresolved : EventSubSubscriptionDeletionOutcome
     {
-        internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
+        internal required EventSubChannelFailureDetails Failure { get; init; }
     }
 }
 
-internal abstract record TwitchEventSubPendingDeletionState
+internal abstract record EventSubPendingDeletionState
 {
-    private TwitchEventSubPendingDeletionState() { }
+    private EventSubPendingDeletionState() { }
 
-    internal sealed record Scheduled : TwitchEventSubPendingDeletionState;
+    internal sealed record Scheduled : EventSubPendingDeletionState;
 
-    internal sealed record Unresolved : TwitchEventSubPendingDeletionState
+    internal sealed record Unresolved : EventSubPendingDeletionState
     {
-        internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
+        internal required EventSubChannelFailureDetails Failure { get; init; }
     }
 }
 
-internal sealed record TwitchEventSubPendingDeletion
+internal sealed record EventSubPendingDeletion
 {
     internal required ActiveEventSubSubscription Subscription { get; init; }
 
-    internal required TwitchEventSubPendingDeletionState State { get; init; }
+    internal required EventSubPendingDeletionState State { get; init; }
 }
 
-internal sealed class TwitchEventSubSubscriptionReconciliationStore
+internal sealed class EventSubSubscriptionReconciliationStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, TwitchEventSubPendingDeletion> _pending = new(
+    private readonly Dictionary<string, EventSubPendingDeletion> _pending = new(
         StringComparer.OrdinalIgnoreCase
     );
     private readonly HashSet<string> _pendingStops = new(StringComparer.OrdinalIgnoreCase);
 
-    internal IReadOnlyList<TwitchEventSubPendingDeletion> PendingDeletions
+    internal IReadOnlyList<EventSubPendingDeletion> PendingDeletions
     {
         get
         {
@@ -85,7 +85,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         }
     }
 
-    internal bool TryGet(string channel, out TwitchEventSubPendingDeletion deletion)
+    internal bool TryGet(string channel, out EventSubPendingDeletion deletion)
     {
         lock (_gate)
         {
@@ -110,17 +110,17 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
                 );
             }
 
-            _pending[subscription.Channel] = new TwitchEventSubPendingDeletion
+            _pending[subscription.Channel] = new EventSubPendingDeletion
             {
                 Subscription = subscription,
-                State = new TwitchEventSubPendingDeletionState.Scheduled(),
+                State = new EventSubPendingDeletionState.Scheduled(),
             };
         }
     }
 
     internal void RetainUnresolved(
         ActiveEventSubSubscription subscription,
-        TwitchEventSubChannelFailureDetails failure
+        EventSubChannelFailureDetails failure
     )
     {
         lock (_gate)
@@ -134,10 +134,10 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
 
             EnsureSameSubscription(existing.Subscription, subscription);
 
-            _pending[subscription.Channel] = new TwitchEventSubPendingDeletion
+            _pending[subscription.Channel] = new EventSubPendingDeletion
             {
                 Subscription = subscription,
-                State = new TwitchEventSubPendingDeletionState.Unresolved { Failure = failure },
+                State = new EventSubPendingDeletionState.Unresolved { Failure = failure },
             };
         }
     }

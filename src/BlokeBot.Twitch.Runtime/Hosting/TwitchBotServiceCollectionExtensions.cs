@@ -120,7 +120,7 @@ public static class TwitchBotServiceCollectionExtensions
             TwitchChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.IrcMessages);
         services.AddContinueAndReportObserverFanOut<
-            TwitchEventSubMessageObserverBoundary,
+            EventSubMessageObserverBoundary,
             TwitchChatMessage,
             TwitchChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.EventSubMessages);
@@ -140,25 +140,19 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<TwitchBotRuntimeStatusStore>()
         );
-        services.AddSingleton<TwitchEventSubChannelStatusStore>();
-        services.AddSingleton<ITwitchEventSubChannelStatusAccessor>(serviceProvider =>
-            serviceProvider.GetRequiredService<TwitchEventSubChannelStatusStore>()
+        services.AddSingleton<EventSubChannelStatusStore>();
+        services.AddSingleton<IEventSubChannelStatusAccessor>(serviceProvider =>
+            serviceProvider.GetRequiredService<EventSubChannelStatusStore>()
         );
-        services.TryAddSingleton<TwitchEventSubSubscriptionReconciliationStore>();
+        services.TryAddSingleton<EventSubSubscriptionReconciliationStore>();
         services.TryAddSingleton<
-            ITwitchEventSubChannelDiagnosticReporter,
-            TwitchEventSubChannelDiagnosticLogger
+            IEventSubChannelDiagnosticReporter,
+            EventSubChannelDiagnosticLogger
         >();
-        services.TryAddSingleton<
-            ITwitchEventSubChannelOperations,
-            TwitchEventSubChannelOperations
-        >();
-        services.TryAddSingleton<TwitchEventSubChannelSessionFactory>();
-        services.TryAddSingleton<
-            ITwitchEventSubConnectionSession,
-            TwitchEventSubConnectionSession
-        >();
-        services.TryAddSingleton<TwitchEventSubRuntime>();
+        services.TryAddSingleton<IEventSubChannelOperations, EventSubChannelOperations>();
+        services.TryAddSingleton<EventSubChannelSessionFactory>();
+        services.TryAddSingleton<IEventSubConnectionSession, EventSubConnectionSession>();
+        services.TryAddSingleton<EventSubRuntime>();
         services.TryAddSingleton<ITwitchIrcConnectionSession, TwitchIrcConnectionSession>();
         services.TryAddSingleton<TwitchIrcRuntime>();
         services.AddHostedService<TwitchBotRuntimeHostedService>();
@@ -216,13 +210,13 @@ public static class TwitchBotServiceCollectionExtensions
         );
         services.AddResiliencePipeline<
             TwitchBotResiliencePipeline,
-            TwitchEventSubChannelReconciliationOutcome
+            EventSubChannelReconciliationOutcome
         >(
             TwitchBotResiliencePipeline.EventSubChannelRecovery,
             (builder, context) =>
             {
                 builder.TimeProvider = context.ServiceProvider.GetRequiredService<TimeProvider>();
-                TwitchEventSubChannelRecoveryResilience.Configure(
+                EventSubChannelRecoveryResilience.Configure(
                     builder,
                     policies.EventSubChannelRecovery
                 );
@@ -233,7 +227,7 @@ public static class TwitchBotServiceCollectionExtensions
                 .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
                 .GetPipeline(TwitchBotResiliencePipeline.IrcSession)
         ));
-        services.AddSingleton(serviceProvider => new TwitchEventSubSessionResiliencePipeline(
+        services.AddSingleton(serviceProvider => new EventSubSessionResiliencePipeline(
             serviceProvider
                 .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
                 .GetPipeline(TwitchBotResiliencePipeline.EventSubSession)
@@ -244,15 +238,15 @@ public static class TwitchBotServiceCollectionExtensions
             {
                 TimeProvider = serviceProvider.GetRequiredService<TimeProvider>(),
             };
-            TwitchEventSubChannelRecoveryResilience.ConfigureAttempt(
+            EventSubChannelRecoveryResilience.ConfigureAttempt(
                 attempt,
                 policies.EventSubChannelRecovery
             );
-            return new TwitchEventSubChannelRecoveryPipeline(
+            return new EventSubChannelRecoveryPipeline(
                 attempt.Build(),
                 serviceProvider
                     .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
-                    .GetPipeline<TwitchEventSubChannelReconciliationOutcome>(
+                    .GetPipeline<EventSubChannelReconciliationOutcome>(
                         TwitchBotResiliencePipeline.EventSubChannelRecovery
                     )
             );

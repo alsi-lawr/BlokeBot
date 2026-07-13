@@ -2,11 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed record TwitchEventSubBadge
+internal sealed record EventSubSession
 {
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;
 
-    [JsonPropertyName("set_id")]
-    public string SetId { get; init; } = string.Empty;
+    [JsonPropertyName("reconnect_url")]
+    public string? ReconnectUrl { get; init; }
 }

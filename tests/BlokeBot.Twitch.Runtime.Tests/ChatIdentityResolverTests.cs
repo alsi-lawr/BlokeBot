@@ -79,7 +79,7 @@ public sealed class ChatIdentityResolverTests
     public async Task MissingChannel_CreatingEventSubSubscription_IsTerminalWithoutCreateRequest()
     {
         var factory = new IdentityHttpClientFactory("""{"data":[{"id":"bot-id","login":"bot"}]}""");
-        var operations = new TwitchEventSubChannelOperations(
+        var operations = new EventSubChannelOperations(
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
@@ -95,7 +95,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<TwitchEventSubSubscriptionSetupOutcome.MissingChannel>();
+        outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingChannel>();
         factory.EventSubRequestCount.ShouldBe(0);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("access-token");
@@ -107,7 +107,7 @@ public sealed class ChatIdentityResolverTests
         var factory = new IdentityHttpClientFactory(
             """{"data":[{"id":"channel-id","login":"private-channel-login"}]}"""
         );
-        var operations = new TwitchEventSubChannelOperations(
+        var operations = new EventSubChannelOperations(
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
@@ -123,7 +123,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<TwitchEventSubSubscriptionSetupOutcome.MissingBot>();
+        outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.MissingBot>();
         factory.EventSubRequestCount.ShouldBe(0);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("private-bot-login");
@@ -205,7 +205,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<TwitchEventSubStartupDeliveryOutcome.Completed>();
+        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
         chat.Messages.ShouldBe(["private startup payload"]);
         chat.Channels.ShouldBe(["private-channel-login"]);
         chat.Deadlines.ShouldHaveSingleItem()
@@ -223,7 +223,7 @@ public sealed class ChatIdentityResolverTests
             CancellationToken.None
         );
 
-        outcome.ShouldBeOfType<TwitchEventSubStartupDeliveryOutcome.Rejected>();
+        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Rejected>();
         chat.Messages.ShouldBe(["private startup payload"]);
         outcome.ToString().ShouldNotContain("private-channel-login");
         outcome.ToString().ShouldNotContain("private startup payload");
@@ -252,9 +252,7 @@ public sealed class ChatIdentityResolverTests
         return new(Identity(), new HelixClient(factory));
     }
 
-    private static TwitchEventSubChannelOperations StartupOperations(
-        ITwitchChatMessageSender sender
-    )
+    private static EventSubChannelOperations StartupOperations(ITwitchChatMessageSender sender)
     {
         var factory = new IdentityHttpClientFactory("""{"data":[]}""");
         return new(
