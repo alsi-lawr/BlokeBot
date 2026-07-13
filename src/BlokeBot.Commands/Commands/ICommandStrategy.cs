@@ -35,7 +35,7 @@ public interface ICommandStrategy<TKind, TState>
 public sealed record CommandStrategyContext<TKind, TState>(
     TKind Kind,
     TState State,
-    TwitchCommandContext Command,
+    ChatCommandContext Command,
     IReadOnlyList<string> Args
 )
     where TKind : notnull;

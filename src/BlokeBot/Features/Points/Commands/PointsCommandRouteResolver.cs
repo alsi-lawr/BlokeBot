@@ -10,7 +10,7 @@ public sealed class PointsCommandRouteResolver(
 ) : ICommandRouteResolver<PointsCommandKind, AppCommandRouteState>
 {
     public async ValueTask<CommandRoute<PointsCommandKind, AppCommandRouteState>?> ResolveAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         CancellationToken cancellationToken
     )
     {

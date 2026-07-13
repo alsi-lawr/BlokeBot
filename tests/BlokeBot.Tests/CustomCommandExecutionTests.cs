@@ -21,7 +21,7 @@ public sealed class CustomCommandExecutionTests
         var disabledHostId = await SeedHostAsync(dbFactory, "disabled", HostFeatureFlags.Points);
         await SeedCommandAsync(dbFactory, disabledHostId, "hello", ["Hidden"]);
         await using var services = BuildServices(dbFactory);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
@@ -45,7 +45,7 @@ public sealed class CustomCommandExecutionTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         await SeedCommandAsync(dbFactory, hostId, "secret", ["Hi {user}"], moderatorOnly: true);
         await using var services = BuildServices(dbFactory);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
@@ -87,7 +87,7 @@ public sealed class CustomCommandExecutionTests
             CustomMessageSelectionMode.First
         );
         await using var services = BuildServices(dbFactory);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
@@ -128,7 +128,7 @@ public sealed class CustomCommandExecutionTests
             CustomMessageSelectionMode.Random
         );
         await using var services = BuildServices(dbFactory);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await DispatchMessageAsync(dispatcher, "viewer", "streamer", "!first", replies);
@@ -160,7 +160,7 @@ public sealed class CustomCommandExecutionTests
             counterValue: 41
         );
         await using var services = BuildServices(dbFactory);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
@@ -202,7 +202,7 @@ public sealed class CustomCommandExecutionTests
             cooldownScope: CustomCommandCooldownScope.User
         );
         await using var services = BuildServices(dbFactory, minimumCooldownSeconds: 5, clock);
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
         List<string> replies = [];
 
         await DispatchMessageAsync(dispatcher, "alice", "streamer", "!global", replies);
@@ -245,7 +245,7 @@ public sealed class CustomCommandExecutionTests
         }
 
         services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
-        services.AddTwitchCommands().AddCommandModule<CustomCommandModule>();
+        services.AddChatCommands().AddCommandModule<CustomCommandModule>();
         return services.BuildServiceProvider();
     }
 
@@ -367,7 +367,7 @@ public sealed class CustomCommandExecutionTests
     }
 
     private static async Task DispatchMessageAsync(
-        TwitchCommandDispatcher dispatcher,
+        ChatCommandDispatcher dispatcher,
         string login,
         string channel,
         string text,

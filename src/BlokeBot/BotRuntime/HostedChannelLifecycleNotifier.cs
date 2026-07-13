@@ -3,7 +3,7 @@ using BlokeBot.Features.HostedChannels.Runtime;
 namespace BlokeBot.BotRuntime;
 
 internal sealed class HostedChannelLifecycleNotifier(HostedChannelRuntimeLifecycleService lifecycle)
-    : ITwitchBotChannelLifecycleNotifier
+    : IBotChannelLifecycleNotifier
 {
     public async Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
     {

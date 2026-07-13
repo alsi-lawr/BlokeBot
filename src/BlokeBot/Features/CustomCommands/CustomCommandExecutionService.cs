@@ -17,7 +17,7 @@ public sealed class CustomCommandExecutionService(
 )
 {
     public async ValueTask<bool> TryExecuteAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
     )
@@ -61,7 +61,7 @@ public sealed class CustomCommandExecutionService(
             return true;
         }
 
-        if (command.ModeratorOnly && !TwitchModeratorPolicy.IsModerator(context.Message))
+        if (command.ModeratorOnly && !ChatModeratorPolicy.IsModerator(context.Message))
         {
             return true;
         }

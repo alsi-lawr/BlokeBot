@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace BlokeBot.Auth.Sessions;
 
-internal sealed class AuthSessionService(BotAdminService admins, TwitchBotSettings botSettings)
+internal sealed class AuthSessionService(BotAdminService admins, BotSettings botSettings)
 {
     public async Task SignInAsync(
         HttpContext context,

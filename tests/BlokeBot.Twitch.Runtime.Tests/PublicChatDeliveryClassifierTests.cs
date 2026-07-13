@@ -85,7 +85,7 @@ public sealed class PublicChatDeliveryClassifierTests
     }
 
     [Test]
-    public void TwitchSendResults_Classifying_MapSentAndBothRejectionShapes()
+    public void TransportSendResults_Classifying_MapSentAndBothRejectionShapes()
     {
         PublicChatDeliveryClassifier
             .ClassifySendResult(

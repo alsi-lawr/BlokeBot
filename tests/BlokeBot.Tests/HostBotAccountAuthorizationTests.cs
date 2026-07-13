@@ -19,8 +19,8 @@ public sealed class HostBotAccountAuthorizationTests
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
-            TwitchBotSettings.FromOptions(
-                new TwitchBotOptions
+            BotSettings.FromOptions(
+                new BotOptions
                 {
                     Identity = new BotIdentityOptions
                     {
@@ -138,12 +138,12 @@ public sealed class HostBotAccountAuthorizationTests
         {
             var expected =
                 result.Channel == "custom-channel"
-                    ? new TwitchBotAccount("custombot", "override-token")
-                    : new TwitchBotAccount("bot", "global-token");
+                    ? new BotAccount("custombot", "override-token")
+                    : new BotAccount("bot", "global-token");
             result.Account.ShouldBe(expected);
         }
 
-        async Task<(string Channel, TwitchBotAccount Account)> ResolveAsync(string channel)
+        async Task<(string Channel, BotAccount Account)> ResolveAsync(string channel)
         {
             return (channel, await service.GetBotAccountAsync(channel, CancellationToken.None));
         }
@@ -264,8 +264,8 @@ public sealed class HostBotAccountAuthorizationTests
     )
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
-        var options = TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        var options = BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {

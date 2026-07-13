@@ -16,20 +16,20 @@ public sealed class ChatActivityHookTests
         var recorder = new RuntimeHookRecorder();
         var dispatcher = BuildDispatcher(recorder);
         var session = new IrcConnectionSession(
-            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
+            BotSettings.FromOptions(new BotOptions()),
             null!,
             null!,
             dispatcher,
             null!,
             null!,
             new RecordingCommandResponseSender(recorder),
-            new TwitchBotRuntimeStatusStore(),
+            new BotRuntimeStatusStore(),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 IrcMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
-            >(TwitchBotObserverBoundaries.IrcMessages),
+            >(BotObserverBoundaries.IrcMessages),
             NullLogger<IrcConnectionSession>.Instance
         );
 
@@ -57,13 +57,13 @@ public sealed class ChatActivityHookTests
             null!,
             dispatcher,
             new RecordingCommandResponseSender(recorder),
-            new TwitchBotRuntimeStatusStore(),
+            new BotRuntimeStatusStore(),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
-            >(TwitchBotObserverBoundaries.EventSubMessages),
+            >(BotObserverBoundaries.EventSubMessages),
             NullLogger<EventSubConnectionSession>.Instance
         );
 
@@ -88,20 +88,20 @@ public sealed class ChatActivityHookTests
         var recorder = new RuntimeHookRecorder();
         var logger = new RecordingLogger<IrcConnectionSession>();
         var session = new IrcConnectionSession(
-            TwitchBotSettings.FromOptions(new TwitchBotOptions()),
+            BotSettings.FromOptions(new BotOptions()),
             null!,
             null!,
             BuildDispatcher(recorder),
             null!,
             null!,
             new RecordingCommandResponseSender(recorder),
-            new TwitchBotRuntimeStatusStore(),
+            new BotRuntimeStatusStore(),
             [],
             RuntimeTestObserverFanOut.Continue<
                 IrcMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
-            >(TwitchBotObserverBoundaries.IrcMessages),
+            >(BotObserverBoundaries.IrcMessages),
             logger
         );
 
@@ -124,17 +124,17 @@ public sealed class ChatActivityHookTests
         entry.Properties.ShouldNotContainKey("Text");
     }
 
-    internal static TwitchCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
+    internal static ChatCommandDispatcher BuildDispatcher(RuntimeHookRecorder recorder)
     {
         var services = new ServiceCollection();
         services.AddSingleton(recorder);
-        services.AddTwitchCommands().AddCommandModule<RecordingCommandModule>();
-        return services.BuildServiceProvider().GetRequiredService<TwitchCommandDispatcher>();
+        services.AddChatCommands().AddCommandModule<RecordingCommandModule>();
+        return services.BuildServiceProvider().GetRequiredService<ChatCommandDispatcher>();
     }
 
-    private sealed class RecordingCommandModule(RuntimeHookRecorder recorder) : ITwitchCommandModule
+    private sealed class RecordingCommandModule(RuntimeHookRecorder recorder) : IChatCommandModule
     {
-        public void AddCommands(ITwitchCommandBuilder commands)
+        public void AddCommands(IChatCommandBuilder commands)
         {
             commands.Map(
                 "ping",

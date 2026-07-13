@@ -2,10 +2,10 @@ using BlokeBot.Commands;
 
 namespace BlokeBot.Commands.Tests;
 
-internal sealed class DenyAllFilter : ITwitchCommandFilter
+internal sealed class DenyAllFilter : IChatCommandFilter
 {
     public ValueTask<bool> AllowAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         CancellationToken cancellationToken
     )
     {

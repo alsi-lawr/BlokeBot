@@ -1016,7 +1016,7 @@ public sealed class PointsGiveawaySchedulerTests
     )
     {
         var httpClientFactory = new FakeHttpClientFactory();
-        var options = TwitchBotSettings.FromOptions(new TwitchBotOptions());
+        var options = BotSettings.FromOptions(new BotOptions());
         var helix = new HelixClient(httpClientFactory);
         var status = new HostBotStatusService(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),

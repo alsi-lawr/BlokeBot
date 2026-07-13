@@ -30,7 +30,7 @@ public sealed class PublicChatOutboxIntegrationTests
             outbox,
             new RecordingPublicChatTransport(),
             new ManualTestTimeProvider(now),
-            new TwitchBotOptions { MaxChatMessageLength = 10 }
+            new BotOptions { MaxChatMessageLength = 10 }
         );
 
         var receipt = await queue.EnqueueAsync(
@@ -472,7 +472,7 @@ public sealed class PublicChatOutboxIntegrationTests
             observed,
             transport,
             clock,
-            new TwitchBotOptions { ChatMessageSendIntervalSeconds = 60 }
+            new BotOptions { ChatMessageSendIntervalSeconds = 60 }
         );
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -510,7 +510,7 @@ public sealed class PublicChatOutboxIntegrationTests
             outbox,
             new RecordingPublicChatTransport(),
             clock,
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 5,
                 DuplicateChatMessageCooldownSeconds = 3,
@@ -621,7 +621,7 @@ public sealed class PublicChatOutboxIntegrationTests
             outbox,
             transport,
             clock,
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 0,
@@ -1147,7 +1147,7 @@ public sealed class PublicChatOutboxIntegrationTests
                 ),
                 restartedTransport,
                 clock,
-                new TwitchBotOptions
+                new BotOptions
                 {
                     ChatMessageSendIntervalSeconds = 0,
                     DuplicateChatMessageCooldownSeconds = 0,

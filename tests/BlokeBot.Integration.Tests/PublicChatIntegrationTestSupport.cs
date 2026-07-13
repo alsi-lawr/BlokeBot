@@ -26,12 +26,12 @@ internal static class PublicChatIntegrationTestSupport
         IPublicChatOutbox outbox,
         IPublicChatTransport transport,
         TimeProvider timeProvider,
-        TwitchBotOptions? options = null,
+        BotOptions? options = null,
         IEnumerable<IPublicChatQueueAlertObserver>? observers = null
     )
     {
         return new(
-            TwitchBotSettings.FromOptions(options ?? new TwitchBotOptions()),
+            BotSettings.FromOptions(options ?? new BotOptions()),
             timeProvider,
             new PublicChatQueueBacklogMonitor(),
             new PublicChatQueueAlertDispatcher(
@@ -40,7 +40,7 @@ internal static class PublicChatIntegrationTestSupport
                     PublicChatQueueAlertObserverBoundary,
                     PublicChatQueueBacklog,
                     PublicChatQueueAlertDeadLetter
-                >(TwitchBotObserverBoundaries.PublicChatQueueAlerts)
+                >(BotObserverBoundaries.PublicChatQueueAlerts)
             ),
             outbox,
             transport,

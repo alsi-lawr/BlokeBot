@@ -1,6 +1,6 @@
 namespace BlokeBot.BotStatus;
 
-internal sealed class OfflineBotStatusAccessor : ITwitchBotRuntimeStatusAccessor
+internal sealed class OfflineBotStatusAccessor : IBotRuntimeStatusAccessor
 {
     public event Action? Changed
     {
@@ -8,5 +8,5 @@ internal sealed class OfflineBotStatusAccessor : ITwitchBotRuntimeStatusAccessor
         remove { }
     }
 
-    public TwitchBotRuntimeStatus Current { get; } = new(false, false, []);
+    public BotRuntimeStatus Current { get; } = new(false, false, []);
 }

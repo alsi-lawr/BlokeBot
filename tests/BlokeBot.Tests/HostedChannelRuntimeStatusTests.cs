@@ -19,8 +19,8 @@ public sealed class HostedChannelRuntimeStatusTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
         var httpClientFactory = new CountingHttpClientFactory();
-        var options = TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        var options = BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {

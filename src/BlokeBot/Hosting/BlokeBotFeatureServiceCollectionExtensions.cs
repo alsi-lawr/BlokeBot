@@ -199,7 +199,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         >();
         services.AddSingleton<PointsCommandService>();
         services.AddSingleton<PointBalanceService>();
-        services.AddSingleton<IPointTargetUserLookup, TwitchPointTargetUserLookup>();
+        services.AddSingleton<IPointTargetUserLookup, HelixPointTargetUserLookup>();
         services.AddSingleton<PointsConfigurationService>();
         services.AddSingleton<PointsDashboardService>();
         services.AddSingleton<
@@ -311,7 +311,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             case AccessListProfileEnrichmentMode.Twitch:
                 services.AddSingleton<
                     IAccessListProfileEnrichmentPolicy,
-                    TwitchAccessListProfileEnrichmentPolicy
+                    HelixAccessListProfileEnrichmentPolicy
                 >();
                 break;
             default:
@@ -362,7 +362,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             case HostBotAppAccessTokenMode.Twitch:
                 services.AddSingleton<
                     IHostBotAppAccessTokenSource,
-                    TwitchHostBotAppAccessTokenSource
+                    OAuthHostBotAppAccessTokenSource
                 >();
                 break;
             default:
@@ -384,7 +384,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             PrivateDeliveryFailureTelemetryHandler
         >();
         services.AddSingleton<WhisperCommandResponseSender>();
-        services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
+        services.AddSingleton<IBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<HostedChannelLifecycleNotifier>();
         return services;
     }

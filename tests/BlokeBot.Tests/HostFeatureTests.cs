@@ -160,7 +160,7 @@ public sealed class HostFeatureTests
         route.State.GuessRoundProfileId.ShouldBe(profileId);
     }
 
-    private static TwitchCommandContext CommandContext(string channel, string commandName)
+    private static ChatCommandContext CommandContext(string channel, string commandName)
     {
         return TestCommandContext.Create("viewer", channel, commandName);
     }

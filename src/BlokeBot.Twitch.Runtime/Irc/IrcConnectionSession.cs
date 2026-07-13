@@ -10,21 +10,21 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface IIrcConnectionSession
 {
-    Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
-        TwitchRuntimeConnectionTarget target,
+    Task<RuntimeSessionEstablishment> EstablishAsync(
+        RuntimeConnectionTarget target,
         CancellationToken cancellationToken
     );
 }
 
 internal sealed class IrcConnectionSession(
-    TwitchBotSettings settings,
-    ITwitchBotChannelProvider channels,
+    BotSettings settings,
+    IBotChannelProvider channels,
     IAccessTokenProvider tokens,
-    TwitchCommandDispatcher dispatcher,
-    ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
+    ChatCommandDispatcher dispatcher,
+    IBotChannelLifecycleNotifier lifecycleNotifier,
     IPublicChatMessageSender sender,
     ICommandResponseSender responses,
-    TwitchBotRuntimeStatusStore status,
+    BotRuntimeStatusStore status,
     IEnumerable<IChatMessageObserver> messageObservers,
     ObserverFanOut<
         IrcMessageObserverBoundary,
@@ -38,22 +38,22 @@ internal sealed class IrcConnectionSession(
         "TwitchChatMessage"
     );
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
-    private readonly TwitchBotSettings _opts = settings;
+    private readonly BotSettings _opts = settings;
     private ILogger<IrcConnectionSession> _log { get; } = log;
 
-    public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
-        TwitchRuntimeConnectionTarget target,
+    public async Task<RuntimeSessionEstablishment> EstablishAsync(
+        RuntimeConnectionTarget target,
         CancellationToken cancellationToken
     )
     {
-        if (target is not TwitchRuntimeConnectionTarget.Initial)
+        if (target is not RuntimeConnectionTarget.Initial)
         {
             throw new UnreachableException(
                 "IRC sessions can only establish the default Twitch endpoint."
             );
         }
 
-        var channelLogins = TwitchChannelList.Normalize(
+        var channelLogins = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
         if (channelLogins.Length == 0)
@@ -62,7 +62,7 @@ internal sealed class IrcConnectionSession(
             _log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );
-            return new TwitchRuntimeSessionEstablishment.Idle();
+            return new RuntimeSessionEstablishment.Idle();
         }
 
         var accessToken = await tokens.GetAccessTokenAsync(cancellationToken);
@@ -104,7 +104,7 @@ internal sealed class IrcConnectionSession(
                 channelLogins.Length
             );
 
-            return new TwitchRuntimeSessionEstablishment.Established
+            return new RuntimeSessionEstablishment.Established
             {
                 Session = new EstablishedSession(this, tcp, reader, writer, joinedChannels),
             };
@@ -169,7 +169,7 @@ internal sealed class IrcConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        var desiredChannels = TwitchChannelList.Normalize(
+        var desiredChannels = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
         var startedChannels = new List<string>();
@@ -346,11 +346,9 @@ internal sealed class IrcConnectionSession(
         StreamReader reader,
         StreamWriter writer,
         HashSet<string> joinedChannels
-    ) : ITwitchRuntimeEstablishedSession
+    ) : IRuntimeEstablishedSession
     {
-        public async Task<TwitchRuntimeReconnectRequest> ListenAsync(
-            CancellationToken cancellationToken
-        )
+        public async Task<RuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)
         {
             while (true)
             {

@@ -8,7 +8,7 @@ public static class WhisperResponseSenderRegistrationExtensions
     /// <summary>
     /// Uses hosted-channel whisper delivery for private command responses.
     /// </summary>
-    public static ITwitchBotBuilder UseWhisperCommandResponseSender(this ITwitchBotBuilder builder)
+    public static IChatBotBuilder UseWhisperCommandResponseSender(this IChatBotBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.OverrideCommandResponseSenderWith<WhisperCommandResponseSender>();

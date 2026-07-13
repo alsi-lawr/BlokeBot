@@ -14,12 +14,10 @@ public sealed class IrcConnectionSessionTests
         var channels = new StaticChannelProvider(["Channel"]);
         var lifecycle = new RecordingLifecycleNotifier();
         var chat = new RejectingChatSender();
-        var status = new TwitchBotRuntimeStatusStore();
+        var status = new BotRuntimeStatusStore();
         var logger = new RecordingLogger<IrcConnectionSession>();
         var session = new IrcConnectionSession(
-            TwitchBotSettings.FromOptions(
-                new TwitchBotOptions { StartupMessage = PrivateStartupMessage }
-            ),
+            BotSettings.FromOptions(new BotOptions { StartupMessage = PrivateStartupMessage }),
             channels,
             null!,
             null!,
@@ -69,8 +67,7 @@ public sealed class IrcConnectionSessionTests
         logger.Entries.ShouldNotContain(entry => entry.Message.Contains("accepted"));
     }
 
-    private sealed class StaticChannelProvider(IReadOnlyList<string> channels)
-        : ITwitchBotChannelProvider
+    private sealed class StaticChannelProvider(IReadOnlyList<string> channels) : IBotChannelProvider
     {
         public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
             CancellationToken cancellationToken
@@ -81,7 +78,7 @@ public sealed class IrcConnectionSessionTests
         }
     }
 
-    private sealed class RecordingLifecycleNotifier : ITwitchBotChannelLifecycleNotifier
+    private sealed class RecordingLifecycleNotifier : IBotChannelLifecycleNotifier
     {
         internal List<string> StartedChannels { get; } = [];
 

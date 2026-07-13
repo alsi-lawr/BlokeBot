@@ -3,16 +3,16 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class EventSubRuntime(
     IEventSubConnectionSession session,
     EventSubSessionResiliencePipeline resilience,
-    ITwitchRuntimeSessionHealthReporter health,
-    TwitchBotRuntimeStatusStore status,
-    ITwitchRuntimeIdleWait idleWait
+    IRuntimeSessionHealthReporter health,
+    BotRuntimeStatusStore status,
+    IRuntimeIdleWait idleWait
 )
 {
     public Task RunAsync(CancellationToken stoppingToken)
     {
-        return TwitchRuntimeSessionRunner.RunUntilStoppedAsync(
-            TwitchBotRuntime.EventSub,
-            new TwitchRuntimeConnectionTarget.Initial(),
+        return RuntimeSessionRunner.RunUntilStoppedAsync(
+            ChatRuntime.EventSub,
+            new RuntimeConnectionTarget.Initial(),
             EstablishSessionAsync,
             EventSubSessionFailureClassifier.Classify,
             health,
@@ -22,13 +22,13 @@ internal sealed class EventSubRuntime(
         );
     }
 
-    internal Task<TwitchRuntimeSessionOutcome> EstablishSessionAsync(
-        TwitchRuntimeConnectionTarget target,
+    internal Task<RuntimeSessionOutcome> EstablishSessionAsync(
+        RuntimeConnectionTarget target,
         CancellationToken stoppingToken
     )
     {
-        return TwitchRuntimeSessionRunner.EstablishOnceAsync(
-            TwitchBotRuntime.EventSub,
+        return RuntimeSessionRunner.EstablishOnceAsync(
+            ChatRuntime.EventSub,
             cancellationToken => session.EstablishAsync(target, cancellationToken),
             resilience.ExecuteAsync,
             EventSubSessionFailureClassifier.Classify,

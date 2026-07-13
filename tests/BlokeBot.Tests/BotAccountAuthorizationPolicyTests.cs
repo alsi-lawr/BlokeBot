@@ -143,10 +143,10 @@ public sealed class BotAccountAuthorizationPolicyTests
         status.Message.ShouldBe("The Twitch bot runner is not configured.");
     }
 
-    private static TwitchBotSettings Settings(string tokenCachePath)
+    private static BotSettings Settings(string tokenCachePath)
     {
-        return TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        return BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {

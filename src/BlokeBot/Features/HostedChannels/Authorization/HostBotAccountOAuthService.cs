@@ -3,7 +3,7 @@ using BlokeBot.Identity;
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public sealed class HostBotAccountOAuthService(
-    TwitchBotSettings settings,
+    BotSettings settings,
     OAuthTransport transport,
     HelixClient helix
 )

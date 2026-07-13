@@ -90,7 +90,7 @@ public sealed class ChatIdentityResolverTests
 
         var outcome = await operations.CreateSubscriptionAsync(
             "private-channel-login",
-            new TwitchBotAccount("bot", "access-token"),
+            new BotAccount("bot", "access-token"),
             "session-id",
             CancellationToken.None
         );
@@ -118,7 +118,7 @@ public sealed class ChatIdentityResolverTests
 
         var outcome = await operations.CreateSubscriptionAsync(
             "private-channel-login",
-            new TwitchBotAccount("private-bot-login", "access-token"),
+            new BotAccount("private-bot-login", "access-token"),
             "session-id",
             CancellationToken.None
         );
@@ -139,7 +139,7 @@ public sealed class ChatIdentityResolverTests
         var identity = Identity();
         var transport = new HelixPublicChatTransport(
             new AppAccessTokenProvider(factory, identity),
-            new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
+            new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
             new ChatClient(factory),
@@ -171,7 +171,7 @@ public sealed class ChatIdentityResolverTests
         var identity = Identity();
         var transport = new HelixPublicChatTransport(
             new AppAccessTokenProvider(factory, identity),
-            new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
+            new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
             new ChatClient(factory),
@@ -265,10 +265,10 @@ public sealed class ChatIdentityResolverTests
         );
     }
 
-    private static TwitchBotSettings Settings(string startupMessage = "")
+    private static BotSettings Settings(string startupMessage = "")
     {
-        return TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        return BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {
@@ -410,9 +410,9 @@ public sealed class ChatIdentityResolverTests
         }
     }
 
-    private sealed class StaticAccountProvider(TwitchBotAccount account) : ITwitchBotAccountProvider
+    private sealed class StaticAccountProvider(BotAccount account) : IBotAccountProvider
     {
-        public ValueTask<TwitchBotAccount> GetBotAccountAsync(
+        public ValueTask<BotAccount> GetBotAccountAsync(
             string channelLogin,
             CancellationToken cancellationToken
         )
@@ -422,9 +422,9 @@ public sealed class ChatIdentityResolverTests
         }
     }
 
-    private sealed class UnusedAccountProvider : ITwitchBotAccountProvider
+    private sealed class UnusedAccountProvider : IBotAccountProvider
     {
-        public ValueTask<TwitchBotAccount> GetBotAccountAsync(
+        public ValueTask<BotAccount> GetBotAccountAsync(
             string channelLogin,
             CancellationToken cancellationToken
         )
@@ -470,7 +470,7 @@ public sealed class ChatIdentityResolverTests
         }
     }
 
-    private sealed class UnusedLifecycleNotifier : ITwitchBotChannelLifecycleNotifier
+    private sealed class UnusedLifecycleNotifier : IBotChannelLifecycleNotifier
     {
         public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
         {

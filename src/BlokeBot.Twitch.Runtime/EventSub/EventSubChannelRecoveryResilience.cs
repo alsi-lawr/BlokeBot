@@ -108,7 +108,7 @@ internal static class EventSubChannelFailureClassifier
 
     private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode)
     {
-        return TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
+        return RuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
     }
 }
 

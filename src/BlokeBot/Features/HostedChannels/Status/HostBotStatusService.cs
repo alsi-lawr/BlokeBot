@@ -7,7 +7,7 @@ public sealed class HostBotStatusService(
     IHostBotAppAccessTokenSource appTokens,
     IHostBotAccountTokenStatusProvider botAccounts,
     HelixClient helix,
-    TwitchBotSettings settings
+    BotSettings settings
 )
 {
     public async Task<HostBotChannelStatus> GetStatusAsync(

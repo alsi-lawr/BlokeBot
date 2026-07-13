@@ -11,18 +11,18 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface IEventSubConnectionSession
 {
-    Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
-        TwitchRuntimeConnectionTarget target,
+    Task<RuntimeSessionEstablishment> EstablishAsync(
+        RuntimeConnectionTarget target,
         CancellationToken cancellationToken
     );
 }
 
 internal sealed class EventSubConnectionSession(
-    ITwitchBotChannelProvider channels,
+    IBotChannelProvider channels,
     EventSubChannelSessionFactory channelSessions,
-    TwitchCommandDispatcher dispatcher,
+    ChatCommandDispatcher dispatcher,
     ICommandResponseSender responses,
-    TwitchBotRuntimeStatusStore status,
+    BotRuntimeStatusStore status,
     IEnumerable<IChatMessageObserver> messageObservers,
     ObserverFanOut<
         EventSubMessageObserverBoundary,
@@ -40,31 +40,31 @@ internal sealed class EventSubConnectionSession(
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private ILogger<EventSubConnectionSession> _log { get; } = log;
 
-    public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
-        TwitchRuntimeConnectionTarget target,
+    public async Task<RuntimeSessionEstablishment> EstablishAsync(
+        RuntimeConnectionTarget target,
         CancellationToken cancellationToken
     )
     {
-        var channelLogins = TwitchChannelList.Normalize(
+        var channelLogins = BotChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
         );
         if (
             channelLogins.Length == 0
             && !channelSessions.HasPendingReconciliation
-            && target is TwitchRuntimeConnectionTarget.Initial
+            && target is RuntimeConnectionTarget.Initial
         )
         {
             status.SetConnected(false, []);
             _log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );
-            return new TwitchRuntimeSessionEstablishment.Idle();
+            return new RuntimeSessionEstablishment.Idle();
         }
 
         var endpoint = target switch
         {
-            TwitchRuntimeConnectionTarget.Initial => _defaultEndpoint,
-            TwitchRuntimeConnectionTarget.EventSubReconnect reconnect => reconnect.Uri,
+            RuntimeConnectionTarget.Initial => _defaultEndpoint,
+            RuntimeConnectionTarget.EventSubReconnect reconnect => reconnect.Uri,
             _ => throw new UnreachableException("Unknown EventSub connection target."),
         };
         var socket = new ClientWebSocket();
@@ -95,7 +95,7 @@ internal sealed class EventSubConnectionSession(
 
             channelSession = channelSessions.Create(sessionId);
             var desiredChannels = await GetDesiredChannelsAsync(cancellationToken);
-            return new TwitchRuntimeSessionEstablishment.Established
+            return new RuntimeSessionEstablishment.Established
             {
                 Session = new EstablishedSession(this, socket, channelSession, desiredChannels),
             };
@@ -120,7 +120,7 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        return TwitchChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken));
+        return BotChannelList.Normalize(await channels.GetChannelsAsync(cancellationToken));
     }
 
     internal async Task DispatchChatMessageAsync(
@@ -282,11 +282,9 @@ internal sealed class EventSubConnectionSession(
         ClientWebSocket socket,
         EventSubChannelSession channelSession,
         IReadOnlyList<string> initialChannels
-    ) : ITwitchRuntimeEstablishedSession
+    ) : IRuntimeEstablishedSession
     {
-        public async Task<TwitchRuntimeReconnectRequest> ListenAsync(
-            CancellationToken cancellationToken
-        )
+        public async Task<RuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)
         {
             channelSession.Start(initialChannels, cancellationToken);
             while (true)
@@ -315,9 +313,9 @@ internal sealed class EventSubConnectionSession(
 
                     case EventSubMessageType.SessionReconnect:
                         owner._log.LogInformation("Twitch requested EventSub WebSocket reconnect.");
-                        return new TwitchRuntimeReconnectRequest
+                        return new RuntimeReconnectRequest
                         {
-                            Target = new TwitchRuntimeConnectionTarget.EventSubReconnect
+                            Target = new RuntimeConnectionTarget.EventSubReconnect
                             {
                                 Uri = RequireReconnectEndpoint(
                                     envelope?.Payload.Session?.ReconnectUrl

@@ -18,7 +18,7 @@ public sealed class CommandStrategyDispatcherTests
     {
         List<string> replies = [];
         var services = BuildServices(new TestResolver(TestKind.Public, "state"));
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
 
         await dispatcher.DispatchResponsesAsync(
             Message("alice", "!dynamic value"),
@@ -34,7 +34,7 @@ public sealed class CommandStrategyDispatcherTests
     {
         List<string> replies = [];
         var services = BuildServices(new TestResolver(TestKind.Moderator, "state"));
-        var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
 
         await dispatcher.DispatchResponsesAsync(
             Message("viewer", "!mod"),
@@ -57,7 +57,7 @@ public sealed class CommandStrategyDispatcherTests
         );
         services.AddSingleton<CommandStrategyCatalog<TestKind, string>>();
         services.AddSingleton<CommandStrategyDispatcher<TestKind, string>>();
-        services.AddTwitchCommands().AddCommandModule<CommandStrategyModule<TestKind, string>>();
+        services.AddChatCommands().AddCommandModule<CommandStrategyModule<TestKind, string>>();
         return services.BuildServiceProvider();
     }
 
@@ -65,7 +65,7 @@ public sealed class CommandStrategyDispatcherTests
         : ICommandRouteResolver<TestKind, string>
     {
         public ValueTask<CommandRoute<TestKind, string>?> ResolveAsync(
-            TwitchCommandContext context,
+            ChatCommandContext context,
             CancellationToken cancellationToken
         )
         {

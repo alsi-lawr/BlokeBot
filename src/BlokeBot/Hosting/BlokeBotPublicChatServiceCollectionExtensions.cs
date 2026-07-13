@@ -14,7 +14,7 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
         services.TryAddSingleton<IPublicChatOutbox>(serviceProvider => new EfPublicChatOutbox(
             serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
             serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
-                TwitchBotResiliencePipeline.PublicChatDelivery
+                BotResiliencePipeline.PublicChatDelivery
             ),
             serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
             serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>()

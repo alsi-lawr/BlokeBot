@@ -150,7 +150,7 @@ public sealed class HostBotStatusTests
         var httpClientFactory = new HostBotStatusHttpClientFactory { StreamIsLive = true };
         var settings = Settings();
         var service = new HostBotStatusService(
-            new TwitchHostBotAppAccessTokenSource(
+            new OAuthHostBotAppAccessTokenSource(
                 new AppAccessTokenProvider(httpClientFactory, settings.Identity)
             ),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
@@ -282,10 +282,10 @@ public sealed class HostBotStatusTests
         );
     }
 
-    private static TwitchBotSettings Settings()
+    private static BotSettings Settings()
     {
-        return TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        return BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {

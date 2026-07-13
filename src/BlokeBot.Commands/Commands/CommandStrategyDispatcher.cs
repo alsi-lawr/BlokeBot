@@ -10,7 +10,7 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
 {
     public async ValueTask<CommandStrategyDispatchResult<TKind>> DispatchAsync(
         CommandRoute<TKind, TState> route,
-        TwitchCommandContext command,
+        ChatCommandContext command,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
     )
@@ -27,7 +27,7 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
             command,
             args
         );
-        if (strategy.RequiresModerator && !TwitchModeratorPolicy.IsModerator(command.Message))
+        if (strategy.RequiresModerator && !ChatModeratorPolicy.IsModerator(command.Message))
         {
             var response = await strategy.ModeratorOnlyResponseAsync(context, cancellationToken);
             if (!string.IsNullOrWhiteSpace(response?.Message))

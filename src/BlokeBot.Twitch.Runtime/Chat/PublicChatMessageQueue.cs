@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class PublicChatMessageQueue(
-    TwitchBotSettings settings,
+    BotSettings settings,
     TimeProvider timeProvider,
     PublicChatQueueBacklogMonitor backlogMonitor,
     PublicChatQueueAlertDispatcher alertDispatcher,

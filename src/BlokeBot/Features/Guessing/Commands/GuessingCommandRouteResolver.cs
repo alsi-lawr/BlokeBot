@@ -10,7 +10,7 @@ public sealed class GuessingCommandRouteResolver(
 ) : ICommandRouteResolver<GuessCommandKind, AppCommandRouteState>
 {
     public async ValueTask<CommandRoute<GuessCommandKind, AppCommandRouteState>?> ResolveAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         CancellationToken cancellationToken
     )
     {

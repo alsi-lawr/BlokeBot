@@ -230,7 +230,7 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
-    public async Task TwitchRateLimit_Delivering_ReturnsRateLimitedAndExhaustsQuota()
+    public async Task ProviderRateLimit_Delivering_ReturnsRateLimitedAndExhaustsQuota()
     {
         await using var harness = await WhisperHarness.CreateAsync(
             HttpStatusCode.TooManyRequests,
@@ -519,10 +519,10 @@ public sealed class WhisperResponseTests
         return failure.Error;
     }
 
-    private static TwitchBotSettings BotOptions()
+    private static BotSettings BotOptions()
     {
-        return TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        return BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {

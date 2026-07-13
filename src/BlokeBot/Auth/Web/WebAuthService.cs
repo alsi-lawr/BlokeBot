@@ -12,7 +12,7 @@ internal sealed class WebAuthService(
     WebOAuthClient oauth,
     UserLookupService users,
     BotAdminService admins,
-    TwitchBotSettings botSettings,
+    BotSettings botSettings,
     AuthorizedHostSelectionService hosts
 )
 {

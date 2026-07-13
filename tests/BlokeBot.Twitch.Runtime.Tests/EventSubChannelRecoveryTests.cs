@@ -91,7 +91,7 @@ public sealed class EventSubChannelRecoveryTests
             {
                 enteredAttempt.Writer.TryWrite(true).ShouldBeTrue();
                 await neverCompletes.Reader.ReadAsync(cancellationToken);
-                return new TwitchBotAccount("slow-bot", "slow-secret");
+                return new BotAccount("slow-bot", "slow-secret");
             }
         );
         await using var harness = CreateHarness(operations, attemptLimit: 2);
@@ -509,7 +509,7 @@ public sealed class EventSubChannelRecoveryTests
             {
                 enteredRecovery.Writer.TryWrite(true).ShouldBeTrue();
                 await releaseRecovery.Reader.ReadAsync(cancellationToken);
-                return new TwitchBotAccount("bad-bot", "bad-secret");
+                return new BotAccount("bad-bot", "bad-secret");
             }
         );
 
@@ -531,13 +531,13 @@ public sealed class EventSubChannelRecoveryTests
             null!,
             ChatActivityHookTests.BuildDispatcher(new ChatActivityHookTests.RuntimeHookRecorder()),
             new UnusedCommandResponseSender(),
-            new TwitchBotRuntimeStatusStore(),
+            new BotRuntimeStatusStore(),
             [observer],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
                 ChatMessage,
                 ChatObserverDeadLetter
-            >(TwitchBotObserverBoundaries.EventSubMessages),
+            >(BotObserverBoundaries.EventSubMessages),
             NullLogger<EventSubConnectionSession>.Instance
         );
         await connection.DispatchChatMessageAsync(
@@ -826,7 +826,7 @@ public sealed class EventSubChannelRecoveryTests
     public async Task Startup_PendingDeletionFromReplacedSession_ReconcilesBeforeRemoval()
     {
         var sharedStatus = new EventSubChannelStatusStore();
-        var sharedRuntimeStatus = new TwitchBotRuntimeStatusStore();
+        var sharedRuntimeStatus = new BotRuntimeStatusStore();
         var sharedPendingDeletions = new EventSubSubscriptionReconciliationStore();
         var oldOperations = new ScriptedChannelOperations();
         await using var old = CreateHarness(
@@ -875,7 +875,7 @@ public sealed class EventSubChannelRecoveryTests
     public async Task ReplacementStartup_DisposingOldPendingRecovery_PreventsPostDisposalMutation()
     {
         var sharedStatus = new EventSubChannelStatusStore();
-        var sharedRuntimeStatus = new TwitchBotRuntimeStatusStore();
+        var sharedRuntimeStatus = new BotRuntimeStatusStore();
         var oldOperations = new ScriptedChannelOperations();
         var enteredRecovery = Channel.CreateUnbounded<bool>();
         var releaseRecovery = Channel.CreateUnbounded<bool>();
@@ -893,7 +893,7 @@ public sealed class EventSubChannelRecoveryTests
             {
                 enteredRecovery.Writer.TryWrite(true).ShouldBeTrue();
                 await releaseRecovery.Reader.ReadAsync(cancellationToken);
-                return new TwitchBotAccount("old-bot", "old-secret");
+                return new BotAccount("old-bot", "old-secret");
             }
         );
         old.Session.TriggerReconciliation(["old"], EventSubChannelRecoveryTrigger.Explicit);
@@ -1098,7 +1098,7 @@ public sealed class EventSubChannelRecoveryTests
         ScriptedChannelOperations operations,
         int attemptLimit,
         EventSubChannelStatusStore? sharedStatus = null,
-        TwitchBotRuntimeStatusStore? sharedRuntimeStatus = null,
+        BotRuntimeStatusStore? sharedRuntimeStatus = null,
         EventSubSubscriptionReconciliationStore? sharedPendingDeletions = null
     )
     {
@@ -1119,7 +1119,7 @@ public sealed class EventSubChannelRecoveryTests
         EventSubChannelRecoveryResilience.ConfigureAttempt(attemptBuilder, policy);
         EventSubChannelRecoveryResilience.Configure(recoveryBuilder, policy);
         var status = sharedStatus ?? new EventSubChannelStatusStore();
-        var runtimeStatus = sharedRuntimeStatus ?? new TwitchBotRuntimeStatusStore();
+        var runtimeStatus = sharedRuntimeStatus ?? new BotRuntimeStatusStore();
         var pendingDeletions =
             sharedPendingDeletions ?? new EventSubSubscriptionReconciliationStore();
         var diagnostics = new RecordingDiagnostics();
@@ -1230,7 +1230,7 @@ public sealed class EventSubChannelRecoveryTests
     private sealed class RecoveryHarness(
         EventSubChannelSession session,
         EventSubChannelStatusStore status,
-        TwitchBotRuntimeStatusStore runtimeStatus,
+        BotRuntimeStatusStore runtimeStatus,
         EventSubSubscriptionReconciliationStore pendingDeletions,
         RecordingDiagnostics diagnostics,
         FixedTimeProvider clock
@@ -1240,7 +1240,7 @@ public sealed class EventSubChannelRecoveryTests
 
         internal EventSubChannelStatusStore Status { get; } = status;
 
-        internal TwitchBotRuntimeStatusStore RuntimeStatus { get; } = runtimeStatus;
+        internal BotRuntimeStatusStore RuntimeStatus { get; } = runtimeStatus;
 
         internal EventSubSubscriptionReconciliationStore PendingDeletions { get; } =
             pendingDeletions;
@@ -1259,7 +1259,7 @@ public sealed class EventSubChannelRecoveryTests
     {
         private readonly Dictionary<
             string,
-            Queue<Func<CancellationToken, ValueTask<TwitchBotAccount>>>
+            Queue<Func<CancellationToken, ValueTask<BotAccount>>>
         > _accountScripts = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<
             string,
@@ -1302,7 +1302,7 @@ public sealed class EventSubChannelRecoveryTests
 
         internal void EnqueueAccount(
             string channel,
-            Func<CancellationToken, ValueTask<TwitchBotAccount>> operation
+            Func<CancellationToken, ValueTask<BotAccount>> operation
         )
         {
             GetQueue(_accountScripts, channel).Enqueue(operation);
@@ -1310,15 +1310,12 @@ public sealed class EventSubChannelRecoveryTests
 
         internal void EnqueueAccountFailure(string channel, Exception exception)
         {
-            EnqueueAccount(channel, _ => ValueTask.FromException<TwitchBotAccount>(exception));
+            EnqueueAccount(channel, _ => ValueTask.FromException<BotAccount>(exception));
         }
 
         internal void EnqueueAccountResult(string channel, string botLogin)
         {
-            EnqueueAccount(
-                channel,
-                _ => ValueTask.FromResult(new TwitchBotAccount(botLogin, "secret"))
-            );
+            EnqueueAccount(channel, _ => ValueTask.FromResult(new BotAccount(botLogin, "secret")));
         }
 
         internal void EnqueueCreateFailure(string channel, Exception exception)
@@ -1392,19 +1389,19 @@ public sealed class EventSubChannelRecoveryTests
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
         }
 
-        public ValueTask<TwitchBotAccount> ResolveAccountAsync(
+        public ValueTask<BotAccount> ResolveAccountAsync(
             string channel,
             CancellationToken cancellationToken
         )
         {
             return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
                 ? scripts.Dequeue()(cancellationToken)
-                : ValueTask.FromResult(new TwitchBotAccount($"{channel}-bot", $"{channel}-secret"));
+                : ValueTask.FromResult(new BotAccount($"{channel}-bot", $"{channel}-secret"));
         }
 
         public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
             string channel,
-            TwitchBotAccount account,
+            BotAccount account,
             string sessionId,
             CancellationToken cancellationToken
         )

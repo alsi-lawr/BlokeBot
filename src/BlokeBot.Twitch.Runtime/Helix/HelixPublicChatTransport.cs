@@ -17,7 +17,7 @@ internal interface IPublicChatTransport
 
 internal sealed class HelixPublicChatTransport(
     AppAccessTokenProvider appTokens,
-    ITwitchBotAccountProvider botAccounts,
+    IBotAccountProvider botAccounts,
     BotIdentity identity,
     ChatIdentityResolver identities,
     ChatClient chat,

@@ -8,8 +8,8 @@ public static class HostedChannelLifecycleNotifierRegistrationExtensions
     /// <summary>
     /// Uses persisted hosted-channel lifecycle tracking.
     /// </summary>
-    public static ITwitchBotBuilder UseBlokeBotHostedChannelLifecycleNotifier(
-        this ITwitchBotBuilder builder
+    public static IChatBotBuilder UseBlokeBotHostedChannelLifecycleNotifier(
+        this IChatBotBuilder builder
     )
     {
         ArgumentNullException.ThrowIfNull(builder);

@@ -86,7 +86,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
 
         var outcome = await queue.EnqueueAsync(Command(channel, message), CancellationToken.None);
 
@@ -101,9 +101,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new PublicChatMessageSender(
-            CreateQueue(new TwitchBotOptions(), outbox, transport)
-        );
+        var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
         var deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
             Utc(12, 0, 0).AddSeconds(30)
         );
@@ -132,9 +130,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new PublicChatMessageSender(
-            CreateQueue(new TwitchBotOptions(), outbox, transport)
-        );
+        var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
         var outcome = await sender.SendAsync(
             channel,
@@ -155,9 +151,7 @@ public sealed class PublicChatMessageQueueTests
         var failure = new IOException("private persistence detail");
         var outbox = new InMemoryOutbox(_standardRetryPolicy) { EnqueueFailure = failure };
         var transport = new RecordingTransport();
-        var sender = new PublicChatMessageSender(
-            CreateQueue(new TwitchBotOptions(), outbox, transport)
-        );
+        var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
         var thrown = await Should.ThrowAsync<IOException>(() =>
             sender
@@ -182,9 +176,7 @@ public sealed class PublicChatMessageQueueTests
         cancellation.Cancel();
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new PublicChatMessageSender(
-            CreateQueue(new TwitchBotOptions(), outbox, transport)
-        );
+        var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
             sender
@@ -211,9 +203,7 @@ public sealed class PublicChatMessageQueueTests
             AfterEnqueue = cancellation.Cancel,
         };
         var transport = new RecordingTransport();
-        var sender = new PublicChatMessageSender(
-            CreateQueue(new TwitchBotOptions(), outbox, transport)
-        );
+        var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
         var outcome = await sender.SendAsync(
             "channel",
@@ -234,7 +224,7 @@ public sealed class PublicChatMessageQueueTests
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var queue = CreateQueue(
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 0,
@@ -269,7 +259,7 @@ public sealed class PublicChatMessageQueueTests
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var queue = CreateQueue(
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 0,
                 DuplicateChatMessageCooldownSeconds = 1,
@@ -301,7 +291,7 @@ public sealed class PublicChatMessageQueueTests
         var transport = new RecordingTransport();
         var observer = new RecordingQueueAlertObserver();
         var queue = CreateQueue(
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 10,
                 DuplicateChatMessageCooldownSeconds = 0,
@@ -409,7 +399,7 @@ public sealed class PublicChatMessageQueueTests
         var transport = new RecordingTransport();
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var queue = CreateQueue(
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 10,
                 DuplicateChatMessageCooldownSeconds = 0,
@@ -424,7 +414,7 @@ public sealed class PublicChatMessageQueueTests
                 PublicChatQueueBacklog,
                 PublicChatQueueAlertDeadLetter
             >(
-                TwitchBotObserverBoundaries.PublicChatQueueAlerts,
+                BotObserverBoundaries.PublicChatQueueAlerts,
                 new IOException("reporter secret payload")
             ),
             logger
@@ -462,7 +452,7 @@ public sealed class PublicChatMessageQueueTests
             EnqueueFailure = new IOException("Persistence unavailable."),
         };
         var transport = new RecordingTransport();
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
 
         await Should.ThrowAsync<IOException>(() =>
             queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None).AsTask()
@@ -478,7 +468,7 @@ public sealed class PublicChatMessageQueueTests
         using var caller = new CancellationTokenSource();
         var outbox = new InMemoryOutbox(_standardRetryPolicy) { AfterEnqueue = caller.Cancel };
         var transport = new RecordingTransport();
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
 
         var receipt = await queue.EnqueueAsync(Command("channel", "message"), caller.Token);
 
@@ -497,7 +487,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = SuccessfulScriptedTransport();
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -529,7 +519,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("A safe preparation failure cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, clock);
+        var queue = CreateQueue(new BotOptions(), outbox, transport, clock);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -575,7 +565,7 @@ public sealed class PublicChatMessageQueueTests
                 );
             }
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, clock);
+        var queue = CreateQueue(new BotOptions(), outbox, transport, clock);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -619,7 +609,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("A safe preparation failure cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, clock);
+        var queue = CreateQueue(new BotOptions(), outbox, transport, clock);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -658,7 +648,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("An unexpected preparation cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -688,7 +678,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("Unexpected preparation cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, logger: logger);
+        var queue = CreateQueue(new BotOptions(), outbox, transport, logger: logger);
         _ = await queue.EnqueueAsync(
             Command("channel", "secret chat payload"),
             CancellationToken.None
@@ -743,7 +733,7 @@ public sealed class PublicChatMessageQueueTests
                     }
                 )
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -768,7 +758,7 @@ public sealed class PublicChatMessageQueueTests
                     new IOException("secret response detail")
                 )
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
@@ -798,7 +788,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("Canceled preparation cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
 
         await queue.RunAsync(stopping.Token);
@@ -825,7 +815,7 @@ public sealed class PublicChatMessageQueueTests
                 );
             }
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+        var queue = CreateQueue(new BotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
 
         await queue.RunAsync(stopping.Token);
@@ -855,7 +845,7 @@ public sealed class PublicChatMessageQueueTests
                 throw new InvalidOperationException("A safe preparation failure cannot send.")
         );
         var queue = CreateQueue(
-            new TwitchBotOptions
+            new BotOptions
             {
                 PublicChatQueueAlerts = new PublicChatQueueAlertOptions { StuckAfterSeconds = 5 },
             },
@@ -880,7 +870,7 @@ public sealed class PublicChatMessageQueueTests
     }
 
     private static PublicChatMessageQueue CreateQueue(
-        TwitchBotOptions options,
+        BotOptions options,
         IPublicChatOutbox outbox,
         IPublicChatTransport transport,
         TimeProvider? timeProvider = null,
@@ -894,7 +884,7 @@ public sealed class PublicChatMessageQueueTests
     )
     {
         return new(
-            TwitchBotSettings.FromOptions(options),
+            BotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
             new PublicChatQueueBacklogMonitor(),
             new PublicChatQueueAlertDispatcher(observers ?? [], fanOut ?? QueueAlertFanOut()),
@@ -921,7 +911,7 @@ public sealed class PublicChatMessageQueueTests
             static (_, _) =>
                 throw new InvalidOperationException("Missing identity preparation cannot send.")
         );
-        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport, logger: logger);
+        var queue = CreateQueue(new BotOptions(), outbox, transport, logger: logger);
         _ = await queue.EnqueueAsync(
             Command("private-channel-login", "secret chat payload"),
             CancellationToken.None
@@ -1000,7 +990,7 @@ public sealed class PublicChatMessageQueueTests
             PublicChatQueueAlertObserverBoundary,
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
-        >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
+        >(BotObserverBoundaries.PublicChatQueueAlerts);
     }
 
     private static async Task StopAsync(CancellationTokenSource stopping, Task worker)

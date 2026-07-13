@@ -8,7 +8,7 @@ internal static class OfflineBotStatusServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.AddSingleton<ITwitchBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
+        services.AddSingleton<IBotRuntimeStatusAccessor, OfflineBotStatusAccessor>();
         return services;
     }
 }

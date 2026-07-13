@@ -56,7 +56,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
             outbox,
             transport,
             clock,
-            new TwitchBotOptions
+            new BotOptions
             {
                 ChatMessageSendIntervalSeconds = 10,
                 DuplicateChatMessageCooldownSeconds = 0,
@@ -131,7 +131,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
             outbox,
             transport,
             clock,
-            new TwitchBotOptions
+            new BotOptions
             {
                 PublicChatQueueAlerts = new PublicChatQueueAlertOptions { StuckAfterSeconds = 5 },
             },

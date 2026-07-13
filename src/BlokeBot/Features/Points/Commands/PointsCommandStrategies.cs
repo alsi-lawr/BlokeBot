@@ -176,7 +176,7 @@ public sealed class PointsBalanceCommandStrategy(
         }
         else if (
             context.Args.Count == 1
-            && !TwitchModeratorPolicy.IsModerator(context.Command.Message)
+            && !ChatModeratorPolicy.IsModerator(context.Command.Message)
         )
         {
             result = new PointOperationResult(

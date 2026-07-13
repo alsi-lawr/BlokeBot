@@ -14,7 +14,7 @@ public sealed class CustomCommandTemplateRenderer
 
     public string Render(
         string template,
-        TwitchCommandContext context,
+        ChatCommandContext context,
         IReadOnlyList<string> args,
         long? count
     )

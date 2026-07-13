@@ -3,15 +3,15 @@ using BlokeBot.Commands;
 namespace BlokeBot.Features.CustomCommands;
 
 public sealed class CustomCommandModule(CustomCommandExecutionService execution)
-    : ITwitchCommandModule
+    : IChatCommandModule
 {
-    public void AddCommands(ITwitchCommandBuilder commands)
+    public void AddCommands(IChatCommandBuilder commands)
     {
         commands.MapDynamic(ExecuteAsync);
     }
 
     private async ValueTask<bool> ExecuteAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
     )

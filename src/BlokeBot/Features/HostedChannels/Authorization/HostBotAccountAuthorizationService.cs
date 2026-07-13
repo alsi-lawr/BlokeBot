@@ -13,8 +13,8 @@ public sealed class HostBotAccountAuthorizationService(
     HelixClient helix,
     ITokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
-    TwitchBotSettings botSettings
-) : ITwitchBotAccountProvider, IHostBotAccountTokenStatusProvider
+    BotSettings botSettings
+) : IBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
     private static readonly TimeSpan _refreshSkew = TimeSpan.FromMinutes(1);
 
@@ -133,7 +133,7 @@ public sealed class HostBotAccountAuthorizationService(
         return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
     }
 
-    public async ValueTask<TwitchBotAccount> GetBotAccountAsync(
+    public async ValueTask<BotAccount> GetBotAccountAsync(
         string channelLogin,
         CancellationToken cancellationToken
     )
@@ -152,10 +152,7 @@ public sealed class HostBotAccountAuthorizationService(
                 ),
             _ => throw BotNotReady(channelLogin),
             _ => throw BotNotReady(channelLogin),
-            ready => new TwitchBotAccount(
-                Login.Normalize(ready.Validation.Login),
-                ready.AccessToken
-            )
+            ready => new BotAccount(Login.Normalize(ready.Validation.Login), ready.AccessToken)
         );
     }
 

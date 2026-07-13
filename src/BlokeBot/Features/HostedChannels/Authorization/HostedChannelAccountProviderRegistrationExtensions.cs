@@ -8,7 +8,7 @@ public static class HostedChannelAccountProviderRegistrationExtensions
     /// <summary>
     /// Uses per-channel hosted account authorization for Twitch bot operations.
     /// </summary>
-    public static ITwitchBotBuilder UseBlokeBotHostedChannelProvider(this ITwitchBotBuilder builder)
+    public static IChatBotBuilder UseBlokeBotHostedChannelProvider(this IChatBotBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         return builder.OverrideAccountProviderWith<HostBotAccountAuthorizationService>();

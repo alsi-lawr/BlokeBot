@@ -4,12 +4,12 @@ namespace BlokeBot.Tests;
 
 internal static class TestCommandContext
 {
-    public static TwitchCommandContext Create(string login, string channel, string commandName)
+    public static ChatCommandContext Create(string login, string channel, string commandName)
     {
         return Create(login, channel, commandName, [], (_, _) => ValueTask.CompletedTask);
     }
 
-    public static TwitchCommandContext Create(
+    public static ChatCommandContext Create(
         string login,
         string channel,
         string commandName,

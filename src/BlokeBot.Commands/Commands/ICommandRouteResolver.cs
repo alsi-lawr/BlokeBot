@@ -7,7 +7,7 @@ public interface ICommandRouteResolver<TKind, TState>
     where TKind : notnull
 {
     ValueTask<CommandRoute<TKind, TState>?> ResolveAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         CancellationToken cancellationToken
     );
 }

@@ -20,7 +20,7 @@ public sealed class ChannelBotAuthorizationTests
     [Test]
     public async Task ReturnedOAuthToken_CompletingChannelAuthorization_ValidatesAndNormalizesGrant()
     {
-        var httpClientFactory = new TwitchOAuthHttpClientFactory();
+        var httpClientFactory = new RecordingOAuthHttpClientFactory();
         var service = new ChannelBotOAuthService(
             ConfigurationWithScopes("channel:bot"),
             new OAuthTransport(httpClientFactory)
@@ -149,8 +149,8 @@ public sealed class ChannelBotAuthorizationTests
     )
     {
         var httpClientFactory = new EmptyHttpClientFactory();
-        var options = TwitchBotSettings.FromOptions(
-            new TwitchBotOptions
+        var options = BotSettings.FromOptions(
+            new BotOptions
             {
                 Identity = new BotIdentityOptions
                 {
@@ -230,7 +230,7 @@ public sealed class ChannelBotAuthorizationTests
         return await db.Hosts.SingleAsync(x => x.Id == hostId);
     }
 
-    private sealed class TwitchOAuthHttpClientFactory : IHttpClientFactory
+    private sealed class RecordingOAuthHttpClientFactory : IHttpClientFactory
     {
         private readonly Handler _handler = new();
 

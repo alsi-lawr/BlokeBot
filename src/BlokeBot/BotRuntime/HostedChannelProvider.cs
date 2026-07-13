@@ -3,7 +3,7 @@ using BlokeBot.Features.HostedChannels.Runtime;
 namespace BlokeBot.BotRuntime;
 
 internal sealed class HostedChannelProvider(HostedChannelRuntimeStatusService hostedChannels)
-    : ITwitchBotChannelProvider
+    : IBotChannelProvider
 {
     public async ValueTask<IReadOnlyList<string>> GetChannelsAsync(
         CancellationToken cancellationToken

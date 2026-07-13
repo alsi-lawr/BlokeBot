@@ -5,7 +5,7 @@ using BlokeBot.Identity;
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
 internal sealed class ConfiguredBotAccountAuthorizationPolicy(
-    TwitchBotSettings settings,
+    BotSettings settings,
     IAccessTokenCache tokenCache,
     HelixClient helix,
     ITokenStatusSource tokenStatus,

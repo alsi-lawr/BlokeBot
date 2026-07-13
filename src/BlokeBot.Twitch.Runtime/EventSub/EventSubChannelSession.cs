@@ -5,14 +5,11 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface IEventSubChannelOperations
 {
-    ValueTask<TwitchBotAccount> ResolveAccountAsync(
-        string channel,
-        CancellationToken cancellationToken
-    );
+    ValueTask<BotAccount> ResolveAccountAsync(string channel, CancellationToken cancellationToken);
 
     ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
-        TwitchBotAccount account,
+        BotAccount account,
         string sessionId,
         CancellationToken cancellationToken
     );
@@ -119,15 +116,15 @@ internal abstract record EventSubStartupDeliveryOutcome
 }
 
 internal sealed class EventSubChannelOperations(
-    TwitchBotSettings settings,
-    ITwitchBotAccountProvider accounts,
+    BotSettings settings,
+    IBotAccountProvider accounts,
     ChatIdentityResolver identities,
     EventSubClient eventSub,
     IPublicChatMessageSender sender,
-    ITwitchBotChannelLifecycleNotifier lifecycle
+    IBotChannelLifecycleNotifier lifecycle
 ) : IEventSubChannelOperations
 {
-    public ValueTask<TwitchBotAccount> ResolveAccountAsync(
+    public ValueTask<BotAccount> ResolveAccountAsync(
         string channel,
         CancellationToken cancellationToken
     )
@@ -137,7 +134,7 @@ internal sealed class EventSubChannelOperations(
 
     public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
-        TwitchBotAccount account,
+        BotAccount account,
         string sessionId,
         CancellationToken cancellationToken
     )
@@ -170,7 +167,7 @@ internal sealed class EventSubChannelOperations(
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateResolvedSubscriptionAsync(
         string channel,
-        TwitchBotAccount account,
+        BotAccount account,
         string sessionId,
         ChatIdentityResolution.Resolved resolved,
         CancellationToken cancellationToken
@@ -263,7 +260,7 @@ internal sealed class EventSubChannelSessionFactory(
     EventSubChannelRecoveryPipeline recovery,
     EventSubSubscriptionReconciliationStore pendingDeletions,
     EventSubChannelStatusStore channelStatus,
-    TwitchBotRuntimeStatusStore runtimeStatus,
+    BotRuntimeStatusStore runtimeStatus,
     IEventSubChannelDiagnosticReporter diagnostics,
     TimeProvider timeProvider
 )
@@ -291,7 +288,7 @@ internal sealed class EventSubChannelSession(
     EventSubChannelRecoveryPipeline recovery,
     EventSubSubscriptionReconciliationStore pendingDeletions,
     EventSubChannelStatusStore.EventSubChannelStatusScope statusScope,
-    TwitchBotRuntimeStatusStore runtimeStatus,
+    BotRuntimeStatusStore runtimeStatus,
     IEventSubChannelDiagnosticReporter diagnostics,
     TimeProvider timeProvider
 ) : IAsyncDisposable
@@ -332,7 +329,7 @@ internal sealed class EventSubChannelSession(
 
     internal void Start(IReadOnlyList<string> desiredChannels, CancellationToken cancellationToken)
     {
-        var desired = TwitchChannelList.Normalize(desiredChannels);
+        var desired = BotChannelList.Normalize(desiredChannels);
         var desiredSet = desired.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var initial = desired
             .Union(pendingDeletions.ReconciliationChannels, StringComparer.OrdinalIgnoreCase)
@@ -397,7 +394,7 @@ internal sealed class EventSubChannelSession(
             }
 
             _currentWork.GetAwaiter().GetResult();
-            var desired = TwitchChannelList.Normalize(desiredChannels);
+            var desired = BotChannelList.Normalize(desiredChannels);
             ScheduleLocked(token => RunReconciliationAsync(desired, trigger, token));
         }
     }
@@ -524,7 +521,7 @@ internal sealed class EventSubChannelSession(
             .Union(pendingDeletions.ReconciliationChannels, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var desired = TwitchChannelList.Normalize(desiredChannels);
+        var desired = BotChannelList.Normalize(desiredChannels);
         var removed = trackedChannels.Except(desired, StringComparer.OrdinalIgnoreCase).ToArray();
         await Task.WhenAll(
             desired

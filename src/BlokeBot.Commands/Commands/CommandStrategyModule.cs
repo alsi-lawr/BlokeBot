@@ -6,16 +6,16 @@ namespace BlokeBot.Commands;
 public sealed class CommandStrategyModule<TKind, TState>(
     ICommandRouteResolver<TKind, TState> resolver,
     CommandStrategyDispatcher<TKind, TState> dispatcher
-) : ITwitchCommandModule
+) : IChatCommandModule
     where TKind : struct, Enum
 {
-    public void AddCommands(ITwitchCommandBuilder commands)
+    public void AddCommands(IChatCommandBuilder commands)
     {
         commands.MapDynamic(RouteAsync);
     }
 
     private async ValueTask<bool> RouteAsync(
-        TwitchCommandContext context,
+        ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
     )

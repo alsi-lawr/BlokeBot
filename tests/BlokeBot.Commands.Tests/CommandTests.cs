@@ -112,12 +112,12 @@ public sealed class CommandTests
         responses.ShouldBe([CommandResponse.Chat("value")]);
     }
 
-    private static TwitchCommandDispatcher BuildDispatcher(Action<ITwitchBotBuilder> configure)
+    private static ChatCommandDispatcher BuildDispatcher(Action<IChatBotBuilder> configure)
     {
         var services = new ServiceCollection();
-        var builder = services.AddTwitchCommands();
+        var builder = services.AddChatCommands();
         configure(builder);
-        return services.BuildServiceProvider().GetRequiredService<TwitchCommandDispatcher>();
+        return services.BuildServiceProvider().GetRequiredService<ChatCommandDispatcher>();
     }
 
     private static ChatMessage Message(string login, string text)
