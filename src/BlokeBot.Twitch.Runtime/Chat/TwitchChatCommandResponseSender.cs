@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -29,18 +28,16 @@ internal sealed class TwitchChatCommandResponseSender(
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
-        switch (outcome)
-        {
-            case PublicChatSendOutcome.Accepted:
-                return;
-            case PublicChatSendOutcome.Rejected:
-                log.LogWarning(
-                    "Public command response for host channel #{HostChannel} was rejected before durable enqueue; no user-visible delivery was attempted.",
-                    Login.Normalize(sourceMessage.Channel)
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown public-chat send outcome.");
-        }
+        outcome
+            .Match<Action>(
+                static _ => static () => { },
+                _ =>
+                    () =>
+                        log.LogWarning(
+                            "Public command response for host channel #{HostChannel} was rejected before durable enqueue; no user-visible delivery was attempted.",
+                            Login.Normalize(sourceMessage.Channel)
+                        )
+            )
+            .Invoke();
     }
 }

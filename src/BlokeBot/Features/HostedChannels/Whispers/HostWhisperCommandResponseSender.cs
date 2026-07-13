@@ -324,19 +324,17 @@ public sealed class HostWhisperCommandResponseSender(
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
-        switch (outcome)
-        {
-            case PublicChatSendOutcome.Accepted:
-                return;
-            case PublicChatSendOutcome.Rejected:
-                log.LogWarning(
-                    "Hosted public command response for channel #{Channel} was rejected before durable enqueue; no user-visible delivery was attempted.",
-                    Login.Normalize(channel)
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown public-chat send outcome.");
-        }
+        outcome
+            .Match<Action>(
+                static _ => static () => { },
+                _ =>
+                    () =>
+                        log.LogWarning(
+                            "Hosted public command response for channel #{Channel} was rejected before durable enqueue; no user-visible delivery was attempted.",
+                            Login.Normalize(channel)
+                        )
+            )
+            .Invoke();
     }
 
     private async Task<WhisperHost?> ResolveHostAsync(

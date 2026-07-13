@@ -163,7 +163,7 @@ internal sealed class TwitchIrcConnectionSession(
         );
     }
 
-    private async Task SyncJoinedChannelsAsync(
+    internal async Task SyncJoinedChannelsAsync(
         StreamWriter writer,
         HashSet<string> joinedChannels,
         CancellationToken cancellationToken
@@ -228,19 +228,17 @@ internal sealed class TwitchIrcConnectionSession(
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
-        switch (outcome)
-        {
-            case PublicChatSendOutcome.Accepted:
-                return;
-            case PublicChatSendOutcome.Rejected:
-                _log.LogWarning(
-                    "IRC startup public-chat message for channel #{Channel} was rejected before durable enqueue; no delivery was attempted.",
-                    channel
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown public-chat send outcome.");
-        }
+        outcome
+            .Match<Action>(
+                static _ => static () => { },
+                _ =>
+                    () =>
+                        _log.LogWarning(
+                            "IRC startup public-chat message for channel #{Channel} was rejected before durable enqueue; no delivery was attempted.",
+                            channel
+                        )
+            )
+            .Invoke();
     }
 
     private async Task AwaitAuthenticationAsync(

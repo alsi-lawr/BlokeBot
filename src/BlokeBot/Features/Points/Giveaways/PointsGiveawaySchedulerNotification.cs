@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.Points.Giveaways;
@@ -56,18 +55,16 @@ internal sealed class TwitchPointsGiveawaySchedulerNotification(
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
-        switch (outcome)
-        {
-            case PublicChatSendOutcome.Accepted:
-                return;
-            case PublicChatSendOutcome.Rejected:
-                log.LogWarning(
-                    "Points giveaway notification for giveaway {GiveawayId} was rejected before durable public-chat enqueue; no delivery was attempted.",
-                    schedule.GiveawayId
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown public-chat send outcome.");
-        }
+        outcome
+            .Match<Action>(
+                static _ => static () => { },
+                _ =>
+                    () =>
+                        log.LogWarning(
+                            "Points giveaway notification for giveaway {GiveawayId} was rejected before durable public-chat enqueue; no delivery was attempted.",
+                            schedule.GiveawayId
+                        )
+            )
+            .Invoke();
     }
 }

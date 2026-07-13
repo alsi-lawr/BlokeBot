@@ -90,9 +90,32 @@ internal abstract record TwitchEventSubStartupDeliveryOutcome
 {
     private TwitchEventSubStartupDeliveryOutcome() { }
 
-    internal sealed record Completed : TwitchEventSubStartupDeliveryOutcome;
+    internal abstract TResult Match<TResult>(
+        Func<Completed, TResult> completed,
+        Func<Rejected, TResult> rejected
+    );
 
-    internal sealed record Rejected : TwitchEventSubStartupDeliveryOutcome;
+    internal sealed record Completed : TwitchEventSubStartupDeliveryOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Completed, TResult> completed,
+            Func<Rejected, TResult> rejected
+        )
+        {
+            return completed(this);
+        }
+    }
+
+    internal sealed record Rejected : TwitchEventSubStartupDeliveryOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Completed, TResult> completed,
+            Func<Rejected, TResult> rejected
+        )
+        {
+            return rejected(this);
+        }
+    }
 }
 
 internal sealed class TwitchEventSubChannelOperations(
@@ -187,12 +210,10 @@ internal sealed class TwitchEventSubChannelOperations(
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
-        return outcome switch
-        {
-            PublicChatSendOutcome.Accepted => new TwitchEventSubStartupDeliveryOutcome.Completed(),
-            PublicChatSendOutcome.Rejected => new TwitchEventSubStartupDeliveryOutcome.Rejected(),
-            _ => throw new UnreachableException("Unknown public-chat send outcome."),
-        };
+        return outcome.Match<TwitchEventSubStartupDeliveryOutcome>(
+            static _ => new TwitchEventSubStartupDeliveryOutcome.Completed(),
+            static _ => new TwitchEventSubStartupDeliveryOutcome.Rejected()
+        );
     }
 
     public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken)
@@ -541,8 +562,16 @@ internal sealed class TwitchEventSubChannelSession(
             _states.TryGetValue(channel, out state);
         }
 
-        if (state is TwitchEventSubChannelStatus.Degraded)
+        if (state is TwitchEventSubChannelStatus.Degraded degraded)
         {
+            if (
+                target is TwitchEventSubChannelReconciliationTarget.Present
+                && degraded.NextAction is TwitchEventSubChannelNextAction.NoFurtherAction
+            )
+            {
+                return;
+            }
+
             await RunRecoveryCycleAsync(
                 channel,
                 target,
@@ -898,16 +927,9 @@ internal sealed class TwitchEventSubChannelSession(
                     token => operations.DeliverStartupMessageAsync(channel, token),
                     cancellationToken
                 );
-                switch (startupDelivery)
+                if (!startupDelivery.Match(static _ => true, static _ => false))
                 {
-                    case TwitchEventSubStartupDeliveryOutcome.Completed:
-                        break;
-                    case TwitchEventSubStartupDeliveryOutcome.Rejected:
-                        return new TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected();
-                    default:
-                        throw new UnreachableException(
-                            "Unknown EventSub startup-delivery outcome."
-                        );
+                    return new TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected();
                 }
 
                 active = active with
@@ -1169,7 +1191,7 @@ internal sealed class TwitchEventSubChannelSession(
                             trigger,
                             attempt,
                             new TwitchEventSubChannelFailureContext.StartupMessageRejected(),
-                            TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                            TwitchEventSubChannelNextAction.NoFurtherAction
                         ),
                 unresolved =>
                     () =>

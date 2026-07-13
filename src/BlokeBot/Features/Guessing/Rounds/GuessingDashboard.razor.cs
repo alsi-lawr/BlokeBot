@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -358,20 +357,17 @@ public partial class GuessingDashboard
                 new PublicChatDeliveryDeadline.ConfiguredMaximum(),
                 CancellationToken.None
             );
-            switch (outcome)
-            {
-                case PublicChatSendOutcome.Accepted:
-                    PublishResult(result);
-                    break;
-                case PublicChatSendOutcome.Rejected:
-                    _toasts.Publish(
-                        ToastKind.Warning,
-                        "The action completed, but its chat message could not be queued."
-                    );
-                    break;
-                default:
-                    throw new UnreachableException("Unknown public-chat send outcome.");
-            }
+            outcome
+                .Match<Action>(
+                    _ => () => PublishResult(result),
+                    _ =>
+                        () =>
+                            _toasts.Publish(
+                                ToastKind.Warning,
+                                "The action completed, but its chat message could not be queued."
+                            )
+                )
+                .Invoke();
         }
         else
         {

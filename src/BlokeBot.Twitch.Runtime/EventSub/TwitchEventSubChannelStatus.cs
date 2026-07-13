@@ -29,6 +29,7 @@ public enum TwitchEventSubChannelNextAction
     BeginRecoveryCycle,
     ContinueRecoveryCycle,
     RetryOnNextReconciliation,
+    NoFurtherAction,
 }
 
 public sealed record TwitchEventSubChannelFailure

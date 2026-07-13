@@ -29,12 +29,42 @@ public abstract record PublicChatSendOutcome
     private PublicChatSendOutcome() { }
 
     /// <summary>
+    /// Matches the queue-admission outcome exhaustively.
+    /// </summary>
+    /// <typeparam name="TResult">The result produced by the selected handler.</typeparam>
+    /// <param name="accepted">Handles durable queue acceptance.</param>
+    /// <param name="rejected">Handles rejection before durable enqueue.</param>
+    /// <returns>The selected handler's result.</returns>
+    public abstract TResult Match<TResult>(
+        Func<Accepted, TResult> accepted,
+        Func<Rejected, TResult> rejected
+    );
+
+    /// <summary>
     /// The message was accepted into durable delivery processing.
     /// </summary>
-    public sealed record Accepted : PublicChatSendOutcome;
+    public sealed record Accepted : PublicChatSendOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Accepted, TResult> accepted,
+            Func<Rejected, TResult> rejected
+        )
+        {
+            return accepted(this);
+        }
+    }
 
     /// <summary>
     /// Queue admission rejected the message before any durable write or delivery attempt.
     /// </summary>
-    public sealed record Rejected : PublicChatSendOutcome;
+    public sealed record Rejected : PublicChatSendOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Accepted, TResult> accepted,
+            Func<Rejected, TResult> rejected
+        )
+        {
+            return rejected(this);
+        }
+    }
 }

@@ -244,7 +244,7 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
-    public async Task Startup_PublicChatEnqueueRejected_IsTerminalWithoutRetryOrLifecycleStart()
+    public async Task Startup_PublicChatEnqueueRejected_RemainsTerminalAcrossKeepalive()
     {
         var operations = new ScriptedChannelOperations();
         operations.EnqueueStartupDeliveryOutcome(
@@ -254,6 +254,11 @@ public sealed class EventSubChannelRecoveryTests
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
         harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        harness.Session.TriggerReconciliation(
+            ["channel"],
+            TwitchEventSubChannelRecoveryTrigger.Keepalive
+        );
         await harness.Session.DrainAsync();
 
         var degraded = harness
@@ -267,7 +272,7 @@ public sealed class EventSubChannelRecoveryTests
             "PublicChatEnqueueRejected",
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
-            TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
+            TwitchEventSubChannelNextAction.NoFurtherAction,
             _now
         );
         harness
