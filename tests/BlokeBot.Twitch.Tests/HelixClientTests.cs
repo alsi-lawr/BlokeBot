@@ -98,7 +98,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBe(TwitchFollowerStatus.Follows);
+        status.ShouldBe(FollowerStatus.Follows);
     }
 
     [Test]
@@ -115,7 +115,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBe(TwitchFollowerStatus.DoesNotFollow);
+        status.ShouldBe(FollowerStatus.DoesNotFollow);
     }
 
     [Test]
@@ -219,7 +219,7 @@ public sealed class HelixClientTests
         var client = new HelixClient(factory);
 
         var channels = await client.GetModeratedChannelsAsync(
-            new TwitchHelixRequestContext("client", "token"),
+            new HelixRequestContext("client", "token"),
             "bot-id",
             CancellationToken.None
         );
@@ -235,7 +235,7 @@ public sealed class HelixClientTests
         };
     }
 
-    private static TwitchHelixRequestContext Context()
+    private static HelixRequestContext Context()
     {
         return new("client", "token");
     }

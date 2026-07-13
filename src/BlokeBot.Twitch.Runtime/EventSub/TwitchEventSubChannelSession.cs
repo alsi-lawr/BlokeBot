@@ -68,7 +68,7 @@ internal sealed class TwitchEventSubChannelOperations(
         {
             Channel = channel,
             SubscriptionId = await eventSub.CreateChatMessageSubscriptionAsync(
-                new TwitchHelixRequestContext(settings.Identity.ClientId, account.AccessToken),
+                new HelixRequestContext(settings.Identity.ClientId, account.AccessToken),
                 resolved.BroadcasterId,
                 resolved.BotUserId,
                 sessionId,
@@ -109,7 +109,7 @@ internal sealed class TwitchEventSubChannelOperations(
         try
         {
             await eventSub.DeleteSubscriptionAsync(
-                new TwitchHelixRequestContext(settings.Identity.ClientId, subscription.AccessToken),
+                new HelixRequestContext(settings.Identity.ClientId, subscription.AccessToken),
                 subscription.SubscriptionId,
                 cancellationToken
             );

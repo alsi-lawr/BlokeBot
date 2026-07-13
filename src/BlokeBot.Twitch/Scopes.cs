@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch;
 /// <summary>
 /// Twitch OAuth scope names used by the bot runtime.
 /// </summary>
-public static class TwitchScopes
+public static class Scopes
 {
     public const string ModeratorReadFollowers = "moderator:read:followers";
     public const string UserManageWhispers = "user:manage:whispers";

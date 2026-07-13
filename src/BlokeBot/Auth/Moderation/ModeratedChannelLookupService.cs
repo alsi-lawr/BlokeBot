@@ -13,13 +13,13 @@ internal sealed class ModeratedChannelLookupService(HelixClient helix)
     )
     {
         var moderatedChannels = await helix.GetModeratedChannelsAsync(
-            new TwitchHelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(options.ClientId, accessToken),
             userId,
             ct
         );
-        var ownLogin = TwitchLogin.Normalize(userLogin);
+        var ownLogin = Login.Normalize(userLogin);
         return moderatedChannels
-            .Select(channel => TwitchLogin.Normalize(channel.BroadcasterLogin))
+            .Select(channel => Login.Normalize(channel.BroadcasterLogin))
             .Where(login =>
                 login.Length > 0
                 && !string.Equals(login, ownLogin, StringComparison.OrdinalIgnoreCase)

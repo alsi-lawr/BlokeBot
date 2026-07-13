@@ -16,7 +16,7 @@ public sealed class TwitchTokenStatusService(
     )
     {
         ArgumentNullException.ThrowIfNull(requiredScopes);
-        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
+        var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
         return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
             InspectAsync(required, cancellationToken)
         );
@@ -97,10 +97,10 @@ public sealed class TwitchTokenStatusService(
             }
 
             var grantedScopes = ImmutableArray.CreateRange(
-                TwitchScopeSet.NormalizeMany(validation.Scopes)
+                ScopeSet.NormalizeMany(validation.Scopes)
             );
             var missingScopes = ImmutableArray.CreateRange(
-                TwitchScopeSet.Missing(grantedScopes, requiredScopes)
+                ScopeSet.Missing(grantedScopes, requiredScopes)
             );
             return missingScopes.IsEmpty
                 ? Success(

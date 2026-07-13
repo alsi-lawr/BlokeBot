@@ -17,7 +17,7 @@ internal sealed class TwitchChatCommandResponseSender(
         {
             log.LogWarning(
                 "Private command response delivery is unavailable in public-chat-only mode for host channel #{HostChannel}; no user-visible delivery was attempted.",
-                TwitchLogin.Normalize(sourceMessage.Channel)
+                Login.Normalize(sourceMessage.Channel)
             );
             return;
         }

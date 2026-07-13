@@ -13,7 +13,7 @@ public sealed class ChatClient(IHttpClientFactory httpClientFactory)
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
     public async Task<ChatMessageSendResult> SendMessageAsync(
-        TwitchHelixRequestContext context,
+        HelixRequestContext context,
         string broadcasterId,
         string senderId,
         string message,

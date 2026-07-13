@@ -102,7 +102,7 @@ builder
     .AddBlokeBotToasts()
     .AddBlokeBotAuth();
 builder.Services.AddTwitchOAuthApi();
-builder.Services.AddTwitchHelix();
+builder.Services.AddHelix();
 builder.Services.AddHttpClient();
 builder
     .Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

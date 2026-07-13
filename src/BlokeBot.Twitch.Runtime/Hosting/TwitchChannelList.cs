@@ -5,7 +5,7 @@ internal static class TwitchChannelList
     public static string[] Normalize(IEnumerable<string> channels)
     {
         return channels
-            .Select(TwitchLogin.Normalize)
+            .Select(Login.Normalize)
             .Where(channel => channel.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(channel => channel, StringComparer.OrdinalIgnoreCase)

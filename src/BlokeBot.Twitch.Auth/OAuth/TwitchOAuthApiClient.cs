@@ -16,14 +16,14 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
 
     public Uri CreateAuthorizationUri(TwitchAuthorizationUriRequest request)
     {
-        var query = TwitchQueryString.Create(
+        var query = QueryString.Create(
             new Dictionary<string, string?>
             {
                 ["client_id"] = request.ClientId,
                 ["force_verify"] = request.ForceVerify ? "true" : null,
                 ["redirect_uri"] = request.RedirectUri,
                 ["response_type"] = "code",
-                ["scope"] = TwitchScopeSet.Format(request.Scopes),
+                ["scope"] = ScopeSet.Format(request.Scopes),
                 ["state"] = request.State,
             }
         );
@@ -118,8 +118,8 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
             ? null
             : new TwitchTokenValidation(
                 payload.UserId,
-                TwitchLogin.Normalize(payload.Login),
-                TwitchScopeSet.NormalizeMany(payload.Scopes).ToHashSet(StringComparer.Ordinal)
+                Login.Normalize(payload.Login),
+                ScopeSet.NormalizeMany(payload.Scopes).ToHashSet(StringComparer.Ordinal)
             );
     }
 

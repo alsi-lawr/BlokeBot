@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch;
 
-public enum TwitchFollowerStatus
+public enum FollowerStatus
 {
     Follows,
     DoesNotFollow,

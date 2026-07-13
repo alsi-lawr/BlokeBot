@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch;
 
-public enum TwitchModeratedChannelStatus
+public enum ModeratedChannelStatus
 {
     Unknown,
     NeedsAuthorization,

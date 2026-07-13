@@ -103,7 +103,7 @@ public sealed class HostWhisperCommandResponseSender(
         try
         {
             var result = await whispers.SendAsync(
-                new TwitchHelixRequestContext(identity.ClientId, prepared.AccessToken),
+                new HelixRequestContext(identity.ClientId, prepared.AccessToken),
                 prepared.SenderUserId,
                 prepared.RecipientUserId,
                 message,
@@ -166,7 +166,7 @@ public sealed class HostWhisperCommandResponseSender(
 
         var tokenStatus = await botAccounts.GetCustomBotTokenStatusAsync(
             host.Id,
-            [TwitchScopes.UserManageWhispers],
+            [Scopes.UserManageWhispers],
             cancellationToken
         );
         var readyStatus = tokenStatus.Status.Match<TwitchTokenStatus.Ready?>(
@@ -247,7 +247,7 @@ public sealed class HostWhisperCommandResponseSender(
     {
         var context = new PrivateDeliveryFailureContext
         {
-            HostChannel = TwitchLogin.Normalize(sourceMessage.Channel),
+            HostChannel = Login.Normalize(sourceMessage.Channel),
         };
         var handling = error switch
         {
@@ -329,7 +329,7 @@ public sealed class HostWhisperCommandResponseSender(
         CancellationToken cancellationToken
     )
     {
-        var login = TwitchLogin.Normalize(channel);
+        var login = Login.Normalize(channel);
         if (string.IsNullOrWhiteSpace(login))
         {
             return null;
@@ -369,14 +369,14 @@ public sealed class HostWhisperCommandResponseSender(
             return taggedUserId.Trim();
         }
 
-        var login = TwitchLogin.Normalize(sourceMessage.Login);
+        var login = Login.Normalize(sourceMessage.Login);
         if (string.IsNullOrWhiteSpace(login))
         {
             return null;
         }
 
         var resolved = await users.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(identity.ClientId, accessToken),
+            new HelixRequestContext(identity.ClientId, accessToken),
             [login],
             cancellationToken
         );

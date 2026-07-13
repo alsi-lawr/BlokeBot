@@ -162,7 +162,7 @@ internal sealed class AuthSessionService(BotAdminService admins, TwitchBotSettin
     {
         return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
             && string.Equals(
-                TwitchLogin.Normalize(login),
+                Login.Normalize(login),
                 botSettings.Identity.BotUsername,
                 StringComparison.Ordinal
             );

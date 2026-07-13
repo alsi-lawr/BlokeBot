@@ -47,7 +47,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task MissingModeratorScope_CheckingReadiness_ReportsScopeFailure()
     {
-        var service = CreateService(AuthorizedTokenStatus([TwitchScopes.ModeratorReadFollowers]));
+        var service = CreateService(AuthorizedTokenStatus([Scopes.ModeratorReadFollowers]));
 
         var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
@@ -68,9 +68,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task MissingFollowerScope_CheckingReadiness_ReportsScopeFailure()
     {
-        var service = CreateService(
-            AuthorizedTokenStatus([TwitchScopes.UserReadModeratedChannels])
-        );
+        var service = CreateService(AuthorizedTokenStatus([Scopes.UserReadModeratedChannels]));
 
         var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
@@ -304,7 +302,7 @@ public sealed class HostBotStatusTests
 
     private static string[] RequiredScopes()
     {
-        return [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
+        return [Scopes.UserReadModeratedChannels, Scopes.ModeratorReadFollowers];
     }
 
     private static ActiveBotAccountTokenStatus UnavailableTokenStatus()

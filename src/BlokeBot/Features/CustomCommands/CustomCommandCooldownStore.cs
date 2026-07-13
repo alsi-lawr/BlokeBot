@@ -38,9 +38,7 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
 
             var key = new CooldownKey(
                 commandId,
-                scope == CustomCommandCooldownScope.User
-                    ? TwitchLogin.Normalize(userLogin)
-                    : string.Empty
+                scope == CustomCommandCooldownScope.User ? Login.Normalize(userLogin) : string.Empty
             );
             if (_blockedUntil.TryGetValue(key, out var expiry) && expiry > now)
             {

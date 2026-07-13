@@ -11,7 +11,7 @@ internal sealed class DefaultTwitchBotAccountProvider(
     )
     {
         return new(
-            TwitchLogin.Normalize(settings.Identity.BotUsername),
+            Login.Normalize(settings.Identity.BotUsername),
             await tokens.GetAccessTokenAsync(cancellationToken)
         );
     }

@@ -117,7 +117,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     )
     {
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(settings.Identity.ClientId, accessToken),
+            new HelixRequestContext(settings.Identity.ClientId, accessToken),
             ct
         );
 

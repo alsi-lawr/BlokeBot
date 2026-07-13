@@ -64,7 +64,7 @@ internal sealed class TwitchHelixPublicChatTransport(
     )
     {
         var result = await chat.SendMessageAsync(
-            new TwitchHelixRequestContext(identity.ClientId, prepared.AppAccessToken),
+            new HelixRequestContext(identity.ClientId, prepared.AppAccessToken),
             prepared.BroadcasterId,
             prepared.BotUserId,
             prepared.Message.Message,

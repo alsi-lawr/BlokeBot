@@ -99,7 +99,7 @@ public sealed class HostBotAccountAuthorizationTests
                 LoginName.Parse("custombot"),
                 "CustomBot",
                 "https://static-cdn.jtvnw.net/custombot.png",
-                ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
+                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
             ),
             CancellationToken.None
         );
@@ -187,7 +187,7 @@ public sealed class HostBotAccountAuthorizationTests
             hostId,
             CreateCustomBotGrant(
                 "override-token",
-                ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
+                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
             ),
             CancellationToken.None
         );
@@ -198,8 +198,8 @@ public sealed class HostBotAccountAuthorizationTests
                 [
                     "chat:read",
                     "chat:edit",
-                    TwitchScopes.UserReadModeratedChannels,
-                    TwitchScopes.UserManageWhispers,
+                    Scopes.UserReadModeratedChannels,
+                    Scopes.UserManageWhispers,
                 ]
             ),
             CancellationToken.None
@@ -207,10 +207,10 @@ public sealed class HostBotAccountAuthorizationTests
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
         missing.Succeeded.ShouldBeFalse();
-        missing.MissingScopes.ShouldContain(TwitchScopes.UserManageWhispers);
+        missing.MissingScopes.ShouldContain(Scopes.UserManageWhispers);
         authorized.Succeeded.ShouldBeTrue();
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
-        status.RequiredScopes.ShouldContain(TwitchScopes.UserManageWhispers);
+        status.RequiredScopes.ShouldContain(Scopes.UserManageWhispers);
     }
 
     [Test]
@@ -273,7 +273,7 @@ public sealed class HostBotAccountAuthorizationTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels],
+                    Scopes = ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
                 },
             }
         );
@@ -319,7 +319,7 @@ public sealed class HostBotAccountAuthorizationTests
             hostId,
             CreateCustomBotGrant(
                 "override-token",
-                ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels]
+                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
             ),
             CancellationToken.None
         );

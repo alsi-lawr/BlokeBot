@@ -61,7 +61,7 @@ public sealed class ChannelBotAuthorizationService(
         }
 
         host.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
-        host.ChannelBotAuthorizedScopes = TwitchScopeSet.Format(grant.Scopes);
+        host.ChannelBotAuthorizedScopes = ScopeSet.Format(grant.Scopes);
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
         return ChannelBotAuthorizationResult.Success("The bot can chat in this channel.");
@@ -94,7 +94,7 @@ public sealed class ChannelBotAuthorizationService(
 
     private string[] MissingRequiredScopes(IEnumerable<string> grantedScopes)
     {
-        return TwitchScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
+        return ScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
     }
 
     private static IEnumerable<string> SplitStoredScopes(string? scopes)

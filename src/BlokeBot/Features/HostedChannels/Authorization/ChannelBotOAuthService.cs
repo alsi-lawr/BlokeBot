@@ -65,7 +65,7 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
         return
             configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>()
                 is { } scopes
-            ? TwitchScopeSet.NormalizeMany(scopes)
+            ? ScopeSet.NormalizeMany(scopes)
             : [];
     }
 

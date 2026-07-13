@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed record TwitchHelixUser
+public sealed record HelixUser
 {
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;

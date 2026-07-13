@@ -27,7 +27,7 @@ public sealed class HostedChannelRuntimeStatusTests
                     BotUsername = "bot",
                     ClientId = "client",
                     ClientSecret = "secret",
-                    Scopes = [TwitchScopes.UserReadModeratedChannels],
+                    Scopes = [Scopes.UserReadModeratedChannels],
                 },
             }
         );

@@ -13,12 +13,12 @@ internal sealed class TwitchAccessListProfileEnrichmentPolicy(
     {
         var token = await appTokens.GetAccessTokenAsync(cancellationToken);
         var users = await helix.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(identity.ClientId, token),
+            new HelixRequestContext(identity.ClientId, token),
             logins,
             cancellationToken
         );
         var profileImages = users.ToDictionary(
-            user => TwitchLogin.Normalize(user.Login),
+            user => Login.Normalize(user.Login),
             user => user.ProfileImageUrl,
             StringComparer.OrdinalIgnoreCase
         );
@@ -27,7 +27,7 @@ internal sealed class TwitchAccessListProfileEnrichmentPolicy(
         [
             .. logins.Select(login =>
             {
-                profileImages.TryGetValue(TwitchLogin.Normalize(login), out var profileImageUrl);
+                profileImages.TryGetValue(Login.Normalize(login), out var profileImageUrl);
                 return new AccessListEntryProfile(
                     login,
                     string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl

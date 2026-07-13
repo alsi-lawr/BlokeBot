@@ -30,7 +30,7 @@ public sealed class PointsGamblingCooldownStore(TimeProvider clock)
                 return true;
             }
 
-            var key = new CooldownKey(hostId, TwitchLogin.Normalize(userLogin));
+            var key = new CooldownKey(hostId, Login.Normalize(userLogin));
             if (_blockedUntil.TryGetValue(key, out var expiry) && expiry > now)
             {
                 return false;

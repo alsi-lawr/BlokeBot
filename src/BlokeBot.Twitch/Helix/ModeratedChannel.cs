@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed record TwitchModeratedChannel
+public sealed record ModeratedChannel
 {
     [JsonPropertyName("broadcaster_id")]
     public string BroadcasterId { get; init; } = string.Empty;

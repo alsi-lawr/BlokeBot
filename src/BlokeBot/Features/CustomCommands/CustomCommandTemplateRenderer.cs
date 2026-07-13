@@ -21,8 +21,8 @@ public sealed class CustomCommandTemplateRenderer
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["user"] = TwitchLogin.Normalize(context.Message.Login),
-            ["channel"] = TwitchLogin.Normalize(context.Message.Channel),
+            ["user"] = Login.Normalize(context.Message.Login),
+            ["channel"] = Login.Normalize(context.Message.Channel),
             ["command"] = CommandAliasNormalizer.Normalize(context.CommandName),
             ["args"] = string.Join(' ', args),
         };

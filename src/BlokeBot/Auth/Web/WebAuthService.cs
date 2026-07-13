@@ -125,7 +125,7 @@ internal sealed class WebAuthService(
     {
         return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
             && string.Equals(
-                TwitchLogin.Normalize(login),
+                Login.Normalize(login),
                 botSettings.Identity.BotUsername,
                 StringComparison.Ordinal
             );

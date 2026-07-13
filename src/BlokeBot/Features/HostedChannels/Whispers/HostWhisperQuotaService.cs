@@ -144,7 +144,7 @@ public sealed class HostWhisperQuotaService(
             new WhisperQuotaRecipient
             {
                 RecipientTwitchUserId = recipientUserId,
-                RecipientLogin = TwitchLogin.Normalize(recipientLogin),
+                RecipientLogin = Login.Normalize(recipientLogin),
                 FirstSentAtUtc = now,
             }
         );

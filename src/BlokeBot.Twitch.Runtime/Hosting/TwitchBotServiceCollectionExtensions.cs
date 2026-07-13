@@ -154,7 +154,7 @@ public static class TwitchBotServiceCollectionExtensions
         RegisterResponseSender(services, responseSender);
         RegisterLifecycleNotifier(services, lifecycleNotifier);
         services.AddTwitchAuth();
-        services.AddTwitchHelix();
+        services.AddHelix();
         services.AddContinueAndReportObserverFanOut<
             TwitchIrcMessageObserverBoundary,
             TwitchChatMessage,

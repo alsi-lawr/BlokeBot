@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch;
 
-public static class TwitchScopeSet
+public static class ScopeSet
 {
     public static string Normalize(string? value)
     {

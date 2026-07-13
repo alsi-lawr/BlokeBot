@@ -156,7 +156,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost/oauth/callback",
-                    Scopes = [TwitchScopes.UserReadModeratedChannels],
+                    Scopes = [Scopes.UserReadModeratedChannels],
                     TokenCachePath = tokenCachePath,
                 },
             }
@@ -205,7 +205,7 @@ public sealed class BotAccountAuthorizationPolicyTests
 
     private static ImmutableArray<string> RequiredScopes()
     {
-        return [TwitchScopes.UserReadModeratedChannels];
+        return [Scopes.UserReadModeratedChannels];
     }
 
     private static TwitchTokenValidation Validation(IEnumerable<string> scopes)

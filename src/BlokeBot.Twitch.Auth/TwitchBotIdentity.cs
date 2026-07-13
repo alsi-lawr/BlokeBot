@@ -35,11 +35,11 @@ public sealed record TwitchBotIdentity
 
         return new TwitchBotIdentity
         {
-            BotUsername = TwitchLogin.Normalize(options.BotUsername),
+            BotUsername = Login.Normalize(options.BotUsername),
             ClientId = (options.ClientId ?? string.Empty).Trim(),
             ClientSecret = options.ClientSecret ?? string.Empty,
             RedirectUri = (options.RedirectUri ?? string.Empty).Trim(),
-            Scopes = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(options.Scopes ?? [])),
+            Scopes = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(options.Scopes ?? [])),
             TokenCachePath = (options.TokenCachePath ?? string.Empty).Trim(),
         };
     }

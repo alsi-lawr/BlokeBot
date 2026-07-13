@@ -2,7 +2,7 @@ namespace BlokeBot.Auth.OAuth;
 
 internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)
 {
-    private static readonly string[] _scopes = [TwitchScopes.UserReadModeratedChannels];
+    private static readonly string[] _scopes = [Scopes.UserReadModeratedChannels];
 
     public Uri CreateAuthorizationUri(HttpRequest request, WebAuthOptions options, string state)
     {

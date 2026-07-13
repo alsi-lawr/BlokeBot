@@ -9,10 +9,10 @@ internal sealed class ChatIdentityResolver(TwitchBotIdentity identity, HelixClie
         CancellationToken cancellationToken
     )
     {
-        var channel = TwitchLogin.Normalize(channelLogin);
-        var bot = TwitchLogin.Normalize(botLogin);
+        var channel = Login.Normalize(channelLogin);
+        var bot = Login.Normalize(botLogin);
         var users = await helix.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(identity.ClientId, accessToken),
+            new HelixRequestContext(identity.ClientId, accessToken),
             [channel, bot],
             cancellationToken
         );

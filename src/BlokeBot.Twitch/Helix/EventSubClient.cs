@@ -15,7 +15,7 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
     public async Task<string> CreateChatMessageSubscriptionAsync(
-        TwitchHelixRequestContext context,
+        HelixRequestContext context,
         string broadcasterId,
         string botUserId,
         string sessionId,
@@ -49,7 +49,7 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
     }
 
     public async Task DeleteSubscriptionAsync(
-        TwitchHelixRequestContext context,
+        HelixRequestContext context,
         string subscriptionId,
         CancellationToken cancellationToken
     )

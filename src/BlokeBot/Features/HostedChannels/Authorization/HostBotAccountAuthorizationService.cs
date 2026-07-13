@@ -72,11 +72,11 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
+        var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()
-            .Where(x => x.Login == TwitchLogin.Normalize(channelLogin))
+            .Where(x => x.Login == Login.Normalize(channelLogin))
             .Select(x => new { x.Id })
             .SingleOrDefaultAsync(ct);
 
@@ -110,7 +110,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
+        var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
@@ -153,7 +153,7 @@ public sealed class HostBotAccountAuthorizationService(
             _ => throw BotNotReady(channelLogin),
             _ => throw BotNotReady(channelLogin),
             ready => new TwitchBotAccount(
-                TwitchLogin.Normalize(ready.Validation.Login),
+                Login.Normalize(ready.Validation.Login),
                 ready.AccessToken
             )
         );
@@ -268,7 +268,7 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        var missingScopes = TwitchScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
+        var missingScopes = ScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
         if (missingScopes.Length > 0)
         {
             return BotAccountAuthorizationResult.Failure(
@@ -279,7 +279,7 @@ public sealed class HostBotAccountAuthorizationService(
 
         settings.AccessToken = grant.Token.AccessToken;
         settings.AuthorizedAtUtc = DateTime.UtcNow;
-        settings.AuthorizedScopes = TwitchScopeSet.Format(grant.Scopes);
+        settings.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
         settings.DisplayName = grant.DisplayName.Trim();
         settings.ExpiresAtUtc = grant.Token.ExpiresAtUtc;
         settings.Login = grant.Login.Value;
@@ -345,7 +345,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
+        var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
         {
             return new TwitchTokenStatus.Unavailable(
@@ -392,9 +392,9 @@ public sealed class HostBotAccountAuthorizationService(
             }
         }
 
-        var granted = TwitchScopeSet.NormalizeMany(validation.Scopes);
-        var missing = TwitchScopeSet.Missing(granted, required);
-        settings.AuthorizedScopes = TwitchScopeSet.Format(granted);
+        var granted = ScopeSet.NormalizeMany(validation.Scopes);
+        var missing = ScopeSet.Missing(granted, required);
+        settings.AuthorizedScopes = ScopeSet.Format(granted);
         settings.Login = validation.Login;
         settings.TwitchUserId = validation.UserId;
         settings.UpdatedAtUtc = DateTime.UtcNow;
@@ -457,7 +457,7 @@ public sealed class HostBotAccountAuthorizationService(
     )
     {
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(botSettings.Identity.ClientId, accessToken),
+            new HelixRequestContext(botSettings.Identity.ClientId, accessToken),
             ct
         );
         if (user is null)
@@ -504,7 +504,7 @@ public sealed class HostBotAccountAuthorizationService(
     {
         var scopes = hostBotOAuth.RequestedScopes();
         return settings?.WhisperResponsesEnabled == true
-            ? TwitchScopeSet.NormalizeMany(scopes.Append(TwitchScopes.UserManageWhispers))
+            ? ScopeSet.NormalizeMany(scopes.Append(Scopes.UserManageWhispers))
             : scopes;
     }
 

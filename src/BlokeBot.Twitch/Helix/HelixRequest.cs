@@ -7,7 +7,7 @@ internal static class HelixRequest
     internal static HttpRequestMessage Create(
         HttpMethod method,
         string uri,
-        TwitchHelixRequestContext context
+        HelixRequestContext context
     )
     {
         var request = new HttpRequestMessage(method, uri);

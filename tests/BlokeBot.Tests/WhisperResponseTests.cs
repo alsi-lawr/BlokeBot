@@ -502,7 +502,7 @@ public sealed class WhisperResponseTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels],
+                    Scopes = ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
                 },
             }
         );
@@ -540,7 +540,7 @@ public sealed class WhisperResponseTests
                 AccessToken = "override-whisper-token",
                 RefreshToken = "override-refresh",
                 ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
-                AuthorizedScopes = TwitchScopeSet.Format([TwitchScopes.UserManageWhispers]),
+                AuthorizedScopes = ScopeSet.Format([Scopes.UserManageWhispers]),
                 UpdatedAtUtc = DateTime.UtcNow,
             }
         );

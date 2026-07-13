@@ -6,14 +6,14 @@ namespace BlokeBot.Twitch;
 /// <summary>
 /// Adds Twitch platform services to an application service collection.
 /// </summary>
-public static class TwitchServiceCollectionExtensions
+public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the Twitch Helix transport clients.
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     /// <returns>The same service collection.</returns>
-    public static IServiceCollection AddTwitchHelix(this IServiceCollection services)
+    public static IServiceCollection AddHelix(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 

@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch;
 
-public static class TwitchQueryString
+public static class QueryString
 {
     public static string Create(IEnumerable<KeyValuePair<string, string?>> values)
     {

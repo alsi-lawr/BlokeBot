@@ -13,7 +13,7 @@ public readonly record struct LoginName
 
     public static LoginName Parse(string? value)
     {
-        return new(TwitchLogin.Normalize(value));
+        return new(Login.Normalize(value));
     }
 
     public override string ToString()

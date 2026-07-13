@@ -17,8 +17,8 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
-    public async Task<TwitchHelixUser?> GetCurrentUserAsync(
-        TwitchHelixRequestContext context,
+    public async Task<HelixUser?> GetCurrentUserAsync(
+        HelixRequestContext context,
         CancellationToken cancellationToken
     )
     {
@@ -26,20 +26,20 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<TwitchUsersResponse>(
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
             cancellationToken
         );
         return payload?.Data.FirstOrDefault();
     }
 
-    public async Task<IReadOnlyList<TwitchHelixUser>> GetUsersByLoginAsync(
-        TwitchHelixRequestContext context,
+    public async Task<IReadOnlyList<HelixUser>> GetUsersByLoginAsync(
+        HelixRequestContext context,
         IEnumerable<string?> logins,
         CancellationToken cancellationToken
     )
     {
-        var normalized = TwitchLogin.NormalizeMany(logins);
+        var normalized = Login.NormalizeMany(logins);
         if (normalized.Length == 0)
         {
             return [];
@@ -47,27 +47,27 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
 
         var uri =
             $"{_usersEndpoint}?"
-            + TwitchQueryString.Create(
+            + QueryString.Create(
                 normalized.Select(login => new KeyValuePair<string, string?>("login", login))
             );
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<TwitchUsersResponse>(
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
             cancellationToken
         );
         return payload?.Data ?? [];
     }
 
-    public async Task<IReadOnlyList<TwitchModeratedChannel>> GetModeratedChannelsAsync(
-        TwitchHelixRequestContext context,
+    public async Task<IReadOnlyList<ModeratedChannel>> GetModeratedChannelsAsync(
+        HelixRequestContext context,
         string userId,
         CancellationToken cancellationToken
     )
     {
-        var channels = new List<TwitchModeratedChannel>();
+        var channels = new List<ModeratedChannel>();
         string? cursor = null;
         do
         {
@@ -79,7 +79,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             using var response = await _http.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var payload = await response.Content.ReadFromJsonAsync<TwitchModeratedChannelsResponse>(
+            var payload = await response.Content.ReadFromJsonAsync<ModeratedChannelsResponse>(
                 _jsonOptions,
                 cancellationToken
             );
@@ -94,8 +94,8 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return channels;
     }
 
-    public async Task<TwitchModeratedChannelStatus> GetModeratedChannelStatusAsync(
-        TwitchHelixRequestContext context,
+    public async Task<ModeratedChannelStatus> GetModeratedChannelStatusAsync(
+        HelixRequestContext context,
         string userId,
         string broadcasterId,
         CancellationToken cancellationToken
@@ -112,20 +112,20 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                return TwitchModeratedChannelStatus.NeedsAuthorization;
+                return ModeratedChannelStatus.NeedsAuthorization;
             }
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
-                return TwitchModeratedChannelStatus.MissingPermission;
+                return ModeratedChannelStatus.MissingPermission;
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                return TwitchModeratedChannelStatus.Unknown;
+                return ModeratedChannelStatus.Unknown;
             }
 
-            var payload = await response.Content.ReadFromJsonAsync<TwitchModeratedChannelsResponse>(
+            var payload = await response.Content.ReadFromJsonAsync<ModeratedChannelsResponse>(
                 _jsonOptions,
                 cancellationToken
             );
@@ -135,42 +135,39 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 ) == true
             )
             {
-                return TwitchModeratedChannelStatus.IsModerator;
+                return ModeratedChannelStatus.IsModerator;
             }
 
             cursor = payload?.Pagination.Cursor;
         } while (!string.IsNullOrWhiteSpace(cursor));
 
-        return TwitchModeratedChannelStatus.NotModerator;
+        return ModeratedChannelStatus.NotModerator;
     }
 
     public async Task<bool> IsStreamLiveAsync(
-        TwitchHelixRequestContext context,
+        HelixRequestContext context,
         string channelLogin,
         CancellationToken cancellationToken
     )
     {
         var uri =
             $"{_streamsEndpoint}?"
-            + TwitchQueryString.Create([
-                new KeyValuePair<string, string?>(
-                    "user_login",
-                    TwitchLogin.Normalize(channelLogin)
-                ),
+            + QueryString.Create([
+                new KeyValuePair<string, string?>("user_login", Login.Normalize(channelLogin)),
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var payload = await response.Content.ReadFromJsonAsync<TwitchStreamResponse>(
+        var payload = await response.Content.ReadFromJsonAsync<StreamResponse>(
             _jsonOptions,
             cancellationToken
         );
         return payload?.Data.Length > 0;
     }
 
-    public async Task<TwitchFollowerStatus> GetFollowerStatusAsync(
-        TwitchHelixRequestContext context,
+    public async Task<FollowerStatus> GetFollowerStatusAsync(
+        HelixRequestContext context,
         string broadcasterId,
         string userId,
         string moderatorId,
@@ -179,7 +176,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     {
         var uri =
             $"{_followersEndpoint}?"
-            + TwitchQueryString.Create(
+            + QueryString.Create(
                 new Dictionary<string, string?>
                 {
                     ["broadcaster_id"] = broadcasterId,
@@ -191,17 +188,15 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
         {
-            return TwitchFollowerStatus.Unavailable;
+            return FollowerStatus.Unavailable;
         }
 
         response.EnsureSuccessStatusCode();
-        var payload = await response.Content.ReadFromJsonAsync<TwitchFollowerResponse>(
+        var payload = await response.Content.ReadFromJsonAsync<FollowerResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.Length > 0
-            ? TwitchFollowerStatus.Follows
-            : TwitchFollowerStatus.DoesNotFollow;
+        return payload?.Data.Length > 0 ? FollowerStatus.Follows : FollowerStatus.DoesNotFollow;
     }
 
     private static string ModeratedChannelsUri(string userId, string? cursor)
@@ -213,37 +208,37 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             query["after"] = cursor;
         }
 
-        return $"{_moderatedChannelsEndpoint}?{TwitchQueryString.Create(query)}";
+        return $"{_moderatedChannelsEndpoint}?{QueryString.Create(query)}";
     }
 
-    private sealed record TwitchUsersResponse
+    private sealed record UsersResponse
     {
         [JsonPropertyName("data")]
-        public IReadOnlyList<TwitchHelixUser> Data { get; init; } = [];
+        public IReadOnlyList<HelixUser> Data { get; init; } = [];
     }
 
-    private sealed record TwitchModeratedChannelsResponse
+    private sealed record ModeratedChannelsResponse
     {
         [JsonPropertyName("data")]
-        public IReadOnlyList<TwitchModeratedChannel> Data { get; init; } = [];
+        public IReadOnlyList<ModeratedChannel> Data { get; init; } = [];
 
         [JsonPropertyName("pagination")]
-        public TwitchPagination Pagination { get; init; } = new();
+        public Pagination Pagination { get; init; } = new();
     }
 
-    private sealed record TwitchStreamResponse
+    private sealed record StreamResponse
     {
         [JsonPropertyName("data")]
-        public required ImmutableArray<TwitchStreamItem> Data { get; init; }
+        public required ImmutableArray<StreamItem> Data { get; init; }
     }
 
-    private sealed record TwitchFollowerResponse
+    private sealed record FollowerResponse
     {
         [JsonPropertyName("data")]
-        public required ImmutableArray<TwitchFollowerItem> Data { get; init; }
+        public required ImmutableArray<FollowerItem> Data { get; init; }
     }
 
-    private sealed record TwitchStreamItem
+    private sealed record StreamItem
     {
         [JsonPropertyName("id")]
         public required string Id { get; init; }
@@ -288,7 +283,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         public required bool IsMature { get; init; }
     }
 
-    private sealed record TwitchFollowerItem
+    private sealed record FollowerItem
     {
         [JsonPropertyName("user_id")]
         public required string UserId { get; init; }
@@ -303,7 +298,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         public required DateTimeOffset FollowedAt { get; init; }
     }
 
-    private sealed record TwitchPagination
+    private sealed record Pagination
     {
         [JsonPropertyName("cursor")]
         public string? Cursor { get; init; }

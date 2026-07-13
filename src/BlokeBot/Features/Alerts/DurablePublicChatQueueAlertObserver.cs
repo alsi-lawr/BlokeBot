@@ -21,7 +21,7 @@ internal sealed class DurablePublicChatQueueAlertObserver(
         CancellationToken cancellationToken
     )
     {
-        var channel = TwitchLogin.Normalize(backlog.Channel);
+        var channel = Login.Normalize(backlog.Channel);
         if (string.IsNullOrWhiteSpace(channel))
         {
             return;

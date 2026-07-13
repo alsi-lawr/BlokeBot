@@ -72,8 +72,8 @@ public sealed class PointsTests
     [Test]
     public void ChannelOrMentionPrefixedLogin_Normalizing_RemovesPrefixAndLowercases()
     {
-        TwitchLogin.Normalize(" #Streamer ").ShouldBe("streamer");
-        TwitchLogin.Normalize(" @Viewer ").ShouldBe("viewer");
+        Login.Normalize(" #Streamer ").ShouldBe("streamer");
+        Login.Normalize(" @Viewer ").ShouldBe("viewer");
     }
 
     [Test]
@@ -664,12 +664,12 @@ public sealed class PointsTests
         : IPointTargetUserLookup
     {
         private readonly HashSet<string> _users = existingUsers
-            .Select(TwitchLogin.Normalize)
+            .Select(Login.Normalize)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         public Task<bool> ExistsAsync(string login, CancellationToken ct)
         {
-            return Task.FromResult(_users.Contains(TwitchLogin.Normalize(login)));
+            return Task.FromResult(_users.Contains(Login.Normalize(login)));
         }
     }
 

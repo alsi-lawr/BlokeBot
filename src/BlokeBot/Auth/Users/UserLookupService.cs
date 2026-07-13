@@ -29,14 +29,14 @@ internal sealed class UserLookupService(
         CancellationToken cancellationToken
     )
     {
-        var normalized = TwitchLogin.Normalize(login);
+        var normalized = Login.Normalize(login);
         if (normalized.Length == 0)
         {
             return Option<UserIdentity>.None;
         }
 
         var users = await helix.GetUsersByLoginAsync(
-            new TwitchHelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(options.ClientId, accessToken),
             [normalized],
             cancellationToken
         );
@@ -50,14 +50,14 @@ internal sealed class UserLookupService(
     )
     {
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(options.ClientId, accessToken),
             cancellationToken
         );
 
         return ToIdentity(user);
     }
 
-    private static Option<UserIdentity> ToIdentity(TwitchHelixUser? user)
+    private static Option<UserIdentity> ToIdentity(HelixUser? user)
     {
         return user is null
             ? Option<UserIdentity>.None

@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch;
 
-public static class TwitchLogin
+public static class Login
 {
     public static string Normalize(string? value)
     {

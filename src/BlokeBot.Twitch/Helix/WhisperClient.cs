@@ -12,7 +12,7 @@ public sealed class WhisperClient(IHttpClientFactory httpClientFactory)
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
     public async Task<WhisperSendResult> SendAsync(
-        TwitchHelixRequestContext context,
+        HelixRequestContext context,
         string senderUserId,
         string recipientUserId,
         string message,
@@ -21,7 +21,7 @@ public sealed class WhisperClient(IHttpClientFactory httpClientFactory)
     {
         var uri =
             $"{_whispersEndpoint}?"
-            + TwitchQueryString.Create(
+            + QueryString.Create(
                 new Dictionary<string, string?>
                 {
                     ["from_user_id"] = senderUserId,

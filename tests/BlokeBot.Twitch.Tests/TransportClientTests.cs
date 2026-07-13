@@ -261,7 +261,7 @@ public sealed class TransportClientTests
         request.Headers.GetValues("Client-Id").Single().ShouldBe("client-id");
     }
 
-    private static TwitchHelixRequestContext Context()
+    private static HelixRequestContext Context()
     {
         return new("client-id", "access-token");
     }

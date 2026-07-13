@@ -31,11 +31,11 @@
 
     private bool _canNavigate => _normalizedChannel.Length > 0;
 
-    private string _normalizedChannel => TwitchLogin.Normalize(_channel);
+    private string _normalizedChannel => Login.Normalize(_channel);
 
     protected override void OnParametersSet()
     {
-        var normalized = TwitchLogin.Normalize(InitialChannel);
+        var normalized = Login.Normalize(InitialChannel);
         if (normalized.Length == 0 || normalized == _normalizedInitialChannel)
         {
             return;
