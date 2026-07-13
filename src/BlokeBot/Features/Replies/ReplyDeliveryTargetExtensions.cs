@@ -14,14 +14,4 @@ internal static class ReplyDeliveryTargetExtensions
             _ => throw new UnreachableException("Unknown reply delivery target."),
         };
     }
-
-    public static CommandResponseTarget ToCommandTarget(this ReplyDeliveryTarget target)
-    {
-        return target switch
-        {
-            ReplyDeliveryTarget.Chat => CommandResponseTarget.Chat,
-            ReplyDeliveryTarget.Whisper => CommandResponseTarget.Whisper,
-            _ => throw new UnreachableException("Unknown reply delivery target."),
-        };
-    }
 }

@@ -21,8 +21,6 @@ public sealed class BoundedDiscriminatorBehaviorTests
 
         delivery.TargetFor("chat-reply").ShouldBe(CommandResponseTarget.Chat);
         delivery.TargetFor("whisper-reply").ShouldBe(CommandResponseTarget.Whisper);
-        ReplyDeliveryTarget.Chat.ToCommandTarget().ShouldBe(CommandResponseTarget.Chat);
-        ReplyDeliveryTarget.Whisper.ToCommandTarget().ShouldBe(CommandResponseTarget.Whisper);
     }
 
     [Test]
