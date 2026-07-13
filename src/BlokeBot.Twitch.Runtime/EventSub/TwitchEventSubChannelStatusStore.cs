@@ -151,19 +151,15 @@ internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelS
 
 internal abstract record TwitchEventSubChannelDiagnosticReport
 {
-    private protected TwitchEventSubChannelDiagnosticReport() { }
+    private TwitchEventSubChannelDiagnosticReport() { }
 
     internal abstract TwitchEventSubChannelStatus Status { get; }
-
-    private protected abstract void Seal();
 
     internal sealed record Healthy : TwitchEventSubChannelDiagnosticReport
     {
         internal required TwitchEventSubChannelStatus.Healthy ChannelStatus { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Recovering : TwitchEventSubChannelDiagnosticReport
@@ -173,8 +169,6 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
         internal required TwitchEventSubChannelFailureContext Failure { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Degraded : TwitchEventSubChannelDiagnosticReport
@@ -184,8 +178,6 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
         internal required TwitchEventSubChannelFailureContext Failure { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
-
-        private protected override void Seal() { }
     }
 }
 

@@ -130,7 +130,7 @@ internal readonly record struct TwitchEventSubChannelFailureDetails(
 
 internal abstract record TwitchEventSubChannelFailureContext
 {
-    private protected TwitchEventSubChannelFailureContext() { }
+    private TwitchEventSubChannelFailureContext() { }
 
     internal abstract TwitchEventSubChannelPhase Phase { get; }
 
@@ -149,8 +149,6 @@ internal abstract record TwitchEventSubChannelFailureContext
     {
         return new() { Classification = Classification, FailureType = FailureType };
     }
-
-    private protected abstract void Seal();
 
     internal sealed record ClassifiedException(TwitchEventSubChannelFailureDetails Details)
         : TwitchEventSubChannelFailureContext
@@ -171,8 +169,6 @@ internal abstract record TwitchEventSubChannelFailureContext
         {
             return classifiedException(this);
         }
-
-        private protected override void Seal() { }
 
         public override string ToString()
         {
@@ -199,8 +195,6 @@ internal abstract record TwitchEventSubChannelFailureContext
         {
             return missingChannel(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingBot : TwitchEventSubChannelFailureContext
@@ -222,8 +216,6 @@ internal abstract record TwitchEventSubChannelFailureContext
         {
             return missingBot(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record StartupMessageRejected : TwitchEventSubChannelFailureContext
@@ -245,8 +237,6 @@ internal abstract record TwitchEventSubChannelFailureContext
         {
             return startupMessageRejected(this);
         }
-
-        private protected override void Seal() { }
     }
 }
 

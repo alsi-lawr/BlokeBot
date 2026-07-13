@@ -40,7 +40,7 @@ public sealed record TwitchEventSubChannelFailure
 
 public abstract record TwitchEventSubChannelStatus
 {
-    private protected TwitchEventSubChannelStatus() { }
+    private TwitchEventSubChannelStatus() { }
 
     public abstract string Channel { get; init; }
 
@@ -57,8 +57,6 @@ public abstract record TwitchEventSubChannelStatus
         Func<Recovering, TResult> recovering,
         Func<Degraded, TResult> degraded
     );
-
-    private protected abstract void Seal();
 
     public sealed record Healthy : TwitchEventSubChannelStatus
     {
@@ -80,8 +78,6 @@ public abstract record TwitchEventSubChannelStatus
         {
             return healthy(this);
         }
-
-        private protected override void Seal() { }
     }
 
     public sealed record Recovering : TwitchEventSubChannelStatus
@@ -108,8 +104,6 @@ public abstract record TwitchEventSubChannelStatus
         {
             return recovering(this);
         }
-
-        private protected override void Seal() { }
     }
 
     public sealed record Degraded : TwitchEventSubChannelStatus
@@ -136,8 +130,6 @@ public abstract record TwitchEventSubChannelStatus
         {
             return degraded(this);
         }
-
-        private protected override void Seal() { }
     }
 }
 

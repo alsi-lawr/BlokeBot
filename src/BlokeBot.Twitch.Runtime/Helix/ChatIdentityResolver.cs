@@ -39,15 +39,13 @@ internal sealed class ChatIdentityResolver(TwitchBotIdentity identity, HelixClie
 
 internal abstract record ChatIdentityResolution
 {
-    private protected ChatIdentityResolution() { }
+    private ChatIdentityResolution() { }
 
     internal abstract TResult Match<TResult>(
         Func<Resolved, TResult> resolved,
         Func<MissingChannel, TResult> missingChannel,
         Func<MissingBot, TResult> missingBot
     );
-
-    private protected abstract void Seal();
 
     internal sealed record Resolved : ChatIdentityResolution
     {
@@ -63,8 +61,6 @@ internal abstract record ChatIdentityResolution
         {
             return resolved(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingChannel : ChatIdentityResolution
@@ -77,8 +73,6 @@ internal abstract record ChatIdentityResolution
         {
             return missingChannel(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingBot : ChatIdentityResolution
@@ -91,7 +85,5 @@ internal abstract record ChatIdentityResolution
         {
             return missingBot(this);
         }
-
-        private protected override void Seal() { }
     }
 }

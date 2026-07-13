@@ -67,12 +67,16 @@ public sealed class NativeUnionTests
             .Where(type => type.BaseType == unionType)
             .OrderBy(type => type.Name)
             .ToArray();
-        var seal =
-            unionType.GetMethod("Seal", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("The union seal contract is missing.");
         var match =
             unionType.GetMethod(nameof(SubmissionOutcome.Match))
             ?? throw new InvalidOperationException("The exhaustive Match contract is missing.");
+        var constructor =
+            unionType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                Type.EmptyTypes,
+                modifiers: null
+            ) ?? throw new InvalidOperationException("The private union constructor is missing.");
         var handledCases = match
             .GetParameters()
             .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
@@ -81,23 +85,10 @@ public sealed class NativeUnionTests
 
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-        seal.IsAbstract.ShouldBeTrue();
-        seal.IsFamilyAndAssembly.ShouldBeTrue();
+        constructor.IsPrivate.ShouldBeTrue();
         directCases.Select(type => type.Name).ShouldBe(["Accepted", "Deferred", "Rejected"]);
         handledCases.ShouldBe(directCases);
-
-        foreach (var caseType in directCases)
-        {
-            caseType.IsSealed.ShouldBeTrue();
-            var caseSeal =
-                caseType.GetMethod(
-                    "Seal",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
-                )
-                ?? throw new InvalidOperationException(
-                    $"{caseType.Name} does not implement the seal."
-                );
-            caseSeal.GetBaseDefinition().ShouldBe(seal);
-        }
+        directCases.ShouldAllBe(type => type.DeclaringType == unionType);
+        directCases.ShouldAllBe(type => type.IsSealed);
     }
 }

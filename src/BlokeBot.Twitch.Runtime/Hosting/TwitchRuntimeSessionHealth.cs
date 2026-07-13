@@ -14,7 +14,7 @@ internal enum TwitchRuntimeSessionFailureClassification
 
 internal abstract record TwitchRuntimeSessionHealthReport
 {
-    private protected TwitchRuntimeSessionHealthReport() { }
+    private TwitchRuntimeSessionHealthReport() { }
 
     internal required TwitchBotRuntime Runtime { get; init; }
 
@@ -26,22 +26,11 @@ internal abstract record TwitchRuntimeSessionHealthReport
 
     internal Type FailureType => Exception.GetType();
 
-    private protected abstract void Seal();
+    internal sealed record RetryScheduled : TwitchRuntimeSessionHealthReport;
 
-    internal sealed record RetryScheduled : TwitchRuntimeSessionHealthReport
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record ReconnectScheduled : TwitchRuntimeSessionHealthReport;
 
-    internal sealed record ReconnectScheduled : TwitchRuntimeSessionHealthReport
-    {
-        private protected override void Seal() { }
-    }
-
-    internal sealed record Unhealthy : TwitchRuntimeSessionHealthReport
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Unhealthy : TwitchRuntimeSessionHealthReport;
 }
 
 internal interface ITwitchRuntimeSessionHealthReporter

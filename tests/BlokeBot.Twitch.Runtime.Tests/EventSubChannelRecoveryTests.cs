@@ -976,7 +976,6 @@ public sealed class EventSubChannelRecoveryTests
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
         constructor.IsPrivate.ShouldBeTrue();
-        unionType.GetMethod("Seal", BindingFlags.Instance | BindingFlags.NonPublic).ShouldBeNull();
         directCases
             .Select(type => type.Name)
             .ShouldBe([
@@ -999,12 +998,17 @@ public sealed class EventSubChannelRecoveryTests
             .Where(type => type.BaseType == unionType)
             .OrderBy(type => type.Name)
             .ToArray();
-        var seal =
-            unionType.GetMethod("Seal", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("The channel lifecycle seal is missing.");
         var match =
             unionType.GetMethod(nameof(TwitchEventSubChannelStatus.Match))
             ?? throw new InvalidOperationException("The channel lifecycle Match is missing.");
+        var constructor =
+            unionType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                Type.EmptyTypes,
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException("The channel lifecycle constructor is missing.");
         var handledCases = match
             .GetParameters()
             .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
@@ -1013,23 +1017,11 @@ public sealed class EventSubChannelRecoveryTests
 
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-        seal.IsAbstract.ShouldBeTrue();
-        seal.IsFamilyAndAssembly.ShouldBeTrue();
+        constructor.IsPrivate.ShouldBeTrue();
         directCases.Select(type => type.Name).ShouldBe(["Degraded", "Healthy", "Recovering"]);
         handledCases.ShouldBe(directCases);
+        directCases.ShouldAllBe(type => type.DeclaringType == unionType);
         directCases.ShouldAllBe(type => type.IsSealed);
-        foreach (var caseType in directCases)
-        {
-            var caseSeal =
-                caseType.GetMethod(
-                    "Seal",
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
-                )
-                ?? throw new InvalidOperationException(
-                    $"{caseType.Name} does not implement the lifecycle seal."
-                );
-            caseSeal.GetBaseDefinition().ShouldBe(seal);
-        }
     }
 
     [Test]

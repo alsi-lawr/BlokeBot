@@ -409,39 +409,25 @@ internal static class TwitchRuntimeSessionRunner
 
 internal abstract record TwitchRuntimeConnectionTarget
 {
-    private protected TwitchRuntimeConnectionTarget() { }
+    private TwitchRuntimeConnectionTarget() { }
 
-    private protected abstract void Seal();
-
-    internal sealed record Initial : TwitchRuntimeConnectionTarget
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Initial : TwitchRuntimeConnectionTarget;
 
     internal sealed record EventSubReconnect : TwitchRuntimeConnectionTarget
     {
         internal required Uri Uri { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record TwitchRuntimeSessionEstablishment
 {
-    private protected TwitchRuntimeSessionEstablishment() { }
+    private TwitchRuntimeSessionEstablishment() { }
 
-    private protected abstract void Seal();
-
-    internal sealed record Idle : TwitchRuntimeSessionEstablishment
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Idle : TwitchRuntimeSessionEstablishment;
 
     internal sealed record Established : TwitchRuntimeSessionEstablishment
     {
         internal required ITwitchRuntimeEstablishedSession Session { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 
@@ -457,48 +443,32 @@ internal sealed record TwitchRuntimeReconnectRequest
 
 internal abstract record TwitchRuntimeSessionOutcome
 {
-    private protected TwitchRuntimeSessionOutcome() { }
+    private TwitchRuntimeSessionOutcome() { }
 
-    private protected abstract void Seal();
-
-    internal sealed record Idle : TwitchRuntimeSessionOutcome
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Idle : TwitchRuntimeSessionOutcome;
 
     internal sealed record Established : TwitchRuntimeSessionOutcome
     {
         internal required ITwitchRuntimeEstablishedSession Session { get; init; }
 
         internal required int Attempt { get; init; }
-
-        private protected override void Seal() { }
     }
 
-    internal sealed record Canceled : TwitchRuntimeSessionOutcome
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Canceled : TwitchRuntimeSessionOutcome;
 
     internal sealed record Unhealthy : TwitchRuntimeSessionOutcome
     {
         internal required TwitchRuntimeSessionHealthReport.Unhealthy Report { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record TwitchRuntimeListenOutcome
 {
-    private protected TwitchRuntimeListenOutcome() { }
-
-    private protected abstract void Seal();
+    private TwitchRuntimeListenOutcome() { }
 
     internal sealed record Reconnect : TwitchRuntimeListenOutcome
     {
         internal required TwitchRuntimeConnectionTarget Target { get; init; }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record ProtocolHandoff : TwitchRuntimeListenOutcome
@@ -508,41 +478,27 @@ internal abstract record TwitchRuntimeListenOutcome
         internal required ITwitchRuntimeEstablishedSession PreviousSession { get; init; }
 
         internal required int Attempt { get; init; }
-
-        private protected override void Seal() { }
     }
 
-    internal sealed record Canceled : TwitchRuntimeListenOutcome
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Canceled : TwitchRuntimeListenOutcome;
 
     internal sealed record Unhealthy : TwitchRuntimeListenOutcome
     {
         internal required TwitchRuntimeSessionHealthReport.Unhealthy Report { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record TwitchRuntimeSessionHandoff
 {
-    private protected TwitchRuntimeSessionHandoff() { }
+    private TwitchRuntimeSessionHandoff() { }
 
-    private protected abstract void Seal();
-
-    internal sealed record None : TwitchRuntimeSessionHandoff
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record None : TwitchRuntimeSessionHandoff;
 
     internal sealed record Pending : TwitchRuntimeSessionHandoff
     {
         internal required ITwitchRuntimeEstablishedSession Session { get; init; }
 
         internal required int Attempt { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 

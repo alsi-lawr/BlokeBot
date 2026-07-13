@@ -27,14 +27,12 @@ internal sealed record PublicChatUnclassifiedPostBoundaryFailure;
 
 internal abstract record PublicChatHttpStatus
 {
-    private protected PublicChatHttpStatus() { }
+    private PublicChatHttpStatus() { }
 
     internal abstract TResult Match<TResult>(
         Func<PublicChatHttpStatusCode, TResult> known,
         Func<TResult> unavailable
     );
-
-    private protected abstract void Seal();
 
     internal sealed record Known(PublicChatHttpStatusCode Code) : PublicChatHttpStatus
     {
@@ -45,8 +43,6 @@ internal abstract record PublicChatHttpStatus
         {
             return known(Code);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Unavailable : PublicChatHttpStatus
@@ -58,14 +54,12 @@ internal abstract record PublicChatHttpStatus
         {
             return unavailable();
         }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record PublicChatFailureDiagnostic
 {
-    private protected PublicChatFailureDiagnostic() { }
+    private PublicChatFailureDiagnostic() { }
 
     internal required PublicChatFailureType FailureType { get; init; }
 
@@ -76,8 +70,6 @@ internal abstract record PublicChatFailureDiagnostic
         Func<Send, TResult> send
     );
 
-    private protected abstract void Seal();
-
     internal sealed record Preparation : PublicChatFailureDiagnostic
     {
         internal override TResult Match<TResult>(
@@ -87,8 +79,6 @@ internal abstract record PublicChatFailureDiagnostic
         {
             return preparation(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Send : PublicChatFailureDiagnostic
@@ -100,21 +90,17 @@ internal abstract record PublicChatFailureDiagnostic
         {
             return send(this);
         }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record PublicChatRejectionReason
 {
-    private protected PublicChatRejectionReason() { }
+    private PublicChatRejectionReason() { }
 
     internal abstract TResult Match<TResult>(
         Func<PublicChatProviderRejectionCode, TResult> providerCode,
         Func<TResult> unspecified
     );
-
-    private protected abstract void Seal();
 
     internal sealed record ProviderCode(PublicChatProviderRejectionCode Code)
         : PublicChatRejectionReason
@@ -126,8 +112,6 @@ internal abstract record PublicChatRejectionReason
         {
             return providerCode(Code);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Unspecified : PublicChatRejectionReason
@@ -139,14 +123,12 @@ internal abstract record PublicChatRejectionReason
         {
             return unspecified();
         }
-
-        private protected override void Seal() { }
     }
 }
 
 internal abstract record PublicChatDeliveryOutcome
 {
-    private protected PublicChatDeliveryOutcome() { }
+    private PublicChatDeliveryOutcome() { }
 
     internal abstract TResult Match<TResult>(
         Func<Sent, TResult> sent,
@@ -167,8 +149,6 @@ internal abstract record PublicChatDeliveryOutcome
         Action<Ambiguous> ambiguous,
         Action<Unexpected> unexpected
     );
-
-    private protected abstract void Seal();
 
     internal sealed record Sent : PublicChatDeliveryOutcome
     {
@@ -197,8 +177,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             sent(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingChannel : PublicChatDeliveryOutcome
@@ -228,8 +206,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             missingChannel(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingBot : PublicChatDeliveryOutcome
@@ -259,8 +235,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             missingBot(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record SafePreSendTransient : PublicChatDeliveryOutcome
@@ -292,8 +266,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             safePreSendTransient(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Rejection : PublicChatDeliveryOutcome
@@ -325,8 +297,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             rejection(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Ambiguous : PublicChatDeliveryOutcome
@@ -358,8 +328,6 @@ internal abstract record PublicChatDeliveryOutcome
         {
             ambiguous(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Unexpected : PublicChatDeliveryOutcome
@@ -394,8 +362,6 @@ internal abstract record PublicChatDeliveryOutcome
             unexpected(this);
         }
 
-        private protected override void Seal() { }
-
         public override string ToString()
         {
             return $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
@@ -421,7 +387,7 @@ internal sealed record PublicChatPreparedSend
 
 internal abstract record PublicChatPreparationOutcome
 {
-    private protected PublicChatPreparationOutcome() { }
+    private PublicChatPreparationOutcome() { }
 
     internal abstract TResult Match<TResult>(
         Func<Ready, TResult> ready,
@@ -430,8 +396,6 @@ internal abstract record PublicChatPreparationOutcome
         Func<SafePreSendTransient, TResult> safePreSendTransient,
         Func<Unexpected, TResult> unexpected
     );
-
-    private protected abstract void Seal();
 
     internal sealed record Ready : PublicChatPreparationOutcome
     {
@@ -447,8 +411,6 @@ internal abstract record PublicChatPreparationOutcome
         {
             return ready(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingChannel : PublicChatPreparationOutcome
@@ -463,8 +425,6 @@ internal abstract record PublicChatPreparationOutcome
         {
             return missingChannel(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record MissingBot : PublicChatPreparationOutcome
@@ -479,8 +439,6 @@ internal abstract record PublicChatPreparationOutcome
         {
             return missingBot(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record SafePreSendTransient : PublicChatPreparationOutcome
@@ -497,8 +455,6 @@ internal abstract record PublicChatPreparationOutcome
         {
             return safePreSendTransient(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Unexpected : PublicChatPreparationOutcome
@@ -518,8 +474,6 @@ internal abstract record PublicChatPreparationOutcome
             return unexpected(this);
         }
 
-        private protected override void Seal() { }
-
         public override string ToString()
         {
             return $"{nameof(Unexpected)} {{ Diagnostic = {Diagnostic} }}";
@@ -529,7 +483,7 @@ internal abstract record PublicChatPreparationOutcome
 
 internal abstract record PublicChatTransportSendResult
 {
-    private protected PublicChatTransportSendResult() { }
+    private PublicChatTransportSendResult() { }
 
     internal abstract TResult Match<TResult>(
         Func<Sent, TResult> sent,
@@ -537,8 +491,6 @@ internal abstract record PublicChatTransportSendResult
     );
 
     internal abstract void Match(Action<Sent> sent, Action<Rejected> rejected);
-
-    private protected abstract void Seal();
 
     internal sealed record Sent : PublicChatTransportSendResult
     {
@@ -554,8 +506,6 @@ internal abstract record PublicChatTransportSendResult
         {
             sent(this);
         }
-
-        private protected override void Seal() { }
     }
 
     internal sealed record Rejected : PublicChatTransportSendResult
@@ -574,7 +524,5 @@ internal abstract record PublicChatTransportSendResult
         {
             rejected(this);
         }
-
-        private protected override void Seal() { }
     }
 }

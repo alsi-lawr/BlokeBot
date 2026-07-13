@@ -21,7 +21,7 @@ internal enum PointsGiveawaySchedulerOperation
 
 internal abstract record PointsGiveawaySchedulerUnhealthyReport
 {
-    private protected PointsGiveawaySchedulerUnhealthyReport() { }
+    private PointsGiveawaySchedulerUnhealthyReport() { }
 
     internal required PointsGiveawaySchedulerFailureClassification Classification { get; init; }
 
@@ -29,20 +29,13 @@ internal abstract record PointsGiveawaySchedulerUnhealthyReport
 
     internal Type FailureType => Cause.GetType();
 
-    private protected abstract void Seal();
-
-    internal sealed record Rehydration : PointsGiveawaySchedulerUnhealthyReport
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Rehydration : PointsGiveawaySchedulerUnhealthyReport;
 
     internal sealed record Giveaway : PointsGiveawaySchedulerUnhealthyReport
     {
         internal required int GiveawayId { get; init; }
 
         internal required PointsGiveawaySchedulerOperation Operation { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 

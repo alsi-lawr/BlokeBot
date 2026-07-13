@@ -66,22 +66,16 @@ public sealed record ObserverFailureHandlingSummary
 
 public abstract record ObserverFanOutOutcome
 {
-    private protected ObserverFanOutOutcome() { }
-
-    private protected abstract void Seal();
+    private ObserverFanOutOutcome() { }
 
     public sealed record AllSucceeded : ObserverFanOutOutcome
     {
         public required int ObserverCount { get; init; }
-
-        private protected override void Seal() { }
     }
 
     public sealed record CompletedWithFailures : ObserverFanOutOutcome
     {
         public required IReadOnlyList<ObserverFailureSummary> Failures { get; init; }
-
-        private protected override void Seal() { }
     }
 }
 
@@ -535,21 +529,14 @@ internal static class ObserverFailureClassifier
 
 internal abstract record ObserverAttemptOutcome
 {
-    private protected ObserverAttemptOutcome() { }
+    private ObserverAttemptOutcome() { }
 
-    private protected abstract void Seal();
-
-    internal sealed record Succeeded : ObserverAttemptOutcome
-    {
-        private protected override void Seal() { }
-    }
+    internal sealed record Succeeded : ObserverAttemptOutcome;
 
     internal sealed record Failed : ObserverAttemptOutcome
     {
         internal required ObserverFailureDetails Details { get; init; }
 
         internal required IReadOnlyList<ObserverFailureHandlingDetails> HandlingFailures { get; init; }
-
-        private protected override void Seal() { }
     }
 }

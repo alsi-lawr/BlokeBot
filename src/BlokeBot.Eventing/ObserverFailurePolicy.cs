@@ -104,16 +104,11 @@ public interface IDurableObserverDeadLetterSink<TBoundary, TDeadLetter>
 public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
     where TDeadLetter : IObserverDeadLetterPayload
 {
-    private protected ObserverFailurePolicy() { }
+    private ObserverFailurePolicy() { }
 
     public required ObserverBoundary Boundary { get; init; }
 
-    private protected abstract void Seal();
-
-    public sealed record ContinueAndReport : ObserverFailurePolicy<TBoundary, TDeadLetter>
-    {
-        private protected override void Seal() { }
-    }
+    public sealed record ContinueAndReport : ObserverFailurePolicy<TBoundary, TDeadLetter>;
 
     public sealed record BoundedRetry : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
@@ -129,14 +124,10 @@ public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
                 field = value;
             }
         }
-
-        private protected override void Seal() { }
     }
 
     public sealed record DeadLetter : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
         public required IDurableObserverDeadLetterSink<TBoundary, TDeadLetter> Sink { get; init; }
-
-        private protected override void Seal() { }
     }
 }
