@@ -1,0 +1,180 @@
+@layer components {
+    .mobile-nav-button {
+        align-items: center;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.5rem;
+        box-shadow: var(--app-shadow-sm);
+        color: var(--app-text-medium);
+        display: inline-flex;
+        grid-area: menu;
+        height: 2.5rem;
+        justify-content: center;
+        width: 2.5rem;
+    }
+
+    .mobile-nav-button:hover {
+        background: var(--app-control-hover);
+        border-color: var(--app-control-hover-border);
+        color: var(--app-text-strong);
+    }
+
+    .app-topbar__inner {
+        align-items: center;
+        display: grid;
+        gap: 0.625rem 0.75rem;
+        grid-template-areas:
+            "menu identity utility"
+            "controls controls controls";
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        padding-bottom: 0.75rem;
+        padding-top: 0.625rem;
+    }
+
+    .app-topbar__identity {
+        grid-area: identity;
+    }
+
+    .app-topbar__utility {
+        align-items: center;
+        display: flex;
+        gap: 0.5rem;
+        grid-area: utility;
+        justify-self: end;
+    }
+
+    .app-topbar__controls {
+        grid-area: controls;
+        width: 100%;
+    }
+
+    .topbar-controls {
+        align-items: stretch;
+        display: grid;
+        gap: 0.5rem;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .topbar-controls > * {
+        min-width: 0;
+    }
+
+    .host-selector {
+        align-items: center;
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: minmax(0, 1fr) 2.25rem;
+        min-width: 0;
+        width: 100%;
+    }
+
+    .host-selector--with-my-channel .host-selector__my-channel {
+        grid-column: 1 / -1;
+    }
+
+    .host-selector__dropdown {
+        width: 100%;
+    }
+
+    .host-selector__refresh {
+        justify-self: end;
+    }
+
+    .account-menu {
+        width: 100%;
+    }
+
+    .account-menu__summary {
+        align-items: center;
+        border-radius: 0.375rem;
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: 1.75rem minmax(0, 1fr) auto 1.25rem;
+        height: 2.25rem;
+        min-width: 0;
+        padding-left: 0.75rem;
+        padding-right: 0.875rem;
+    }
+
+    @media (max-width: 23.75rem) {
+        .account-menu__summary {
+            grid-template-columns: 1.75rem minmax(0, 1fr) 1.25rem;
+        }
+
+        .account-menu__role-badge {
+            display: none;
+        }
+    }
+
+    @media (min-width: 64rem) {
+        .app-topbar__inner {
+            gap: 0.75rem;
+            grid-template-areas: "identity controls utility";
+            grid-template-columns: minmax(12rem, 1fr) auto auto;
+            min-height: 4rem;
+            padding-bottom: 0;
+            padding-top: 0;
+        }
+
+        .app-topbar__controls {
+            justify-self: end;
+            width: auto;
+        }
+
+        .topbar-controls {
+            align-items: center;
+            gap: 0.75rem;
+            width: auto;
+        }
+
+        .topbar-controls--account-only {
+            grid-template-columns: minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--account-only.topbar-controls--with-alert {
+            grid-template-columns: auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--selector-account {
+            grid-template-columns: auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--selector-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--status-account {
+            grid-template-columns: auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--status-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--status-selector-account {
+            grid-template-columns: auto auto minmax(14rem, 18rem);
+        }
+
+        .topbar-controls--status-selector-account.topbar-controls--with-alert {
+            grid-template-columns: auto auto auto minmax(14rem, 18rem);
+        }
+
+        .host-selector {
+            grid-template-columns: 18rem 2.25rem;
+            width: auto;
+        }
+
+        .host-selector--with-my-channel {
+            grid-template-columns: 7.5rem 18rem 2.25rem;
+        }
+
+        .host-selector--with-my-channel .host-selector__my-channel {
+            grid-column: auto;
+        }
+
+        .account-menu {
+            width: auto;
+        }
+    }
+}

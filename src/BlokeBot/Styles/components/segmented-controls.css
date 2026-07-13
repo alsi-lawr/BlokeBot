@@ -1,0 +1,77 @@
+@layer components {
+    .segmented-motion {
+        align-items: center;
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.5rem;
+        box-shadow: var(--app-shadow-sm);
+        display: inline-grid;
+        grid-template-columns: repeat(2, minmax(5.5rem, 1fr));
+        isolation: isolate;
+        overflow: hidden;
+        padding: 0.25rem;
+        position: relative;
+    }
+
+    .segmented-motion__indicator {
+        background: var(--app-primary-button-bg);
+        border-radius: 0.375rem;
+        bottom: 0.25rem;
+        box-shadow: var(--app-shadow-sm);
+        left: 0.25rem;
+        position: absolute;
+        top: 0.25rem;
+        transform: translateX(0);
+        transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        width: calc((100% - 0.5rem) / 2);
+        z-index: 0;
+    }
+
+    .segmented-motion--history .segmented-motion__indicator {
+        transform: translateX(100%);
+    }
+
+    .segmented-motion--three {
+        grid-template-columns: repeat(3, minmax(5.5rem, 1fr));
+    }
+
+    .segmented-motion--three .segmented-motion__indicator {
+        width: calc((100% - 0.5rem) / 3);
+    }
+
+    .segmented-motion--second .segmented-motion__indicator {
+        transform: translateX(100%);
+    }
+
+    .segmented-motion--third .segmented-motion__indicator {
+        transform: translateX(200%);
+    }
+
+    .segmented-motion__tab {
+        background: transparent;
+        border-radius: 0.375rem;
+        color: var(--app-text-muted);
+        font-size: 0.875rem;
+        font-weight: 650;
+        height: 2.25rem;
+        min-width: 5.5rem;
+        padding: 0 1rem;
+        position: relative;
+        transition:
+            color 150ms ease,
+            transform 150ms ease;
+        z-index: 1;
+    }
+
+    .segmented-motion__tab:hover {
+        color: var(--app-text-strong);
+    }
+
+    .segmented-motion__tab--active {
+        color: var(--app-primary-button-fg);
+    }
+
+    .segmented-motion__tab--active:hover {
+        color: var(--app-primary-button-fg);
+    }
+}

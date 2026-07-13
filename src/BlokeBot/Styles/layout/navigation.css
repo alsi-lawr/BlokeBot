@@ -1,0 +1,107 @@
+.nav-menu {
+    background: var(--app-nav-bg);
+}
+
+.nav-menu__brand {
+    background: var(--app-nav-brand-bg);
+    border-color: var(--app-border);
+}
+
+.nav-menu__panel {
+    background: var(--app-nav-panel-bg);
+    border: 1px solid var(--app-border);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.nav-menu__panel--admin {
+    background: var(--app-nav-admin-panel-bg);
+}
+
+.nav-menu__active-channel {
+    background: var(--app-nav-active-channel-bg);
+    border: 1px solid var(--app-nav-active-channel-border);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.nav-menu__icon {
+    background: var(--app-surface-muted);
+    border: 1px solid var(--app-border);
+}
+
+.nav-menu__link {
+    color: var(--app-text-medium);
+}
+
+.nav-menu__summary {
+    color: var(--app-text-strong);
+}
+
+.nav-menu__sub-link {
+    color: var(--app-text-muted);
+}
+
+.nav-menu__separator {
+    background: var(--app-border);
+    height: 1px;
+    margin: 0 0.5rem;
+}
+
+html[data-nav-guessing-open="false"]
+    .nav-menu__section[data-nav-section="guessing"]
+    .nav-menu__section-body,
+html[data-nav-points-open="false"]
+    .nav-menu__section[data-nav-section="points"]
+    .nav-menu__section-body {
+    display: none !important;
+}
+
+html[data-nav-guessing-open="false"]
+    .nav-menu__section[data-nav-section="guessing"]
+    .nav-menu__section-chevron,
+html[data-nav-points-open="false"]
+    .nav-menu__section[data-nav-section="points"]
+    .nav-menu__section-chevron {
+    rotate: 0deg !important;
+}
+
+.nav-menu__link:hover,
+.nav-menu__summary:hover,
+.nav-menu__sub-link:hover {
+    background: var(--app-control-hover);
+    color: var(--app-text-strong);
+}
+
+.nav-menu__item-active {
+    background: var(--app-nav-selected-bg) !important;
+    border: 1px solid var(--app-nav-selected-border) !important;
+    box-shadow:
+        inset 0 0 0 1px var(--app-nav-selected-inner),
+        var(--app-shadow-sm) !important;
+    color: var(--app-nav-selected-text) !important;
+}
+
+.nav-menu__item-active .nav-menu__icon {
+    background: var(--app-nav-selected-icon-bg);
+    border-color: var(--app-nav-selected-border);
+}
+
+.nav-menu__item-active--admin {
+    --app-nav-selected-bg: var(--app-nav-selected-admin-bg);
+    --app-nav-selected-border: var(--app-nav-selected-admin-border);
+    --app-nav-selected-icon-bg: var(--app-nav-selected-admin-icon-bg);
+}
+
+.nav-menu__item-active--host {
+    --app-nav-selected-bg: var(--app-nav-selected-host-bg);
+    --app-nav-selected-border: var(--app-nav-selected-host-border);
+    --app-nav-selected-icon-bg: var(--app-nav-selected-host-icon-bg);
+}
+
+.nav-menu__link:hover {
+    border-color: var(--app-border);
+}
+
+.nav-menu img {
+    background-color: var(--app-surface-solid);
+    border-color: var(--app-border);
+}

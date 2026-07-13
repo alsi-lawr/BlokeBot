@@ -1,0 +1,54 @@
+@layer components {
+    .scroll-panel {
+        overflow-y: auto;
+        scrollbar-color: color-mix(in srgb, var(--app-primary-button-bg) 48%, transparent)
+            transparent;
+        scrollbar-gutter: stable;
+        scrollbar-width: thin;
+    }
+
+    .scroll-panel::-webkit-scrollbar {
+        height: 0.7rem;
+        width: 0.7rem;
+    }
+
+    .scroll-panel::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scroll-panel::-webkit-scrollbar-thumb {
+        background: color-mix(in srgb, var(--app-primary-button-bg) 44%, transparent);
+        background-clip: content-box;
+        border: 2px solid transparent;
+        border-radius: 999px;
+    }
+
+    .scroll-panel::-webkit-scrollbar-thumb:hover {
+        background: color-mix(in srgb, var(--app-primary-button-bg) 62%, transparent);
+        background-clip: content-box;
+    }
+
+    .scroll-panel--access-list {
+        max-height: 16rem;
+    }
+
+    .scroll-panel--data-table {
+        max-height: min(32rem, calc(100vh - 22rem));
+    }
+
+    .scroll-panel--hosted-channels {
+        max-height: min(42rem, calc(100vh - 20rem));
+    }
+
+    .scroll-panel--settings {
+        max-height: min(36rem, calc(100vh - 18rem));
+    }
+
+    .scroll-panel--valid-guesses {
+        max-height: min(21.875rem, calc(100vh - 19rem));
+    }
+
+    .scroll-panel--tag-cloud {
+        max-height: 12rem;
+    }
+}

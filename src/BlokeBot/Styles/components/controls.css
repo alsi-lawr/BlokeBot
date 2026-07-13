@@ -1,0 +1,105 @@
+@layer components {
+    .menu-item {
+        color: var(--app-text-medium);
+    }
+
+    .menu-item:hover {
+        background: var(--app-control-hover);
+        color: var(--app-text-strong);
+    }
+
+    .primary-control {
+        background: var(--app-primary-button-bg);
+        border: 1px solid var(--app-primary-button-border);
+        box-shadow: var(--app-shadow-sm);
+        color: var(--app-primary-button-fg);
+    }
+
+    .primary-control:hover {
+        background: var(--app-primary-button-hover);
+        border-color: var(--app-primary-button-hover-border);
+    }
+
+    .btn-primary,
+    .btn-secondary {
+        align-items: center;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        display: inline-flex;
+        font-size: 0.875rem;
+        font-weight: 600;
+        height: 2.5rem;
+        justify-content: center;
+        padding: 0 1rem;
+        transition:
+            background-color 140ms ease,
+            border-color 140ms ease,
+            color 140ms ease,
+            transform 140ms ease;
+    }
+
+    .btn-primary {
+        background: var(--app-primary-button-bg);
+        border: 1px solid var(--app-primary-button-border);
+        color: var(--app-primary-button-fg);
+    }
+
+    .btn-primary:hover {
+        background: var(--app-primary-button-hover);
+        border-color: var(--app-primary-button-hover-border);
+        transform: translateY(-1px);
+    }
+
+    .auth-action {
+        background: var(--app-auth-button-bg);
+        border: 1px solid var(--app-auth-button-border);
+        box-shadow: var(--app-shadow-sm);
+        color: var(--app-auth-button-fg);
+    }
+
+    .auth-action:hover {
+        background: var(--app-auth-button-hover);
+        border-color: var(--app-auth-button-hover-border);
+        color: var(--app-auth-button-hover-fg);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        color: var(--app-text-medium);
+    }
+
+    .btn-secondary:hover {
+        background: var(--app-control-hover);
+        border-color: var(--app-control-hover-border);
+        color: var(--app-text-strong);
+    }
+
+    .input {
+        background: var(--app-control-bg);
+        border: 1px solid var(--app-control-border);
+        border-radius: 0.5rem;
+        color: var(--app-text-strong);
+        min-height: 2.5rem;
+        outline: none;
+        padding: 0.5rem 0.75rem;
+        width: 100%;
+    }
+
+    .input:focus {
+        border-color: var(--app-focus-border);
+        box-shadow: var(--app-focus-shadow);
+    }
+
+    .input::placeholder {
+        color: var(--app-placeholder);
+    }
+
+    .label {
+        color: var(--app-text-medium);
+        display: block;
+        font-size: 0.8125rem;
+        font-weight: 600;
+    }
+}

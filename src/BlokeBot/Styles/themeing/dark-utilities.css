@@ -1,0 +1,194 @@
+html[data-theme="dark"] .bg-white,
+html[data-theme="dark"] .bg-white\/75,
+html[data-theme="dark"] .bg-white\/90 {
+    background-color: var(--app-surface);
+}
+
+html[data-theme="dark"] .bg-slate-50,
+html[data-theme="dark"] .bg-slate-50\/70 {
+    background-color: var(--app-surface-muted);
+}
+
+html[data-theme="dark"] .bg-slate-100 {
+    background-color: rgb(36 39 40 / 0.84);
+}
+
+html[data-theme="dark"] .bg-slate-950 {
+    background-color: rgb(52 56 58);
+    color: var(--app-text-strong);
+}
+
+html[data-theme="dark"] .bg-amber-50 {
+    background-color: rgb(120 53 15 / 0.35);
+}
+
+html[data-theme="dark"] .bg-blue-50,
+html[data-theme="dark"] .bg-sky-50 {
+    background-color: rgb(54 57 59 / 0.58);
+}
+
+html[data-theme="dark"] .bg-emerald-50 {
+    background-color: rgb(6 78 59 / 0.36);
+}
+
+html[data-theme="dark"] .bg-orange-50 {
+    background-color: rgb(124 45 18 / 0.36);
+}
+
+html[data-theme="dark"] .bg-purple-50 {
+    background-color: rgb(88 28 135 / 0.34);
+}
+
+html[data-theme="dark"] .bg-red-50,
+html[data-theme="dark"] .bg-rose-50 {
+    background-color: rgb(127 29 29 / 0.32);
+}
+
+html[data-theme="dark"] .from-white,
+html[data-theme="dark"] .from-white\/80 {
+    --tw-gradient-from: rgb(24 26 27 / 0.9);
+}
+
+html[data-theme="dark"] .to-slate-100 {
+    --tw-gradient-to: rgb(36 39 40 / 0.82);
+}
+
+html[data-theme="dark"] .to-teal-50\/70 {
+    --tw-gradient-to: rgb(19 78 74 / 0.42);
+}
+
+html[data-theme="dark"] .border-slate-100,
+html[data-theme="dark"] .border-slate-200,
+html[data-theme="dark"] .border-slate-200\/80,
+html[data-theme="dark"] .border-slate-200\/90 {
+    border-color: var(--app-border);
+}
+
+html[data-theme="dark"] .border-red-200\/60 {
+    border-color: rgb(127 29 29 / 0.38);
+}
+
+html[data-theme="dark"] .divide-slate-100 > :not(:last-child) {
+    border-color: var(--app-border);
+}
+
+html[data-theme="dark"] .ring-slate-200 {
+    --tw-ring-color: rgb(82 86 89 / 0.76);
+}
+
+html[data-theme="dark"] .ring-amber-200 {
+    --tw-ring-color: rgb(245 158 11 / 0.34);
+}
+
+html[data-theme="dark"] .ring-emerald-200 {
+    --tw-ring-color: rgb(16 185 129 / 0.34);
+}
+
+html[data-theme="dark"] .ring-orange-200 {
+    --tw-ring-color: rgb(249 115 22 / 0.34);
+}
+
+html[data-theme="dark"] .ring-purple-200 {
+    --tw-ring-color: rgb(168 85 247 / 0.34);
+}
+
+html[data-theme="dark"] .ring-red-200,
+html[data-theme="dark"] .ring-rose-200 {
+    --tw-ring-color: rgb(248 113 113 / 0.34);
+}
+
+html[data-theme="dark"] .ring-sky-200 {
+    --tw-ring-color: rgb(56 189 248 / 0.34);
+}
+
+html[data-theme="dark"] .text-black,
+html[data-theme="dark"] .text-slate-950,
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800 {
+    color: var(--app-text-strong);
+}
+
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-600 {
+    color: var(--app-text-medium);
+}
+
+html[data-theme="dark"] .text-slate-500 {
+    color: var(--app-text-muted);
+}
+
+html[data-theme="dark"] .text-slate-400 {
+    color: rgb(132 136 138);
+}
+
+html[data-theme="dark"] .text-amber-700 {
+    color: rgb(252 211 77);
+}
+
+html[data-theme="dark"] .text-blue-600,
+html[data-theme="dark"] .text-blue-700,
+html[data-theme="dark"] .text-sky-700 {
+    color: rgb(181 177 171);
+}
+
+html[data-theme="dark"] .text-emerald-600,
+html[data-theme="dark"] .text-emerald-700 {
+    color: rgb(110 231 183);
+}
+
+html[data-theme="dark"] .text-orange-700 {
+    color: rgb(253 186 116);
+}
+
+html[data-theme="dark"] .text-purple-700 {
+    color: rgb(216 180 254);
+}
+
+html[data-theme="dark"] .text-red-600,
+html[data-theme="dark"] .text-red-700,
+html[data-theme="dark"] .text-rose-700 {
+    color: rgb(252 165 165);
+}
+
+html[data-theme="dark"] .shadow-slate-200\/70,
+html[data-theme="dark"] .shadow-slate-300\/40,
+html[data-theme="dark"] .shadow-slate-300\/70 {
+    --tw-shadow-color: rgb(0 0 0 / 0.55);
+}
+
+html[data-theme="dark"] .focus\:ring-offset-2:focus {
+    --tw-ring-offset-color: var(--app-background);
+}
+
+@media (hover: hover) {
+    html[data-theme="dark"] .hover\:bg-white:hover,
+    html[data-theme="dark"] .hover\:bg-slate-50:hover,
+    html[data-theme="dark"] .hover\:bg-slate-100:hover {
+        background-color: rgb(36 39 40 / 0.96);
+    }
+
+    html[data-theme="dark"] .hover\:bg-blue-50:hover {
+        background-color: rgb(54 57 59 / 0.68);
+    }
+
+    html[data-theme="dark"] .hover\:bg-red-50:hover {
+        background-color: rgb(127 29 29 / 0.36);
+    }
+
+    html[data-theme="dark"] .hover\:bg-slate-800:hover {
+        background-color: rgb(203 213 225);
+    }
+
+    html[data-theme="dark"] .hover\:text-slate-900:hover,
+    html[data-theme="dark"] .hover\:text-slate-950:hover {
+        color: rgb(255 255 255);
+    }
+
+    html[data-theme="dark"] .hover\:text-blue-700:hover {
+        color: var(--app-text-strong);
+    }
+
+    html[data-theme="dark"] .hover\:text-red-700:hover {
+        color: rgb(254 202 202);
+    }
+}
