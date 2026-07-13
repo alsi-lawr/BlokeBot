@@ -979,6 +979,14 @@ public sealed class EventSubChannelRecoveryTests
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
         constructor.IsPrivate.ShouldBeTrue();
+        unionType
+            .GetMethods(
+                BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly
+            )
+            .ShouldNotContain(method => method.Name == "Seal");
         match.IsGenericMethodDefinition.ShouldBeTrue();
         matchResultType.IsGenericParameter.ShouldBeTrue();
         matchResultType.Name.ShouldBe("TResult");
