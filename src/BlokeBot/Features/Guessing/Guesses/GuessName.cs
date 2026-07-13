@@ -11,8 +11,13 @@ public readonly record struct GuessName
 
     public bool IsEmpty => Value.Length == 0;
 
-    public static GuessName Parse(string? value) =>
-        new((value ?? string.Empty).Trim().ToLowerInvariant());
+    public static GuessName Parse(string? value)
+    {
+        return new((value ?? string.Empty).Trim().ToLowerInvariant());
+    }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }

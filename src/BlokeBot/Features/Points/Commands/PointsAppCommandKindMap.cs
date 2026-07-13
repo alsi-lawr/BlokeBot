@@ -18,8 +18,9 @@ public static class PointsAppCommandKindMap
             AppCommandKind.CancelGiveaway,
         };
 
-    public static AppCommandKind ToAppKind(PointsCommandKind kind) =>
-        kind switch
+    public static AppCommandKind ToAppKind(PointsCommandKind kind)
+    {
+        return kind switch
         {
             PointsCommandKind.Points => AppCommandKind.Points,
             PointsCommandKind.GivePoints => AppCommandKind.GivePoints,
@@ -32,6 +33,7 @@ public static class PointsAppCommandKindMap
             PointsCommandKind.CancelGiveaway => AppCommandKind.CancelGiveaway,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
         };
+    }
 
     public static bool TryFromAppKind(AppCommandKind appKind, out PointsCommandKind kind)
     {

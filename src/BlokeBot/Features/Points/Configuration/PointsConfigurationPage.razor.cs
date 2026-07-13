@@ -46,7 +46,7 @@ namespace BlokeBot.Features.Points.Configuration;
 
 public partial class PointsConfigurationPage
 {
-    private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
+    private static readonly IReadOnlyList<ReplyDeliveryOption> _whisperReplyOptions =
     [
         new("Balance", PointsReplyKeys.Balance),
         new("Another viewer's balance", PointsReplyKeys.OtherBalance),
@@ -66,13 +66,13 @@ public partial class PointsConfigurationPage
         new("Follower check unavailable", PointsReplyKeys.FollowerEligibilityUnavailable),
     ];
 
-    private PointsConfiguration? config;
-    private bool featureEnabled;
+    private PointsConfiguration? _config;
+    private bool _featureEnabled;
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 work => InvokeAsync(work),
                 LoadAsync,
@@ -85,33 +85,35 @@ public partial class PointsConfigurationPage
     private async Task LoadAsync()
     {
         await LoadPageContextAsync();
-        featureEnabled =
+        _featureEnabled =
             HostId != 0
-            && await Features.IsEnabledAsync(
+            && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Points,
                 CancellationToken.None
             );
-        config = featureEnabled
-            ? await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
+        _config = _featureEnabled
+            ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
     }
 
     private async Task SaveAsync()
     {
-        if (config is null || HostId == 0)
+        if (_config is null || HostId == 0)
+        {
             return;
+        }
 
         try
         {
-            await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
-            config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            Toasts.Success("Points settings saved.");
+            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
+            _config = await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
+            _toasts.Success("Points settings saved.");
         }
         catch (Exception ex)
             when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
         {
-            Toasts.Error(ex.Message);
+            _toasts.Error(ex.Message);
         }
     }
 }

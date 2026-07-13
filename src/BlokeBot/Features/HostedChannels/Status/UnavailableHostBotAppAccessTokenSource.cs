@@ -2,8 +2,10 @@ namespace BlokeBot.Features.HostedChannels.Status;
 
 internal sealed class UnavailableHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
 {
-    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    {
         throw new HostBotAppAccessTokenUnavailableException();
+    }
 }
 
 internal sealed class HostBotAppAccessTokenUnavailableException()

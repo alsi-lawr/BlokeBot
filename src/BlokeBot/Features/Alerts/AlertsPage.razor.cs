@@ -6,11 +6,11 @@ namespace BlokeBot.Features.Alerts;
 
 public partial class AlertsPage
 {
-    private DurableAlertState? state;
-    private bool canAcknowledge;
+    private DurableAlertState? _state;
+    private bool _canAcknowledge;
 
-    private string ActiveSummary =>
-        state?.ActiveCount switch
+    private string _activeSummary =>
+        _state?.ActiveCount switch
         {
             null => "Loading active alerts.",
             0 => "No active alerts for this channel.",
@@ -21,7 +21,7 @@ public partial class AlertsPage
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 AppEventKind.AlertsChanged,
                 work => InvokeAsync(work),
                 LoadAsync,
@@ -34,46 +34,58 @@ public partial class AlertsPage
     private async Task AcknowledgeAsync(DurableAlertItem alert)
     {
         await LoadPageContextAsync();
-        canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
-        if (HostId == 0 || !canAcknowledge)
+        _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
+        if (HostId == 0 || !_canAcknowledge)
+        {
             return;
+        }
 
-        await Alerts.AcknowledgeAsync(HostId, alert.Id, ActorLogin, CancellationToken.None);
+        await _alerts.AcknowledgeAsync(HostId, alert.Id, ActorLogin, CancellationToken.None);
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         await LoadPageContextAsync();
-        canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
-        state =
+        _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
+        _state =
             HostId == 0
                 ? null
-                : await Alerts.LoadStateAsync(HostId, CancellationToken.None);
+                : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
     }
 
-    private Task RefreshAsync() => LoadAsync();
+    private Task RefreshAsync()
+    {
+        return LoadAsync();
+    }
 
-    private static string FormatTimestamp(DateTime? value) =>
-        value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
+    private static string FormatTimestamp(DateTime? value)
+    {
+        return value is null ? "n/a" : value.Value.ToLocalTime().ToString("MMM d, yyyy HH:mm");
+    }
 
-    private static string AlertAreaLabel(string source) =>
-        source switch
+    private static string AlertAreaLabel(string source)
+    {
+        return source switch
         {
             "twitch-outbound-queue" => "Chat messages",
             _ => "BlokeBot",
         };
+    }
 
-    private static string ImportanceLabel(DurableAlertSeverity severity) =>
-        severity switch
+    private static string ImportanceLabel(DurableAlertSeverity severity)
+    {
+        return severity switch
         {
             DurableAlertSeverity.Critical => "Urgent",
             DurableAlertSeverity.Warning => "Warning",
             _ => "Information",
         };
+    }
 
-    private static string SeverityBadgeClass(DurableAlertSeverity severity) =>
-        severity switch
+    private static string SeverityBadgeClass(DurableAlertSeverity severity)
+    {
+        return severity switch
         {
             DurableAlertSeverity.Critical =>
                 "inline-flex rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700",
@@ -82,4 +94,5 @@ public partial class AlertsPage
             _ =>
                 "inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700",
         };
+    }
 }

@@ -6,10 +6,16 @@ public sealed record ChannelBotAuthorizationResult(
     IReadOnlyList<string> MissingScopes
 )
 {
-    public static ChannelBotAuthorizationResult Success(string message) => new(true, message, []);
+    public static ChannelBotAuthorizationResult Success(string message)
+    {
+        return new(true, message, []);
+    }
 
     public static ChannelBotAuthorizationResult Failure(
         string message,
         IReadOnlyList<string>? missingScopes = null
-    ) => new(false, message, missingScopes ?? []);
+    )
+    {
+        return new(false, message, missingScopes ?? []);
+    }
 }

@@ -20,7 +20,9 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
     public bool Allows(string normalizedLogin, AccessListPolicy policy)
     {
         if (!policy.Enabled)
+        {
             return false;
+        }
 
         return policy.WhitelistMode switch
         {
@@ -67,7 +69,9 @@ internal static class AccessListStore
         where TEntry : class, IAccessListEntry
     {
         if (await scopedEntries.AnyAsync(x => x.Kind == kind && x.Login == normalizedLogin, ct))
+        {
             return false;
+        }
 
         entries.Add(createEntry(normalizedLogin));
         return true;
@@ -97,7 +101,9 @@ internal static class AccessListStore
         where TEntry : class, IAccessListEntry
     {
         if (!TryNormalizeLogin(login, out var normalized))
+        {
             return 0;
+        }
 
         return await scopedEntries
             .Where(x => x.Kind == kind && x.Login == normalized)

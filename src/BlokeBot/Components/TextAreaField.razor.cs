@@ -51,6 +51,8 @@ public partial class TextAreaField
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
 
-    private Task OnInput(ChangeEventArgs e) =>
-        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    private Task OnInput(ChangeEventArgs e)
+    {
+        return ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    }
 }

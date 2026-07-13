@@ -51,7 +51,9 @@ public sealed class HostedChannelRuntimeStatusService(
     {
         var host = await LoadHostRuntimeFieldsAsync(hostId, ct);
         if (host is null)
+        {
             return null;
+        }
 
         return new HostedChannelRuntimeStatus(
             host.ChannelBotAuthorizedAtUtc != null,
@@ -71,7 +73,9 @@ public sealed class HostedChannelRuntimeStatusService(
     {
         var host = await LoadHostRuntimeFieldsAsync(hostId, ct);
         if (host is null)
+        {
             return null;
+        }
 
         return new HostedChannelRuntimeSummary(
             host.ChannelBotAuthorizedAtUtc != null,

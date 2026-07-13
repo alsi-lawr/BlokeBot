@@ -51,12 +51,16 @@ public sealed class HostFeatureService(
     )
     {
         if (feature is HostFeatureFlags.None or HostFeatureFlags.All)
+        {
             throw new ArgumentOutOfRangeException(nameof(feature), feature, null);
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return;
+        }
 
         host.EnabledFeatures = enabled
             ? host.EnabledFeatures | feature

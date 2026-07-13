@@ -6,10 +6,10 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class TwitchEventSubChannelStatusStore
     : ITwitchEventSubChannelStatusAccessor
 {
-    private readonly object gate = new();
-    private long nextScopeId;
-    private long activeScopeId;
-    private TwitchEventSubChannelStatusSnapshot current = new()
+    private readonly object _gate = new();
+    private long _nextScopeId;
+    private long _activeScopeId;
+    private TwitchEventSubChannelStatusSnapshot _current = new()
     {
         Channels = Array.Empty<TwitchEventSubChannelStatus>(),
     };
@@ -20,31 +20,33 @@ internal sealed class TwitchEventSubChannelStatusStore
     {
         get
         {
-            lock (gate)
-                return current;
+            lock (_gate)
+            {
+                return _current;
+            }
         }
     }
 
     internal TwitchEventSubChannelStatusScope CreateScope()
     {
-        lock (gate)
+        lock (_gate)
         {
             checked
             {
-                nextScopeId++;
+                _nextScopeId++;
             }
 
-            return new TwitchEventSubChannelStatusScope(this, nextScopeId);
+            return new TwitchEventSubChannelStatusScope(this, _nextScopeId);
         }
     }
 
     private void Activate(TwitchEventSubChannelStatusScope scope)
     {
         Action? changed;
-        lock (gate)
+        lock (_gate)
         {
-            activeScopeId = scope.Id;
-            current = CreateSnapshot(scope.States);
+            _activeScopeId = scope.Id;
+            _current = CreateSnapshot(scope.States);
             changed = Changed;
         }
 
@@ -57,12 +59,12 @@ internal sealed class TwitchEventSubChannelStatusStore
     )
     {
         Action? changed = null;
-        lock (gate)
+        lock (_gate)
         {
             scope.States[status.Channel] = status;
-            if (activeScopeId == scope.Id)
+            if (_activeScopeId == scope.Id)
             {
-                current = CreateSnapshot(scope.States);
+                _current = CreateSnapshot(scope.States);
                 changed = Changed;
             }
         }
@@ -73,12 +75,14 @@ internal sealed class TwitchEventSubChannelStatusStore
     private void Remove(TwitchEventSubChannelStatusScope scope, string channel)
     {
         Action? changed = null;
-        lock (gate)
+        lock (_gate)
         {
-            if (!scope.States.Remove(channel) || activeScopeId != scope.Id)
+            if (!scope.States.Remove(channel) || _activeScopeId != scope.Id)
+            {
                 return;
+            }
 
-            current = CreateSnapshot(scope.States);
+            _current = CreateSnapshot(scope.States);
             changed = Changed;
         }
 
@@ -88,13 +92,15 @@ internal sealed class TwitchEventSubChannelStatusStore
     private void Deactivate(TwitchEventSubChannelStatusScope scope)
     {
         Action? changed = null;
-        lock (gate)
+        lock (_gate)
         {
-            if (activeScopeId != scope.Id)
+            if (_activeScopeId != scope.Id)
+            {
                 return;
+            }
 
-            activeScopeId = 0;
-            current = new TwitchEventSubChannelStatusSnapshot
+            _activeScopeId = 0;
+            _current = new TwitchEventSubChannelStatusSnapshot
             {
                 Channels = Array.Empty<TwitchEventSubChannelStatus>(),
             };
@@ -106,8 +112,9 @@ internal sealed class TwitchEventSubChannelStatusStore
 
     private static TwitchEventSubChannelStatusSnapshot CreateSnapshot(
         Dictionary<string, TwitchEventSubChannelStatus> states
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Channels = Array.AsReadOnly(
                 states.Values
@@ -115,6 +122,7 @@ internal sealed class TwitchEventSubChannelStatusStore
                     .ToArray()
             ),
         };
+    }
 
     internal sealed class TwitchEventSubChannelStatusScope(
         TwitchEventSubChannelStatusStore owner,
@@ -126,13 +134,25 @@ internal sealed class TwitchEventSubChannelStatusStore
         internal Dictionary<string, TwitchEventSubChannelStatus> States { get; } =
             new(StringComparer.OrdinalIgnoreCase);
 
-        internal void Activate() => owner.Activate(this);
+        internal void Activate()
+        {
+            owner.Activate(this);
+        }
 
-        internal void Set(TwitchEventSubChannelStatus status) => owner.Set(this, status);
+        internal void Set(TwitchEventSubChannelStatus status)
+        {
+            owner.Set(this, status);
+        }
 
-        internal void Remove(string channel) => owner.Remove(this, channel);
+        internal void Remove(string channel)
+        {
+            owner.Remove(this, channel);
+        }
 
-        public void Dispose() => owner.Deactivate(this);
+        public void Dispose()
+        {
+            owner.Deactivate(this);
+        }
     }
 }
 

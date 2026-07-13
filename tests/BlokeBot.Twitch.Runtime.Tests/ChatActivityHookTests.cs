@@ -121,7 +121,10 @@ public sealed class ChatActivityHookTests
         public ValueTask MessageReceivedAsync(
             TwitchChatMessage message,
             CancellationToken cancellationToken
-        ) => ValueTask.FromException(new InvalidOperationException("Observer failed."));
+        )
+        {
+            return ValueTask.FromException(new InvalidOperationException("Observer failed."));
+        }
     }
 
     private sealed class RecordingCommandResponseSender(RuntimeHookRecorder recorder)

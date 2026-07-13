@@ -11,11 +11,11 @@ internal sealed class PublicChatQueueAlertDispatcher(
     > fanOut
 )
 {
-    private static readonly ObserverEventIdentity BacklogEvent =
+    private static readonly ObserverEventIdentity _backlogEvent =
         ObserverEventIdentity.Named("PublicChatQueueBacklog");
-    private readonly IPublicChatQueueAlertObserver[] observers = [.. observers];
+    private readonly IPublicChatQueueAlertObserver[] _observers = [.. observers];
 
-    public bool HasObservers => observers.Length > 0;
+    public bool HasObservers => _observers.Length > 0;
 
     public async Task NotifyAsync(
         IReadOnlyList<PublicChatQueueBacklog> alerts,
@@ -25,7 +25,7 @@ internal sealed class PublicChatQueueAlertDispatcher(
         foreach (var alert in alerts)
         {
             _ = await fanOut.DispatchAsync(
-                observers,
+                _observers,
                 _ =>
                     new ObserverDispatch<
                         PublicChatQueueBacklog,
@@ -33,7 +33,7 @@ internal sealed class PublicChatQueueAlertDispatcher(
                     >
                     {
                         Event = alert,
-                        EventIdentity = BacklogEvent,
+                        EventIdentity = _backlogEvent,
                         DeadLetter = new PublicChatQueueAlertDeadLetter(
                             alert.Channel,
                             alert.PendingCount,

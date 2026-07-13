@@ -1,10 +1,10 @@
-@inject IJSRuntime JS
+@inject IJSRuntime _js
 
-<button class="@ButtonClass"
+<button class="@_buttonClass"
         type="button"
-        title="@Label"
-        aria-label="@Label"
-        aria-pressed="@isDark"
+        title="@_label"
+        aria-label="@_label"
+        aria-pressed="@_isDark"
         @onclick="ToggleAsync">
     <span class="theme-toggle__glow" aria-hidden="true"></span>
     <span class="theme-toggle__icons" aria-hidden="true">

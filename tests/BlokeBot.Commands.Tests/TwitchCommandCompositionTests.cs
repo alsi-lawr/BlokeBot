@@ -80,12 +80,17 @@ public sealed class TwitchCommandCompositionTests
 
     private static TwitchCommandRegistration Registration(
         Action<ITwitchCommandBuilder> configure
-    ) => new() { Configure = configure };
+    )
+    {
+        return new() { Configure = configure };
+    }
 
     private sealed class CompositionModule : ITwitchCommandModule
     {
-        public void AddCommands(ITwitchCommandBuilder commands) =>
+        public void AddCommands(ITwitchCommandBuilder commands)
+        {
             commands.Map("module", (_, _, _) => ValueTask.CompletedTask);
+        }
     }
 
     private sealed class AllowFilter : ITwitchCommandFilter;

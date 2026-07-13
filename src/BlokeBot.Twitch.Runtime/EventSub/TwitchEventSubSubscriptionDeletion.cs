@@ -35,11 +35,11 @@ internal sealed record TwitchEventSubPendingDeletion
 
 internal sealed class TwitchEventSubSubscriptionReconciliationStore
 {
-    private readonly object gate = new();
-    private readonly Dictionary<string, TwitchEventSubPendingDeletion> pending = new(
+    private readonly object _gate = new();
+    private readonly Dictionary<string, TwitchEventSubPendingDeletion> _pending = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly HashSet<string> pendingStops = new(
+    private readonly HashSet<string> _pendingStops = new(
         StringComparer.OrdinalIgnoreCase
     );
 
@@ -47,13 +47,15 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
     {
         get
         {
-            lock (gate)
-                return pending.Values
+            lock (_gate)
+            {
+                return _pending.Values
                     .OrderBy(
                         deletion => deletion.Subscription.Channel,
                         StringComparer.OrdinalIgnoreCase
                     )
                     .ToArray();
+            }
         }
     }
 
@@ -64,11 +66,13 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
     {
         get
         {
-            lock (gate)
-                return pending.Keys
-                    .Union(pendingStops, StringComparer.OrdinalIgnoreCase)
+            lock (_gate)
+            {
+                return _pending.Keys
+                    .Union(_pendingStops, StringComparer.OrdinalIgnoreCase)
                     .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
+            }
         }
     }
 
@@ -76,8 +80,10 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
     {
         get
         {
-            lock (gate)
-                return pending.Count > 0 || pendingStops.Count > 0;
+            lock (_gate)
+            {
+                return _pending.Count > 0 || _pendingStops.Count > 0;
+            }
         }
     }
 
@@ -86,28 +92,30 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         out TwitchEventSubPendingDeletion deletion
     )
     {
-        lock (gate)
-            return pending.TryGetValue(channel, out deletion!);
+        lock (_gate)
+        {
+            return _pending.TryGetValue(channel, out deletion!);
+        }
     }
 
     internal void Begin(ActiveEventSubSubscription subscription)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (pending.TryGetValue(subscription.Channel, out var existing))
+            if (_pending.TryGetValue(subscription.Channel, out var existing))
             {
                 EnsureSameSubscription(existing.Subscription, subscription);
                 return;
             }
 
-            if (pendingStops.Contains(subscription.Channel))
+            if (_pendingStops.Contains(subscription.Channel))
             {
                 throw new UnreachableException(
                     "An EventSub deletion cannot begin before the prior channel stop is reconciled."
                 );
             }
 
-            pending[subscription.Channel] = new TwitchEventSubPendingDeletion
+            _pending[subscription.Channel] = new TwitchEventSubPendingDeletion
             {
                 Subscription = subscription,
                 State = new TwitchEventSubPendingDeletionState.Scheduled(),
@@ -120,9 +128,9 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         TwitchEventSubChannelFailureDetails failure
     )
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (!pending.TryGetValue(subscription.Channel, out var existing))
+            if (!_pending.TryGetValue(subscription.Channel, out var existing))
             {
                 throw new UnreachableException(
                     "An unresolved EventSub deletion has no pending local evidence."
@@ -131,7 +139,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
 
             EnsureSameSubscription(existing.Subscription, subscription);
 
-            pending[subscription.Channel] = new TwitchEventSubPendingDeletion
+            _pending[subscription.Channel] = new TwitchEventSubPendingDeletion
             {
                 Subscription = subscription,
                 State = new TwitchEventSubPendingDeletionState.Unresolved
@@ -144,9 +152,9 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
 
     internal void ConfirmDeleted(ActiveEventSubSubscription subscription)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (!pending.TryGetValue(subscription.Channel, out var existing))
+            if (!_pending.TryGetValue(subscription.Channel, out var existing))
             {
                 throw new UnreachableException(
                     "A confirmed EventSub deletion has no pending local evidence."
@@ -154,22 +162,24 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
             }
 
             EnsureSameSubscription(existing.Subscription, subscription);
-            pending.Remove(subscription.Channel);
-            pendingStops.Add(subscription.Channel);
+            _pending.Remove(subscription.Channel);
+            _pendingStops.Add(subscription.Channel);
         }
     }
 
     internal bool HasPendingStop(string channel)
     {
-        lock (gate)
-            return pendingStops.Contains(channel);
+        lock (_gate)
+        {
+            return _pendingStops.Contains(channel);
+        }
     }
 
     internal void ConfirmStopped(string channel)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (!pendingStops.Remove(channel))
+            if (!_pendingStops.Remove(channel))
             {
                 throw new UnreachableException(
                     "A confirmed EventSub channel stop has no pending local evidence."

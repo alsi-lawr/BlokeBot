@@ -3,14 +3,14 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "Operator")]
 @inherits AuthenticatedPageComponent
-@inject DurableAlertService Alerts
-@inject EventBus<AppEventKind> Events
+@inject DurableAlertService _alerts
+@inject EventBus<AppEventKind> _events
 
-<PageTitle>BlokeBot | Alerts</PageTitle>
+<PageTitle>BlokeBot | _alerts</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
     <PageHeader Kicker="Channel health"
-                Title="Alerts"
+                Title="_alerts"
                 Description="See problems that need attention and alerts you have already handled.">
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
     </PageHeader>
@@ -19,7 +19,7 @@
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
-    else if (state is null)
+    else if (_state is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
     }
@@ -28,17 +28,17 @@
         <section class="space-y-3">
             <div>
                 <h2 class="text-lg font-semibold text-slate-950">Active</h2>
-                <p class="mt-1 text-sm text-muted-foreground">@ActiveSummary</p>
+                <p class="mt-1 text-sm text-muted-foreground">@_activeSummary</p>
             </div>
 
-            @if (state.Active.Count == 0)
+            @if (_state.Active.Count == 0)
             {
                 <div class="card p-8 text-sm text-muted-foreground">No active alerts.</div>
             }
             else
             {
                 <div class="grid gap-3">
-                    @foreach (var alert in state.Active)
+                    @foreach (var alert in _state.Active)
                     {
                         <article @key="alert.Id" class="card p-5">
                             <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -61,7 +61,7 @@
                                     }
                                     <button class="btn-primary"
                                             aria-label="@($"Mark {alert.Title} as handled")"
-                                            disabled="@(!canAcknowledge)"
+                                            disabled="@(!_canAcknowledge)"
                                             @onclick="() => AcknowledgeAsync(alert)">
                                         Mark as handled
                                     </button>
@@ -78,7 +78,7 @@
                 <h2 class="text-lg font-semibold text-slate-950">History</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Handled alerts stay here so you can see who dealt with them and when.</p>
             </div>
-            @if (state.History.Count == 0)
+            @if (_state.History.Count == 0)
             {
                 <div class="p-8 text-sm text-muted-foreground">No handled alerts yet.</div>
             }
@@ -95,7 +95,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            @foreach (var alert in state.History)
+                            @foreach (var alert in _state.History)
                             {
                                 <tr @key="alert.Id">
                                     <td class="px-5 py-3">

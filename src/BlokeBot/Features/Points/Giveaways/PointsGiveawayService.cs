@@ -52,10 +52,12 @@ public sealed class PointsGiveawayService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, hostId, ct);
         if (await PointsGiveawayQueries.HasActiveGiveawayAsync(db, hostId, ct))
+        {
             return new PointsGiveawayStartOutcome(
                 PointsGiveawayStartOutcomeKind.AlreadyActive,
                 settings
             );
+        }
 
         var now = DateTime.UtcNow;
         var cooldownStart = now.AddSeconds(-settings.GiveawayCooldownSeconds);
@@ -95,10 +97,12 @@ public sealed class PointsGiveawayService(
         }
 
         if (!await eligibility.IsFollowerEligibilityAvailableAsync(hostLogin, settings, ct))
+        {
             return new PointsGiveawayStartOutcome(
                 PointsGiveawayStartOutcomeKind.FollowerEligibilityUnavailable,
                 settings
             );
+        }
 
         var giveaway = new PointsGiveaway
         {
@@ -156,18 +160,22 @@ public sealed class PointsGiveawayService(
             .FirstOrDefaultAsync(ct);
         var normalized = LoginName.Parse(login).Value;
         if (giveaway is null)
+        {
             return new PointsGiveawayJoinOutcome(
                 PointsGiveawayJoinOutcomeKind.NotActive,
                 settings,
                 normalized
             );
+        }
 
         if (giveaway.Entrants.Any(x => x.Login == normalized))
+        {
             return new PointsGiveawayJoinOutcome(
                 PointsGiveawayJoinOutcomeKind.DuplicateJoin,
                 settings,
                 normalized
             );
+        }
 
         var joinEligibility = await eligibility.CheckJoinEligibilityAsync(
             settings,
@@ -177,18 +185,22 @@ public sealed class PointsGiveawayService(
             ct
         );
         if (joinEligibility == FollowerCheckResult.Unavailable)
+        {
             return new PointsGiveawayJoinOutcome(
                 PointsGiveawayJoinOutcomeKind.FollowerEligibilityUnavailable,
                 settings,
                 normalized
             );
+        }
 
         if (joinEligibility == FollowerCheckResult.NotEligible)
+        {
             return new PointsGiveawayJoinOutcome(
                 PointsGiveawayJoinOutcomeKind.NotEligible,
                 settings,
                 normalized
             );
+        }
 
         db.PointsGiveawayEntrants.Add(
             new PointsGiveawayEntrant
@@ -237,10 +249,12 @@ public sealed class PointsGiveawayService(
             .OrderByDescending(x => x.StartedAtUtc)
             .FirstOrDefaultAsync(ct);
         if (giveaway is null)
+        {
             return new PointsGiveawayCancelOutcome(
                 PointsGiveawayCancelOutcomeKind.NotActive,
                 settings
             );
+        }
 
         giveaway.Status = PointsGiveawayStatus.Cancelled;
         giveaway.CompletedAtUtc = DateTime.UtcNow;
@@ -260,7 +274,9 @@ public sealed class PointsGiveawayService(
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, hostId, ct);
         var giveawayId = await PointsGiveawayQueries.FindActiveGiveawayIdAsync(db, hostId, ct);
         if (giveawayId is null)
+        {
             return PointsGiveawayDrawOutcome.NotActive(settings);
+        }
 
         var result = await draws.DrawOutcomeAsync(giveawayId.Value, ct);
         if (result.Success)
@@ -275,7 +291,10 @@ public sealed class PointsGiveawayService(
     internal async Task<PointsGiveawayDrawOutcome> DrawOutcomeAsync(
         int giveawayId,
         CancellationToken ct
-    ) => await draws.DrawOutcomeAsync(giveawayId, ct);
+    )
+    {
+        return await draws.DrawOutcomeAsync(giveawayId, ct);
+    }
 
     private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
     {

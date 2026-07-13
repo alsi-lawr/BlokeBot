@@ -40,10 +40,7 @@ public sealed class HostBotAccountOAuthService(
             ),
             ct
         );
-        var validation = await oauth.ValidateTokenAsync(token.AccessToken, ct);
-        if (validation is null)
-            throw new InvalidOperationException("Twitch did not validate the bot account grant.");
-
+        var validation = await oauth.ValidateTokenAsync(token.AccessToken, ct) ?? throw new InvalidOperationException("Twitch did not validate the bot account grant.");
         var user = await helix.GetCurrentUserAsync(
             new TwitchHelixRequestContext(identity.ClientId, token.AccessToken),
             ct
@@ -63,7 +60,10 @@ public sealed class HostBotAccountOAuthService(
         );
     }
 
-    public string[] RequestedScopes() => TwitchScopeSet.NormalizeMany(settings.Identity.Scopes);
+    public string[] RequestedScopes()
+    {
+        return TwitchScopeSet.NormalizeMany(settings.Identity.Scopes);
+    }
 
     private static void ValidateConfiguredIdentity(
         TwitchBotIdentity identity,

@@ -5,6 +5,8 @@ internal sealed class TwitchIrcRuntimeStrategy(TwitchIrcRuntime runtime)
 {
     public TwitchBotRuntime Runtime => TwitchBotRuntime.Irc;
 
-    public Task RunAsync(CancellationToken cancellationToken) =>
-        runtime.RunAsync(cancellationToken);
+    public Task RunAsync(CancellationToken cancellationToken)
+    {
+        return runtime.RunAsync(cancellationToken);
+    }
 }

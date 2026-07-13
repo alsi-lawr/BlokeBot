@@ -5,7 +5,9 @@ public sealed record AnnouncementRetryDelay
     public AnnouncementRetryDelay(TimeSpan value)
     {
         if (value <= TimeSpan.Zero)
+        {
             throw new ArgumentOutOfRangeException(nameof(value), value, "Retry delay must be positive.");
+        }
 
         Value = value;
     }

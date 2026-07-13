@@ -7,5 +7,8 @@ internal sealed class DenyAllFilter : ITwitchCommandFilter
     public ValueTask<bool> AllowAsync(
         TwitchCommandContext context,
         CancellationToken cancellationToken
-    ) => ValueTask.FromResult(false);
+    )
+    {
+        return ValueTask.FromResult(false);
+    }
 }

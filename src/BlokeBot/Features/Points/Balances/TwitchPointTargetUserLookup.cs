@@ -10,7 +10,9 @@ public sealed class TwitchPointTargetUserLookup(
     {
         var normalized = TwitchLogin.Normalize(login);
         if (normalized.Length == 0 || string.IsNullOrWhiteSpace(settings.Identity.ClientId))
+        {
             return false;
+        }
 
         var accessToken = await appTokens.GetAccessTokenAsync(ct);
         var users = await helix.GetUsersByLoginAsync(

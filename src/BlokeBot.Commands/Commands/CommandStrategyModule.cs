@@ -22,7 +22,9 @@ public sealed class CommandStrategyModule<TKind, TState>(
     {
         var route = await resolver.ResolveAsync(context, cancellationToken);
         if (route is null)
+        {
             return false;
+        }
 
         var result = await dispatcher.DispatchAsync(route, context, args, cancellationToken);
         return result.Status == CommandStrategyDispatchStatus.Handled;

@@ -144,19 +144,23 @@ public sealed class PointsConfigurationService(
             config.Replies.FollowerEligibilityUnavailableReply.Trim();
     }
 
-    private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind) =>
-        CommandAliasRegistry.JoinAliases(aliases, PointsAppCommandKindMap.ToAppKind(kind));
+    private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind)
+    {
+        return CommandAliasRegistry.JoinAliases(aliases, PointsAppCommandKindMap.ToAppKind(kind));
+    }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .HostBotAccountSettings.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
             .SingleOrDefaultAsync(ct);
+    }
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,
@@ -189,22 +193,32 @@ public sealed class PointsConfigurationService(
         var min = PointAmount.ParseAbsolute(config.GiveawayMinimumPayout);
         var max = PointAmount.ParseAbsolute(config.GiveawayMaximumPayout);
         if (min.Value > max.Value)
+        {
             throw new InvalidOperationException(
                 "The smallest giveaway prize cannot be larger than the largest prize."
             );
+        }
 
         if (min.Value % 10 != 0 || max.Value % 10 != 0)
+        {
             throw new InvalidOperationException("Giveaway prizes must be multiples of 10.");
+        }
 
         if (config.GamblingWinRatePercent is < 0 or > 100)
+        {
             throw new InvalidOperationException(
                 "The chance of winning must be between 0% and 100%."
             );
+        }
 
         if (config.GamblingCooldownSeconds < 0)
+        {
             config.GamblingCooldownSeconds = 0;
+        }
 
         if (config.GiveawayCooldownSeconds < MinimumGiveawayCooldownSeconds)
+        {
             config.GiveawayCooldownSeconds = MinimumGiveawayCooldownSeconds;
+        }
     }
 }

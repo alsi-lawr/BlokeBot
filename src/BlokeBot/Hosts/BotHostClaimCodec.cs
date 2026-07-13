@@ -6,10 +6,11 @@ namespace BlokeBot.Hosts;
 
 internal static class BotHostClaimCodec
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-    public static string Encode(BotHostChoice host) =>
-        JsonSerializer.Serialize(
+    public static string Encode(BotHostChoice host)
+    {
+        return JsonSerializer.Serialize(
             new Payload
             {
                 Id = host.Id,
@@ -18,14 +19,15 @@ internal static class BotHostClaimCodec
                 Role = AuthRoleCodec.Encode(host.Role),
                 ProfileImageUrl = host.ProfileImageUrl,
             },
-            JsonOptions
+            _jsonOptions
         );
+    }
 
     public static BotHostChoice? Decode(string value)
     {
         try
         {
-            var payload = JsonSerializer.Deserialize<Payload>(value, JsonOptions);
+            var payload = JsonSerializer.Deserialize<Payload>(value, _jsonOptions);
             if (
                 payload is null
                 || payload.Id <= 0
@@ -51,12 +53,14 @@ internal static class BotHostClaimCodec
         }
     }
 
-    public static bool Equivalent(BotHostChoice left, BotHostChoice right) =>
-        left.Id == right.Id
+    public static bool Equivalent(BotHostChoice left, BotHostChoice right)
+    {
+        return left.Id == right.Id
         && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
         && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
         && left.Role == right.Role
         && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
+    }
 
     private sealed record Payload
     {

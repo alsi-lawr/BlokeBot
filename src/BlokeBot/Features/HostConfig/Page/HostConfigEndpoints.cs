@@ -23,10 +23,14 @@ internal static class HostConfigEndpoints
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
                     var login = currentSession.Login;
                     if (string.IsNullOrWhiteSpace(login))
+                    {
                         return Results.Redirect("/auth/login");
+                    }
 
                     if (!await siteAccess.CanCreateHostAsync(login, ct))
+                    {
                         return Results.Forbid();
+                    }
 
                     var userId = currentSession.UserId;
                     var displayName = string.IsNullOrWhiteSpace(currentSession.DisplayName)

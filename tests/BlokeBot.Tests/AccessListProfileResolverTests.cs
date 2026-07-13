@@ -71,17 +71,20 @@ public sealed class AccessListProfileResolverTests
 
     private sealed class ProfileHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
-        public int TokenRequestCount => handler.TokenRequestCount;
+        public int TokenRequestCount => _handler.TokenRequestCount;
 
-        public int UserRequestCount => handler.UserRequestCount;
+        public int UserRequestCount => _handler.UserRequestCount;
 
-        public string? UserRequestAccessToken => handler.UserRequestAccessToken;
+        public string? UserRequestAccessToken => _handler.UserRequestAccessToken;
 
-        public string? UserRequestClientId => handler.UserRequestClientId;
+        public string? UserRequestClientId => _handler.UserRequestClientId;
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {
@@ -96,8 +99,9 @@ public sealed class AccessListProfileResolverTests
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            ) =>
-                Task.FromResult(
+            )
+            {
+                return Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
                         "/oauth2/token" => TokenResponse(),
@@ -105,6 +109,7 @@ public sealed class AccessListProfileResolverTests
                         _ => new HttpResponseMessage(HttpStatusCode.NotFound),
                     }
                 );
+            }
 
             private HttpResponseMessage TokenResponse()
             {
@@ -128,11 +133,13 @@ public sealed class AccessListProfileResolverTests
                 );
             }
 
-            private static HttpResponseMessage JsonResponse(string json) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+            }
         }
     }
 }

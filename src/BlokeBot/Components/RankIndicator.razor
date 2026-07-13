@@ -1,4 +1,4 @@
-<span class="@IndicatorClass" aria-label="@Label" title="@Label">
+<span class="@_indicatorClass" aria-label="@_label" title="@_label">
     <span class="rank-indicator__prefix">#</span>@Rank
 </span>
 
@@ -6,7 +6,7 @@
     [Parameter]
     public int Rank { get; set; }
 
-    private string IndicatorClass =>
+    private string _indicatorClass =>
         Rank switch
         {
             1 => "rank-indicator rank-indicator--gold",
@@ -15,7 +15,7 @@
             _ => "rank-indicator",
         };
 
-    private string Label =>
+    private string _label =>
         Rank switch
         {
             1 => "First place",

@@ -2,11 +2,11 @@ namespace BlokeBot.Commands;
 
 public sealed class TwitchCommandDispatcher
 {
-    private readonly TwitchCommandPlan plan;
+    private readonly TwitchCommandPlan _plan;
 
     internal TwitchCommandDispatcher(TwitchCommandRegistry registry)
     {
-        plan = registry.Plan;
+        _plan = registry.Plan;
     }
 
     public async ValueTask DispatchResponsesAsync(
@@ -16,7 +16,9 @@ public sealed class TwitchCommandDispatcher
     )
     {
         if (!TryParseCommand(message.Text, out var route, out var args))
+        {
             return;
+        }
 
         var context = new TwitchCommandContext
         {
@@ -25,27 +27,33 @@ public sealed class TwitchCommandDispatcher
             Responder = respond,
         };
 
-        foreach (var filter in plan.Filters)
+        foreach (var filter in _plan.Filters)
         {
             if (!await filter.AllowAsync(context, cancellationToken))
+            {
                 return;
+            }
         }
 
-        var matched = plan.Routes.TryGetValue(route, out var handler);
+        var matched = _plan.Routes.TryGetValue(route, out var handler);
         if (matched && handler is not null)
         {
             await handler(context, args, cancellationToken);
             return;
         }
 
-        foreach (var dynamicHandler in plan.DynamicHandlers)
+        foreach (var dynamicHandler in _plan.DynamicHandlers)
         {
             if (await dynamicHandler(context, args, cancellationToken))
+            {
                 return;
+            }
         }
 
-        if (plan.FallbackHandler is not null)
-            await plan.FallbackHandler(context, args, cancellationToken);
+        if (_plan.FallbackHandler is not null)
+        {
+            await _plan.FallbackHandler(context, args, cancellationToken);
+        }
     }
 
     private static bool TryParseCommand(
@@ -58,14 +66,18 @@ public sealed class TwitchCommandDispatcher
         args = [];
 
         if (string.IsNullOrWhiteSpace(text) || text[0] != '!')
+        {
             return false;
+        }
 
         var parts = text.Split(
             ' ',
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
         );
         if (parts.Length == 0 || parts[0].Length <= 1)
+        {
             return false;
+        }
 
         route = parts[0][1..];
         args = parts[1..];

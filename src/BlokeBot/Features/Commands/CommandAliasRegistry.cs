@@ -37,7 +37,9 @@ public sealed class CommandAliasRegistry
             .ToArray();
         var duplicate = CommandAliasPolicy.FindDuplicateAlias(genericDrafts);
         if (duplicate is not null)
+        {
             throw new InvalidOperationException($"!{duplicate} is entered more than once.");
+        }
 
         var requestedAliases = rows.Select(x => x.Alias).ToArray();
         var existingCollision = await db
@@ -50,9 +52,11 @@ public sealed class CommandAliasRegistry
             .Select(x => x.Alias)
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(existingCollision))
+        {
             throw new InvalidOperationException(
                 $"!{existingCollision} is already used by another bot command."
             );
+        }
 
         db.CommandAliases.RemoveRange(
             db.CommandAliases.Where(x =>
@@ -68,14 +72,16 @@ public sealed class CommandAliasRegistry
         IEnumerable<CommandAlias> aliases,
         AppCommandKind kind,
         int? guessRoundProfileId = null
-    ) =>
-        string.Join(
+    )
+    {
+        return string.Join(
             ", ",
             aliases
                 .Where(x => x.Kind == kind && x.GuessRoundProfileId == guessRoundProfileId)
                 .Select(x => x.Alias)
                 .Order()
         );
+    }
 }
 
 public sealed record CommandAliasDraft(AppCommandKind Kind, string Aliases);

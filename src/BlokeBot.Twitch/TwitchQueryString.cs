@@ -2,8 +2,9 @@ namespace BlokeBot.Twitch;
 
 public static class TwitchQueryString
 {
-    public static string Create(IEnumerable<KeyValuePair<string, string?>> values) =>
-        string.Join(
+    public static string Create(IEnumerable<KeyValuePair<string, string?>> values)
+    {
+        return string.Join(
             '&',
             values
                 .Where(value => !string.IsNullOrWhiteSpace(value.Value))
@@ -11,4 +12,5 @@ public static class TwitchQueryString
                     $"{Uri.EscapeDataString(value.Key)}={Uri.EscapeDataString(value.Value!)}"
                 )
         );
+    }
 }

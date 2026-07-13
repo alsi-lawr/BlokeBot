@@ -16,7 +16,9 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
             var fullPath = Path.GetFullPath(databasePath);
             var directory = Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrWhiteSpace(directory))
+            {
                 Directory.CreateDirectory(directory);
+            }
 
             var connectionString = new SqliteConnectionStringBuilder
             {

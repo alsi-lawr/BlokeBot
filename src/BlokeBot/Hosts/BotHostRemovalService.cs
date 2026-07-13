@@ -16,7 +16,9 @@ public sealed class BotHostRemovalService(
 
         var removed = await db.Hosts.Where(host => host.Id == hostId).ExecuteDeleteAsync(ct);
         if (removed == 0)
+        {
             return false;
+        }
 
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);

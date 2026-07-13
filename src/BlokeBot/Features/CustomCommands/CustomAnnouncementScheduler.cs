@@ -101,7 +101,9 @@ internal sealed class CustomAnnouncementScheduler(
             .ThenInclude(x => x!.Variants)
             .SingleOrDefaultAsync(x => x.Id == candidate.AnnouncementId, cancellationToken);
         if (announcement is null || !announcement.Enabled)
+        {
             return;
+        }
 
         var policy = AnnouncementDeliveryPolicyMapper.ToDomain(announcement.DeliveryPolicy);
         await policy.Match(retry =>
@@ -161,7 +163,9 @@ internal sealed class CustomAnnouncementScheduler(
 
         var due = ((AnnouncementScheduleEvaluation.Evaluated)schedule).Due;
         if (due is AnnouncementDueResult.NotDue)
+        {
             return;
+        }
 
         var dueAt = ((AnnouncementDueResult.Due)due).DueAt;
         if (announcement.OccurrenceDueAtUtc != dueAt.UtcDateTime)
@@ -306,8 +310,9 @@ internal sealed class CustomAnnouncementScheduler(
         CustomAnnouncement announcement,
         AnnouncementCandidate candidate,
         DateTimeOffset now
-    ) =>
-        announcement.Schedule switch
+    )
+    {
+        return announcement.Schedule switch
         {
             IntervalCustomAnnouncementSchedule interval =>
                 new AnnouncementScheduleEvaluation.Evaluated(
@@ -332,6 +337,7 @@ internal sealed class CustomAnnouncementScheduler(
             ),
             _ => throw new UnreachableException("Unknown custom announcement schedule."),
         };
+    }
 
     private static AnnouncementDueResult IsIntervalDue(
         CustomAnnouncement announcement,
@@ -359,7 +365,9 @@ internal sealed class CustomAnnouncementScheduler(
     {
         var timeZone = ResolveTimeZone(candidate.TimeZoneId);
         if (timeZone is null)
+        {
             return new AnnouncementScheduleEvaluation.InvalidTimeZone();
+        }
 
         var utcNow = now.UtcDateTime;
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
@@ -381,7 +389,9 @@ internal sealed class CustomAnnouncementScheduler(
         }
 
         if (timeZone.IsInvalidTime(scheduledLocal))
+        {
             return new AnnouncementScheduleEvaluation.InvalidTimeZone();
+        }
 
         var dueAt = new DateTimeOffset(
             TimeZoneInfo.ConvertTimeToUtc(scheduledLocal, timeZone),
@@ -415,7 +425,9 @@ internal sealed class CustomAnnouncementScheduler(
     private static TimeZoneInfo? ResolveTimeZone(string? timeZoneId)
     {
         if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
             return null;
+        }
 
         try
         {
@@ -466,7 +478,9 @@ internal sealed class CustomAnnouncementScheduler(
     )
     {
         if (announcement.OccurrenceDueAtUtc is { } dueAt)
+        {
             announcement.LastOccurrenceAtUtc = dueAt;
+        }
 
         announcement.OccurrenceStatus = status;
         announcement.OccurrenceNextAttemptAtUtc = null;
@@ -501,7 +515,8 @@ internal sealed class CustomAnnouncementScheduler(
         CustomAnnouncement announcement,
         AnnouncementCandidate candidate,
         string reason
-    ) =>
+    )
+    {
         log.LogWarning(
             "Custom announcement {AnnouncementId} occurrence completed for host {HostLogin}; Status: {Status}; Reason: {Reason}; AttemptCount: {AttemptCount}; DueAtUtc: {DueAtUtc}; ExpiresAtUtc: {ExpiresAtUtc}.",
             announcement.Id,
@@ -512,31 +527,42 @@ internal sealed class CustomAnnouncementScheduler(
             announcement.OccurrenceDueAtUtc,
             announcement.OccurrenceExpiresAtUtc
         );
+    }
 
-    private static bool IsTerminal(AnnouncementOccurrenceStatus status) =>
-        status
+    private static bool IsTerminal(AnnouncementOccurrenceStatus status)
+    {
+        return status
         is AnnouncementOccurrenceStatus.SkippedExpired
             or AnnouncementOccurrenceStatus.TerminalRejected
             or AnnouncementOccurrenceStatus.TerminalAmbiguous
             or AnnouncementOccurrenceStatus.TerminalUnexpected
             or AnnouncementOccurrenceStatus.TerminalInvalidTimeZone
             or AnnouncementOccurrenceStatus.TerminalMissingMessage;
+    }
 
-    private TimeSpan TickInterval() =>
-        TimeSpan.FromSeconds(
+    private TimeSpan TickInterval()
+    {
+        return TimeSpan.FromSeconds(
             Math.Max(1, options.Value.CustomCommands.AnnouncementSchedulerTickSeconds)
         );
+    }
 
-    private static DateTimeOffset RequireUtc(DateTime? value, string field) =>
-        value is { } dateTime
+    private static DateTimeOffset RequireUtc(DateTime? value, string field)
+    {
+        return value is { } dateTime
             ? AsUtc(dateTime)
             : throw new UnreachableException($"Announcement occurrence {field} is required.");
+    }
 
-    private static DateTimeOffset AsUtc(DateTime value) =>
-        new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
+    private static DateTimeOffset AsUtc(DateTime value)
+    {
+        return new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
+    }
 
-    private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right) =>
-        left <= right ? left : right;
+    private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right)
+    {
+        return left <= right ? left : right;
+    }
 
     private sealed record AnnouncementCandidate(
         int AnnouncementId,

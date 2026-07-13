@@ -6,16 +6,16 @@ namespace BlokeBot.Testing;
 
 public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContext>, IAsyncDisposable
 {
-    private readonly SqliteConnection keeperConnection;
-    private readonly DbContextOptions<BlokeBotDbContext> options;
+    private readonly SqliteConnection _keeperConnection;
+    private readonly DbContextOptions<BlokeBotDbContext> _options;
 
     private SqliteBlokeBotDbFactory(
         SqliteConnection keeperConnection,
         string connectionString
     )
     {
-        this.keeperConnection = keeperConnection;
-        options = new DbContextOptionsBuilder<BlokeBotDbContext>()
+        _keeperConnection = keeperConnection;
+        _options = new DbContextOptionsBuilder<BlokeBotDbContext>()
             .UseSqlite(connectionString)
             .Options;
     }
@@ -43,11 +43,20 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
         return new SqliteBlokeBotDbFactory(keeperConnection, connectionString);
     }
 
-    public BlokeBotDbContext CreateDbContext() => new(options);
+    public BlokeBotDbContext CreateDbContext()
+    {
+        return new(_options);
+    }
 
     public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
         CancellationToken cancellationToken = default
-    ) => ValueTask.FromResult(CreateDbContext());
+    )
+    {
+        return ValueTask.FromResult(CreateDbContext());
+    }
 
-    public async ValueTask DisposeAsync() => await keeperConnection.DisposeAsync();
+    public async ValueTask DisposeAsync()
+    {
+        await _keeperConnection.DisposeAsync();
+    }
 }

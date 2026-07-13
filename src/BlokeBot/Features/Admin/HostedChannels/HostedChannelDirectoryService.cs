@@ -53,7 +53,9 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
     )
     {
         if (choices.Count == 0)
+        {
             return [];
+        }
 
         var roles = choices.ToDictionary(x => x.Id, x => x.Role);
         var ids = roles.Keys.ToArray();

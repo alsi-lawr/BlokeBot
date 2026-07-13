@@ -1,13 +1,13 @@
 @inherits BackgroundLoadComponent<HostBotChannelStatus>
 @using BlokeBot.Persistence.Models
-@inject HostBotStatusService HostBotStatus
+@inject HostBotStatusService _hostBotStatus
 
 <div class="space-y-2">
     <label class="label" for="eligibility">Who can enter</label>
-    <select id="eligibility" class="input" title="@FollowerEligibilityTitle" value="@Value" @onchange="OnEligibilityChangedAsync">
+    <select id="eligibility" class="input" title="@_followerEligibilityTitle" value="@Value" @onchange="OnEligibilityChangedAsync">
         <option value="@PointsEligibilityMode.Everyone">Everyone</option>
         <option value="@PointsEligibilityMode.Subscribers">Subscribers</option>
-        <option value="@PointsEligibilityMode.Followers" disabled="@(!FollowerEligibilityAvailable)" title="@FollowerEligibilityTitle">Followers</option>
+        <option value="@PointsEligibilityMode.Followers" disabled="@(!_followerEligibilityAvailable)" title="@_followerEligibilityTitle">Followers</option>
     </select>
-    <p class="text-xs font-medium text-slate-500">@FollowerEligibilityTitle</p>
+    <p class="text-xs font-medium text-slate-500">@_followerEligibilityTitle</p>
 </div>

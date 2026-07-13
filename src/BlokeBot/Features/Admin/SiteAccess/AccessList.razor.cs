@@ -43,8 +43,8 @@ namespace BlokeBot.Features.Admin.SiteAccess;
 
 public partial class AccessList
 {
-    private const int RemovalAnimationDelayMs = 150;
-    private readonly HashSet<string> pendingRemovals = new(StringComparer.OrdinalIgnoreCase);
+    private const int _removalAnimationDelayMs = 150;
+    private readonly HashSet<string> _pendingRemovals = new(StringComparer.OrdinalIgnoreCase);
 
     [Parameter]
     public Func<Task> Add { get; set; } = () => Task.CompletedTask;
@@ -70,7 +70,7 @@ public partial class AccessList
     [Parameter]
     public string Title { get; set; } = string.Empty;
 
-    private string ContainerClass =>
+    private string _containerClass =>
         Disabled ? "surface-muted rounded-lg p-4 opacity-50" : "surface-muted rounded-lg p-4";
 
     private async Task OnInput(ChangeEventArgs args)
@@ -83,25 +83,27 @@ public partial class AccessList
     {
         const string baseClass =
             "motion-list__item surface-row flex items-center justify-between rounded-md px-3 py-2";
-        return pendingRemovals.Contains(entry)
+        return _pendingRemovals.Contains(entry)
             ? $"{baseClass} motion-list__item--removing"
             : baseClass;
     }
 
     private async Task RemoveEntryAsync(string entry)
     {
-        if (!pendingRemovals.Add(entry))
+        if (!_pendingRemovals.Add(entry))
+        {
             return;
+        }
 
         StateHasChanged();
         try
         {
-            await Task.Delay(RemovalAnimationDelayMs);
+            await Task.Delay(_removalAnimationDelayMs);
             await Remove(entry);
         }
         finally
         {
-            pendingRemovals.Remove(entry);
+            _pendingRemovals.Remove(entry);
         }
     }
 }

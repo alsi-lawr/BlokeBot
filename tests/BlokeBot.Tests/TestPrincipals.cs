@@ -31,9 +31,13 @@ internal static class TestPrincipals
         };
 
         if (roleClaim is not null)
+        {
             claims.Add(new Claim(AuthClaims.Role, roleClaim));
+        }
         else if (role is not null)
+        {
             claims.Add(new Claim(AuthClaims.Role, AuthRoleCodec.Encode(role.Value)));
+        }
 
         if (availableHosts is not null)
         {
@@ -46,16 +50,22 @@ internal static class TestPrincipals
         }
 
         if (availableHostClaims is not null)
+        {
             claims.AddRange(
                 availableHostClaims.Select(value => new Claim(BotHostClaims.AvailableHost, value))
             );
+        }
 
         if (selectedHostClaim is not null)
+        {
             claims.Add(new Claim(BotHostClaims.SelectedHost, selectedHostClaim));
+        }
         else if (selectedHost is not null)
+        {
             claims.Add(
                 new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(selectedHost))
             );
+        }
 
         return new ClaimsPrincipal(
             new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)

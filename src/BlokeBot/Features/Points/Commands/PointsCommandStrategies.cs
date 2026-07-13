@@ -38,7 +38,10 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     public async ValueTask<string> ModeratorOnlyReplyAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) => (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+    )
+    {
+        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+    }
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -48,7 +51,10 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     protected async Task<PointsCommandResolution> LoadResolutionAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) => await Commands.CreateResolutionAsync(context.State.HostId, Kind, cancellationToken);
+    )
+    {
+        return await Commands.CreateResolutionAsync(context.State.HostId, Kind, cancellationToken);
+    }
 
     protected static async ValueTask ReplyAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -57,16 +63,21 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     )
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
+        {
             await context.Command.RespondAsync(
                 new TwitchCommandResponse(result.Target, result.Message),
                 cancellationToken
             );
+        }
     }
 
     protected static TwitchCommandResponse Response(
         string message,
         TwitchCommandResponseTarget target
-    ) => new(target, message);
+    )
+    {
+        return new(target, message);
+    }
 
     protected static string Format(
         string template,
@@ -76,8 +87,9 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         string? to = null,
         string? amount = null,
         string? balance = null
-    ) =>
-        MessageTemplateFormatter.Format(
+    )
+    {
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -89,32 +101,39 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
                 ["balance"] = balance ?? string.Empty,
             }
         );
+    }
 
     protected static PointOperationResult Insufficient(
         PointsSettings settings,
         ReplyDeliveryMap delivery
-    ) =>
-        PointOperationResult.Failure(
+    )
+    {
+        return PointOperationResult.Failure(
             PointOperationFailureReason.InsufficientBalance,
             Format(settings.InsufficientBalanceReply, settings),
             target: delivery.TargetFor(PointsReplyKeys.InsufficientBalance)
         );
+    }
 
     protected static PointOperationResult Invalid(
         PointsSettings settings,
         ReplyDeliveryMap delivery
-    ) =>
-        PointOperationResult.Failure(
+    )
+    {
+        return PointOperationResult.Failure(
             PointOperationFailureReason.InvalidAmount,
             Format(settings.InvalidAmountReply, settings),
             target: delivery.TargetFor(PointsReplyKeys.InvalidAmount)
         );
+    }
 
-    protected static PointOperationResult UnknownUser(string login) =>
-        PointOperationResult.Failure(
+    protected static PointOperationResult UnknownUser(string login)
+    {
+        return PointOperationResult.Failure(
             PointOperationFailureReason.UnknownUser,
             $"Twitch user @{login} was not found."
         );
+    }
 
     protected static bool TryParseSpend(
         string value,
@@ -456,7 +475,9 @@ public sealed class GambleCommandStrategy(
                         Cooldown(resolution.Settings)
                     )
                 )
+                {
                     return;
+                }
 
                 var won = random.NextDouble() * 100 < resolution.Settings.GamblingWinRatePercent;
                 result = await balances.ApplyGambleAsync(

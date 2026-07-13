@@ -25,12 +25,18 @@ public sealed record PointOperationResult(
         PointAmount? balance = null,
         PointAmount? amount = null,
         TwitchCommandResponseTarget target = TwitchCommandResponseTarget.Chat
-    ) => new(false, message, balance, amount, reason, target);
+    )
+    {
+        return new(false, message, balance, amount, reason, target);
+    }
 
     public static PointOperationResult Successful(
         string message = "",
         PointAmount? balance = null,
         PointAmount? amount = null,
         TwitchCommandResponseTarget target = TwitchCommandResponseTarget.Chat
-    ) => new(true, message, balance, amount, PointOperationFailureReason.None, target);
+    )
+    {
+        return new(true, message, balance, amount, PointOperationFailureReason.None, target);
+    }
 }

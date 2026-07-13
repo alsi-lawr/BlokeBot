@@ -126,12 +126,18 @@ public sealed class ChannelBotAuthorizationTests
         string userId,
         string login,
         params string[] scopes
-    ) => new(userId, LoginName.Parse(login), scopes.ToHashSet(StringComparer.Ordinal));
+    )
+    {
+        return new(userId, LoginName.Parse(login), scopes.ToHashSet(StringComparer.Ordinal));
+    }
 
     private static ChannelBotAuthorizationService ChannelAuthorizationService(
         SqliteBlokeBotDbFactory dbFactory,
         params string[] scopes
-    ) => new(dbFactory, ChangeNotifier(), ChannelOAuthService(scopes));
+    )
+    {
+        return new(dbFactory, ChangeNotifier(), ChannelOAuthService(scopes));
+    }
 
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
@@ -169,8 +175,10 @@ public sealed class ChannelBotAuthorizationTests
         );
     }
 
-    private static HostedChannelChangeNotifier ChangeNotifier() =>
-        new(TestEventBus.Create<AppEventKind>());
+    private static HostedChannelChangeNotifier ChangeNotifier()
+    {
+        return new(TestEventBus.Create<AppEventKind>());
+    }
 
     private static IConfiguration ConfigurationWithScopes(params string[] scopes)
     {
@@ -181,7 +189,9 @@ public sealed class ChannelBotAuthorizationTests
         };
 
         for (var i = 0; i < scopes.Length; i++)
+        {
             values[$"TwitchBot:ChannelAuthorization:Scopes:{i}"] = scopes[i];
+        }
 
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
@@ -224,11 +234,14 @@ public sealed class ChannelBotAuthorizationTests
 
     private sealed class TwitchOAuthHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
-        public string? ValidatedToken => handler.ValidatedToken;
+        public string? ValidatedToken => _handler.ValidatedToken;
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {
@@ -259,16 +272,21 @@ public sealed class ChannelBotAuthorizationTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             }
 
-            private static HttpResponseMessage JsonResponse(string json) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+            }
         }
     }
 
     private sealed class EmptyHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new();
+        public HttpClient CreateClient(string name)
+        {
+            return new();
+        }
     }
 }

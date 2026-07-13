@@ -236,8 +236,9 @@ public sealed class WhisperResponseTests
         result.ResponseBody.ShouldBe(body);
     }
 
-    private static TwitchBotSettings BotOptions() =>
-        TwitchBotSettings.FromOptions(
+    private static TwitchBotSettings BotOptions()
+    {
+        return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions
@@ -250,6 +251,7 @@ public sealed class WhisperResponseTests
                 },
             }
         );
+    }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
@@ -288,7 +290,10 @@ public sealed class WhisperResponseTests
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => now;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return now;
+        }
     }
 
     private sealed record SentChatMessage(string Channel, string Message);
@@ -314,11 +319,14 @@ public sealed class WhisperResponseTests
         string? whisperBody = null
     ) : IHttpClientFactory
     {
-        private readonly Handler handler = new(whisperStatus, whisperBody);
+        private readonly Handler _handler = new(whisperStatus, whisperBody);
 
-        public int WhisperRequestCount => handler.WhisperRequestCount;
+        public int WhisperRequestCount => _handler.WhisperRequestCount;
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler(HttpStatusCode whisperStatus, string? whisperBody)
             : HttpMessageHandler
@@ -349,11 +357,13 @@ public sealed class WhisperResponseTests
                 WhisperRequestCount++;
                 var response = new HttpResponseMessage(whisperStatus);
                 if (whisperBody is not null)
+                {
                     response.Content = new StringContent(
                         whisperBody,
                         Encoding.UTF8,
                         "application/json"
                     );
+                }
 
                 return response;
             }
@@ -371,11 +381,13 @@ public sealed class WhisperResponseTests
                 };
             }
 
-            private static HttpResponseMessage JsonResponse(string json) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+            }
         }
     }
 }

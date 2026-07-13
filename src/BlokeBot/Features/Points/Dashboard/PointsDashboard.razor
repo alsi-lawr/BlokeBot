@@ -6,29 +6,29 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject PointsDashboardService Dashboard
-@inject HostFeatureService Features
-@inject EventBus<AppEventKind> Events
-@inject ToastService Toasts
+@inject PointsDashboardService _dashboard
+@inject HostFeatureService _features
+@inject EventBus<AppEventKind> _events
+@inject ToastService _toasts
 
 <PageTitle>BlokeBot | Points</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Kicker="Dashboard"
+    <PageHeader Kicker="_dashboard"
                 Title="Points"
                 Description="Check balances, adjust points, and run the current giveaway.">
-        <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
+        <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </PageHeader>
 
     @if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
-    else if (!featureEnabled)
+    else if (!_featureEnabled)
     {
         <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
     }
-    else if (state is null)
+    else if (_state is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
     }
@@ -51,9 +51,9 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            @for (var i = 0; i < state.Leaderboard.Count; i++)
+                            @for (var i = 0; i < _state.Leaderboard.Count; i++)
                             {
-                                var entry = state.Leaderboard[i];
+                                var entry = _state.Leaderboard[i];
                                 <tr @key="entry.Login" class="motion-list__item">
                                     <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@(i + 1)" /></td>
                                     <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
@@ -69,7 +69,7 @@
                             }
                         </tbody>
                     </table>
-                    @if (state.Leaderboard.Count == 0)
+                    @if (_state.Leaderboard.Count == 0)
                     {
                         <div class="p-8 text-sm text-muted-foreground">No balances yet.</div>
                     }
@@ -82,36 +82,36 @@
                     <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
                 </div>
                 <div class="grid gap-4 p-5 md:grid-cols-2">
-                    <Field Label="Find viewer" @bind-Value="lookupLogin" Placeholder="username" />
+                    <Field Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
                     <div class="flex items-end">
                         <button class="btn-secondary" @onclick="LookupAsync">Search</button>
                     </div>
-                    @if (lookupResult is not null)
+                    @if (_lookupResult is not null)
                     {
                         <div class="surface-muted rounded-lg p-4 md:col-span-2">
-                            <p class="text-sm font-bold text-slate-950">@lookupResult.Login</p>
-                            <p class="mt-1 text-sm text-muted-foreground">@lookupResult.Balance.ToDisplayString() points</p>
+                            <p class="text-sm font-bold text-slate-950">@_lookupResult.Login</p>
+                            <p class="mt-1 text-sm text-muted-foreground">@_lookupResult.Balance.ToDisplayString() points</p>
                         </div>
                     }
                 </div>
                 <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Move points</h3>
-                        <Field Label="From viewer" @bind-Value="giveFrom" Placeholder="from username" />
-                        <Field Label="To viewer" @bind-Value="giveTo" Placeholder="to username" />
-                        <Field Label="Amount" @bind-Value="giveAmount" Placeholder="100, 50%, all" />
+                        <Field Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
+                        <Field Label="To viewer" @bind-Value="_giveTo" Placeholder="to username" />
+                        <Field Label="Amount" @bind-Value="_giveAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="GiveAsync">Move points</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Add points</h3>
-                        <Field Label="Viewer" @bind-Value="addLogin" Placeholder="username" />
-                        <Field Label="Amount" @bind-Value="addAmount" Placeholder="100" />
+                        <Field Label="Viewer" @bind-Value="_addLogin" Placeholder="username" />
+                        <Field Label="Amount" @bind-Value="_addAmount" Placeholder="100" />
                         <button class="btn-secondary" @onclick="AddAsync">Add points</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Take away points</h3>
-                        <Field Label="Viewer" @bind-Value="removeLogin" Placeholder="username" />
-                        <Field Label="Amount" @bind-Value="removeAmount" Placeholder="100, 50%, all" />
+                        <Field Label="Viewer" @bind-Value="_removeLogin" Placeholder="username" />
+                        <Field Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
                     </div>
                 </div>
@@ -122,19 +122,19 @@
             <div class="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">@GiveawaySummary</p>
+                    <p class="mt-1 text-sm text-muted-foreground">@_giveawaySummary</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button class="btn-primary" @onclick="StartGiveawayAsync">Start</button>
-                    <button class="btn-secondary" disabled="@(state.ActiveGiveaway is null)" @onclick="EndGiveawayAsync">End</button>
-                    <button class="btn-secondary" disabled="@(state.ActiveGiveaway is null)" @onclick="CancelGiveawayAsync">Cancel</button>
+                    <button class="btn-secondary" disabled="@(_state.ActiveGiveaway is null)" @onclick="EndGiveawayAsync">End</button>
+                    <button class="btn-secondary" disabled="@(_state.ActiveGiveaway is null)" @onclick="CancelGiveawayAsync">Cancel</button>
                 </div>
             </div>
             <div class="grid gap-5 p-5 lg:grid-cols-2">
                 <div>
                     <h3 class="text-sm font-bold text-slate-950">People who joined</h3>
                     <div class="scroll-panel scroll-panel--tag-cloud mt-3 flex flex-wrap gap-2 pr-2">
-                        @foreach (var entrant in state.ActiveGiveaway?.Entrants ?? [])
+                        @foreach (var entrant in _state.ActiveGiveaway?.Entrants ?? [])
                         {
                             <span @key="entrant" class="motion-list__item surface-row rounded-full px-2.5 py-1 text-xs font-semibold text-slate-700">@entrant</span>
                         }
@@ -143,7 +143,7 @@
                 <div>
                     <h3 class="text-sm font-bold text-slate-950">Winners</h3>
                     <div class="scroll-panel scroll-panel--tag-cloud mt-3 flex flex-wrap gap-2 pr-2">
-                        @foreach (var winner in state.ActiveGiveaway?.Winners ?? [])
+                        @foreach (var winner in _state.ActiveGiveaway?.Winners ?? [])
                         {
                             <span @key="winner" class="motion-list__item rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">@winner.Login: @winner.Payout.ToDisplayString()</span>
                         }
@@ -169,7 +169,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
-                        @foreach (var entry in state.RecentLedger)
+                        @foreach (var entry in _state.RecentLedger)
                         {
                             <tr @key="entry" class="motion-list__item">
                                 <td class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>

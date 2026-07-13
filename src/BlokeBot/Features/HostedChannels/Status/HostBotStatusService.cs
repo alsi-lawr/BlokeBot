@@ -13,7 +13,10 @@ public sealed class HostBotStatusService(
     public async Task<HostBotChannelStatus> GetStatusAsync(
         string channelLogin,
         CancellationToken ct
-    ) => HostBotChannelStatus.FromReadiness(await GetReadinessAsync(channelLogin, ct));
+    )
+    {
+        return HostBotChannelStatus.FromReadiness(await GetReadinessAsync(channelLogin, ct));
+    }
 
     public async Task<HostBotReadinessOutcome> GetReadinessAsync(
         string channelLogin,
@@ -22,7 +25,9 @@ public sealed class HostBotStatusService(
     {
         var configuredFlags = ConfiguredFlags();
         if (!HasAll(configuredFlags, HostBotChannelStatusFlags.ModeratorCheckConfigured))
+        {
             return HostBotReadinessOutcome.NotConfigured();
+        }
 
         try
         {
@@ -80,7 +85,9 @@ public sealed class HostBotStatusService(
     {
         var flags = GrantedFlags(configuredFlags, tokenStatus.GrantedScopes);
         if (!HasAll(flags, HostBotChannelStatusFlags.ModeratorCheckGranted))
+        {
             return HostBotReadinessOutcome.MissingModeratorCheckScope(flags);
+        }
 
         if (
             !string.IsNullOrWhiteSpace(tokenStatus.BotLogin)
@@ -105,7 +112,9 @@ public sealed class HostBotStatusService(
         }
 
         if (string.Equals(tokenStatus.Validation!.UserId, channelId, StringComparison.Ordinal))
+        {
             return ChannelAuthorityReadyOutcome(flags);
+        }
 
         var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
             HelixContext(tokenStatus.AccessToken!),
@@ -136,14 +145,16 @@ public sealed class HostBotStatusService(
 
     private static HostBotReadinessOutcome ChannelAuthorityReadyOutcome(
         HostBotChannelStatusFlags flags
-    ) =>
-        HasAll(
+    )
+    {
+        return HasAll(
             flags,
             HostBotChannelStatusFlags.FollowerReadConfigured
                 | HostBotChannelStatusFlags.FollowerReadGranted
         )
             ? HostBotReadinessOutcome.Ready()
             : HostBotReadinessOutcome.MissingFollowerReadScope(flags);
+    }
 
     public async Task<HostStreamLivenessOutcome> GetStreamLivenessAsync(
         string channelLogin,
@@ -220,7 +231,9 @@ public sealed class HostBotStatusService(
     {
         var status = await GetStatusAsync(channelLogin, ct);
         if (status.ModeratorState != HostBotModeratorState.IsModerator)
+        {
             return FollowerCheckResult.Unavailable;
+        }
 
         var tokenStatus = await GetValidatedUserAccessTokenAsync(channelLogin, ct);
         var token = tokenStatus.AccessToken!;
@@ -299,7 +312,10 @@ public sealed class HostBotStatusService(
     private static bool HasAll(
         HostBotChannelStatusFlags flags,
         HostBotChannelStatusFlags required
-    ) => (flags & required) == required;
+    )
+    {
+        return (flags & required) == required;
+    }
 
     private async Task<ActiveBotAccountTokenStatus> GetValidatedUserAccessTokenAsync(
         string channelLogin,
@@ -312,7 +328,9 @@ public sealed class HostBotStatusService(
             ct
         );
         if (status.AccessToken is not null && status.Validation is not null)
+        {
             return status;
+        }
 
         throw new InvalidOperationException("The Twitch bot runner is not connected.");
     }
@@ -331,11 +349,16 @@ public sealed class HostBotStatusService(
         );
     }
 
-    private TwitchHelixRequestContext HelixContext(string token) =>
-        new(settings.Identity.ClientId, token);
+    private TwitchHelixRequestContext HelixContext(string token)
+    {
+        return new(settings.Identity.ClientId, token);
+    }
 
     private static HostStreamLivenessOutcome.Unavailable Unavailable(
         HostStreamLivenessUnavailableReason reason,
         Exception cause
-    ) => new(reason, cause);
+    )
+    {
+        return new(reason, cause);
+    }
 }

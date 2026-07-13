@@ -148,7 +148,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.ToTable(
                 "site_access_entries",
                 t =>
-                    t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", AccessKinds))
+                    t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", _accessKinds))
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
@@ -180,7 +180,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_host_mod_access_entries_Kind",
-                        KindIn("Kind", AccessKinds)
+                        KindIn("Kind", _accessKinds)
                     )
             );
             b.HasKey(x => x.Id);
@@ -221,7 +221,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_command_aliases_Kind",
-                        KindIn("Kind", CommandAliasKinds)
+                        KindIn("Kind", _commandAliasKinds)
                     )
             );
             b.HasKey(x => x.Id);
@@ -252,7 +252,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_custom_message_library_entries_SelectionMode",
-                        KindIn("SelectionMode", CustomMessageSelectionModes)
+                        KindIn("SelectionMode", _customMessageSelectionModes)
                     )
             );
             b.HasKey(x => x.Id);
@@ -303,7 +303,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_custom_commands_CooldownScope",
-                        KindIn("CooldownScope", CustomCommandCooldownScopes)
+                        KindIn("CooldownScope", _customCommandCooldownScopes)
                     )
             );
             b.HasKey(x => x.Id);
@@ -335,7 +335,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_custom_command_actions_ActionType",
-                        KindIn("ActionType", CustomCommandActionTypes)
+                        KindIn("ActionType", _customCommandActionTypes)
                     );
                     t.HasCheckConstraint(
                         "CK_custom_command_actions_Payload",
@@ -356,14 +356,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<CounterCustomCommandAction>(b =>
-        {
-            b.HasOne(x => x.Counter)
+        modelBuilder.Entity<CounterCustomCommandAction>(b => b.HasOne(x => x.Counter)
                 .WithMany()
                 .HasForeignKey(x => new { x.HostId, x.CounterId })
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
-                .OnDelete(DeleteBehavior.Restrict);
-        });
+                .OnDelete(DeleteBehavior.Restrict));
 
         modelBuilder.Entity<CustomCommandAlias>(b =>
         {
@@ -386,7 +383,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceStatus",
-                        KindIn("OccurrenceStatus", AnnouncementOccurrenceStatuses)
+                        KindIn("OccurrenceStatus", _announcementOccurrenceStatuses)
                     );
                     t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceState",
@@ -478,7 +475,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_custom_announcement_delivery_policies_PolicyType",
-                        KindIn("PolicyType", CustomAnnouncementDeliveryPolicyTypes)
+                        KindIn("PolicyType", _customAnnouncementDeliveryPolicyTypes)
                     );
                     t.HasCheckConstraint(
                         "CK_custom_announcement_delivery_policies_Payload",
@@ -529,7 +526,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_custom_announcement_schedules_ScheduleType",
-                        KindIn("ScheduleType", CustomAnnouncementScheduleTypes)
+                        KindIn("ScheduleType", _customAnnouncementScheduleTypes)
                     );
                     t.HasCheckConstraint(
                         "CK_custom_announcement_schedules_Payload",
@@ -578,7 +575,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_durable_alerts_Severity",
-                        KindIn("Severity", DurableAlertSeverities)
+                        KindIn("Severity", _durableAlertSeverities)
                     )
             );
             b.HasKey(x => x.Id);
@@ -617,7 +614,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_Status",
-                        KindIn("Status", PublicChatOutboxStatuses)
+                        KindIn("Status", _publicChatOutboxStatuses)
                     );
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_AttemptCount",
@@ -639,7 +636,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                         "CK_public_chat_outbox_FailurePhase",
                         KindInOrNull(
                             "FailurePhase",
-                            PublicChatOutboxFailurePhases
+                            _publicChatOutboxFailurePhases
                         )
                     );
                     t.HasCheckConstraint(
@@ -792,7 +789,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_points_settings_GiveawayEligibility",
-                        KindIn("GiveawayEligibility", PointsEligibilityKinds)
+                        KindIn("GiveawayEligibility", _pointsEligibilityKinds)
                     )
             );
             b.HasKey(x => x.Id);
@@ -852,11 +849,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 {
                     t.HasCheckConstraint(
                         "CK_points_giveaways_Status",
-                        KindIn("Status", PointsGiveawayStatusKinds)
+                        KindIn("Status", _pointsGiveawayStatusKinds)
                     );
                     t.HasCheckConstraint(
                         "CK_points_giveaways_Eligibility",
-                        KindIn("Eligibility", PointsEligibilityKinds)
+                        KindIn("Eligibility", _pointsEligibilityKinds)
                     );
                 }
             );
@@ -942,7 +939,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 t =>
                     t.HasCheckConstraint(
                         "CK_guess_rounds_Status",
-                        KindIn("Status", GuessRoundStatusKinds)
+                        KindIn("Status", _guessRoundStatusKinds)
                     )
             );
             b.HasKey(x => x.Id);
@@ -978,62 +975,67 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         });
     }
 
-    private static readonly string[] AccessKinds =
+    private static readonly string[] _accessKinds =
         PersistedEnumTokens<AccessListEntryKind>.Values.ToArray();
 
-    private static readonly string[] AnnouncementOccurrenceStatuses =
+    private static readonly string[] _announcementOccurrenceStatuses =
         PersistedEnumTokens<AnnouncementOccurrenceStatus>.Values.ToArray();
 
-    private static readonly string[] CommandAliasKinds =
+    private static readonly string[] _commandAliasKinds =
         PersistedEnumTokens<AppCommandKind>.Values.ToArray();
 
-    private static readonly string[] CustomAnnouncementScheduleTypes =
+    private static readonly string[] _customAnnouncementScheduleTypes =
     [
         IntervalCustomAnnouncementSchedule.Discriminator,
         IntervalAfterChatCustomAnnouncementSchedule.Discriminator,
         WeeklyCustomAnnouncementSchedule.Discriminator,
     ];
 
-    private static readonly string[] CustomAnnouncementDeliveryPolicyTypes =
+    private static readonly string[] _customAnnouncementDeliveryPolicyTypes =
     [
         nameof(CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip),
     ];
 
-    private static readonly string[] CustomCommandActionTypes =
+    private static readonly string[] _customCommandActionTypes =
     [
         CounterCustomCommandAction.Discriminator,
         MessageCustomCommandAction.Discriminator,
     ];
 
-    private static readonly string[] CustomCommandCooldownScopes =
+    private static readonly string[] _customCommandCooldownScopes =
         PersistedEnumTokens<CustomCommandCooldownScope>.Values.ToArray();
 
-    private static readonly string[] CustomMessageSelectionModes =
+    private static readonly string[] _customMessageSelectionModes =
         PersistedEnumTokens<CustomMessageSelectionMode>.Values.ToArray();
 
-    private static readonly string[] DurableAlertSeverities =
+    private static readonly string[] _durableAlertSeverities =
         PersistedEnumTokens<DurableAlertSeverity>.Values.ToArray();
 
-    private static readonly string[] GuessRoundStatusKinds =
+    private static readonly string[] _guessRoundStatusKinds =
         PersistedEnumTokens<GuessRoundStatus>.Values.ToArray();
 
-    private static readonly string[] PointsEligibilityKinds =
+    private static readonly string[] _pointsEligibilityKinds =
         PersistedEnumTokens<PointsEligibilityMode>.Values.ToArray();
 
-    private static readonly string[] PointsGiveawayStatusKinds =
+    private static readonly string[] _pointsGiveawayStatusKinds =
         PersistedEnumTokens<PointsGiveawayStatus>.Values.ToArray();
 
-    private static readonly string[] PublicChatOutboxStatuses =
+    private static readonly string[] _publicChatOutboxStatuses =
         PersistedEnumTokens<PublicChatOutboxStatus>.Values.ToArray();
 
-    private static readonly string[] PublicChatOutboxFailurePhases =
+    private static readonly string[] _publicChatOutboxFailurePhases =
         PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ToArray();
 
-    private static string KindIn(string columnName, IEnumerable<string> values) =>
-        $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
+    private static string KindIn(string columnName, IEnumerable<string> values)
+    {
+        return $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
+    }
 
     private static string KindInOrNull(
         string columnName,
         IEnumerable<string> values
-    ) => $"{columnName} IS NULL OR {KindIn(columnName, values)}";
+    )
+    {
+        return $"{columnName} IS NULL OR {KindIn(columnName, values)}";
+    }
 }

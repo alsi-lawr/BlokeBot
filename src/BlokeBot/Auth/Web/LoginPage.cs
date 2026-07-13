@@ -4,7 +4,7 @@ namespace BlokeBot.Auth.Web;
 
 internal static class LoginPage
 {
-    private const string ThemeScript = """
+    private const string _themeScript = """
         <script>
             (() => {
                 const storageKey = "blokebot.theme";
@@ -32,7 +32,7 @@ internal static class LoginPage
         </script>
         """;
 
-    private const string LeaderboardScript = """
+    private const string _leaderboardScript = """
         <script>
             document.addEventListener("DOMContentLoaded", () => {
                 const form = document.querySelector("[data-public-leaderboard-form]");
@@ -77,7 +77,7 @@ internal static class LoginPage
                 <meta charset="utf-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>Sign in to BlokeBot</title>
-                {{ThemeScript}}
+                {{_themeScript}}
                 <link rel="stylesheet" href="/app.css" />
             </head>
             <body class="min-h-screen bg-background text-foreground">
@@ -107,7 +107,7 @@ internal static class LoginPage
                         {{errorBlock}}
                     </section>
                 </main>
-                {{LeaderboardScript}}
+                {{_leaderboardScript}}
             </body>
             </html>
             """;

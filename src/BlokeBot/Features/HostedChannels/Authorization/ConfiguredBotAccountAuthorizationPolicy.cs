@@ -104,7 +104,9 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     {
         var tokenCachePath = settings.Identity.TokenCachePath;
         if (!string.IsNullOrWhiteSpace(tokenCachePath) && File.Exists(tokenCachePath))
+        {
             File.Delete(tokenCachePath);
+        }
 
         await tokenCache.ClearAsync(ct);
         await changes.NotifyChangedAsync(ct);
@@ -116,7 +118,9 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     )
     {
         if (string.IsNullOrWhiteSpace(status.AccessToken))
+        {
             return null;
+        }
 
         var user = await helix.GetCurrentUserAsync(
             new TwitchHelixRequestContext(settings.Identity.ClientId, status.AccessToken),

@@ -12,13 +12,18 @@ public enum PointAmountArgumentKind
 
 public static class PointAmountArgumentParser
 {
-    public static PointAmount ParseAbsoluteOnly(string? value) => PointAmount.ParseAbsolute(value);
+    public static PointAmount ParseAbsoluteOnly(string? value)
+    {
+        return PointAmount.ParseAbsolute(value);
+    }
 
     public static PointAmount ParseSpendAmount(string? value, PointAmount sourceBalance)
     {
         var text = (value ?? string.Empty).Trim();
         if (text.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
             return RejectZero(sourceBalance);
+        }
 
         if (text.EndsWith('%'))
         {
@@ -50,7 +55,9 @@ public static class PointAmountArgumentParser
     private static PointAmount RejectZero(PointAmount amount)
     {
         if (amount.IsZero)
+        {
             throw new FormatException("Point amount must be greater than zero.");
+        }
 
         return amount;
     }

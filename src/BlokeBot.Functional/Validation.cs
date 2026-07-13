@@ -11,34 +11,45 @@ public sealed record Validation<T, TError>
         _state = state;
     }
 
-    public static Validation<T, TError> Valid(T value) => new(new ValidState(value));
+    public static Validation<T, TError> Valid(T value)
+    {
+        return new(new ValidState(value));
+    }
 
     public static Validation<T, TError> Invalid(
         TError firstError,
         params TError[] additionalErrors
-    ) =>
-        new(
+    )
+    {
+        return new(
             new InvalidState(
                 NonEmptyValidationErrors<TError>.Create(firstError, additionalErrors)
             )
         );
+    }
 
     public TResult Match<TResult>(
         Func<T, TResult> valid,
         Func<IReadOnlyList<TError>, TResult> invalid
-    ) => MatchState(valid, errors => invalid(errors));
+    )
+    {
+        return MatchState(valid, errors => invalid(errors));
+    }
 
-    public Validation<TMapped, TError> Map<TMapped>(Func<T, TMapped> map) =>
-        MatchState(
+    public Validation<TMapped, TError> Map<TMapped>(Func<T, TMapped> map)
+    {
+        return MatchState(
             value => Validation<TMapped, TError>.Valid(map(value)),
             Validation<TMapped, TError>.FromInvalid
         );
+    }
 
     public Validation<TResult, TError> Combine<TOther, TResult>(
         Validation<TOther, TError> other,
         Func<T, TOther, TResult> combine
-    ) =>
-        MatchState(
+    )
+    {
+        return MatchState(
             first =>
                 other.MatchState(
                     second => Validation<TResult, TError>.Valid(combine(first, second)),
@@ -53,23 +64,32 @@ public sealed record Validation<T, TError>
                         )
                 )
         );
+    }
 
     public Result<T, TAggregateError> ToResult<TAggregateError>(
         Func<IReadOnlyList<TError>, TAggregateError> aggregateErrors
-    ) =>
-        MatchState(
+    )
+    {
+        return MatchState(
             Result<T, TAggregateError>.Success,
             errors => Result<T, TAggregateError>.Error(aggregateErrors(errors))
         );
+    }
 
     private static Validation<T, TError> FromInvalid(
         NonEmptyValidationErrors<TError> errors
-    ) => new(new InvalidState(errors));
+    )
+    {
+        return new(new InvalidState(errors));
+    }
 
     private TResult MatchState<TResult>(
         Func<T, TResult> valid,
         Func<NonEmptyValidationErrors<TError>, TResult> invalid
-    ) => _state.Match(valid, invalid);
+    )
+    {
+        return _state.Match(valid, invalid);
+    }
 
     private abstract record ValidationState
     {
@@ -84,7 +104,10 @@ public sealed record Validation<T, TError>
         public override TResult Match<TResult>(
             Func<T, TResult> valid,
             Func<NonEmptyValidationErrors<TError>, TResult> _
-        ) => valid(Value);
+        )
+        {
+            return valid(Value);
+        }
     }
 
     private sealed record InvalidState(NonEmptyValidationErrors<TError> Errors) : ValidationState
@@ -92,7 +115,10 @@ public sealed record Validation<T, TError>
         public override TResult Match<TResult>(
             Func<T, TResult> _,
             Func<NonEmptyValidationErrors<TError>, TResult> invalid
-        ) => invalid(Errors);
+        )
+        {
+            return invalid(Errors);
+        }
     }
 }
 
@@ -132,10 +158,15 @@ internal sealed class NonEmptyValidationErrors<TError>
         return new(errors);
     }
 
-    public IEnumerator<TError> GetEnumerator() =>
-        ((IEnumerable<TError>)_errors).GetEnumerator();
+    public IEnumerator<TError> GetEnumerator()
+    {
+        return ((IEnumerable<TError>)_errors).GetEnumerator();
+    }
 
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
 
     public bool Equals(NonEmptyValidationErrors<TError>? other)
     {
@@ -161,8 +192,10 @@ internal sealed class NonEmptyValidationErrors<TError>
         return true;
     }
 
-    public override bool Equals(object? obj) =>
-        obj is NonEmptyValidationErrors<TError> other && Equals(other);
+    public override bool Equals(object? obj)
+    {
+        return obj is NonEmptyValidationErrors<TError> other && Equals(other);
+    }
 
     public override int GetHashCode()
     {

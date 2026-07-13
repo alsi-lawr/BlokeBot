@@ -1,17 +1,17 @@
 @using BlokeBot.Twitch
-@inject NavigationManager Navigation
+@inject NavigationManager _navigation
 
 <div class="@ContainerClass">
     <p class="text-sm font-bold text-slate-950">Public leaderboard</p>
     <div class="mt-3 grid gap-3">
-        <select class="input" aria-label="Leaderboard feature" @bind="feature">
+        <select class="input" aria-label="Leaderboard feature" @bind="_feature">
             <option value="guessing">Guessing</option>
             <option value="points">Points</option>
         </select>
-        <input class="input" placeholder="channel" aria-label="Channel" @bind="channel" @bind:event="oninput" />
+        <input class="input" placeholder="channel" aria-label="Channel" @bind="_channel" @bind:event="oninput" />
         <button class="btn-secondary h-10 w-full disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
-                disabled="@(!CanNavigate)"
+                disabled="@(!_canNavigate)"
                 @onclick="OpenLeaderboard">
             View leaderboard
         </button>
@@ -19,9 +19,9 @@
 </div>
 
 @code {
-    private string channel = string.Empty;
-    private string feature = "guessing";
-    private string? normalizedInitialChannel;
+    private string _channel = string.Empty;
+    private string _feature = "guessing";
+    private string? _normalizedInitialChannel;
 
     [Parameter]
     public string ContainerClass { get; set; } = "mt-6 border-t border-slate-200 pt-5";
@@ -29,26 +29,32 @@
     [Parameter]
     public string? InitialChannel { get; set; }
 
-    private bool CanNavigate => NormalizedChannel.Length > 0;
+    private bool _canNavigate => _normalizedChannel.Length > 0;
 
-    private string NormalizedChannel => TwitchLogin.Normalize(channel);
+    private string _normalizedChannel => TwitchLogin.Normalize(_channel);
 
     protected override void OnParametersSet()
     {
         var normalized = TwitchLogin.Normalize(InitialChannel);
-        if (normalized.Length == 0 || normalized == normalizedInitialChannel)
+        if (normalized.Length == 0 || normalized == _normalizedInitialChannel)
+        {
             return;
+        }
 
-        normalizedInitialChannel = normalized;
-        if (string.IsNullOrWhiteSpace(channel))
-            channel = normalized;
+        _normalizedInitialChannel = normalized;
+        if (string.IsNullOrWhiteSpace(_channel))
+        {
+            _channel = normalized;
+        }
     }
 
     private void OpenLeaderboard()
     {
-        if (!CanNavigate)
+        if (!_canNavigate)
+        {
             return;
+        }
 
-        Navigation.NavigateTo($"/{feature}/leaderboard/{Uri.EscapeDataString(NormalizedChannel)}");
+        _navigation.NavigateTo($"/{_feature}/leaderboard/{Uri.EscapeDataString(_normalizedChannel)}");
     }
 }

@@ -13,7 +13,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class PublicChatMessageQueueTests
 {
-    private static readonly PublicChatRetryPolicy StandardRetryPolicy = new()
+    private static readonly PublicChatRetryPolicy _standardRetryPolicy = new()
     {
         AttemptLimit = 3,
         Delay = TimeSpan.FromSeconds(1),
@@ -81,7 +81,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task MessageOverLength_Enqueueing_PersistsEveryPartBeforeDelivery()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var queue = CreateQueue(
             new TwitchBotOptions
@@ -115,7 +115,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task DuplicateAndDistinctMessages_Processing_DelaysOnlyDuplicate()
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var queue = CreateQueue(
             new TwitchBotOptions
@@ -149,7 +149,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task RepeatedAndLaterBackups_MonitoringPublicChatQueue_AlertsOncePerIncident()
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var observer = new RecordingQueueAlertObserver();
         var queue = CreateQueue(
@@ -262,7 +262,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task AlertHandlingEscalation_ProcessingPublicChatQueue_ContinuesDelivery()
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var queue = CreateQueue(
@@ -317,7 +317,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task PersistenceFailure_Enqueueing_IsObservableWithoutDelivery()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy)
+        var outbox = new InMemoryOutbox(_standardRetryPolicy)
         {
             EnqueueFailure = new IOException("Persistence unavailable."),
         };
@@ -338,7 +338,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task CallerCanceledAfterCommit_Enqueueing_LeavesDeliveryRecoverable()
     {
         using var caller = new CancellationTokenSource();
-        var outbox = new InMemoryOutbox(StandardRetryPolicy)
+        var outbox = new InMemoryOutbox(_standardRetryPolicy)
         {
             AfterEnqueue = caller.Cancel,
         };
@@ -359,7 +359,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task SentResult_Processing_DeletesAfterOneSendAttempt()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = SuccessfulScriptedTransport();
         var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
         _ = await queue.EnqueueAsync(Command("channel", "message"), CancellationToken.None);
@@ -383,7 +383,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
         var failure = new IOException("secret preparation detail");
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
                 ValueTask.FromResult(
@@ -423,7 +423,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task SafePreparationFailure_ThenReady_Processing_RetriesAfterConfiguredSchedule()
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var preparationCalls = 0;
         var transport = new ScriptedTransport(
             (message, cancellationToken) =>
@@ -519,7 +519,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task UnexpectedPreparationFailure_Processing_RedactsTerminalWithoutSendAttempt()
     {
         var failure = new InvalidOperationException("secret preparation detail");
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
                 ValueTask.FromResult(
@@ -550,7 +550,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task UnexpectedPreparationFailure_Reporting_UsesOnlyRedactedStructuredContext()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
@@ -590,7 +590,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task ExplicitRejection_Processing_RecordsRedactedTerminalAfterSendBoundary()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             Ready,
             static (_, _) =>
@@ -622,7 +622,7 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public async Task PostBoundaryTransientFailure_Processing_IsAmbiguousWithoutRetry()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             Ready,
             static (_, _) =>
@@ -650,7 +650,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task CallerCanceledDuringPreparation_Processing_ReleasesPendingWithoutAttempt()
     {
         using var stopping = new CancellationTokenSource();
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
             {
@@ -678,7 +678,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task CallerCanceledAfterSendBoundary_Processing_PersistsAmbiguousAndPropagatesToWorker()
     {
         using var stopping = new CancellationTokenSource();
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new ScriptedTransport(
             Ready,
             (_, cancellationToken) =>
@@ -705,7 +705,7 @@ public sealed class PublicChatMessageQueueTests
     public async Task SafePreparationFailure_MonitoringOutstandingBacklog_StillRaisesAlert()
     {
         var clock = new ManualTimeProvider(Utc(12, 0, 0));
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var observer = new RecordingQueueAlertObserver();
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
@@ -758,8 +758,9 @@ public sealed class PublicChatMessageQueueTests
             PublicChatQueueAlertDeadLetter
         >? fanOut = null,
         ILogger<PublicChatMessageQueue>? logger = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             TwitchBotSettings.FromOptions(options),
             timeProvider ?? TimeProvider.System,
             new PublicChatQueueBacklogMonitor(),
@@ -771,28 +772,33 @@ public sealed class PublicChatMessageQueueTests
             transport,
             logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
+    }
 
     private static PublicChatEnqueueCommand Command(
         string channel,
         string message
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Channel = channel,
             Message = message,
             Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
         };
+    }
 
     private static PublicChatPreparedSend Prepared(
         PublicChatClaimedMessage message
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Message = message,
             AppAccessToken = "app-token",
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
+    }
 
     private static ValueTask<PublicChatPreparationOutcome> Ready(
         PublicChatClaimedMessage message,
@@ -805,8 +811,9 @@ public sealed class PublicChatMessageQueueTests
         );
     }
 
-    private static ScriptedTransport SuccessfulScriptedTransport() =>
-        new(
+    private static ScriptedTransport SuccessfulScriptedTransport()
+    {
+        return new(
             Ready,
             static (_, cancellationToken) =>
             {
@@ -816,17 +823,20 @@ public sealed class PublicChatMessageQueueTests
                 );
             }
         );
+    }
 
     private static ObserverFanOut<
         PublicChatQueueAlertObserverBoundary,
         PublicChatQueueBacklog,
         PublicChatQueueAlertDeadLetter
-    > QueueAlertFanOut() =>
-        RuntimeTestObserverFanOut.Continue<
+    > QueueAlertFanOut()
+    {
+        return RuntimeTestObserverFanOut.Continue<
             PublicChatQueueAlertObserverBoundary,
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
+    }
 
     private static async Task StopAsync(
         CancellationTokenSource stopping,
@@ -837,12 +847,14 @@ public sealed class PublicChatMessageQueueTests
         await worker;
     }
 
-    private static DateTimeOffset Utc(int hour, int minute, int second) =>
-        new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+    private static DateTimeOffset Utc(int hour, int minute, int second)
+    {
+        return new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+    }
 
     private sealed class RecordingTransport : IPublicChatTransport
     {
-        private readonly Channel<PublicChatClaimedMessage> delivered =
+        private readonly Channel<PublicChatClaimedMessage> _delivered =
             Channel.CreateUnbounded<PublicChatClaimedMessage>();
 
         public List<PublicChatClaimedMessage> Deliveries { get; } = [];
@@ -850,13 +862,15 @@ public sealed class PublicChatMessageQueueTests
         public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
             PublicChatClaimedMessage message,
             CancellationToken cancellationToken
-        ) =>
-            ValueTask.FromResult<PublicChatPreparationOutcome>(
+        )
+        {
+            return ValueTask.FromResult<PublicChatPreparationOutcome>(
                 new PublicChatPreparationOutcome.Ready
                 {
                     Send = Prepared(message),
                 }
             );
+        }
 
         public ValueTask<PublicChatTransportSendResult> SendAsync(
             PublicChatPreparedSend prepared,
@@ -865,15 +879,20 @@ public sealed class PublicChatMessageQueueTests
         {
             var message = prepared.Message;
             Deliveries.Add(message);
-            if (!delivered.Writer.TryWrite(message))
+            if (!_delivered.Writer.TryWrite(message))
+            {
                 throw new InvalidOperationException("The transport delivery could not be observed.");
+            }
 
             return ValueTask.FromResult<PublicChatTransportSendResult>(
                 new PublicChatTransportSendResult.Sent()
             );
         }
 
-        public ValueTask<PublicChatClaimedMessage> ReadAsync() => delivered.Reader.ReadAsync();
+        public ValueTask<PublicChatClaimedMessage> ReadAsync()
+        {
+            return _delivered.Reader.ReadAsync();
+        }
     }
 
     private sealed class ScriptedTransport(
@@ -914,7 +933,7 @@ public sealed class PublicChatMessageQueueTests
 
     private sealed class RecordingQueueAlertObserver : IPublicChatQueueAlertObserver
     {
-        private readonly Channel<PublicChatQueueBacklog> alerts =
+        private readonly Channel<PublicChatQueueBacklog> _alerts =
             Channel.CreateUnbounded<PublicChatQueueBacklog>();
 
         public List<PublicChatQueueBacklog> Alerts { get; } = [];
@@ -925,13 +944,18 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             Alerts.Add(backlog);
-            if (!alerts.Writer.TryWrite(backlog))
+            if (!_alerts.Writer.TryWrite(backlog))
+            {
                 throw new InvalidOperationException("The queue alert could not be observed.");
+            }
 
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask<PublicChatQueueBacklog> ReadAsync() => alerts.Reader.ReadAsync();
+        public ValueTask<PublicChatQueueBacklog> ReadAsync()
+        {
+            return _alerts.Reader.ReadAsync();
+        }
     }
 
     private sealed class ThrowingQueueAlertObserver(string failureMessage)
@@ -940,21 +964,24 @@ public sealed class PublicChatMessageQueueTests
         public ValueTask QueueBackedUpAsync(
             PublicChatQueueBacklog backlog,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException(failureMessage);
+        )
+        {
+            throw new InvalidOperationException(failureMessage);
+        }
     }
 
     private sealed class InMemoryOutbox(PublicChatRetryPolicy retryPolicy)
         : IPublicChatOutbox
     {
-        private readonly object gate = new();
-        private readonly List<Row> rows = [];
-        private readonly List<Delivery> deliveries = [];
-        private readonly Channel<RowStatus> completions =
+        private readonly object _gate = new();
+        private readonly List<Row> _rows = [];
+        private readonly List<Delivery> _deliveries = [];
+        private readonly Channel<RowStatus> _completions =
             Channel.CreateUnbounded<RowStatus>();
-        private readonly PublicChatRetryPolicy safePreSendRetryPolicy =
+        private readonly PublicChatRetryPolicy _safePreSendRetryPolicy =
             retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
-        private long nextId = 1;
-        private OutboxSnapshot? lastDeletedSnapshot;
+        private long _nextId = 1;
+        private OutboxSnapshot? _lastDeletedSnapshot;
 
         public Action? AfterEnqueue { get; init; }
 
@@ -964,9 +991,9 @@ public sealed class PublicChatMessageQueueTests
         {
             get
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    return rows
+                    return _rows
                         .Where(row => row.Status == RowStatus.Pending)
                         .Select(row => row.Message!)
                         .ToArray();
@@ -978,19 +1005,22 @@ public sealed class PublicChatMessageQueueTests
         {
             get
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    if (rows.Count == 0)
-                        return lastDeletedSnapshot.ShouldNotBeNull();
+                    if (_rows.Count == 0)
+                    {
+                        return _lastDeletedSnapshot.ShouldNotBeNull();
+                    }
 
-                    var row = rows.ShouldHaveSingleItem();
+                    var row = _rows.ShouldHaveSingleItem();
                     return Snapshot(row);
                 }
             }
         }
 
-        private static OutboxSnapshot Snapshot(Row row) =>
-            new()
+        private static OutboxSnapshot Snapshot(Row row)
+        {
+            return new()
             {
                 Status = row.Status,
                 AttemptCount = row.AttemptCount,
@@ -998,9 +1028,12 @@ public sealed class PublicChatMessageQueueTests
                 NextAttemptAt = row.NextAttemptAt,
                 Message = row.Message,
             };
+        }
 
-        public ValueTask<RowStatus> ReadCompletionAsync() =>
-            completions.Reader.ReadAsync();
+        public ValueTask<RowStatus> ReadCompletionAsync()
+        {
+            return _completions.Reader.ReadAsync();
+        }
 
         public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
             PublicChatOutboxBatch batch,
@@ -1009,16 +1042,18 @@ public sealed class PublicChatMessageQueueTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (EnqueueFailure is { } failure)
+            {
                 throw failure;
+            }
 
             long[] ids;
-            lock (gate)
+            lock (_gate)
             {
                 ids = batch.Items
                     .Select(item =>
                     {
-                        var id = nextId++;
-                        rows.Add(new Row(id, batch.Channel, item, batch.EnqueuedAt));
+                        var id = _nextId++;
+                        _rows.Add(new Row(id, batch.Channel, item, batch.EnqueuedAt));
                         return id;
                     })
                     .ToArray();
@@ -1041,9 +1076,9 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
-                var active = rows.FirstOrDefault(row =>
+                var active = _rows.FirstOrDefault(row =>
                     row.Status is RowStatus.Claimed or RowStatus.Sending
                 );
                 if (active is not null)
@@ -1053,18 +1088,18 @@ public sealed class PublicChatMessageQueueTests
                     );
                 }
 
-                var previousAttempt = rows
+                var previousAttempt = _rows
                     .Where(row => row.CompletedAt is not null && row.AttemptCount > 0)
                     .Select(row => row.CompletedAt!.Value)
                     .DefaultIfEmpty(DateTimeOffset.MinValue)
                     .Append(
-                        deliveries
+                        _deliveries
                             .Select(delivery => delivery.CompletedAt)
                             .DefaultIfEmpty(DateTimeOffset.MinValue)
                             .Max()
                     )
                     .Max();
-                var claimable = rows
+                var claimable = _rows
                     .Where(row =>
                         row.Status is RowStatus.Pending or RowStatus.SafePreSendTransient
                     )
@@ -1072,8 +1107,11 @@ public sealed class PublicChatMessageQueueTests
                     {
                         var eligibleAt = row.NextAttemptAt;
                         if (previousAttempt != DateTimeOffset.MinValue)
+                        {
                             eligibleAt = Max(eligibleAt, previousAttempt + sendInterval);
-                        var previousDelivery = deliveries
+                        }
+
+                        var previousDelivery = _deliveries
                             .Where(delivery =>
                                 delivery.DeduplicationKey == row.Item.DeduplicationKey
                             )
@@ -1126,13 +1164,15 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Claimed);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 row.Status = RowStatus.Sending;
                 row.AttemptCount++;
@@ -1148,8 +1188,9 @@ public sealed class PublicChatMessageQueueTests
             PublicChatDeliveryOutcome outcome,
             DateTimeOffset recordedAt,
             CancellationToken cancellationToken
-        ) =>
-            outcome.Match(
+        )
+        {
+            return outcome.Match(
                 _ => DeleteSending(message, recordedAt, cancellationToken),
                 _ => RecordSafePreSendTransient(
                     message,
@@ -1165,13 +1206,17 @@ public sealed class PublicChatMessageQueueTests
                     cancellationToken
                 )
             );
+        }
 
         public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
             PublicChatClaimedMessage message,
             PublicChatFailureDiagnostic.Send diagnostic,
             DateTimeOffset interruptedAt,
             CancellationToken cancellationToken
-        ) => CompleteSending(message, RowStatus.Ambiguous, interruptedAt, cancellationToken);
+        )
+        {
+            return CompleteSending(message, RowStatus.Ambiguous, interruptedAt, cancellationToken);
+        }
 
         public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
             PublicChatClaimedMessage message,
@@ -1180,13 +1225,15 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Claimed);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 row.Status = row.SafePreSendFailureCount > 0
                     ? RowStatus.SafePreSendTransient
@@ -1204,9 +1251,9 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
-                IReadOnlyList<PublicChatPendingMessage> pending = rows
+                IReadOnlyList<PublicChatPendingMessage> pending = _rows
                     .Where(row =>
                         row.Status == RowStatus.Sending
                         || (
@@ -1233,13 +1280,15 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Sending);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 row.Status = status;
                 row.CompletedAt = completedAt;
@@ -1259,21 +1308,23 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Sending);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 row.Status = RowStatus.SentAndDeleted;
                 row.CompletedAt = completedAt;
                 row.Message = null;
                 row.ClaimToken = null;
-                lastDeletedSnapshot = Snapshot(row);
-                deliveries.Add(new Delivery(row.Item.DeduplicationKey, completedAt));
-                rows.Remove(row);
+                _lastDeletedSnapshot = Snapshot(row);
+                _deliveries.Add(new Delivery(row.Item.DeduplicationKey, completedAt));
+                _rows.Remove(row);
                 NotifyCompletion(RowStatus.SentAndDeleted);
                 return ValueTask.FromResult<PublicChatClaimUpdate>(
                     new PublicChatClaimUpdate.Applied()
@@ -1288,16 +1339,18 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Claimed);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 var decision = PublicChatSafePreSendRetrySchedule.Create(
-                    safePreSendRetryPolicy,
+                    _safePreSendRetryPolicy,
                     new PublicChatSafePreSendFailureCount(
                         row.SafePreSendFailureCount
                     ),
@@ -1337,14 +1390,16 @@ public sealed class PublicChatMessageQueueTests
             RowStatus status,
             DateTimeOffset completedAt,
             CancellationToken cancellationToken
-        ) =>
-            CompleteClaimed(
+        )
+        {
+            return CompleteClaimed(
                 message,
                 status,
                 completedAt,
                 static row => row.Message = null,
                 cancellationToken
             );
+        }
 
         private ValueTask<PublicChatClaimUpdate> CompleteClaimed(
             PublicChatClaimedMessage message,
@@ -1355,13 +1410,15 @@ public sealed class PublicChatMessageQueueTests
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            lock (gate)
+            lock (_gate)
             {
                 var row = Owned(message, RowStatus.Claimed);
                 if (row is null)
+                {
                     return ValueTask.FromResult<PublicChatClaimUpdate>(
                         new PublicChatClaimUpdate.OwnershipLost()
                     );
+                }
 
                 row.Status = status;
                 row.CompletedAt = completedAt;
@@ -1374,16 +1431,18 @@ public sealed class PublicChatMessageQueueTests
             }
         }
 
-        private Row? Owned(PublicChatClaimedMessage message, RowStatus status) =>
-            rows.SingleOrDefault(row =>
+        private Row? Owned(PublicChatClaimedMessage message, RowStatus status)
+        {
+            return _rows.SingleOrDefault(row =>
                 row.Id == message.Id
                 && row.Status == status
                 && row.ClaimToken == message.ClaimToken
             );
+        }
 
         private void NotifyCompletion(RowStatus status)
         {
-            if (!completions.Writer.TryWrite(status))
+            if (!_completions.Writer.TryWrite(status))
             {
                 throw new InvalidOperationException(
                     "The public chat outcome could not be observed."
@@ -1391,8 +1450,10 @@ public sealed class PublicChatMessageQueueTests
             }
         }
 
-        private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right) =>
-            left >= right ? left : right;
+        private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right)
+        {
+            return left >= right ? left : right;
+        }
 
         private sealed class Row(
             long id,
@@ -1427,8 +1488,9 @@ public sealed class PublicChatMessageQueueTests
 
             public DateTimeOffset? CompletedAt { get; set; }
 
-            public PublicChatClaimedMessage Claimed(PublicChatClaimToken token) =>
-                new()
+            public PublicChatClaimedMessage Claimed(PublicChatClaimToken token)
+            {
+                return new()
                 {
                     Id = Id,
                     Channel = Channel,
@@ -1440,6 +1502,7 @@ public sealed class PublicChatMessageQueueTests
                     ClaimExpiresAt = ClaimExpiresAt,
                     DeduplicationKey = Item.DeduplicationKey,
                 };
+            }
         }
 
         private sealed record Candidate(Row Row, DateTimeOffset EligibleAt);
@@ -1480,9 +1543,15 @@ public sealed class PublicChatMessageQueueTests
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
+            where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -1490,28 +1559,36 @@ public sealed class PublicChatMessageQueueTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        ) => Entries.Add(new LogEntry(formatter(state, exception), exception));
+        )
+        {
+            Entries.Add(new LogEntry(formatter(state, exception), exception));
+        }
     }
 
     private sealed record LogEntry(string Message, Exception? Exception);
 
     private sealed class ManualTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
-        private readonly object gate = new();
-        private readonly List<ManualTimer> timers = [];
-        private readonly Channel<ManualTimer> timerRegistrations =
+        private readonly object _gate = new();
+        private readonly List<ManualTimer> _timers = [];
+        private readonly Channel<ManualTimer> _timerRegistrations =
             Channel.CreateUnbounded<ManualTimer>();
-        private DateTimeOffset now = initialNow;
+        private DateTimeOffset _now = initialNow;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
         public override DateTimeOffset GetUtcNow()
         {
-            lock (gate)
-                return now;
+            lock (_gate)
+            {
+                return _now;
+            }
         }
 
-        public override long GetTimestamp() => GetUtcNow().UtcTicks;
+        public override long GetTimestamp()
+        {
+            return GetUtcNow().UtcTicks;
+        }
 
         public override ITimer CreateTimer(
             TimerCallback callback,
@@ -1528,27 +1605,31 @@ public sealed class PublicChatMessageQueueTests
         public void Advance(TimeSpan delta)
         {
             List<ManualTimer> due;
-            lock (gate)
+            lock (_gate)
             {
-                now = now.Add(delta);
-                due = timers.Where(timer => timer.IsDue(now)).ToList();
+                _now = _now.Add(delta);
+                due = _timers.Where(timer => timer.IsDue(_now)).ToList();
             }
 
             foreach (var timer in due)
+            {
                 timer.Fire();
+            }
         }
 
         public async ValueTask WaitForTimerRegistrationAsync()
         {
             while (true)
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    if (timers.Count > 0)
+                    if (_timers.Count > 0)
+                    {
                         return;
+                    }
                 }
 
-                _ = await timerRegistrations.Reader.ReadAsync();
+                _ = await _timerRegistrations.Reader.ReadAsync();
             }
         }
 
@@ -1556,35 +1637,43 @@ public sealed class PublicChatMessageQueueTests
         {
             while (true)
             {
-                lock (gate)
+                lock (_gate)
                 {
-                    if (timers.Any(timer => timer.IsScheduledAt(dueAt)))
+                    if (_timers.Any(timer => timer.IsScheduledAt(dueAt)))
+                    {
                         return;
+                    }
                 }
 
-                _ = await timerRegistrations.Reader.ReadAsync();
+                _ = await _timerRegistrations.Reader.ReadAsync();
             }
         }
 
         private void AddTimer(ManualTimer timer)
         {
-            lock (gate)
+            lock (_gate)
             {
-                if (!timers.Contains(timer))
-                    timers.Add(timer);
+                if (!_timers.Contains(timer))
+                {
+                    _timers.Add(timer);
+                }
 
-                if (!timerRegistrations.Writer.TryWrite(timer))
+                if (!_timerRegistrations.Writer.TryWrite(timer))
+                {
                     throw new InvalidOperationException("The timer observer could not be notified.");
+                }
             }
         }
 
         private void RemoveTimer(ManualTimer timer)
         {
-            lock (gate)
-                timers.Remove(timer);
+            lock (_gate)
+            {
+                _timers.Remove(timer);
+            }
         }
 
-        private DateTimeOffset CurrentNowLocked => now;
+        private DateTimeOffset _currentNowLocked => _now;
 
         private sealed class ManualTimer(
             ManualTimeProvider owner,
@@ -1592,38 +1681,44 @@ public sealed class PublicChatMessageQueueTests
             object? state
         ) : ITimer
         {
-            private TimeSpan period;
-            private DateTimeOffset dueAt = DateTimeOffset.MaxValue;
-            private bool disposed;
+            private TimeSpan _period;
+            private DateTimeOffset _dueAt = DateTimeOffset.MaxValue;
+            private bool _disposed;
 
             public bool Change(TimeSpan dueTime, TimeSpan period)
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (disposed)
+                    if (_disposed)
+                    {
                         return false;
+                    }
 
-                    this.period = period;
-                    dueAt = dueTime == Timeout.InfiniteTimeSpan
+                    _period = period;
+                    _dueAt = dueTime == Timeout.InfiniteTimeSpan
                         ? DateTimeOffset.MaxValue
-                        : owner.CurrentNowLocked.Add(dueTime);
+                        : owner._currentNowLocked.Add(dueTime);
                     owner.AddTimer(this);
                 }
 
                 if (dueTime != Timeout.InfiniteTimeSpan && dueTime <= TimeSpan.Zero)
+                {
                     Fire();
+                }
 
                 return true;
             }
 
             public void Dispose()
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (disposed)
+                    if (_disposed)
+                    {
                         return;
+                    }
 
-                    disposed = true;
+                    _disposed = true;
                     owner.RemoveTimer(this);
                 }
             }
@@ -1636,28 +1731,36 @@ public sealed class PublicChatMessageQueueTests
 
             public bool IsDue(DateTimeOffset value)
             {
-                lock (owner.gate)
-                    return !disposed && dueAt <= value;
+                lock (owner._gate)
+                {
+                    return !_disposed && _dueAt <= value;
+                }
             }
 
             public bool IsScheduledAt(DateTimeOffset value)
             {
-                lock (owner.gate)
-                    return !disposed && dueAt == value;
+                lock (owner._gate)
+                {
+                    return !_disposed && _dueAt == value;
+                }
             }
 
             public void Fire()
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (disposed || dueAt > owner.CurrentNowLocked)
+                    if (_disposed || _dueAt > owner._currentNowLocked)
+                    {
                         return;
+                    }
 
-                    if (period > TimeSpan.Zero && period != Timeout.InfiniteTimeSpan)
-                        dueAt = owner.CurrentNowLocked.Add(period);
+                    if (_period > TimeSpan.Zero && _period != Timeout.InfiniteTimeSpan)
+                    {
+                        _dueAt = owner._currentNowLocked.Add(_period);
+                    }
                     else
                     {
-                        disposed = true;
+                        _disposed = true;
                         owner.RemoveTimer(this);
                     }
                 }

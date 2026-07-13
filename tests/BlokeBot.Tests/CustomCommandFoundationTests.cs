@@ -86,8 +86,9 @@ public sealed class CustomCommandFoundationTests
         timeZone.ShouldBe("UTC");
     }
 
-    private static CustomMessageLibraryEntry MessageEntry(int hostId, string name) =>
-        new()
+    private static CustomMessageLibraryEntry MessageEntry(int hostId, string name)
+    {
+        return new()
         {
             HostId = hostId,
             Name = name,
@@ -102,6 +103,7 @@ public sealed class CustomCommandFoundationTests
                 },
             ],
         };
+    }
 
     private static async Task<int> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,

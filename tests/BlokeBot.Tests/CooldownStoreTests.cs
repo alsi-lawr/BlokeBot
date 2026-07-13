@@ -55,10 +55,16 @@ public sealed class CooldownStoreTests
 
     private sealed class ManualTimeProvider : TimeProvider
     {
-        private DateTimeOffset now = new(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        private DateTimeOffset _now = new(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
 
-        public override DateTimeOffset GetUtcNow() => now;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _now;
+        }
 
-        public void Advance(TimeSpan value) => now += value;
+        public void Advance(TimeSpan value)
+        {
+            _now += value;
+        }
     }
 }

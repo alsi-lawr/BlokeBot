@@ -67,10 +67,12 @@ public sealed class CommandStrategyDispatcherTests
         public ValueTask<CommandRoute<TestKind, string>?> ResolveAsync(
             TwitchCommandContext context,
             CancellationToken cancellationToken
-        ) =>
-            ValueTask.FromResult<CommandRoute<TestKind, string>?>(
+        )
+        {
+            return ValueTask.FromResult<CommandRoute<TestKind, string>?>(
                 new CommandRoute<TestKind, string>(kind, state)
             );
+        }
     }
 
     private sealed class TestStrategy(TestKind kind, bool requiresModerator)
@@ -85,7 +87,10 @@ public sealed class CommandStrategyDispatcherTests
         public ValueTask<string> ModeratorOnlyReplyAsync(
             CommandStrategyContext<TestKind, string> context,
             CancellationToken cancellationToken
-        ) => ValueTask.FromResult("mods only");
+        )
+        {
+            return ValueTask.FromResult("mods only");
+        }
 
         public async ValueTask ExecuteAsync(
             CommandStrategyContext<TestKind, string> context,
@@ -99,19 +104,23 @@ public sealed class CommandStrategyDispatcherTests
         }
     }
 
-    private static TwitchChatMessage Message(string login, string text) =>
-        new(
+    private static TwitchChatMessage Message(string login, string text)
+    {
+        return new(
             login,
             "channel",
             text,
             $":{login}!u@h PRIVMSG #channel :{text}",
             new Dictionary<string, string>()
         );
+    }
 
-    private static TwitchCommandResponder ReplyTo(List<string> replies) =>
-        (response, _) =>
+    private static TwitchCommandResponder ReplyTo(List<string> replies)
+    {
+        return (response, _) =>
         {
             replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
+    }
 }

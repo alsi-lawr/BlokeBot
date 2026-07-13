@@ -33,8 +33,9 @@ public sealed record HostBotChannelStatus(
         )
         && ModeratorState == HostBotModeratorState.IsModerator;
 
-    public static HostBotChannelStatus FromReadiness(HostBotReadinessOutcome outcome) =>
-        outcome.Kind switch
+    public static HostBotChannelStatus FromReadiness(HostBotReadinessOutcome outcome)
+    {
+        return outcome.Kind switch
         {
             HostBotReadinessKind.NotConfigured => NotConfigured(),
             HostBotReadinessKind.TokenUnavailable
@@ -54,19 +55,23 @@ public sealed record HostBotChannelStatus(
             HostBotReadinessKind.Ready => Ready(),
             _ => Unknown(outcome.Flags),
         };
+    }
 
-    public static HostBotChannelStatus NotConfigured() =>
-        new(
+    public static HostBotChannelStatus NotConfigured()
+    {
+        return new(
             HostBotChannelStatusFlags.None,
             HostBotModeratorState.Unknown,
             "BlokeBot needs bot account settings before it can check this.",
             "Follower-only giveaways are not set up for this bot account."
         );
+    }
 
     public static HostBotChannelStatus NeedsAuthorization(
         HostBotChannelStatusFlags configuredFlags
-    ) =>
-        new(
+    )
+    {
+        return new(
             configuredFlags
                 & (
                     HostBotChannelStatusFlags.ModeratorCheckConfigured
@@ -76,11 +81,13 @@ public sealed record HostBotChannelStatus(
             "Connect the bot account before BlokeBot can check this.",
             "Connect the bot account before follower-only giveaways can work."
         );
+    }
 
     public static HostBotChannelStatus MissingModeratorCheckPermission(
         HostBotChannelStatusFlags flags
-    ) =>
-        new(
+    )
+    {
+        return new(
             flags,
             HostBotModeratorState.Unknown,
             "The connected bot account does not allow BlokeBot to check mod status.",
@@ -88,35 +95,43 @@ public sealed record HostBotChannelStatus(
                 ? "Follower-only giveaways need the mod check to work first."
                 : "Follower-only giveaways are not set up for this bot account."
         );
+    }
 
     public static HostBotChannelStatus MissingFollowerReadPermission(
         HostBotChannelStatusFlags flags
-    ) =>
-        new(
+    )
+    {
+        return new(
             flags,
             HostBotModeratorState.IsModerator,
             "The bot is a mod in this channel.",
             "The connected bot account does not allow BlokeBot to check followers."
         );
+    }
 
-    public static HostBotChannelStatus NotModerator(HostBotChannelStatusFlags flags) =>
-        new(
+    public static HostBotChannelStatus NotModerator(HostBotChannelStatusFlags flags)
+    {
+        return new(
             flags,
             HostBotModeratorState.NotModerator,
             "The bot is not a mod in this channel.",
             "Follower-only giveaways need the bot to be a channel mod."
         );
+    }
 
-    public static HostBotChannelStatus Unknown(HostBotChannelStatusFlags flags) =>
-        new(
+    public static HostBotChannelStatus Unknown(HostBotChannelStatusFlags flags)
+    {
+        return new(
             flags,
             HostBotModeratorState.Unknown,
             "BlokeBot could not check whether the bot is a mod.",
             "BlokeBot could not check follower-only giveaways."
         );
+    }
 
-    public static HostBotChannelStatus Ready() =>
-        new(
+    public static HostBotChannelStatus Ready()
+    {
+        return new(
             HostBotChannelStatusFlags.BotAccountAuthorized
                 | HostBotChannelStatusFlags.ModeratorCheckConfigured
                 | HostBotChannelStatusFlags.ModeratorCheckGranted
@@ -126,6 +141,10 @@ public sealed record HostBotChannelStatus(
             "The bot is a mod in this channel.",
             "Follower-only giveaways are ready."
         );
+    }
 
-    private bool HasAll(HostBotChannelStatusFlags flags) => (Flags & flags) == flags;
+    private bool HasAll(HostBotChannelStatusFlags flags)
+    {
+        return (Flags & flags) == flags;
+    }
 }

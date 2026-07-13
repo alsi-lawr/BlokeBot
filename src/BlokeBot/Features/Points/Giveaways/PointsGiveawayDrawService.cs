@@ -59,11 +59,15 @@ public sealed class PointsGiveawayDrawService(
             .Select(x => new { x.HostId, x.Status })
             .SingleOrDefaultAsync(ct);
         if (giveawayHeader is null)
+        {
             return PointsGiveawayDrawOutcome.Missing();
+        }
 
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveawayHeader.HostId, ct);
         if (giveawayHeader.Status != PointsGiveawayStatus.Active)
+        {
             return PointsGiveawayDrawOutcome.NotActive(settings);
+        }
 
         var now = DateTime.UtcNow;
         var claimed = await db
@@ -78,7 +82,9 @@ public sealed class PointsGiveawayDrawService(
                 ct
             );
         if (claimed == 0)
+        {
             return PointsGiveawayDrawOutcome.NotActive(settings);
+        }
 
         var giveaway = await db
             .PointsGiveaways.Include(x => x.Entrants)

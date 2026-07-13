@@ -15,7 +15,9 @@ public sealed class SiteAccessService(
     public async Task AddEntryAsync(AccessListEntryKind kind, string login, CancellationToken ct)
     {
         if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        {
             return;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, ct);
@@ -33,7 +35,9 @@ public sealed class SiteAccessService(
             ct
         );
         if (!changed)
+        {
             return;
+        }
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
@@ -42,10 +46,14 @@ public sealed class SiteAccessService(
     public async Task<bool> CanCreateHostAsync(string login, CancellationToken ct)
     {
         if (admins.IsAdmin(login))
+        {
             return true;
+        }
 
         if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        {
             return false;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, ct);
@@ -98,7 +106,9 @@ public sealed class SiteAccessService(
     {
         var settings = await db.SiteAccessSettings.SingleOrDefaultAsync(x => x.Id == 1, ct);
         if (settings is not null)
+        {
             return settings;
+        }
 
         settings = new SiteAccessSettings { Id = 1, WhitelistEnabled = false };
         db.SiteAccessSettings.Add(settings);

@@ -66,7 +66,13 @@ public partial class ProfileSettingsSection
         await NewProfileNameChanged.InvokeAsync(NewProfileName);
     }
 
-    private async Task InvokeCreateProfileAsync() => await CreateProfile.InvokeAsync();
+    private async Task InvokeCreateProfileAsync()
+    {
+        await CreateProfile.InvokeAsync();
+    }
 
-    private async Task InvokeDeleteProfileAsync() => await DeleteProfile.InvokeAsync();
+    private async Task InvokeDeleteProfileAsync()
+    {
+        await DeleteProfile.InvokeAsync();
+    }
 }

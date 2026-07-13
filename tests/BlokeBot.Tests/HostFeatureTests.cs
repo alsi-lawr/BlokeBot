@@ -161,7 +161,9 @@ public sealed class HostFeatureTests
     }
 
     private static TwitchCommandContext CommandContext(string channel, string commandName)
-        => TestCommandContext.Create("viewer", channel, commandName);
+    {
+        return TestCommandContext.Create("viewer", channel, commandName);
+    }
 
     private static async Task SeedAliasAsync(
         SqliteBlokeBotDbFactory dbFactory,

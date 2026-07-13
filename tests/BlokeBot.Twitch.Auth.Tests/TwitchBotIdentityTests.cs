@@ -54,8 +54,9 @@ public sealed class TwitchBotIdentityTests
         identity.ToString().ShouldContain("[redacted]");
     }
 
-    private static TwitchBotIdentityOptions ValidOptions(string[] scopes) =>
-        new()
+    private static TwitchBotIdentityOptions ValidOptions(string[] scopes)
+    {
+        return new()
         {
             BotUsername = "TestBot",
             ClientId = "client-value",
@@ -64,4 +65,5 @@ public sealed class TwitchBotIdentityTests
             Scopes = scopes,
             TokenCachePath = "tokens.json",
         };
+    }
 }

@@ -91,8 +91,10 @@ internal sealed class AuthSessionService(
         );
     }
 
-    public async Task SignOutAsync(HttpContext context) =>
+    public async Task SignOutAsync(HttpContext context)
+    {
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    }
 
     private static ClaimsPrincipal CreatePrincipal(
         string userId,
@@ -119,7 +121,9 @@ internal sealed class AuthSessionService(
         };
 
         if (isBotAccount)
+        {
             claims.Add(new(AuthClaims.Role, AuthRoleCodec.Encode(AuthRole.Bot)));
+        }
 
         if (selectedHost is not null)
         {
@@ -130,15 +134,21 @@ internal sealed class AuthSessionService(
         }
 
         if (!string.IsNullOrWhiteSpace(profileImageUrl))
+        {
             claims.Add(new Claim(AuthClaims.ProfileImageUrl, profileImageUrl));
+        }
 
         if (!string.IsNullOrWhiteSpace(adminEditingLogin))
+        {
             claims.Add(new Claim(BotHostClaims.AdminEditingLogin, adminEditingLogin));
+        }
 
         if (adminReturnHost is not null)
+        {
             claims.Add(
                 new Claim(BotHostClaims.AdminReturnHost, BotHostClaimCodec.Encode(adminReturnHost))
             );
+        }
 
         claims.AddRange(
             hosts.Select(host => new Claim(
@@ -151,13 +161,15 @@ internal sealed class AuthSessionService(
         );
     }
 
-    public bool IsConfiguredBotAccount(string login) =>
-        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
+    public bool IsConfiguredBotAccount(string login)
+    {
+        return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
         && string.Equals(
             TwitchLogin.Normalize(login),
             botSettings.Identity.BotUsername,
             StringComparison.Ordinal
         );
+    }
 
     private static BotHostChoice? SelectInitialHost(
         IReadOnlyList<BotHostChoice> hosts,
@@ -167,13 +179,17 @@ internal sealed class AuthSessionService(
     )
     {
         if (hosts.Count == 0)
+        {
             return null;
+        }
 
         if (preferredHostId is { } hostId)
         {
             var preferred = hosts.FirstOrDefault(host => host.Id == hostId);
             if (preferred is not null)
+            {
                 return preferred;
+            }
         }
 
         var ownHost = hosts.FirstOrDefault(host =>
@@ -181,7 +197,9 @@ internal sealed class AuthSessionService(
             && string.Equals(host.Login, login, StringComparison.OrdinalIgnoreCase)
         );
         if (ownHost is not null)
+        {
             return ownHost;
+        }
 
         return canCreateHost ? null : hosts[0];
     }

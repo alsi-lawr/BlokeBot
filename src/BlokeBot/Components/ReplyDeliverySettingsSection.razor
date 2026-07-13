@@ -4,9 +4,9 @@
     <div class="grid gap-3 p-4 md:grid-cols-2">
         @foreach (var option in Options)
         {
-            <span @key="option.ReplyKey" title="@WhisperTitle">
-                <label class="@WhisperLabelClass">
-                    <input class="h-4 w-4" type="checkbox" checked="@Delivery.IsWhisper(option.ReplyKey)" disabled="@WhisperDisabled" @onchange="args => SetWhisper(option.ReplyKey, args)" />
+            <span @key="option.ReplyKey" title="@_whisperTitle">
+                <label class="@_whisperLabelClass">
+                    <input class="h-4 w-4" type="checkbox" checked="@Delivery.IsWhisper(option.ReplyKey)" disabled="@_whisperDisabled" @onchange="args => SetWhisper(option.ReplyKey, args)" />
                     <span>@option.Label</span>
                 </label>
             </span>

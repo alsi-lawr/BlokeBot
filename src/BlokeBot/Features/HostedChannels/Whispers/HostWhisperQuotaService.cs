@@ -36,7 +36,9 @@ public sealed class HostWhisperQuotaService(
     {
         var botUserId = NormalizeId(botTwitchUserId);
         if (string.IsNullOrWhiteSpace(botUserId))
+        {
             return EmptyStatus();
+        }
 
         var day = CurrentDayUtc();
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -62,7 +64,9 @@ public sealed class HostWhisperQuotaService(
         var botUserId = NormalizeId(botTwitchUserId);
         var recipientUserId = NormalizeId(recipientTwitchUserId);
         if (string.IsNullOrWhiteSpace(botUserId) || string.IsNullOrWhiteSpace(recipientUserId))
+        {
             return Blocked(EmptyStatus());
+        }
 
         var now = clock.GetUtcNow().UtcDateTime;
         var day = now.Date;
@@ -90,7 +94,9 @@ public sealed class HostWhisperQuotaService(
             x.RecipientTwitchUserId.Equals(recipientUserId, StringComparison.Ordinal)
         );
         if (existing)
+        {
             return Allowed(bucket, countedNewRecipient: false);
+        }
 
         if (bucket.Exhausted || bucket.Recipients.Count >= UniqueRecipientLimit)
         {
@@ -117,7 +123,9 @@ public sealed class HostWhisperQuotaService(
     {
         var botUserId = NormalizeId(botTwitchUserId);
         if (string.IsNullOrWhiteSpace(botUserId))
+        {
             return;
+        }
 
         var now = clock.GetUtcNow().UtcDateTime;
         var day = now.Date;
@@ -143,26 +151,41 @@ public sealed class HostWhisperQuotaService(
         await db.SaveChangesAsync(ct);
     }
 
-    private DateTime CurrentDayUtc() => clock.GetUtcNow().UtcDateTime.Date;
+    private DateTime CurrentDayUtc()
+    {
+        return clock.GetUtcNow().UtcDateTime.Date;
+    }
 
-    private static string NormalizeId(string? value) => value?.Trim() ?? string.Empty;
+    private static string NormalizeId(string? value)
+    {
+        return value?.Trim() ?? string.Empty;
+    }
 
-    private static WhisperQuotaStatus EmptyStatus() => new(0, UniqueRecipientLimit, false);
+    private static WhisperQuotaStatus EmptyStatus()
+    {
+        return new(0, UniqueRecipientLimit, false);
+    }
 
     private static WhisperQuotaReservationResult Allowed(
         WhisperQuotaBucket bucket,
         bool countedNewRecipient
-    ) =>
-        new(
+    )
+    {
+        return new(
             true,
             countedNewRecipient,
             null,
             new WhisperQuotaStatus(bucket.Recipients.Count, UniqueRecipientLimit, bucket.Exhausted)
         );
+    }
 
-    private static WhisperQuotaReservationResult Blocked(WhisperQuotaBucket bucket) =>
-        Blocked(new WhisperQuotaStatus(bucket.Recipients.Count, UniqueRecipientLimit, true));
+    private static WhisperQuotaReservationResult Blocked(WhisperQuotaBucket bucket)
+    {
+        return Blocked(new WhisperQuotaStatus(bucket.Recipients.Count, UniqueRecipientLimit, true));
+    }
 
-    private static WhisperQuotaReservationResult Blocked(WhisperQuotaStatus status) =>
-        new(false, false, WhisperQuotaReservationBlockReason.DailyRecipientLimitReached, status);
+    private static WhisperQuotaReservationResult Blocked(WhisperQuotaStatus status)
+    {
+        return new(false, false, WhisperQuotaReservationBlockReason.DailyRecipientLimitReached, status);
+    }
 }

@@ -2,9 +2,15 @@ namespace BlokeBot.Features.Points.Gambling;
 
 public sealed class PointsRandom : IPointsRandom
 {
-    private readonly Random random = new();
+    private readonly Random _random = new();
 
-    public double NextDouble() => random.NextDouble();
+    public double NextDouble()
+    {
+        return _random.NextDouble();
+    }
 
-    public int Next(int minValue, int maxValue) => random.Next(minValue, maxValue);
+    public int Next(int minValue, int maxValue)
+    {
+        return _random.Next(minValue, maxValue);
+    }
 }

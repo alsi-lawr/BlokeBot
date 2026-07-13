@@ -46,19 +46,19 @@ namespace BlokeBot.Features.Admin.Monitoring;
 
 public partial class ConnectedChannelsSummary
 {
-    private string ConnectedChannelsText =>
-        BotStatus.Current.ConnectedChannels.Count == 0
+    private string _connectedChannelsText =>
+        _botStatus.Current.ConnectedChannels.Count == 0
             ? "No channels connected."
-            : $"Connected: {string.Join(", ", BotStatus.Current.ConnectedChannels.Select(channel => $"#{channel}"))}";
+            : $"Connected: {string.Join(", ", _botStatus.Current.ConnectedChannels.Select(channel => $"#{channel}"))}";
 
     protected override void OnInitialized()
     {
-        BotStatus.Changed += OnBotStatusChanged;
+        _botStatus.Changed += OnBotStatusChanged;
     }
 
     public void Dispose()
     {
-        BotStatus.Changed -= OnBotStatusChanged;
+        _botStatus.Changed -= OnBotStatusChanged;
     }
 
     private void OnBotStatusChanged()

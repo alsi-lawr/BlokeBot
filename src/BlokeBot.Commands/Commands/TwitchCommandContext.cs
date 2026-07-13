@@ -26,11 +26,16 @@ public sealed record TwitchCommandContext
     /// <param name="message">The reply text.</param>
     /// <param name="cancellationToken">A token that cancels the reply operation.</param>
     /// <returns>A task that completes when the reply is sent.</returns>
-    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken) =>
-        Responder(TwitchCommandResponse.Chat(message), cancellationToken);
+    public ValueTask ReplyAsync(string message, CancellationToken cancellationToken)
+    {
+        return Responder(TwitchCommandResponse.Chat(message), cancellationToken);
+    }
 
     public ValueTask RespondAsync(
         TwitchCommandResponse response,
         CancellationToken cancellationToken
-    ) => Responder(response, cancellationToken);
+    )
+    {
+        return Responder(response, cancellationToken);
+    }
 }

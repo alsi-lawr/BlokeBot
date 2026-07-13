@@ -28,8 +28,9 @@ internal static class PublicChatIntegrationTestSupport
         TimeProvider timeProvider,
         TwitchBotOptions? options = null,
         IEnumerable<IPublicChatQueueAlertObserver>? observers = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             TwitchBotSettings.FromOptions(options ?? new TwitchBotOptions()),
             timeProvider,
             new PublicChatQueueBacklogMonitor(),
@@ -45,6 +46,7 @@ internal static class PublicChatIntegrationTestSupport
             transport,
             NullLogger<PublicChatMessageQueue>.Instance
         );
+    }
 
     public static async Task StopAsync(
         CancellationTokenSource stopping,
@@ -55,53 +57,61 @@ internal static class PublicChatIntegrationTestSupport
         await worker;
     }
 
-    public static DateTimeOffset Utc(int hour, int minute, int second) =>
-        new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+    public static DateTimeOffset Utc(int hour, int minute, int second)
+    {
+        return new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
+    }
 
     public static PublicChatEnqueueCommand Command(
         string channel,
         string message
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Channel = channel,
             Message = message,
             Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
         };
+    }
 
     public static PublicChatPreparedSend Prepared(
         PublicChatClaimedMessage message
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Message = message,
             AppAccessToken = "app-token",
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
+    }
 
     public static PublicChatRetryPolicy CreateRetryPolicy(
         int attemptLimit,
         TimeSpan delay,
         TimeSpan maximumDelay,
         DelayBackoffType delayBackoffType
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             AttemptLimit = attemptLimit,
             Delay = delay,
             MaximumDelay = maximumDelay,
             DelayBackoffType = delayBackoffType,
         };
+    }
 }
 
 internal sealed class RecordingPublicChatTransport : IPublicChatTransport
 {
-    private readonly Channel<PublicChatClaimedMessage> deliveries =
+    private readonly Channel<PublicChatClaimedMessage> _deliveries =
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
-    private int deliveryCount;
+    private int _deliveryCount;
 
-    public int DeliveryCount => Volatile.Read(ref deliveryCount);
+    public int DeliveryCount => Volatile.Read(ref _deliveryCount);
 
     public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
         PublicChatClaimedMessage message,
@@ -123,8 +133,8 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Interlocked.Increment(ref deliveryCount);
-        if (!deliveries.Writer.TryWrite(prepared.Message))
+        Interlocked.Increment(ref _deliveryCount);
+        if (!_deliveries.Writer.TryWrite(prepared.Message))
         {
             throw new InvalidOperationException(
                 "The public chat delivery could not be observed."
@@ -136,8 +146,10 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
         );
     }
 
-    public ValueTask<PublicChatClaimedMessage> ReadAsync() =>
-        deliveries.Reader.ReadAsync();
+    public ValueTask<PublicChatClaimedMessage> ReadAsync()
+    {
+        return _deliveries.Reader.ReadAsync();
+    }
 }
 
 internal sealed class ScriptedPublicChatTransport(
@@ -153,19 +165,19 @@ internal sealed class ScriptedPublicChatTransport(
     > send
 ) : IPublicChatTransport
 {
-    private int prepareCount;
-    private int sendCount;
+    private int _prepareCount;
+    private int _sendCount;
 
-    public int PrepareCount => Volatile.Read(ref prepareCount);
+    public int PrepareCount => Volatile.Read(ref _prepareCount);
 
-    public int SendCount => Volatile.Read(ref sendCount);
+    public int SendCount => Volatile.Read(ref _sendCount);
 
     public ValueTask<PublicChatPreparationOutcome> PrepareAsync(
         PublicChatClaimedMessage message,
         CancellationToken cancellationToken
     )
     {
-        Interlocked.Increment(ref prepareCount);
+        Interlocked.Increment(ref _prepareCount);
         return prepare(message, cancellationToken);
     }
 
@@ -174,7 +186,7 @@ internal sealed class ScriptedPublicChatTransport(
         CancellationToken cancellationToken
     )
     {
-        Interlocked.Increment(ref sendCount);
+        Interlocked.Increment(ref _sendCount);
         return send(prepared, cancellationToken);
     }
 }
@@ -182,17 +194,20 @@ internal sealed class ScriptedPublicChatTransport(
 internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inner)
     : IPublicChatOutbox
 {
-    private readonly Channel<PublicChatClaimedMessage> deliveries =
+    private readonly Channel<PublicChatClaimedMessage> _deliveries =
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
-    private readonly Channel<PublicChatDeliveryOutcome> outcomes =
+    private readonly Channel<PublicChatDeliveryOutcome> _outcomes =
         Channel.CreateUnbounded<PublicChatDeliveryOutcome>();
-    private readonly Channel<PublicChatClaimOutcome> claims =
+    private readonly Channel<PublicChatClaimOutcome> _claims =
         Channel.CreateUnbounded<PublicChatClaimOutcome>();
 
     public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
-    ) => inner.EnqueueAsync(batch, cancellationToken);
+    )
+    {
+        return inner.EnqueueAsync(batch, cancellationToken);
+    }
 
     public async ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
         DateTimeOffset now,
@@ -209,8 +224,10 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
             duplicateCooldown,
             cancellationToken
         );
-        if (!claims.Writer.TryWrite(outcome))
+        if (!_claims.Writer.TryWrite(outcome))
+        {
             throw new InvalidOperationException("The public chat claim could not be observed.");
+        }
 
         return outcome;
     }
@@ -220,13 +237,15 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         DateTimeOffset sendStartedAt,
         DateTimeOffset claimExpiresAt,
         CancellationToken cancellationToken
-    ) =>
-        inner.BeginSendAsync(
+    )
+    {
+        return inner.BeginSendAsync(
             message,
             sendStartedAt,
             claimExpiresAt,
             cancellationToken
         );
+    }
 
     public async ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
         PublicChatClaimedMessage message,
@@ -243,7 +262,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         );
         if (result is PublicChatClaimUpdate.Applied)
         {
-            if (!outcomes.Writer.TryWrite(outcome))
+            if (!_outcomes.Writer.TryWrite(outcome))
             {
                 throw new InvalidOperationException(
                     "The public chat outcome could not be observed."
@@ -267,37 +286,51 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         PublicChatFailureDiagnostic.Send diagnostic,
         DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    ) =>
-        inner.RecordPostBoundaryInterruptionAsync(
+    )
+    {
+        return inner.RecordPostBoundaryInterruptionAsync(
             message,
             diagnostic,
             interruptedAt,
             cancellationToken
         );
+    }
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
         DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
+    )
+    {
+        return inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
+    }
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken
-    ) => inner.LoadOutstandingAsync(now, cancellationToken);
+    )
+    {
+        return inner.LoadOutstandingAsync(now, cancellationToken);
+    }
 
-    public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync() =>
-        deliveries.Reader.ReadAsync();
+    public ValueTask<PublicChatClaimedMessage> ReadDeliveryAsync()
+    {
+        return _deliveries.Reader.ReadAsync();
+    }
 
-    public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync() =>
-        outcomes.Reader.ReadAsync();
+    public ValueTask<PublicChatDeliveryOutcome> ReadOutcomeAsync()
+    {
+        return _outcomes.Reader.ReadAsync();
+    }
 
-    public ValueTask<PublicChatClaimOutcome> ReadClaimOutcomeAsync() =>
-        claims.Reader.ReadAsync();
+    public ValueTask<PublicChatClaimOutcome> ReadClaimOutcomeAsync()
+    {
+        return _claims.Reader.ReadAsync();
+    }
 
     private void NotifyDelivery(PublicChatClaimedMessage message)
     {
-        if (!deliveries.Writer.TryWrite(message))
+        if (!_deliveries.Writer.TryWrite(message))
         {
             throw new InvalidOperationException(
                 "The public chat completion could not be observed."
@@ -309,14 +342,17 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
 internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
     : IPublicChatOutbox
 {
-    private readonly Channel<PublicChatClaimedMessage> beginAttempts =
+    private readonly Channel<PublicChatClaimedMessage> _beginAttempts =
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
-    private readonly Channel<bool> beginPermission = Channel.CreateUnbounded<bool>();
+    private readonly Channel<bool> _beginPermission = Channel.CreateUnbounded<bool>();
 
     public ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatOutboxBatch batch,
         CancellationToken cancellationToken
-    ) => inner.EnqueueAsync(batch, cancellationToken);
+    )
+    {
+        return inner.EnqueueAsync(batch, cancellationToken);
+    }
 
     public ValueTask<PublicChatClaimOutcome> TryClaimNextAsync(
         DateTimeOffset now,
@@ -324,14 +360,16 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         TimeSpan sendInterval,
         TimeSpan duplicateCooldown,
         CancellationToken cancellationToken
-    ) =>
-        inner.TryClaimNextAsync(
+    )
+    {
+        return inner.TryClaimNextAsync(
             now,
             claimExpiresAt,
             sendInterval,
             duplicateCooldown,
             cancellationToken
         );
+    }
 
     public async ValueTask<PublicChatClaimUpdate> BeginSendAsync(
         PublicChatClaimedMessage message,
@@ -340,10 +378,12 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         CancellationToken cancellationToken
     )
     {
-        if (!beginAttempts.Writer.TryWrite(message))
+        if (!_beginAttempts.Writer.TryWrite(message))
+        {
             throw new InvalidOperationException("The begin-send attempt could not be observed.");
+        }
 
-        _ = await beginPermission.Reader.ReadAsync(cancellationToken);
+        _ = await _beginPermission.Reader.ReadAsync(cancellationToken);
         return await inner.BeginSendAsync(
             message,
             sendStartedAt,
@@ -357,61 +397,78 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         PublicChatDeliveryOutcome outcome,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
-    ) =>
-        inner.RecordDeliveryOutcomeAsync(
+    )
+    {
+        return inner.RecordDeliveryOutcomeAsync(
             message,
             outcome,
             recordedAt,
             cancellationToken
         );
+    }
 
     public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Send diagnostic,
         DateTimeOffset interruptedAt,
         CancellationToken cancellationToken
-    ) =>
-        inner.RecordPostBoundaryInterruptionAsync(
+    )
+    {
+        return inner.RecordPostBoundaryInterruptionAsync(
             message,
             diagnostic,
             interruptedAt,
             cancellationToken
         );
+    }
 
     public ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
         PublicChatClaimedMessage message,
         DateTimeOffset releasedAt,
         CancellationToken cancellationToken
-    ) => inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
+    )
+    {
+        return inner.ReleaseClaimAsync(message, releasedAt, cancellationToken);
+    }
 
     public ValueTask<IReadOnlyList<PublicChatPendingMessage>> LoadOutstandingAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken
-    ) => inner.LoadOutstandingAsync(now, cancellationToken);
+    )
+    {
+        return inner.LoadOutstandingAsync(now, cancellationToken);
+    }
 
-    public ValueTask<PublicChatClaimedMessage> ReadBeginAttemptAsync() =>
-        beginAttempts.Reader.ReadAsync();
+    public ValueTask<PublicChatClaimedMessage> ReadBeginAttemptAsync()
+    {
+        return _beginAttempts.Reader.ReadAsync();
+    }
 }
 
 internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimeProvider
 {
-    private readonly object gate = new();
-    private readonly List<ManualTimer> timers = [];
-    private readonly Channel<bool> timerRegistrations = Channel.CreateUnbounded<bool>();
-    private DateTimeOffset now = initialNow;
-    private int timerRegistrationCount;
-    private int observedTimerRegistrationCount;
-    private bool waitingForTimerRegistration;
+    private readonly object _gate = new();
+    private readonly List<ManualTimer> _timers = [];
+    private readonly Channel<bool> _timerRegistrations = Channel.CreateUnbounded<bool>();
+    private DateTimeOffset _now = initialNow;
+    private int _timerRegistrationCount;
+    private int _observedTimerRegistrationCount;
+    private bool _waitingForTimerRegistration;
 
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
     public override DateTimeOffset GetUtcNow()
     {
-        lock (gate)
-            return now;
+        lock (_gate)
+        {
+            return _now;
+        }
     }
 
-    public override long GetTimestamp() => GetUtcNow().UtcTicks;
+    public override long GetTimestamp()
+    {
+        return GetUtcNow().UtcTicks;
+    }
 
     public override ITimer CreateTimer(
         TimerCallback callback,
@@ -428,49 +485,55 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     public void Advance(TimeSpan delta)
     {
         List<ManualTimer> due;
-        lock (gate)
+        lock (_gate)
         {
-            now = now.Add(delta);
-            due = timers.Where(timer => timer.IsDue(now)).ToList();
+            _now = _now.Add(delta);
+            due = _timers.Where(timer => timer.IsDue(_now)).ToList();
         }
 
         foreach (var timer in due)
+        {
             timer.Fire();
+        }
     }
 
     public ValueTask<bool> WaitForTimerRegistrationAsync()
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (timerRegistrationCount > observedTimerRegistrationCount)
+            if (_timerRegistrationCount > _observedTimerRegistrationCount)
             {
-                observedTimerRegistrationCount = timerRegistrationCount;
+                _observedTimerRegistrationCount = _timerRegistrationCount;
                 return ValueTask.FromResult(true);
             }
 
-            if (waitingForTimerRegistration)
+            if (_waitingForTimerRegistration)
+            {
                 throw new InvalidOperationException("Only one timer observer is supported.");
+            }
 
-            waitingForTimerRegistration = true;
-            return timerRegistrations.Reader.ReadAsync();
+            _waitingForTimerRegistration = true;
+            return _timerRegistrations.Reader.ReadAsync();
         }
     }
 
     private void AddTimer(ManualTimer timer)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (!timers.Contains(timer))
+            if (!_timers.Contains(timer))
             {
-                timers.Add(timer);
-                timerRegistrationCount++;
+                _timers.Add(timer);
+                _timerRegistrationCount++;
             }
-            if (!waitingForTimerRegistration)
+            if (!_waitingForTimerRegistration)
+            {
                 return;
+            }
 
-            waitingForTimerRegistration = false;
-            observedTimerRegistrationCount = timerRegistrationCount;
-            if (!timerRegistrations.Writer.TryWrite(true))
+            _waitingForTimerRegistration = false;
+            _observedTimerRegistrationCount = _timerRegistrationCount;
+            if (!_timerRegistrations.Writer.TryWrite(true))
             {
                 throw new InvalidOperationException(
                     "The timer observer could not be notified."
@@ -481,11 +544,13 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
 
     private void RemoveTimer(ManualTimer timer)
     {
-        lock (gate)
-            timers.Remove(timer);
+        lock (_gate)
+        {
+            _timers.Remove(timer);
+        }
     }
 
-    private DateTimeOffset CurrentNowLocked => now;
+    private DateTimeOffset _currentNowLocked => _now;
 
     private sealed class ManualTimer(
         ManualTestTimeProvider owner,
@@ -493,38 +558,44 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
         object? state
     ) : ITimer
     {
-        private TimeSpan period;
-        private DateTimeOffset dueAt = DateTimeOffset.MaxValue;
-        private bool disposed;
+        private TimeSpan _period;
+        private DateTimeOffset _dueAt = DateTimeOffset.MaxValue;
+        private bool _disposed;
 
         public bool Change(TimeSpan dueTime, TimeSpan period)
         {
-            lock (owner.gate)
+            lock (owner._gate)
             {
-                if (disposed)
+                if (_disposed)
+                {
                     return false;
+                }
 
-                this.period = period;
-                dueAt = dueTime == Timeout.InfiniteTimeSpan
+                _period = period;
+                _dueAt = dueTime == Timeout.InfiniteTimeSpan
                     ? DateTimeOffset.MaxValue
-                    : owner.CurrentNowLocked.Add(dueTime);
+                    : owner._currentNowLocked.Add(dueTime);
                 owner.AddTimer(this);
             }
 
             if (dueTime != Timeout.InfiniteTimeSpan && dueTime <= TimeSpan.Zero)
+            {
                 Fire();
+            }
 
             return true;
         }
 
         public void Dispose()
         {
-            lock (owner.gate)
+            lock (owner._gate)
             {
-                if (disposed)
+                if (_disposed)
+                {
                     return;
+                }
 
-                disposed = true;
+                _disposed = true;
                 owner.RemoveTimer(this);
             }
         }
@@ -537,22 +608,28 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
 
         public bool IsDue(DateTimeOffset value)
         {
-            lock (owner.gate)
-                return !disposed && dueAt <= value;
+            lock (owner._gate)
+            {
+                return !_disposed && _dueAt <= value;
+            }
         }
 
         public void Fire()
         {
-            lock (owner.gate)
+            lock (owner._gate)
             {
-                if (disposed || dueAt > owner.CurrentNowLocked)
+                if (_disposed || _dueAt > owner._currentNowLocked)
+                {
                     return;
+                }
 
-                if (period > TimeSpan.Zero && period != Timeout.InfiniteTimeSpan)
-                    dueAt = owner.CurrentNowLocked.Add(period);
+                if (_period > TimeSpan.Zero && _period != Timeout.InfiniteTimeSpan)
+                {
+                    _dueAt = owner._currentNowLocked.Add(_period);
+                }
                 else
                 {
-                    disposed = true;
+                    _disposed = true;
                     owner.RemoveTimer(this);
                 }
             }

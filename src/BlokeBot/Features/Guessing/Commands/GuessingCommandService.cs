@@ -20,7 +20,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
+        {
             return NotConfiguredResponse();
+        }
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
         var selectedProfileId =
@@ -64,7 +66,10 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         int? profileId,
         CancellationToken ct
-    ) => (await AvailableGuessesResponseAsync(hostLogin, profileId, ct)).Message;
+    )
+    {
+        return (await AvailableGuessesResponseAsync(hostLogin, profileId, ct)).Message;
+    }
 
     public async Task<TwitchCommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
@@ -75,7 +80,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
+        {
             return NotConfiguredResponse();
+        }
 
         var resolution =
             await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
@@ -95,7 +102,10 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         int? profileId,
         CancellationToken ct
-    ) => (await ModeratorOnlyResponseAsync(hostLogin, profileId, ct)).Message;
+    )
+    {
+        return (await ModeratorOnlyResponseAsync(hostLogin, profileId, ct)).Message;
+    }
 
     public async Task<TwitchCommandResponse> UsageResponseAsync(
         string hostLogin,
@@ -108,7 +118,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
+        {
             return NotConfiguredResponse();
+        }
 
         var resolution =
             await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
@@ -147,13 +159,20 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string command,
         int? profileId,
         CancellationToken ct
-    ) => (await UsageResponseAsync(hostLogin, kind, command, profileId, ct)).Message;
+    )
+    {
+        return (await UsageResponseAsync(hostLogin, kind, command, profileId, ct)).Message;
+    }
 
-    private static GuessingOperationResult NotConfigured() =>
-        new(false, "This channel is not set up.");
+    private static GuessingOperationResult NotConfigured()
+    {
+        return new(false, "This channel is not set up.");
+    }
 
-    private static TwitchCommandResponse NotConfiguredResponse() =>
-        TwitchCommandResponse.Chat(NotConfigured().Message);
+    private static TwitchCommandResponse NotConfiguredResponse()
+    {
+        return TwitchCommandResponse.Chat(NotConfigured().Message);
+    }
 
     private static string FormatOptions(IEnumerable<string> options)
     {

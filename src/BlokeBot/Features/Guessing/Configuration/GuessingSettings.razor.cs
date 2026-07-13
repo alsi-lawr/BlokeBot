@@ -45,7 +45,7 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public partial class GuessingSettings
 {
-    private static readonly IReadOnlyList<ReplyDeliveryOption> WhisperReplyOptions =
+    private static readonly IReadOnlyList<ReplyDeliveryOption> _whisperReplyOptions =
     [
         new("Round already running", GuessingReplyKeys.RoundAlreadyOpen),
         new("No round running", GuessingReplyKeys.NoOpenRound),
@@ -58,14 +58,14 @@ public partial class GuessingSettings
         new("Only moderators can use this", GuessingReplyKeys.ModeratorOnly),
     ];
 
-    private GuessingConfiguration? config;
-    private bool featureEnabled;
-    private string newProfileName = string.Empty;
+    private GuessingConfiguration? _config;
+    private bool _featureEnabled;
+    private string _newProfileName = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 work => InvokeAsync(work),
                 LoadAsync,
@@ -78,28 +78,30 @@ public partial class GuessingSettings
     private async Task LoadAsync()
     {
         await LoadPageContextAsync();
-        featureEnabled =
+        _featureEnabled =
             HostId != 0
-            && await Features.IsEnabledAsync(
+            && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Guessing,
                 CancellationToken.None
             );
-        config = featureEnabled
-            ? await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None)
+        _config = _featureEnabled
+            ? await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None)
             : null;
     }
 
     private void AddOption()
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
-        config.Profile.Options.Add(
+        _config.Profile.Options.Add(
             new GuessOptionEditor
             {
                 ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-                    config.Profile.WhisperAnswerReplies
+                    _config.Profile.WhisperAnswerReplies
                         ? TwitchCommandResponseTarget.Whisper
                         : TwitchCommandResponseTarget.Chat
                 ),
@@ -109,63 +111,69 @@ public partial class GuessingSettings
 
     private void RemoveOption(GuessOptionEditor option)
     {
-        config?.Profile.Options.Remove(option);
+        _config?.Profile.Options.Remove(option);
     }
 
     private async Task CreateProfileAsync()
     {
-        var result = await Configuration.CreateProfileAsync(
+        var result = await _configuration.CreateProfileAsync(
             HostId,
-            newProfileName,
+            _newProfileName,
             CancellationToken.None
         );
         PublishResult(result);
-        newProfileName = string.Empty;
-        config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+        _newProfileName = string.Empty;
+        _config = await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
     }
 
     private async Task DeleteProfileAsync()
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
-        var result = await Configuration.DeleteProfileAsync(
+        var result = await _configuration.DeleteProfileAsync(
             HostId,
-            config.Profile.Id,
+            _config.Profile.Id,
             CancellationToken.None
         );
         PublishResult(result);
-        config = await Configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+        _config = await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
     }
 
     private async Task SaveAsync()
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
         try
         {
-            await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
-            var selectedId = config.Profile.Id;
-            config = await Configuration.LoadConfigurationAsync(
+            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
+            var selectedId = _config.Profile.Id;
+            _config = await _configuration.LoadConfigurationAsync(
                 HostId,
                 selectedId,
                 CancellationToken.None
             );
-            Toasts.Success("Guessing settings saved.");
+            _toasts.Success("Guessing settings saved.");
         }
         catch (InvalidOperationException ex)
         {
-            Toasts.Error(ex.Message);
+            _toasts.Error(ex.Message);
         }
     }
 
     private async Task SelectProfileAsync(ChangeEventArgs args)
     {
         if (!int.TryParse(args.Value?.ToString(), out var profileId))
+        {
             return;
+        }
 
-        config = await Configuration.LoadConfigurationAsync(
+        _config = await _configuration.LoadConfigurationAsync(
             HostId,
             profileId,
             CancellationToken.None
@@ -175,8 +183,10 @@ public partial class GuessingSettings
     private void PublishResult(GuessingOperationResult result)
     {
         if (string.IsNullOrWhiteSpace(result.Message))
+        {
             return;
+        }
 
-        Toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
+        _toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
     }
 }

@@ -4,6 +4,8 @@ internal sealed class TwitchHostBotAppAccessTokenSource(
     TwitchAppAccessTokenProvider appTokens
 ) : IHostBotAppAccessTokenSource
 {
-    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-        appTokens.GetAccessTokenAsync(cancellationToken);
+    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        return appTokens.GetAccessTokenAsync(cancellationToken);
+    }
 }

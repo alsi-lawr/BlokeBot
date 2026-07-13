@@ -805,25 +805,35 @@ public sealed class RuntimeSessionResilienceTests
         entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
     }
 
-    private static Task<TwitchRuntimeSessionEstablishment> IdleAsync() =>
-        Task.FromResult<TwitchRuntimeSessionEstablishment>(
+    private static Task<TwitchRuntimeSessionEstablishment> IdleAsync()
+    {
+        return Task.FromResult<TwitchRuntimeSessionEstablishment>(
             new TwitchRuntimeSessionEstablishment.Idle()
         );
+    }
 
     private static Task<TwitchRuntimeSessionEstablishment> EstablishedAsync(
         ScriptedEstablishedSession session
-    ) =>
-        Task.FromResult<TwitchRuntimeSessionEstablishment>(
+    )
+    {
+        return Task.FromResult<TwitchRuntimeSessionEstablishment>(
             new TwitchRuntimeSessionEstablishment.Established { Session = session }
         );
+    }
 
     private static Task<TwitchRuntimeSessionEstablishment> FailedEstablishmentAsync(
         Exception exception
-    ) => Task.FromException<TwitchRuntimeSessionEstablishment>(exception);
+    )
+    {
+        return Task.FromException<TwitchRuntimeSessionEstablishment>(exception);
+    }
 
     private static Task<TwitchRuntimeReconnectRequest> FailedListeningAsync(
         Exception exception
-    ) => Task.FromException<TwitchRuntimeReconnectRequest>(exception);
+    )
+    {
+        return Task.FromException<TwitchRuntimeReconnectRequest>(exception);
+    }
 
     private static void AssertReport(
         TwitchRuntimeSessionHealthReport report,
@@ -936,10 +946,15 @@ public sealed class RuntimeSessionResilienceTests
         internal Task<TwitchRuntimeSessionOutcome> EstablishSessionAsync(
             TwitchRuntimeConnectionTarget target,
             CancellationToken cancellationToken
-        ) => establishSession(target, cancellationToken);
+        )
+        {
+            return establishSession(target, cancellationToken);
+        }
 
-        internal Task RunRuntimeAsync(CancellationToken cancellationToken) =>
-            runRuntime(cancellationToken);
+        internal Task RunRuntimeAsync(CancellationToken cancellationToken)
+        {
+            return runRuntime(cancellationToken);
+        }
     }
 
     private sealed class ScriptedConnectionSession
@@ -952,7 +967,7 @@ public sealed class RuntimeSessionResilienceTests
                 CancellationToken,
                 Task<TwitchRuntimeSessionEstablishment>
             >
-        > operations = [];
+        > _operations = [];
 
         internal int CallCount { get; private set; }
 
@@ -964,7 +979,10 @@ public sealed class RuntimeSessionResilienceTests
                 CancellationToken,
                 Task<TwitchRuntimeSessionEstablishment>
             > operation
-        ) => operations.Enqueue(operation);
+        )
+        {
+            _operations.Enqueue(operation);
+        }
 
         public Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
             TwitchRuntimeConnectionTarget target,
@@ -973,7 +991,7 @@ public sealed class RuntimeSessionResilienceTests
         {
             CallCount++;
             Targets.Add(target);
-            return operations.Dequeue()(target, cancellationToken);
+            return _operations.Dequeue()(target, cancellationToken);
         }
     }
 
@@ -981,7 +999,7 @@ public sealed class RuntimeSessionResilienceTests
     {
         private readonly Queue<
             Func<CancellationToken, Task<TwitchRuntimeReconnectRequest>>
-        > listeners = [];
+        > _listeners = [];
 
         internal int ListenCount { get; private set; }
 
@@ -991,14 +1009,17 @@ public sealed class RuntimeSessionResilienceTests
 
         internal void Enqueue(
             Func<CancellationToken, Task<TwitchRuntimeReconnectRequest>> listener
-        ) => listeners.Enqueue(listener);
+        )
+        {
+            _listeners.Enqueue(listener);
+        }
 
         public Task<TwitchRuntimeReconnectRequest> ListenAsync(
             CancellationToken cancellationToken
         )
         {
             ListenCount++;
-            return listeners.Dequeue()(cancellationToken);
+            return _listeners.Dequeue()(cancellationToken);
         }
 
         public ValueTask DisposeAsync()
@@ -1014,7 +1035,10 @@ public sealed class RuntimeSessionResilienceTests
     {
         internal List<TwitchRuntimeSessionHealthReport> Reports { get; } = [];
 
-        public void Report(TwitchRuntimeSessionHealthReport report) => Reports.Add(report);
+        public void Report(TwitchRuntimeSessionHealthReport report)
+        {
+            Reports.Add(report);
+        }
     }
 
     private sealed class RecordingIdleWait : ITwitchRuntimeIdleWait
@@ -1033,9 +1057,15 @@ public sealed class RuntimeSessionResilienceTests
         internal List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull => Scope.Instance;
+            where TState : notnull
+        {
+            return Scope.Instance;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,

@@ -36,8 +36,9 @@ public sealed record AuthenticatedSession
         : !string.IsNullOrWhiteSpace(Login) ? Login
         : "Twitch user";
 
-    public bool HasCapability(AuthSessionCapability capability) =>
-        capability switch
+    public bool HasCapability(AuthSessionCapability capability)
+    {
+        return capability switch
         {
             AuthSessionCapability.BotAdmin => IsBotAdmin,
             AuthSessionCapability.HostSelected => HostSelection is not null,
@@ -50,11 +51,14 @@ public sealed record AuthenticatedSession
                 ),
             _ => false,
         };
+    }
 
     public bool CanOpenHostConfig(IReadOnlySet<int> existingHostIds)
     {
         if (IsBotAccount)
+        {
             return false;
+        }
 
         return CanCreateHost
             || (
@@ -64,23 +68,29 @@ public sealed record AuthenticatedSession
             );
     }
 
-    public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds) =>
-        !IsBotAccount
+    public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds)
+    {
+        return !IsBotAccount
         && HostSelection is not null
         && existingHostIds.Contains(HostSelection.Current.Id);
+    }
 
     public bool CanAuthorizeSelectedHost =>
         HostSelection is not null
         && CurrentHostRoleIs(AuthRole.Streamer)
         && string.Equals(HostSelection.Current.Login, Login, StringComparison.OrdinalIgnoreCase);
 
-    public bool CurrentHostRoleIs(AuthRole role) =>
-        HostSelection is not null && HostSelection.Current.Role == role;
+    public bool CurrentHostRoleIs(AuthRole role)
+    {
+        return HostSelection is not null && HostSelection.Current.Role == role;
+    }
 
     public static AuthenticatedSession FromPrincipal(ClaimsPrincipal? user)
     {
         if (user?.Identity?.IsAuthenticated != true)
+        {
             return Anonymous;
+        }
 
         var claimsValid = true;
         var availableHosts = DecodeHostClaims(user, ref claimsValid);
@@ -171,10 +181,14 @@ public sealed record AuthenticatedSession
     private static AuthRole? DecodeOptionalRole(string? value, ref bool claimsValid)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return null;
+        }
 
         if (AuthRoleCodec.TryDecode(value, out var role))
+        {
             return role;
+        }
 
         claimsValid = false;
         return null;
@@ -183,15 +197,21 @@ public sealed record AuthenticatedSession
     private static BotHostChoice? DecodeOptionalHost(string? value, ref bool claimsValid)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             return null;
+        }
 
         if (BotHostClaimCodec.Decode(value) is { } host)
+        {
             return host;
+        }
 
         claimsValid = false;
         return null;
     }
 
-    private static bool BooleanClaim(ClaimsPrincipal user, string claimType) =>
-        string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);
+    private static bool BooleanClaim(ClaimsPrincipal user, string claimType)
+    {
+        return string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);
+    }
 }

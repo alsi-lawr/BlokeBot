@@ -371,8 +371,9 @@ public sealed class OAuthTests
         loaded.ExpiresAtUtc.ShouldBe(token.ExpiresAtUtc);
     }
 
-    private static TwitchBotIdentity IdentityWithPath(string path) =>
-        TwitchBotIdentity.FromOptions(
+    private static TwitchBotIdentity IdentityWithPath(string path)
+    {
+        return TwitchBotIdentity.FromOptions(
             new TwitchBotIdentityOptions
             {
                 BotUsername = "bot",
@@ -382,4 +383,5 @@ public sealed class OAuthTests
                 TokenCachePath = path,
             }
         );
+    }
 }

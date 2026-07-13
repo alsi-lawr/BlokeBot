@@ -27,10 +27,14 @@ public sealed class HostCustomCommandSettingsService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return;
+        }
 
         if (host.TimeZoneId == normalized)
+        {
             return;
+        }
 
         host.TimeZoneId = normalized;
         await db.SaveChangesAsync(ct);

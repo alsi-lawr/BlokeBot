@@ -47,51 +47,51 @@ namespace BlokeBot.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
-    private static readonly TimeSpan AccessModeSaveDebounce = TimeSpan.FromMilliseconds(180);
+    private static readonly TimeSpan _accessModeSaveDebounce = TimeSpan.FromMilliseconds(180);
 
-    private CancellationTokenSource? allowModsByDefaultSaveCts;
-    private string newBlacklistLogin = string.Empty;
-    private string newWhitelistLogin = string.Empty;
-    private int allowModsByDefaultSaveVersion;
-    private bool blockedByMode;
-    private BotChannelRuntimeState? pendingRuntimeState;
-    private IReadOnlyList<AccessListEntryProfile> blacklistEntries = [];
-    private HostConfigState? state;
-    private IReadOnlyList<AccessListEntryProfile> whitelistEntries = [];
+    private CancellationTokenSource? _allowModsByDefaultSaveCts;
+    private string _newBlacklistLogin = string.Empty;
+    private string _newWhitelistLogin = string.Empty;
+    private int _allowModsByDefaultSaveVersion;
+    private bool _blockedByMode;
+    private BotChannelRuntimeState? _pendingRuntimeState;
+    private IReadOnlyList<AccessListEntryProfile> _blacklistEntries = [];
+    private HostConfigState? _state;
+    private IReadOnlyList<AccessListEntryProfile> _whitelistEntries = [];
 
-    private bool CanStart =>
-        state?.RuntimeStatus is not null
-        && state.IsChannelBotAuthorized
-        && state.RuntimeStatus.ChannelBotAuthorizationScopesCurrent
-        && BotAccountCanStart
-        && state.RuntimeStatus.RuntimeState is BotChannelRuntimeState.Stopped;
+    private bool _canStart =>
+        _state?.RuntimeStatus is not null
+        && _state.IsChannelBotAuthorized
+        && _state.RuntimeStatus.ChannelBotAuthorizationScopesCurrent
+        && _botAccountCanStart
+        && _state.RuntimeStatus.RuntimeState is BotChannelRuntimeState.Stopped;
 
-    private bool CanStop =>
-        state?.RuntimeStatus?.RuntimeState
+    private bool _canStop =>
+        _state?.RuntimeStatus?.RuntimeState
             is BotChannelRuntimeState.Started
                 or BotChannelRuntimeState.Starting;
 
-    private string AuthorizationBadgeClass =>
-        state?.IsChannelBotAuthorized == true
-        && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
+    private string _authorizationBadgeClass =>
+        _state?.IsChannelBotAuthorized == true
+        && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
             : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
 
-    private string AuthorizationDotClass =>
-        state?.IsChannelBotAuthorized == true
-        && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
+    private string _authorizationDotClass =>
+        _state?.IsChannelBotAuthorized == true
+        && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
             ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
             : "h-1.5 w-1.5 rounded-full bg-amber-500";
 
-    private string AuthorizationText =>
-        state?.IsChannelBotAuthorized == true
-        && state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
+    private string _authorizationText =>
+        _state?.IsChannelBotAuthorized == true
+        && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
             ? "connected"
-        : state?.IsChannelBotAuthorized == true ? "needs update"
+        : _state?.IsChannelBotAuthorized == true ? "needs update"
         : "not connected";
 
-    private string RuntimeBadgeClass =>
-        state?.RuntimeStatus?.RuntimeState switch
+    private string _runtimeBadgeClass =>
+        _state?.RuntimeStatus?.RuntimeState switch
         {
             BotChannelRuntimeState.Starting =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-orange-50 px-2.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200",
@@ -103,8 +103,8 @@ public partial class HostConfigPage
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
         };
 
-    private string RuntimeDotClass =>
-        state?.RuntimeStatus?.RuntimeState switch
+    private string _runtimeDotClass =>
+        _state?.RuntimeStatus?.RuntimeState switch
         {
             BotChannelRuntimeState.Starting => "h-1.5 w-1.5 rounded-full bg-orange-500",
             BotChannelRuntimeState.Started => "h-1.5 w-1.5 rounded-full bg-emerald-500",
@@ -112,8 +112,8 @@ public partial class HostConfigPage
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
-    private string RuntimeText =>
-        state?.RuntimeStatus?.RuntimeState switch
+    private string _runtimeText =>
+        _state?.RuntimeStatus?.RuntimeState switch
         {
             BotChannelRuntimeState.Starting => "starting",
             BotChannelRuntimeState.Started => "online",
@@ -121,8 +121,8 @@ public partial class HostConfigPage
             _ => "offline",
         };
 
-    private string RuntimeStatusMessage =>
-        state?.RuntimeStatus?.RuntimeState switch
+    private string _runtimeStatusMessage =>
+        _state?.RuntimeStatus?.RuntimeState switch
         {
             BotChannelRuntimeState.Starting => "The bot is starting.",
             BotChannelRuntimeState.Started => "The bot is in chat.",
@@ -130,85 +130,94 @@ public partial class HostConfigPage
             _ => "The bot is offline.",
         };
 
-    private string StartRuntimeTooltip =>
-        CanStart ? "Start the bot for this channel." : StartRuntimeDisabledTooltip;
+    private string _startRuntimeTooltip =>
+        _canStart ? "Start the bot for this channel." : _startRuntimeDisabledTooltip;
 
-    private string StopRuntimeTooltip =>
-        CanStop ? "Stop the bot for this channel." : StopRuntimeDisabledTooltip;
+    private string _stopRuntimeTooltip =>
+        _canStop ? "Stop the bot for this channel." : _stopRuntimeDisabledTooltip;
 
-    private string StartRuntimeDisabledTooltip =>
-        state is null ? "Wait for the channel to load before starting the bot."
-        : state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot."
-        : state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
+    private string _startRuntimeDisabledTooltip =>
+        _state is null ? "Wait for the channel to load before starting the bot."
+        : _state.IsChannelBotAuthorized != true ? "Connect the channel before starting the bot."
+        : _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
             ? "Reconnect the channel before starting the bot."
-        : !BotAccountCanStart ? "Connect the custom bot account before starting the bot."
-        : state.RuntimeStatus?.RuntimeState is not BotChannelRuntimeState.Stopped
+        : !_botAccountCanStart ? "Connect the custom bot account before starting the bot."
+        : _state.RuntimeStatus?.RuntimeState is not BotChannelRuntimeState.Stopped
             ? "Wait for the bot to stop before starting it again."
         : "The bot cannot be started right now.";
 
-    private string StopRuntimeDisabledTooltip =>
-        state?.RuntimeStatus?.RuntimeState is BotChannelRuntimeState.Stopping
+    private string _stopRuntimeDisabledTooltip =>
+        _state?.RuntimeStatus?.RuntimeState is BotChannelRuntimeState.Stopping
             ? "The bot is already stopping."
             : "The bot is not running right now.";
 
-    private bool BotAccountCanStart =>
-        state?.BotOverride.Enabled != true
-        || state.BotOverride.Status.State == BotAccountAuthorizationState.Ready;
+    private bool _botAccountCanStart =>
+        _state?.BotOverride.Enabled != true
+        || _state.BotOverride.Status.State == BotAccountAuthorizationState.Ready;
 
-    private string BotAccountStatusReloadKey =>
-        state is null
+    private string _botAccountStatusReloadKey =>
+        _state is null
             ? string.Empty
             : string.Join(
                 ":",
-                state.Login,
-                state.BotOverride.Enabled,
-                state.BotOverride.Status.State,
-                state.BotOverride.Status.AuthorizedLogin ?? string.Empty,
-                string.Join(",", state.BotOverride.Status.GrantedScopes)
+                _state.Login,
+                _state.BotOverride.Enabled,
+                _state.BotOverride.Status.State,
+                _state.BotOverride.Status.AuthorizedLogin ?? string.Empty,
+                string.Join(",", _state.BotOverride.Status.GrantedScopes)
             );
 
-    private string WhisperQuotaBadgeClass =>
-        state?.BotOverride.WhisperQuota.Exhausted == true
-        || state?.BotOverride.WhisperQuota.Remaining == 0
+    private string _whisperQuotaBadgeClass =>
+        _state?.BotOverride.WhisperQuota.Exhausted == true
+        || _state?.BotOverride.WhisperQuota.Remaining == 0
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200"
             : "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200";
 
-    private string WhisperQuotaDotClass =>
-        state?.BotOverride.WhisperQuota.Exhausted == true
-        || state?.BotOverride.WhisperQuota.Remaining == 0
+    private string _whisperQuotaDotClass =>
+        _state?.BotOverride.WhisperQuota.Exhausted == true
+        || _state?.BotOverride.WhisperQuota.Remaining == 0
             ? "h-1.5 w-1.5 rounded-full bg-amber-500"
             : "h-1.5 w-1.5 rounded-full bg-emerald-500";
 
-    private string WhisperQuotaText =>
-        state?.BotOverride.WhisperQuota is { } quota
+    private string _whisperQuotaText =>
+        _state?.BotOverride.WhisperQuota is { } quota
             ? $"{quota.RecipientCount} of {quota.Limit}"
             : "0 of 40";
 
-    private string AccessModeSegmentClass =>
-        state?.ModAccess.AllowModsByDefault == false
+    private string _accessModeSegmentClass =>
+        _state?.ModAccess.AllowModsByDefault == false
             ? "segmented-motion segmented-motion--second"
             : "segmented-motion";
 
-    private static string AccessModeTabClass(bool active) =>
-        active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
+    private static string AccessModeTabClass(bool active)
+    {
+        return active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
+    }
 
-    private static string FeatureBadgeClass(HostFeatureCardState feature) =>
-        feature.Enabled
+    private static string FeatureBadgeClass(HostFeatureCardState feature)
+    {
+        return feature.Enabled
             ? "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2 text-[0.68rem] font-bold text-emerald-700 ring-1 ring-emerald-200"
             : "inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2 text-[0.68rem] font-bold text-slate-600 ring-1 ring-slate-200";
+    }
 
-    private static string FeatureCardClass(HostFeatureCardState feature) =>
-        feature.Enabled
+    private static string FeatureCardClass(HostFeatureCardState feature)
+    {
+        return feature.Enabled
             ? "feature-toggle-card grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left"
             : "feature-toggle-card feature-toggle-card--disabled grid min-h-24 grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left";
+    }
 
-    private static string FeatureDotClass(HostFeatureCardState feature) =>
-        feature.Enabled
+    private static string FeatureDotClass(HostFeatureCardState feature)
+    {
+        return feature.Enabled
             ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
             : "h-1.5 w-1.5 rounded-full bg-slate-400";
+    }
 
-    private static string FeatureIconClass(HostFeatureCardState feature) =>
-        feature.Enabled
+    private static string FeatureIconClass(HostFeatureCardState feature)
+    {
+        return feature.Enabled
             ? feature.Feature switch
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
@@ -216,9 +225,11 @@ public partial class HostConfigPage
                 _ => "feature-toggle-card__icon text-blue-600",
             }
             : "feature-toggle-card__icon text-slate-500";
+    }
 
-    private static MarkupString FeatureIcon(HostFeatureFlags feature) =>
-        new(
+    private static MarkupString FeatureIcon(HostFeatureFlags feature)
+    {
+        return new(
             feature switch
             {
                 HostFeatureFlags.Guessing => """
@@ -248,11 +259,12 @@ public partial class HostConfigPage
                 _ => string.Empty,
             }
         );
+    }
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
                 work => InvokeAsync(work),
                 ReloadForEventAsync,
@@ -264,12 +276,17 @@ public partial class HostConfigPage
 
     private async Task AddAccessAsync(int hostId, AccessListEntryKind kind)
     {
-        var login = kind == AccessListEntryKind.Whitelist ? newWhitelistLogin : newBlacklistLogin;
-        await ModAccess.AddEntryAsync(hostId, kind, login, CancellationToken.None);
+        var login = kind == AccessListEntryKind.Whitelist ? _newWhitelistLogin : _newBlacklistLogin;
+        await _modAccess.AddEntryAsync(hostId, kind, login, CancellationToken.None);
         if (kind == AccessListEntryKind.Whitelist)
-            newWhitelistLogin = string.Empty;
+        {
+            _newWhitelistLogin = string.Empty;
+        }
         else
-            newBlacklistLogin = string.Empty;
+        {
+            _newBlacklistLogin = string.Empty;
+        }
+
         await LoadAsync();
     }
 
@@ -280,75 +297,87 @@ public partial class HostConfigPage
         var selection = pageContext.HostSelection;
         if (pageContext.IsBotAccount)
         {
-            blockedByMode = true;
-            state = null;
+            _blockedByMode = true;
+            _state = null;
             ClearAccessEntries();
             return;
         }
 
-        state = await HostConfig.LoadAsync(session, CancellationToken.None);
+        _state = await _hostConfig.LoadAsync(session, CancellationToken.None);
 
-        blockedByMode =
+        _blockedByMode =
             selection is not null
             && !session.CurrentHostRoleIs(AuthRole.Streamer)
-            && state?.IsHostCreated == true;
-        if (blockedByMode)
+            && _state?.IsHostCreated == true;
+        if (_blockedByMode)
         {
-            state = null;
+            _state = null;
             ClearAccessEntries();
             return;
         }
 
-        if (state is { IsHostCreated: true } loadedState)
+        if (_state is { IsHostCreated: true } loadedState)
+        {
             await LoadAccessEntriesAsync(loadedState.ModAccess);
+        }
         else
+        {
             ClearAccessEntries();
+        }
     }
 
     private async Task ReloadForEventAsync()
     {
-        var previousPendingRuntimeState = pendingRuntimeState;
+        var previousPendingRuntimeState = _pendingRuntimeState;
         await LoadAsync();
 
         if (previousPendingRuntimeState is null)
+        {
             return;
+        }
 
-        var currentRuntimeState = state?.RuntimeStatus?.RuntimeState;
+        var currentRuntimeState = _state?.RuntimeStatus?.RuntimeState;
         if (currentRuntimeState == previousPendingRuntimeState)
+        {
             return;
+        }
 
         TrackPendingRuntimeTransition();
         if (currentRuntimeState is not null)
-            Toasts.Status(RuntimeStatusMessage);
+        {
+            _toasts.Status(_runtimeStatusMessage);
+        }
     }
 
     private async Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
     {
-        await ModAccess.RemoveEntryAsync(hostId, kind, login, CancellationToken.None);
+        await _modAccess.RemoveEntryAsync(hostId, kind, login, CancellationToken.None);
         await LoadAsync();
     }
 
     private async Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
     {
-        await ModAccess.SetModsEnabledAsync(hostId, args.Value is true, CancellationToken.None);
+        await _modAccess.SetModsEnabledAsync(hostId, args.Value is true, CancellationToken.None);
         await LoadAsync();
     }
 
     private void SetAllowModsByDefault(int hostId, bool allowByDefault)
     {
-        if (state is null || state.ModAccess.AllowModsByDefault == allowByDefault)
+        if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
+        {
             return;
+        }
 
-        var previousAccess = state.ModAccess;
-        var version = ++allowModsByDefaultSaveVersion;
-        state = state with
+        var previousAccess = _state.ModAccess;
+        var version = ++_allowModsByDefaultSaveVersion;
+        _state = _state with
         {
             ModAccess = previousAccess with { AllowModsByDefault = allowByDefault },
         };
 
-        allowModsByDefaultSaveCts?.Cancel();
+        _allowModsByDefaultSaveCts?.Cancel();
         var saveCts = new CancellationTokenSource();
-        allowModsByDefaultSaveCts = saveCts;
+        _allowModsByDefaultSaveCts = saveCts;
 
         _ = PersistAllowModsByDefaultAsync(
             hostId,
@@ -370,25 +399,31 @@ public partial class HostConfigPage
         var cancellationToken = saveCts.Token;
         try
         {
-            await Task.Delay(AccessModeSaveDebounce, cancellationToken);
-            await ModAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, cancellationToken);
+            await Task.Delay(_accessModeSaveDebounce, cancellationToken);
+            await _modAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
-            if (version == allowModsByDefaultSaveVersion)
+            if (version == _allowModsByDefaultSaveVersion)
+            {
                 await InvokeAsync(LoadAsync);
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch
         {
-            if (version != allowModsByDefaultSaveVersion)
+            if (version != _allowModsByDefaultSaveVersion)
+            {
                 return;
+            }
 
             await InvokeAsync(() =>
             {
-                if (state is not null)
-                    state = state with { ModAccess = previousAccess };
+                if (_state is not null)
+                {
+                    _state = _state with { ModAccess = previousAccess };
+                }
 
-                Toasts.Error(
+                _toasts.Error(
                     "Who can help could not be saved. Your previous setting has been restored.",
                     "Mod help not saved"
                 );
@@ -397,8 +432,10 @@ public partial class HostConfigPage
         }
         finally
         {
-            if (ReferenceEquals(allowModsByDefaultSaveCts, saveCts))
-                allowModsByDefaultSaveCts = null;
+            if (ReferenceEquals(_allowModsByDefaultSaveCts, saveCts))
+            {
+                _allowModsByDefaultSaveCts = null;
+            }
 
             saveCts.Dispose();
         }
@@ -406,7 +443,7 @@ public partial class HostConfigPage
 
     private async Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
     {
-        await Features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
+        await _features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
         await LoadAsync();
         ToastFeatureChange(feature, enabled);
     }
@@ -414,15 +451,17 @@ public partial class HostConfigPage
     private async Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
     {
         var runtimeWasActive =
-            state?.RuntimeStatus?.RuntimeState
+            _state?.RuntimeStatus?.RuntimeState
             is BotChannelRuntimeState.Starting
                 or BotChannelRuntimeState.Started;
-        await HostBotAccounts.SetOverrideEnabledAsync(hostId, enabled, CancellationToken.None);
+        await _hostBotAccounts.SetOverrideEnabledAsync(hostId, enabled, CancellationToken.None);
         await LoadAsync();
         if (runtimeWasActive)
+        {
             TrackPendingRuntimeTransition();
+        }
 
-        Toasts.Status(
+        _toasts.Status(
             enabled
                 ? "Custom bot is turned on for this channel. Connect the account before starting the bot."
                 : "Custom bot is turned off. This channel will use the main bot account.",
@@ -433,7 +472,7 @@ public partial class HostConfigPage
 
     private async Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
     {
-        var saved = await HostBotAccounts.SetWhisperResponsesEnabledAsync(
+        var saved = await _hostBotAccounts.SetWhisperResponsesEnabledAsync(
             hostId,
             enabled,
             CancellationToken.None
@@ -442,14 +481,14 @@ public partial class HostConfigPage
 
         if (!saved && enabled)
         {
-            Toasts.Error(
+            _toasts.Error(
                 "Turn on custom bot before enabling whisper responses.",
                 "Whisper responses not saved"
             );
             return;
         }
 
-        Toasts.Status(
+        _toasts.Status(
             enabled
                 ? "Command replies will use custom-bot whispers when available."
                 : "Command replies will use public chat.",
@@ -460,11 +499,11 @@ public partial class HostConfigPage
 
     private async Task LoadAccessEntriesAsync(HostModAccessState access)
     {
-        whitelistEntries = await AccessListProfiles.ResolveAsync(
+        _whitelistEntries = await _accessListProfiles.ResolveAsync(
             access.Whitelist,
             CancellationToken.None
         );
-        blacklistEntries = await AccessListProfiles.ResolveAsync(
+        _blacklistEntries = await _accessListProfiles.ResolveAsync(
             access.Blacklist,
             CancellationToken.None
         );
@@ -472,47 +511,49 @@ public partial class HostConfigPage
 
     private void ClearAccessEntries()
     {
-        whitelistEntries = [];
-        blacklistEntries = [];
+        _whitelistEntries = [];
+        _blacklistEntries = [];
     }
 
     private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)
     {
         var featureName = FeatureName(feature);
-        var channelName = state is { Login.Length: > 0 } ? $"#{state.Login}" : "this channel";
+        var channelName = _state is { Login.Length: > 0 } ? $"#{_state.Login}" : "this channel";
         var stateText = enabled ? "enabled" : "disabled";
         var impactText = enabled
             ? "Its chat commands and pages are available again."
             : "Its chat commands and pages are unavailable until you enable it again.";
 
-        Toasts.Status(
+        _toasts.Status(
             $"{featureName} is now {stateText} for {channelName}. {impactText}",
             $"{featureName} {stateText}",
             enabled ? ToastTone.Positive : ToastTone.Caution
         );
     }
 
-    private static string FeatureName(HostFeatureFlags feature) =>
-        feature switch
+    private static string FeatureName(HostFeatureFlags feature)
+    {
+        return feature switch
         {
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.CustomCommands => "Custom commands",
             _ => "Feature",
         };
+    }
 
     private async Task ClearChannelAuthorizationAsync(int hostId)
     {
-        await ChannelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
+        await _channelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        Toasts.Status("The channel has been disconnected from Twitch chat.");
+        _toasts.Status("The channel has been disconnected from Twitch chat.");
     }
 
     private async Task ClearBotOverrideAuthorizationAsync(int hostId)
     {
-        await HostBotAccounts.ClearAsync(hostId, CancellationToken.None);
+        await _hostBotAccounts.ClearAsync(hostId, CancellationToken.None);
         await LoadAsync();
-        Toasts.Status(
+        _toasts.Status(
             "The custom bot account has been disconnected.",
             "Custom bot disconnected",
             ToastTone.Caution
@@ -521,43 +562,51 @@ public partial class HostConfigPage
 
     private async Task StartAsync(int hostId)
     {
-        var result = await Runtime.StartAsync(hostId, CancellationToken.None);
+        var result = await _runtime.StartAsync(hostId, CancellationToken.None);
         await LoadAsync();
         if (result.Succeeded)
+        {
             TrackPendingRuntimeTransition();
-        Toasts.Publish(
+        }
+
+        _toasts.Publish(
             result.Succeeded ? ToastKind.Status : ToastKind.Error,
-            result.Succeeded ? RuntimeStatusMessage : result.Message
+            result.Succeeded ? _runtimeStatusMessage : result.Message
         );
     }
 
     private async Task StopAsync(int hostId)
     {
-        var result = await Runtime.StopAsync(hostId, CancellationToken.None);
+        var result = await _runtime.StopAsync(hostId, CancellationToken.None);
         await LoadAsync();
         if (result.Succeeded)
+        {
             TrackPendingRuntimeTransition();
-        Toasts.Publish(
+        }
+
+        _toasts.Publish(
             result.Succeeded ? ToastKind.Status : ToastKind.Error,
-            result.Succeeded ? RuntimeStatusMessage : result.Message
+            result.Succeeded ? _runtimeStatusMessage : result.Message
         );
     }
 
     private void TrackPendingRuntimeTransition()
     {
-        var runtimeState = state?.RuntimeStatus?.RuntimeState;
-        pendingRuntimeState = IsRuntimeTransitionPending(runtimeState) ? runtimeState : null;
+        var runtimeState = _state?.RuntimeStatus?.RuntimeState;
+        _pendingRuntimeState = IsRuntimeTransitionPending(runtimeState) ? runtimeState : null;
     }
 
-    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? runtimeState) =>
-        runtimeState is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? runtimeState)
+    {
+        return runtimeState is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+    }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            allowModsByDefaultSaveCts?.Cancel();
-            allowModsByDefaultSaveCts = null;
+            _allowModsByDefaultSaveCts?.Cancel();
+            _allowModsByDefaultSaveCts = null;
         }
 
         base.Dispose(disposing);

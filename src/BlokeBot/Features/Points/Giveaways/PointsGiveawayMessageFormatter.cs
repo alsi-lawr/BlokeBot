@@ -8,14 +8,15 @@ namespace BlokeBot.Features.Points.Giveaways;
 
 public sealed class PointsGiveawayMessageFormatter
 {
-    private const string StreamLivenessUnavailableReply =
+    private const string _streamLivenessUnavailableReply =
         "Stream status could not be checked right now.";
 
     public PointOperationResult Reply(
         PointsGiveawayStartOutcome outcome,
         ReplyDeliveryMap delivery
-    ) =>
-        outcome.Kind switch
+    )
+    {
+        return outcome.Kind switch
         {
             PointsGiveawayStartOutcomeKind.Started => ChatReply(
                 true,
@@ -46,7 +47,7 @@ public sealed class PointsGiveawayMessageFormatter
             ),
             PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable => new PointOperationResult(
                 false,
-                StreamLivenessUnavailableReply
+                _streamLivenessUnavailableReply
             ),
             PointsGiveawayStartOutcomeKind.FollowerEligibilityUnavailable => Reply(
                 false,
@@ -57,12 +58,14 @@ public sealed class PointsGiveawayMessageFormatter
             ),
             _ => throw new UnreachableException("Unknown giveaway start outcome."),
         };
+    }
 
     public PointOperationResult Reply(
         PointsGiveawayJoinOutcome outcome,
         ReplyDeliveryMap delivery
-    ) =>
-        outcome.Kind switch
+    )
+    {
+        return outcome.Kind switch
         {
             PointsGiveawayJoinOutcomeKind.Joined => Reply(
                 true,
@@ -110,12 +113,14 @@ public sealed class PointsGiveawayMessageFormatter
                 PointsReplyKeys.GiveawayNotActive
             ),
         };
+    }
 
     public PointOperationResult Reply(
         PointsGiveawayDrawOutcome outcome,
         ReplyDeliveryMap delivery
-    ) =>
-        outcome.Kind switch
+    )
+    {
+        return outcome.Kind switch
         {
             PointsGiveawayDrawOutcomeKind.Missing => new PointOperationResult(false, string.Empty),
             PointsGiveawayDrawOutcomeKind.NotActive when outcome.Settings is { } settings => Reply(
@@ -136,12 +141,14 @@ public sealed class PointsGiveawayMessageFormatter
                 ),
             _ => new PointOperationResult(false, string.Empty),
         };
+    }
 
     public PointOperationResult Reply(
         PointsGiveawayCancelOutcome outcome,
         ReplyDeliveryMap delivery
-    ) =>
-        outcome.Kind switch
+    )
+    {
+        return outcome.Kind switch
         {
             PointsGiveawayCancelOutcomeKind.Cancelled => ChatReply(
                 true,
@@ -163,6 +170,7 @@ public sealed class PointsGiveawayMessageFormatter
                 PointsReplyKeys.GiveawayNotActive
             ),
         };
+    }
 
     public PointOperationResult Reply(
         bool success,
@@ -173,8 +181,9 @@ public sealed class PointsGiveawayMessageFormatter
         string? user = null,
         string? winners = null,
         TimeSpan? timeLeft = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             success,
             Format(
                 template,
@@ -185,6 +194,7 @@ public sealed class PointsGiveawayMessageFormatter
             ),
             Target: delivery.TargetFor(replyKey)
         );
+    }
 
     private PointOperationResult ChatReply(
         bool success,
@@ -193,8 +203,9 @@ public sealed class PointsGiveawayMessageFormatter
         string? user = null,
         string? winners = null,
         TimeSpan? timeLeft = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             success,
             Format(
                 template,
@@ -204,6 +215,7 @@ public sealed class PointsGiveawayMessageFormatter
                 timeLeft is null ? null : FormatTimeLeft(timeLeft.Value)
             )
         );
+    }
 
     public string Format(
         string template,
@@ -211,8 +223,9 @@ public sealed class PointsGiveawayMessageFormatter
         string? user = null,
         string? winners = null,
         string? timeLeft = null
-    ) =>
-        MessageTemplateFormatter.Format(
+    )
+    {
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -222,6 +235,7 @@ public sealed class PointsGiveawayMessageFormatter
                 ["time_left"] = timeLeft ?? string.Empty,
             }
         );
+    }
 
     public string FormatTimeLeft(TimeSpan timeLeft)
     {
@@ -229,6 +243,8 @@ public sealed class PointsGiveawayMessageFormatter
         return seconds == 1 ? "1 second" : $"{seconds} seconds";
     }
 
-    private static string FormatWinners(IReadOnlyList<PointsGiveawayWinnerPayout> winners) =>
-        string.Join(", ", winners.Select(x => $"{x.Login} ({x.Payout.ToDisplayString()})"));
+    private static string FormatWinners(IReadOnlyList<PointsGiveawayWinnerPayout> winners)
+    {
+        return string.Join(", ", winners.Select(x => $"{x.Login} ({x.Payout.ToDisplayString()})"));
+    }
 }

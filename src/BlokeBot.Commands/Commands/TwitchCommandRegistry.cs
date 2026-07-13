@@ -11,10 +11,14 @@ internal sealed class TwitchCommandRegistry
         var builder = new TwitchCommandPlanBuilder(filters);
 
         foreach (var callback in registrations.CommandCallbacks)
+        {
             callback(builder);
+        }
 
         foreach (var module in modules)
+        {
             module.AddCommands(builder);
+        }
 
         Plan = builder.Build();
     }

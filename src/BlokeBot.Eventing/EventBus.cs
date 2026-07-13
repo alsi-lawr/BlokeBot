@@ -3,14 +3,14 @@ namespace BlokeBot.Eventing;
 public sealed class EventBus<TKey>
     where TKey : notnull
 {
-    private readonly object gate = new();
-    private readonly Dictionary<TKey, List<RegisteredObserver>> subscriptions = [];
+    private readonly object _gate = new();
+    private readonly Dictionary<TKey, List<RegisteredObserver>> _subscriptions = [];
     private readonly ObserverFanOut<
         EventBusObserverBoundary<TKey>,
         EventNotification<TKey>,
         EventBusDeadLetter
-    > fanOut;
-    private readonly EventBusEventIdentity<TKey> eventIdentity;
+    > _fanOut;
+    private readonly EventBusEventIdentity<TKey> _eventIdentity;
 
     internal EventBus(
         ObserverFanOut<
@@ -21,8 +21,8 @@ public sealed class EventBus<TKey>
         EventBusEventIdentity<TKey> eventIdentity
     )
     {
-        this.fanOut = fanOut;
-        this.eventIdentity = eventIdentity;
+        _fanOut = fanOut;
+        _eventIdentity = eventIdentity;
     }
 
     public IDisposable Subscribe(
@@ -33,12 +33,12 @@ public sealed class EventBus<TKey>
     {
         ArgumentNullException.ThrowIfNull(handler);
         var registration = new RegisteredObserver(observer, handler);
-        lock (gate)
+        lock (_gate)
         {
-            if (!subscriptions.TryGetValue(key, out var handlers))
+            if (!_subscriptions.TryGetValue(key, out var handlers))
             {
                 handlers = [];
-                subscriptions[key] = handlers;
+                _subscriptions[key] = handlers;
             }
 
             handlers.Add(registration);
@@ -67,15 +67,15 @@ public sealed class EventBus<TKey>
     )
     {
         RegisteredObserver[] handlers;
-        lock (gate)
+        lock (_gate)
         {
-            handlers = subscriptions.TryGetValue(key, out var current)
+            handlers = _subscriptions.TryGetValue(key, out var current)
                 ? [.. current]
                 : [];
         }
 
-        var identity = eventIdentity.Project(key);
-        return fanOut.DispatchAsync(
+        var identity = _eventIdentity.Project(key);
+        return _fanOut.DispatchAsync(
             handlers,
             correlationId =>
             {
@@ -99,14 +99,18 @@ public sealed class EventBus<TKey>
 
     private void Unsubscribe(TKey key, RegisteredObserver observer)
     {
-        lock (gate)
+        lock (_gate)
         {
-            if (!subscriptions.TryGetValue(key, out var handlers))
+            if (!_subscriptions.TryGetValue(key, out var handlers))
+            {
                 return;
+            }
 
             handlers.Remove(observer);
             if (handlers.Count == 0)
-                subscriptions.Remove(key);
+            {
+                _subscriptions.Remove(key);
+            }
         }
     }
 
@@ -121,14 +125,16 @@ public sealed class EventBus<TKey>
         RegisteredObserver observer
     ) : IDisposable
     {
-        private bool disposed;
+        private bool _disposed;
 
         public void Dispose()
         {
-            if (disposed)
+            if (_disposed)
+            {
                 return;
+            }
 
-            disposed = true;
+            _disposed = true;
             owner.Unsubscribe(key, observer);
         }
     }

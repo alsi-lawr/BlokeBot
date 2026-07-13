@@ -58,12 +58,14 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .Profiles.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.Name)
             .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
             .ToListAsync(ct);
+    }
 }

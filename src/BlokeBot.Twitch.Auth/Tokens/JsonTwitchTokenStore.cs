@@ -7,7 +7,7 @@ namespace BlokeBot.Twitch.Auth;
 /// </summary>
 public sealed class JsonTwitchTokenStore : ITwitchTokenStore
 {
-    private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions _jsonOpts = new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// Creates a JSON token store.
@@ -18,12 +18,14 @@ public sealed class JsonTwitchTokenStore : ITwitchTokenStore
     public async Task<TwitchTokenSet?> LoadAsync(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
+        {
             return null;
+        }
 
         await using var stream = File.OpenRead(path);
         return await JsonSerializer.DeserializeAsync<TwitchTokenSet>(
             stream,
-            JsonOpts,
+            _jsonOpts,
             cancellationToken
         );
     }
@@ -37,9 +39,11 @@ public sealed class JsonTwitchTokenStore : ITwitchTokenStore
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrWhiteSpace(directory))
+        {
             Directory.CreateDirectory(directory);
+        }
 
         await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, tokenSet, JsonOpts, cancellationToken);
+        await JsonSerializer.SerializeAsync(stream, tokenSet, _jsonOpts, cancellationToken);
     }
 }

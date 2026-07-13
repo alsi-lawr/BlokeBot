@@ -5,12 +5,14 @@ namespace BlokeBot.Testing;
 public static class TestEventBus
 {
     public static EventBus<TKey> Create<TKey>()
-        where TKey : notnull =>
-        Create<TKey>(key =>
+        where TKey : notnull
+    {
+        return Create<TKey>(key =>
             ObserverEventIdentity.Named(
                 $"Test.{typeof(TKey).Name}.{RequireKeyText(key)}"
             )
         );
+    }
 
     public static EventBus<TKey> Create<TKey>(
         Func<TKey, ObserverEventIdentity> eventIdentity
@@ -44,8 +46,9 @@ public static class TestObserverFanOut
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary)
-        where TDeadLetter : IObserverDeadLetterPayload =>
-        new(
+        where TDeadLetter : IObserverDeadLetterPayload
+    {
+        return new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -53,18 +56,19 @@ public static class TestObserverFanOut
             new TestObserverFailureReporter(),
             new TestObserverCorrelationIdProvider()
         );
+    }
 
     private sealed class TestObserverFailureReporter
         : IObserverFailureDiagnosticReporter
     {
-        private readonly List<ObserverFailureDiagnosticReport> reports = [];
+        private readonly List<ObserverFailureDiagnosticReport> _reports = [];
 
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
         )
         {
-            reports.Add(report);
+            _reports.Add(report);
             return ValueTask.CompletedTask;
         }
     }
@@ -72,9 +76,11 @@ public static class TestObserverFanOut
     private sealed class TestObserverCorrelationIdProvider
         : IObserverCorrelationIdProvider
     {
-        private int next;
+        private int _next;
 
-        public ObserverCorrelationId Next() =>
-            ObserverCorrelationId.Named($"test-correlation-{++next}");
+        public ObserverCorrelationId Next()
+        {
+            return ObserverCorrelationId.Named($"test-correlation-{++_next}");
+        }
     }
 }

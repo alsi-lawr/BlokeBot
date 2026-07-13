@@ -4,20 +4,21 @@ namespace BlokeBot.Features.Replies;
 
 public sealed class ReplyDeliveryMap
 {
-    private readonly HashSet<string> whisperKeys;
+    private readonly HashSet<string> _whisperKeys;
 
     public ReplyDeliveryMap()
         : this([]) { }
 
     private ReplyDeliveryMap(IEnumerable<string> whisperKeys)
     {
-        this.whisperKeys = whisperKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _whisperKeys = whisperKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
-    public IReadOnlyCollection<string> WhisperKeys => whisperKeys;
+    public IReadOnlyCollection<string> WhisperKeys => _whisperKeys;
 
-    public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings) =>
-        new(
+    public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings)
+    {
+        return new(
             settings
                 .Where(x =>
                     string.Equals(
@@ -28,25 +29,35 @@ public sealed class ReplyDeliveryMap
                 )
                 .Select(x => x.ReplyKey)
         );
+    }
 
-    public bool IsWhisper(string replyKey) => whisperKeys.Contains(replyKey);
+    public bool IsWhisper(string replyKey)
+    {
+        return _whisperKeys.Contains(replyKey);
+    }
 
     public ReplyDeliveryMap Only(IEnumerable<string> allowedKeys)
     {
         var allowed = allowedKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return new ReplyDeliveryMap(whisperKeys.Where(allowed.Contains));
+        return new ReplyDeliveryMap(_whisperKeys.Where(allowed.Contains));
     }
 
-    public TwitchCommandResponseTarget TargetFor(string replyKey) =>
-        IsWhisper(replyKey)
+    public TwitchCommandResponseTarget TargetFor(string replyKey)
+    {
+        return IsWhisper(replyKey)
             ? TwitchCommandResponseTarget.Whisper
             : TwitchCommandResponseTarget.Chat;
+    }
 
     public void SetWhisper(string replyKey, bool whisper)
     {
         if (whisper)
-            whisperKeys.Add(replyKey);
+        {
+            _whisperKeys.Add(replyKey);
+        }
         else
-            whisperKeys.Remove(replyKey);
+        {
+            _whisperKeys.Remove(replyKey);
+        }
     }
 }

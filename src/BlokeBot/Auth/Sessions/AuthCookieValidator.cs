@@ -97,7 +97,9 @@ internal sealed class AuthCookieValidator(
         }
 
         if (!session.CurrentHostRoleIs(AuthRole.Moderator))
+        {
             return;
+        }
 
         if (
             await modAccess.CanModeratorAccessAsync(

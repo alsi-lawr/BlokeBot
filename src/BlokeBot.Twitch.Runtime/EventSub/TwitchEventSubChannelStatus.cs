@@ -80,7 +80,10 @@ public abstract record TwitchEventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        ) => healthy(this);
+        )
+        {
+            return healthy(this);
+        }
 
         private protected override void Seal() { }
     }
@@ -105,7 +108,10 @@ public abstract record TwitchEventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        ) => recovering(this);
+        )
+        {
+            return recovering(this);
+        }
 
         private protected override void Seal() { }
     }
@@ -130,7 +136,10 @@ public abstract record TwitchEventSubChannelStatus
             Func<Healthy, TResult> healthy,
             Func<Recovering, TResult> recovering,
             Func<Degraded, TResult> degraded
-        ) => degraded(this);
+        )
+        {
+            return degraded(this);
+        }
 
         private protected override void Seal() { }
     }

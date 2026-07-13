@@ -13,8 +13,8 @@ internal sealed class DurablePublicChatQueueAlertObserver(
     ILogger<DurablePublicChatQueueAlertObserver> log
 ) : IPublicChatQueueAlertObserver
 {
-    private const string Source = "twitch-outbound-queue";
-    private const string LinkPath = "/alerts";
+    private const string _source = "twitch-outbound-queue";
+    private const string _linkPath = "/alerts";
 
     public async ValueTask QueueBackedUpAsync(
         PublicChatQueueBacklog backlog,
@@ -23,7 +23,9 @@ internal sealed class DurablePublicChatQueueAlertObserver(
     {
         var channel = TwitchLogin.Normalize(backlog.Channel);
         if (string.IsNullOrWhiteSpace(channel))
+        {
             return;
+        }
 
         var host = await ResolveHostAsync(channel, cancellationToken);
         if (host is null)
@@ -38,11 +40,11 @@ internal sealed class DurablePublicChatQueueAlertObserver(
         await alerts.CreateOrGetActiveAsync(
             host.Id,
             DurableAlertSeverity.Warning,
-            Source,
+            _source,
             SourceKey(channel, backlog.OldestPendingAt),
             "Chat messages are delayed",
             Message(host.Login, backlog),
-            LinkPath,
+            _linkPath,
             cancellationToken
         );
     }
@@ -57,16 +59,22 @@ internal sealed class DurablePublicChatQueueAlertObserver(
             .SingleOrDefaultAsync(ct);
     }
 
-    private static string Message(string hostLogin, PublicChatQueueBacklog backlog) =>
-        $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
+    private static string Message(string hostLogin, PublicChatQueueBacklog backlog)
+    {
+        return $"BlokeBot has {backlog.PendingCount} messages waiting to be sent in #{hostLogin}. The oldest has been waiting about {FormatAge(backlog.OldestPendingAge)}.";
+    }
 
-    private static string SourceKey(string channel, DateTimeOffset oldestPendingAt) =>
-        $"{channel}:{oldestPendingAt.UtcDateTime:O}";
+    private static string SourceKey(string channel, DateTimeOffset oldestPendingAt)
+    {
+        return $"{channel}:{oldestPendingAt.UtcDateTime:O}";
+    }
 
     private static string FormatAge(TimeSpan age)
     {
         if (age.TotalMinutes >= 1)
+        {
             return $"{Math.Round(age.TotalMinutes, 1)} minutes";
+        }
 
         return $"{Math.Max(1, (int)Math.Round(age.TotalSeconds))} seconds";
     }

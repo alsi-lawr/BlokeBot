@@ -11,18 +11,23 @@ public sealed class PointsDashboardService(
     IPointTargetUserLookup users
 )
 {
-    public async Task<PointsDashboardState> LoadAsync(int hostId, CancellationToken ct) =>
-        new(
+    public async Task<PointsDashboardState> LoadAsync(int hostId, CancellationToken ct)
+    {
+        return new(
             await balances.GetLeaderboardAsync(hostId, 25, ct),
             await balances.GetRecentLedgerAsync(hostId, 25, ct),
             await giveaways.GetActiveGiveawayAsync(hostId, ct)
         );
+    }
 
     public async Task<PointBalanceEntry> LookupAsync(
         int hostId,
         string login,
         CancellationToken ct
-    ) => await balances.GetBalanceAsync(hostId, login, ct);
+    )
+    {
+        return await balances.GetBalanceAsync(hostId, login, ct);
+    }
 
     public async Task<PointOperationResult> AddAsync(
         int hostId,
@@ -33,17 +38,21 @@ public sealed class PointsDashboardService(
     )
     {
         if (!PointAmount.TryParseAbsolute(amountText, out var amount) || amount.IsZero)
+        {
             return PointOperationResult.Failure(
                 PointOperationFailureReason.InvalidAmount,
                 "Invalid amount."
             );
+        }
 
         var target = LoginName.Parse(targetLogin).Value;
         if (!await users.ExistsAsync(target, ct))
+        {
             return PointOperationResult.Failure(
                 PointOperationFailureReason.UnknownUser,
                 $"Twitch user @{target} was not found."
             );
+        }
 
         var result = await balances.AddAsync(hostId, target, amount, actorLogin, "dashboard", ct);
         await changes.NotifyChangedAsync(ct);
@@ -68,17 +77,21 @@ public sealed class PointsDashboardService(
     {
         var source = await balances.GetBalanceAsync(hostId, fromLogin, ct);
         if (!TryParseSpend(amountText, source.Balance, out var amount))
+        {
             return PointOperationResult.Failure(
                 PointOperationFailureReason.InvalidAmount,
                 "Invalid amount."
             );
+        }
 
         var target = LoginName.Parse(toLogin).Value;
         if (!await users.ExistsAsync(target, ct))
+        {
             return PointOperationResult.Failure(
                 PointOperationFailureReason.UnknownUser,
                 $"Twitch user @{target} was not found."
             );
+        }
 
         var result = await balances.TransferAsync(hostId, fromLogin, target, amount, ct);
         await changes.NotifyChangedAsync(ct);
@@ -103,10 +116,12 @@ public sealed class PointsDashboardService(
     {
         var target = await balances.GetBalanceAsync(hostId, targetLogin, ct);
         if (!TryParseSpend(amountText, target.Balance, out var amount))
+        {
             return PointOperationResult.Failure(
                 PointOperationFailureReason.InvalidAmount,
                 "Invalid amount."
             );
+        }
 
         var result = await balances.RemoveAsync(
             hostId,
@@ -143,7 +158,9 @@ public sealed class PointsDashboardService(
             ct
         );
         if (result.Success)
+        {
             await changes.NotifyChangedAsync(ct);
+        }
 
         return result.Success
             ? result with
@@ -160,16 +177,24 @@ public sealed class PointsDashboardService(
         int hostId,
         string hostLogin,
         CancellationToken ct
-    ) => giveaways.StartAsync(hostId, hostLogin, null, ct);
+    )
+    {
+        return giveaways.StartAsync(hostId, hostLogin, null, ct);
+    }
 
     public Task<PointOperationResult> EndGiveawayAsync(
         int hostId,
         string hostLogin,
         CancellationToken ct
-    ) => giveaways.EndAsync(hostId, hostLogin, ct);
+    )
+    {
+        return giveaways.EndAsync(hostId, hostLogin, ct);
+    }
 
-    public Task<PointOperationResult> CancelGiveawayAsync(int hostId, CancellationToken ct) =>
-        giveaways.CancelAsync(hostId, ct);
+    public Task<PointOperationResult> CancelGiveawayAsync(int hostId, CancellationToken ct)
+    {
+        return giveaways.CancelAsync(hostId, ct);
+    }
 
     private static bool TryParseSpend(
         string value,

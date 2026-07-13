@@ -252,7 +252,9 @@ public sealed class CustomCommandExecutionTests
             )
         );
         if (clock is not null)
+        {
             services.AddSingleton(clock);
+        }
 
         services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
         services.AddTwitchCommands().AddCommandModule<CustomCommandModule>();
@@ -367,14 +369,16 @@ public sealed class CustomCommandExecutionTests
         string channel,
         string text,
         IReadOnlyDictionary<string, string>? tags = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             login,
             channel,
             text,
             $":{login}!u@h PRIVMSG #{channel} :{text}",
             tags ?? new Dictionary<string, string>()
         );
+    }
 
     private static async Task DispatchMessageAsync(
         TwitchCommandDispatcher dispatcher,
@@ -382,19 +386,23 @@ public sealed class CustomCommandExecutionTests
         string channel,
         string text,
         List<string> replies
-    ) =>
+    )
+    {
         await dispatcher.DispatchResponsesAsync(
             Message(login, channel, text),
             RecordMessages(replies),
             CancellationToken.None
         );
+    }
 
-    private static TwitchCommandResponder RecordMessages(List<string> replies) =>
-        (response, _) =>
+    private static TwitchCommandResponder RecordMessages(List<string> replies)
+    {
+        return (response, _) =>
         {
             replies.Add(response.Message);
             return ValueTask.CompletedTask;
         };
+    }
 
     private sealed record CommandSeed(
         int CommandId,
@@ -404,13 +412,16 @@ public sealed class CustomCommandExecutionTests
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        private DateTimeOffset current = now;
+        private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow() => current;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _current;
+        }
 
         public void Advance(TimeSpan interval)
         {
-            current += interval;
+            _current += interval;
         }
     }
 }

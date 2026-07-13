@@ -2,47 +2,55 @@ namespace BlokeBot.Functional;
 
 public sealed class IO<TValue, TError>
 {
-    private readonly Func<CancellationToken, ValueTask<Result<TValue, TError>>> operation;
+    private readonly Func<CancellationToken, ValueTask<Result<TValue, TError>>> _operation;
 
     private IO(Func<CancellationToken, ValueTask<Result<TValue, TError>>> operation)
     {
-        this.operation = operation;
+        _operation = operation;
     }
 
     public static IO<TValue, TError> Create(
         Func<CancellationToken, ValueTask<Result<TValue, TError>>> operation
-    ) => new(operation);
+    )
+    {
+        return new(operation);
+    }
 
     public static IO<TValue, TError> FromException<TException>(
         Func<CancellationToken, ValueTask<TValue>> operation,
         Func<TException, TError> mapException
     )
-        where TException : Exception =>
-        new(cancellationToken =>
+        where TException : Exception
+    {
+        return new(cancellationToken =>
             ExecuteMappedAsync<TException>(operation, mapException, cancellationToken)
         );
+    }
 
     public async ValueTask<Result<TValue, TError>> ExecuteAsync(
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var result = await operation(cancellationToken).ConfigureAwait(false);
+        var result = await _operation(cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return result;
     }
 
-    public IO<TMapped, TError> Map<TMapped>(Func<TValue, TMapped> map) =>
-        IO<TMapped, TError>.Create(async cancellationToken =>
+    public IO<TMapped, TError> Map<TMapped>(Func<TValue, TMapped> map)
+    {
+        return IO<TMapped, TError>.Create(async cancellationToken =>
         {
             var result = await ExecuteAsync(cancellationToken).ConfigureAwait(false);
             return result.Map(map);
         });
+    }
 
     public IO<TMapped, TError> Bind<TMapped>(
         Func<TValue, IO<TMapped, TError>> bind
-    ) =>
-        IO<TMapped, TError>.Create(async cancellationToken =>
+    )
+    {
+        return IO<TMapped, TError>.Create(async cancellationToken =>
         {
             var result = await ExecuteAsync(cancellationToken).ConfigureAwait(false);
             return await result
@@ -52,6 +60,7 @@ public sealed class IO<TValue, TError>
                 )
                 .ConfigureAwait(false);
         });
+    }
 
     private static async ValueTask<Result<TValue, TError>> ExecuteMappedAsync<TException>(
         Func<CancellationToken, ValueTask<TValue>> operation,

@@ -44,11 +44,13 @@ namespace BlokeBot.Components.Pages;
 public partial class Error
 {
     [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
+    private HttpContext? _httpContext { get; set; }
 
-    private string? RequestId { get; set; }
-    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    private string? _requestId { get; set; }
+    private bool _showRequestId => !string.IsNullOrEmpty(_requestId);
 
-    protected override void OnInitialized() =>
-        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    protected override void OnInitialized()
+    {
+        _requestId = Activity.Current?.Id ?? _httpContext?.TraceIdentifier;
+    }
 }

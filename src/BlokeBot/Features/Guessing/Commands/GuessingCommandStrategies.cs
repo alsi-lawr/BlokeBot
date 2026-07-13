@@ -19,17 +19,22 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     public async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) =>
-        await Commands.ModeratorOnlyResponseAsync(
+    )
+    {
+        return await Commands.ModeratorOnlyResponseAsync(
             context.Command.Message.Channel,
             context.State.GuessRoundProfileId,
             cancellationToken
         );
+    }
 
     public async ValueTask<string> ModeratorOnlyReplyAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
-    ) => (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+    )
+    {
+        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+    }
 
     public abstract ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -43,10 +48,12 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     )
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
+        {
             await context.Command.RespondAsync(
                 new TwitchCommandResponse(result.Target, result.Message),
                 cancellationToken
             );
+        }
     }
 
     protected async Task<GuessingOperationResult> UsageAsync(
@@ -208,6 +215,8 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
             cancellationToken
         );
         if (!string.IsNullOrWhiteSpace(response.Message))
+        {
             await context.Command.RespondAsync(response, cancellationToken);
+        }
     }
 }

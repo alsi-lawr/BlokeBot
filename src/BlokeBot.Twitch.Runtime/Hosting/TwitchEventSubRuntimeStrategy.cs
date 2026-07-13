@@ -5,6 +5,8 @@ internal sealed class TwitchEventSubRuntimeStrategy(TwitchEventSubRuntime runtim
 {
     public TwitchBotRuntime Runtime => TwitchBotRuntime.EventSub;
 
-    public Task RunAsync(CancellationToken cancellationToken) =>
-        runtime.RunAsync(cancellationToken);
+    public Task RunAsync(CancellationToken cancellationToken)
+    {
+        return runtime.RunAsync(cancellationToken);
+    }
 }

@@ -45,25 +45,26 @@ namespace BlokeBot.Features.Points.Dashboard;
 
 public partial class PointsDashboard
 {
-    private bool featureEnabled;
-    private PointsDashboardState? state;
-    private PointBalanceEntry? lookupResult;
-    private string lookupLogin = string.Empty;
-    private string giveFrom = string.Empty;
-    private string giveTo = string.Empty;
-    private string giveAmount = string.Empty;
-    private string addLogin = string.Empty;
-    private string addAmount = string.Empty;
-    private string removeLogin = string.Empty;
-    private string removeAmount = string.Empty;
+    private bool _featureEnabled;
+    private PointsDashboardState? _state;
+    private PointBalanceEntry? _lookupResult;
+    private string _lookupLogin = string.Empty;
+    private string _giveFrom = string.Empty;
+    private string _giveTo = string.Empty;
+    private string _giveAmount = string.Empty;
+    private string _addLogin = string.Empty;
+    private string _addAmount = string.Empty;
+    private string _removeLogin = string.Empty;
+    private string _removeAmount = string.Empty;
 
-    private string GiveawaySummary =>
-        state?.ActiveGiveaway is null
+    private string _giveawaySummary =>
+        _state?.ActiveGiveaway is null
             ? "No giveaway running."
-            : $"Runs until {state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {state.ActiveGiveaway.Entrants.Count} people joined.";
+            : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Count} people joined.";
 
-    private static string LedgerChangeLabel(string kind) =>
-        kind switch
+    private static string LedgerChangeLabel(string kind)
+    {
+        return kind switch
         {
             "Add" => "Points added",
             "Remove" => "Points removed",
@@ -76,11 +77,12 @@ public partial class PointsDashboard
             "GuessWin" => "Guessing prize",
             _ => "Points changed",
         };
+    }
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 [AppEventKind.PointsChanged, AppEventKind.HostedChannelsChanged],
                 work => InvokeAsync(work),
                 LoadAsync,
@@ -91,37 +93,49 @@ public partial class PointsDashboard
         await LoadAsync();
     }
 
-    private Task AddAsync() =>
-        RunAsync(() =>
-            Dashboard.AddAsync(HostId, addLogin, addAmount, ActorLogin, CancellationToken.None)
+    private Task AddAsync()
+    {
+        return RunAsync(() =>
+            _dashboard.AddAsync(HostId, _addLogin, _addAmount, ActorLogin, CancellationToken.None)
         );
+    }
 
-    private Task CancelGiveawayAsync() =>
-        RunAsync(() => Dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
+    private Task CancelGiveawayAsync()
+    {
+        return RunAsync(() => _dashboard.CancelGiveawayAsync(HostId, CancellationToken.None));
+    }
 
-    private Task EndGiveawayAsync() =>
-        RunAsync(() => Dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    private Task EndGiveawayAsync()
+    {
+        return RunAsync(() => _dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    }
 
-    private Task GiveAsync() =>
-        RunAsync(() =>
-            Dashboard.GiveAsync(HostId, giveFrom, giveTo, giveAmount, CancellationToken.None)
+    private Task GiveAsync()
+    {
+        return RunAsync(() =>
+            _dashboard.GiveAsync(HostId, _giveFrom, _giveTo, _giveAmount, CancellationToken.None)
         );
+    }
 
     private async Task LoadAsync()
     {
         if (HostId == 0)
+        {
             return;
+        }
 
         await LoadFeatureStateAsync();
-        state = featureEnabled ? await Dashboard.LoadAsync(HostId, CancellationToken.None) : null;
+        _state = _featureEnabled ? await _dashboard.LoadAsync(HostId, CancellationToken.None) : null;
     }
 
     private async Task LookupAsync()
     {
-        if (HostId == 0 || !featureEnabled || string.IsNullOrWhiteSpace(lookupLogin))
+        if (HostId == 0 || !_featureEnabled || string.IsNullOrWhiteSpace(_lookupLogin))
+        {
             return;
+        }
 
-        lookupResult = await Dashboard.LookupAsync(HostId, lookupLogin, CancellationToken.None);
+        _lookupResult = await _dashboard.LookupAsync(HostId, _lookupLogin, CancellationToken.None);
     }
 
     private async Task RefreshAsync()
@@ -129,41 +143,49 @@ public partial class PointsDashboard
         await LoadAsync();
     }
 
-    private Task RemoveAsync() =>
-        RunAsync(() =>
-            Dashboard.RemoveAsync(
+    private Task RemoveAsync()
+    {
+        return RunAsync(() =>
+            _dashboard.RemoveAsync(
                 HostId,
-                removeLogin,
-                removeAmount,
+                _removeLogin,
+                _removeAmount,
                 ActorLogin,
                 CancellationToken.None
             )
         );
+    }
 
-    private Task RemoveLeaderboardEntryAsync(string login) =>
-        RunAsync(() =>
-            Dashboard.RemoveBalanceAsync(HostId, login, ActorLogin, CancellationToken.None)
+    private Task RemoveLeaderboardEntryAsync(string login)
+    {
+        return RunAsync(() =>
+            _dashboard.RemoveBalanceAsync(HostId, login, ActorLogin, CancellationToken.None)
         );
+    }
 
     private async Task RunAsync(Func<Task<PointOperationResult>> operation)
     {
         await LoadFeatureStateAsync();
-        if (!featureEnabled)
+        if (!_featureEnabled)
+        {
             return;
+        }
 
         var result = await operation();
         PublishResult(result);
         await LoadAsync();
     }
 
-    private Task StartGiveawayAsync() =>
-        RunAsync(() => Dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    private Task StartGiveawayAsync()
+    {
+        return RunAsync(() => _dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+    }
 
     private async Task LoadFeatureStateAsync()
     {
-        featureEnabled =
+        _featureEnabled =
             HostId != 0
-            && await Features.IsEnabledAsync(
+            && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.Points,
                 CancellationToken.None
@@ -173,8 +195,10 @@ public partial class PointsDashboard
     private void PublishResult(PointOperationResult result)
     {
         if (string.IsNullOrWhiteSpace(result.Message))
+        {
             return;
+        }
 
-        Toasts.Publish(result.Success ? ToastKind.Success : ToastKind.Warning, result.Message);
+        _toasts.Publish(result.Success ? ToastKind.Success : ToastKind.Warning, result.Message);
     }
 }

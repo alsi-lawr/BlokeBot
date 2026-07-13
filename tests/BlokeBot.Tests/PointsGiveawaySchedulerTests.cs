@@ -978,14 +978,16 @@ public sealed class PointsGiveawaySchedulerTests
         TimeProvider timeProvider,
         IPointsGiveawaySchedulerNotification notification,
         ILogger<PointsGiveawayScheduler> logger
-    ) =>
-        new(
+    )
+    {
+        return new(
             operations,
             notification,
             new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
             timeProvider,
             logger
         );
+    }
 
     private static PointsGiveawayService CreateGiveawayService(
         SqliteBlokeBotDbFactory dbFactory,
@@ -1017,15 +1019,18 @@ public sealed class PointsGiveawaySchedulerTests
 
     private static PointsGiveawayDrawService CreateDrawService(
         IDbContextFactory<BlokeBotDbContext> dbFactory
-    ) =>
-        new(
+    )
+    {
+        return new(
             dbFactory,
             new PointBalanceService(dbFactory),
             new FixedPointsRandom()
         );
+    }
 
-    private static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now) =>
-        new(
+    private static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now)
+    {
+        return new(
             42,
             7,
             "streamer",
@@ -1033,13 +1038,16 @@ public sealed class PointsGiveawaySchedulerTests
             now.AddHours(1).UtcDateTime,
             null
         );
+    }
 
-    private static Result<TValue, PointsGiveawaySchedulerTransientFailure> Failure<TValue>() =>
-        Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
+    private static Result<TValue, PointsGiveawaySchedulerTransientFailure> Failure<TValue>()
+    {
+        return Result<TValue, PointsGiveawaySchedulerTransientFailure>.Error(
             new PointsGiveawaySchedulerTransientFailure(
                 new SqliteException("database busy", SQLitePCL.raw.SQLITE_BUSY)
             )
         );
+    }
 
     private static async Task<int> SeedHostAsync(
         IDbContextFactory<BlokeBotDbContext> dbFactory,
@@ -1170,8 +1178,9 @@ public sealed class PointsGiveawaySchedulerTests
         public IO<
             IReadOnlyList<PointsGiveawaySchedule>,
             PointsGiveawaySchedulerTransientFailure
-        > LoadActive() =>
-            IO<
+        > LoadActive()
+        {
+            return IO<
                 IReadOnlyList<PointsGiveawaySchedule>,
                 PointsGiveawaySchedulerTransientFailure
             >.Create(_ =>
@@ -1180,21 +1189,25 @@ public sealed class PointsGiveawaySchedulerTests
                 BeforeLoadResult?.Invoke();
                 return ValueTask.FromResult(Next(LoadOutcomes, Active));
             });
+        }
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildUpdate(
             int giveawayId,
             DateTime endsAtUtc
-        ) =>
-            IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
+        )
+        {
+            return IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
             {
                 UpdateAttempts++;
                 return ValueTask.FromResult(Next(UpdateOutcomes, Option<string>.None));
             });
+        }
 
         public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
             int giveawayId
-        ) =>
-            IO<
+        )
+        {
+            return IO<
                 PointsGiveawayDrawOutcome,
                 PointsGiveawaySchedulerTransientFailure
             >.Create(_ =>
@@ -1214,23 +1227,27 @@ public sealed class PointsGiveawaySchedulerTests
                     Next(DrawOutcomes, PointsGiveawayDrawOutcome.Missing())
                 );
             });
+        }
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
             PointsGiveawayDrawOutcome outcome
-        ) =>
-            IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
+        )
+        {
+            return IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
             {
                 DrawNotificationAttempts++;
                 return ValueTask.FromResult(
                     Next(DrawNotificationOutcomes, Option<string>.None)
                 );
             });
+        }
 
         public IO<
             PointsGiveawayExpirationOutcome,
             PointsGiveawaySchedulerTransientFailure
-        > Expire(int giveawayId) =>
-            IO<
+        > Expire(int giveawayId)
+        {
+            return IO<
                 PointsGiveawayExpirationOutcome,
                 PointsGiveawaySchedulerTransientFailure
             >.Create(_ =>
@@ -1240,12 +1257,14 @@ public sealed class PointsGiveawaySchedulerTests
                     Next(ExpirationOutcomes, PointsGiveawayExpirationOutcome.Expired)
                 );
             });
+        }
 
         public IO<
             PointsGiveawayChangeNotificationCompleted,
             PointsGiveawaySchedulerNotificationFailure
-        > NotifyChanged() =>
-            IO<
+        > NotifyChanged()
+        {
+            return IO<
                 PointsGiveawayChangeNotificationCompleted,
                 PointsGiveawaySchedulerNotificationFailure
             >.Create(_ =>
@@ -1258,14 +1277,17 @@ public sealed class PointsGiveawaySchedulerTests
                     )
                 );
             });
+        }
 
         private static Result<TValue, TError> Next<TValue, TError>(
             Queue<Result<TValue, TError>> outcomes,
             TValue defaultValue
-        ) =>
-            outcomes.TryDequeue(out var outcome)
+        )
+        {
+            return outcomes.TryDequeue(out var outcome)
                 ? outcome
                 : Result<TValue, TError>.Success(defaultValue);
+        }
     }
 
     private sealed class FailingOnceDbContextFactory(
@@ -1278,7 +1300,9 @@ public sealed class PointsGiveawaySchedulerTests
         public BlokeBotDbContext CreateDbContext()
         {
             if (++Attempts == 1)
+            {
                 throw failure;
+            }
 
             return inner.CreateDbContext();
         }
@@ -1288,7 +1312,9 @@ public sealed class PointsGiveawaySchedulerTests
         )
         {
             if (++Attempts == 1)
+            {
                 return Task.FromException<BlokeBotDbContext>(failure);
+            }
 
             return inner.CreateDbContextAsync(cancellationToken);
         }
@@ -1298,14 +1324,14 @@ public sealed class PointsGiveawaySchedulerTests
         IDbContextFactory<BlokeBotDbContext> inner
     ) : IDbContextFactory<BlokeBotDbContext>
     {
-        private readonly ConcurrentQueue<DbConnection> connections = [];
+        private readonly ConcurrentQueue<DbConnection> _connections = [];
 
-        public DbConnection[] Connections => connections.ToArray();
+        public DbConnection[] Connections => _connections.ToArray();
 
         public BlokeBotDbContext CreateDbContext()
         {
             var db = inner.CreateDbContext();
-            connections.Enqueue(db.Database.GetDbConnection());
+            _connections.Enqueue(db.Database.GetDbConnection());
             return db;
         }
 
@@ -1314,7 +1340,7 @@ public sealed class PointsGiveawaySchedulerTests
         )
         {
             var db = await inner.CreateDbContextAsync(cancellationToken);
-            connections.Enqueue(db.Database.GetDbConnection());
+            _connections.Enqueue(db.Database.GetDbConnection());
             return db;
         }
     }
@@ -1342,7 +1368,9 @@ public sealed class PointsGiveawaySchedulerTests
                 .UseSqlite(connectionString)
                 .Options;
             await using (var db = new BlokeBotDbContext(creationOptions))
+            {
                 await db.Database.EnsureCreatedAsync();
+            }
 
             var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
                 .UseSqlite(connectionString)
@@ -1351,24 +1379,36 @@ public sealed class PointsGiveawaySchedulerTests
             return new InterceptedSqliteBlokeBotDbFactory(keeperConnection, options);
         }
 
-        public BlokeBotDbContext CreateDbContext() => new(options);
+        public BlokeBotDbContext CreateDbContext()
+        {
+            return new(options);
+        }
 
         public Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
-        ) => Task.FromResult(CreateDbContext());
+        )
+        {
+            return Task.FromResult(CreateDbContext());
+        }
 
-        public async ValueTask DisposeAsync() => await keeperConnection.DisposeAsync();
+        public async ValueTask DisposeAsync()
+        {
+            await keeperConnection.DisposeAsync();
+        }
     }
 
     private sealed class CommitCancellationInterceptor : DbTransactionInterceptor
     {
-        private bool failNextCommit;
+        private bool _failNextCommit;
 
         public int CommitAttempts { get; private set; }
 
         public CancellationToken ObservedCancellationToken { get; private set; }
 
-        public void FailNextCommit() => failNextCommit = true;
+        public void FailNextCommit()
+        {
+            _failNextCommit = true;
+        }
 
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(
             DbTransaction transaction,
@@ -1377,10 +1417,12 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken cancellationToken = default
         )
         {
-            if (!failNextCommit)
+            if (!_failNextCommit)
+            {
                 return ValueTask.FromResult(result);
+            }
 
-            failNextCommit = false;
+            _failNextCommit = false;
             CommitAttempts++;
             ObservedCancellationToken = cancellationToken;
             return ValueTask.FromException<InterceptionResult>(
@@ -1426,16 +1468,25 @@ public sealed class PointsGiveawaySchedulerTests
             PointsGiveawaySchedule schedule,
             string message,
             CancellationToken cancellationToken
-        ) => ValueTask.FromException(new HttpRequestException(failureMessage));
+        )
+        {
+            return ValueTask.FromException(new HttpRequestException(failureMessage));
+        }
     }
 
     private class StaticTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
         protected DateTimeOffset UtcNow { get; set; } = utcNow;
 
-        public override DateTimeOffset GetUtcNow() => UtcNow;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return UtcNow;
+        }
 
-        public override long GetTimestamp() => UtcNow.UtcTicks;
+        public override long GetTimestamp()
+        {
+            return UtcNow.UtcTicks;
+        }
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     }
@@ -1451,7 +1502,9 @@ public sealed class PointsGiveawaySchedulerTests
         )
         {
             if (dueTime > TimeSpan.Zero)
+            {
                 UtcNow = UtcNow.Add(dueTime);
+            }
 
             callback(state);
             return CompletedTimer.Instance;
@@ -1462,11 +1515,17 @@ public sealed class PointsGiveawaySchedulerTests
     {
         internal static CompletedTimer Instance { get; } = new();
 
-        public bool Change(TimeSpan dueTime, TimeSpan period) => false;
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            return false;
+        }
 
         public void Dispose() { }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class RecordingGiveawayScheduler : IPointsGiveawayScheduler
@@ -1475,29 +1534,42 @@ public sealed class PointsGiveawaySchedulerTests
 
         public void Schedule(PointsGiveawaySchedule schedule) { }
 
-        public void Cancel(int giveawayId) => Cancelled.Add(giveawayId);
+        public void Cancel(int giveawayId)
+        {
+            Cancelled.Add(giveawayId);
+        }
     }
 
     private sealed class FixedPointsRandom : IPointsRandom
     {
-        public double NextDouble() => 0;
+        public double NextDouble()
+        {
+            return 0;
+        }
 
-        public int Next(int minValue, int maxValue) => minValue;
+        public int Next(int minValue, int maxValue)
+        {
+            return minValue;
+        }
     }
 
     private sealed class FakeHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
-            ) =>
-                Task.FromResult(
+            )
+            {
+                return Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {
                         Content = new StringContent(
@@ -1507,20 +1579,25 @@ public sealed class PointsGiveawaySchedulerTests
                         ),
                     }
                 );
+            }
         }
     }
 
     private sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult("app-token");
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult("app-token");
+        }
     }
 
     private sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
         : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
             throw failure;
+        }
     }
 
     private sealed class UnavailableHostBotAccountTokenStatusProvider
@@ -1530,8 +1607,9 @@ public sealed class PointsGiveawaySchedulerTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        ) =>
-            Task.FromResult(
+        )
+        {
+            return Task.FromResult(
                 new ActiveBotAccountTokenStatus(
                     string.Empty,
                     null,
@@ -1543,6 +1621,7 @@ public sealed class PointsGiveawaySchedulerTests
                     []
                 )
             );
+        }
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>
@@ -1550,9 +1629,15 @@ public sealed class PointsGiveawaySchedulerTests
         public List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull => NullLoggerScope.Instance;
+            where TState : notnull
+        {
+            return NullLoggerScope.Instance;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,

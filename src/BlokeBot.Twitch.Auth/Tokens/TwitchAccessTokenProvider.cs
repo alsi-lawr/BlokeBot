@@ -7,8 +7,10 @@ internal sealed class TwitchAccessTokenProvider(
     ITwitchOAuthClient oauth
 ) : ITwitchAccessTokenProvider
 {
-    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-        cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken);
+    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        return cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken);
+    }
 
     private async Task<string> GetAccessTokenSynchronizedAsync(
         ITwitchAccessTokenCacheTransaction transaction,
@@ -19,12 +21,16 @@ internal sealed class TwitchAccessTokenProvider(
 
         var accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
         if (!string.IsNullOrWhiteSpace(accessToken))
+        {
             return accessToken;
+        }
 
         await LoadTokenAsync(transaction, cancellationToken);
         accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
         if (!string.IsNullOrWhiteSpace(accessToken))
+        {
             return accessToken;
+        }
 
         throw new TwitchAccessTokenUnavailableException(
             TwitchAccessTokenUnavailableReason.MissingRefreshToken,
@@ -50,7 +56,9 @@ internal sealed class TwitchAccessTokenProvider(
     )
     {
         if (!transaction.IsLoaded)
+        {
             await LoadTokenAsync(transaction, cancellationToken);
+        }
     }
 
     private async Task<string?> TryGetAccessTokenAsync(
@@ -63,7 +71,9 @@ internal sealed class TwitchAccessTokenProvider(
             && current.ExpiresAtUtc > DateTimeOffset.UtcNow
             && await oauth.ValidateAsync(current.AccessToken, cancellationToken)
         )
+        {
             return current.AccessToken;
+        }
 
         if (transaction.Current is { RefreshToken.Length: > 0 } refreshable)
         {

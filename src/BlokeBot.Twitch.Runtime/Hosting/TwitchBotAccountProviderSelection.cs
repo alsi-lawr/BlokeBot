@@ -5,14 +5,14 @@ namespace BlokeBot.Twitch.Runtime;
 /// </summary>
 public sealed class TwitchBotAccountProviderSelection
 {
-    private readonly List<TwitchBotAccountProviderRegistration> selections = [];
+    private readonly List<TwitchBotAccountProviderRegistration> _selections = [];
 
     /// <summary>
     /// Selects the runtime's built-in configured account provider.
     /// </summary>
     public TwitchBotAccountProviderSelection UseDefaultProvider()
     {
-        selections.Add(
+        _selections.Add(
             new TwitchBotAccountProviderRegistration
             {
                 Kind = TwitchBotAccountProviderKind.Default,
@@ -29,7 +29,7 @@ public sealed class TwitchBotAccountProviderSelection
     public TwitchBotAccountProviderSelection UseHostedChannelProvider<TProvider>()
         where TProvider : class, ITwitchBotAccountProvider
     {
-        selections.Add(
+        _selections.Add(
             new TwitchBotAccountProviderRegistration
             {
                 Kind = TwitchBotAccountProviderKind.HostedChannel,
@@ -46,7 +46,7 @@ public sealed class TwitchBotAccountProviderSelection
     public TwitchBotAccountProviderSelection UseCustomProvider<TProvider>()
         where TProvider : class, ITwitchBotAccountProvider
     {
-        selections.Add(
+        _selections.Add(
             new TwitchBotAccountProviderRegistration
             {
                 Kind = TwitchBotAccountProviderKind.Custom,
@@ -56,17 +56,19 @@ public sealed class TwitchBotAccountProviderSelection
         return this;
     }
 
-    internal TwitchBotAccountProviderRegistration RequireSingle() =>
-        selections.Count switch
+    internal TwitchBotAccountProviderRegistration RequireSingle()
+    {
+        return _selections.Count switch
         {
-            1 => selections[0],
+            1 => _selections[0],
             0 => throw new InvalidOperationException(
                 "Exactly one Twitch bot account provider must be selected; none was selected."
             ),
             _ => throw new InvalidOperationException(
-                $"Exactly one Twitch bot account provider must be selected; {selections.Count} were selected."
+                $"Exactly one Twitch bot account provider must be selected; {_selections.Count} were selected."
             ),
         };
+    }
 }
 
 internal enum TwitchBotAccountProviderKind

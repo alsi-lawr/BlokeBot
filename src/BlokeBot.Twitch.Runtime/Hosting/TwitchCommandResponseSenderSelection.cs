@@ -5,14 +5,14 @@ namespace BlokeBot.Twitch.Runtime;
 /// </summary>
 public sealed class TwitchCommandResponseSenderSelection
 {
-    private readonly List<TwitchCommandResponseSenderRegistration> selections = [];
+    private readonly List<TwitchCommandResponseSenderRegistration> _selections = [];
 
     /// <summary>
     /// Selects standalone delivery of every command response through public chat.
     /// </summary>
     public TwitchCommandResponseSenderSelection UseStandalonePublicChat()
     {
-        selections.Add(
+        _selections.Add(
             new TwitchCommandResponseSenderRegistration
             {
                 Kind = TwitchCommandResponseSenderKind.StandalonePublicChat,
@@ -29,7 +29,7 @@ public sealed class TwitchCommandResponseSenderSelection
     public TwitchCommandResponseSenderSelection UseHostedWhisperSender<TSender>()
         where TSender : class, ITwitchCommandResponseSender
     {
-        selections.Add(
+        _selections.Add(
             new TwitchCommandResponseSenderRegistration
             {
                 Kind = TwitchCommandResponseSenderKind.HostedWhisper,
@@ -39,17 +39,19 @@ public sealed class TwitchCommandResponseSenderSelection
         return this;
     }
 
-    internal TwitchCommandResponseSenderRegistration RequireSingle() =>
-        selections.Count switch
+    internal TwitchCommandResponseSenderRegistration RequireSingle()
+    {
+        return _selections.Count switch
         {
-            1 => selections[0],
+            1 => _selections[0],
             0 => throw new InvalidOperationException(
                 "Exactly one Twitch command-response sender must be selected; none was selected."
             ),
             _ => throw new InvalidOperationException(
-                $"Exactly one Twitch command-response sender must be selected; {selections.Count} were selected."
+                $"Exactly one Twitch command-response sender must be selected; {_selections.Count} were selected."
             ),
         };
+    }
 }
 
 internal enum TwitchCommandResponseSenderKind

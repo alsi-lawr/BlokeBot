@@ -3,20 +3,20 @@
 @using BlokeBot.Hosts
 @using BlokeBot.Persistence.Models
 @implements IDisposable
-@inject EventBus<AppEventKind> Events
-@inject HostedChannelRuntimeStatusService HostedChannels
+@inject EventBus<AppEventKind> _events
+@inject HostedChannelRuntimeStatusService _hostedChannels
 
-@if (Selection is not null && selectedHostStatus is not null)
+@if (_selection is not null && _selectedHostStatus is not null)
 {
-    <div class="@SelectedBotStatusShellClass">
-        @if (SelectedHostBotAuthorized)
+    <div class="@_selectedBotStatusShellClass">
+        @if (_selectedHostBotAuthorized)
         {
-            <span class="@SelectedBotStatusDotClass"></span>
-            <span>@SelectedBotStatusText</span>
+            <span class="@_selectedBotStatusDotClass"></span>
+            <span>@_selectedBotStatusText</span>
         }
         else if (CanAuthorizeSelectedHost())
         {
-            <span class="@SelectedBotStatusDotClass"></span>
+            <span class="@_selectedBotStatusDotClass"></span>
             <AuthPopupButton Class="font-bold text-[#9146ff] transition hover:text-[#7c3aed] disabled:opacity-70"
                              Url="/oauth/channel-bot/start"
                              PopupName="blokebot-channel-oauth"
@@ -27,8 +27,8 @@
         }
         else
         {
-            <span class="@SelectedBotStatusDotClass"></span>
-            <span>@SelectedBotStatusText</span>
+            <span class="@_selectedBotStatusDotClass"></span>
+            <span>@_selectedBotStatusText</span>
         }
     </div>
 }

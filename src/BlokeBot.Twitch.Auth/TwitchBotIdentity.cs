@@ -57,11 +57,13 @@ public sealed record TwitchBotIdentity
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
         var validation = new TwitchBotIdentityOptionsValidator().Validate(boundary, options);
         if (validation.Failed)
+        {
             throw new OptionsValidationException(
                 boundary,
                 typeof(TwitchBotIdentityOptions),
                 validation.Failures
             );
+        }
 
         var identity = FromOptions(options);
         if (identity.Scopes.IsEmpty)
@@ -77,6 +79,8 @@ public sealed record TwitchBotIdentity
     }
 
     /// <inheritdoc />
-    public override string ToString() =>
-        $"{nameof(TwitchBotIdentity)} {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Length} }}";
+    public override string ToString()
+    {
+        return $"{nameof(TwitchBotIdentity)} {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Length} }}";
+    }
 }

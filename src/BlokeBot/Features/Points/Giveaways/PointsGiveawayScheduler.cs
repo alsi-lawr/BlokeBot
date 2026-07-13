@@ -14,25 +14,25 @@ internal sealed class PointsGiveawayScheduler(
     ILogger<PointsGiveawayScheduler> log
 ) : BackgroundService, IPointsGiveawayScheduler
 {
-    private static readonly double[] ReminderFactors = [0.25, 0.5, 0.75];
+    private static readonly double[] _reminderFactors = [0.25, 0.5, 0.75];
 
-    private readonly object scheduleGate = new();
-    private readonly Dictionary<int, ScheduledGiveaway> schedules = [];
-    private readonly TimeSpan retryDelay = ValidRetryDelay(recoveryPolicy);
-    private readonly Channel<PointsGiveawaySchedulerUnhealthyReport> unhealthyReports =
+    private readonly object _scheduleGate = new();
+    private readonly Dictionary<int, ScheduledGiveaway> _schedules = [];
+    private readonly TimeSpan _retryDelay = ValidRetryDelay(recoveryPolicy);
+    private readonly Channel<PointsGiveawaySchedulerUnhealthyReport> _unhealthyReports =
         Channel.CreateUnbounded<PointsGiveawaySchedulerUnhealthyReport>();
-    private CancellationToken shutdownToken;
+    private CancellationToken _shutdownToken;
 
     public void Schedule(PointsGiveawaySchedule schedule)
     {
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_shutdownToken);
         var scheduled = new ScheduledGiveaway(cts);
         ScheduledGiveaway? previous;
 
-        lock (scheduleGate)
+        lock (_scheduleGate)
         {
-            schedules.Remove(schedule.GiveawayId, out previous);
-            schedules[schedule.GiveawayId] = scheduled;
+            _schedules.Remove(schedule.GiveawayId, out previous);
+            _schedules[schedule.GiveawayId] = scheduled;
         }
 
         previous?.Cancellation.Cancel();
@@ -42,10 +42,12 @@ internal sealed class PointsGiveawayScheduler(
     public void Cancel(int giveawayId)
     {
         ScheduledGiveaway? scheduled;
-        lock (scheduleGate)
+        lock (_scheduleGate)
         {
-            if (!schedules.Remove(giveawayId, out scheduled))
+            if (!_schedules.Remove(giveawayId, out scheduled))
+            {
                 return;
+            }
         }
 
         scheduled.Cancellation.Cancel();
@@ -53,9 +55,9 @@ internal sealed class PointsGiveawayScheduler(
 
     internal bool IsScheduled(int giveawayId)
     {
-        lock (scheduleGate)
+        lock (_scheduleGate)
         {
-            return schedules.ContainsKey(giveawayId);
+            return _schedules.ContainsKey(giveawayId);
         }
     }
 
@@ -113,7 +115,9 @@ internal sealed class PointsGiveawayScheduler(
         await base.StopAsync(cancellationToken);
 
         if (tasks.Length == 0)
+        {
             return;
+        }
 
         try
         {
@@ -124,7 +128,7 @@ internal sealed class PointsGiveawayScheduler(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        shutdownToken = stoppingToken;
+        _shutdownToken = stoppingToken;
 
         try
         {
@@ -136,7 +140,7 @@ internal sealed class PointsGiveawayScheduler(
 
     internal async Task ThrowWhenUnhealthyAsync(CancellationToken ct)
     {
-        var report = await unhealthyReports.Reader.ReadAsync(ct);
+        var report = await _unhealthyReports.Reader.ReadAsync(ct);
         throw new PointsGiveawaySchedulerUnhealthyException(report);
     }
 
@@ -154,7 +158,9 @@ internal sealed class PointsGiveawayScheduler(
         foreach (var reminderAtUtc in ReminderTimes(schedule))
         {
             if (reminderAtUtc <= GetUtcNow())
+            {
                 continue;
+            }
 
             await DelayUntilAsync(reminderAtUtc, ct);
             var message = await BuildUpdateAsync(schedule, ct);
@@ -169,7 +175,9 @@ internal sealed class PointsGiveawayScheduler(
             ct
         );
         if (drawOutcome.Success)
+        {
             await NotifyChangedAsync(schedule.GiveawayId, ct);
+        }
 
         var drawMessage = await BuildDrawNotificationAsync(schedule, drawOutcome, ct);
         await SendAsync(
@@ -482,79 +490,94 @@ internal sealed class PointsGiveawayScheduler(
     {
         var delay = targetUtc - GetUtcNow();
         if (delay <= TimeSpan.Zero)
+        {
             return;
+        }
 
         await Task.Delay(delay, timeProvider, ct);
     }
 
-    private Task DelayForRecoveryAsync(CancellationToken ct) =>
-        Task.Delay(retryDelay, timeProvider, ct);
+    private Task DelayForRecoveryAsync(CancellationToken ct)
+    {
+        return Task.Delay(_retryDelay, timeProvider, ct);
+    }
 
-    private void ReportRehydrationRetryScheduled(int attempt, Exception exception) =>
+    private void ReportRehydrationRetryScheduled(int attempt, Exception exception)
+    {
         log.LogError(
             "Points giveaway scheduler rehydration failed with {FailureType} on attempt {Attempt}; retry scheduled for {RetryAtUtc}.",
             exception.GetType().FullName,
             attempt,
-            GetUtcNow().Add(retryDelay)
+            GetUtcNow().Add(_retryDelay)
         );
+    }
 
     private void ReportRetryScheduled(
         PointsGiveawaySchedulerOperation operation,
         int giveawayId,
         int attempt,
         Exception exception
-    ) =>
+    )
+    {
         log.LogError(
             "Points giveaway scheduler {Operation} failed for giveaway {GiveawayId} with {FailureType} on attempt {Attempt}; retry scheduled for {RetryAtUtc}.",
             operation,
             giveawayId,
             exception.GetType().FullName,
             attempt,
-            GetUtcNow().Add(retryDelay)
+            GetUtcNow().Add(_retryDelay)
         );
+    }
 
     private void ReportNotificationFailure(
         int giveawayId,
         PointsGiveawayNotificationKind kind,
         Exception exception
-    ) =>
+    )
+    {
         log.LogError(
             "Points giveaway {NotificationKind} notification failed for giveaway {GiveawayId} with {FailureType}; delivery is not retried because acceptance is ambiguous, and durable schedule processing continues.",
             kind,
             giveawayId,
             exception.GetType().FullName
         );
+    }
 
     private Task[] CancelAll()
     {
         ScheduledGiveaway[] scheduled;
-        lock (scheduleGate)
+        lock (_scheduleGate)
         {
-            scheduled = schedules.Values.ToArray();
-            schedules.Clear();
+            scheduled = _schedules.Values.ToArray();
+            _schedules.Clear();
         }
 
         foreach (var giveaway in scheduled)
+        {
             giveaway.Cancellation.Cancel();
+        }
 
         return scheduled.Select(x => x.Task).ToArray();
     }
 
     private void RemoveCompleted(int giveawayId, CancellationTokenSource cts)
     {
-        lock (scheduleGate)
+        lock (_scheduleGate)
         {
             if (
-                schedules.TryGetValue(giveawayId, out var scheduled)
+                _schedules.TryGetValue(giveawayId, out var scheduled)
                 && ReferenceEquals(scheduled.Cancellation, cts)
             )
             {
-                schedules.Remove(giveawayId);
+                _schedules.Remove(giveawayId);
             }
         }
     }
 
-    private DateTime GetUtcNow() => timeProvider.GetUtcNow().UtcDateTime;
+    private DateTime GetUtcNow()
+    {
+        return timeProvider.GetUtcNow().UtcDateTime;
+    }
 
     private static TimeSpan ValidRetryDelay(PointsGiveawaySchedulerRecoveryPolicy policy)
     {
@@ -564,8 +587,11 @@ internal sealed class PointsGiveawayScheduler(
 
     private void PublishUnhealthy(PointsGiveawaySchedulerUnhealthyReport report)
     {
-        if (!unhealthyReports.Writer.TryWrite(report))
+        if (!_unhealthyReports.Writer.TryWrite(report))
+        {
             throw new UnreachableException("The scheduler unhealthy report could not be queued.");
+        }
+
         LogUnhealthy(report);
     }
 
@@ -598,8 +624,9 @@ internal sealed class PointsGiveawayScheduler(
         PointsGiveawaySchedulerOperation operation,
         int giveawayId,
         Exception exception
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Operation = operation,
             GiveawayId = giveawayId,
@@ -608,22 +635,27 @@ internal sealed class PointsGiveawayScheduler(
             ),
             Cause = exception,
         };
+    }
 
     private static OperationAttempt<TValue, TError> ToAttempt<TValue, TError>(
         Result<TValue, TError> result
-    ) =>
-        result.Match<OperationAttempt<TValue, TError>>(
+    )
+    {
+        return result.Match<OperationAttempt<TValue, TError>>(
             value => new OperationAttempt<TValue, TError>.Succeeded(value),
             failure => new OperationAttempt<TValue, TError>.Failed(failure)
         );
+    }
 
     private static IEnumerable<DateTime> ReminderTimes(PointsGiveawaySchedule schedule)
     {
         var duration = schedule.EndsAtUtc - schedule.StartedAtUtc;
-        foreach (var factor in ReminderFactors)
+        foreach (var factor in _reminderFactors)
+        {
             yield return schedule.StartedAtUtc.Add(
                 TimeSpan.FromTicks((long)(duration.Ticks * factor))
             );
+        }
     }
 
     private sealed class ScheduledGiveaway(CancellationTokenSource cancellation)

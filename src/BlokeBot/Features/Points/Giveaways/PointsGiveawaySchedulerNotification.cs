@@ -22,10 +22,12 @@ internal sealed class ReplyOnlyPointsGiveawaySchedulerNotification
         PointsGiveawaySchedule schedule,
         string message,
         CancellationToken cancellationToken
-    ) =>
-        schedule.Reply is { } reply
+    )
+    {
+        return schedule.Reply is { } reply
             ? reply(message, cancellationToken)
             : ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class TwitchPointsGiveawaySchedulerNotification(
@@ -36,8 +38,9 @@ internal sealed class TwitchPointsGiveawaySchedulerNotification(
         PointsGiveawaySchedule schedule,
         string message,
         CancellationToken cancellationToken
-    ) =>
-        schedule.Reply is { } reply
+    )
+    {
+        return schedule.Reply is { } reply
             ? reply(message, cancellationToken)
             : new ValueTask(
                 sender.SendAsync(
@@ -47,4 +50,5 @@ internal sealed class TwitchPointsGiveawaySchedulerNotification(
                     cancellationToken
                 )
             );
+    }
 }

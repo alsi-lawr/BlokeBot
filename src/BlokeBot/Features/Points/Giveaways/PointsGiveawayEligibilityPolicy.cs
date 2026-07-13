@@ -40,7 +40,9 @@ public sealed class PointsGiveawayEligibilityPolicy(
     )
     {
         if (settings.GiveawayEligibility != PointsEligibilityMode.Followers)
+        {
             return true;
+        }
 
         var status = await botStatus.GetStatusAsync(hostLogin, ct);
         return status.ModeratorState == HostBotModeratorState.IsModerator;
@@ -71,7 +73,9 @@ public sealed class PointsGiveawayEligibilityPolicy(
     private static bool HasSubscriberBadge(IReadOnlyDictionary<string, string> tags)
     {
         if (!tags.TryGetValue("badges", out var badges))
+        {
             return false;
+        }
 
         return badges
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

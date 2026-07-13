@@ -12,8 +12,9 @@ internal static class TwitchIrcSessionFailureClassifier
     internal static TwitchRuntimeSessionFailureClassification Classify(
         Exception exception,
         CancellationToken cancellationToken
-    ) =>
-        exception switch
+    )
+    {
+        return exception switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
                 TwitchRuntimeSessionFailureClassification.Cancellation,
@@ -29,13 +30,16 @@ internal static class TwitchIrcSessionFailureClassifier
             or JsonException => TwitchRuntimeSessionFailureClassification.Terminal,
             _ => TwitchRuntimeSessionFailureClassification.Unexpected,
         };
+    }
 
     private static TwitchRuntimeSessionFailureClassification ClassifyHttp(
         HttpRequestException exception
-    ) =>
-        TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
+    )
+    {
+        return TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
             ? TwitchRuntimeSessionFailureClassification.Transient
             : TwitchRuntimeSessionFailureClassification.Terminal;
+    }
 }
 
 internal static class TwitchEventSubSessionFailureClassifier
@@ -43,8 +47,9 @@ internal static class TwitchEventSubSessionFailureClassifier
     internal static TwitchRuntimeSessionFailureClassification Classify(
         Exception exception,
         CancellationToken cancellationToken
-    ) =>
-        exception switch
+    )
+    {
+        return exception switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
                 TwitchRuntimeSessionFailureClassification.Cancellation,
@@ -61,26 +66,33 @@ internal static class TwitchEventSubSessionFailureClassifier
             or JsonException => TwitchRuntimeSessionFailureClassification.Terminal,
             _ => TwitchRuntimeSessionFailureClassification.Unexpected,
         };
+    }
 
     private static TwitchRuntimeSessionFailureClassification ClassifyHttp(
         HttpRequestException exception
-    ) =>
-        TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
+    )
+    {
+        return TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(exception.StatusCode)
             ? TwitchRuntimeSessionFailureClassification.Transient
             : TwitchRuntimeSessionFailureClassification.Terminal;
+    }
 }
 
 internal static class TwitchRuntimeSessionFailureClassifier
 {
-    internal static bool IsTransientHttpStatus(HttpStatusCode? statusCode) =>
-        statusCode is null
+    internal static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
+    {
+        return statusCode is null
         || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
         || (int)statusCode >= 500;
+    }
 
     internal static bool IsRetryable(
         TwitchRuntimeSessionFailureClassification classification
-    ) =>
-        classification
+    )
+    {
+        return classification
             is TwitchRuntimeSessionFailureClassification.Transient
                 or TwitchRuntimeSessionFailureClassification.Timeout;
+    }
 }

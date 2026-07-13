@@ -10,7 +10,8 @@ internal static class TwitchRuntimeSessionResilience
         ResiliencePipelineBuilder builder,
         IrcSessionResiliencePolicy policy,
         ITwitchRuntimeSessionHealthReporter health
-    ) =>
+    )
+    {
         Configure(
             builder,
             TwitchBotRuntime.Irc,
@@ -22,12 +23,14 @@ internal static class TwitchRuntimeSessionResilience
             TwitchIrcSessionFailureClassifier.Classify,
             health
         );
+    }
 
     internal static void ConfigureEventSub(
         ResiliencePipelineBuilder builder,
         EventSubSessionResiliencePolicy policy,
         ITwitchRuntimeSessionHealthReporter health
-    ) =>
+    )
+    {
         Configure(
             builder,
             TwitchBotRuntime.EventSub,
@@ -39,6 +42,7 @@ internal static class TwitchRuntimeSessionResilience
             TwitchEventSubSessionFailureClassifier.Classify,
             health
         );
+    }
 
     private static void Configure(
         ResiliencePipelineBuilder builder,
@@ -106,14 +110,16 @@ internal sealed class TwitchIrcSessionResiliencePipeline(ResiliencePipeline pipe
     internal ValueTask<TwitchRuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<TwitchRuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
-    ) =>
-        pipeline.ExecuteAsync(
+    )
+    {
+        return pipeline.ExecuteAsync(
             static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
                 callback(token)
             ),
             operation,
             cancellationToken
         );
+    }
 }
 
 internal sealed class TwitchEventSubSessionResiliencePipeline(ResiliencePipeline pipeline)
@@ -121,12 +127,14 @@ internal sealed class TwitchEventSubSessionResiliencePipeline(ResiliencePipeline
     internal ValueTask<TwitchRuntimeSessionEstablishment> ExecuteAsync(
         Func<CancellationToken, Task<TwitchRuntimeSessionEstablishment>> operation,
         CancellationToken cancellationToken
-    ) =>
-        pipeline.ExecuteAsync(
+    )
+    {
+        return pipeline.ExecuteAsync(
             static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
                 callback(token)
             ),
             operation,
             cancellationToken
         );
+    }
 }

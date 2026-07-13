@@ -11,8 +11,13 @@ public readonly record struct GuessRoundProfileSlug
 
     public string Value { get; }
 
-    public static GuessRoundProfileSlug FromName(string? value) =>
-        new(GuessName.Parse(value).Value.Replace(' ', '-'));
+    public static GuessRoundProfileSlug FromName(string? value)
+    {
+        return new(GuessName.Parse(value).Value.Replace(' ', '-'));
+    }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }

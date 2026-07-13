@@ -2,23 +2,30 @@ namespace BlokeBot.Twitch.Auth;
 
 internal sealed class InMemoryTwitchOAuthStateStore : ITwitchOAuthStateStore
 {
-    private readonly HashSet<string> states = new(StringComparer.Ordinal);
-    private readonly object gate = new();
+    private readonly HashSet<string> _states = new(StringComparer.Ordinal);
+    private readonly object _gate = new();
 
     public string Issue()
     {
         var state = Guid.NewGuid().ToString("N");
-        lock (gate)
-            states.Add(state);
+        lock (_gate)
+        {
+            _states.Add(state);
+        }
+
         return state;
     }
 
     public bool Consume(string state)
     {
         if (string.IsNullOrWhiteSpace(state))
+        {
             return false;
+        }
 
-        lock (gate)
-            return states.Remove(state);
+        lock (_gate)
+        {
+            return _states.Remove(state);
+        }
     }
 }

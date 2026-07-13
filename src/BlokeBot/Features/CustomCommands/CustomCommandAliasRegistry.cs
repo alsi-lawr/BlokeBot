@@ -12,14 +12,16 @@ public sealed class CustomCommandAliasRegistry
         int? commandId,
         string aliases,
         CancellationToken ct
-    ) =>
-        await ValidateExcludingCommandsAsync(
+    )
+    {
+        return await ValidateExcludingCommandsAsync(
             db,
             hostId,
             commandId is { } id ? new HashSet<int> { id } : new HashSet<int>(),
             aliases,
             ct
         );
+    }
 
     public async Task<string[]> ValidateExcludingCommandsAsync(
         BlokeBotDbContext db,
@@ -31,14 +33,18 @@ public sealed class CustomCommandAliasRegistry
     {
         var normalized = CommandAliasNormalizer.Split(aliases).ToArray();
         if (normalized.Length == 0)
+        {
             throw new InvalidOperationException("Enter at least one command word.");
+        }
 
         var duplicate = normalized
             .GroupBy(alias => alias, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => group.Count() > 1)
             ?.Key;
         if (duplicate is not null)
+        {
             throw new InvalidOperationException($"!{duplicate} is entered more than once.");
+        }
 
         var builtInCollision = await db
             .CommandAliases.AsNoTracking()
@@ -46,9 +52,11 @@ public sealed class CustomCommandAliasRegistry
             .Select(x => x.Alias)
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(builtInCollision))
+        {
             throw new InvalidOperationException(
                 $"!{builtInCollision} is already used by another bot command."
             );
+        }
 
         var customCollision = await db
             .CustomCommandAliases.AsNoTracking()
@@ -60,9 +68,11 @@ public sealed class CustomCommandAliasRegistry
             .Select(x => x.Alias)
             .FirstOrDefaultAsync(ct);
         if (!string.IsNullOrWhiteSpace(customCollision))
+        {
             throw new InvalidOperationException(
                 $"!{customCollision} is already used by another custom command."
             );
+        }
 
         return normalized;
     }

@@ -9,8 +9,9 @@ internal static class RuntimeTestObserverFanOut
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary)
-        where TDeadLetter : IObserverDeadLetterPayload =>
-        new(
+        where TDeadLetter : IObserverDeadLetterPayload
+    {
+        return new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -18,14 +19,16 @@ internal static class RuntimeTestObserverFanOut
             new TestReporter(),
             new TestCorrelationIdProvider()
         );
+    }
 
     internal static ObserverFanOut<TBoundary, TEvent, TDeadLetter> EscalatingContinue<
         TBoundary,
         TEvent,
         TDeadLetter
     >(ObserverBoundary boundary, Exception reporterFailure)
-        where TDeadLetter : IObserverDeadLetterPayload =>
-        new(
+        where TDeadLetter : IObserverDeadLetterPayload
+    {
+        return new(
             new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
             {
                 Boundary = boundary,
@@ -33,27 +36,30 @@ internal static class RuntimeTestObserverFanOut
             new ThrowingReporter(reporterFailure),
             new TestCorrelationIdProvider()
         );
+    }
 
     private sealed class TestReporter : IObserverFailureDiagnosticReporter
     {
-        private readonly List<ObserverFailureDiagnosticReport> reports = [];
+        private readonly List<ObserverFailureDiagnosticReport> _reports = [];
 
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
         )
         {
-            reports.Add(report);
+            _reports.Add(report);
             return ValueTask.CompletedTask;
         }
     }
 
     private sealed class TestCorrelationIdProvider : IObserverCorrelationIdProvider
     {
-        private int next;
+        private int _next;
 
-        public ObserverCorrelationId Next() =>
-            ObserverCorrelationId.Named($"runtime-test-{++next}");
+        public ObserverCorrelationId Next()
+        {
+            return ObserverCorrelationId.Named($"runtime-test-{++_next}");
+        }
     }
 
     private sealed class ThrowingReporter(Exception failure)
@@ -62,6 +68,9 @@ internal static class RuntimeTestObserverFanOut
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
-        ) => ValueTask.FromException(failure);
+        )
+        {
+            return ValueTask.FromException(failure);
+        }
     }
 }

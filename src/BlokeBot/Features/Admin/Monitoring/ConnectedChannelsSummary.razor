@@ -3,6 +3,6 @@
 @using BlokeBot.Twitch.Auth
 @using BlokeBot.Twitch.Runtime
 @implements IDisposable
-@inject ITwitchBotRuntimeStatusAccessor BotStatus
+@inject ITwitchBotRuntimeStatusAccessor _botStatus
 
-<p class="mt-1 text-sm text-muted-foreground">@ConnectedChannelsText</p>
+<p class="mt-1 text-sm text-muted-foreground">@_connectedChannelsText</p>

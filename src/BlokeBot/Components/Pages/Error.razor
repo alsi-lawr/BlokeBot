@@ -8,10 +8,10 @@
         <h1 class="text-2xl font-bold text-slate-950">Something went wrong</h1>
         <p class="mt-3 text-sm leading-6 text-muted-foreground">Try reloading the page. If the problem keeps happening, share the reference below when you ask for help.</p>
 
-        @if (ShowRequestId)
+        @if (_showRequestId)
         {
             <p class="mt-4 text-xs font-medium text-slate-500">
-                <strong>Reference:</strong> <code>@RequestId</code>
+                <strong>Reference:</strong> <code>@_requestId</code>
             </p>
         }
     </section>

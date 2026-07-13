@@ -5,13 +5,13 @@ namespace BlokeBot.Commands;
 
 internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
 {
-    private readonly Dictionary<Type, ITwitchCommandFilter> availableFilters = [];
-    private readonly ConcurrentDictionary<string, TwitchCommandHandler> routes = new(
+    private readonly Dictionary<Type, ITwitchCommandFilter> _availableFilters = [];
+    private readonly ConcurrentDictionary<string, TwitchCommandHandler> _routes = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly List<TwitchDynamicCommandHandler> dynamicHandlers = [];
-    private readonly List<ITwitchCommandFilter> filters = [];
-    private TwitchCommandHandler? fallbackHandler;
+    private readonly List<TwitchDynamicCommandHandler> _dynamicHandlers = [];
+    private readonly List<ITwitchCommandFilter> _filters = [];
+    private TwitchCommandHandler? _fallbackHandler;
 
     public TwitchCommandPlanBuilder(IEnumerable<ITwitchCommandFilter> registeredFilters)
     {
@@ -20,7 +20,7 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
         foreach (var filter in registeredFilters)
         {
             var filterType = filter.GetType();
-            if (!availableFilters.TryAdd(filterType, filter))
+            if (!_availableFilters.TryAdd(filterType, filter))
             {
                 throw new InvalidOperationException(
                     $"Command filter '{filterType.FullName}' was registered more than once."
@@ -34,7 +34,7 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(route);
         ArgumentNullException.ThrowIfNull(handler);
 
-        routes[route.TrimStart('!')] = handler;
+        _routes[route.TrimStart('!')] = handler;
         return this;
     }
 
@@ -42,7 +42,7 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
     {
         ArgumentNullException.ThrowIfNull(handler);
 
-        dynamicHandlers.Add(handler);
+        _dynamicHandlers.Add(handler);
         return this;
     }
 
@@ -50,32 +50,34 @@ internal sealed class TwitchCommandPlanBuilder : ITwitchCommandBuilder
     {
         ArgumentNullException.ThrowIfNull(handler);
 
-        fallbackHandler = handler;
+        _fallbackHandler = handler;
         return this;
     }
 
     public ITwitchCommandBuilder UseFilter<TFilter>()
         where TFilter : class, ITwitchCommandFilter
     {
-        if (!availableFilters.TryGetValue(typeof(TFilter), out var filter))
+        if (!_availableFilters.TryGetValue(typeof(TFilter), out var filter))
         {
             throw new InvalidOperationException(
                 $"Command filter '{typeof(TFilter).FullName}' must be registered explicitly."
             );
         }
 
-        filters.Add(filter);
+        _filters.Add(filter);
         return this;
     }
 
-    public TwitchCommandPlan Build() =>
-        new()
+    public TwitchCommandPlan Build()
+    {
+        return new()
         {
             Routes = new ReadOnlyDictionary<string, TwitchCommandHandler>(
-                routes.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
+                _routes.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase)
             ),
-            DynamicHandlers = Array.AsReadOnly<TwitchDynamicCommandHandler>([.. dynamicHandlers]),
-            Filters = Array.AsReadOnly<ITwitchCommandFilter>([.. filters]),
-            FallbackHandler = fallbackHandler,
+            DynamicHandlers = Array.AsReadOnly<TwitchDynamicCommandHandler>([.. _dynamicHandlers]),
+            Filters = Array.AsReadOnly<ITwitchCommandFilter>([.. _filters]),
+            FallbackHandler = _fallbackHandler,
         };
+    }
 }

@@ -20,8 +20,9 @@ public sealed class DurableAlertService(
         string message,
         string? linkPath,
         CancellationToken ct
-    ) =>
-        (
+    )
+    {
+        return (
             await CreateOrGetActiveAsync(
                 hostId,
                 severity,
@@ -33,6 +34,7 @@ public sealed class DurableAlertService(
                 ct
             )
         ).Alert;
+    }
 
     public async Task<DurableAlertCreateResult> CreateOrGetActiveAsync(
         int hostId,
@@ -58,7 +60,9 @@ public sealed class DurableAlertService(
             ct
         );
         if (existing is not null)
+        {
             return new DurableAlertCreateResult(existing, Created: false);
+        }
 
         var alert = new DurableAlert
         {
@@ -91,10 +95,14 @@ public sealed class DurableAlertService(
             ct
         );
         if (alert is null)
+        {
             return false;
+        }
 
         if (alert.AcknowledgedAtUtc is not null)
+        {
             return true;
+        }
 
         alert.AcknowledgedAtUtc = UtcNow();
         alert.AcknowledgedByLogin = actor;
@@ -139,12 +147,17 @@ public sealed class DurableAlertService(
         );
     }
 
-    private DateTime UtcNow() => timeProvider.GetUtcNow().UtcDateTime;
+    private DateTime UtcNow()
+    {
+        return timeProvider.GetUtcNow().UtcDateTime;
+    }
 
     private static string NormalizeRequired(string value, string parameterName)
     {
         if (string.IsNullOrWhiteSpace(value))
+        {
             throw new ArgumentException("Value is required.", parameterName);
+        }
 
         return value.Trim();
     }

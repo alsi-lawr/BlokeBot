@@ -43,10 +43,10 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public partial class GuessOptionsSettingsSection
 {
-    private const int RemovalAnimationDelayMs = 150;
-    private const string WhisperDisabledTooltip =
+    private const int _removalAnimationDelayMs = 150;
+    private const string _whisperDisabledTooltip =
         "Enable whisper responses in Channel setup before using whisper replies.";
-    private readonly HashSet<GuessOptionEditor> pendingRemovals = [];
+    private readonly HashSet<GuessOptionEditor> _pendingRemovals = [];
 
     [Parameter, EditorRequired]
     public EventCallback AddOption { get; set; }
@@ -66,21 +66,26 @@ public partial class GuessOptionsSettingsSection
     [Parameter, EditorRequired]
     public EventCallback<GuessOptionEditor> RemoveOption { get; set; }
 
-    private bool WhisperDisabled => !WhisperResponsesEnabled;
+    private bool _whisperDisabled => !WhisperResponsesEnabled;
 
-    private string WhisperTitle => WhisperDisabled ? WhisperDisabledTooltip : string.Empty;
+    private string _whisperTitle => _whisperDisabled ? _whisperDisabledTooltip : string.Empty;
 
-    private string WhisperLabelClass =>
-        WhisperDisabled
+    private string _whisperLabelClass =>
+        _whisperDisabled
             ? "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground opacity-60"
             : "inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground";
 
-    private async Task InvokeAddOptionAsync() => await AddOption.InvokeAsync();
+    private async Task InvokeAddOptionAsync()
+    {
+        await AddOption.InvokeAsync();
+    }
 
     private async Task SetAnswerWhispersAsync(ChangeEventArgs args)
     {
-        if (WhisperDisabled)
+        if (_whisperDisabled)
+        {
             return;
+        }
 
         var whisper = args.Value is true || args.Value?.ToString() == "true";
         WhisperAnswerReplies = whisper;
@@ -95,32 +100,36 @@ public partial class GuessOptionsSettingsSection
         );
 
         foreach (var option in Options)
+        {
             option.ReplyTarget = target;
+        }
     }
 
     private string OptionRowClass(GuessOptionEditor option)
     {
         const string baseClass =
             "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]";
-        return pendingRemovals.Contains(option)
+        return _pendingRemovals.Contains(option)
             ? $"{baseClass} motion-list__item--removing"
             : baseClass;
     }
 
     private async Task RemoveOptionAsync(GuessOptionEditor option)
     {
-        if (!pendingRemovals.Add(option))
+        if (!_pendingRemovals.Add(option))
+        {
             return;
+        }
 
         StateHasChanged();
         try
         {
-            await Task.Delay(RemovalAnimationDelayMs);
+            await Task.Delay(_removalAnimationDelayMs);
             await RemoveOption.InvokeAsync(option);
         }
         finally
         {
-            pendingRemovals.Remove(option);
+            _pendingRemovals.Remove(option);
         }
     }
 }

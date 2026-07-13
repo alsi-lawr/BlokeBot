@@ -42,8 +42,8 @@ namespace BlokeBot.Components;
 
 public partial class CollapsibleSection
 {
-    private readonly string generatedContentId = $"disclosure-{Guid.NewGuid():N}";
-    private bool isOpen;
+    private readonly string _generatedContentId = $"disclosure-{Guid.NewGuid():N}";
+    private bool _isOpen;
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -63,19 +63,19 @@ public partial class CollapsibleSection
     [Parameter]
     public string Title { get; set; } = string.Empty;
 
-    private string PanelClass =>
+    private string _panelClass =>
         string.IsNullOrWhiteSpace(Class) ? "disclosure-panel" : $"disclosure-panel {Class}";
 
-    private string ResolvedContentId =>
-        string.IsNullOrWhiteSpace(ContentId) ? generatedContentId : ContentId;
+    private string _resolvedContentId =>
+        string.IsNullOrWhiteSpace(ContentId) ? _generatedContentId : ContentId;
 
     protected override void OnInitialized()
     {
-        isOpen = InitiallyOpen;
+        _isOpen = InitiallyOpen;
     }
 
     private void Toggle()
     {
-        isOpen = !isOpen;
+        _isOpen = !_isOpen;
     }
 }

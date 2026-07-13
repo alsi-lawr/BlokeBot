@@ -2,20 +2,20 @@
 @using BlokeBot.Features.Admin.HostedChannels
 @using BlokeBot.Hosts
 @implements IDisposable
-@inject EventBus<AppEventKind> Events
-@inject HostedChannelDirectoryService HostedChannels
-@inject NavigationManager Navigation
+@inject EventBus<AppEventKind> _events
+@inject HostedChannelDirectoryService _hostedChannels
+@inject NavigationManager _navigation
 
 @if (!IsAdminEditing())
 {
     var showMyChannel = ShowMyChannelControl();
-    var hasAlternateHosts = visibleHosts.Count > 0;
+    var hasAlternateHosts = _visibleHosts.Count > 0;
 
     <div class="@SelectorShellClass(showMyChannel)">
         @if (showMyChannel)
         {
             <a class="host-selector__my-channel control-surface inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-               href="@MyChannelHref"
+               href="@_myChannelHref"
                data-enhance-nav="false">
                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 10.5 12 4l8 6.5V20H4Z" />
@@ -50,14 +50,14 @@
                     </svg>
                 </summary>
                 <div class="surface absolute left-0 z-50 mt-2 w-full overflow-hidden rounded-md py-1 shadow-xl shadow-slate-200/70">
-                    @foreach (var host in visibleHosts)
+                    @foreach (var host in _visibleHosts)
                     {
                         <a class="@HostItemClass(host)"
                            href="@SelectHostHref(host.Id)"
                            data-enhance-nav="false">
                             @ChannelImage(host)
                             <span class="min-w-0 truncate">#@host.DisplayName</span>
-                            @if (host.Id == selectedHostId)
+                            @if (host.Id == _selectedHostId)
                             {
                                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="m5 12 4 4 10-10" />
@@ -91,9 +91,9 @@
         <a class="host-selector__refresh control-surface inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
            title="Find channels again"
            aria-label="Find channels again"
-           href="/auth/login?start=true&returnUrl=@CurrentReturnUrl"
+           href="/auth/login?start=true&returnUrl=@_currentReturnUrl"
            data-enhance-nav="false">
-            <svg class="@RefreshIconClass" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="@_refreshIconClass" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
                 <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
             </svg>

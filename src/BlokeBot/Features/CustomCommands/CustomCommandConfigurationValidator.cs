@@ -5,8 +5,8 @@ namespace BlokeBot.Features.CustomCommands;
 
 internal static class CustomCommandConfigurationValidator
 {
-    private const int MessageVariantMaxLength = 500;
-    private const int NameMaxLength = 128;
+    private const int _messageVariantMaxLength = 500;
+    private const int _nameMaxLength = 128;
 
     public static void Validate(CustomCommandConfiguration config)
     {
@@ -25,40 +25,52 @@ internal static class CustomCommandConfigurationValidator
         {
             RequiredName(entry.Name, "Reply");
             if (entry.Variants.Count == 0)
+            {
                 throw new InvalidOperationException(
                     $"Reply '{entry.Name.Trim()}' needs at least one message."
                 );
+            }
 
             foreach (var variant in entry.Variants)
             {
                 var text = variant.Text.Trim();
                 if (string.IsNullOrWhiteSpace(text))
+                {
                     throw new InvalidOperationException(
                         $"Reply '{entry.Name.Trim()}' has a blank message."
                     );
+                }
 
-                if (text.Length > MessageVariantMaxLength)
+                if (text.Length > _messageVariantMaxLength)
+                {
                     throw new InvalidOperationException(
-                        $"Reply messages cannot exceed {MessageVariantMaxLength} characters."
+                        $"Reply messages cannot exceed {_messageVariantMaxLength} characters."
                     );
+                }
             }
         }
 
         foreach (var counter in config.Counters)
+        {
             RequiredName(counter.Name, "Counter");
+        }
 
         foreach (var command in config.Commands)
         {
             RequiredName(command.Name, "Command");
             if (!messageEntryIds.Contains(command.Action.MessageLibraryEntryId))
+            {
                 throw new InvalidOperationException(
                     $"Choose a saved reply for command '{command.Name.Trim()}'."
                 );
+            }
 
             if (command.CooldownSeconds < 0)
+            {
                 throw new InvalidOperationException(
                     "The wait between command uses cannot be negative."
                 );
+            }
 
             switch (command.Action)
             {
@@ -82,9 +94,11 @@ internal static class CustomCommandConfigurationValidator
         {
             RequiredName(announcement.Name, "Announcement");
             if (!messageEntryIds.Contains(announcement.MessageLibraryEntryId))
+            {
                 throw new InvalidOperationException(
                     $"Choose a saved reply for announcement '{announcement.Name.Trim()}'."
                 );
+            }
 
             var retryDelay = RequireRetryDelay(announcement.RetryDelaySeconds);
             var occurrenceLifetime = RequireOccurrenceLifetime(
@@ -120,9 +134,12 @@ internal static class CustomCommandConfigurationValidator
                     break;
                 case WeeklyCustomAnnouncementScheduleEditor weekly:
                     if (!Enum.IsDefined(weekly.Day))
+                    {
                         throw new InvalidOperationException(
                             "Choose a valid day for weekly announcements."
                         );
+                    }
+
                     break;
                 default:
                     throw new InvalidOperationException(
@@ -197,12 +214,16 @@ internal static class CustomCommandConfigurationValidator
         var trimmed = value.Trim();
         var displayName = char.ToUpperInvariant(entityName[0]) + entityName[1..];
         if (string.IsNullOrWhiteSpace(trimmed))
+        {
             throw new InvalidOperationException($"{displayName} name is required.");
+        }
 
-        if (trimmed.Length > NameMaxLength)
+        if (trimmed.Length > _nameMaxLength)
+        {
             throw new InvalidOperationException(
-                $"{displayName} names cannot exceed {NameMaxLength} characters."
+                $"{displayName} names cannot exceed {_nameMaxLength} characters."
             );
+        }
 
         return trimmed;
     }
@@ -211,9 +232,11 @@ internal static class CustomCommandConfigurationValidator
     {
         var duplicate = ids.GroupBy(x => x).FirstOrDefault(x => x.Count() > 1);
         if (duplicate is not null)
+        {
             throw new InvalidOperationException(
                 $"Some {entityName} were duplicated while you were editing. Reload the page and try again."
             );
+        }
     }
 
     private static void EnsureUniqueNames<T>(
@@ -228,9 +251,11 @@ internal static class CustomCommandConfigurationValidator
             .FirstOrDefault(x => x.Count() > 1)
             ?.Key;
         if (!string.IsNullOrWhiteSpace(duplicate))
+        {
             throw new InvalidOperationException(
                 $"Another {entityName} named '{duplicate}' already exists."
             );
+        }
     }
 
     private static void EnsurePositiveIdsExist(
@@ -241,8 +266,10 @@ internal static class CustomCommandConfigurationValidator
     {
         var missingId = editorIds.Where(x => x > 0).FirstOrDefault(x => !existingIds.Contains(x));
         if (missingId != 0)
+        {
             throw new InvalidOperationException(
                 $"A {entityName} you edited is no longer available. Reload the page and try again."
             );
+        }
     }
 }

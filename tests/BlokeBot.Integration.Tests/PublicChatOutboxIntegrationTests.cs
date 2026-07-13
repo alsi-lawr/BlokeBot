@@ -417,7 +417,10 @@ public sealed class PublicChatOutboxIntegrationTests
         );
 
         foreach (var outcome in outcomes)
+        {
             outcome.ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync();
         AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), expiry);
     }
@@ -470,10 +473,13 @@ public sealed class PublicChatOutboxIntegrationTests
 
         transport.DeliveryCount.ShouldBe(0);
         await using (var db = await dbFactory.CreateDbContextAsync())
+        {
             AssertExpired(
                 await db.PublicChatOutboxMessages.SingleAsync(),
                 now.AddSeconds(5)
             );
+        }
+
         await StopAsync(stopping, worker);
     }
 
@@ -514,13 +520,17 @@ public sealed class PublicChatOutboxIntegrationTests
 
         clock.Advance(TimeSpan.FromSeconds(4));
         await using (var beforeExpiry = await dbFactory.CreateDbContextAsync())
+        {
             (await beforeExpiry.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+        }
 
         clock.Advance(TimeSpan.FromSeconds(1));
         _ = (await outbox.ReadClaimOutcomeAsync())
             .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
         await using (var atExpiry = await dbFactory.CreateDbContextAsync())
+        {
             (await atExpiry.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
+        }
 
         await StopAsync(stopping, worker);
     }
@@ -560,7 +570,9 @@ public sealed class PublicChatOutboxIntegrationTests
             .ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>()
             .AvailableAt.ShouldBe(now);
         await using (var afterFirstBatch = await dbFactory.CreateDbContextAsync())
+        {
             (await afterFirstBatch.PublicChatSendReceipts.CountAsync()).ShouldBe(1);
+        }
 
         (await outbox.TryClaimNextAsync(
                 now,
@@ -1222,12 +1234,15 @@ public sealed class PublicChatOutboxIntegrationTests
         );
         concurrentClaims.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
         foreach (var outcome in concurrentClaims)
+        {
             (
                 outcome
                     is PublicChatClaimOutcome.AwaitingAvailability
                         or PublicChatClaimOutcome.Contended
             )
                 .ShouldBeTrue();
+        }
+
         (
             await firstRestartStore.TryClaimNextAsync(
                 retryAt,
@@ -1830,7 +1845,9 @@ public sealed class PublicChatOutboxIntegrationTests
             )
         ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
         await using (var db = await dbFactory.CreateDbContextAsync())
+        {
             (await db.PublicChatOutboxMessages.CountAsync()).ShouldBe(1);
+        }
 
         (
             await outbox.TryClaimNextAsync(
@@ -2015,8 +2032,9 @@ public sealed class PublicChatOutboxIntegrationTests
         string channel,
         DateTimeOffset enqueuedAt,
         params string[] messages
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Channel = channel,
             EnqueuedAt = enqueuedAt,
@@ -2034,14 +2052,16 @@ public sealed class PublicChatOutboxIntegrationTests
                 )
                 .ToImmutableArray(),
         };
+    }
 
     private static async Task<PublicChatClaimedMessage> ClaimAsync(
         IPublicChatOutbox outbox,
         DateTimeOffset now,
         TimeSpan sendInterval,
         TimeSpan duplicateCooldown = default
-    ) =>
-        (
+    )
+    {
+        return (
             await outbox.TryClaimNextAsync(
                 now,
                 now.AddMinutes(5),
@@ -2050,6 +2070,7 @@ public sealed class PublicChatOutboxIntegrationTests
                 CancellationToken.None
             )
         ).ShouldBeOfType<PublicChatClaimOutcome.Claimed>().Message;
+    }
 
     private static async Task BeginAndDeliverAsync(
         IPublicChatOutbox outbox,
@@ -2085,19 +2106,25 @@ public sealed class PublicChatOutboxIntegrationTests
         );
     }
 
-    private static PublicChatDeliveryOutcome SafePreSendTransientOutcome() =>
-        PublicChatDeliveryClassifier.MapPreparationFailure(
+    private static PublicChatDeliveryOutcome SafePreSendTransientOutcome()
+    {
+        return PublicChatDeliveryClassifier.MapPreparationFailure(
             PublicChatDeliveryClassifier.ClassifyPreparationFailure(
                 new IOException("secret preparation detail"),
                 CancellationToken.None
             )
         );
+    }
 
-    private static PublicChatTerminalRetentionPolicy Retention(TimeSpan duration) =>
-        new() { Duration = duration };
+    private static PublicChatTerminalRetentionPolicy Retention(TimeSpan duration)
+    {
+        return new() { Duration = duration };
+    }
 
-    private static PublicChatDeliveryLifetimePolicy Lifetime(TimeSpan maximumAge) =>
-        new() { MaximumAge = maximumAge };
+    private static PublicChatDeliveryLifetimePolicy Lifetime(TimeSpan maximumAge)
+    {
+        return new() { MaximumAge = maximumAge };
+    }
 
     private static void AssertExpired(
         PublicChatOutboxMessage row,

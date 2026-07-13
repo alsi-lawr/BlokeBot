@@ -74,11 +74,17 @@ public sealed class TwitchBotChannelLifecycleNotifierSelectionTests
         public Task ChannelStartedAsync(
             string channel,
             CancellationToken cancellationToken
-        ) => Task.CompletedTask;
+        )
+        {
+            return Task.CompletedTask;
+        }
 
         public Task ChannelStoppedAsync(
             string channel,
             CancellationToken cancellationToken
-        ) => Task.CompletedTask;
+        )
+        {
+            return Task.CompletedTask;
+        }
     }
 }

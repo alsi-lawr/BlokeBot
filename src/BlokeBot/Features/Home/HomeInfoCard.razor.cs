@@ -13,9 +13,9 @@ public partial class HomeInfoCard
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
-    private string CardClass => $"home-info-card home-info-card--{IconCssClass} rounded-lg p-5";
+    private string _cardClass => $"home-info-card home-info-card--{_iconCssClass} rounded-lg p-5";
 
-    private string IconCssClass =>
+    private string _iconCssClass =>
         Icon switch
         {
             HomeInfoCardIcon.Channel => "channel",

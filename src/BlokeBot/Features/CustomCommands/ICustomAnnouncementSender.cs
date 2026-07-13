@@ -49,7 +49,10 @@ internal sealed class DisabledCustomAnnouncementSender : ICustomAnnouncementSend
         string message,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken
-    ) => ValueTask.FromResult<AnnouncementEnqueueOutcome>(new AnnouncementEnqueueOutcome.Rejected());
+    )
+    {
+        return ValueTask.FromResult<AnnouncementEnqueueOutcome>(new AnnouncementEnqueueOutcome.Rejected());
+    }
 }
 
 internal sealed class TwitchCustomAnnouncementSender(PublicChatMessageQueue queue)
@@ -60,8 +63,9 @@ internal sealed class TwitchCustomAnnouncementSender(PublicChatMessageQueue queu
         string message,
         DateTimeOffset expiresAt,
         CancellationToken cancellationToken
-    ) =>
-        await queue.EnqueueAsync(
+    )
+    {
+        return await queue.EnqueueAsync(
             new PublicChatEnqueueCommand
             {
                 Channel = channel,
@@ -83,7 +87,10 @@ internal sealed class TwitchCustomAnnouncementSender(PublicChatMessageQueue queu
                 new AnnouncementEnqueueOutcome.Unexpected(FailureType(unexpected.Cause)),
             _ => throw new UnreachableException("Unknown public-chat enqueue outcome."),
         };
+    }
 
-    private static AnnouncementEnqueueFailureType FailureType(Exception exception) =>
-        new(exception.GetType().Name);
+    private static AnnouncementEnqueueFailureType FailureType(Exception exception)
+    {
+        return new(exception.GetType().Name);
+    }
 }

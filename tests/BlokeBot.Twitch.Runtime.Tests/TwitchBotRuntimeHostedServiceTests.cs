@@ -63,11 +63,13 @@ public sealed class TwitchBotRuntimeHostedServiceTests
     private static TwitchBotRuntimeHostedService CreateService(
         TwitchBotRuntime runtime,
         params ITwitchBotRuntimeStrategy[] strategies
-    ) =>
-        new(
+    )
+    {
+        return new(
             TwitchBotSettings.FromOptions(new TwitchBotOptions { Runtime = runtime }),
             strategies
         );
+    }
 
     private sealed class RecordingRuntimeStrategy(TwitchBotRuntime runtime)
         : ITwitchBotRuntimeStrategy

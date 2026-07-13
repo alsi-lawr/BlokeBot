@@ -10,8 +10,13 @@ public interface ICustomAnnouncementTickScheduler
 internal sealed class TimeProviderCustomAnnouncementTickScheduler(TimeProvider timeProvider)
     : ICustomAnnouncementTickScheduler
 {
-    public DateTimeOffset GetUtcNow() => timeProvider.GetUtcNow();
+    public DateTimeOffset GetUtcNow()
+    {
+        return timeProvider.GetUtcNow();
+    }
 
-    public Task DelayAsync(TimeSpan delay, CancellationToken ct) =>
-        Task.Delay(delay, timeProvider, ct);
+    public Task DelayAsync(TimeSpan delay, CancellationToken ct)
+    {
+        return Task.Delay(delay, timeProvider, ct);
+    }
 }

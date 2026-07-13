@@ -17,7 +17,9 @@ public sealed class GuessingHostSeeder(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         if (!await db.Hosts.AnyAsync(x => x.Id == hostId, ct))
+        {
             return;
+        }
 
         var defaultProfile = await db.Profiles.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.IsDefault,

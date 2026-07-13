@@ -120,21 +120,25 @@ public sealed class CommandTests
         return services.BuildServiceProvider().GetRequiredService<TwitchCommandDispatcher>();
     }
 
-    private static TwitchChatMessage Message(string login, string text) =>
-        new(
+    private static TwitchChatMessage Message(string login, string text)
+    {
+        return new(
             login,
             "channel",
             text,
             $":{login}!u@h PRIVMSG #channel :{text}",
             new Dictionary<string, string>()
         );
+    }
 
     private static TwitchCommandResponder RecordResponses(
         List<TwitchCommandResponse> responses
-    ) =>
-        (response, _) =>
+    )
+    {
+        return (response, _) =>
         {
             responses.Add(response);
             return ValueTask.CompletedTask;
         };
+    }
 }

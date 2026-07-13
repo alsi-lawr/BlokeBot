@@ -48,18 +48,20 @@ public partial class HostBotChannelStatusPanel
     [Parameter]
     public string? ReloadKey { get; set; }
 
-    private HostBotChannelStatus? Status => BackgroundValue;
+    private HostBotChannelStatus? _status => BackgroundValue;
 
     protected override object? BackgroundLoadKey =>
         string.IsNullOrWhiteSpace(HostLogin)
             ? null
             : $"{HostLogin.Trim().ToLowerInvariant()}:{ReloadKey}";
 
-    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct) =>
-        HostBotStatus.GetStatusAsync(HostLogin, ct);
+    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct)
+    {
+        return _hostBotStatus.GetStatusAsync(HostLogin, ct);
+    }
 
-    private string ModeratorStatusBadgeClass =>
-        Status?.ModeratorState switch
+    private string _moderatorStatusBadgeClass =>
+        _status?.ModeratorState switch
         {
             HostBotModeratorState.IsModerator =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
@@ -69,51 +71,51 @@ public partial class HostBotChannelStatusPanel
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
         };
 
-    private string ModeratorStatusDotClass =>
-        Status?.ModeratorState switch
+    private string _moderatorStatusDotClass =>
+        _status?.ModeratorState switch
         {
             HostBotModeratorState.IsModerator => "h-1.5 w-1.5 rounded-full bg-emerald-500",
             HostBotModeratorState.NotModerator => "h-1.5 w-1.5 rounded-full bg-amber-500",
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
-    private string ModeratorStatusText =>
+    private string _moderatorStatusText =>
         IsBackgroundLoading
             ? "checking"
-            : Status?.ModeratorState switch
+            : _status?.ModeratorState switch
             {
                 HostBotModeratorState.IsModerator => "yes",
                 HostBotModeratorState.NotModerator => "no",
                 _ => "unknown",
             };
 
-    private string ModeratorStatusMessage =>
+    private string _moderatorStatusMessage =>
         IsBackgroundLoading ? "Checking whether the bot is a channel mod."
         : BackgroundError is not null ? "BlokeBot could not check whether the bot is a mod."
-        : Status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
+        : _status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
 
-    private string FollowerReadStatusBadgeClass =>
-        Status?.CanReadFollowers == true
+    private string _followerReadStatusBadgeClass =>
+        _status?.CanReadFollowers == true
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-        : Status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
+        : _status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200"
         : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
 
-    private string FollowerReadStatusDotClass =>
-        Status?.CanReadFollowers == true ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-        : Status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
+    private string _followerReadStatusDotClass =>
+        _status?.CanReadFollowers == true ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+        : _status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
             ? "h-1.5 w-1.5 rounded-full bg-slate-400"
         : "h-1.5 w-1.5 rounded-full bg-amber-500";
 
-    private string FollowerReadStatusText =>
+    private string _followerReadStatusText =>
         IsBackgroundLoading ? "checking"
-        : Status?.CanReadFollowers == true ? "ready"
-        : Status?.ModeratorState == HostBotModeratorState.Unknown ? "unknown"
+        : _status?.CanReadFollowers == true ? "ready"
+        : _status?.ModeratorState == HostBotModeratorState.Unknown ? "unknown"
         : "not ready";
 
-    private string FollowerReadStatusMessage =>
+    private string _followerReadStatusMessage =>
         IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
         : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
-        : Status?.FollowerReadStatusMessage
+        : _status?.FollowerReadStatusMessage
             ?? "BlokeBot has not checked follower-only giveaways yet.";
 }

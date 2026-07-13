@@ -7,6 +7,8 @@ internal sealed class BotHostSelectionAccessor(IHttpContextAccessor httpContextA
 {
     public BotHostSelection? Current => FromPrincipal(httpContextAccessor.HttpContext?.User);
 
-    public static BotHostSelection? FromPrincipal(ClaimsPrincipal? user) =>
-        AuthenticatedSession.FromPrincipal(user).HostSelection;
+    public static BotHostSelection? FromPrincipal(ClaimsPrincipal? user)
+    {
+        return AuthenticatedSession.FromPrincipal(user).HostSelection;
+    }
 }

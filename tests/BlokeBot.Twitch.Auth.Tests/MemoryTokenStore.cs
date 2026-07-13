@@ -24,7 +24,9 @@ internal sealed class MemoryTokenStore : ITwitchTokenStore
         LoadCalls++;
         await Task.Yield();
         if (LoadException is not null)
+        {
             throw LoadException;
+        }
 
         return Loaded;
     }
@@ -38,7 +40,9 @@ internal sealed class MemoryTokenStore : ITwitchTokenStore
         SaveCalls++;
         await Task.Yield();
         if (SaveException is not null)
+        {
             throw SaveException;
+        }
 
         Saved = tokenSet;
     }

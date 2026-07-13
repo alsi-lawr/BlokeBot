@@ -14,12 +14,16 @@ public sealed class HostedChannelRuntimeLifecycleService(
     {
         var normalized = LoginName.Parse(channel);
         if (normalized.IsEmpty)
+        {
             return;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
         if (host?.BotRuntimeState is not BotChannelRuntimeState.Starting)
+        {
             return;
+        }
 
         host.BotRuntimeState = BotChannelRuntimeState.Started;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
@@ -31,12 +35,16 @@ public sealed class HostedChannelRuntimeLifecycleService(
     {
         var normalized = LoginName.Parse(channel);
         if (normalized.IsEmpty)
+        {
             return;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
         if (host is null || host.BotRuntimeState is BotChannelRuntimeState.Stopped)
+        {
             return;
+        }
 
         host.BotRuntimeState = BotChannelRuntimeState.Stopped;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;

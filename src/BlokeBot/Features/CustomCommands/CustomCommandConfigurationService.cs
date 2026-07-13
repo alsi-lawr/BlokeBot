@@ -12,7 +12,7 @@ public sealed class CustomCommandConfigurationService(
     EventBus<AppEventKind> events
 )
 {
-    private const int AliasMaxLength = 64;
+    private const int _aliasMaxLength = 64;
 
     public async Task<CustomCommandConfiguration> LoadConfigurationAsync(
         int hostId,
@@ -130,10 +130,12 @@ public sealed class CustomCommandConfigurationService(
                 command.Aliases,
                 ct
             );
-            if (aliases.Any(alias => alias.Length > AliasMaxLength))
+            if (aliases.Any(alias => alias.Length > _aliasMaxLength))
+            {
                 throw new InvalidOperationException(
-                    $"Command words cannot exceed {AliasMaxLength} characters."
+                    $"Command words cannot exceed {_aliasMaxLength} characters."
                 );
+            }
 
             normalized[command] = aliases;
         }
@@ -144,9 +146,11 @@ public sealed class CustomCommandConfigurationService(
             .FirstOrDefault(group => group.Select(x => x.Key).Distinct().Count() > 1)
             ?.Key;
         if (duplicate is not null)
+        {
             throw new InvalidOperationException(
                 $"!{duplicate} is already used by another custom command."
             );
+        }
 
         return normalized;
     }

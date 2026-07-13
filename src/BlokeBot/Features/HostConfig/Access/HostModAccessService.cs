@@ -19,7 +19,9 @@ public sealed class HostModAccessService(
     )
     {
         if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        {
             return;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await EnsureSettingsAsync(db, hostId, ct);
@@ -38,7 +40,9 @@ public sealed class HostModAccessService(
             ct
         );
         if (!changed)
+        {
             return;
+        }
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
@@ -47,7 +51,9 @@ public sealed class HostModAccessService(
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
     {
         if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        {
             return false;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
@@ -98,7 +104,9 @@ public sealed class HostModAccessService(
             ct
         );
         if (deleted > 0)
+        {
             await changes.NotifyChangedAsync(ct);
+        }
     }
 
     public async Task SetModsEnabledAsync(int hostId, bool enabled, CancellationToken ct)
@@ -134,7 +142,9 @@ public sealed class HostModAccessService(
             ct
         );
         if (settings is not null)
+        {
             return settings;
+        }
 
         settings = new HostModAccessSettings
         {

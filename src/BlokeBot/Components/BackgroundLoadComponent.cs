@@ -4,10 +4,10 @@ namespace BlokeBot.Components;
 
 public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposable
 {
-    private CancellationTokenSource? activeLoad;
-    private object? currentLoadKey;
-    private bool disposed;
-    private long version;
+    private CancellationTokenSource? _activeLoad;
+    private object? _currentLoadKey;
+    private bool _disposed;
+    private long _version;
 
     protected TValue? BackgroundValue { get; private set; }
     protected Exception? BackgroundError { get; private set; }
@@ -26,43 +26,45 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
             return;
         }
 
-        if (Equals(currentLoadKey, key))
+        if (Equals(_currentLoadKey, key))
+        {
             return;
+        }
 
         StartBackgroundLoad(key);
     }
 
     public void Dispose()
     {
-        disposed = true;
-        activeLoad?.Cancel();
+        _disposed = true;
+        _activeLoad?.Cancel();
     }
 
     private void StartBackgroundLoad(object key)
     {
-        activeLoad?.Cancel();
+        _activeLoad?.Cancel();
 
         var cts = new CancellationTokenSource();
-        activeLoad = cts;
-        currentLoadKey = key;
+        _activeLoad = cts;
+        _currentLoadKey = key;
         BackgroundValue = default;
         BackgroundError = null;
         IsBackgroundLoading = true;
-        var loadVersion = unchecked(++version);
+        var loadVersion = unchecked(++_version);
 
         _ = RunBackgroundLoadAsync(loadVersion, cts);
     }
 
     private void ClearBackgroundLoad()
     {
-        activeLoad?.Cancel();
-        currentLoadKey = null;
+        _activeLoad?.Cancel();
+        _currentLoadKey = null;
         BackgroundValue = default;
         BackgroundError = null;
         IsBackgroundLoading = false;
         unchecked
         {
-            version++;
+            _version++;
         }
     }
 
@@ -101,8 +103,10 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
         }
         finally
         {
-            if (ReferenceEquals(activeLoad, cts))
-                activeLoad = null;
+            if (ReferenceEquals(_activeLoad, cts))
+            {
+                _activeLoad = null;
+            }
 
             cts.Dispose();
         }
@@ -114,21 +118,25 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
         Action apply
     )
     {
-        if (disposed || cts.IsCancellationRequested || loadVersion != version)
+        if (_disposed || cts.IsCancellationRequested || loadVersion != _version)
+        {
             return;
+        }
 
         try
         {
             await InvokeAsync(() =>
             {
-                if (disposed || cts.IsCancellationRequested || loadVersion != version)
+                if (_disposed || cts.IsCancellationRequested || loadVersion != _version)
+                {
                     return;
+                }
 
                 apply();
                 StateHasChanged();
             });
         }
-        catch (InvalidOperationException) when (disposed) { }
-        catch (ObjectDisposedException) when (disposed) { }
+        catch (InvalidOperationException) when (_disposed) { }
+        catch (ObjectDisposedException) when (_disposed) { }
     }
 }

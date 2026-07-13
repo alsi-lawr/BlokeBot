@@ -1,11 +1,11 @@
-﻿@using BlokeBot.Auth.Sessions
+@using BlokeBot.Auth.Sessions
 @using BlokeBot.Features.HostedChannels
 @using BlokeBot.Hosts
 @using BlokeBot.Persistence.Models
-@inject EventBus<AppEventKind> Events
-@inject HostFeatureService Features
-@inject IJSRuntime Js
-@inject BlokeBotPageContextAccessor PageContext
+@inject EventBus<AppEventKind> _events
+@inject HostFeatureService _features
+@inject IJSRuntime _js
+@inject BlokeBotPageContextAccessor _pageContext
 @implements IAsyncDisposable
 
 <div class="nav-menu flex h-full flex-col">
@@ -21,10 +21,10 @@
         <AuthorizeView>
             <Authorized Context="navAuth">
                 @{
-                    var navContext = PageContext.FromPrincipal(navAuth.User);
+                    var navContext = _pageContext.FromPrincipal(navAuth.User);
                     var session = navContext.Session;
                     var selection = navContext.HostSelection;
-                    var showHostConfig = session.CanOpenHostConfig(existingHostIds);
+                    var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
@@ -112,7 +112,7 @@
         <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>
         @if (showGuessing)
         {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@guessingOpen">
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@_guessingOpen">
             <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleGuessingAsync">
                 <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
@@ -148,7 +148,7 @@
         }
         @if (showPoints)
         {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="points" open="@pointsOpen">
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="points" open="@_pointsOpen">
             <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="TogglePointsAsync">
                 <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
@@ -180,7 +180,7 @@
         }
         @if (showCustomCommands)
         {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="custom-commands" open="@customCommandsOpen">
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="custom-commands" open="@_customCommandsOpen">
             <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleCustomCommandsAsync">
                 <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">

@@ -1,6 +1,6 @@
 @using BlokeBot.Persistence.Models
 
-<div class="@RowClass">
+<div class="@_rowClass">
     <div class="flex min-w-0 items-center gap-3">
         @if (!string.IsNullOrWhiteSpace(Host.ProfileImageUrl))
         {
@@ -19,9 +19,9 @@
                     <span class="@StatusDotClass(Host.IsChannelBotAuthorized)"></span>
                     @(Host.IsChannelBotAuthorized ? "chat connected" : "chat not connected")
                 </span>
-                <span class="@BotStartedBadgeClass">
-                    <span class="@BotStartedDotClass"></span>
-                    @BotStartedText
+                <span class="@_botStartedBadgeClass">
+                    <span class="@_botStartedDotClass"></span>
+                    @_botStartedText
                 </span>
             </div>
         </div>
@@ -41,8 +41,8 @@
         }
         @if (CanEditHost)
         {
-            <a class="btn-secondary" href="@EditHostHref" data-enhance-nav="false">Manage channel</a>
+            <a class="btn-secondary" href="@_editHostHref" data-enhance-nav="false">Manage channel</a>
         }
-        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@pendingRemoval" @onclick="RemoveHostAsync">Remove</button>
+        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@_pendingRemoval" @onclick="RemoveHostAsync">Remove</button>
     </div>
 </div>

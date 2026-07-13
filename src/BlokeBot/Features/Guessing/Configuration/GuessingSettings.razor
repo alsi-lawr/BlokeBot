@@ -5,58 +5,58 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject GuessingConfigurationService Configuration
-@inject HostFeatureService Features
-@inject EventBus<AppEventKind> Events
-@inject ToastService Toasts
+@inject GuessingConfigurationService _configuration
+@inject HostFeatureService _features
+@inject EventBus<AppEventKind> _events
+@inject ToastService _toasts
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Round settings"
                 Description="Choose game types, answers, chat commands, and what the bot says.">
-        <button class="btn-primary" disabled="@(!featureEnabled || config is null)" @onclick="SaveAsync">Save changes</button>
+        <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
     </PageHeader>
 
     @if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
-    else if (!featureEnabled)
+    else if (!_featureEnabled)
     {
         <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
-    else if (config is null)
+    else if (_config is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading guessing settings...</div>
     }
     else
     {
         <div id="profiles">
-            <ProfileSettingsSection Configuration="config"
+            <ProfileSettingsSection Configuration="_config"
                                     CreateProfile="CreateProfileAsync"
                                     DeleteProfile="DeleteProfileAsync"
                                     SelectProfile="SelectProfileAsync"
-                                    @bind-NewProfileName="newProfileName" />
+                                    @bind-NewProfileName="_newProfileName" />
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div id="aliases">
-                <CommandAliasSettingsSection Aliases="config.Aliases" />
+                <CommandAliasSettingsSection Aliases="_config.Aliases" />
             </div>
 
-            <GuessOptionsSettingsSection Options="config.Profile.Options"
-                                         WhisperResponsesEnabled="config.WhisperResponsesEnabled"
-                                         @bind-WhisperAnswerReplies="config.Profile.WhisperAnswerReplies"
+            <GuessOptionsSettingsSection Options="_config.Profile.Options"
+                                         WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
+                                         @bind-WhisperAnswerReplies="_config.Profile.WhisperAnswerReplies"
                                          AddOption="AddOption"
                                          RemoveOption="RemoveOption" />
         </div>
 
         <div id="replies">
-            <ReplySettingsSection Replies="config.Profile.Replies" />
-            <ReplyDeliverySettingsSection Delivery="config.ReplyDelivery"
-                                          WhisperResponsesEnabled="config.WhisperResponsesEnabled"
-                                          Options="WhisperReplyOptions" />
+            <ReplySettingsSection Replies="_config.Profile.Replies" />
+            <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
+                                          WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
+                                          Options="_whisperReplyOptions" />
         </div>
     }
 </div>

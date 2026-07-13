@@ -6,9 +6,9 @@
         <NavMenu />
     </div>
 
-    <div class="@MobileDrawerOverlayClass" aria-hidden="true" @onclick="CloseMobileNavigation"></div>
+    <div class="@_mobileDrawerOverlayClass" aria-hidden="true" @onclick="CloseMobileNavigation"></div>
 
-    <aside class="@MobileDrawerClass" aria-label="Main navigation" aria-hidden="@(!mobileNavigationOpen)">
+    <aside class="@_mobileDrawerClass" aria-label="Main navigation" aria-hidden="@(!_mobileNavigationOpen)">
         <button class="mobile-drawer__close"
                 type="button"
                 aria-label="Close navigation menu"
@@ -27,7 +27,7 @@
                 <button class="mobile-nav-button lg:hidden"
                         type="button"
                         aria-label="Open navigation menu"
-                        aria-expanded="@mobileNavigationOpen"
+                        aria-expanded="@_mobileNavigationOpen"
                         @onclick="OpenMobileNavigation">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 7h16" />
@@ -64,25 +64,25 @@
 </div>
 
 @code {
-    private bool mobileNavigationOpen;
+    private bool _mobileNavigationOpen;
 
-    private string MobileDrawerClass =>
-        mobileNavigationOpen
+    private string _mobileDrawerClass =>
+        _mobileNavigationOpen
             ? "app-shell__mobile-drawer app-shell__mobile-drawer--open lg:hidden"
             : "app-shell__mobile-drawer lg:hidden";
 
-    private string MobileDrawerOverlayClass =>
-        mobileNavigationOpen
+    private string _mobileDrawerOverlayClass =>
+        _mobileNavigationOpen
             ? "app-shell__drawer-overlay app-shell__drawer-overlay--open lg:hidden"
             : "app-shell__drawer-overlay lg:hidden";
 
     private void CloseMobileNavigation()
     {
-        mobileNavigationOpen = false;
+        _mobileNavigationOpen = false;
     }
 
     private void OpenMobileNavigation()
     {
-        mobileNavigationOpen = true;
+        _mobileNavigationOpen = true;
     }
 }

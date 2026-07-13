@@ -10,8 +10,9 @@ public enum AuthRole
 
 internal static class AuthRoleCodec
 {
-    public static string Encode(AuthRole role) =>
-        role switch
+    public static string Encode(AuthRole role)
+    {
+        return role switch
         {
             AuthRole.Admin => "admin",
             AuthRole.Bot => "bot",
@@ -19,12 +20,15 @@ internal static class AuthRoleCodec
             AuthRole.Streamer => "streamer",
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
         };
+    }
 
     public static bool TryDecode(string? value, out AuthRole role)
     {
         role = default;
         if (string.IsNullOrWhiteSpace(value))
+        {
             return false;
+        }
 
         var normalized = value.Trim().ToLowerInvariant();
         role = normalized switch

@@ -46,27 +46,27 @@ public partial class HostSelector
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
 
-    private IDisposable? hostedChannelSubscription;
-    private IReadOnlyList<BotHostChoice> visibleHosts = [];
-    private int? selectedHostId;
-    private string? loadedVisibleHostsKey;
-    private BotHostSelection? Selection => Session.HostSelection;
+    private IDisposable? _hostedChannelSubscription;
+    private IReadOnlyList<BotHostChoice> _visibleHosts = [];
+    private int? _selectedHostId;
+    private string? _loadedVisibleHostsKey;
+    private BotHostSelection? _selection => Session.HostSelection;
 
-    private string RefreshIconClass =>
+    private string _refreshIconClass =>
         "h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";
 
-    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+    private string _currentPath => "/" + _navigation.ToBaseRelativePath(_navigation.Uri);
 
-    private string CurrentReturnUrl
+    private string _currentReturnUrl => Uri.EscapeDataString(_currentPath);
+
+    private bool IsAdminEditing()
     {
-        get { return Uri.EscapeDataString(CurrentPath); }
+        return Session.IsAdminEditing;
     }
-
-    private bool IsAdminEditing() => Session.IsAdminEditing;
 
     protected override void OnInitialized()
     {
-        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
+        _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             work => InvokeAsync(work),
             ReloadForEventAsync,
@@ -81,36 +81,38 @@ public partial class HostSelector
 
     public void Dispose()
     {
-        hostedChannelSubscription?.Dispose();
+        _hostedChannelSubscription?.Dispose();
     }
 
     private async Task LoadVisibleHostsIfChangedAsync()
     {
         var key = VisibleHostsKey();
-        if (string.Equals(key, loadedVisibleHostsKey, StringComparison.Ordinal))
+        if (string.Equals(key, _loadedVisibleHostsKey, StringComparison.Ordinal))
+        {
             return;
+        }
 
         await LoadVisibleHostsAsync();
-        loadedVisibleHostsKey = key;
+        _loadedVisibleHostsKey = key;
     }
 
     private async Task ReloadForEventAsync()
     {
-        loadedVisibleHostsKey = null;
+        _loadedVisibleHostsKey = null;
         await LoadVisibleHostsAsync();
-        loadedVisibleHostsKey = VisibleHostsKey();
+        _loadedVisibleHostsKey = VisibleHostsKey();
     }
 
     private async Task LoadVisibleHostsAsync()
     {
         var selectable = Session.AvailableHosts.Where(IsAlternateHost).ToArray();
 
-        visibleHosts = await HostedChannels.LoadExistingHostChoicesAsync(
+        _visibleHosts = await _hostedChannels.LoadExistingHostChoicesAsync(
             selectable,
             CancellationToken.None
         );
-        selectedHostId = visibleHosts.Any(host => host.Id == Selection?.Current.Id)
-            ? Selection?.Current.Id
+        _selectedHostId = _visibleHosts.Any(host => host.Id == _selection?.Current.Id)
+            ? _selection?.Current.Id
             : null;
     }
 
@@ -121,43 +123,55 @@ public partial class HostSelector
             Session.AvailableHosts.Select(host => $"{host.Id}:{host.Login}:{host.Role}")
         );
 
-        return $"{Selection?.Current.Id}:{Session.Login}:{hosts}";
+        return $"{_selection?.Current.Id}:{Session.Login}:{hosts}";
     }
 
-    private bool IsAlternateHost(BotHostChoice host) =>
-        host.Role != AuthRole.Admin
+    private bool IsAlternateHost(BotHostChoice host)
+    {
+        return host.Role != AuthRole.Admin
         && host.Role != AuthRole.Streamer
         && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+    }
 
-    private BotHostChoice? SelectedVisibleHost() =>
-        selectedHostId is { } hostId
-            ? visibleHosts.FirstOrDefault(host => host.Id == hostId)
+    private BotHostChoice? SelectedVisibleHost()
+    {
+        return _selectedHostId is { } hostId
+            ? _visibleHosts.FirstOrDefault(host => host.Id == hostId)
             : null;
+    }
 
-    private string SelectHostHref(int hostId) =>
-        $"/auth/select-host?hostId={hostId}&returnUrl={CurrentReturnUrl}";
+    private string SelectHostHref(int hostId)
+    {
+        return $"/auth/select-host?hostId={hostId}&returnUrl={_currentReturnUrl}";
+    }
 
-    private string MyChannelHref => $"/auth/select-own-host?returnUrl={CurrentReturnUrl}";
+    private string _myChannelHref => $"/auth/select-own-host?returnUrl={_currentReturnUrl}";
 
-    private static string SelectorShellClass(bool showMyChannel) =>
-        showMyChannel ? "host-selector host-selector--with-my-channel" : "host-selector";
+    private static string SelectorShellClass(bool showMyChannel)
+    {
+        return showMyChannel ? "host-selector host-selector--with-my-channel" : "host-selector";
+    }
 
     private bool ShowMyChannelControl()
     {
-        if (Selection is null)
+        if (_selection is null)
+        {
             return false;
+        }
 
-        return !IsOwnHost(Selection.Current)
+        return !IsOwnHost(_selection.Current)
             && (Session.CanCreateHost || Session.AvailableHosts.Any(IsOwnHost));
     }
 
-    private bool IsOwnHost(BotHostChoice host) =>
-        host.Role == AuthRole.Streamer
+    private bool IsOwnHost(BotHostChoice host)
+    {
+        return host.Role == AuthRole.Streamer
         && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+    }
 
     private string HostItemClass(BotHostChoice host)
     {
-        var selected = host.Id == selectedHostId ? "bg-purple-50 text-[#6f2bdc]" : "text-slate-800";
+        var selected = host.Id == _selectedHostId ? "bg-purple-50 text-[#6f2bdc]" : "text-slate-800";
 
         return $"menu-item grid grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 px-2.5 py-2 text-sm font-semibold {selected}";
     }

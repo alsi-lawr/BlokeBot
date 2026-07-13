@@ -1,9 +1,9 @@
-<section class="@PanelClass">
+<section class="@_panelClass">
     <button
         type="button"
         class="disclosure-trigger"
-        aria-controls="@ResolvedContentId"
-        aria-expanded="@isOpen"
+        aria-controls="@_resolvedContentId"
+        aria-expanded="@_isOpen"
         @onclick="Toggle">
         <span class="disclosure-copy">
             <span class="disclosure-title">@Title</span>
@@ -12,16 +12,16 @@
                 <span class="disclosure-description">@Description</span>
             }
         </span>
-        <span class="disclosure-chevron @(isOpen ? "open" : "")" aria-hidden="true">
+        <span class="disclosure-chevron @(_isOpen ? "open" : "")" aria-hidden="true">
             <svg viewBox="0 0 20 20" focusable="false">
                 <path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
         </span>
     </button>
 
-    @if (isOpen)
+    @if (_isOpen)
     {
-        <div id="@ResolvedContentId" class="disclosure-content">
+        <div id="@_resolvedContentId" class="disclosure-content">
             @ChildContent
         </div>
     }

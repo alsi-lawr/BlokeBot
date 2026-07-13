@@ -5,8 +5,8 @@ namespace BlokeBot.Components;
 
 public partial class AuthPopupButton
 {
-    private IJSObjectReference? module;
-    private bool opening;
+    private IJSObjectReference? _module;
+    private bool _opening;
 
     [Inject]
     public IJSRuntime Js { get; set; } = default!;
@@ -34,12 +34,14 @@ public partial class AuthPopupButton
 
     public async ValueTask DisposeAsync()
     {
-        if (module is null)
+        if (_module is null)
+        {
             return;
+        }
 
         try
         {
-            await module.DisposeAsync();
+            await _module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
@@ -47,23 +49,27 @@ public partial class AuthPopupButton
 
     private async Task OpenAsync()
     {
-        if (opening || Disabled || string.IsNullOrWhiteSpace(Url))
+        if (_opening || Disabled || string.IsNullOrWhiteSpace(Url))
+        {
             return;
+        }
 
-        opening = true;
+        _opening = true;
         try
         {
-            module ??= await Js.InvokeAsync<IJSObjectReference>(
+            _module ??= await Js.InvokeAsync<IJSObjectReference>(
                 "import",
                 "./Components/AuthPopupButton.razor.js"
             );
-            var popupClosed = await module.InvokeAsync<bool>("openAuthPopup", Url, PopupName);
+            var popupClosed = await _module.InvokeAsync<bool>("openAuthPopup", Url, PopupName);
             if (popupClosed && OnClosed.HasDelegate)
+            {
                 await OnClosed.InvokeAsync();
+            }
         }
         finally
         {
-            opening = false;
+            _opening = false;
         }
     }
 }

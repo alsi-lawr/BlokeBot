@@ -106,34 +106,44 @@ public sealed class TwitchTokenStatusServiceTests
         status.MissingScopes.ShouldBe(["chat:edit"]);
     }
 
-    private static TwitchOAuthApiClient OAuthClient(string? validationJson) =>
-        new(new StatusHttpClientFactory(validationJson));
+    private static TwitchOAuthApiClient OAuthClient(string? validationJson)
+    {
+        return new(new StatusHttpClientFactory(validationJson));
+    }
 
     private sealed class ServiceProviderStub(ITwitchAccessTokenProvider? tokens) : IServiceProvider
     {
-        public object? GetService(Type serviceType) =>
-            serviceType == typeof(ITwitchAccessTokenProvider) ? tokens : null;
+        public object? GetService(Type serviceType)
+        {
+            return serviceType == typeof(ITwitchAccessTokenProvider) ? tokens : null;
+        }
     }
 
     private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(accessToken);
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(accessToken);
+        }
     }
 
     private sealed class UnavailableTokenProvider : ITwitchAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
             throw new TwitchAccessTokenUnavailableException(
                 TwitchAccessTokenUnavailableReason.MissingRefreshToken,
                 TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
             );
+        }
     }
 
     private sealed class StatusHttpClientFactory(string? validationJson) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) =>
-            new(new Handler(validationJson), disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler(validationJson), disposeHandler: false);
+        }
 
         private sealed class Handler(string? validationJson) : HttpMessageHandler
         {
@@ -143,7 +153,9 @@ public sealed class TwitchTokenStatusServiceTests
             )
             {
                 if (validationJson is null)
+                {
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+                }
 
                 return Task.FromResult(
                     new HttpResponseMessage(HttpStatusCode.OK)

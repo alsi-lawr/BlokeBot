@@ -60,19 +60,27 @@ internal static class BotOAuthEndpoints
 
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.IsBotAdmin)
+                    {
                         return Results.Forbid();
+                    }
 
                     if (!string.IsNullOrWhiteSpace(error))
+                    {
                         return Results.Content(
                             $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
                             "text/plain"
                         );
+                    }
 
                     if (string.IsNullOrWhiteSpace(code))
+                    {
                         return Results.BadRequest("Twitch sign-in did not finish. Try again.");
+                    }
 
                     if (string.IsNullOrWhiteSpace(state))
+                    {
                         return Results.BadRequest("This Twitch sign-in expired. Try again.");
+                    }
 
                     try
                     {
@@ -117,11 +125,15 @@ internal static class BotOAuthEndpoints
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
+                    {
                         return Results.Forbid();
+                    }
 
                     var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is not null)
+                    {
                         await channelBotAuthorization.ClearIfScopesStaleAsync(selectedHost.Id, ct);
+                    }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     DeleteChannelBotStateCookie(context);
@@ -160,19 +172,25 @@ internal static class BotOAuthEndpoints
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
+                    {
                         return Results.Forbid();
+                    }
 
                     var storedState = context.Request.Cookies["BlokeBot.ChannelBotState"];
                     DeleteChannelBotStateCookie(context);
 
                     if (!string.IsNullOrWhiteSpace(error))
+                    {
                         return Results.Content(
                             $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
                             "text/plain"
                         );
+                    }
 
                     if (string.IsNullOrWhiteSpace(code))
+                    {
                         return Results.BadRequest("Twitch connection did not finish. Try again.");
+                    }
 
                     if (
                         string.IsNullOrWhiteSpace(state)
@@ -185,7 +203,9 @@ internal static class BotOAuthEndpoints
 
                     var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is null)
+                    {
                         return Results.BadRequest("Choose your channel before connecting it.");
+                    }
 
                     try
                     {
@@ -196,7 +216,9 @@ internal static class BotOAuthEndpoints
                             ct
                         );
                         if (!authorization.Succeeded)
+                        {
                             return Results.BadRequest(authorization.Message);
+                        }
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -245,14 +267,20 @@ internal static class BotOAuthEndpoints
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
+                    {
                         return Results.Forbid();
+                    }
 
                     var selectedHost = session.HostSelection?.Current;
                     if (selectedHost is null)
+                    {
                         return Results.BadRequest("Choose your channel before connecting it.");
+                    }
 
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
+                    {
                         return Results.BadRequest("Turn on custom bot before connecting it.");
+                    }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     DeleteHostBotStateCookie(context);
@@ -293,19 +321,25 @@ internal static class BotOAuthEndpoints
     {
         var session = AuthenticatedSession.FromPrincipal(context.User);
         if (!session.CanAuthorizeSelectedHost)
+        {
             return Results.Forbid();
+        }
 
         var storedState = context.Request.Cookies["BlokeBot.HostBotState"];
         DeleteHostBotStateCookie(context);
 
         if (!string.IsNullOrWhiteSpace(error))
+        {
             return Results.Content(
                 $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
                 "text/plain"
             );
+        }
 
         if (string.IsNullOrWhiteSpace(code))
+        {
             return Results.BadRequest("Twitch connection did not finish. Try again.");
+        }
 
         if (
             string.IsNullOrWhiteSpace(state)
@@ -318,7 +352,9 @@ internal static class BotOAuthEndpoints
 
         var selectedHost = session.HostSelection?.Current;
         if (selectedHost is null)
+        {
             return Results.BadRequest("Choose your channel before connecting it.");
+        }
 
         try
         {
@@ -329,7 +365,9 @@ internal static class BotOAuthEndpoints
                 ct
             );
             if (!authorization.Succeeded)
+            {
                 return Results.BadRequest(authorization.Message);
+            }
         }
         catch (InvalidOperationException ex)
         {
@@ -367,8 +405,9 @@ internal static class BotOAuthEndpoints
     private static CookieOptions ChannelBotStateCookieOptions(
         HttpRequest request,
         TimeSpan? maxAge
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             HttpOnly = true,
             IsEssential = true,
@@ -377,6 +416,7 @@ internal static class BotOAuthEndpoints
             SameSite = SameSiteMode.Lax,
             Secure = request.IsHttps,
         };
+    }
 
     private static void DeleteChannelBotStateCookie(HttpContext context)
     {
@@ -390,8 +430,9 @@ internal static class BotOAuthEndpoints
         );
     }
 
-    private static CookieOptions HostBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge) =>
-        new()
+    private static CookieOptions HostBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)
+    {
+        return new()
         {
             HttpOnly = true,
             IsEssential = true,
@@ -400,6 +441,7 @@ internal static class BotOAuthEndpoints
             SameSite = SameSiteMode.Lax,
             Secure = request.IsHttps,
         };
+    }
 
     private static void DeleteHostBotStateCookie(HttpContext context)
     {

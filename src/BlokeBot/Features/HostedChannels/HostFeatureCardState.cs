@@ -1,6 +1,6 @@
-namespace BlokeBot.Features.HostedChannels;
-
 using BlokeBot.Persistence.Models;
+
+namespace BlokeBot.Features.HostedChannels;
 
 public sealed record HostFeatureCardState(
     HostFeatureFlags Feature,

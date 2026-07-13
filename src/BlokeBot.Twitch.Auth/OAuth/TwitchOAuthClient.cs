@@ -52,7 +52,10 @@ internal sealed class TwitchOAuthClient(
     public async Task<bool> ValidateAsync(
         string accessToken,
         CancellationToken cancellationToken
-    ) => await twitch.ValidateTokenAsync(accessToken, cancellationToken) is not null;
+    )
+    {
+        return await twitch.ValidateTokenAsync(accessToken, cancellationToken) is not null;
+    }
 
     private static TwitchTokenSet ToTokenSet(TwitchOAuthTokenResponse payload)
     {

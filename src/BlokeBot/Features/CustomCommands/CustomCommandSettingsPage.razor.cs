@@ -8,26 +8,26 @@ namespace BlokeBot.Features.CustomCommands;
 
 public partial class CustomCommandSettingsPage
 {
-    private static readonly IReadOnlyList<CustomMessageSelectionMode> MessageSelectionModes =
+    private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
-    private static readonly IReadOnlyList<CustomCommandCooldownScope> CooldownScopes =
+    private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
         Enum.GetValues<CustomCommandCooldownScope>();
-    private static readonly IReadOnlyList<CustomCommandActionKind> ActionKinds =
+    private static readonly IReadOnlyList<CustomCommandActionKind> _actionKinds =
         Enum.GetValues<CustomCommandActionKind>();
-    private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> AnnouncementScheduleKinds =
+    private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> _announcementScheduleKinds =
         Enum.GetValues<CustomAnnouncementScheduleKind>();
-    private static readonly IReadOnlyList<DayOfWeek> DaysOfWeek = Enum.GetValues<DayOfWeek>();
-    private static readonly IReadOnlyList<TimeZoneInfo> TimeZones =
+    private static readonly IReadOnlyList<DayOfWeek> _daysOfWeek = Enum.GetValues<DayOfWeek>();
+    private static readonly IReadOnlyList<TimeZoneInfo> _timeZones =
         TimeZoneInfo.GetSystemTimeZones();
 
-    private CustomCommandConfiguration? config;
-    private bool featureEnabled;
-    private int nextTemporaryId = -1;
+    private CustomCommandConfiguration? _config;
+    private bool _featureEnabled;
+    private int _nextTemporaryId = -1;
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.CustomCommandsChanged],
                 work => InvokeAsync(work),
                 LoadAsync,
@@ -40,44 +40,48 @@ public partial class CustomCommandSettingsPage
     private async Task LoadAsync()
     {
         await LoadPageContextAsync();
-        featureEnabled =
+        _featureEnabled =
             HostId != 0
-            && await Features.IsEnabledAsync(
+            && await _features.IsEnabledAsync(
                 HostId,
                 HostFeatureFlags.CustomCommands,
                 CancellationToken.None
             );
-        config = featureEnabled
-            ? await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
+        _config = _featureEnabled
+            ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
-        nextTemporaryId = -1;
+        _nextTemporaryId = -1;
     }
 
     private async Task SaveAsync()
     {
-        if (config is null || HostId == 0)
+        if (_config is null || HostId == 0)
+        {
             return;
+        }
 
         try
         {
-            await Configuration.SaveConfigurationAsync(HostId, config, CancellationToken.None);
-            config = await Configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            nextTemporaryId = -1;
-            Toasts.Success("Custom commands saved.");
+            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
+            _config = await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
+            _nextTemporaryId = -1;
+            _toasts.Success("Custom commands saved.");
         }
         catch (Exception ex)
             when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
         {
-            Toasts.Error(ex.Message);
+            _toasts.Error(ex.Message);
         }
     }
 
     private void AddMessageEntry()
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
-        config.MessageEntries.Add(
+        _config.MessageEntries.Add(
             new CustomMessageLibraryEntryEditor
             {
                 Id = NextTemporaryId(),
@@ -96,21 +100,23 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveMessageEntry(CustomMessageLibraryEntryEditor entry)
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
         if (
-            config.Commands.Any(x => x.Action.MessageLibraryEntryId == entry.Id)
-            || config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
+            _config.Commands.Any(x => x.Action.MessageLibraryEntryId == entry.Id)
+            || _config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
-            Toasts.Warning(
+            _toasts.Warning(
                 "This reply is used by a command or announcement. Change that first, then delete it."
             );
             return;
         }
 
-        config.MessageEntries.Remove(entry);
+        _config.MessageEntries.Remove(entry);
     }
 
     private void AddVariant(CustomMessageLibraryEntryEditor entry)
@@ -131,7 +137,7 @@ public partial class CustomCommandSettingsPage
     {
         if (entry.Variants.Count <= 1)
         {
-            Toasts.Warning("A reply needs at least one message.");
+            _toasts.Warning("A reply needs at least one message.");
             return;
         }
 
@@ -147,7 +153,9 @@ public partial class CustomCommandSettingsPage
     {
         var nextIndex = index + direction;
         if (nextIndex < 0 || nextIndex >= entry.Variants.Count)
+        {
             return;
+        }
 
         (entry.Variants[index], entry.Variants[nextIndex]) = (
             entry.Variants[nextIndex],
@@ -158,10 +166,12 @@ public partial class CustomCommandSettingsPage
 
     private void AddCommand()
     {
-        if (config is null || config.MessageEntries.Count == 0)
+        if (_config is null || _config.MessageEntries.Count == 0)
+        {
             return;
+        }
 
-        config.Commands.Add(
+        _config.Commands.Add(
             new CustomCommandEditor
             {
                 Id = NextTemporaryId(),
@@ -169,7 +179,7 @@ public partial class CustomCommandSettingsPage
                 Aliases = "newcommand",
                 Action = new MessageCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = config.MessageEntries[0].Id,
+                    MessageLibraryEntryId = _config.MessageEntries[0].Id,
                 },
             }
         );
@@ -177,15 +187,17 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveCommand(CustomCommandEditor command)
     {
-        config?.Commands.Remove(command);
+        _config?.Commands.Remove(command);
     }
 
     private void AddCounter()
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
-        config.Counters.Add(
+        _config.Counters.Add(
             new CustomCounterEditor
             {
                 Id = NextTemporaryId(),
@@ -196,36 +208,40 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveCounter(CustomCounterEditor counter)
     {
-        if (config is null)
+        if (_config is null)
+        {
             return;
+        }
 
         if (
-            config.Commands.Any(x =>
+            _config.Commands.Any(x =>
                 x.Action is CounterCustomCommandActionEditor action
                 && action.CounterId == counter.Id
             )
         )
         {
-            Toasts.Warning(
+            _toasts.Warning(
                 "This counter is used by a command. Change that command first, then delete it."
             );
             return;
         }
 
-        config.Counters.Remove(counter);
+        _config.Counters.Remove(counter);
     }
 
     private void AddAnnouncement()
     {
-        if (config is null || config.MessageEntries.Count == 0)
+        if (_config is null || _config.MessageEntries.Count == 0)
+        {
             return;
+        }
 
-        config.Announcements.Add(
+        _config.Announcements.Add(
             new CustomAnnouncementEditor
             {
                 Id = NextTemporaryId(),
                 Name = "New announcement",
-                MessageLibraryEntryId = config.MessageEntries[0].Id,
+                MessageLibraryEntryId = _config.MessageEntries[0].Id,
                 RetryDelaySeconds = 0,
                 OccurrenceLifetimeSeconds = 0,
                 Schedule = new IntervalCustomAnnouncementScheduleEditor
@@ -238,48 +254,60 @@ public partial class CustomCommandSettingsPage
 
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
     {
-        config?.Announcements.Remove(announcement);
+        _config?.Announcements.Remove(announcement);
     }
 
-    private int NextTemporaryId() => nextTemporaryId--;
+    private int NextTemporaryId()
+    {
+        return _nextTemporaryId--;
+    }
 
-    private string SelectedTimeZoneLabel =>
-        config is null
+    private string _selectedTimeZoneLabel =>
+        _config is null
             ? string.Empty
-            : TimeZones.FirstOrDefault(x => x.Id == config.TimeZoneId) is { } timeZone
+            : _timeZones.FirstOrDefault(x => x.Id == _config.TimeZoneId) is { } timeZone
                 ? TimeZoneLabel(timeZone)
-                : config.TimeZoneId;
+                : _config.TimeZoneId;
 
-    private static string CountLabel(int count, string singular) =>
-        $"{count} {(count == 1 ? singular : singular + "s")}";
+    private static string CountLabel(int count, string singular)
+    {
+        return $"{count} {(count == 1 ? singular : singular + "s")}";
+    }
 
-    private static string MessageSelectionLabel(CustomMessageSelectionMode mode) =>
-        mode switch
+    private static string MessageSelectionLabel(CustomMessageSelectionMode mode)
+    {
+        return mode switch
         {
             CustomMessageSelectionMode.First => "Always use the first message",
             CustomMessageSelectionMode.Random => "Pick a message at random",
             CustomMessageSelectionMode.Sequential => "Use each message in order",
             _ => "Choose a message",
         };
+    }
 
-    private static string CooldownScopeLabel(CustomCommandCooldownScope scope) =>
-        scope switch
+    private static string CooldownScopeLabel(CustomCommandCooldownScope scope)
+    {
+        return scope switch
         {
             CustomCommandCooldownScope.Global => "Everyone shares the wait",
             CustomCommandCooldownScope.User => "Each viewer has their own wait",
             _ => "Choose who waits",
         };
+    }
 
-    private static string ActionKindLabel(CustomCommandActionKind action) =>
-        action switch
+    private static string ActionKindLabel(CustomCommandActionKind action)
+    {
+        return action switch
         {
             CustomCommandActionKind.Message => "Send a reply",
             CustomCommandActionKind.Counter => "Add 1 to a counter, then send a reply",
             _ => "Choose what happens",
         };
+    }
 
-    private static string AnnouncementScheduleLabel(CustomAnnouncementScheduleKind schedule) =>
-        schedule switch
+    private static string AnnouncementScheduleLabel(CustomAnnouncementScheduleKind schedule)
+    {
+        return schedule switch
         {
             CustomAnnouncementScheduleKind.Interval => "On a timer",
             CustomAnnouncementScheduleKind.IntervalAfterChat =>
@@ -287,17 +315,25 @@ public partial class CustomCommandSettingsPage
             CustomAnnouncementScheduleKind.Weekly => "Once a week",
             _ => "Choose when to send",
         };
+    }
 
-    private static string TimeZoneLabel(TimeZoneInfo timeZone) => timeZone.DisplayName;
+    private static string TimeZoneLabel(TimeZoneInfo timeZone)
+    {
+        return timeZone.DisplayName;
+    }
 
-    private static string AlertImportanceLabel(DurableAlertSeverity severity) =>
-        severity switch
+    private static string AlertImportanceLabel(DurableAlertSeverity severity)
+    {
+        return severity switch
         {
             DurableAlertSeverity.Critical => "Urgent",
             DurableAlertSeverity.Warning => "Warning",
             _ => "Information",
         };
+    }
 
-    private static string FormatLastSent(DateTime? value) =>
-        value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");
+    private static string FormatLastSent(DateTime? value)
+    {
+        return value is null ? "Never" : value.Value.ToString("yyyy-MM-dd HH:mm 'UTC'");
+    }
 }

@@ -34,12 +34,12 @@ internal sealed class TwitchIrcConnectionSession(
     ILogger<TwitchIrcConnectionSession> log
 ) : ITwitchIrcConnectionSession
 {
-    private static readonly ObserverEventIdentity ChatMessageEvent =
+    private static readonly ObserverEventIdentity _chatMessageEvent =
         ObserverEventIdentity.Named("TwitchChatMessage");
-    private readonly ITwitchChatMessageObserver[] messageObservers =
+    private readonly ITwitchChatMessageObserver[] _messageObservers =
         [.. messageObservers];
-    private readonly TwitchBotSettings opts = settings;
-    private ILogger<TwitchIrcConnectionSession> Log { get; } = log;
+    private readonly TwitchBotSettings _opts = settings;
+    private ILogger<TwitchIrcConnectionSession> _log { get; } = log;
 
     public async Task<TwitchRuntimeSessionEstablishment> EstablishAsync(
         TwitchRuntimeConnectionTarget target,
@@ -47,9 +47,11 @@ internal sealed class TwitchIrcConnectionSession(
     )
     {
         if (target is not TwitchRuntimeConnectionTarget.Initial)
+        {
             throw new UnreachableException(
                 "IRC sessions can only establish the default Twitch endpoint."
             );
+        }
 
         var channelLogins = TwitchChannelList.Normalize(
             await channels.GetChannelsAsync(cancellationToken)
@@ -57,7 +59,7 @@ internal sealed class TwitchIrcConnectionSession(
         if (channelLogins.Length == 0)
         {
             status.SetConnected(false, []);
-            Log.LogWarning(
+            _log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );
             return new TwitchRuntimeSessionEstablishment.Idle();
@@ -72,8 +74,8 @@ internal sealed class TwitchIrcConnectionSession(
         try
         {
             await tcp.ConnectAsync(
-                opts.Connection.Host,
-                opts.Connection.Port,
+                _opts.Connection.Host,
+                _opts.Connection.Port,
                 cancellationToken
             );
             var stream = await OpenStreamAsync(tcp, cancellationToken);
@@ -88,7 +90,7 @@ internal sealed class TwitchIrcConnectionSession(
                 "CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership"
             );
             await writer.WriteLineAsync($"PASS oauth:{accessToken}");
-            await writer.WriteLineAsync($"NICK {opts.Identity.BotUsername}");
+            await writer.WriteLineAsync($"NICK {_opts.Identity.BotUsername}");
             var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var startedChannels = new List<string>();
             foreach (var channel in channelLogins)
@@ -100,11 +102,13 @@ internal sealed class TwitchIrcConnectionSession(
             await AwaitAuthenticationAsync(reader, writer, cancellationToken);
             status.SetConnected(joinedChannels.Count > 0, joinedChannels.ToArray());
             foreach (var channel in startedChannels)
+            {
                 await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+            }
 
-            Log.LogInformation(
+            _log.LogInformation(
                 "Twitch IRC authentication sent for {BotUsername}; joining {Channels}.",
-                opts.Identity.BotUsername,
+                _opts.Identity.BotUsername,
                 string.Join(", ", channelLogins.Select(channel => $"#{channel}"))
             );
 
@@ -122,7 +126,9 @@ internal sealed class TwitchIrcConnectionSession(
         catch
         {
             if (writer is not null)
+            {
                 await writer.DisposeAsync();
+            }
 
             reader?.Dispose();
             tcp.Dispose();
@@ -140,7 +146,7 @@ internal sealed class TwitchIrcConnectionSession(
             message,
             async (response, ct) =>
             {
-                Log.LogInformation(
+                _log.LogInformation(
                     "Queueing Twitch {Target} response to #{Channel}: {Reply}",
                     response.Target,
                     message.Channel,
@@ -158,12 +164,12 @@ internal sealed class TwitchIrcConnectionSession(
     )
     {
         _ = await messageObserverFanOut.DispatchAsync(
-            messageObservers,
+            _messageObservers,
             _ =>
                 new ObserverDispatch<TwitchChatMessage, TwitchChatObserverDeadLetter>
                 {
                     Event = message,
-                    EventIdentity = ChatMessageEvent,
+                    EventIdentity = _chatMessageEvent,
                     DeadLetter = new TwitchChatObserverDeadLetter(message.Channel),
                 },
             observer => ObserverIdentity.For(observer.GetType()),
@@ -194,7 +200,7 @@ internal sealed class TwitchIrcConnectionSession(
             await writer.WriteLineAsync($"PART #{channel}");
             joinedChannels.Remove(channel);
             stoppedChannels.Add(channel);
-            Log.LogInformation("Parted Twitch IRC channel #{Channel}.", channel);
+            _log.LogInformation("Parted Twitch IRC channel #{Channel}.", channel);
         }
 
         foreach (
@@ -204,15 +210,19 @@ internal sealed class TwitchIrcConnectionSession(
             await JoinChannelAsync(writer, channel, cancellationToken);
             joinedChannels.Add(channel);
             startedChannels.Add(channel);
-            Log.LogInformation("Joined Twitch IRC channel #{Channel}.", channel);
+            _log.LogInformation("Joined Twitch IRC channel #{Channel}.", channel);
         }
 
         status.SetConnected(joinedChannels.Count > 0, joinedChannels.ToArray());
         foreach (var channel in stoppedChannels)
+        {
             await lifecycleNotifier.ChannelStoppedAsync(channel, cancellationToken);
+        }
 
         foreach (var channel in startedChannels)
+        {
             await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+        }
     }
 
     private async Task JoinChannelAsync(
@@ -222,9 +232,11 @@ internal sealed class TwitchIrcConnectionSession(
     )
     {
         await writer.WriteLineAsync($"JOIN #{channel}");
-        var startupMessage = opts.StartupMessage;
+        var startupMessage = _opts.StartupMessage;
         if (string.IsNullOrWhiteSpace(startupMessage))
+        {
             return;
+        }
 
         await sender.SendAsync(
             channel,
@@ -242,10 +254,7 @@ internal sealed class TwitchIrcConnectionSession(
     {
         while (true)
         {
-            var line = await reader.ReadLineAsync(cancellationToken);
-            if (line is null)
-                throw new IOException("Disconnected before IRC authentication completed.");
-
+            var line = await reader.ReadLineAsync(cancellationToken) ?? throw new IOException("Disconnected before IRC authentication completed.");
             if (TwitchIrcProtocol.IsPing(line))
             {
                 await writer.WriteLineAsync(TwitchIrcProtocol.CreatePong(line));
@@ -254,12 +263,16 @@ internal sealed class TwitchIrcConnectionSession(
 
             LogServerLine(line);
             if (line.Contains(" NOTICE ", StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException(
                     "Twitch rejected IRC session establishment."
                 );
+            }
 
             if (line.Contains(" 001 ", StringComparison.Ordinal))
+            {
                 return;
+            }
         }
     }
 
@@ -267,50 +280,50 @@ internal sealed class TwitchIrcConnectionSession(
     {
         if (line.Contains(" NOTICE ", StringComparison.Ordinal))
         {
-            Log.LogWarning("Twitch IRC notice: {Line}", line);
+            _log.LogWarning("Twitch IRC notice: {Line}", line);
             return;
         }
 
         if (line.Contains(" 001 ", StringComparison.Ordinal))
         {
-            Log.LogInformation(
+            _log.LogInformation(
                 "Twitch IRC authenticated as {BotUsername}.",
-                opts.Identity.BotUsername
+                _opts.Identity.BotUsername
             );
             return;
         }
 
         if (line.Contains(" JOIN ", StringComparison.Ordinal))
         {
-            Log.LogInformation("Twitch IRC join event: {Line}", line);
+            _log.LogInformation("Twitch IRC join event: {Line}", line);
             return;
         }
 
         if (line.Contains(" ROOMSTATE ", StringComparison.Ordinal))
         {
-            Log.LogInformation("Twitch IRC room state: {Line}", line);
+            _log.LogInformation("Twitch IRC room state: {Line}", line);
             return;
         }
 
         if (line.Contains(" USERSTATE ", StringComparison.Ordinal))
         {
-            Log.LogInformation("Twitch IRC user state: {Line}", line);
+            _log.LogInformation("Twitch IRC user state: {Line}", line);
             return;
         }
 
         if (line.Contains(" GLOBALUSERSTATE ", StringComparison.Ordinal))
         {
-            Log.LogInformation("Twitch IRC global user state: {Line}", line);
+            _log.LogInformation("Twitch IRC global user state: {Line}", line);
             return;
         }
 
         if (line.Contains(" CLEARCHAT ", StringComparison.Ordinal))
         {
-            Log.LogWarning("Twitch IRC clear chat event: {Line}", line);
+            _log.LogWarning("Twitch IRC clear chat event: {Line}", line);
             return;
         }
 
-        Log.LogTrace("Twitch IRC line: {Line}", line);
+        _log.LogTrace("Twitch IRC line: {Line}", line);
     }
 
     private async ValueTask<Stream> OpenStreamAsync(
@@ -319,12 +332,14 @@ internal sealed class TwitchIrcConnectionSession(
     )
     {
         var networkStream = tcp.GetStream();
-        if (!opts.Connection.UseTls)
+        if (!_opts.Connection.UseTls)
+        {
             return networkStream;
+        }
 
         var ssl = new SslStream(networkStream, leaveInnerStreamOpen: false);
         await ssl.AuthenticateAsClientAsync(
-            new SslClientAuthenticationOptions { TargetHost = opts.Connection.Host },
+            new SslClientAuthenticationOptions { TargetHost = _opts.Connection.Host },
             cancellationToken
         );
         return ssl;
@@ -350,10 +365,7 @@ internal sealed class TwitchIrcConnectionSession(
                     joinedChannels,
                     cancellationToken
                 );
-                var line = await reader.ReadLineAsync(cancellationToken);
-                if (line is null)
-                    throw new IOException("Disconnected.");
-
+                var line = await reader.ReadLineAsync(cancellationToken) ?? throw new IOException("Disconnected.");
                 if (TwitchIrcProtocol.IsPing(line))
                 {
                     await writer.WriteLineAsync(TwitchIrcProtocol.CreatePong(line));
@@ -364,10 +376,12 @@ internal sealed class TwitchIrcConnectionSession(
 
                 var parseResult = TwitchIrcProtocol.ParsePrivMsg(line);
                 if (!parseResult.Success)
+                {
                     continue;
+                }
 
                 var message = parseResult.Message;
-                owner.Log.LogDebug(
+                owner._log.LogDebug(
                     "Received Twitch chat message from {Login} in #{Channel}: {Text}",
                     message.Login,
                     message.Channel,
@@ -409,15 +423,19 @@ internal sealed class TwitchIrcConnectionSession(
             }
 
             if (failure is not null)
+            {
                 ExceptionDispatchInfo.Capture(failure).Throw();
+            }
         }
 
         private static Exception CombineCleanupFailures(
             Exception? previous,
             Exception current
-        ) =>
-            previous is null
+        )
+        {
+            return previous is null
                 ? current
                 : new AggregateException("IRC session cleanup failed.", previous, current);
+        }
     }
 }

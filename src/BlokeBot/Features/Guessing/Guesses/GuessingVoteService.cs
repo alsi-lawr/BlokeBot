@@ -25,7 +25,9 @@ public sealed class GuessingVoteService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
+        {
             return NotConfigured();
+        }
 
         var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
         var resolution =
@@ -41,18 +43,22 @@ public sealed class GuessingVoteService(
         var normalizedName = GuessName.Parse(name).Value;
 
         if (round is null)
+        {
             return new GuessingOperationResult(
                 false,
                 settings.NoOpenRoundReply,
                 delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
             );
+        }
 
         if (round.Status != GuessRoundStatus.Open)
+        {
             return new GuessingOperationResult(
                 false,
                 settings.GuessingClosedReply,
                 delivery.TargetFor(GuessingReplyKeys.GuessingClosed)
             );
+        }
 
         var option = await db
             .GuessOptions.AsNoTracking()
@@ -76,7 +82,9 @@ public sealed class GuessingVoteService(
         );
 
         if (vote is not null)
+        {
             return new GuessingOperationResult(false, string.Empty);
+        }
 
         db.Votes.Add(
             new GuessVote
@@ -102,8 +110,9 @@ public sealed class GuessingVoteService(
         BlokeBotDbContext db,
         int profileId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .GuessOptions.AsNoTracking()
             .AnyAsync(
                 x =>
@@ -113,9 +122,11 @@ public sealed class GuessingVoteService(
             )
             ? TwitchCommandResponseTarget.Whisper
             : TwitchCommandResponseTarget.Chat;
+    }
 
-    private static string Format(string template, string name, string login) =>
-        MessageTemplateFormatter.Format(
+    private static string Format(string template, string name, string login)
+    {
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -123,7 +134,10 @@ public sealed class GuessingVoteService(
                 ["login"] = login,
             }
         );
+    }
 
-    private static GuessingOperationResult NotConfigured() =>
-        new(false, "This channel is not set up.");
+    private static GuessingOperationResult NotConfigured()
+    {
+        return new(false, "This channel is not set up.");
+    }
 }

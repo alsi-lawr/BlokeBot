@@ -1,4 +1,4 @@
-﻿@page "/guessing"
+@page "/guessing"
 @using System.Globalization
 @using BlokeBot.Commands
 @using BlokeBot.Twitch
@@ -11,28 +11,28 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject GuessingDashboardService Dashboard
-@inject GuessingHistoryService History
-@inject GuessingRoundService Rounds
-@inject HostFeatureService Features
-@inject EventBus<AppEventKind> Events
-@inject ITwitchChatMessageSender Chat
-@inject ToastService Toasts
+@inject GuessingDashboardService _dashboard
+@inject GuessingHistoryService _history
+@inject GuessingRoundService _rounds
+@inject HostFeatureService _features
+@inject EventBus<AppEventKind> _events
+@inject ITwitchChatMessageSender _chat
+@inject ToastService _toasts
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Kicker="Dashboard"
+    <PageHeader Kicker="_dashboard"
                 Title="Guessing game"
                 Description="Run live rounds and look back at viewer results.">
-        <button class="btn-primary" disabled="@(!featureEnabled)" @onclick="RefreshAsync">Refresh</button>
+        <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </PageHeader>
 
     @if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
-    else if (!featureEnabled)
+    else if (!_featureEnabled)
     {
         <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
@@ -40,67 +40,67 @@
     {
 
         <div id="live"
-             class="@SegmentedControlClass"
+             class="@_segmentedControlClass"
              role="tablist"
              aria-label="Guessing dashboard view">
             <span class="segmented-motion__indicator" aria-hidden="true"></span>
             <button class="@TabClass(DashboardTab.Live)"
                     type="button"
                     role="tab"
-                    aria-selected="@(activeTab == DashboardTab.Live)"
+                    aria-selected="@(_activeTab == DashboardTab.Live)"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
             </button>
             <button class="@TabClass(DashboardTab.History)"
                     type="button"
                     role="tab"
-                    aria-selected="@(activeTab == DashboardTab.History)"
+                    aria-selected="@(_activeTab == DashboardTab.History)"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
             </button>
             <button class="@TabClass(DashboardTab.Leaderboard)"
                     type="button"
                     role="tab"
-                    aria-selected="@(activeTab == DashboardTab.Leaderboard)"
+                    aria-selected="@(_activeTab == DashboardTab.Leaderboard)"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard
             </button>
         </div>
 
-        @if (activeTab == DashboardTab.Live)
+        @if (_activeTab == DashboardTab.Live)
         {
-            @if (state is null)
+            @if (_state is null)
             {
                 <div class="card p-8 text-sm text-muted-foreground">Loading guessing game...</div>
             }
             else
             {
-                <LiveRoundSummary State="state" RoundStartedText="@RoundStartedText" RoundStatusText="@RoundStatusText" />
+                <LiveRoundSummary State="_state" RoundStartedText="@_roundStartedText" RoundStatusText="@_roundStatusText" />
 
                 <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                    <RoundOrchestrationPanel State="state"
+                    <RoundOrchestrationPanel State="_state"
                                              StartRound="StartRoundAsync"
                                              StopGuessing="StopGuessingAsync"
                                              DeclareWinner="DeclareWinnerAsync"
-                                             @bind-SelectedProfileId="selectedProfileId"
-                                             @bind-WinnerName="winnerName" />
+                                             @bind-SelectedProfileId="_selectedProfileId"
+                                             @bind-WinnerName="_winnerName" />
 
-                    <GuessVotesTable Votes="state.Votes" />
+                    <GuessVotesTable Votes="_state.Votes" />
                 </div>
             }
         }
-        else if (activeTab == DashboardTab.History)
+        else if (_activeTab == DashboardTab.History)
         {
             <section id="history" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Recent rounds</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Past rounds for this channel.</p>
                 </div>
-                @if (recentRounds is null)
+                @if (_recentRounds is null)
                 {
                     <div class="p-8 text-sm text-muted-foreground">Loading recent rounds...</div>
                 }
-                else if (recentRounds.Count == 0)
+                else if (_recentRounds.Count == 0)
                 {
                     <div class="p-8 text-sm text-muted-foreground">No completed rounds yet.</div>
                 }
@@ -119,7 +119,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                @foreach (var round in recentRounds)
+                                @foreach (var round in _recentRounds)
                                 {
                                     <tr @key="round.Id" class="motion-list__item">
                                         <td class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
@@ -138,7 +138,7 @@
         }
         else
         {
-            <section id="leaderboard" class="card">
+            <section id="_leaderboard" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
@@ -146,55 +146,55 @@
                 <div class="surface-band grid gap-4 border-b p-5 lg:grid-cols-4">
                     <div>
                         <label class="label" for="leaderboardFrom">From</label>
-                        <input id="leaderboardFrom" class="input mt-2" type="date" @bind="leaderboardFromDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <input id="leaderboardFrom" class="input mt-2" type="date" @bind="_leaderboardFromDate" @bind:after="ResetAndLoadLeaderboardAsync" />
                     </div>
                     <div>
                         <label class="label" for="leaderboardTo">To</label>
-                        <input id="leaderboardTo" class="input mt-2" type="date" @bind="leaderboardToDate" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <input id="leaderboardTo" class="input mt-2" type="date" @bind="_leaderboardToDate" @bind:after="ResetAndLoadLeaderboardAsync" />
                     </div>
                     <div>
                         <label class="label" for="leaderboardProfile">Round type</label>
-                        <select id="leaderboardProfile" class="input mt-2" @bind="leaderboardProfileId" @bind:after="ResetAndLoadLeaderboardAsync">
+                        <select id="leaderboardProfile" class="input mt-2" @bind="_leaderboardProfileId" @bind:after="ResetAndLoadLeaderboardAsync">
                             <option value="0">All round types</option>
-                            @foreach (var profile in state?.Profiles ?? [])
+                            @foreach (var profile in _state?.Profiles ?? [])
                             {
                                 <option value="@profile.Id">@profile.Name</option>
                             }
                         </select>
                     </div>
                     <div>
-                        <label class="label" for="leaderboardUsername">Username</label>
-                        <input id="leaderboardUsername" class="input mt-2" placeholder="any player" @bind="leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <label class="label" for="_leaderboardUsername">Username</label>
+                        <input id="_leaderboardUsername" class="input mt-2" placeholder="any player" @bind="_leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
                     </div>
                 </div>
 
-                @if (leaderboard is null)
+                @if (_leaderboard is null)
                 {
-                    <div class="p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
+                    <div class="p-8 text-sm text-muted-foreground">Loading _leaderboard...</div>
                 }
                 else
                 {
                     <div class="grid gap-4 border-b border-slate-200 p-5 md:grid-cols-2 xl:grid-cols-4">
                         <div class="surface-row rounded-lg p-4">
                             <p class="text-sm font-medium text-muted-foreground">Players</p>
-                            <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalPlayers</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.TotalPlayers</p>
                         </div>
                         <div class="surface-row rounded-lg p-4">
                             <p class="text-sm font-medium text-muted-foreground">Guesses</p>
-                            <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalGuesses</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.TotalGuesses</p>
                         </div>
                         <div class="surface-row rounded-lg p-4">
                             <p class="text-sm font-medium text-muted-foreground">Correct</p>
-                            <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.CorrectGuesses</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.CorrectGuesses</p>
                         </div>
                         <div class="surface-row rounded-lg p-4">
                             <p class="text-sm font-medium text-muted-foreground">Page</p>
-                            <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.Page / @leaderboard.PageCount</p>
+                            <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.Page / @_leaderboard.PageCount</p>
                         </div>
                     </div>
 
                     <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
-                        @if (leaderboard.Entries.Count == 0)
+                        @if (_leaderboard.Entries.Count == 0)
                         {
                             <div class="p-8 text-sm text-muted-foreground">No past guesses match these filters.</div>
                         }
@@ -206,13 +206,13 @@
                                         <th class="px-5 py-3 font-semibold">Rank</th>
                                         <th class="px-5 py-3 font-semibold">Player</th>
                                         <th class="px-5 py-3 font-semibold">Correct</th>
-                                        <th class="px-5 py-3 font-semibold">Rounds</th>
+                                        <th class="px-5 py-3 font-semibold">_rounds</th>
                                         <th class="px-5 py-3 font-semibold">Accuracy</th>
                                         <th class="px-5 py-3 font-semibold">Latest</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
-                                    @foreach (var entry in leaderboard.Entries)
+                                    @foreach (var entry in _leaderboard.Entries)
                                     {
                                         <tr @key="entry" class="motion-list__item">
                                             <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
@@ -230,8 +230,8 @@
 
                     <div class="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
-                            <label class="label" for="leaderboardPageSize">Rows</label>
-                            <select id="leaderboardPageSize" class="control-surface h-9 rounded-md px-2 text-sm font-medium" @bind="leaderboardPageSize" @bind:after="ResetAndLoadLeaderboardAsync">
+                            <label class="label" for="_leaderboardPageSize">Rows</label>
+                            <select id="_leaderboardPageSize" class="control-surface h-9 rounded-md px-2 text-sm font-medium" @bind="_leaderboardPageSize" @bind:after="ResetAndLoadLeaderboardAsync">
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
@@ -239,8 +239,8 @@
                             </select>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(leaderboard.Page <= 1)" @onclick="PreviousLeaderboardPageAsync">Previous</button>
-                            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(leaderboard.Page >= leaderboard.PageCount)" @onclick="NextLeaderboardPageAsync">Next</button>
+                            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(_leaderboard.Page <= 1)" @onclick="PreviousLeaderboardPageAsync">Previous</button>
+                            <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled="@(_leaderboard.Page >= _leaderboard.PageCount)" @onclick="NextLeaderboardPageAsync">Next</button>
                         </div>
                     </div>
                 }

@@ -5,10 +5,10 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject CustomCommandConfigurationService Configuration
-@inject HostFeatureService Features
-@inject EventBus<AppEventKind> Events
-@inject ToastService Toasts
+@inject CustomCommandConfigurationService _configuration
+@inject HostFeatureService _features
+@inject EventBus<AppEventKind> _events
+@inject ToastService _toasts
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
@@ -17,7 +17,7 @@
                 Description="Create chat commands, choose what the bot says, keep counters, and send automatic announcements.">
         <button class="btn-primary"
                 aria-label="Save custom commands"
-                disabled="@(!featureEnabled || config is null)"
+                disabled="@(!_featureEnabled || _config is null)"
                 @onclick="SaveAsync">Save changes</button>
     </PageHeader>
 
@@ -25,11 +25,11 @@
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
-    else if (!featureEnabled)
+    else if (!_featureEnabled)
     {
         <div class="card p-8 text-sm text-muted-foreground">Custom commands are off for this channel. Turn them on in Channel setup.</div>
     }
-    else if (config is null)
+    else if (_config is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading custom commands...</div>
     }
@@ -38,18 +38,18 @@
         <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.MessageEntries.Count, "reply")</p>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.MessageEntries.Count, "reply")</p>
                     <button class="btn-secondary" @onclick="AddMessageEntry">Add reply</button>
                 </div>
 
-                @if (config.MessageEntries.Count == 0)
+                @if (_config.MessageEntries.Count == 0)
                 {
                     <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No replies yet.</p>
                 }
                 else
                 {
                     <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
-                        @foreach (var entry in config.MessageEntries)
+                        @foreach (var entry in _config.MessageEntries)
                         {
                             <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,1.2fr)_12rem_auto] xl:items-end">
@@ -60,7 +60,7 @@
                                     <div class="space-y-2">
                                         <label class="label">How the bot chooses</label>
                                         <select class="input" @bind="entry.SelectionMode">
-                                            @foreach (var mode in MessageSelectionModes)
+                                            @foreach (var mode in _messageSelectionModes)
                                             {
                                                 <option value="@mode">@MessageSelectionLabel(mode)</option>
                                             }
@@ -111,18 +111,18 @@
         <CollapsibleSection Title="Chat commands" Description="Choose what viewers type and what the bot should do." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Commands.Count, "command")</p>
-                    <button class="btn-secondary" disabled="@(config.MessageEntries.Count == 0)" @onclick="AddCommand">Add command</button>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Commands.Count, "command")</p>
+                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddCommand">Add command</button>
                 </div>
 
-                @if (config.Commands.Count == 0)
+                @if (_config.Commands.Count == 0)
                 {
                     <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No custom commands yet.</p>
                 }
                 else
                 {
                     <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
-                        @foreach (var command in config.Commands)
+                        @foreach (var command in _config.Commands)
                         {
                             <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
@@ -146,7 +146,7 @@
                                     <div class="space-y-2">
                                         <label class="label">Who waits?</label>
                                         <select class="input" @bind="command.CooldownScope">
-                                            @foreach (var scope in CooldownScopes)
+                                            @foreach (var scope in _cooldownScopes)
                                             {
                                                 <option value="@scope">@CooldownScopeLabel(scope)</option>
                                             }
@@ -157,7 +157,7 @@
                                         <select id="@($"command-{command.Id}-action-kind")"
                                                 class="input"
                                                 @bind="command.ActionKind">
-                                            @foreach (var action in ActionKinds)
+                                            @foreach (var action in _actionKinds)
                                             {
                                                 <option value="@action">@ActionKindLabel(action)</option>
                                             }
@@ -166,7 +166,7 @@
                                     <div class="space-y-2">
                                         <label class="label">Reply</label>
                                         <select class="input" @bind="command.Action.MessageLibraryEntryId">
-                                            @foreach (var entry in config.MessageEntries)
+                                            @foreach (var entry in _config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
@@ -179,11 +179,11 @@
                                             <select id="@($"command-{command.Id}-counter-id")"
                                                     class="input"
                                                     @bind="counterAction.CounterId">
-                                                @if (config.Counters.Count == 0)
+                                                @if (_config.Counters.Count == 0)
                                                 {
                                                     <option value="0">Create a counter first</option>
                                                 }
-                                                @foreach (var counter in config.Counters)
+                                                @foreach (var counter in _config.Counters)
                                                 {
                                                     <option value="@counter.Id">@counter.Name</option>
                                                 }
@@ -201,18 +201,18 @@
         <CollapsibleSection Title="Counters" Description="Keep track of things such as deaths, wins, or drinks." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Counters.Count, "counter")</p>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Counters.Count, "counter")</p>
                     <button class="btn-secondary" @onclick="AddCounter">Add counter</button>
                 </div>
 
-                @if (config.Counters.Count == 0)
+                @if (_config.Counters.Count == 0)
                 {
                     <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No counters yet.</p>
                 }
                 else
                 {
                     <div class="grid gap-3">
-                        @foreach (var counter in config.Counters)
+                        @foreach (var counter in _config.Counters)
                         {
                             <div @key="counter" class="surface-muted grid gap-3 rounded-lg p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
                                 <Field Label="Counter name" @bind-Value="counter.Name" Placeholder="deaths" />
@@ -234,18 +234,18 @@
                             InitiallyOpen="false">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@CountLabel(config.Announcements.Count, "announcement")</p>
-                    <button class="btn-secondary" disabled="@(config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add announcement</button>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "announcement")</p>
+                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add announcement</button>
                 </div>
 
-                @if (config.Announcements.Count == 0)
+                @if (_config.Announcements.Count == 0)
                 {
                     <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No announcements yet.</p>
                 }
                 else
                 {
                     <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
-                        @foreach (var announcement in config.Announcements)
+                        @foreach (var announcement in _config.Announcements)
                         {
                             <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
@@ -260,7 +260,7 @@
                                     <div class="space-y-2">
                                         <label class="label">Reply to send</label>
                                         <select class="input" @bind="announcement.MessageLibraryEntryId">
-                                            @foreach (var entry in config.MessageEntries)
+                                            @foreach (var entry in _config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
@@ -271,7 +271,7 @@
                                         <select id="@($"announcement-{announcement.Id}-schedule-kind")"
                                                 class="input"
                                                 @bind="announcement.ScheduleKind">
-                                            @foreach (var type in AnnouncementScheduleKinds)
+                                            @foreach (var type in _announcementScheduleKinds)
                                             {
                                                 <option value="@type">@AnnouncementScheduleLabel(type)</option>
                                             }
@@ -326,7 +326,7 @@
                                         <div class="space-y-2">
                                             <label class="label">Day</label>
                                             <select class="input" @bind="weekly.Day">
-                                                @foreach (var day in DaysOfWeek)
+                                                @foreach (var day in _daysOfWeek)
                                                 {
                                                     <option value="@day">@day</option>
                                                 }
@@ -357,8 +357,8 @@
             <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <div class="space-y-2">
                     <label class="label">Time zone</label>
-                    <select class="input" @bind="config.TimeZoneId">
-                        @foreach (var timeZone in TimeZones)
+                    <select class="input" @bind="_config.TimeZoneId">
+                        @foreach (var timeZone in _timeZones)
                         {
                             <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
                         }
@@ -366,7 +366,7 @@
                 </div>
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selected time zone</p>
-                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@SelectedTimeZoneLabel</p>
+                    <p class="mt-1 break-words text-sm font-semibold text-slate-900">@_selectedTimeZoneLabel</p>
                 </div>
             </div>
         </CollapsibleSection>
@@ -375,16 +375,16 @@
             <div class="space-y-3 p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Active alerts</p>
-                    <p class="mt-1 text-sm font-semibold text-slate-900">@config.AlertSummary.ActiveCount</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900">@_config.AlertSummary.ActiveCount</p>
                 </div>
-                @if (config.AlertSummary.ActiveAlerts.Count == 0)
+                @if (_config.AlertSummary.ActiveAlerts.Count == 0)
                 {
                     <p class="text-sm text-muted-foreground">No active alerts.</p>
                 }
                 else
                 {
                     <div class="grid gap-3">
-                        @foreach (var alert in config.AlertSummary.ActiveAlerts)
+                        @foreach (var alert in _config.AlertSummary.ActiveAlerts)
                         {
                             <div @key="alert" class="surface-row rounded-lg p-3">
                                 <div class="flex flex-wrap items-center justify-between gap-3">

@@ -44,30 +44,30 @@ namespace BlokeBot.Components.Layout;
 
 public partial class TopBarControls : IDisposable
 {
-    private IDisposable? alertsSubscription;
-    private int activeAlertCount;
+    private IDisposable? _alertsSubscription;
+    private int _activeAlertCount;
 
     [CascadingParameter]
-    private Task<AuthenticationState> AuthenticationState { get; set; } =
+    private Task<AuthenticationState> _authenticationState { get; set; } =
         Task.FromResult(new AuthenticationState(new()));
 
     [Inject]
-    private DurableAlertService Alerts { get; set; } = default!;
+    private DurableAlertService _alerts { get; set; } = default!;
 
     [Inject]
-    private EventBus<AppEventKind> Events { get; set; } = default!;
+    private EventBus<AppEventKind> _events { get; set; } = default!;
 
     [Inject]
-    private NavigationManager Navigation { get; set; } = default!;
+    private NavigationManager _navigation { get; set; } = default!;
 
-    private bool ShowAlertIndicator => activeAlertCount > 0;
+    private bool _showAlertIndicator => _activeAlertCount > 0;
 
-    private string AlertButtonLabel =>
-        activeAlertCount == 1 ? "1 active alert" : $"{activeAlertCount} active alerts";
+    private string _alertButtonLabel =>
+        _activeAlertCount == 1 ? "1 active alert" : $"{_activeAlertCount} active alerts";
 
     protected override async Task OnInitializedAsync()
     {
-        alertsSubscription = Events.SubscribeForComponentRefresh(
+        _alertsSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.AlertsChanged,
             work => InvokeAsync(work),
             LoadAlertCountAsync,
@@ -78,16 +78,16 @@ public partial class TopBarControls : IDisposable
 
     public void Dispose()
     {
-        alertsSubscription?.Dispose();
+        _alertsSubscription?.Dispose();
     }
 
     private async Task LoadAlertCountAsync()
     {
-        var pageContext = await PageContext.FromAsync(AuthenticationState);
-        activeAlertCount =
+        var pageContext = await _pageContext.FromAsync(_authenticationState);
+        _activeAlertCount =
             pageContext.SelectedHost is null || pageContext.IsBotAccount
                 ? 0
-                : await Alerts.CountActiveAsync(
+                : await _alerts.CountActiveAsync(
                     pageContext.SelectedHost.Id,
                     CancellationToken.None
                 );
@@ -95,12 +95,16 @@ public partial class TopBarControls : IDisposable
 
     private void OpenAlerts()
     {
-        if (ShowAlertIndicator)
-            Navigation.NavigateTo("/alerts");
+        if (_showAlertIndicator)
+        {
+            _navigation.NavigateTo("/alerts");
+        }
     }
 
-    private static bool ShowsHostSelector(AuthenticatedSession session) =>
-        !session.IsAdminEditing && !session.IsBotAccount;
+    private static bool ShowsHostSelector(AuthenticatedSession session)
+    {
+        return !session.IsAdminEditing && !session.IsBotAccount;
+    }
 
     private static string ControlsGridClass(
         BotHostSelection? selection,
@@ -112,7 +116,9 @@ public partial class TopBarControls : IDisposable
     {
         var alertClass = showAlertIndicator ? " topbar-controls--with-alert" : string.Empty;
         if (isBotAccount)
+        {
             return $"topbar-controls topbar-controls--account-only{alertClass}";
+        }
 
         if (selection is null)
         {
@@ -122,7 +128,9 @@ public partial class TopBarControls : IDisposable
         }
 
         if (isAdminEditing || !showHostSelector)
+        {
             return $"topbar-controls topbar-controls--status-account{alertClass}";
+        }
 
         return $"topbar-controls topbar-controls--status-selector-account{alertClass}";
     }

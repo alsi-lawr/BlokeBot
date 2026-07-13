@@ -17,7 +17,9 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
     {
         var strategy = catalog.Find(route.Kind);
         if (strategy is null)
+        {
             return CommandStrategyDispatchResult<TKind>.Unknown();
+        }
 
         var context = new CommandStrategyContext<TKind, TState>(
             route.Kind,
@@ -29,7 +31,9 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
         {
             var response = await strategy.ModeratorOnlyResponseAsync(context, cancellationToken);
             if (!string.IsNullOrWhiteSpace(response?.Message))
+            {
                 await command.RespondAsync(response, cancellationToken);
+            }
 
             return CommandStrategyDispatchResult<TKind>.Handled(route.Kind);
         }
@@ -51,9 +55,13 @@ public sealed record CommandStrategyDispatchResult<TKind>(
 )
     where TKind : struct, Enum
 {
-    public static CommandStrategyDispatchResult<TKind> Unknown() =>
-        new(CommandStrategyDispatchStatus.Unknown, null);
+    public static CommandStrategyDispatchResult<TKind> Unknown()
+    {
+        return new(CommandStrategyDispatchStatus.Unknown, null);
+    }
 
-    public static CommandStrategyDispatchResult<TKind> Handled(TKind kind) =>
-        new(CommandStrategyDispatchStatus.Handled, kind);
+    public static CommandStrategyDispatchResult<TKind> Handled(TKind kind)
+    {
+        return new(CommandStrategyDispatchStatus.Handled, kind);
+    }
 }

@@ -45,31 +45,48 @@ internal sealed class PointsGiveawaySchedulerOperations(
     public IO<
         IReadOnlyList<PointsGiveawaySchedule>,
         PointsGiveawaySchedulerTransientFailure
-    > LoadActive() => CaptureDurable(LoadActiveAsync);
+    > LoadActive()
+    {
+        return CaptureDurable(LoadActiveAsync);
+    }
 
     public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildUpdate(
         int giveawayId,
         DateTime endsAtUtc
-    ) => CaptureNotification(ct => BuildUpdateAsync(giveawayId, endsAtUtc, ct));
+    )
+    {
+        return CaptureNotification(ct => BuildUpdateAsync(giveawayId, endsAtUtc, ct));
+    }
 
     public IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
         int giveawayId
-    ) =>
-        CaptureDurable(ct => DrawAsync(giveawayId, ct));
+    )
+    {
+        return CaptureDurable(ct => DrawAsync(giveawayId, ct));
+    }
 
     public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
         PointsGiveawayDrawOutcome outcome
-    ) => CaptureNotification(ct => BuildDrawNotificationAsync(outcome, ct));
+    )
+    {
+        return CaptureNotification(ct => BuildDrawNotificationAsync(outcome, ct));
+    }
 
     public IO<
         PointsGiveawayExpirationOutcome,
         PointsGiveawaySchedulerTransientFailure
-    > Expire(int giveawayId) => CaptureDurable(ct => ExpireAsync(giveawayId, ct));
+    > Expire(int giveawayId)
+    {
+        return CaptureDurable(ct => ExpireAsync(giveawayId, ct));
+    }
 
     public IO<
         PointsGiveawayChangeNotificationCompleted,
         PointsGiveawaySchedulerNotificationFailure
-    > NotifyChanged() => CaptureNotification(NotifyChangedAsync);
+    > NotifyChanged()
+    {
+        return CaptureNotification(NotifyChangedAsync);
+    }
 
     private async ValueTask<IReadOnlyList<PointsGiveawaySchedule>> LoadActiveAsync(
         CancellationToken ct
@@ -102,7 +119,9 @@ internal sealed class PointsGiveawaySchedulerOperations(
             .PointsGiveaways.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Id == giveawayId, ct);
         if (giveaway is null || giveaway.Status != PointsGiveawayStatus.Active)
+        {
             return Option<string>.None;
+        }
 
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveaway.HostId, ct);
         var message = formatter.Format(
@@ -116,7 +135,10 @@ internal sealed class PointsGiveawaySchedulerOperations(
     private async ValueTask<PointsGiveawayDrawOutcome> DrawAsync(
         int giveawayId,
         CancellationToken ct
-    ) => await draws.DrawOutcomeAsync(giveawayId, ct);
+    )
+    {
+        return await draws.DrawOutcomeAsync(giveawayId, ct);
+    }
 
     private async ValueTask<Option<string>> BuildDrawNotificationAsync(
         PointsGiveawayDrawOutcome outcome,
@@ -182,7 +204,9 @@ internal sealed class PointsGiveawaySchedulerOperations(
             );
 
         if (expired == 0)
+        {
             return PointsGiveawayExpirationOutcome.AlreadyInactive;
+        }
 
         await CommitExpirationAsync(transaction, giveawayId, ct);
         onCommitted(PointsGiveawayExpirationOutcome.Expired);
@@ -199,8 +223,9 @@ internal sealed class PointsGiveawaySchedulerOperations(
 
     private static IO<TValue, PointsGiveawaySchedulerTransientFailure> CaptureDurable<TValue>(
         Func<CancellationToken, ValueTask<TValue>> operation
-    ) =>
-        IO<TValue, PointsGiveawaySchedulerTransientFailure>.Create(async ct =>
+    )
+    {
+        return IO<TValue, PointsGiveawaySchedulerTransientFailure>.Create(async ct =>
         {
             try
             {
@@ -217,11 +242,13 @@ internal sealed class PointsGiveawaySchedulerOperations(
                 );
             }
         });
+    }
 
     private static IO<TValue, PointsGiveawaySchedulerNotificationFailure> CaptureNotification<
         TValue
-    >(Func<CancellationToken, ValueTask<TValue>> operation) =>
-        IO<TValue, PointsGiveawaySchedulerNotificationFailure>.Create(async ct =>
+    >(Func<CancellationToken, ValueTask<TValue>> operation)
+    {
+        return IO<TValue, PointsGiveawaySchedulerNotificationFailure>.Create(async ct =>
         {
             try
             {
@@ -240,13 +267,19 @@ internal sealed class PointsGiveawaySchedulerOperations(
                 );
             }
         });
+    }
 
-    private static Option<string> Message(string? message) =>
-        string.IsNullOrWhiteSpace(message)
+    private static Option<string> Message(string? message)
+    {
+        return string.IsNullOrWhiteSpace(message)
             ? Option<string>.None
             : Option<string>.Some(message);
+    }
 
-    private DateTime GetUtcNow() => timeProvider.GetUtcNow().UtcDateTime;
+    private DateTime GetUtcNow()
+    {
+        return timeProvider.GetUtcNow().UtcDateTime;
+    }
 
     private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(
         int hostId,

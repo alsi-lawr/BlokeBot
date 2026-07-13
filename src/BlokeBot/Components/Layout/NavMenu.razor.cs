@@ -44,25 +44,25 @@ namespace BlokeBot.Components.Layout;
 
 public partial class NavMenu
 {
-    private const string GuessingOpenStorageKey = "blokebot.sidebar.guessing.open";
-    private const string PointsOpenStorageKey = "blokebot.sidebar.points.open";
-    private const string CustomCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
+    private const string _guessingOpenStorageKey = "blokebot.sidebar.guessing.open";
+    private const string _pointsOpenStorageKey = "blokebot.sidebar.points.open";
+    private const string _customCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
 
-    private bool guessingOpen = true;
-    private bool pointsOpen = true;
-    private bool customCommandsOpen = true;
-    private IDisposable? hostedChannelSubscription;
-    private IReadOnlyDictionary<int, HostFeatureFlags> hostedFeatures =
+    private bool _guessingOpen = true;
+    private bool _pointsOpen = true;
+    private bool _customCommandsOpen = true;
+    private IDisposable? _hostedChannelSubscription;
+    private IReadOnlyDictionary<int, HostFeatureFlags> _hostedFeatures =
         new Dictionary<int, HostFeatureFlags>();
-    private IReadOnlySet<int> existingHostIds = new HashSet<int>();
-    private IJSObjectReference? module;
+    private IReadOnlySet<int> _existingHostIds = new HashSet<int>();
+    private IJSObjectReference? _module;
 
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
+        _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             work => InvokeAsync(work),
             LoadHostedFeaturesAsync,
@@ -74,23 +74,25 @@ public partial class NavMenu
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
+        {
             return;
+        }
 
         try
         {
-            module = await Js.InvokeAsync<IJSObjectReference>(
+            _module = await _js.InvokeAsync<IJSObjectReference>(
                 "import",
                 "./Components/Layout/NavMenu.razor.js"
             );
-            guessingOpen = await module.InvokeAsync<bool>(
+            _guessingOpen = await _module.InvokeAsync<bool>(
                 "readBoolean",
-                GuessingOpenStorageKey,
+                _guessingOpenStorageKey,
                 true
             );
-            pointsOpen = await module.InvokeAsync<bool>("readBoolean", PointsOpenStorageKey, true);
-            customCommandsOpen = await module.InvokeAsync<bool>(
+            _pointsOpen = await _module.InvokeAsync<bool>("readBoolean", _pointsOpenStorageKey, true);
+            _customCommandsOpen = await _module.InvokeAsync<bool>(
                 "readBoolean",
-                CustomCommandsOpenStorageKey,
+                _customCommandsOpenStorageKey,
                 true
             );
             StateHasChanged();
@@ -101,14 +103,16 @@ public partial class NavMenu
 
     public async ValueTask DisposeAsync()
     {
-        hostedChannelSubscription?.Dispose();
+        _hostedChannelSubscription?.Dispose();
 
-        if (module is null)
+        if (_module is null)
+        {
             return;
+        }
 
         try
         {
-            await module.DisposeAsync();
+            await _module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
@@ -116,31 +120,39 @@ public partial class NavMenu
 
     private async Task ToggleGuessingAsync()
     {
-        guessingOpen = !guessingOpen;
-        if (module is not null)
-            await module.InvokeVoidAsync("writeBoolean", GuessingOpenStorageKey, guessingOpen);
+        _guessingOpen = !_guessingOpen;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("writeBoolean", _guessingOpenStorageKey, _guessingOpen);
+        }
     }
 
     private async Task TogglePointsAsync()
     {
-        pointsOpen = !pointsOpen;
-        if (module is not null)
-            await module.InvokeVoidAsync("writeBoolean", PointsOpenStorageKey, pointsOpen);
+        _pointsOpen = !_pointsOpen;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("writeBoolean", _pointsOpenStorageKey, _pointsOpen);
+        }
     }
 
     private async Task ToggleCustomCommandsAsync()
     {
-        customCommandsOpen = !customCommandsOpen;
-        if (module is not null)
-            await module.InvokeVoidAsync(
+        _customCommandsOpen = !_customCommandsOpen;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync(
                 "writeBoolean",
-                CustomCommandsOpenStorageKey,
-                customCommandsOpen
+                _customCommandsOpenStorageKey,
+                _customCommandsOpen
             );
+        }
     }
 
-    private Task NotifyNavigatedAsync() =>
-        OnNavigate.HasDelegate ? OnNavigate.InvokeAsync() : Task.CompletedTask;
+    private Task NotifyNavigatedAsync()
+    {
+        return OnNavigate.HasDelegate ? OnNavigate.InvokeAsync() : Task.CompletedTask;
+    }
 
     private bool FeatureIsVisible(
         AuthenticatedSession session,
@@ -148,16 +160,18 @@ public partial class NavMenu
         HostFeatureFlags feature
     )
     {
-        if (!session.CanUseBotFunctions(existingHostIds) || selection is null)
+        if (!session.CanUseBotFunctions(_existingHostIds) || selection is null)
+        {
             return false;
+        }
 
-        return hostedFeatures.TryGetValue(selection.Current.Id, out var features)
+        return _hostedFeatures.TryGetValue(selection.Current.Id, out var features)
             && features.Contains(feature);
     }
 
     private async Task LoadHostedFeaturesAsync()
     {
-        hostedFeatures = await Features.LoadHostedFeaturesAsync(CancellationToken.None);
-        existingHostIds = hostedFeatures.Keys.ToHashSet();
+        _hostedFeatures = await _features.LoadHostedFeaturesAsync(CancellationToken.None);
+        _existingHostIds = _hostedFeatures.Keys.ToHashSet();
     }
 }

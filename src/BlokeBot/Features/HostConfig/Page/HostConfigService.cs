@@ -27,7 +27,9 @@ public sealed class HostConfigService(
     {
         var login = session.Login;
         if (string.IsNullOrWhiteSpace(login))
+        {
             return null;
+        }
 
         var canCreateHost = await siteAccess.CanCreateHostAsync(login, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -94,8 +96,9 @@ public sealed class HostConfigService(
         );
     }
 
-    private static BotAccountAuthorizationStatus DisabledBotOverrideStatus() =>
-        new(
+    private static BotAccountAuthorizationStatus DisabledBotOverrideStatus()
+    {
+        return new(
             null,
             null,
             null,
@@ -105,4 +108,5 @@ public sealed class HostConfigService(
             [],
             "Create your channel setup before using a custom bot."
         );
+    }
 }

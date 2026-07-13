@@ -42,50 +42,54 @@ namespace BlokeBot.Features.Toasts;
 
 public partial class ToastHost
 {
-    private const int RemovalAnimationDelayMs = 180;
-    private readonly Dictionary<Guid, CancellationTokenSource> autoDismissTokens = [];
-    private readonly HashSet<Guid> dismissingToastIds = [];
-    private CancellationTokenSource disposeToken = new();
-    private IReadOnlyList<ToastNotification> visibleToasts = [];
+    private const int _removalAnimationDelayMs = 180;
+    private readonly Dictionary<Guid, CancellationTokenSource> _autoDismissTokens = [];
+    private readonly HashSet<Guid> _dismissingToastIds = [];
+    private CancellationTokenSource _disposeToken = new();
+    private IReadOnlyList<ToastNotification> _visibleToasts = [];
 
     protected override void OnInitialized()
     {
-        Toasts.Changed += OnToastsChanged;
+        _toasts.Changed += OnToastsChanged;
         RefreshToasts();
     }
 
     public void Dispose()
     {
-        Toasts.Changed -= OnToastsChanged;
-        disposeToken.Cancel();
-        disposeToken.Dispose();
-        foreach (var token in autoDismissTokens.Values)
+        _toasts.Changed -= OnToastsChanged;
+        _disposeToken.Cancel();
+        _disposeToken.Dispose();
+        foreach (var token in _autoDismissTokens.Values)
         {
             token.Cancel();
             token.Dispose();
         }
-        autoDismissTokens.Clear();
+        _autoDismissTokens.Clear();
     }
 
     private async Task BeginDismissAsync(Guid toastId)
     {
-        if (!dismissingToastIds.Add(toastId))
+        if (!_dismissingToastIds.Add(toastId))
+        {
             return;
+        }
 
-        if (autoDismissTokens.Remove(toastId, out var autoDismissToken))
+        if (_autoDismissTokens.Remove(toastId, out var autoDismissToken))
         {
             autoDismissToken.Cancel();
             autoDismissToken.Dispose();
         }
 
         await InvokeAsync(StateHasChanged);
-        await Task.Delay(RemovalAnimationDelayMs);
-        Toasts.Dismiss(toastId);
-        dismissingToastIds.Remove(toastId);
+        await Task.Delay(_removalAnimationDelayMs);
+        _toasts.Dismiss(toastId);
+        _dismissingToastIds.Remove(toastId);
     }
 
-    private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId) =>
-        args.Key is "Enter" or " " ? BeginDismissAsync(toastId) : Task.CompletedTask;
+    private Task BeginDismissOnKeyAsync(KeyboardEventArgs args, Guid toastId)
+    {
+        return args.Key is "Enter" or " " ? BeginDismissAsync(toastId) : Task.CompletedTask;
+    }
 
     private async Task AutoDismissAsync(Guid toastId, TimeSpan delay, CancellationToken ct)
     {
@@ -97,38 +101,43 @@ public partial class ToastHost
         catch (OperationCanceledException) { }
     }
 
-    private void OnToastsChanged() => _ = InvokeAsync(RefreshToasts);
+    private void OnToastsChanged()
+    {
+        _ = InvokeAsync(RefreshToasts);
+    }
 
     private void RefreshToasts()
     {
-        visibleToasts = Toasts.Current;
+        _visibleToasts = _toasts.Current;
         ScheduleAutoDismiss();
         StateHasChanged();
     }
 
     private void ScheduleAutoDismiss()
     {
-        var currentIds = visibleToasts.Select(toast => toast.Id).ToHashSet();
+        var currentIds = _visibleToasts.Select(toast => toast.Id).ToHashSet();
         foreach (
-            var staleId in autoDismissTokens.Keys.Where(id => !currentIds.Contains(id)).ToArray()
+            var staleId in _autoDismissTokens.Keys.Where(id => !currentIds.Contains(id)).ToArray()
         )
         {
-            autoDismissTokens[staleId].Cancel();
-            autoDismissTokens[staleId].Dispose();
-            autoDismissTokens.Remove(staleId);
+            _autoDismissTokens[staleId].Cancel();
+            _autoDismissTokens[staleId].Dispose();
+            _autoDismissTokens.Remove(staleId);
         }
 
-        foreach (var toast in visibleToasts)
+        foreach (var toast in _visibleToasts)
         {
             if (
                 toast.AutoDismissAfter is not { } delay
-                || autoDismissTokens.ContainsKey(toast.Id)
-                || dismissingToastIds.Contains(toast.Id)
+                || _autoDismissTokens.ContainsKey(toast.Id)
+                || _dismissingToastIds.Contains(toast.Id)
             )
+            {
                 continue;
+            }
 
-            var token = CancellationTokenSource.CreateLinkedTokenSource(disposeToken.Token);
-            autoDismissTokens[toast.Id] = token;
+            var token = CancellationTokenSource.CreateLinkedTokenSource(_disposeToken.Token);
+            _autoDismissTokens[toast.Id] = token;
             _ = AutoDismissAsync(toast.Id, delay, token.Token);
         }
     }
@@ -136,21 +145,27 @@ public partial class ToastHost
     private string ToastClass(ToastNotification toast)
     {
         var classes = $"toast-card toast-card--{ToneCssClass(toast.Tone)}";
-        return dismissingToastIds.Contains(toast.Id) ? $"{classes} toast-card--removing" : classes;
+        return _dismissingToastIds.Contains(toast.Id) ? $"{classes} toast-card--removing" : classes;
     }
 
-    private static string DismissLabel(ToastNotification toast) =>
-        $"Dismiss notification: {toast.Title}. {toast.Message}";
+    private static string DismissLabel(ToastNotification toast)
+    {
+        return $"Dismiss notification: {toast.Title}. {toast.Message}";
+    }
 
-    private static string ToneCssClass(ToastTone tone) =>
-        tone switch
+    private static string ToneCssClass(ToastTone tone)
+    {
+        return tone switch
         {
             ToastTone.Positive => "positive",
             ToastTone.Caution => "caution",
             ToastTone.Critical => "critical",
             _ => "neutral",
         };
+    }
 
-    private static string ToastRole(ToastNotification toast) =>
-        toast.Kind is ToastKind.Error or ToastKind.Warning ? "alert" : "status";
+    private static string ToastRole(ToastNotification toast)
+    {
+        return toast.Kind is ToastKind.Error or ToastKind.Warning ? "alert" : "status";
+    }
 }

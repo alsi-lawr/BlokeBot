@@ -8,9 +8,11 @@ internal sealed class DefaultTwitchBotAccountProvider(
     public async ValueTask<TwitchBotAccount> GetBotAccountAsync(
         string channelLogin,
         CancellationToken cancellationToken
-    ) =>
-        new(
+    )
+    {
+        return new(
             TwitchLogin.Normalize(settings.Identity.BotUsername),
             await tokens.GetAccessTokenAsync(cancellationToken)
         );
+    }
 }

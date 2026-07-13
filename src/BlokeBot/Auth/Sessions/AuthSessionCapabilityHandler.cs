@@ -12,7 +12,9 @@ internal sealed class AuthSessionCapabilityHandler
     {
         var session = AuthenticatedSession.FromPrincipal(context.User);
         if (session.HasCapability(requirement.Capability))
+        {
             context.Succeed(requirement);
+        }
 
         return Task.CompletedTask;
     }

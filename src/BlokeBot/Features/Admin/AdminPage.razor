@@ -16,14 +16,14 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "BotAdmin")]
 @inherits AuthenticatedPageComponent
-@inject SiteAccessService SiteAccess
-@inject AdminHostManagementService HostManagement
-@inject HostedChannelDirectoryService HostedChannels
-@inject BotAccountAuthorizationService BotAccountAuthorization
-@inject AccessListProfileResolver AccessListProfiles
-@inject EventBus<AppEventKind> Events
-@inject NavigationManager Navigation
-@inject ToastService Toasts
+@inject SiteAccessService _siteAccess
+@inject AdminHostManagementService _hostManagement
+@inject HostedChannelDirectoryService _hostedChannels
+@inject BotAccountAuthorizationService _botAccountAuthorization
+@inject AccessListProfileResolver _accessListProfiles
+@inject EventBus<AppEventKind> _events
+@inject NavigationManager _navigation
+@inject ToastService _toasts
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
@@ -31,36 +31,36 @@
     <PageHeader Title="Admin"
                 Description="Connect the bot and manage who can use BlokeBot." />
 
-    @if (state is null)
+    @if (_state is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
     }
     else
     {
-        <BotAccountAuthorizationSection Status="@botAccountStatus"
-                                        Disabled="@(botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
+        <BotAccountAuthorizationSection Status="@_botAccountStatus"
+                                        Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
                                         Clear="@ClearBotAccountAuthorizationAsync"
                                         Refresh="@RefreshBotAccountAuthorizationAsync"
                                         Collapsible="true"
                                         InitiallyOpen="true" />
 
-        <SiteAccessSection State="@state"
-                           WhitelistEntries="@siteWhitelistEntries"
-                           BlacklistEntries="@siteBlacklistEntries"
+        <SiteAccessSection State="@_state"
+                           WhitelistEntries="@_siteWhitelistEntries"
+                           BlacklistEntries="@_siteBlacklistEntries"
                            AddBlacklist="@AddBlacklistAsync"
                            AddWhitelist="@AddWhitelistAsync"
                            RemoveBlacklist="@RemoveBlacklistAsync"
                            RemoveWhitelist="@RemoveWhitelistAsync"
                            ToggleWhitelist="@ToggleWhitelistAsync"
-                           @bind-NewBlacklistLogin="newBlacklistLogin"
-                           @bind-NewWhitelistLogin="newWhitelistLogin" />
+                           @bind-NewBlacklistLogin="_newBlacklistLogin"
+                           @bind-NewWhitelistLogin="_newWhitelistLogin" />
 
-        <HostedChannelsSection Hosts="@hosts"
+        <HostedChannelsSection Hosts="@_hosts"
                                CreateHost="@CreateHostAsync"
-                               CanEditHosts="@(!isBotAccount)"
+                               CanEditHosts="@(!_isBotAccount)"
                                RemoveHost="@RemoveHostAsync"
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
-                               @bind-NewHostLogin="newHostLogin" />
+                               @bind-NewHostLogin="_newHostLogin" />
     }
 </div>

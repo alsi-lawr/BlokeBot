@@ -28,14 +28,18 @@ public sealed class GuessingConfigurationService(
 
         var normalizedName = NormalizeDisplayName(name);
         if (string.IsNullOrWhiteSpace(normalizedName))
+        {
             return new GuessingOperationResult(false, "Round type name is required.");
+        }
 
         var slug = GuessRoundProfileSlug.FromName(normalizedName);
         if (await db.Profiles.AnyAsync(x => x.HostId == hostId && x.Slug == slug.Value, ct))
+        {
             return new GuessingOperationResult(
                 false,
                 "A round type with that name already exists."
             );
+        }
 
         db.Profiles.Add(
             new GuessRoundProfile
@@ -65,16 +69,22 @@ public sealed class GuessingConfigurationService(
             ct
         );
         if (profile is null)
+        {
             return new GuessingOperationResult(false, "Round type not found.");
+        }
 
         if (await db.Profiles.CountAsync(x => x.HostId == hostId, ct) <= 1)
+        {
             return new GuessingOperationResult(false, "Keep at least one round type.");
+        }
 
         if (await db.Rounds.AnyAsync(x => x.GuessRoundProfileId == profileId, ct))
+        {
             return new GuessingOperationResult(
                 false,
                 "Round types used by past rounds cannot be deleted."
             );
+        }
 
         var wasDefault = profile.IsDefault;
         var deliverySettings = await db
@@ -162,7 +172,9 @@ public sealed class GuessingConfigurationService(
 
         var profileName = NormalizeDisplayName(config.Profile.Name);
         if (string.IsNullOrWhiteSpace(profileName))
+        {
             profileName = profile.Name;
+        }
 
         var slug = GuessRoundProfileSlug.FromName(profileName);
         var duplicate = await db.Profiles.AnyAsync(
@@ -170,9 +182,11 @@ public sealed class GuessingConfigurationService(
             ct
         );
         if (duplicate)
+        {
             throw new InvalidOperationException(
                 "A round type with that name already exists."
             );
+        }
 
         profile.Name = profileName;
         profile.Slug = slug.Value;
@@ -259,12 +273,14 @@ public sealed class GuessingConfigurationService(
         List<CommandAlias> aliases,
         GuessCommandKind kind,
         int profileId
-    ) =>
-        CommandAliasRegistry.JoinAliases(
+    )
+    {
+        return CommandAliasRegistry.JoinAliases(
             aliases,
             GuessingAppCommandKindMap.ToAppKind(kind),
             profileId
         );
+    }
 
     private static async Task<GuessRoundProfileEditor> LoadProfileEditorAsync(
         BlokeBotDbContext db,
@@ -299,7 +315,9 @@ public sealed class GuessingConfigurationService(
                 : TwitchCommandResponseTarget.Chat
         );
         foreach (var option in options)
+        {
             option.ReplyTarget = answerReplyTarget;
+        }
 
         return new GuessRoundProfileEditor
         {
@@ -315,35 +333,44 @@ public sealed class GuessingConfigurationService(
         };
     }
 
-    private static bool IsWhisperTarget(GuessOptionEditor option) =>
-        ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
+    private static bool IsWhisperTarget(GuessOptionEditor option)
+    {
+        return ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
         == TwitchCommandResponseTarget.Whisper;
+    }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .HostBotAccountSettings.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .Select(x => x.OverrideEnabled && x.WhisperResponsesEnabled)
             .SingleOrDefaultAsync(ct);
+    }
 
     private async Task<List<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .Profiles.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.Name)
             .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
             .ToListAsync(ct);
+    }
 
-    private static string NormalizeDisplayName(string name) => name.Trim();
+    private static string NormalizeDisplayName(string name)
+    {
+        return name.Trim();
+    }
 
     private async Task SaveAliasesAsync(
         BlokeBotDbContext db,

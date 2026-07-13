@@ -1,10 +1,10 @@
 @implements IDisposable
-@inject ToastService Toasts
+@inject ToastService _toasts
 
-@if (visibleToasts.Count > 0)
+@if (_visibleToasts.Count > 0)
 {
     <section class="toast-region" aria-label="Notifications" aria-live="polite" aria-atomic="false">
-        @foreach (var toast in visibleToasts)
+        @foreach (var toast in _visibleToasts)
         {
             <article @key="toast.Id"
                      class="@ToastClass(toast)"

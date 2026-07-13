@@ -7,12 +7,12 @@ namespace BlokeBot.Twitch.Auth;
 
 public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
 {
-    private const string AuthorizationEndpoint = "https://id.twitch.tv/oauth2/authorize";
-    private const string TokenEndpoint = "https://id.twitch.tv/oauth2/token";
-    private const string ValidationEndpoint = "https://id.twitch.tv/oauth2/validate";
+    private const string _authorizationEndpoint = "https://id.twitch.tv/oauth2/authorize";
+    private const string _tokenEndpoint = "https://id.twitch.tv/oauth2/token";
+    private const string _validationEndpoint = "https://id.twitch.tv/oauth2/validate";
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly HttpClient http = httpClientFactory.CreateClient("twitch-oauth");
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-oauth");
 
     public Uri CreateAuthorizationUri(TwitchAuthorizationUriRequest request)
     {
@@ -28,7 +28,7 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
             }
         );
 
-        return new Uri($"{AuthorizationEndpoint}?{query}");
+        return new Uri($"{_authorizationEndpoint}?{query}");
     }
 
     public async Task<TwitchOAuthTokenResponse> ExchangeCodeAsync(
@@ -45,8 +45,8 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
             ["redirect_uri"] = exchange.RedirectUri,
         };
 
-        using var response = await http.PostAsync(
-            TokenEndpoint,
+        using var response = await _http.PostAsync(
+            _tokenEndpoint,
             new FormUrlEncodedContent(form),
             cancellationToken
         );
@@ -54,7 +54,7 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
 
         return ToTokenResponse(
             await response.Content.ReadFromJsonAsync<TwitchTokenPayload>(
-                JsonOptions,
+                _jsonOptions,
                 cancellationToken
             )
         );
@@ -75,8 +75,8 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
             ["grant_type"] = "refresh_token",
         };
 
-        using var response = await http.PostAsync(
-            TokenEndpoint,
+        using var response = await _http.PostAsync(
+            _tokenEndpoint,
             new FormUrlEncodedContent(form),
             cancellationToken
         );
@@ -84,7 +84,7 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
 
         var refreshed = ToTokenResponse(
             await response.Content.ReadFromJsonAsync<TwitchTokenPayload>(
-                JsonOptions,
+                _jsonOptions,
                 cancellationToken
             )
         );
@@ -101,15 +101,17 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, ValidationEndpoint);
+        using var request = new HttpRequestMessage(HttpMethod.Get, _validationEndpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("OAuth", accessToken);
 
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
+        {
             return null;
+        }
 
         var payload = await response.Content.ReadFromJsonAsync<TwitchTokenValidationPayload>(
-            JsonOptions,
+            _jsonOptions,
             cancellationToken
         );
         return payload is null
@@ -124,7 +126,9 @@ public sealed class TwitchOAuthApiClient(IHttpClientFactory httpClientFactory)
     private static TwitchOAuthTokenResponse ToTokenResponse(TwitchTokenPayload? payload)
     {
         if (string.IsNullOrWhiteSpace(payload?.AccessToken))
+        {
             throw new InvalidOperationException("Twitch did not return an access token.");
+        }
 
         return new TwitchOAuthTokenResponse(
             payload.AccessToken,

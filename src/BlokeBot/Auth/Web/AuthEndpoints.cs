@@ -16,14 +16,18 @@ internal static class AuthEndpoints
                 {
                     var currentOptions = auth.CurrentOptions;
                     if (!auth.IsConfigured(currentOptions))
+                    {
                         return Results.Content(
                             LoginPage.Render("Twitch sign-in is not set up yet."),
                             "text/html",
                             statusCode: StatusCodes.Status503ServiceUnavailable
                         );
+                    }
 
                     if (start != true)
+                    {
                         return Results.Content(LoginPage.Render(), "text/html");
+                    }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     context.Response.Cookies.Append(
@@ -83,14 +87,18 @@ internal static class AuthEndpoints
                     context.Response.Cookies.Delete("BlokeBot.AuthReturnUrl");
 
                     if (!string.IsNullOrWhiteSpace(error))
+                    {
                         return Results.Content(
                             LoginPage.Render(error),
                             "text/html",
                             statusCode: StatusCodes.Status400BadRequest
                         );
+                    }
 
                     if (string.IsNullOrWhiteSpace(code))
+                    {
                         return Results.BadRequest("Twitch sign-in did not finish. Try again.");
+                    }
 
                     if (
                         string.IsNullOrWhiteSpace(state)
@@ -128,6 +136,7 @@ internal static class AuthEndpoints
                     }
 
                     if (!result.IsAuthorized || result.User is null)
+                    {
                         return Results.Content(
                             LoginPage.Render(
                                 result.Error
@@ -136,6 +145,7 @@ internal static class AuthEndpoints
                             "text/html",
                             statusCode: StatusCodes.Status403Forbidden
                         );
+                    }
 
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
                     await session.SignInAsync(
@@ -166,11 +176,15 @@ internal static class AuthEndpoints
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
                     var available = currentSession.AvailableHosts;
                     if (available.Count == 0)
+                    {
                         return Results.Redirect("/auth/login");
+                    }
 
                     var selected = available.FirstOrDefault(host => host.Id == hostId);
                     if (selected is null)
+                    {
                         return Results.Forbid();
+                    }
 
                     if (
                         selected.Role == AuthRole.Moderator
@@ -203,7 +217,9 @@ internal static class AuthEndpoints
                 {
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
                     if (currentSession.IsBotAccount)
+                    {
                         return Results.Forbid();
+                    }
 
                     var ownHost = currentSession.AvailableHosts.FirstOrDefault(host =>
                         host.Role == AuthRole.Streamer
@@ -228,7 +244,9 @@ internal static class AuthEndpoints
                     }
 
                     if (!currentSession.CanCreateHost)
+                    {
                         return Results.Forbid();
+                    }
 
                     await session.SignInHostSelectionAsync(
                         context,
@@ -256,7 +274,9 @@ internal static class AuthEndpoints
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
 
                     if (currentSession.IsBotAccount)
+                    {
                         return Results.Forbid();
+                    }
 
                     var selected = await hostedChannels.LoadHostChoiceAsync(
                         hostId,
@@ -264,7 +284,9 @@ internal static class AuthEndpoints
                         context.RequestAborted
                     );
                     if (selected is null)
+                    {
                         return Results.NotFound();
+                    }
 
                     var available = currentSession
                         .AvailableHosts.Where(x => x.Id != selected.Id)
@@ -300,7 +322,9 @@ internal static class AuthEndpoints
                         returnHost is not null
                         && nonAdminHosts.All(host => host.Id != returnHost.Id)
                     )
+                    {
                         nonAdminHosts = [.. nonAdminHosts, returnHost];
+                    }
 
                     var login = currentSession.Login;
                     var selected = returnHost is not null

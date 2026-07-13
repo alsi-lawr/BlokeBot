@@ -76,7 +76,10 @@ public sealed class TwitchBotAccountProviderSelectionTests
         public ValueTask<TwitchBotAccount> GetBotAccountAsync(
             string channelLogin,
             CancellationToken cancellationToken
-        ) => ValueTask.FromResult(new TwitchBotAccount(channelLogin, "hosted-token"));
+        )
+        {
+            return ValueTask.FromResult(new TwitchBotAccount(channelLogin, "hosted-token"));
+        }
     }
 
     private sealed class CustomProvider : ITwitchBotAccountProvider
@@ -84,6 +87,9 @@ public sealed class TwitchBotAccountProviderSelectionTests
         public ValueTask<TwitchBotAccount> GetBotAccountAsync(
             string channelLogin,
             CancellationToken cancellationToken
-        ) => ValueTask.FromResult(new TwitchBotAccount(channelLogin, "custom-token"));
+        )
+        {
+            return ValueTask.FromResult(new TwitchBotAccount(channelLogin, "custom-token"));
+        }
     }
 }

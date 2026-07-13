@@ -30,7 +30,9 @@ internal sealed class UserLookupService(
     {
         var normalized = TwitchLogin.Normalize(login);
         if (normalized.Length == 0)
+        {
             return null;
+        }
 
         var users = await helix.GetUsersByLoginAsync(
             new TwitchHelixRequestContext(options.ClientId, accessToken),
@@ -56,5 +58,8 @@ internal sealed class UserLookupService(
             : user;
     }
 
-    private WebAuthOptions CreateCurrentOptions() => configuration.CurrentOptions;
+    private WebAuthOptions CreateCurrentOptions()
+    {
+        return configuration.CurrentOptions;
+    }
 }

@@ -6,37 +6,39 @@ namespace BlokeBot.Features.PublicLeaderboards;
 
 public partial class PublicPointsLeaderboardPage
 {
-    private const int PublicLeaderboardSize = 50;
+    private const int _publicLeaderboardSize = 50;
 
-    private PublicLeaderboardHost? host;
-    private IReadOnlyList<PointBalanceEntry>? leaderboard;
-    private bool loaded;
+    private PublicLeaderboardHost? _host;
+    private IReadOnlyList<PointBalanceEntry>? _leaderboard;
+    private bool _loaded;
 
     [Parameter]
     public string Channel { get; set; } = string.Empty;
 
-    private bool FeatureEnabled =>
-        host is not null
-        && (host.EnabledFeatures & HostFeatureFlags.Points) == HostFeatureFlags.Points;
+    private bool _featureEnabled =>
+        _host is not null
+        && (_host.EnabledFeatures & HostFeatureFlags.Points) == HostFeatureFlags.Points;
 
-    private string HeaderDescription =>
-        host is null
+    private string _headerDescription =>
+        _host is null
             ? "Read-only point balances."
-            : $"Read-only point balances for {host.DisplayName}.";
+            : $"Read-only point balances for {_host.DisplayName}.";
 
     protected override async Task OnParametersSetAsync()
     {
-        loaded = false;
-        leaderboard = null;
-        host = await Hosts.FindAsync(Channel, CancellationToken.None);
+        _loaded = false;
+        _leaderboard = null;
+        _host = await _hosts.FindAsync(Channel, CancellationToken.None);
 
-        if (FeatureEnabled)
-            leaderboard = await Balances.GetLeaderboardAsync(
-                host!.Id,
-                PublicLeaderboardSize,
+        if (_featureEnabled)
+        {
+            _leaderboard = await _balances.GetLeaderboardAsync(
+                _host!.Id,
+                _publicLeaderboardSize,
                 CancellationToken.None
             );
+        }
 
-        loaded = true;
+        _loaded = true;
     }
 }

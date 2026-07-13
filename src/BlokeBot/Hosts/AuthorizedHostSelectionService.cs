@@ -29,7 +29,9 @@ internal sealed class AuthorizedHostSelectionService(
 
         var selfHost = await LoadSelfHostChoiceAsync(db, userLogin, ct);
         if (selfHost is not null)
+        {
             choices.Add(selfHost);
+        }
 
         choices.AddRange(
             await LoadModeratedHostChoicesAsync(db, options, accessToken, userId, userLogin, ct)
@@ -48,7 +50,9 @@ internal sealed class AuthorizedHostSelectionService(
             .Hosts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.Login == userLogin, ct);
         if (selfHost is null)
+        {
             return null;
+        }
 
         return new BotHostChoice(
             selfHost.Id,
@@ -77,7 +81,9 @@ internal sealed class AuthorizedHostSelectionService(
         );
 
         if (moderatedLogins.Count == 0)
+        {
             return [];
+        }
 
         var configuredHosts = await db
             .Hosts.AsNoTracking()
@@ -96,7 +102,9 @@ internal sealed class AuthorizedHostSelectionService(
         foreach (var host in configuredHosts)
         {
             if (await modAccess.CanModeratorAccessAsync(host.Id, userLogin, ct))
+            {
                 choices.Add(host);
+            }
         }
 
         return choices;

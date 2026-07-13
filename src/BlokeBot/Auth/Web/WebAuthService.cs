@@ -18,8 +18,10 @@ internal sealed class WebAuthService(
 {
     public WebAuthOptions CurrentOptions => configuration.CurrentOptions;
 
-    public Uri CreateAuthorizationUri(HttpRequest request, string state) =>
-        oauth.CreateAuthorizationUri(request, CurrentOptions, state);
+    public Uri CreateAuthorizationUri(HttpRequest request, string state)
+    {
+        return oauth.CreateAuthorizationUri(request, CurrentOptions, state);
+    }
 
     public async Task<AuthResult> AuthenticateAsync(
         HttpRequest request,
@@ -29,7 +31,9 @@ internal sealed class WebAuthService(
     {
         var currentOptions = CurrentOptions;
         if (!IsConfigured(currentOptions))
+        {
             return new AuthResult(false, null, "Twitch sign-in is not set up yet.");
+        }
 
         var accessToken = await oauth.ExchangeCodeAsync(
             request,
@@ -43,7 +47,9 @@ internal sealed class WebAuthService(
             cancellationToken
         );
         if (twitchUser is null)
+        {
             return new AuthResult(false, null, "Twitch did not return the signed-in user.");
+        }
 
         var twitchUserId = twitchUser.Id;
         var twitchLogin = twitchUser.Login;
@@ -102,14 +108,18 @@ internal sealed class WebAuthService(
         );
     }
 
-    public bool IsConfigured(WebAuthOptions currentOptions) =>
-        configuration.IsConfigured(currentOptions);
+    public bool IsConfigured(WebAuthOptions currentOptions)
+    {
+        return configuration.IsConfigured(currentOptions);
+    }
 
-    private bool IsConfiguredBotAccount(string login) =>
-        !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
+    private bool IsConfiguredBotAccount(string login)
+    {
+        return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
         && string.Equals(
             TwitchLogin.Normalize(login),
             botSettings.Identity.BotUsername,
             StringComparison.Ordinal
         );
+    }
 }

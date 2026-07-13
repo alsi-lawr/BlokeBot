@@ -19,7 +19,9 @@ public sealed class CustomAnnouncementChatActivity(
     {
         var hostLogin = LoginName.Parse(message.Channel).Value;
         if (hostLogin.Length == 0)
+        {
             return;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
@@ -28,7 +30,9 @@ public sealed class CustomAnnouncementChatActivity(
             .Select(x => new { x.Id, x.EnabledFeatures })
             .SingleOrDefaultAsync(cancellationToken);
         if (host is null || !HasCustomCommands(host.EnabledFeatures))
+        {
             return;
+        }
 
         var intervalAfterChatIds = db
             .CustomAnnouncementSchedules.OfType<IntervalAfterChatCustomAnnouncementSchedule>()
@@ -40,7 +44,9 @@ public sealed class CustomAnnouncementChatActivity(
             )
             .ToListAsync(cancellationToken);
         if (announcements.Count == 0)
+        {
             return;
+        }
 
         var now = clock.GetUtcNow().UtcDateTime;
         foreach (var announcement in announcements)
@@ -52,6 +58,8 @@ public sealed class CustomAnnouncementChatActivity(
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static bool HasCustomCommands(HostFeatureFlags features) =>
-        (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+    private static bool HasCustomCommands(HostFeatureFlags features)
+    {
+        return (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+    }
 }

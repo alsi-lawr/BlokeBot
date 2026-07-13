@@ -10,7 +10,9 @@ public sealed class PublicLeaderboardHostLookup(IDbContextFactory<BlokeBotDbCont
     {
         var login = LoginName.Parse(channel).Value;
         if (string.IsNullOrWhiteSpace(login))
+        {
             return null;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db

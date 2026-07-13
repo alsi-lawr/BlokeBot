@@ -12,7 +12,9 @@ public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOA
         var required = TwitchScopeSet.NormalizeMany(requiredScopes);
         var provider = services.GetService<ITwitchAccessTokenProvider>();
         if (provider is null)
+        {
             return Unavailable(required);
+        }
 
         string accessToken;
         try
@@ -36,7 +38,9 @@ public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOA
         {
             var validation = await oauth.ValidateTokenAsync(accessToken, cancellationToken);
             if (validation is null)
+            {
                 return Invalid(accessToken, required);
+            }
 
             var granted = TwitchScopeSet.NormalizeMany(validation.Scopes);
             var missing = TwitchScopeSet.Missing(granted, required);
@@ -64,12 +68,18 @@ public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOA
         }
     }
 
-    private static TwitchTokenStatus Unknown(string[] required, string? accessToken = null) =>
-        new(TwitchTokenStatusState.Unknown, accessToken, null, required, [], required);
+    private static TwitchTokenStatus Unknown(string[] required, string? accessToken = null)
+    {
+        return new(TwitchTokenStatusState.Unknown, accessToken, null, required, [], required);
+    }
 
-    private static TwitchTokenStatus Unavailable(string[] required) =>
-        new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+    private static TwitchTokenStatus Unavailable(string[] required)
+    {
+        return new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+    }
 
-    private static TwitchTokenStatus Invalid(string accessToken, string[] required) =>
-        new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+    private static TwitchTokenStatus Invalid(string accessToken, string[] required)
+    {
+        return new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+    }
 }

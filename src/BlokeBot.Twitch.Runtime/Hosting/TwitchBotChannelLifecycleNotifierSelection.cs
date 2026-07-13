@@ -5,14 +5,14 @@ namespace BlokeBot.Twitch.Runtime;
 /// </summary>
 public sealed class TwitchBotChannelLifecycleNotifierSelection
 {
-    private readonly List<TwitchBotChannelLifecycleNotifierRegistration> selections = [];
+    private readonly List<TwitchBotChannelLifecycleNotifierRegistration> _selections = [];
 
     /// <summary>
     /// Selects the runtime's no-op channel-lifecycle notifier.
     /// </summary>
     public TwitchBotChannelLifecycleNotifierSelection UseNoOpNotifier()
     {
-        selections.Add(
+        _selections.Add(
             new TwitchBotChannelLifecycleNotifierRegistration
             {
                 Kind = TwitchBotChannelLifecycleNotifierKind.NoOp,
@@ -29,7 +29,7 @@ public sealed class TwitchBotChannelLifecycleNotifierSelection
     public TwitchBotChannelLifecycleNotifierSelection UseHostedNotifier<TNotifier>()
         where TNotifier : class, ITwitchBotChannelLifecycleNotifier
     {
-        selections.Add(
+        _selections.Add(
             new TwitchBotChannelLifecycleNotifierRegistration
             {
                 Kind = TwitchBotChannelLifecycleNotifierKind.Hosted,
@@ -39,17 +39,19 @@ public sealed class TwitchBotChannelLifecycleNotifierSelection
         return this;
     }
 
-    internal TwitchBotChannelLifecycleNotifierRegistration RequireSingle() =>
-        selections.Count switch
+    internal TwitchBotChannelLifecycleNotifierRegistration RequireSingle()
+    {
+        return _selections.Count switch
         {
-            1 => selections[0],
+            1 => _selections[0],
             0 => throw new InvalidOperationException(
                 "Exactly one Twitch bot channel-lifecycle notifier must be selected; none was selected."
             ),
             _ => throw new InvalidOperationException(
-                $"Exactly one Twitch bot channel-lifecycle notifier must be selected; {selections.Count} were selected."
+                $"Exactly one Twitch bot channel-lifecycle notifier must be selected; {_selections.Count} were selected."
             ),
         };
+    }
 }
 
 internal enum TwitchBotChannelLifecycleNotifierKind

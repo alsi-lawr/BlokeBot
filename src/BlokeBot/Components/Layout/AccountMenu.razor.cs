@@ -46,29 +46,29 @@ public partial class AccountMenu
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
 
-    private BotHostSelection? Selection => Session.HostSelection;
+    private BotHostSelection? _selection => Session.HostSelection;
 
-    private string CurrentPath => "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+    private string _currentPath => "/" + _navigation.ToBaseRelativePath(_navigation.Uri);
 
-    private bool IsAdminEditing => Session.IsAdminEditing;
+    private bool _isAdminEditing => Session.IsAdminEditing;
 
-    private string Role => Session.DisplayRole;
+    private string _role => Session.DisplayRole;
 
     private string? AccountImageUrl()
     {
-        return IsAdminEditing && !string.IsNullOrWhiteSpace(Selection?.Current.ProfileImageUrl)
-            ? Selection.Current.ProfileImageUrl
+        return _isAdminEditing && !string.IsNullOrWhiteSpace(_selection?.Current.ProfileImageUrl)
+            ? _selection.Current.ProfileImageUrl
             : Session.ProfileImageUrl;
     }
 
     private string IdentityText()
     {
         if (
-            Selection?.Current.Role == AuthRole.Admin
+            _selection?.Current.Role == AuthRole.Admin
             && !string.IsNullOrWhiteSpace(Session.AdminEditingLogin)
         )
         {
-            return $"#{Selection.Current.DisplayName} ({Session.AdminEditingLogin})";
+            return $"#{_selection.Current.DisplayName} ({Session.AdminEditingLogin})";
         }
 
         return Session.DisplayText;

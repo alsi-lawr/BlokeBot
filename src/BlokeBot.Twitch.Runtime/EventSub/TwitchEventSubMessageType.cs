@@ -12,8 +12,9 @@ public enum TwitchEventSubMessageType
 
 internal static class TwitchEventSubMessageTypes
 {
-    public static TwitchEventSubMessageType Parse(string? messageType) =>
-        messageType switch
+    public static TwitchEventSubMessageType Parse(string? messageType)
+    {
+        return messageType switch
         {
             "session_welcome" => TwitchEventSubMessageType.SessionWelcome,
             "session_keepalive" => TwitchEventSubMessageType.SessionKeepalive,
@@ -22,4 +23,5 @@ internal static class TwitchEventSubMessageTypes
             "revocation" => TwitchEventSubMessageType.Revocation,
             _ => TwitchEventSubMessageType.Unknown,
         };
+    }
 }

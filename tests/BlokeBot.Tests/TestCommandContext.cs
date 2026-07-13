@@ -8,14 +8,16 @@ internal static class TestCommandContext
         string login,
         string channel,
         string commandName
-    ) =>
-        Create(
+    )
+    {
+        return Create(
             login,
             channel,
             commandName,
             [],
             (_, _) => ValueTask.CompletedTask
         );
+    }
 
     public static TwitchCommandContext Create(
         string login,
@@ -23,13 +25,15 @@ internal static class TestCommandContext
         string commandName,
         IReadOnlyList<string> args,
         TwitchCommandResponder respond
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Message = Message(login, channel, commandName, args),
             CommandName = commandName,
             Responder = respond,
         };
+    }
 
     private static TwitchChatMessage Message(
         string login,

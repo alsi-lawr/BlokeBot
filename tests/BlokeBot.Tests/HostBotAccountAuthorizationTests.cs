@@ -146,8 +146,10 @@ public sealed class HostBotAccountAuthorizationTests
             result.Account.ShouldBe(expected);
         }
 
-        async Task<(string Channel, TwitchBotAccount Account)> ResolveAsync(string channel) =>
-            (channel, await service.GetBotAccountAsync(channel, CancellationToken.None));
+        async Task<(string Channel, TwitchBotAccount Account)> ResolveAsync(string channel)
+        {
+            return (channel, await service.GetBotAccountAsync(channel, CancellationToken.None));
+        }
     }
 
     [Test]
@@ -267,7 +269,9 @@ public sealed class HostBotAccountAuthorizationTests
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var services = new ServiceCollection();
         if (tokenProvider is not null)
+        {
             services.AddSingleton(tokenProvider);
+        }
 
         var serviceProvider = services.BuildServiceProvider();
         var options = TwitchBotSettings.FromOptions(
@@ -330,8 +334,9 @@ public sealed class HostBotAccountAuthorizationTests
     private static HostBotAccountAuthorizationGrant CreateCustomBotGrant(
         string accessToken,
         IReadOnlyList<string> scopes
-    ) =>
-        new(
+    )
+    {
+        return new(
             new TwitchTokenSet(accessToken, "override-refresh", DateTimeOffset.UtcNow.AddHours(1)),
             "custom-id",
             LoginName.Parse("custombot"),
@@ -339,6 +344,7 @@ public sealed class HostBotAccountAuthorizationTests
             "https://static-cdn.jtvnw.net/custombot.png",
             scopes
         );
+    }
 
     private static async Task SetRuntimeStateAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -355,15 +361,20 @@ public sealed class HostBotAccountAuthorizationTests
 
     private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(accessToken);
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(accessToken);
+        }
     }
 
     private sealed class HostBotAccountHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {
@@ -409,11 +420,13 @@ public sealed class HostBotAccountAuthorizationTests
                 };
             }
 
-            private static HttpResponseMessage JsonResponse(string json) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+            }
         }
     }
 }

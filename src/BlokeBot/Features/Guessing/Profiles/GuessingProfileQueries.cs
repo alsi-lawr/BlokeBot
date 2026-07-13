@@ -18,33 +18,38 @@ internal static class GuessingProfileQueries
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .Profiles.Where(x => x.HostId == hostId && x.IsDefault)
             .Select(x => x.Id)
             .FirstAsync(ct);
+    }
 
     public static async Task<GuessRoundProfile> DefaultProfileWithSettingsAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct,
         bool includeOptions = false
-    ) =>
-        await LoadProfileWithSettingsAsync(
+    )
+    {
+        return await LoadProfileWithSettingsAsync(
             db,
             hostId,
             await DefaultProfileIdAsync(db, hostId, ct),
             ct,
             includeOptions
         ) ?? throw new InvalidOperationException("Default profile is missing.");
+    }
 
     public static async Task<GuessRoundProfile?> LoadProfileByNameAsync(
         BlokeBotDbContext db,
         int hostId,
         string profileName,
         CancellationToken ct
-    ) =>
-        await db
+    )
+    {
+        return await db
             .Profiles.AsNoTracking()
             .FirstOrDefaultAsync(
                 x =>
@@ -52,6 +57,7 @@ internal static class GuessingProfileQueries
                     && x.Slug == GuessRoundProfileSlug.FromName(profileName).Value,
                 ct
             );
+    }
 
     public static async Task<GuessRoundProfile?> LoadProfileWithSettingsAsync(
         BlokeBotDbContext db,
@@ -63,7 +69,9 @@ internal static class GuessingProfileQueries
     {
         IQueryable<GuessRoundProfile> query = db.Profiles.Include(x => x.ReplySettings);
         if (includeOptions)
+        {
             query = query.Include(x => x.Options);
+        }
 
         return await query.SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct);
     }
@@ -73,8 +81,9 @@ internal static class GuessingProfileQueries
         int hostId,
         GuessRound? round,
         CancellationToken ct
-    ) =>
-        (
+    )
+    {
+        return (
             await ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
                 db,
                 hostId,
@@ -83,6 +92,7 @@ internal static class GuessingProfileQueries
                 ct
             )
         ).Settings;
+    }
 
     public static async Task<BotReplySettings> ReplySettingsForRoundOrProfileOrDefaultAsync(
         BlokeBotDbContext db,
@@ -90,8 +100,9 @@ internal static class GuessingProfileQueries
         GuessRound? round,
         int? profileId,
         CancellationToken ct
-    ) =>
-        (
+    )
+    {
+        return (
             await ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
                 db,
                 hostId,
@@ -100,6 +111,7 @@ internal static class GuessingProfileQueries
                 ct
             )
         ).Settings;
+    }
 
     public static async Task<GuessingReplySettingsResolution> ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
         BlokeBotDbContext db,

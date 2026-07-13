@@ -2,7 +2,7 @@
 
 @if (Collapsible)
 {
-    <CollapsibleSection Title="@Title" Description="@Description" InitiallyOpen="@InitiallyOpen" Class="@CollapsibleSectionClass">
+    <CollapsibleSection Title="@Title" Description="@Description" InitiallyOpen="@InitiallyOpen" Class="@_collapsibleSectionClass">
         <div class="border-b border-slate-200 p-4">
             <div class="flex flex-wrap items-center gap-2">
                 @if (ShowEnableToggle)
@@ -24,7 +24,7 @@
                 <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60" disabled="@Disabled" @onclick="Clear">Disconnect</button>
             </div>
         </div>
-        <div class="@BodyClass">
+        <div class="@_bodyClass">
             <div class="surface-muted rounded-lg p-4">
                 <div class="flex items-center gap-4">
                     @if (Status?.AuthorizedProfileImageUrl is { Length: > 0 } imageUrl)
@@ -47,13 +47,13 @@
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot account</p>
-                            <span class="@StatusBadgeClass">
-                                <span class="@StatusDotClass"></span>
-                                @StatusText
+                            <span class="@_statusBadgeClass">
+                                <span class="@_statusDotClass"></span>
+                                @_statusText
                             </span>
                         </div>
-                        <p class="mt-2 truncate text-sm font-semibold text-slate-900">@AuthorizedAccountText</p>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @ConfiguredAccountText</p>
+                        <p class="mt-2 truncate text-sm font-semibold text-slate-900">@_authorizedAccountText</p>
+                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @_configuredAccountText</p>
                         <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
                         @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
                         {
@@ -64,14 +64,14 @@
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
                 <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch connection</p>
-                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@ConnectionHelpText</p>
+                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@_connectionHelpText</p>
             </div>
         </div>
     </CollapsibleSection>
 }
 else
 {
-    <section class="@SectionClass">
+    <section class="@_sectionClass">
         <div class="border-b border-slate-200 p-5">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -99,7 +99,7 @@ else
                 </div>
             </div>
         </div>
-        <div class="@BodyClass">
+        <div class="@_bodyClass">
             <div class="surface-muted rounded-lg p-4">
                 <div class="flex items-center gap-4">
                     @if (Status?.AuthorizedProfileImageUrl is { Length: > 0 } imageUrl)
@@ -122,13 +122,13 @@ else
                     <div class="min-w-0 flex-1">
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot account</p>
-                            <span class="@StatusBadgeClass">
-                                <span class="@StatusDotClass"></span>
-                                @StatusText
+                            <span class="@_statusBadgeClass">
+                                <span class="@_statusDotClass"></span>
+                                @_statusText
                             </span>
                         </div>
-                        <p class="mt-2 truncate text-sm font-semibold text-slate-900">@AuthorizedAccountText</p>
-                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @ConfiguredAccountText</p>
+                        <p class="mt-2 truncate text-sm font-semibold text-slate-900">@_authorizedAccountText</p>
+                        <p class="mt-1 text-xs font-medium text-slate-500">Set to use @_configuredAccountText</p>
                         <p class="mt-1 text-xs font-medium text-slate-500">@Status?.Message</p>
                         @if (Disabled && !string.IsNullOrWhiteSpace(DisabledMessage))
                         {
@@ -139,7 +139,7 @@ else
             </div>
             <div class="surface-muted rounded-lg px-3 py-2.5">
                 <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch connection</p>
-                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@ConnectionHelpText</p>
+                <p class="mt-2 text-xs font-medium leading-5 text-slate-500">@_connectionHelpText</p>
             </div>
         </div>
     </section>

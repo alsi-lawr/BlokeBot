@@ -5,10 +5,14 @@ internal static class TwitchChatMessageSplitter
     public static IReadOnlyList<string> Split(string message, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(message))
+        {
             return [];
+        }
 
         if (maxLength <= 0)
+        {
             return [message.Trim()];
+        }
 
         var remaining = message.Trim();
         var parts = new List<string>();
@@ -17,13 +21,17 @@ internal static class TwitchChatMessageSplitter
             var breakIndex = FindBreakIndex(remaining, maxLength);
             var part = remaining[..breakIndex].Trim();
             if (!string.IsNullOrWhiteSpace(part))
+            {
                 parts.Add(part);
+            }
 
             remaining = remaining[breakIndex..].TrimStart();
         }
 
         if (!string.IsNullOrWhiteSpace(remaining))
+        {
             parts.Add(remaining);
+        }
 
         return parts;
     }
@@ -34,11 +42,15 @@ internal static class TwitchChatMessageSplitter
         var segment = value.AsSpan(0, searchLength);
         var lineBreak = segment.LastIndexOfAny('\n', '\r');
         if (lineBreak > 0)
+        {
             return lineBreak;
+        }
 
         var sentenceBreak = LastSentenceBreak(segment);
         if (sentenceBreak > 0)
+        {
             return sentenceBreak;
+        }
 
         var wordBreak = LastWordBreak(segment);
         return wordBreak > 0 ? wordBreak : searchLength;
@@ -49,11 +61,15 @@ internal static class TwitchChatMessageSplitter
         for (var i = value.Length - 1; i > 0; i--)
         {
             if (!char.IsWhiteSpace(value[i]))
+            {
                 continue;
+            }
 
             var punctuation = value[i - 1];
             if (punctuation is '.' or '!' or '?')
+            {
                 return i;
+            }
         }
 
         return -1;
@@ -64,7 +80,9 @@ internal static class TwitchChatMessageSplitter
         for (var i = value.Length - 1; i > 0; i--)
         {
             if (char.IsWhiteSpace(value[i]))
+            {
                 return i;
+            }
         }
 
         return -1;

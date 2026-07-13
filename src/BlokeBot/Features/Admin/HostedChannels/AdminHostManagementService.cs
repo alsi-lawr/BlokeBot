@@ -36,7 +36,9 @@ internal sealed class AdminHostManagementService(
         }
 
         if (user is null || string.IsNullOrWhiteSpace(user.Login))
+        {
             return new AdminHostOperationResult(false, "Twitch user not found.");
+        }
 
         var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
             ? user.Login
@@ -61,11 +63,15 @@ internal sealed class AdminHostManagementService(
         );
     }
 
-    public async Task<AdminHostOperationResult> StartBotAsync(int hostId, CancellationToken ct) =>
-        await ApplyRuntimeOperationAsync(hostId, runtime.StartAsync, ct);
+    public async Task<AdminHostOperationResult> StartBotAsync(int hostId, CancellationToken ct)
+    {
+        return await ApplyRuntimeOperationAsync(hostId, runtime.StartAsync, ct);
+    }
 
-    public async Task<AdminHostOperationResult> StopBotAsync(int hostId, CancellationToken ct) =>
-        await ApplyRuntimeOperationAsync(hostId, runtime.StopAsync, ct);
+    public async Task<AdminHostOperationResult> StopBotAsync(int hostId, CancellationToken ct)
+    {
+        return await ApplyRuntimeOperationAsync(hostId, runtime.StopAsync, ct);
+    }
 
     public AdminHostOperationResult RefreshPendingRuntime(
         int hostId,
@@ -97,17 +103,21 @@ internal sealed class AdminHostManagementService(
         );
     }
 
-    private static string RuntimeStatusMessage(BotChannelRuntimeState? state) =>
-        state switch
+    private static string RuntimeStatusMessage(BotChannelRuntimeState? state)
+    {
+        return state switch
         {
             BotChannelRuntimeState.Starting => "Bot starting.",
             BotChannelRuntimeState.Started => "Bot running.",
             BotChannelRuntimeState.Stopping => "Bot stopping.",
             _ => "Bot offline.",
         };
+    }
 
-    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? state) =>
-        state is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? state)
+    {
+        return state is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+    }
 }
 
 public sealed record AdminHostOperationResult(

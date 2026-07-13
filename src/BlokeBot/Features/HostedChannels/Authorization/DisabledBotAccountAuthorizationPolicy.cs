@@ -5,8 +5,9 @@ internal sealed class DisabledBotAccountAuthorizationPolicy(TwitchBotSettings se
 {
     public Task<BotAccountAuthorizationStatus> GetStatusAsync(
         CancellationToken cancellationToken
-    ) =>
-        Task.FromResult(
+    )
+    {
+        return Task.FromResult(
             new BotAccountAuthorizationStatus(
                 settings.Identity.BotUsername,
                 null,
@@ -18,6 +19,10 @@ internal sealed class DisabledBotAccountAuthorizationPolicy(TwitchBotSettings se
                 "The Twitch bot runner is not configured."
             )
         );
+    }
 
-    public Task ClearAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task ClearAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }

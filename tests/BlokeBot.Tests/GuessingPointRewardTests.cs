@@ -89,13 +89,15 @@ public sealed class GuessingPointRewardTests
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
 
-    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
-        new(
+    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory)
+    {
+        return new(
             dbFactory,
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
+    }
 
     private static async Task<RoundSeed> SeedRoundAsync(
         SqliteBlokeBotDbFactory dbFactory,

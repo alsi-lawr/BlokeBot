@@ -15,8 +15,9 @@ public sealed record ActiveBotAccountTokenStatus(
         string botLogin,
         string? profileImageUrl,
         TwitchTokenStatus status
-    ) =>
-        new(
+    )
+    {
+        return new(
             botLogin,
             profileImageUrl,
             status.State,
@@ -26,4 +27,5 @@ public sealed record ActiveBotAccountTokenStatus(
             status.GrantedScopes,
             status.MissingScopes
         );
+    }
 }

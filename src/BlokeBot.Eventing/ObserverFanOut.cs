@@ -109,9 +109,9 @@ public sealed class ObserverFanOutEscalationException : Exception
 public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
     where TDeadLetter : IObserverDeadLetterPayload
 {
-    private readonly ObserverFailurePolicy<TBoundary, TDeadLetter> policy;
-    private readonly IObserverFailureDiagnosticReporter reporter;
-    private readonly IObserverCorrelationIdProvider correlations;
+    private readonly ObserverFailurePolicy<TBoundary, TDeadLetter> _policy;
+    private readonly IObserverFailureDiagnosticReporter _reporter;
+    private readonly IObserverCorrelationIdProvider _correlations;
 
     internal ObserverFanOut(
         ObserverFailurePolicy<TBoundary, TDeadLetter> policy,
@@ -124,10 +124,13 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         ArgumentNullException.ThrowIfNull(correlations);
         ArgumentException.ThrowIfNullOrWhiteSpace(policy.Boundary.Value);
         if (policy is ObserverFailurePolicy<TBoundary, TDeadLetter>.DeadLetter deadLetter)
+        {
             ArgumentNullException.ThrowIfNull(deadLetter.Sink);
-        this.policy = policy;
-        this.reporter = reporter;
-        this.correlations = correlations;
+        }
+
+        _policy = policy;
+        _reporter = reporter;
+        _correlations = correlations;
     }
 
     public async ValueTask<ObserverFanOutOutcome> DispatchAsync<TObserver>(
@@ -144,7 +147,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         ArgumentNullException.ThrowIfNull(invoke);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var correlationId = correlations.Next();
+        var correlationId = _correlations.Next();
         ArgumentException.ThrowIfNullOrWhiteSpace(correlationId.Value);
         var dispatch = createDispatch(correlationId);
         ArgumentNullException.ThrowIfNull(dispatch);
@@ -202,7 +205,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         CancellationToken cancellationToken
     )
     {
-        switch (policy)
+        switch (_policy)
         {
             case ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport:
                 AppendEscalation(
@@ -327,7 +330,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         catch (Exception exception)
         {
             details = ObserverFailureClassifier.Classify(
-                policy.Boundary,
+                _policy.Boundary,
                 dispatch.EventIdentity,
                 observerIdentity,
                 correlationId,
@@ -341,7 +344,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         var handlingFailures = new List<ObserverFailureHandlingDetails>();
         try
         {
-            await reporter.ReportAsync(
+            await _reporter.ReportAsync(
                 new ObserverFailureDiagnosticReport
                 {
                     Summary = details.Summary,
@@ -378,7 +381,9 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
     )
     {
         if (outcome is not ObserverAttemptOutcome.Failed failed)
+        {
             return;
+        }
 
         AppendEscalation(failed.HandlingFailures, escalationFailures);
     }
@@ -389,7 +394,9 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
     )
     {
         if (handlingFailures.Count == 0)
+        {
             return;
+        }
 
         escalationFailures.AddRange(handlingFailures);
     }
@@ -440,8 +447,10 @@ internal interface IObserverCorrelationIdProvider
 
 internal sealed class ObserverCorrelationIdProvider : IObserverCorrelationIdProvider
 {
-    public ObserverCorrelationId Next() =>
-        ObserverCorrelationId.Named(Guid.NewGuid().ToString("N"));
+    public ObserverCorrelationId Next()
+    {
+        return ObserverCorrelationId.Named(Guid.NewGuid().ToString("N"));
+    }
 }
 
 internal readonly record struct ObserverFailureDetails(
@@ -458,8 +467,9 @@ internal readonly record struct ObserverFailureHandlingDetails(
         ObserverFailureSummary observerFailure,
         ObserverFailureHandlingStage stage,
         Exception exception
-    ) =>
-        new(
+    )
+    {
+        return new(
             new ObserverFailureHandlingSummary
             {
                 ObserverFailure = observerFailure,
@@ -468,6 +478,7 @@ internal readonly record struct ObserverFailureHandlingDetails(
             },
             exception
         );
+    }
 }
 
 internal static class ObserverFailureClassifier
@@ -479,8 +490,9 @@ internal static class ObserverFailureClassifier
         ObserverCorrelationId correlationId,
         int attempt,
         Exception exception
-    ) =>
-        new(
+    )
+    {
+        return new(
             new ObserverFailureSummary
             {
                 Boundary = boundary,
@@ -493,9 +505,11 @@ internal static class ObserverFailureClassifier
             },
             exception
         );
+    }
 
-    private static ObserverFailureClassification Classify(Exception exception) =>
-        exception switch
+    private static ObserverFailureClassification Classify(Exception exception)
+    {
+        return exception switch
         {
             TimeoutException or IOException or SocketException =>
                 ObserverFailureClassification.Transient,
@@ -510,12 +524,15 @@ internal static class ObserverFailureClassifier
             or JsonException => ObserverFailureClassification.Terminal,
             _ => ObserverFailureClassification.Unexpected,
         };
+    }
 
-    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode) =>
-        statusCode is null
+    private static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
+    {
+        return statusCode is null
         || statusCode is HttpStatusCode.RequestTimeout
             or HttpStatusCode.TooManyRequests
         || (int)statusCode >= 500;
+    }
 }
 
 internal abstract record ObserverAttemptOutcome

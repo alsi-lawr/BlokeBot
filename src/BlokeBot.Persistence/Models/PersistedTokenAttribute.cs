@@ -14,8 +14,8 @@ public sealed class PersistedTokenAttribute(string token) : Attribute
 public static class PersistedEnumTokens<TEnum>
     where TEnum : struct, Enum
 {
-    private static readonly IReadOnlyDictionary<TEnum, string> TokensByValue = BuildTokensByValue();
-    private static readonly IReadOnlyDictionary<string, TEnum> ValuesByToken = BuildValuesByToken();
+    private static readonly IReadOnlyDictionary<TEnum, string> _tokensByValue = BuildTokensByValue();
+    private static readonly IReadOnlyDictionary<string, TEnum> _valuesByToken = BuildValuesByToken();
 
     public static IReadOnlyList<string> Values { get; } =
         Enum.GetValues<TEnum>()
@@ -23,23 +23,26 @@ public static class PersistedEnumTokens<TEnum>
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-    public static string Format(TEnum value) =>
-        TokensByValue.TryGetValue(value, out var token)
+    public static string Format(TEnum value)
+    {
+        return _tokensByValue.TryGetValue(value, out var token)
             ? token
             : throw new ArgumentOutOfRangeException(nameof(value), value, null);
+    }
 
     public static TEnum Parse(string token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        return ValuesByToken.TryGetValue(token.Trim(), out var value)
+        return _valuesByToken.TryGetValue(token.Trim(), out var value)
             ? value
             : throw new FormatException(
                 $"Unknown persisted {typeof(TEnum).Name} token '{token}'."
             );
     }
 
-    private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue() =>
-        Enum.GetValues<TEnum>()
+    private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue()
+    {
+        return Enum.GetValues<TEnum>()
             .ToDictionary(
                 value => value,
                 value =>
@@ -51,16 +54,19 @@ public static class PersistedEnumTokens<TEnum>
                         $"{typeof(TEnum).Name}.{value} must declare {nameof(PersistedTokenAttribute)}."
                     )
             );
+    }
 
     private static IReadOnlyDictionary<string, TEnum> BuildValuesByToken()
     {
         var values = new Dictionary<string, TEnum>(StringComparer.OrdinalIgnoreCase);
-        foreach (var pair in TokensByValue)
+        foreach (var pair in _tokensByValue)
         {
             if (!values.TryAdd(pair.Value, pair.Key))
+            {
                 throw new InvalidOperationException(
                     $"Persisted token '{pair.Value}' is duplicated on {typeof(TEnum).Name}."
                 );
+            }
         }
 
         return values;

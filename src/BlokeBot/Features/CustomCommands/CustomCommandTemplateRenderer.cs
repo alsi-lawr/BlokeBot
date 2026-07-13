@@ -7,7 +7,7 @@ namespace BlokeBot.Features.CustomCommands;
 
 public sealed class CustomCommandTemplateRenderer
 {
-    private static readonly Regex TokenPattern = new(
+    private static readonly Regex _tokenPattern = new(
         @"\{([A-Za-z0-9_]+)\}",
         RegexOptions.CultureInvariant
     );
@@ -28,12 +28,16 @@ public sealed class CustomCommandTemplateRenderer
         };
 
         for (var i = 0; i < 9; i++)
+        {
             values[$"arg{i + 1}"] = i < args.Count ? args[i] : string.Empty;
+        }
 
         if (count is not null)
+        {
             values["count"] = count.Value.ToString(CultureInfo.InvariantCulture);
+        }
 
-        return TokenPattern.Replace(
+        return _tokenPattern.Replace(
             template,
             match =>
                 values.TryGetValue(match.Groups[1].Value, out var value)

@@ -40,11 +40,13 @@ public sealed class GuessingRoundService(
         var normalizedName = GuessName.Parse(name).Value;
 
         if (round is null)
+        {
             return new GuessingOperationResult(
                 false,
                 settings.NoOpenRoundReply,
                 delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
             );
+        }
 
         var optionExists = await db.GuessOptions.AnyAsync(
             x => x.GuessRoundProfileId == round.GuessRoundProfileId && x.Name == normalizedName,
@@ -106,7 +108,9 @@ public sealed class GuessingRoundService(
         await tx.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);
         if (awardedAnyPoints)
+        {
             await pointsChanges.NotifyChangedAsync(ct);
+        }
 
         var message = MessageTemplateFormatter.Format(
             winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
@@ -153,7 +157,9 @@ public sealed class GuessingRoundService(
             includeOptions: true
         );
         if (profile is null)
+        {
             return new GuessingOperationResult(false, "Round type not found.");
+        }
 
         var settings = profile.ReplySettings!;
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
@@ -164,11 +170,13 @@ public sealed class GuessingRoundService(
             ct
         );
         if (await GuessingRoundQueries.Unresolved(db, hostId).AnyAsync(ct))
+        {
             return new GuessingOperationResult(
                 false,
                 settings.RoundAlreadyOpenReply,
                 delivery.TargetFor(GuessingReplyKeys.RoundAlreadyOpen)
             );
+        }
 
         db.Rounds.Add(
             new GuessRound
@@ -200,7 +208,9 @@ public sealed class GuessingRoundService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
         if (hostId is null)
+        {
             return NotConfigured();
+        }
 
         var profile = string.IsNullOrWhiteSpace(profileName)
             ? await GuessingProfileQueries.DefaultProfileWithSettingsAsync(db, hostId.Value, ct)
@@ -212,7 +222,9 @@ public sealed class GuessingRoundService(
             );
 
         if (profile is null)
+        {
             return new GuessingOperationResult(false, $"Unknown round type: {profileName}.");
+        }
 
         return await StartRoundAsync(hostId.Value, profile.Id, ct);
     }
@@ -233,11 +245,13 @@ public sealed class GuessingRoundService(
         var delivery = resolution.ReplyDelivery;
 
         if (round is null)
+        {
             return new GuessingOperationResult(
                 false,
                 settings.NoOpenRoundReply,
                 delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
             );
+        }
 
         round.Status = GuessRoundStatus.Closed;
         round.ClosedAtUtc = DateTime.UtcNow;
@@ -256,8 +270,9 @@ public sealed class GuessingRoundService(
         return hostId is null ? NotConfigured() : await StopGuessingAsync(hostId.Value, ct);
     }
 
-    private static string Format(string template, string name, string login) =>
-        MessageTemplateFormatter.Format(
+    private static string Format(string template, string name, string login)
+    {
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -265,9 +280,11 @@ public sealed class GuessingRoundService(
                 ["login"] = login,
             }
         );
+    }
 
-    private static string FormatRoundStarted(string template, string round, string options) =>
-        MessageTemplateFormatter.Format(
+    private static string FormatRoundStarted(string template, string round, string options)
+    {
+        return MessageTemplateFormatter.Format(
             template,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -275,6 +292,7 @@ public sealed class GuessingRoundService(
                 ["options"] = options,
             }
         );
+    }
 
     private static string FormatOptions(IEnumerable<string> options)
     {
@@ -282,6 +300,8 @@ public sealed class GuessingRoundService(
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
 
-    private static GuessingOperationResult NotConfigured() =>
-        new(false, "This channel is not set up.");
+    private static GuessingOperationResult NotConfigured()
+    {
+        return new(false, "This channel is not set up.");
+    }
 }

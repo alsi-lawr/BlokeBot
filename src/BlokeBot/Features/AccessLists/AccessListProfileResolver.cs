@@ -14,7 +14,9 @@ public sealed class AccessListProfileResolver(
             .Select(login => login.Trim())
             .ToArray();
         if (entries.Length == 0)
+        {
             return [];
+        }
 
         return await enrichment.EnrichAsync(entries, ct);
     }

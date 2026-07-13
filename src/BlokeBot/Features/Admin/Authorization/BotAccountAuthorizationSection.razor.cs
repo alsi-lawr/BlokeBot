@@ -92,26 +92,26 @@ public partial class BotAccountAuthorizationSection
     [Parameter, EditorRequired]
     public Func<Task> Refresh { get; set; } = () => Task.CompletedTask;
 
-    private string AuthorizedAccountText =>
+    private string _authorizedAccountText =>
         Status?.AuthorizedLogin is { Length: > 0 } login
             ? $"@{login}"
             : "No Twitch account connected";
 
-    private string ConfiguredAccountText =>
+    private string _configuredAccountText =>
         Status?.ConfiguredBotLogin is { Length: > 0 } login
             ? $"@{login}"
             : ConfiguredAccountFallbackText;
 
-    private string SectionClass => Disabled ? "card bot-account-section--disabled" : "card";
+    private string _sectionClass => Disabled ? "card bot-account-section--disabled" : "card";
 
-    private string? CollapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
+    private string? _collapsibleSectionClass => Disabled ? "bot-account-section--disabled" : null;
 
-    private string BodyClass =>
+    private string _bodyClass =>
         Disabled
             ? "grid gap-4 p-5 opacity-60 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
             : "grid gap-4 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]";
 
-    private string StatusBadgeClass =>
+    private string _statusBadgeClass =>
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled =>
@@ -125,7 +125,7 @@ public partial class BotAccountAuthorizationSection
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
         };
 
-    private string StatusDotClass =>
+    private string _statusDotClass =>
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled => "h-1.5 w-1.5 rounded-full bg-slate-400",
@@ -136,7 +136,7 @@ public partial class BotAccountAuthorizationSection
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
-    private string StatusText =>
+    private string _statusText =>
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled => "disabled",
@@ -147,7 +147,7 @@ public partial class BotAccountAuthorizationSection
             _ => "unknown",
         };
 
-    private string ConnectionHelpText =>
+    private string _connectionHelpText =>
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled =>

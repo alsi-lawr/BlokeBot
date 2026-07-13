@@ -118,7 +118,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
                         CreatedAtUtc = now,
                     };
             if (editor.Id <= 0)
+            {
                 db.CustomMessageLibraryEntries.Add(entry);
+            }
 
             entry.Name = TemporaryName("message", editor.Id);
             entry.SelectionMode = editor.SelectionMode;
@@ -149,7 +151,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     ? existingById[editor.Id]
                     : new CustomCounter { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
+            {
                 db.CustomCounters.Add(counter);
+            }
 
             counter.Name = TemporaryName("counter", editor.Id);
             counter.Value = editor.Value;
@@ -181,7 +185,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     ? existingById[editor.Id]
                     : new CustomCommand { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
+            {
                 db.CustomCommands.Add(command);
+            }
 
             command.Name = TemporaryName("command", editor.Id);
             command.Enabled = editor.Enabled;
@@ -243,7 +249,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
                             ),
                     };
             if (editor.Id <= 0)
+            {
                 db.CustomAnnouncements.Add(announcement);
+            }
 
             announcement.Name = TemporaryName("announcement", editor.Id);
             announcement.Enabled = editor.Enabled;
@@ -476,9 +484,13 @@ public sealed class CustomCommandConfigurationGraphWriter(
         }
     }
 
-    private static int ClampVariantIndex(int index, int variantCount) =>
-        variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
+    private static int ClampVariantIndex(int index, int variantCount)
+    {
+        return variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
+    }
 
-    private static string TemporaryName(string entityName, int editorId) =>
-        $"__editing_{entityName}_{editorId}_{Guid.NewGuid():N}";
+    private static string TemporaryName(string entityName, int editorId)
+    {
+        return $"__editing_{entityName}_{editorId}_{Guid.NewGuid():N}";
+    }
 }

@@ -49,14 +49,16 @@ public sealed class TwitchChatCommandResponseSenderTests
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
     }
 
-    private static TwitchChatMessage SourceMessage() =>
-        new(
+    private static TwitchChatMessage SourceMessage()
+    {
+        return new(
             "viewer",
             "streamer",
             "!points",
             ":viewer!u@h PRIVMSG #streamer :!points",
             new Dictionary<string, string>()
         );
+    }
 
     private sealed class RecordingChatSender : ITwitchChatMessageSender
     {

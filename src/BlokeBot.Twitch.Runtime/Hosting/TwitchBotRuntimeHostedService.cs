@@ -4,7 +4,7 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchBotRuntimeHostedService : BackgroundService
 {
-    private readonly ITwitchBotRuntimeStrategy strategy;
+    private readonly ITwitchBotRuntimeStrategy _strategy;
 
     public TwitchBotRuntimeHostedService(
         TwitchBotSettings settings,
@@ -18,7 +18,7 @@ internal sealed class TwitchBotRuntimeHostedService : BackgroundService
             .Where(candidate => candidate.Runtime == settings.Runtime)
             .Take(2)
             .ToArray();
-        strategy = matches switch
+        _strategy = matches switch
         {
             [var selected] => selected,
             [] => throw new InvalidOperationException(
@@ -30,9 +30,13 @@ internal sealed class TwitchBotRuntimeHostedService : BackgroundService
         };
     }
 
-    internal Task RunSelectedStrategyAsync(CancellationToken cancellationToken) =>
-        strategy.RunAsync(cancellationToken);
+    internal Task RunSelectedStrategyAsync(CancellationToken cancellationToken)
+    {
+        return _strategy.RunAsync(cancellationToken);
+    }
 
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-        RunSelectedStrategyAsync(stoppingToken);
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return RunSelectedStrategyAsync(stoppingToken);
+    }
 }

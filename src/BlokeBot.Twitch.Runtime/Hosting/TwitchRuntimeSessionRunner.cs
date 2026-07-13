@@ -41,7 +41,10 @@ internal static class TwitchRuntimeSessionRunner
                             await DisposeHandoffAsync(idleHandoff);
                             target = initialTarget;
                             if (!await WaitForChannelsAsync(idleWait, stoppingToken))
+                            {
                                 return;
+                            }
+
                             break;
                         case TwitchRuntimeSessionOutcome.Established established:
                             var completedHandoff = handoff;
@@ -141,7 +144,9 @@ internal static class TwitchRuntimeSessionRunner
             if (stoppingToken.IsCancellationRequested)
             {
                 if (establishment is TwitchRuntimeSessionEstablishment.Established connected)
+                {
                     await connected.Session.DisposeAsync();
+                }
 
                 return new TwitchRuntimeSessionOutcome.Canceled();
             }
@@ -168,7 +173,9 @@ internal static class TwitchRuntimeSessionRunner
         catch (Exception exception)
         {
             if (exception is TwitchAccessTokenUnavailableException)
+            {
                 status.SetAuthorized(false);
+            }
 
             var report = CreateUnhealthyReport(
                 runtime,
@@ -261,7 +268,9 @@ internal static class TwitchRuntimeSessionRunner
         catch (Exception exception)
         {
             if (exception is TwitchAccessTokenUnavailableException)
+            {
                 status.SetAuthorized(false);
+            }
 
             var failure = await IncludeCleanupFailureAsync(
                 session,
@@ -416,14 +425,16 @@ internal static class TwitchRuntimeSessionRunner
         int attempt,
         Exception exception,
         CancellationToken cancellationToken
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Runtime = runtime,
             Classification = classify(exception, cancellationToken),
             Attempt = attempt,
             Exception = exception,
         };
+    }
 }
 
 internal abstract record TwitchRuntimeConnectionTarget
@@ -581,8 +592,10 @@ internal interface ITwitchRuntimeIdleWait
 
 internal sealed class TwitchRuntimeIdleWait(TimeProvider timeProvider) : ITwitchRuntimeIdleWait
 {
-    private static readonly TimeSpan IdleInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan _idleInterval = TimeSpan.FromSeconds(30);
 
-    public ValueTask WaitAsync(CancellationToken cancellationToken) =>
-        new(Task.Delay(IdleInterval, timeProvider, cancellationToken));
+    public ValueTask WaitAsync(CancellationToken cancellationToken)
+    {
+        return new(Task.Delay(_idleInterval, timeProvider, cancellationToken));
+    }
 }

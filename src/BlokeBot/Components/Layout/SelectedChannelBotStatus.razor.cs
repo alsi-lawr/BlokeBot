@@ -43,24 +43,24 @@ namespace BlokeBot.Components.Layout;
 
 public partial class SelectedChannelBotStatus
 {
-    private int? loadedStatusHostId;
-    private IDisposable? hostedChannelSubscription;
-    private HostedChannelRuntimeSummary? selectedHostStatus;
+    private int? _loadedStatusHostId;
+    private IDisposable? _hostedChannelSubscription;
+    private HostedChannelRuntimeSummary? _selectedHostStatus;
 
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
 
-    private BotHostSelection? Selection => Session.HostSelection;
+    private BotHostSelection? _selection => Session.HostSelection;
 
-    private bool SelectedHostBotAuthorized =>
-        selectedHostStatus?.IsChannelBotAuthorized == true
-        && selectedHostStatus.ChannelBotAuthorizationScopesCurrent;
+    private bool _selectedHostBotAuthorized =>
+        _selectedHostStatus?.IsChannelBotAuthorized == true
+        && _selectedHostStatus.ChannelBotAuthorizationScopesCurrent;
 
-    private string SelectedBotStatusShellClass
+    private string _selectedBotStatusShellClass
     {
         get
         {
-            var color = selectedHostStatus switch
+            var color = _selectedHostStatus switch
             {
                 { IsChannelBotAuthorized: false } => "border-amber-200 bg-amber-50 text-amber-700",
                 { ChannelBotAuthorizationScopesCurrent: false } =>
@@ -79,11 +79,11 @@ public partial class SelectedChannelBotStatus
         }
     }
 
-    private string SelectedBotStatusDotClass
+    private string _selectedBotStatusDotClass
     {
         get
         {
-            var color = selectedHostStatus switch
+            var color = _selectedHostStatus switch
             {
                 { IsChannelBotAuthorized: false } => "bg-amber-500",
                 { ChannelBotAuthorizationScopesCurrent: false } => "bg-amber-500",
@@ -98,8 +98,8 @@ public partial class SelectedChannelBotStatus
         }
     }
 
-    private string SelectedBotStatusText =>
-        selectedHostStatus switch
+    private string _selectedBotStatusText =>
+        _selectedHostStatus switch
         {
             { RuntimeState: BotChannelRuntimeState.Starting } => "bot starting",
             { RuntimeState: BotChannelRuntimeState.Stopping } => "bot stopping",
@@ -112,7 +112,7 @@ public partial class SelectedChannelBotStatus
 
     protected override void OnInitialized()
     {
-        hostedChannelSubscription = Events.SubscribeForComponentRefresh(
+        _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             work => InvokeAsync(work),
             ReloadForEventAsync,
@@ -127,7 +127,7 @@ public partial class SelectedChannelBotStatus
 
     public void Dispose()
     {
-        hostedChannelSubscription?.Dispose();
+        _hostedChannelSubscription?.Dispose();
     }
 
     private bool CanAuthorizeSelectedHost()
@@ -137,26 +137,28 @@ public partial class SelectedChannelBotStatus
 
     private async Task LoadSelectedHostStatusAsync()
     {
-        if (Selection is null)
+        if (_selection is null)
         {
-            loadedStatusHostId = null;
-            selectedHostStatus = null;
+            _loadedStatusHostId = null;
+            _selectedHostStatus = null;
             return;
         }
 
-        if (loadedStatusHostId == Selection.Current.Id)
+        if (_loadedStatusHostId == _selection.Current.Id)
+        {
             return;
+        }
 
-        loadedStatusHostId = Selection.Current.Id;
-        selectedHostStatus = await HostedChannels.LoadHostRuntimeSummaryAsync(
-            Selection.Current.Id,
+        _loadedStatusHostId = _selection.Current.Id;
+        _selectedHostStatus = await _hostedChannels.LoadHostRuntimeSummaryAsync(
+            _selection.Current.Id,
             CancellationToken.None
         );
     }
 
     private async Task ReloadForEventAsync()
     {
-        loadedStatusHostId = null;
+        _loadedStatusHostId = null;
         await LoadSelectedHostStatusAsync();
     }
 }

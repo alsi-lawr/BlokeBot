@@ -2,9 +2,9 @@ namespace BlokeBot.Features.Toasts;
 
 public sealed class ToastService
 {
-    private const int MaxVisibleToasts = 5;
-    private readonly object gate = new();
-    private readonly List<ToastNotification> toasts = [];
+    private const int _maxVisibleToasts = 5;
+    private readonly object _gate = new();
+    private readonly List<ToastNotification> _toasts = [];
 
     public event Action? Changed;
 
@@ -12,30 +12,40 @@ public sealed class ToastService
     {
         get
         {
-            lock (gate)
+            lock (_gate)
             {
-                return [.. toasts];
+                return [.. _toasts];
             }
         }
     }
 
-    public ToastNotification Error(string message, string? title = null, ToastTone? tone = null) =>
-        Publish(ToastKind.Error, message, title, tone);
+    public ToastNotification Error(string message, string? title = null, ToastTone? tone = null)
+    {
+        return Publish(ToastKind.Error, message, title, tone);
+    }
 
-    public ToastNotification Status(string message, string? title = null, ToastTone? tone = null) =>
-        Publish(ToastKind.Status, message, title, tone);
+    public ToastNotification Status(string message, string? title = null, ToastTone? tone = null)
+    {
+        return Publish(ToastKind.Status, message, title, tone);
+    }
 
     public ToastNotification Success(
         string message,
         string? title = null,
         ToastTone? tone = null
-    ) => Publish(ToastKind.Success, message, title, tone);
+    )
+    {
+        return Publish(ToastKind.Success, message, title, tone);
+    }
 
     public ToastNotification Warning(
         string message,
         string? title = null,
         ToastTone? tone = null
-    ) => Publish(ToastKind.Warning, message, title, tone);
+    )
+    {
+        return Publish(ToastKind.Warning, message, title, tone);
+    }
 
     public ToastNotification Publish(
         ToastKind kind,
@@ -46,7 +56,9 @@ public sealed class ToastService
     {
         var trimmed = message.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
+        {
             throw new ArgumentException("Toast message is required.", nameof(message));
+        }
 
         var toast = new ToastNotification(
             Guid.NewGuid(),
@@ -58,11 +70,13 @@ public sealed class ToastService
             DefaultAutoDismiss(kind)
         );
 
-        lock (gate)
+        lock (_gate)
         {
-            toasts.Add(toast);
-            if (toasts.Count > MaxVisibleToasts)
-                toasts.RemoveRange(0, toasts.Count - MaxVisibleToasts);
+            _toasts.Add(toast);
+            if (_toasts.Count > _maxVisibleToasts)
+            {
+                _toasts.RemoveRange(0, _toasts.Count - _maxVisibleToasts);
+            }
         }
 
         NotifyChanged();
@@ -72,30 +86,38 @@ public sealed class ToastService
     public bool Dismiss(Guid toastId)
     {
         bool removed;
-        lock (gate)
+        lock (_gate)
         {
-            removed = toasts.RemoveAll(toast => toast.Id == toastId) > 0;
+            removed = _toasts.RemoveAll(toast => toast.Id == toastId) > 0;
         }
 
         if (removed)
+        {
             NotifyChanged();
+        }
 
         return removed;
     }
 
-    private void NotifyChanged() => Changed?.Invoke();
+    private void NotifyChanged()
+    {
+        Changed?.Invoke();
+    }
 
-    private static ToastTone DefaultTone(ToastKind kind) =>
-        kind switch
+    private static ToastTone DefaultTone(ToastKind kind)
+    {
+        return kind switch
         {
             ToastKind.Success => ToastTone.Positive,
             ToastKind.Warning => ToastTone.Caution,
             ToastKind.Error => ToastTone.Critical,
             _ => ToastTone.Neutral,
         };
+    }
 
-    private static TimeSpan? DefaultAutoDismiss(ToastKind kind) =>
-        kind switch
+    private static TimeSpan? DefaultAutoDismiss(ToastKind kind)
+    {
+        return kind switch
         {
             ToastKind.Status => TimeSpan.FromSeconds(4),
             ToastKind.Success => TimeSpan.FromSeconds(4),
@@ -103,9 +125,11 @@ public sealed class ToastService
             ToastKind.Error => null,
             _ => null,
         };
+    }
 
-    private static string DefaultTitle(ToastKind kind) =>
-        kind switch
+    private static string DefaultTitle(ToastKind kind)
+    {
+        return kind switch
         {
             ToastKind.Status => "Status",
             ToastKind.Success => "Done",
@@ -113,4 +137,5 @@ public sealed class ToastService
             ToastKind.Error => "Something went wrong",
             _ => "Notification",
         };
+    }
 }

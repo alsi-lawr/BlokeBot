@@ -1,30 +1,30 @@
-@page "/guessing/leaderboard/{Channel}"
+@page "/guessing/_leaderboard/{Channel}"
 @using System.Globalization
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
-@inject GuessingHistoryService History
-@inject PublicLeaderboardHostLookup Hosts
+@inject GuessingHistoryService _history
+@inject PublicLeaderboardHostLookup _hosts
 
 <PageTitle>BlokeBot | Guessing Leaderboard</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Public leaderboard"
-                Title="Guessing leaderboard"
-                Description="@HeaderDescription" />
+    <PageHeader Kicker="Public _leaderboard"
+                Title="Guessing _leaderboard"
+                Description="@_headerDescription" />
 
-    @if (!loaded)
+    @if (!_loaded)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading _leaderboard...</div>
     }
-    else if (host is null)
+    else if (_host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Channel not found.</div>
     }
-    else if (!FeatureEnabled)
+    else if (!_featureEnabled)
     {
         <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel.</div>
     }
-    else if (leaderboard is null)
+    else if (_leaderboard is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Leaderboard unavailable.</div>
     }
@@ -34,20 +34,20 @@
             <div class="grid gap-4 border-b border-slate-200 p-5 md:grid-cols-3">
                 <div class="surface-row rounded-lg p-4">
                     <p class="text-sm font-medium text-muted-foreground">Players</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalPlayers</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.TotalPlayers</p>
                 </div>
                 <div class="surface-row rounded-lg p-4">
                     <p class="text-sm font-medium text-muted-foreground">Guesses</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.TotalGuesses</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.TotalGuesses</p>
                 </div>
                 <div class="surface-row rounded-lg p-4">
                     <p class="text-sm font-medium text-muted-foreground">Correct</p>
-                    <p class="mt-2 text-2xl font-bold text-slate-950">@leaderboard.CorrectGuesses</p>
+                    <p class="mt-2 text-2xl font-bold text-slate-950">@_leaderboard.CorrectGuesses</p>
                 </div>
             </div>
 
             <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
-                @if (leaderboard.Entries.Count == 0)
+                @if (_leaderboard.Entries.Count == 0)
                 {
                     <div class="p-8 text-sm text-muted-foreground">No completed guesses yet.</div>
                 }
@@ -65,7 +65,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
-                            @foreach (var entry in leaderboard.Entries)
+                            @foreach (var entry in _leaderboard.Entries)
                             {
                                 <tr @key="entry.Login" class="motion-list__item">
                                     <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>

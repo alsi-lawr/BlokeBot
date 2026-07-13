@@ -232,8 +232,9 @@ public sealed class PublicChatDeliveryClassifierTests
     private static PublicChatPreparedSend Prepared(
         string accessToken,
         string message
-    ) =>
-        new()
+    )
+    {
+        return new()
         {
             Message = new PublicChatClaimedMessage
             {
@@ -251,4 +252,5 @@ public sealed class PublicChatDeliveryClassifierTests
             BroadcasterId = "broadcaster-id",
             BotUserId = "bot-user-id",
         };
+    }
 }

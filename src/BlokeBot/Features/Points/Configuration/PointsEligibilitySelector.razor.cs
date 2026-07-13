@@ -51,22 +51,24 @@ public partial class PointsEligibilitySelector
     [Parameter]
     public EventCallback<PointsEligibilityMode> ValueChanged { get; set; }
 
-    private HostBotChannelStatus? Status => BackgroundValue;
+    private HostBotChannelStatus? _status => BackgroundValue;
 
     protected override object? BackgroundLoadKey =>
         string.IsNullOrWhiteSpace(HostLogin) ? null : HostLogin.Trim().ToLowerInvariant();
 
-    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct) =>
-        HostBotStatus.GetStatusAsync(HostLogin, ct);
+    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct)
+    {
+        return _hostBotStatus.GetStatusAsync(HostLogin, ct);
+    }
 
-    private bool FollowerEligibilityAvailable =>
-        Status?.ModeratorState == HostBotModeratorState.IsModerator;
+    private bool _followerEligibilityAvailable =>
+        _status?.ModeratorState == HostBotModeratorState.IsModerator;
 
-    private string FollowerEligibilityTitle =>
+    private string _followerEligibilityTitle =>
         IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
-        : FollowerEligibilityAvailable ? "Followers can enter."
+        : _followerEligibilityAvailable ? "Followers can enter."
         : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
-        : Status?.ModeratorStatusMessage
+        : _status?.ModeratorStatusMessage
             ?? "Follower-only giveaways are not ready for this channel.";
 
     private async Task OnEligibilityChangedAsync(ChangeEventArgs args)
@@ -82,8 +84,10 @@ public partial class PointsEligibilitySelector
             return;
         }
 
-        if (mode == PointsEligibilityMode.Followers && !FollowerEligibilityAvailable)
+        if (mode == PointsEligibilityMode.Followers && !_followerEligibilityAvailable)
+        {
             return;
+        }
 
         await ValueChanged.InvokeAsync(mode);
     }

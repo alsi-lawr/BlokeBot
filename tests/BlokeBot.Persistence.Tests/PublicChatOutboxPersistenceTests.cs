@@ -9,7 +9,7 @@ namespace BlokeBot.Persistence.Tests;
 
 public sealed class PublicChatOutboxPersistenceTests
 {
-    private const string DeduplicationKey =
+    private const string _deduplicationKey =
         "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
 
     [Test]
@@ -24,7 +24,7 @@ public sealed class PublicChatOutboxPersistenceTests
                 {
                     Channel = "streamer",
                     Message = "durable message",
-                    DeduplicationKey = DeduplicationKey,
+                    DeduplicationKey = _deduplicationKey,
                     CreatedAtUtc = now,
                     ExpiresAtUtc = now.AddSeconds(30),
                     NextAttemptAtUtc = now.AddSeconds(5),
@@ -39,7 +39,7 @@ public sealed class PublicChatOutboxPersistenceTests
             .SingleAsync();
         row.Channel.ShouldBe("streamer");
         row.Message.ShouldBe("durable message");
-        row.DeduplicationKey.ShouldBe(DeduplicationKey);
+        row.DeduplicationKey.ShouldBe(_deduplicationKey);
         row.CreatedAtUtc.ShouldBe(now);
         row.ExpiresAtUtc.ShouldBe(now.AddSeconds(30));
         row.NextAttemptAtUtc.ShouldBe(now.AddSeconds(5));
@@ -88,7 +88,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      NextAttemptAtUtc,
                      Status, AttemptCount)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                    ('streamer', 'message', {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                      {now}, 'Unknown', 0)
                 """
             )
@@ -101,7 +101,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      NextAttemptAtUtc,
                      Status, AttemptCount, SafePreSendFailureCount)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                    ('streamer', 'message', {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                      {now}, 'Pending', 0,
                      -1)
                 """
@@ -116,7 +116,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      Status, AttemptCount, SendStartedAtUtc, CompletedAtUtc,
                      FailurePhase, RejectionCode)
                 VALUES
-                    ('streamer', NULL, {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                    ('streamer', NULL, {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                      {now}, 'Rejected', 0,
                      {now}, {now}, 'Send', 'followers_only')
                 """
@@ -130,7 +130,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      NextAttemptAtUtc,
                      Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
                 VALUES
-                    ('streamer', 'must be redacted', {DeduplicationKey}, {now},
+                    ('streamer', 'must be redacted', {_deduplicationKey}, {now},
                      {now.AddSeconds(30)}, {now},
                      'Unexpected', 0, {now}, 'Preparation', 'System.InvalidOperationException')
                 """
@@ -144,7 +144,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      NextAttemptAtUtc,
                      Status, AttemptCount, ClaimToken)
                 VALUES
-                    ('streamer', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                    ('streamer', 'message', {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                      {now}, 'Pending', 0,
                      {Guid.NewGuid()})
                 """
@@ -158,7 +158,7 @@ public sealed class PublicChatOutboxPersistenceTests
                      NextAttemptAtUtc,
                      Status, AttemptCount)
                 VALUES
-                    ('   ', 'message', {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                    ('   ', 'message', {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                      {now}, 'Pending', 0)
                 """
             )
@@ -267,8 +267,9 @@ public sealed class PublicChatOutboxPersistenceTests
         string message,
         Guid claimToken,
         DateTime now
-    ) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
+    )
+    {
+        return db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO public_chat_outbox
                 (Channel, Message, DeduplicationKey, CreatedAtUtc, ExpiresAtUtc,
@@ -276,9 +277,10 @@ public sealed class PublicChatOutboxPersistenceTests
                  Status, AttemptCount, SafePreSendFailureCount, ClaimToken, ClaimSlot,
                  ClaimExpiresAtUtc)
             VALUES
-                ('streamer', {message}, {DeduplicationKey}, {now}, {now.AddSeconds(30)},
+                ('streamer', {message}, {_deduplicationKey}, {now}, {now.AddSeconds(30)},
                  {now}, 'Claimed', 0,
                  0, {claimToken}, 1, {now.AddMinutes(5)})
             """
         );
+    }
 }

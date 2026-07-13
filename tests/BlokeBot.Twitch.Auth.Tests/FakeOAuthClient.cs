@@ -14,13 +14,18 @@ internal sealed class FakeOAuthClient : ITwitchOAuthClient
 
     public int RefreshCalls { get; private set; }
 
-    public Uri BuildAuthorizeUri(string state) =>
-        new($"https://id.twitch.tv/oauth2/authorize?state={state}");
+    public Uri BuildAuthorizeUri(string state)
+    {
+        return new($"https://id.twitch.tv/oauth2/authorize?state={state}");
+    }
 
     public Task<TwitchTokenSet> ExchangeCodeAsync(
         string code,
         CancellationToken cancellationToken
-    ) => Task.FromResult(ExchangeResult);
+    )
+    {
+        return Task.FromResult(ExchangeResult);
+    }
 
     public Task<TwitchTokenSet> RefreshAsync(
         string refreshToken,
@@ -31,6 +36,8 @@ internal sealed class FakeOAuthClient : ITwitchOAuthClient
         return Task.FromResult(RefreshResult);
     }
 
-    public Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken) =>
-        Task.FromResult(ValidateResult);
+    public Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(ValidateResult);
+    }
 }

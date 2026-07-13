@@ -2,9 +2,9 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAccessor
 {
-    private readonly object gate = new();
-    private TwitchBotRuntimeStatus current = new(false, false, []);
-    private long activeEventSubScopeId;
+    private readonly object _gate = new();
+    private TwitchBotRuntimeStatus _current = new(false, false, []);
+    private long _activeEventSubScopeId;
 
     public event Action? Changed;
 
@@ -12,17 +12,19 @@ internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAcces
     {
         get
         {
-            lock (gate)
-                return current;
+            lock (_gate)
+            {
+                return _current;
+            }
         }
     }
 
     public void SetAuthorized(bool isAuthorized)
     {
         Action? changed;
-        lock (gate)
+        lock (_gate)
         {
-            current = current with { IsAuthorized = isAuthorized };
+            _current = _current with { IsAuthorized = isAuthorized };
             changed = Changed;
         }
 
@@ -32,11 +34,11 @@ internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAcces
     public void SetConnected(bool isConnected, IReadOnlyList<string> channels)
     {
         Action? changed;
-        lock (gate)
+        lock (_gate)
         {
-            current = current with
+            _current = _current with
             {
-                IsAuthorized = isConnected || current.IsAuthorized,
+                IsAuthorized = isConnected || _current.IsAuthorized,
                 IsConnected = isConnected,
                 ConnectedChannels = isConnected ? channels : [],
             };
@@ -48,8 +50,10 @@ internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAcces
 
     internal void ActivateEventSubScope(long scopeId)
     {
-        lock (gate)
-            activeEventSubScopeId = scopeId;
+        lock (_gate)
+        {
+            _activeEventSubScopeId = scopeId;
+        }
     }
 
     internal void SetEventSubStatus(
@@ -59,12 +63,14 @@ internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAcces
     )
     {
         Action? changed;
-        lock (gate)
+        lock (_gate)
         {
-            if (activeEventSubScopeId != scopeId)
+            if (_activeEventSubScopeId != scopeId)
+            {
                 return;
+            }
 
-            current = current with
+            _current = _current with
             {
                 IsAuthorized = isAuthorized || connectedChannels.Count > 0,
                 IsConnected = connectedChannels.Count > 0,
@@ -79,13 +85,15 @@ internal sealed class TwitchBotRuntimeStatusStore : ITwitchBotRuntimeStatusAcces
     internal void DeactivateEventSubScope(long scopeId)
     {
         Action? changed;
-        lock (gate)
+        lock (_gate)
         {
-            if (activeEventSubScopeId != scopeId)
+            if (_activeEventSubScopeId != scopeId)
+            {
                 return;
+            }
 
-            activeEventSubScopeId = 0;
-            current = current with { IsConnected = false, ConnectedChannels = [] };
+            _activeEventSubScopeId = 0;
+            _current = _current with { IsConnected = false, ConnectedChannels = [] };
             changed = Changed;
         }
 

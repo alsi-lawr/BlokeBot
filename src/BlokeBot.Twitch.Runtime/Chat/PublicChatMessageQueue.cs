@@ -18,9 +18,9 @@ internal sealed class PublicChatMessageQueue(
     ILogger<PublicChatMessageQueue> log
 )
 {
-    private static readonly TimeSpan ClaimContentionDelay = TimeSpan.FromMilliseconds(25);
-    private static readonly TimeSpan ClaimLease = TimeSpan.FromMinutes(5);
-    private readonly Channel<bool> wakeSignals = Channel.CreateBounded<bool>(
+    private static readonly TimeSpan _claimContentionDelay = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan _claimLease = TimeSpan.FromMinutes(5);
+    private readonly Channel<bool> _wakeSignals = Channel.CreateBounded<bool>(
         new BoundedChannelOptions(1)
         {
             SingleReader = true,
@@ -28,7 +28,7 @@ internal sealed class PublicChatMessageQueue(
             FullMode = BoundedChannelFullMode.DropWrite,
         }
     );
-    private int running;
+    private int _running;
 
     public async ValueTask<PublicChatEnqueueOutcome> EnqueueAsync(
         PublicChatEnqueueCommand command,
@@ -40,13 +40,17 @@ internal sealed class PublicChatMessageQueue(
             string.IsNullOrWhiteSpace(command.Channel)
             || string.IsNullOrWhiteSpace(command.Message)
         )
+        {
             return new PublicChatEnqueueOutcome.Rejected();
+        }
 
         var parts = TwitchChatMessageSplitter
-            .Split(command.Message, MaxMessageLength)
+            .Split(command.Message, _maxMessageLength)
             .ToImmutableArray();
         if (parts.IsDefaultOrEmpty)
+        {
             return new PublicChatEnqueueOutcome.Rejected();
+        }
 
         var items = parts
             .Select(part =>
@@ -71,15 +75,19 @@ internal sealed class PublicChatMessageQueue(
             cancellationToken
         );
         if (outcome is PublicChatEnqueueOutcome.Accepted)
-            _ = wakeSignals.Writer.TryWrite(true);
+        {
+            _ = _wakeSignals.Writer.TryWrite(true);
+        }
 
         return outcome;
     }
 
     internal async Task RunAsync(CancellationToken cancellationToken)
     {
-        if (Interlocked.Exchange(ref running, 1) != 0)
+        if (Interlocked.Exchange(ref _running, 1) != 0)
+        {
             throw new InvalidOperationException("The public chat outbox worker is already running.");
+        }
 
         try
         {
@@ -89,9 +97,9 @@ internal sealed class PublicChatMessageQueue(
                 var nextBacklogAlert = await ObserveBacklogAsync(now, cancellationToken);
                 var outcome = await outbox.TryClaimNextAsync(
                     now,
-                    now + ClaimLease,
-                    SendInterval,
-                    DuplicateCooldown,
+                    now + _claimLease,
+                    _sendInterval,
+                    _duplicateCooldown,
                     cancellationToken
                 );
                 switch (outcome)
@@ -118,12 +126,12 @@ internal sealed class PublicChatMessageQueue(
                         }
                         else
                         {
-                            _ = await wakeSignals.Reader.ReadAsync(cancellationToken);
+                            _ = await _wakeSignals.Reader.ReadAsync(cancellationToken);
                         }
                         break;
                     case PublicChatClaimOutcome.Contended:
                         await WaitForSignalOrScheduledWakeAsync(
-                            ClaimContentionDelay,
+                            _claimContentionDelay,
                             cancellationToken
                         );
                         break;
@@ -137,7 +145,7 @@ internal sealed class PublicChatMessageQueue(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
         {
-            Interlocked.Exchange(ref running, 0);
+            Interlocked.Exchange(ref _running, 0);
         }
     }
 
@@ -196,7 +204,7 @@ internal sealed class PublicChatMessageQueue(
                     outbox.BeginSendAsync(
                         message,
                         sendStartedAt,
-                        sendStartedAt + ClaimLease,
+                        sendStartedAt + _claimLease,
                         cancellationToken
                     ),
                 cancellationToken
@@ -332,13 +340,16 @@ internal sealed class PublicChatMessageQueue(
         }
 
         if (recorded is not PublicChatClaimUpdate.Expired)
+        {
             LogOutcome(message, outcome);
+        }
     }
 
     private void LogOutcome(
         PublicChatClaimedMessage message,
         PublicChatDeliveryOutcome outcome
-    ) =>
+    )
+    {
         outcome.Match(
             static _ => { },
             transient =>
@@ -370,6 +381,7 @@ internal sealed class PublicChatMessageQueue(
                     unexpected.Diagnostic
                 )
         );
+    }
 
     private void LogFailure(
         LogLevel level,
@@ -405,14 +417,14 @@ internal sealed class PublicChatMessageQueue(
         var alerts = backlogMonitor.CaptureAlerts(
             pending,
             now,
-            QueueStuckThreshold,
+            _queueStuckThreshold,
             alertDispatcher.HasObservers
         );
         await NotifyQueueAlertsAsync(alerts);
         return backlogMonitor.NextAlertDelay(
             pending,
             now,
-            QueueStuckThreshold,
+            _queueStuckThreshold,
             alertDispatcher.HasObservers
         );
     }
@@ -436,8 +448,10 @@ internal sealed class PublicChatMessageQueue(
         CancellationToken cancellationToken
     )
     {
-        if (delay <= TimeSpan.Zero || wakeSignals.Reader.TryRead(out _))
+        if (delay <= TimeSpan.Zero || _wakeSignals.Reader.TryRead(out _))
+        {
             return;
+        }
 
         var scheduledWakeSignals = Channel.CreateBounded<bool>(
             new BoundedChannelOptions(1)
@@ -451,10 +465,7 @@ internal sealed class PublicChatMessageQueue(
             cancellationToken
         );
         using var wakeTimer = timeProvider.CreateTimer(
-            static state =>
-            {
-                _ = ((ChannelWriter<bool>)state!).TryWrite(true);
-            },
+            static state => _ = ((ChannelWriter<bool>)state!).TryWrite(true),
             scheduledWakeSignals.Writer,
             delay,
             Timeout.InfiniteTimeSpan
@@ -462,7 +473,7 @@ internal sealed class PublicChatMessageQueue(
         var scheduledWake = scheduledWakeSignals.Reader
             .ReadAsync(waitCancellation.Token)
             .AsTask();
-        var signal = wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
+        var signal = _wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
         var completed = await Task.WhenAny(scheduledWake, signal);
         await waitCancellation.CancelAsync();
         _ = await completed;
@@ -484,7 +495,7 @@ internal sealed class PublicChatMessageQueue(
                     return result;
                 case PublicChatClaimUpdate.Contended:
                     await WaitForSignalOrScheduledWakeAsync(
-                        ClaimContentionDelay,
+                        _claimContentionDelay,
                         cancellationToken
                     );
                     break;
@@ -496,13 +507,13 @@ internal sealed class PublicChatMessageQueue(
         }
     }
 
-    private TimeSpan SendInterval =>
+    private TimeSpan _sendInterval =>
         TimeSpan.FromSeconds(Math.Max(0, settings.ChatMessageSendIntervalSeconds));
 
-    private TimeSpan DuplicateCooldown =>
+    private TimeSpan _duplicateCooldown =>
         TimeSpan.FromSeconds(Math.Max(0, settings.DuplicateChatMessageCooldownSeconds));
 
-    private TimeSpan QueueStuckThreshold =>
+    private TimeSpan _queueStuckThreshold =>
         TimeSpan.FromSeconds(Math.Max(0, settings.PublicChatQueueAlerts.StuckAfterSeconds));
 
     private void ReportAlertEscalation(
@@ -553,17 +564,24 @@ internal sealed class PublicChatMessageQueue(
         );
     }
 
-    private int MaxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
+    private int _maxMessageLength => Math.Max(0, settings.MaxChatMessageLength);
 
-    private DateTimeOffset UtcNow() => timeProvider.GetUtcNow();
+    private DateTimeOffset UtcNow()
+    {
+        return timeProvider.GetUtcNow();
+    }
 
-    private static TimeSpan Min(TimeSpan left, TimeSpan right) =>
-        left <= right ? left : right;
+    private static TimeSpan Min(TimeSpan left, TimeSpan right)
+    {
+        return left <= right ? left : right;
+    }
 }
 
 internal sealed class PublicChatOutboxWorker(PublicChatMessageQueue queue)
     : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken) =>
-        queue.RunAsync(stoppingToken);
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        return queue.RunAsync(stoppingToken);
+    }
 }

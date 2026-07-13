@@ -2,10 +2,10 @@
 
 <button class="@Class"
         type="button"
-        disabled="@(Disabled || opening)"
+        disabled="@(Disabled || _opening)"
         @onclick="OpenAsync">
-    @(opening && !string.IsNullOrWhiteSpace(OpeningText) ? OpeningText : null)
-    @if (!opening || string.IsNullOrWhiteSpace(OpeningText))
+    @(_opening && !string.IsNullOrWhiteSpace(OpeningText) ? OpeningText : null)
+    @if (!_opening || string.IsNullOrWhiteSpace(OpeningText))
     {
         @ChildContent
     }

@@ -55,21 +55,27 @@ public sealed class TwitchHelixApiClientTests
         channels.Select(channel => channel.BroadcasterLogin).ShouldBe(["one", "two"]);
     }
 
-    private static HttpResponseMessage JsonResponse(string json) =>
-        new(HttpStatusCode.OK)
+    private static HttpResponseMessage JsonResponse(string json)
+    {
+        return new(HttpStatusCode.OK)
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
+    }
 
     private sealed class ScriptedHttpClientFactory : IHttpClientFactory
     {
-        private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> responses = new();
+        private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> _responses = new();
 
-        public void Respond(Func<HttpRequestMessage, HttpResponseMessage> response) =>
-            responses.Enqueue(response);
+        public void Respond(Func<HttpRequestMessage, HttpResponseMessage> response)
+        {
+            _responses.Enqueue(response);
+        }
 
-        public HttpClient CreateClient(string name) =>
-            new(new Handler(responses), disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler(_responses), disposeHandler: false);
+        }
 
         private sealed class Handler(Queue<Func<HttpRequestMessage, HttpResponseMessage>> responses)
             : HttpMessageHandler

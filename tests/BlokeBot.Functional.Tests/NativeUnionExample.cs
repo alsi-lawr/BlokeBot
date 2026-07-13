@@ -30,7 +30,10 @@ public abstract record SubmissionOutcome
             Func<Accepted, TResult> accepted,
             Func<Deferred, TResult> deferred,
             Func<Rejected, TResult> rejected
-        ) => accepted(this);
+        )
+        {
+            return accepted(this);
+        }
 
         private protected override void Seal()
         {
@@ -59,7 +62,10 @@ public abstract record SubmissionOutcome
             Func<Accepted, TResult> accepted,
             Func<Deferred, TResult> deferred,
             Func<Rejected, TResult> rejected
-        ) => deferred(this);
+        )
+        {
+            return deferred(this);
+        }
 
         private protected override void Seal()
         {
@@ -80,7 +86,10 @@ public abstract record SubmissionOutcome
             Func<Accepted, TResult> accepted,
             Func<Deferred, TResult> deferred,
             Func<Rejected, TResult> rejected
-        ) => rejected(this);
+        )
+        {
+            return rejected(this);
+        }
 
         private protected override void Seal()
         {
@@ -90,10 +99,12 @@ public abstract record SubmissionOutcome
 
 public static class SubmissionOutcomeDescription
 {
-    public static string Describe(SubmissionOutcome outcome) =>
-        outcome.Match(
+    public static string Describe(SubmissionOutcome outcome)
+    {
+        return outcome.Match(
             accepted => $"Accepted: {accepted.Receipt}",
             deferred => $"Deferred: {deferred.RetryAfter.TotalMinutes:0} minutes",
             rejected => $"Rejected: {rejected.Reason}"
         );
+    }
 }

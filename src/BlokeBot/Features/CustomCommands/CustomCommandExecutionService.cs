@@ -25,7 +25,9 @@ public sealed class CustomCommandExecutionService(
         var hostLogin = LoginName.Parse(context.Message.Channel).Value;
         var alias = CommandAliasNormalizer.Normalize(context.CommandName);
         if (hostLogin.Length == 0 || alias.Length == 0)
+        {
             return false;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
@@ -34,7 +36,9 @@ public sealed class CustomCommandExecutionService(
             .Select(x => new { x.Id, x.EnabledFeatures })
             .SingleOrDefaultAsync(ct);
         if (host is null || !HasCustomCommands(host.EnabledFeatures))
+        {
             return false;
+        }
 
         var commandId = await db
             .CustomCommandAliases.AsNoTracking()
@@ -42,7 +46,9 @@ public sealed class CustomCommandExecutionService(
             .Select(x => (int?)x.CustomCommandId)
             .FirstOrDefaultAsync(ct);
         if (commandId is null)
+        {
             return false;
+        }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var command = await db
@@ -51,13 +57,19 @@ public sealed class CustomCommandExecutionService(
             .ThenInclude(x => x!.Variants)
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
+        {
             return true;
+        }
 
         if (command.ModeratorOnly && !TwitchModeratorPolicy.IsModerator(context.Message))
+        {
             return true;
+        }
 
         if (!cooldowns.TryRecord(command.Id, command.CooldownScope, context.Message.Login, Cooldown(command)))
+        {
             return true;
+        }
 
         long? count = null;
         if (command.Action is CounterCustomCommandAction counterAction)
@@ -65,12 +77,16 @@ public sealed class CustomCommandExecutionService(
             await db.Entry(counterAction).Reference(x => x.Counter).LoadAsync(ct);
             count = IncrementCounter(counterAction);
             if (count is null)
+            {
                 return true;
+            }
         }
 
         var selectedMessage = messageSelector.SelectMessage(command.Action.MessageLibraryEntry);
         if (selectedMessage is null)
+        {
             return true;
+        }
 
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -92,13 +108,17 @@ public sealed class CustomCommandExecutionService(
     private long? IncrementCounter(CounterCustomCommandAction action)
     {
         if (action.Counter is null)
+        {
             return null;
+        }
 
         action.Counter.Value++;
         action.Counter.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
         return action.Counter.Value;
     }
 
-    private static bool HasCustomCommands(HostFeatureFlags features) =>
-        (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+    private static bool HasCustomCommands(HostFeatureFlags features)
+    {
+        return (features & HostFeatureFlags.CustomCommands) == HostFeatureFlags.CustomCommands;
+    }
 }

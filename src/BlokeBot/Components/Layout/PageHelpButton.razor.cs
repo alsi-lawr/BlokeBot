@@ -42,15 +42,15 @@ namespace BlokeBot.Components.Layout;
 
 public partial class PageHelpButton
 {
-    private bool isOpen;
+    private bool _isOpen;
 
-    private HelpPage? CurrentHelp => HelpForPath(CurrentPath);
+    private HelpPage? _currentHelp => HelpForPath(_currentPath);
 
-    private string CurrentPath
+    private string _currentPath
     {
         get
         {
-            var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var relative = _navigation.ToBaseRelativePath(_navigation.Uri);
             var path = relative.Split('?', '#')[0].Trim('/');
             return string.IsNullOrWhiteSpace(path) ? "/" : "/" + path;
         }
@@ -58,41 +58,49 @@ public partial class PageHelpButton
 
     protected override void OnInitialized()
     {
-        Navigation.LocationChanged += OnLocationChanged;
+        _navigation.LocationChanged += OnLocationChanged;
     }
 
     public void Dispose()
     {
-        Navigation.LocationChanged -= OnLocationChanged;
+        _navigation.LocationChanged -= OnLocationChanged;
     }
 
-    private void Close() => isOpen = false;
+    private void Close()
+    {
+        _isOpen = false;
+    }
 
-    private void Toggle() => isOpen = !isOpen;
+    private void Toggle()
+    {
+        _isOpen = !_isOpen;
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
         _ = InvokeAsync(() =>
         {
-            isOpen = false;
+            _isOpen = false;
             StateHasChanged();
         });
     }
 
-    private static HelpPage? HelpForPath(string path) =>
-        path switch
+    private static HelpPage? HelpForPath(string path)
+    {
+        return path switch
         {
-            "/" => HomeHelp,
-            "/guessing" => GuessingDashboardHelp,
-            "/guessing/settings" => GuessingSettingsHelp,
-            "/points" => PointsDashboardHelp,
-            "/points/settings" => PointsSettingsHelp,
-            "/custom-commands/settings" => CustomCommandsHelp,
-            "/host" => HostConfigHelp,
+            "/" => _homeHelp,
+            "/guessing" => _guessingDashboardHelp,
+            "/guessing/settings" => _guessingSettingsHelp,
+            "/points" => _pointsDashboardHelp,
+            "/points/settings" => _pointsSettingsHelp,
+            "/custom-commands/settings" => _customCommandsHelp,
+            "/host" => _hostConfigHelp,
             _ => null,
         };
+    }
 
-    private static readonly string[] TemplateVariableItems =
+    private static readonly string[] _templateVariableItems =
     [
         "<strong>Start reply</strong>: <code>{round}</code>, <code>{options}</code>",
         "<strong>Guess option reply</strong>: <code>{name}</code>, <code>{login}</code>",
@@ -104,7 +112,7 @@ public partial class PageHelpButton
         "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong>: no live details",
     ];
 
-    private static readonly HelpPage HomeHelp = new(
+    private static readonly HelpPage _homeHelp = new(
         "Home",
         [
             new(
@@ -120,7 +128,7 @@ public partial class PageHelpButton
         ]
     );
 
-    private static readonly HelpPage HostConfigHelp = new(
+    private static readonly HelpPage _hostConfigHelp = new(
         "Channel setup",
         [
             new(
@@ -136,7 +144,7 @@ public partial class PageHelpButton
         ]
     );
 
-    private static readonly HelpPage GuessingDashboardHelp = new(
+    private static readonly HelpPage _guessingDashboardHelp = new(
         "Guessing game dashboard",
         [
             new(
@@ -157,7 +165,7 @@ public partial class PageHelpButton
         ]
     );
 
-    private static readonly HelpPage GuessingSettingsHelp = new(
+    private static readonly HelpPage _guessingSettingsHelp = new(
         "Guessing game settings",
         [
             new(
@@ -173,12 +181,12 @@ public partial class PageHelpButton
             new(
                 "Add live details to replies",
                 "Words in braces are replaced with details from the current round or viewer.",
-                TemplateVariableItems
+                _templateVariableItems
             ),
         ]
     );
 
-    private static readonly HelpPage PointsDashboardHelp = new(
+    private static readonly HelpPage _pointsDashboardHelp = new(
         "Points dashboard",
         [
             new(
@@ -200,7 +208,7 @@ public partial class PageHelpButton
         ]
     );
 
-    private static readonly HelpPage PointsSettingsHelp = new(
+    private static readonly HelpPage _pointsSettingsHelp = new(
         "Points settings",
         [
             new(
@@ -229,7 +237,7 @@ public partial class PageHelpButton
         ]
     );
 
-    private static readonly HelpPage CustomCommandsHelp = new(
+    private static readonly HelpPage _customCommandsHelp = new(
         "Custom commands",
         [
             new(

@@ -2,7 +2,10 @@ namespace BlokeBot.Eventing;
 
 public readonly record struct ObserverBoundary
 {
-    private ObserverBoundary(string value) => Value = value;
+    private ObserverBoundary(string value)
+    {
+        Value = value;
+    }
 
     public string Value { get; }
 
@@ -12,12 +15,18 @@ public readonly record struct ObserverBoundary
         return new ObserverBoundary(value);
     }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }
 
 public readonly record struct ObserverEventIdentity
 {
-    private ObserverEventIdentity(string value) => Value = value;
+    private ObserverEventIdentity(string value)
+    {
+        Value = value;
+    }
 
     public string Value { get; }
 
@@ -27,12 +36,18 @@ public readonly record struct ObserverEventIdentity
         return new ObserverEventIdentity(value);
     }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }
 
 public readonly record struct ObserverIdentity
 {
-    private ObserverIdentity(string value) => Value = value;
+    private ObserverIdentity(string value)
+    {
+        Value = value;
+    }
 
     public string Value { get; }
 
@@ -48,12 +63,18 @@ public readonly record struct ObserverIdentity
         return Named(observerType.FullName ?? observerType.Name);
     }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }
 
 public readonly record struct ObserverCorrelationId
 {
-    private ObserverCorrelationId(string value) => Value = value;
+    private ObserverCorrelationId(string value)
+    {
+        Value = value;
+    }
 
     public string Value { get; }
 
@@ -63,7 +84,10 @@ public readonly record struct ObserverCorrelationId
         return new ObserverCorrelationId(value);
     }
 
-    public override string ToString() => Value;
+    public override string ToString()
+    {
+        return Value;
+    }
 }
 
 public interface IObserverDeadLetterPayload;
@@ -94,18 +118,18 @@ public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
 
     public sealed record BoundedRetry : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
-        private int attemptLimit;
+        private int _attemptLimit;
 
         /// <summary>
         /// Gets the total invocation limit, including the first attempt.
         /// </summary>
         public required int AttemptLimit
         {
-            get => attemptLimit;
+            get => _attemptLimit;
             init
             {
                 ArgumentOutOfRangeException.ThrowIfLessThan(value, 2);
-                attemptLimit = value;
+                _attemptLimit = value;
             }
         }
 

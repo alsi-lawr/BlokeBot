@@ -5,15 +5,17 @@ namespace BlokeBot.Features.CustomCommands;
 
 public sealed class CustomCommandCooldownStore(TimeProvider clock)
 {
-    private readonly object gate = new();
-    private readonly Dictionary<CooldownKey, DateTimeOffset> blockedUntil = [];
+    private readonly object _gate = new();
+    private readonly Dictionary<CooldownKey, DateTimeOffset> _blockedUntil = [];
 
     internal int EntryCount
     {
         get
         {
-            lock (gate)
-                return blockedUntil.Count;
+            lock (_gate)
+            {
+                return _blockedUntil.Count;
+            }
         }
     }
 
@@ -26,11 +28,13 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
     {
         var now = clock.GetUtcNow();
 
-        lock (gate)
+        lock (_gate)
         {
             PruneExpired(now);
             if (cooldown <= TimeSpan.Zero)
+            {
                 return true;
+            }
 
             var key = new CooldownKey(
                 commandId,
@@ -38,10 +42,12 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
                     ? TwitchLogin.Normalize(userLogin)
                     : string.Empty
             );
-            if (blockedUntil.TryGetValue(key, out var expiry) && expiry > now)
+            if (_blockedUntil.TryGetValue(key, out var expiry) && expiry > now)
+            {
                 return false;
+            }
 
-            blockedUntil[key] = now + cooldown;
+            _blockedUntil[key] = now + cooldown;
             return true;
         }
     }
@@ -49,12 +55,14 @@ public sealed class CustomCommandCooldownStore(TimeProvider clock)
     private void PruneExpired(DateTimeOffset now)
     {
         foreach (
-            var key in blockedUntil
+            var key in _blockedUntil
                 .Where(pair => pair.Value <= now)
                 .Select(pair => pair.Key)
                 .ToArray()
         )
-            blockedUntil.Remove(key);
+        {
+            _blockedUntil.Remove(key);
+        }
     }
 
     private readonly record struct CooldownKey(int CommandId, string UserLogin);

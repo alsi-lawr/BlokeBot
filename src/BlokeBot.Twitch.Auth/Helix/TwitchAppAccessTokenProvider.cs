@@ -6,22 +6,22 @@ public sealed class TwitchAppAccessTokenProvider(
     TwitchBotIdentity identity
 )
 {
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private readonly HttpClient http = factory.CreateClient("twitch-oauth");
-    private string? accessToken;
-    private DateTimeOffset expiresAtUtc;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly HttpClient _http = factory.CreateClient("twitch-oauth");
+    private string? _accessToken;
+    private DateTimeOffset _expiresAtUtc;
 
     public async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
-        await gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken);
         try
         {
             if (
-                !string.IsNullOrWhiteSpace(accessToken)
-                && expiresAtUtc > DateTimeOffset.UtcNow.AddMinutes(1)
+                !string.IsNullOrWhiteSpace(_accessToken)
+                && _expiresAtUtc > DateTimeOffset.UtcNow.AddMinutes(1)
             )
             {
-                return accessToken;
+                return _accessToken;
             }
 
             var form = new Dictionary<string, string>
@@ -31,7 +31,7 @@ public sealed class TwitchAppAccessTokenProvider(
                 ["grant_type"] = "client_credentials",
             };
 
-            using var response = await http.PostAsync(
+            using var response = await _http.PostAsync(
                 "https://id.twitch.tv/oauth2/token",
                 new FormUrlEncodedContent(form),
                 cancellationToken
@@ -43,15 +43,17 @@ public sealed class TwitchAppAccessTokenProvider(
             );
 
             if (string.IsNullOrWhiteSpace(payload?.AccessToken))
+            {
                 throw new TwitchAppAccessTokenResponseException();
+            }
 
-            accessToken = payload.AccessToken;
-            expiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, payload.ExpiresIn));
-            return accessToken;
+            _accessToken = payload.AccessToken;
+            _expiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(Math.Max(60, payload.ExpiresIn));
+            return _accessToken;
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
         }
     }
 }

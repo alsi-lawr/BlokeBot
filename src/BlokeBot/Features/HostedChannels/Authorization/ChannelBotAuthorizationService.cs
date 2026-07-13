@@ -16,10 +16,14 @@ public sealed class ChannelBotAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null || host.ChannelBotAuthorizedAtUtc is null)
+        {
             return;
+        }
 
         if (IsCurrent(host.ChannelBotAuthorizedAtUtc, host.ChannelBotAuthorizedScopes))
+        {
             return;
+        }
 
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
@@ -36,7 +40,9 @@ public sealed class ChannelBotAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return ChannelBotAuthorizationResult.Failure("Channel setup was not found.");
+        }
 
         if (!GrantMatchesHost(host.TwitchUserId, host.Login, grant))
         {
@@ -66,7 +72,9 @@ public sealed class ChannelBotAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return;
+        }
 
         host.ChannelBotAuthorizedAtUtc = null;
         host.ChannelBotAuthorizedScopes = null;
@@ -74,17 +82,25 @@ public sealed class ChannelBotAuthorizationService(
         await changes.NotifyChangedAsync(ct);
     }
 
-    public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes) =>
-        authorizedAtUtc is not null && HasRequiredScopes(authorizedScopes);
+    public bool IsCurrent(DateTime? authorizedAtUtc, string? authorizedScopes)
+    {
+        return authorizedAtUtc is not null && HasRequiredScopes(authorizedScopes);
+    }
 
-    private bool HasRequiredScopes(string? authorizedScopes) =>
-        MissingRequiredScopes(SplitStoredScopes(authorizedScopes)).Length == 0;
+    private bool HasRequiredScopes(string? authorizedScopes)
+    {
+        return MissingRequiredScopes(SplitStoredScopes(authorizedScopes)).Length == 0;
+    }
 
-    private string[] MissingRequiredScopes(IEnumerable<string> grantedScopes) =>
-        TwitchScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
+    private string[] MissingRequiredScopes(IEnumerable<string> grantedScopes)
+    {
+        return TwitchScopeSet.Missing(grantedScopes, oauth.RequestedScopes());
+    }
 
-    private static IEnumerable<string> SplitStoredScopes(string? scopes) =>
-        (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    private static IEnumerable<string> SplitStoredScopes(string? scopes)
+    {
+        return (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    }
 
     private static bool GrantMatchesHost(
         string? hostTwitchUserId,
@@ -93,7 +109,9 @@ public sealed class ChannelBotAuthorizationService(
     )
     {
         if (!string.IsNullOrWhiteSpace(hostTwitchUserId))
+        {
             return string.Equals(hostTwitchUserId, grant.UserId, StringComparison.Ordinal);
+        }
 
         return LoginName.Parse(hostLogin) == grant.Login;
     }

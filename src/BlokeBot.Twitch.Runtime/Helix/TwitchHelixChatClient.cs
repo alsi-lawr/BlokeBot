@@ -11,8 +11,8 @@ public sealed class TwitchHelixChatClient(
     TwitchHelixApiClient helix
 )
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly HttpClient http = factory.CreateClient("twitch-helix");
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly HttpClient _http = factory.CreateClient("twitch-helix");
 
     public async Task<string> CreateChatMessageSubscriptionAsync(
         string accessToken,
@@ -36,11 +36,11 @@ public sealed class TwitchHelixChatClient(
             accessToken
         );
         request.Content = JsonContent.Create(payload);
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<TwitchEventSubSubscriptionResponse>(
-            JsonOptions,
+            _jsonOptions,
             cancellationToken
         );
 
@@ -61,9 +61,11 @@ public sealed class TwitchHelixChatClient(
             + $"?id={Uri.EscapeDataString(subscriptionId)}";
 
         using var request = CreateRequest(HttpMethod.Delete, uri, accessToken);
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
+        {
             return;
+        }
 
         response.EnsureSuccessStatusCode();
     }
@@ -90,12 +92,16 @@ public sealed class TwitchHelixChatClient(
         );
 
         if (string.IsNullOrWhiteSpace(broadcaster?.Id))
+        {
             throw new InvalidOperationException(
                 $"Twitch channel login '{channelLogin}' was not found."
             );
+        }
 
         if (string.IsNullOrWhiteSpace(botUser?.Id))
+        {
             throw new InvalidOperationException($"Twitch bot login '{botLogin}' was not found.");
+        }
 
         return new TwitchChatIdentitySet(broadcaster.Id, botUser.Id);
     }
@@ -121,11 +127,11 @@ public sealed class TwitchHelixChatClient(
             accessToken
         );
         request.Content = JsonContent.Create(payload);
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<TwitchChatMessageResponse>(
-            JsonOptions,
+            _jsonOptions,
             cancellationToken
         );
 
@@ -152,7 +158,7 @@ public sealed class TwitchHelixChatClient(
             );
         using var request = CreateRequest(HttpMethod.Post, uri, accessToken);
         request.Content = JsonContent.Create(new { message });
-        using var response = await http.SendAsync(request, cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         var responseBody =
             response.StatusCode == HttpStatusCode.NoContent
                 ? null
@@ -175,11 +181,15 @@ public sealed class TwitchHelixChatClient(
     )
     {
         if (response.Content is null)
+        {
             return null;
+        }
 
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(body))
+        {
             return null;
+        }
 
         const int maxLoggedBodyLength = 1000;
         return body.Length <= maxLoggedBodyLength ? body : body[..maxLoggedBodyLength];

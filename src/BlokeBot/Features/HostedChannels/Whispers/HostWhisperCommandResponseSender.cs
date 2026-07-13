@@ -36,7 +36,9 @@ public sealed class HostWhisperCommandResponseSender(
 
         var result = await TrySendWhisperAsync(sourceMessage, response.Message, cancellationToken);
         if (result.Outcome == HostWhisperSendOutcome.Sent)
+        {
             return;
+        }
 
         log.LogInformation(
             "Falling back to public chat response for {Login} in #{Channel}. Whisper outcome: {Outcome}; StatusCode: {StatusCode}; Detail: {Detail}.",
@@ -64,7 +66,9 @@ public sealed class HostWhisperCommandResponseSender(
         {
             var host = await ResolveHostAsync(sourceMessage.Channel, cancellationToken);
             if (host is null)
+            {
                 return new HostWhisperSendResult(HostWhisperSendOutcome.Disabled);
+            }
 
             var tokenStatus = await botAccounts.GetCustomBotTokenStatusAsync(
                 host.Id,
@@ -86,7 +90,9 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (string.IsNullOrWhiteSpace(recipientUserId))
+            {
                 return new HostWhisperSendResult(HostWhisperSendOutcome.RecipientUnavailable);
+            }
 
             var senderUserId = tokenStatus.Validation.UserId;
             if (string.Equals(senderUserId, recipientUserId, StringComparison.Ordinal))
@@ -105,7 +111,9 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (!reservation.Allowed)
+            {
                 return new HostWhisperSendResult(HostWhisperSendOutcome.QuotaExceeded);
+            }
 
             var result = await helix.SendWhisperAsync(
                 tokenStatus.AccessToken,
@@ -115,7 +123,9 @@ public sealed class HostWhisperCommandResponseSender(
                 cancellationToken
             );
             if (result.IsAccepted)
+            {
                 return new HostWhisperSendResult(HostWhisperSendOutcome.Sent);
+            }
 
             if (result.Status == TwitchWhisperSendStatus.RateLimited)
             {
@@ -156,7 +166,9 @@ public sealed class HostWhisperCommandResponseSender(
     {
         var login = TwitchLogin.Normalize(channel);
         if (string.IsNullOrWhiteSpace(login))
+        {
             return null;
+        }
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db
@@ -165,7 +177,9 @@ public sealed class HostWhisperCommandResponseSender(
             .Select(x => new { x.Id })
             .SingleOrDefaultAsync(cancellationToken);
         if (host is null)
+        {
             return null;
+        }
 
         var enabled = await db
             .HostBotAccountSettings.AsNoTracking()
@@ -192,7 +206,9 @@ public sealed class HostWhisperCommandResponseSender(
 
         var login = TwitchLogin.Normalize(sourceMessage.Login);
         if (string.IsNullOrWhiteSpace(login))
+        {
             return null;
+        }
 
         var resolved = await users.GetUsersByLoginAsync(
             new TwitchHelixRequestContext(identity.ClientId, accessToken),

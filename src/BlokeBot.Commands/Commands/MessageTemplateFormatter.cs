@@ -9,7 +9,9 @@ public static class MessageTemplateFormatter
     {
         var formatted = template;
         foreach (var (key, value) in values)
+        {
             formatted = formatted.Replace($"{{{key}}}", value, StringComparison.OrdinalIgnoreCase);
+        }
 
         return formatted;
     }

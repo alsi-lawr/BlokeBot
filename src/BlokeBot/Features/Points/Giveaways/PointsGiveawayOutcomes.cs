@@ -61,19 +61,28 @@ public sealed record PointsGiveawayDrawOutcome(
     public bool Success =>
         Kind is PointsGiveawayDrawOutcomeKind.NoEntrants or PointsGiveawayDrawOutcomeKind.Winners;
 
-    public static PointsGiveawayDrawOutcome Missing() =>
-        new(PointsGiveawayDrawOutcomeKind.Missing, null, []);
+    public static PointsGiveawayDrawOutcome Missing()
+    {
+        return new(PointsGiveawayDrawOutcomeKind.Missing, null, []);
+    }
 
-    public static PointsGiveawayDrawOutcome NotActive(PointsSettings settings) =>
-        new(PointsGiveawayDrawOutcomeKind.NotActive, settings, []);
+    public static PointsGiveawayDrawOutcome NotActive(PointsSettings settings)
+    {
+        return new(PointsGiveawayDrawOutcomeKind.NotActive, settings, []);
+    }
 
-    public static PointsGiveawayDrawOutcome NoEntrants(PointsSettings settings) =>
-        new(PointsGiveawayDrawOutcomeKind.NoEntrants, settings, []);
+    public static PointsGiveawayDrawOutcome NoEntrants(PointsSettings settings)
+    {
+        return new(PointsGiveawayDrawOutcomeKind.NoEntrants, settings, []);
+    }
 
     public static PointsGiveawayDrawOutcome WithWinners(
         PointsSettings settings,
         IReadOnlyList<PointsGiveawayWinnerPayout> winners
-    ) => new(PointsGiveawayDrawOutcomeKind.Winners, settings, winners);
+    )
+    {
+        return new(PointsGiveawayDrawOutcomeKind.Winners, settings, winners);
+    }
 }
 
 public enum PointsGiveawayCancelOutcomeKind

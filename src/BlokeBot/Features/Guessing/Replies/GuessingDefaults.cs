@@ -2,8 +2,9 @@ namespace BlokeBot.Features.Guessing.Replies;
 
 public static class GuessingDefaults
 {
-    public static ReplySettingsEditor Replies() =>
-        new()
+    public static ReplySettingsEditor Replies()
+    {
+        return new()
         {
             RoundStartedReply =
                 "{round} guessing is open. Vote with !guess <name>. Options: {options}.",
@@ -20,4 +21,5 @@ public static class GuessingDefaults
             WinnerReply = "{name} wins. Correct guesses: {winners}.{reward_text}",
             NoWinnersReply = "{name} wins. Nobody guessed correctly.",
         };
+    }
 }

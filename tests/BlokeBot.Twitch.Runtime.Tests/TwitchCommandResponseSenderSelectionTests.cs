@@ -67,6 +67,9 @@ public sealed class TwitchCommandResponseSenderSelectionTests
             TwitchChatMessage sourceMessage,
             TwitchCommandResponse response,
             CancellationToken cancellationToken
-        ) => ValueTask.CompletedTask;
+        )
+        {
+            return ValueTask.CompletedTask;
+        }
     }
 }

@@ -5,5 +5,8 @@ public abstract class EventNotifier<TKey>(EventBus<TKey> events, TKey key)
 {
     public ValueTask<ObserverFanOutOutcome> NotifyChangedAsync(
         CancellationToken cancellationToken
-    ) => events.PublishAsync(key, cancellationToken);
+    )
+    {
+        return events.PublishAsync(key, cancellationToken);
+    }
 }

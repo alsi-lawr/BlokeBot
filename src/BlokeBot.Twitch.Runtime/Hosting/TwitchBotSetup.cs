@@ -8,7 +8,9 @@ internal static class TwitchBotSetup
     public static string CreateOAuthStartUri(string redirectUri)
     {
         if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var uri))
+        {
             return "the bot OAuth start endpoint";
+        }
 
         var path = uri.AbsolutePath;
         var startPath = path.EndsWith("/callback", StringComparison.OrdinalIgnoreCase)

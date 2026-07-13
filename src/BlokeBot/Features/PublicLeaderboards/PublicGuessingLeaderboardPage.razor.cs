@@ -6,39 +6,39 @@ namespace BlokeBot.Features.PublicLeaderboards;
 
 public partial class PublicGuessingLeaderboardPage
 {
-    private const int PublicPageSize = 50;
+    private const int _publicPageSize = 50;
 
-    private PublicLeaderboardHost? host;
-    private GuessLeaderboardPage? leaderboard;
-    private bool loaded;
+    private PublicLeaderboardHost? _host;
+    private GuessLeaderboardPage? _leaderboard;
+    private bool _loaded;
 
     [Parameter]
     public string Channel { get; set; } = string.Empty;
 
-    private bool FeatureEnabled =>
-        host is not null
-        && (host.EnabledFeatures & HostFeatureFlags.Guessing) == HostFeatureFlags.Guessing;
+    private bool _featureEnabled =>
+        _host is not null
+        && (_host.EnabledFeatures & HostFeatureFlags.Guessing) == HostFeatureFlags.Guessing;
 
-    private string HeaderDescription =>
-        host is null
+    private string _headerDescription =>
+        _host is null
             ? "Read-only guessing results."
-            : $"Read-only guessing results for {host.DisplayName}.";
+            : $"Read-only guessing results for {_host.DisplayName}.";
 
     protected override async Task OnParametersSetAsync()
     {
-        loaded = false;
-        leaderboard = null;
-        host = await Hosts.FindAsync(Channel, CancellationToken.None);
+        _loaded = false;
+        _leaderboard = null;
+        _host = await _hosts.FindAsync(Channel, CancellationToken.None);
 
-        if (FeatureEnabled)
+        if (_featureEnabled)
         {
-            leaderboard = await History.LoadLeaderboardAsync(
-                host!.Id,
-                new GuessHistoryQuery { Page = 1, PageSize = PublicPageSize },
+            _leaderboard = await _history.LoadLeaderboardAsync(
+                _host!.Id,
+                new GuessHistoryQuery { Page = 1, PageSize = _publicPageSize },
                 CancellationToken.None
             );
         }
 
-        loaded = true;
+        _loaded = true;
     }
 }

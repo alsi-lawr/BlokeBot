@@ -51,13 +51,19 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
             );
 
         if (query.FromUtc is { } fromUtc)
+        {
             votes = votes.Where(x => x.GuessedAtUtc >= fromUtc);
+        }
 
         if (query.ToUtc is { } toUtc)
+        {
             votes = votes.Where(x => x.GuessedAtUtc < toUtc);
+        }
 
         if (query.ProfileId is { } profileId and > 0)
+        {
             votes = votes.Where(x => x.GuessRound!.GuessRoundProfileId == profileId);
+        }
 
         if (!string.IsNullOrWhiteSpace(query.Username))
         {
@@ -96,7 +102,9 @@ public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> 
             .ToListAsync(ct);
 
         for (var i = 0; i < entries.Count; i++)
+        {
             entries[i].Rank = ((page - 1) * pageSize) + i + 1;
+        }
 
         return new GuessLeaderboardPage
         {

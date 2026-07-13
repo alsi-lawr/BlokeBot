@@ -22,7 +22,9 @@ public sealed class AppCommandAliasResolver(IDbContextFactory<BlokeBotDbContext>
             .Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(ct);
         if (hostId is null)
+        {
             return null;
+        }
 
         var normalizedAlias = CommandAliasNormalizer.Normalize(alias);
         var resolution = await db

@@ -10,12 +10,14 @@ internal abstract record AnnouncementDeliveryPolicy
 
     internal TResult Match<TResult>(
         Func<RetryUntilExpiredThenSkip, TResult> retryUntilExpiredThenSkip
-    ) =>
-        this switch
+    )
+    {
+        return this switch
         {
             RetryUntilExpiredThenSkip policy => retryUntilExpiredThenSkip(policy),
             _ => throw new UnreachableException("Unknown announcement delivery policy."),
         };
+    }
 
     internal sealed record RetryUntilExpiredThenSkip : AnnouncementDeliveryPolicy
     {
@@ -49,8 +51,9 @@ internal static class AnnouncementDeliveryPolicyMapper
 {
     internal static AnnouncementDeliveryPolicy ToDomain(
         CustomAnnouncementDeliveryPolicy? policy
-    ) =>
-        policy switch
+    )
+    {
+        return policy switch
         {
             RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy retry =>
                 new AnnouncementDeliveryPolicy.RetryUntilExpiredThenSkip(
@@ -64,4 +67,5 @@ internal static class AnnouncementDeliveryPolicyMapper
                 "Unknown persisted custom announcement delivery policy."
             ),
         };
+    }
 }

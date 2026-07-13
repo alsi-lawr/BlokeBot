@@ -6,10 +6,16 @@ public sealed record BotAccountAuthorizationResult(
     IReadOnlyList<string> MissingScopes
 )
 {
-    public static BotAccountAuthorizationResult Success(string message) => new(true, message, []);
+    public static BotAccountAuthorizationResult Success(string message)
+    {
+        return new(true, message, []);
+    }
 
     public static BotAccountAuthorizationResult Failure(
         string message,
         IReadOnlyList<string>? missingScopes = null
-    ) => new(false, message, missingScopes ?? []);
+    )
+    {
+        return new(false, message, missingScopes ?? []);
+    }
 }

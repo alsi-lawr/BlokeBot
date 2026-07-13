@@ -7,7 +7,7 @@ namespace BlokeBot.Components;
 
 public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
 {
-    private readonly List<IDisposable> subscriptions = [];
+    private readonly List<IDisposable> _subscriptions = [];
 
     [CascadingParameter]
     protected Task<AuthenticationState> AuthenticationState { get; set; } =
@@ -37,7 +37,7 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     protected T TrackSubscription<T>(T subscription)
         where T : IDisposable
     {
-        subscriptions.Add(subscription);
+        _subscriptions.Add(subscription);
         return subscription;
     }
 
@@ -50,11 +50,15 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     protected virtual void Dispose(bool disposing)
     {
         if (!disposing)
+        {
             return;
+        }
 
-        foreach (var subscription in subscriptions.AsEnumerable().Reverse())
+        foreach (var subscription in _subscriptions.AsEnumerable().Reverse())
+        {
             subscription.Dispose();
+        }
 
-        subscriptions.Clear();
+        _subscriptions.Clear();
     }
 }

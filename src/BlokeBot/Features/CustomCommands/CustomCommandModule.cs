@@ -13,5 +13,8 @@ public sealed class CustomCommandModule(CustomCommandExecutionService execution)
         TwitchCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
-    ) => await execution.TryExecuteAsync(context, args, cancellationToken);
+    )
+    {
+        return await execution.TryExecuteAsync(context, args, cancellationToken);
+    }
 }

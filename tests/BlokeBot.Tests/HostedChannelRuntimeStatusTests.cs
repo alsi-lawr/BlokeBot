@@ -55,12 +55,14 @@ public sealed class HostedChannelRuntimeStatusTests
     private static ChannelBotAuthorizationService ChannelAuthorizationService(
         SqliteBlokeBotDbFactory dbFactory,
         params string[] scopes
-    ) =>
-        new(
+    )
+    {
+        return new(
             dbFactory,
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             ChannelOAuthService(scopes)
         );
+    }
 
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
@@ -71,7 +73,9 @@ public sealed class HostedChannelRuntimeStatusTests
         };
 
         for (var i = 0; i < scopes.Length; i++)
+        {
             values[$"TwitchBot:ChannelAuthorization:Scopes:{i}"] = scopes[i];
+        }
 
         return new(
             new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
@@ -103,16 +107,22 @@ public sealed class HostedChannelRuntimeStatusTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("Remote bot status should not be queried.");
+        )
+        {
+            throw new InvalidOperationException("Remote bot status should not be queried.");
+        }
     }
 
     private sealed class CountingHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
-        public int RequestCount => handler.RequestCount;
+        public int RequestCount => _handler.RequestCount;
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {

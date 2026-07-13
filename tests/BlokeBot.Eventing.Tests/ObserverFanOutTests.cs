@@ -7,11 +7,11 @@ namespace BlokeBot.Eventing.Tests;
 
 public sealed class ObserverFanOutTests
 {
-    private static readonly ObserverBoundary Boundary =
+    private static readonly ObserverBoundary _boundary =
         ObserverBoundary.Named("Test.ObserverFanOut");
-    private static readonly ObserverEventIdentity EventIdentity =
+    private static readonly ObserverEventIdentity _eventIdentity =
         ObserverEventIdentity.Named("TestEvent");
-    private static readonly ObserverCorrelationId CorrelationId =
+    private static readonly ObserverCorrelationId _correlationId =
         ObserverCorrelationId.Named("correlation-123");
 
     [Test]
@@ -296,7 +296,7 @@ public sealed class ObserverFanOutTests
         Should.Throw<ArgumentOutOfRangeException>(() =>
             new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
             {
-                Boundary = Boundary,
+                Boundary = _boundary,
                 AttemptLimit = 1,
             }
         );
@@ -308,56 +308,68 @@ public sealed class ObserverFanOutTests
         Should.Throw<ArgumentException>(() => ObserverCorrelationId.Named(" "));
     }
 
-    private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Continue() =>
-        new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.ContinueAndReport
+    private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Continue()
+    {
+        return new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.ContinueAndReport
         {
-            Boundary = Boundary,
+            Boundary = _boundary,
         };
+    }
 
     private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Retry(
         int attemptLimit
-    ) =>
-        new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
+    )
+    {
+        return new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
         {
-            Boundary = Boundary,
+            Boundary = _boundary,
             AttemptLimit = attemptLimit,
         };
+    }
 
     private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> DeadLetter(
         RecordingDeadLetterSink sink
-    ) =>
-        new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.DeadLetter
+    )
+    {
+        return new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.DeadLetter
         {
-            Boundary = Boundary,
+            Boundary = _boundary,
             Sink = sink,
         };
+    }
 
     private static ObserverFanOut<TestBoundary, TestEvent, TestDeadLetter> CreateFanOut(
         ObserverFailurePolicy<TestBoundary, TestDeadLetter> policy,
         RecordingReporter reporter
-    ) => new(policy, reporter, new FixedCorrelationIdProvider());
+    )
+    {
+        return new(policy, reporter, new FixedCorrelationIdProvider());
+    }
 
     private static ValueTask<ObserverFanOutOutcome> DispatchAsync(
         ObserverFanOut<TestBoundary, TestEvent, TestDeadLetter> fanOut,
         IReadOnlyList<TestObserver> observers,
         CancellationToken cancellationToken
-    ) =>
-        fanOut.DispatchAsync(
+    )
+    {
+        return fanOut.DispatchAsync(
             observers,
             _ =>
                 new ObserverDispatch<TestEvent, TestDeadLetter>
                 {
                     Event = new TestEvent("private chat text", "raw oauth payload"),
-                    EventIdentity = EventIdentity,
+                    EventIdentity = _eventIdentity,
                     DeadLetter = new TestDeadLetter("event-42"),
                 },
             observer => ObserverIdentity.Named(observer.Name),
             static (observer, _, token) => observer.InvokeAsync(token),
             cancellationToken
         );
+    }
 
-    private static TestObserver Observer(string name, Action operation) =>
-        new(
+    private static TestObserver Observer(string name, Action operation)
+    {
+        return new(
             name,
             _ =>
             {
@@ -365,13 +377,15 @@ public sealed class ObserverFanOutTests
                 return ValueTask.CompletedTask;
             }
         );
+    }
 
     private static TestObserver FailingObserver(
         string name,
         Exception exception,
         List<string> order
-    ) =>
-        new(
+    )
+    {
+        return new(
             name,
             _ =>
             {
@@ -379,6 +393,7 @@ public sealed class ObserverFanOutTests
                 return ValueTask.FromException(exception);
             }
         );
+    }
 
     private static void AssertFailure(
         ObserverFailureSummary summary,
@@ -388,10 +403,10 @@ public sealed class ObserverFanOutTests
         Type failureType
     )
     {
-        summary.Boundary.ShouldBe(Boundary);
-        summary.Event.ShouldBe(EventIdentity);
+        summary.Boundary.ShouldBe(_boundary);
+        summary.Event.ShouldBe(_eventIdentity);
         summary.Observer.ShouldBe(ObserverIdentity.Named(observer));
-        summary.CorrelationId.ShouldBe(CorrelationId);
+        summary.CorrelationId.ShouldBe(_correlationId);
         summary.Attempt.ShouldBe(attempt);
         summary.Classification.ShouldBe(classification);
         summary.FailureType.ShouldBe(failureType.FullName);
@@ -410,13 +425,15 @@ public sealed class ObserverFanOutTests
     {
         internal string Name { get; } = name;
 
-        internal ValueTask InvokeAsync(CancellationToken cancellationToken) =>
-            invoke(cancellationToken);
+        internal ValueTask InvokeAsync(CancellationToken cancellationToken)
+        {
+            return invoke(cancellationToken);
+        }
     }
 
     private sealed class RecordingReporter : IObserverFailureDiagnosticReporter
     {
-        private readonly Queue<Exception> failures = [];
+        private readonly Queue<Exception> _failures = [];
 
         internal int Attempts { get; private set; }
 
@@ -428,20 +445,25 @@ public sealed class ObserverFanOutTests
         )
         {
             Attempts++;
-            if (failures.TryDequeue(out var failure))
+            if (_failures.TryDequeue(out var failure))
+            {
                 return ValueTask.FromException(failure);
+            }
 
             Reports.Add(report);
             return ValueTask.CompletedTask;
         }
 
-        internal void EnqueueFailure(Exception failure) => failures.Enqueue(failure);
+        internal void EnqueueFailure(Exception failure)
+        {
+            _failures.Enqueue(failure);
+        }
     }
 
     private sealed class RecordingDeadLetterSink
         : IDurableObserverDeadLetterSink<TestBoundary, TestDeadLetter>
     {
-        private readonly Queue<Exception> failures = [];
+        private readonly Queue<Exception> _failures = [];
 
         internal int Attempts { get; private set; }
 
@@ -453,18 +475,26 @@ public sealed class ObserverFanOutTests
         )
         {
             Attempts++;
-            if (failures.TryDequeue(out var failure))
+            if (_failures.TryDequeue(out var failure))
+            {
                 return ValueTask.FromException(failure);
+            }
 
             Entries.Add(deadLetter);
             return ValueTask.CompletedTask;
         }
 
-        internal void EnqueueFailure(Exception failure) => failures.Enqueue(failure);
+        internal void EnqueueFailure(Exception failure)
+        {
+            _failures.Enqueue(failure);
+        }
     }
 
     private sealed class FixedCorrelationIdProvider : IObserverCorrelationIdProvider
     {
-        public ObserverCorrelationId Next() => CorrelationId;
+        public ObserverCorrelationId Next()
+        {
+            return _correlationId;
+        }
     }
 }

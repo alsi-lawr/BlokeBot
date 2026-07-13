@@ -8,8 +8,10 @@ internal interface IPointsGiveawayChangeNotification
 internal sealed class PointsGiveawayChangeNotification(PointsChangeNotifier changes)
     : IPointsGiveawayChangeNotification
 {
-    public async ValueTask NotifyAsync(CancellationToken cancellationToken) =>
+    public async ValueTask NotifyAsync(CancellationToken cancellationToken)
+    {
         await changes.NotifyChangedAsync(cancellationToken);
+    }
 }
 
 internal readonly record struct PointsGiveawayChangeNotificationCompleted;

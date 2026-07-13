@@ -45,8 +45,10 @@ internal static class TwitchEventSubChannelRecoveryResilience
     internal static void ConfigureAttempt(
         ResiliencePipelineBuilder builder,
         EventSubChannelRecoveryPolicy policy
-    ) =>
+    )
+    {
         builder.AddTimeout(policy.AttemptTimeout);
+    }
 }
 
 internal static class TwitchEventSubChannelFailureClassifier
@@ -58,7 +60,9 @@ internal static class TwitchEventSubChannelFailureClassifier
     )
     {
         if (exception is TwitchEventSubSubscriptionDeletionUnresolvedException deletion)
+        {
             return deletion.Failure;
+        }
 
         var (phase, failure) = exception switch
         {
@@ -97,13 +101,17 @@ internal static class TwitchEventSubChannelFailureClassifier
 
     internal static bool IsRecoverable(
         TwitchEventSubChannelFailureClassification classification
-    ) =>
-        classification
+    )
+    {
+        return classification
             is TwitchEventSubChannelFailureClassification.Timeout
                 or TwitchEventSubChannelFailureClassification.Transient;
+    }
 
-    private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode) =>
-        TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
+    private static bool IsTransientHttpStatus(System.Net.HttpStatusCode? statusCode)
+    {
+        return TwitchRuntimeSessionFailureClassifier.IsTransientHttpStatus(statusCode);
+    }
 }
 
 internal readonly record struct TwitchEventSubChannelFailureDetails(
@@ -113,8 +121,10 @@ internal readonly record struct TwitchEventSubChannelFailureDetails(
     Exception Exception
 )
 {
-    internal TwitchEventSubChannelFailure ToPublicFailure() =>
-        new() { Classification = Classification, FailureType = FailureType };
+    internal TwitchEventSubChannelFailure ToPublicFailure()
+    {
+        return new() { Classification = Classification, FailureType = FailureType };
+    }
 }
 
 internal sealed class TwitchEventSubChannelOperationException(
@@ -135,10 +145,16 @@ internal sealed class TwitchEventSubChannelRecoveryPipeline(
     internal ValueTask ExecuteAttemptAsync(
         Func<CancellationToken, ValueTask> operation,
         CancellationToken cancellationToken
-    ) => attemptPipeline.ExecuteAsync(operation, cancellationToken);
+    )
+    {
+        return attemptPipeline.ExecuteAsync(operation, cancellationToken);
+    }
 
     internal ValueTask ExecuteRecoveryAsync(
         Func<CancellationToken, ValueTask> operation,
         CancellationToken cancellationToken
-    ) => recoveryPipeline.ExecuteAsync(operation, cancellationToken);
+    )
+    {
+        return recoveryPipeline.ExecuteAsync(operation, cancellationToken);
+    }
 }

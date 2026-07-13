@@ -14,7 +14,7 @@ public sealed class HostedChannelRuntimeControlService(
     IOptions<BlokeBotOptions> options
 )
 {
-    private TimeSpan RuntimeChangeCooldown =>
+    private TimeSpan _runtimeChangeCooldown =>
         TimeSpan.FromSeconds(Math.Max(0, options.Value.BotStateChangeCooldownSeconds));
 
     public async Task<HostedChannelRuntimeControlResult> StartAsync(
@@ -25,7 +25,9 @@ public sealed class HostedChannelRuntimeControlService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
+        }
 
         if (
             !channelBotAuthorization.IsCurrent(
@@ -52,7 +54,9 @@ public sealed class HostedChannelRuntimeControlService(
         }
 
         if (CooldownMessage(host) is { } cooldown)
+        {
             return cooldown;
+        }
 
         host.BotRuntimeState = BotChannelRuntimeState.Starting;
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
@@ -66,10 +70,14 @@ public sealed class HostedChannelRuntimeControlService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
+        }
 
         if (CooldownMessage(host) is { } cooldown)
+        {
             return cooldown;
+        }
 
         host.BotRuntimeState = host.BotRuntimeState switch
         {
@@ -87,12 +95,16 @@ public sealed class HostedChannelRuntimeControlService(
     private HostedChannelRuntimeControlResult? CooldownMessage(BotHost host)
     {
         if (host.BotRuntimeStateChangedAtUtc is not { } changedAt)
+        {
             return null;
+        }
 
-        if (RuntimeChangeCooldown == TimeSpan.Zero)
+        if (_runtimeChangeCooldown == TimeSpan.Zero)
+        {
             return null;
+        }
 
-        var nextAllowedAt = changedAt.Add(RuntimeChangeCooldown);
+        var nextAllowedAt = changedAt.Add(_runtimeChangeCooldown);
         return nextAllowedAt > DateTime.UtcNow
             ? HostedChannelRuntimeControlResult.Failure(
                 $"Wait until {nextAllowedAt.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",

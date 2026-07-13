@@ -68,8 +68,9 @@ public sealed class BotAccountAuthorizationPolicyTests
         status.Message.ShouldBe("The Twitch bot runner is not configured.");
     }
 
-    private static TwitchBotSettings Settings(string tokenCachePath) =>
-        TwitchBotSettings.FromOptions(
+    private static TwitchBotSettings Settings(string tokenCachePath)
+    {
+        return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions
@@ -83,6 +84,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                 },
             }
         );
+    }
 
     private sealed class RecordingAccessTokenCache : ITwitchAccessTokenCache
     {
@@ -91,7 +93,10 @@ public sealed class BotAccountAuthorizationPolicyTests
         Task<TResult> ITwitchAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
             Func<ITwitchAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("Read-through should not run while clearing.");
+        )
+        {
+            throw new InvalidOperationException("Read-through should not run while clearing.");
+        }
 
         public Task ClearAsync(CancellationToken cancellationToken)
         {
@@ -102,7 +107,10 @@ public sealed class BotAccountAuthorizationPolicyTests
 
     private sealed class RejectingHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new(new RejectingHttpMessageHandler());
+        public HttpClient CreateClient(string name)
+        {
+            return new(new RejectingHttpMessageHandler());
+        }
     }
 
     private sealed class RejectingHttpMessageHandler : HttpMessageHandler
@@ -110,6 +118,9 @@ public sealed class BotAccountAuthorizationPolicyTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("HTTP should not be requested while clearing.");
+        )
+        {
+            throw new InvalidOperationException("HTTP should not be requested while clearing.");
+        }
     }
 }

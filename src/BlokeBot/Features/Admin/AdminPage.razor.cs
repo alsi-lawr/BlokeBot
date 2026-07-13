@@ -51,21 +51,21 @@ namespace BlokeBot.Features.Admin;
 
 public partial class AdminPage
 {
-    private SiteAccessAdminState? state;
-    private BotAccountAuthorizationStatus? botAccountStatus;
-    private IReadOnlyList<HostedChannelAdminView> hosts = [];
-    private IReadOnlyList<AccessListEntryProfile> siteBlacklistEntries = [];
-    private IReadOnlyList<AccessListEntryProfile> siteWhitelistEntries = [];
-    private bool isBotAccount;
-    private int? pendingRuntimeHostId;
-    private string newBlacklistLogin = string.Empty;
-    private string newHostLogin = string.Empty;
-    private string newWhitelistLogin = string.Empty;
+    private SiteAccessAdminState? _state;
+    private BotAccountAuthorizationStatus? _botAccountStatus;
+    private IReadOnlyList<HostedChannelAdminView> _hosts = [];
+    private IReadOnlyList<AccessListEntryProfile> _siteBlacklistEntries = [];
+    private IReadOnlyList<AccessListEntryProfile> _siteWhitelistEntries = [];
+    private bool _isBotAccount;
+    private int? _pendingRuntimeHostId;
+    private string _newBlacklistLogin = string.Empty;
+    private string _newHostLogin = string.Empty;
+    private string _newWhitelistLogin = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         TrackSubscription(
-            Events.SubscribeForComponentRefresh(
+            _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
                 work => InvokeAsync(work),
                 ReloadForEventAsync,
@@ -77,30 +77,30 @@ public partial class AdminPage
 
     private async Task AddBlacklistAsync()
     {
-        await SiteAccess.AddEntryAsync(
+        await _siteAccess.AddEntryAsync(
             AccessListEntryKind.Blacklist,
-            newBlacklistLogin,
+            _newBlacklistLogin,
             CancellationToken.None
         );
-        newBlacklistLogin = string.Empty;
+        _newBlacklistLogin = string.Empty;
         await LoadAsync();
     }
 
     private async Task AddWhitelistAsync()
     {
-        await SiteAccess.AddEntryAsync(
+        await _siteAccess.AddEntryAsync(
             AccessListEntryKind.Whitelist,
-            newWhitelistLogin,
+            _newWhitelistLogin,
             CancellationToken.None
         );
-        newWhitelistLogin = string.Empty;
+        _newWhitelistLogin = string.Empty;
         await LoadAsync();
     }
 
     private async Task CreateHostAsync()
     {
         await ApplyHostOperationAsync(
-            await HostManagement.CreateHostAsync(newHostLogin, CancellationToken.None),
+            await _hostManagement.CreateHostAsync(_newHostLogin, CancellationToken.None),
             clearNewHostLogin: true
         );
         await LoadAsync();
@@ -109,7 +109,7 @@ public partial class AdminPage
     private async Task RemoveHostAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await HostManagement.RemoveHostAsync(hostId, CancellationToken.None)
+            await _hostManagement.RemoveHostAsync(hostId, CancellationToken.None)
         );
         await LoadAsync();
     }
@@ -117,7 +117,7 @@ public partial class AdminPage
     private async Task StartBotAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await HostManagement.StartBotAsync(hostId, CancellationToken.None)
+            await _hostManagement.StartBotAsync(hostId, CancellationToken.None)
         );
         await LoadAsync();
     }
@@ -125,30 +125,30 @@ public partial class AdminPage
     private async Task StopBotAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await HostManagement.StopBotAsync(hostId, CancellationToken.None)
+            await _hostManagement.StopBotAsync(hostId, CancellationToken.None)
         );
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
-        isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
-        state = await SiteAccess.LoadAdminStateAsync(CancellationToken.None);
-        siteWhitelistEntries = await AccessListProfiles.ResolveAsync(
-            state.Whitelist,
+        _isBotAccount = (await LoadPageContextAsync()).IsBotAccount;
+        _state = await _siteAccess.LoadAdminStateAsync(CancellationToken.None);
+        _siteWhitelistEntries = await _accessListProfiles.ResolveAsync(
+            _state.Whitelist,
             CancellationToken.None
         );
-        siteBlacklistEntries = await AccessListProfiles.ResolveAsync(
-            state.Blacklist,
+        _siteBlacklistEntries = await _accessListProfiles.ResolveAsync(
+            _state.Blacklist,
             CancellationToken.None
         );
-        hosts = await HostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
-        botAccountStatus = await BotAccountAuthorization.GetStatusAsync(CancellationToken.None);
+        _hosts = await _hostedChannels.LoadHostedChannelsAsync(CancellationToken.None);
+        _botAccountStatus = await _botAccountAuthorization.GetStatusAsync(CancellationToken.None);
     }
 
     private async Task ClearBotAccountAuthorizationAsync()
     {
-        await BotAccountAuthorization.ClearAsync(CancellationToken.None);
+        await _botAccountAuthorization.ClearAsync(CancellationToken.None);
         await LoadAsync();
     }
 
@@ -160,9 +160,9 @@ public partial class AdminPage
     private async Task ReloadForEventAsync()
     {
         await LoadAsync();
-        if (pendingRuntimeHostId is { } hostId)
+        if (_pendingRuntimeHostId is { } hostId)
         {
-            ApplyHostOperation(HostManagement.RefreshPendingRuntime(hostId, hosts));
+            ApplyHostOperation(_hostManagement.RefreshPendingRuntime(hostId, _hosts));
         }
     }
 
@@ -173,20 +173,26 @@ public partial class AdminPage
     {
         ApplyHostOperation(result);
         if (clearNewHostLogin && result.Succeeded)
-            newHostLogin = string.Empty;
+        {
+            _newHostLogin = string.Empty;
+        }
+
         return Task.CompletedTask;
     }
 
     private void ApplyHostOperation(AdminHostOperationResult result)
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
-            Toasts.Publish(result.Succeeded ? ToastKind.Status : ToastKind.Error, result.Message);
-        pendingRuntimeHostId = result.PendingRuntimeHostId;
+        {
+            _toasts.Publish(result.Succeeded ? ToastKind.Status : ToastKind.Error, result.Message);
+        }
+
+        _pendingRuntimeHostId = result.PendingRuntimeHostId;
     }
 
     private async Task RemoveBlacklistAsync(string login)
     {
-        await SiteAccess.RemoveEntryAsync(
+        await _siteAccess.RemoveEntryAsync(
             AccessListEntryKind.Blacklist,
             login,
             CancellationToken.None
@@ -196,7 +202,7 @@ public partial class AdminPage
 
     private async Task RemoveWhitelistAsync(string login)
     {
-        await SiteAccess.RemoveEntryAsync(
+        await _siteAccess.RemoveEntryAsync(
             AccessListEntryKind.Whitelist,
             login,
             CancellationToken.None
@@ -206,7 +212,7 @@ public partial class AdminPage
 
     private async Task ToggleWhitelistAsync(ChangeEventArgs args)
     {
-        await SiteAccess.SetWhitelistEnabledAsync(args.Value is true, CancellationToken.None);
+        await _siteAccess.SetWhitelistEnabledAsync(args.Value is true, CancellationToken.None);
         await LoadAsync();
     }
 }

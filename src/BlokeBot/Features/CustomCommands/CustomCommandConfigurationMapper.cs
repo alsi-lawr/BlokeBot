@@ -6,8 +6,9 @@ namespace BlokeBot.Features.CustomCommands;
 
 internal static class CustomCommandConfigurationMapper
 {
-    public static CustomMessageLibraryEntryEditor ToEditor(CustomMessageLibraryEntry entry) =>
-        new()
+    public static CustomMessageLibraryEntryEditor ToEditor(CustomMessageLibraryEntry entry)
+    {
+        return new()
         {
             Id = entry.Id,
             Name = entry.Name,
@@ -19,17 +20,21 @@ internal static class CustomCommandConfigurationMapper
                 .Select(x => new CustomMessageVariantEditor { Id = x.Id, Text = x.Text })
                 .ToList(),
         };
+    }
 
-    public static CustomCounterEditor ToEditor(CustomCounter counter) =>
-        new()
+    public static CustomCounterEditor ToEditor(CustomCounter counter)
+    {
+        return new()
         {
             Id = counter.Id,
             Name = counter.Name,
             Value = counter.Value,
         };
+    }
 
-    public static CustomCommandEditor ToEditor(CustomCommand command) =>
-        new()
+    public static CustomCommandEditor ToEditor(CustomCommand command)
+    {
+        return new()
         {
             Id = command.Id,
             Name = command.Name,
@@ -52,9 +57,11 @@ internal static class CustomCommandConfigurationMapper
                 _ => throw new InvalidOperationException("Unsupported custom command action."),
             },
         };
+    }
 
-    public static CustomAnnouncementEditor ToEditor(CustomAnnouncement announcement) =>
-        new()
+    public static CustomAnnouncementEditor ToEditor(CustomAnnouncement announcement)
+    {
+        return new()
         {
             Id = announcement.Id,
             Name = announcement.Name,
@@ -93,12 +100,14 @@ internal static class CustomCommandConfigurationMapper
             LastSentAtUtc = announcement.LastSentAtUtc,
             ChatMessagesSinceLastSent = announcement.ChatMessagesSinceLastSent,
         };
+    }
 
     public static CustomAnnouncementDeliveryPolicy CreateDeliveryPolicy(
         int hostId,
         CustomAnnouncementEditor editor
-    ) =>
-        new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+    )
+    {
+        return new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         {
             HostId = hostId,
             RetryDelay = new AnnouncementRetryDelay(
@@ -108,6 +117,7 @@ internal static class CustomCommandConfigurationMapper
                 TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
             ),
         };
+    }
 
     public static void ApplyDeliveryPolicy(
         CustomAnnouncementDeliveryPolicy policy,
@@ -128,8 +138,9 @@ internal static class CustomCommandConfigurationMapper
         ICustomCommandActionEditor editor,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         IReadOnlyDictionary<int, CustomCounter> counters
-    ) =>
-        editor switch
+    )
+    {
+        return editor switch
         {
             MessageCustomCommandActionEditor => new MessageCustomCommandAction
             {
@@ -144,6 +155,7 @@ internal static class CustomCommandConfigurationMapper
             },
             _ => throw new InvalidOperationException("Unsupported custom command action."),
         };
+    }
 
     public static void ApplyAction(
         CustomCommandAction action,
@@ -165,8 +177,9 @@ internal static class CustomCommandConfigurationMapper
     public static CustomAnnouncementSchedule CreateSchedule(
         int hostId,
         ICustomAnnouncementScheduleEditor editor
-    ) =>
-        editor switch
+    )
+    {
+        return editor switch
         {
             IntervalCustomAnnouncementScheduleEditor =>
                 new IntervalCustomAnnouncementSchedule { HostId = hostId },
@@ -176,6 +189,7 @@ internal static class CustomCommandConfigurationMapper
                 new WeeklyCustomAnnouncementSchedule { HostId = hostId },
             _ => throw new InvalidOperationException("Unsupported custom announcement schedule."),
         };
+    }
 
     public static void ApplySchedule(
         CustomAnnouncementSchedule schedule,
@@ -212,34 +226,42 @@ internal static class CustomCommandConfigurationMapper
     public static bool ActionMatches(
         CustomCommandAction action,
         ICustomCommandActionEditor editor
-    ) =>
-        (action, editor) is
+    )
+    {
+        return (action, editor) is
             (MessageCustomCommandAction, MessageCustomCommandActionEditor)
                 or (CounterCustomCommandAction, CounterCustomCommandActionEditor);
+    }
 
     public static bool ScheduleMatches(
         CustomAnnouncementSchedule schedule,
         ICustomAnnouncementScheduleEditor editor
-    ) =>
-        (schedule, editor) is
+    )
+    {
+        return (schedule, editor) is
             (IntervalCustomAnnouncementSchedule, IntervalCustomAnnouncementScheduleEditor)
                 or (
                     IntervalAfterChatCustomAnnouncementSchedule,
                     IntervalAfterChatCustomAnnouncementScheduleEditor
                 )
                 or (WeeklyCustomAnnouncementSchedule, WeeklyCustomAnnouncementScheduleEditor);
+    }
 
     private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
-        RequireRetryUntilExpiredThenSkip(CustomAnnouncementDeliveryPolicy policy) =>
-        policy as RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
+        RequireRetryUntilExpiredThenSkip(CustomAnnouncementDeliveryPolicy policy)
+    {
+        return policy as RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         ?? throw new UnreachableException("Unknown custom announcement delivery policy.");
+    }
 
     private static int ToWholeSeconds(TimeSpan value)
     {
         if (value.Ticks % TimeSpan.TicksPerSecond != 0)
+        {
             throw new InvalidOperationException(
                 "Announcement delivery timing must use whole seconds."
             );
+        }
 
         return checked((int)(value.Ticks / TimeSpan.TicksPerSecond));
     }

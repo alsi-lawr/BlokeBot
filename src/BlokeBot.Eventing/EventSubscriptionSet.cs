@@ -2,16 +2,20 @@ namespace BlokeBot.Eventing;
 
 public sealed class EventSubscriptionSet(IEnumerable<IDisposable> subscriptions) : IDisposable
 {
-    private readonly IDisposable[] subscriptions = [.. subscriptions];
-    private bool disposed;
+    private readonly IDisposable[] _subscriptions = [.. subscriptions];
+    private bool _disposed;
 
     public void Dispose()
     {
-        if (disposed)
+        if (_disposed)
+        {
             return;
+        }
 
-        disposed = true;
-        foreach (var subscription in subscriptions)
+        _disposed = true;
+        foreach (var subscription in _subscriptions)
+        {
             subscription.Dispose();
+        }
     }
 }

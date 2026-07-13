@@ -551,8 +551,9 @@ public sealed class PointsTests
         SqliteBlokeBotDbFactory dbFactory,
         TimeProvider clock,
         int minimumGamblingCooldownSeconds = 0
-    ) =>
-        new(
+    )
+    {
+        return new(
             new PointsCommandService(dbFactory),
             new PointBalanceService(dbFactory),
             new FixedPointsRandom(),
@@ -567,6 +568,7 @@ public sealed class PointsTests
                 }
             )
         );
+    }
 
     private static PointsConfigurationService CreateConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
@@ -660,36 +662,50 @@ public sealed class PointsTests
 
     private sealed class FakeHttpClientFactory : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new();
+        public HttpClient CreateClient(string name)
+        {
+            return new();
+        }
     }
 
     private sealed class FixedPointTargetUserLookup(IEnumerable<string> existingUsers)
         : IPointTargetUserLookup
     {
-        private readonly HashSet<string> users = existingUsers
+        private readonly HashSet<string> _users = existingUsers
             .Select(TwitchLogin.Normalize)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        public Task<bool> ExistsAsync(string login, CancellationToken ct) =>
-            Task.FromResult(users.Contains(TwitchLogin.Normalize(login)));
+        public Task<bool> ExistsAsync(string login, CancellationToken ct)
+        {
+            return Task.FromResult(_users.Contains(TwitchLogin.Normalize(login)));
+        }
     }
 
     private sealed class FixedPointsRandom : IPointsRandom
     {
-        public double NextDouble() => 0;
+        public double NextDouble()
+        {
+            return 0;
+        }
 
-        public int Next(int minValue, int maxValue) => minValue;
+        public int Next(int minValue, int maxValue)
+        {
+            return minValue;
+        }
     }
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        private DateTimeOffset current = now;
+        private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow() => current;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _current;
+        }
 
         public void Advance(TimeSpan interval)
         {
-            current += interval;
+            _current += interval;
         }
     }
 }

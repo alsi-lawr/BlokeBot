@@ -8,14 +8,18 @@ public sealed class CustomMessageSelector(TimeProvider clock)
     public string? SelectMessage(CustomMessageLibraryEntry? entry)
     {
         if (entry is null)
+        {
             return null;
+        }
 
         var variants = entry
             .Variants.OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Id)
             .ToArray();
         if (variants.Length == 0)
+        {
             return null;
+        }
 
         return entry.SelectionMode switch
         {

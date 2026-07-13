@@ -69,7 +69,9 @@ public partial class RoundOrchestrationPanel
     private async Task OnSelectedProfileChanged(ChangeEventArgs args)
     {
         if (!int.TryParse(args.Value?.ToString(), out var profileId))
+        {
             return;
+        }
 
         SelectedProfileId = profileId;
         await SelectedProfileIdChanged.InvokeAsync(profileId);
@@ -81,9 +83,18 @@ public partial class RoundOrchestrationPanel
         await WinnerNameChanged.InvokeAsync(WinnerName);
     }
 
-    private async Task InvokeDeclareWinnerAsync() => await DeclareWinner.InvokeAsync();
+    private async Task InvokeDeclareWinnerAsync()
+    {
+        await DeclareWinner.InvokeAsync();
+    }
 
-    private async Task InvokeStartRoundAsync() => await StartRound.InvokeAsync();
+    private async Task InvokeStartRoundAsync()
+    {
+        await StartRound.InvokeAsync();
+    }
 
-    private async Task InvokeStopGuessingAsync() => await StopGuessing.InvokeAsync();
+    private async Task InvokeStopGuessingAsync()
+    {
+        await StopGuessing.InvokeAsync();
+    }
 }

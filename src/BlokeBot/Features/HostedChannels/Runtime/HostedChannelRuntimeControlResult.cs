@@ -6,10 +6,16 @@ public sealed record HostedChannelRuntimeControlResult(
     DateTime? NextAllowedAtUtc = null
 )
 {
-    public static HostedChannelRuntimeControlResult Success(string message) => new(true, message);
+    public static HostedChannelRuntimeControlResult Success(string message)
+    {
+        return new(true, message);
+    }
 
     public static HostedChannelRuntimeControlResult Failure(
         string message,
         DateTime? nextAllowedAtUtc = null
-    ) => new(false, message, nextAllowedAtUtc);
+    )
+    {
+        return new(false, message, nextAllowedAtUtc);
+    }
 }

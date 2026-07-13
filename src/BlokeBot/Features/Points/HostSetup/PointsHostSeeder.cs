@@ -16,18 +16,25 @@ public sealed class PointsHostSeeder(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         if (!await db.Hosts.AnyAsync(x => x.Id == hostId, ct))
+        {
             return;
+        }
 
         if (!await db.PointsSettings.AnyAsync(x => x.HostId == hostId, ct))
+        {
             db.PointsSettings.Add(new PointsSettings { HostId = hostId });
+        }
 
         foreach (var command in commands.Descriptors)
         {
             var appKind = PointsAppCommandKindMap.ToAppKind(command.Kind);
             if (await db.CommandAliases.AnyAsync(x => x.HostId == hostId && x.Kind == appKind, ct))
+            {
                 continue;
+            }
 
             foreach (var alias in command.DefaultAliases)
+            {
                 db.CommandAliases.Add(
                     new CommandAlias
                     {
@@ -36,6 +43,7 @@ public sealed class PointsHostSeeder(
                         Alias = alias,
                     }
                 );
+            }
         }
 
         await db.SaveChangesAsync(ct);

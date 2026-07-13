@@ -293,16 +293,19 @@ public sealed class HostBotStatusTests
     private static HostBotStatusService CreateStreamService(
         HostBotStatusHttpClientFactory httpClientFactory,
         IHostBotAppAccessTokenSource? appTokens = null
-    ) =>
-        new(
+    )
+    {
+        return new(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
             new TwitchHelixApiClient(httpClientFactory),
             Settings()
         );
+    }
 
-    private static TwitchBotSettings Settings() =>
-        TwitchBotSettings.FromOptions(
+    private static TwitchBotSettings Settings()
+    {
+        return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
                 Identity = new TwitchBotIdentityOptions
@@ -316,12 +319,16 @@ public sealed class HostBotStatusTests
                 },
             }
         );
+    }
 
-    private static string[] RequiredScopes() =>
-        [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
+    private static string[] RequiredScopes()
+    {
+        return [TwitchScopes.UserReadModeratedChannels, TwitchScopes.ModeratorReadFollowers];
+    }
 
-    private static ActiveBotAccountTokenStatus UnavailableTokenStatus() =>
-        new(
+    private static ActiveBotAccountTokenStatus UnavailableTokenStatus()
+    {
+        return new(
             "bot",
             null,
             TwitchTokenStatusState.Unavailable,
@@ -331,9 +338,11 @@ public sealed class HostBotStatusTests
             [],
             RequiredScopes()
         );
+    }
 
-    private static ActiveBotAccountTokenStatus InvalidTokenStatus() =>
-        new(
+    private static ActiveBotAccountTokenStatus InvalidTokenStatus()
+    {
+        return new(
             "bot",
             null,
             TwitchTokenStatusState.Invalid,
@@ -343,6 +352,7 @@ public sealed class HostBotStatusTests
             [],
             RequiredScopes()
         );
+    }
 
     private static ActiveBotAccountTokenStatus AuthorizedTokenStatus(
         IReadOnlyList<string> grantedScopes,
@@ -381,55 +391,65 @@ public sealed class HostBotStatusTests
             string channelLogin,
             IEnumerable<string?> requiredScopes,
             CancellationToken cancellationToken
-        ) => Task.FromResult(status);
+        )
+        {
+            return Task.FromResult(status);
+        }
     }
 
     private sealed class StaticHostBotAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
-            Task.FromResult("app-token");
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult("app-token");
+        }
     }
 
     private sealed class ThrowingHostBotAppAccessTokenSource(Exception failure)
         : IHostBotAppAccessTokenSource
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken) =>
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
             throw failure;
+        }
     }
 
     private sealed class HostBotStatusHttpClientFactory : IHttpClientFactory
     {
-        private readonly Handler handler = new();
+        private readonly Handler _handler = new();
 
         public bool BotIsModerator
         {
-            get => handler.BotIsModerator;
-            init => handler.BotIsModerator = value;
+            get => _handler.BotIsModerator;
+            init => _handler.BotIsModerator = value;
         }
 
         public bool StreamIsLive
         {
-            get => handler.StreamIsLive;
-            init => handler.StreamIsLive = value;
+            get => _handler.StreamIsLive;
+            init => _handler.StreamIsLive = value;
         }
 
         public Exception? StreamFailure
         {
-            get => handler.StreamFailure;
-            init => handler.StreamFailure = value;
+            get => _handler.StreamFailure;
+            init => _handler.StreamFailure = value;
         }
 
-        public string? LastModerationUserId => handler.LastModerationUserId;
+        public string? LastModerationUserId => _handler.LastModerationUserId;
 
-        public string? StreamRequestAccessToken => handler.StreamRequestAccessToken;
+        public string? StreamRequestAccessToken => _handler.StreamRequestAccessToken;
 
-        public string? StreamRequestClientId => handler.StreamRequestClientId;
+        public string? StreamRequestClientId => _handler.StreamRequestClientId;
 
-        public int StreamRequestCount => handler.StreamRequestCount;
+        public int StreamRequestCount => _handler.StreamRequestCount;
 
-        public int TokenRequestCount => handler.TokenRequestCount;
+        public int TokenRequestCount => _handler.TokenRequestCount;
 
-        public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(_handler, disposeHandler: false);
+        }
 
         private sealed class Handler : HttpMessageHandler
         {
@@ -504,16 +524,20 @@ public sealed class HostBotStatusTests
                 return JsonResponse("""{"access_token":"app-token","expires_in":3600}""");
             }
 
-            private static HttpResponseMessage JsonResponse(string json) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage JsonResponse(string json)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json"),
                 };
+            }
 
             private static string? QueryValue(Uri? uri, string key)
             {
                 if (string.IsNullOrWhiteSpace(uri?.Query))
+                {
                     return null;
+                }
 
                 foreach (
                     var part in uri
@@ -545,9 +569,15 @@ public sealed class HostBotStatusTests
         public List<LogEntry> Entries { get; } = [];
 
         public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull => NullLoggerScope.Instance;
+            where TState : notnull
+        {
+            return NullLoggerScope.Instance;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -555,7 +585,10 @@ public sealed class HostBotStatusTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        ) => Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+        )
+        {
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+        }
     }
 
     private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);

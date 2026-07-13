@@ -22,7 +22,9 @@ internal sealed class TwitchOAuthFlow(
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
         if (!states.Consume(state))
+        {
             throw new InvalidOperationException("Invalid OAuth state.");
+        }
 
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
         await tokens.SaveAsync(identity.TokenCachePath, tokenSet, cancellationToken);

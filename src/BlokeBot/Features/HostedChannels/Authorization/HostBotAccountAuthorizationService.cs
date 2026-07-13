@@ -15,7 +15,7 @@ public sealed class HostBotAccountAuthorizationService(
     TwitchBotSettings botSettings
 ) : ITwitchBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
-    private static readonly TimeSpan RefreshSkew = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan _refreshSkew = TimeSpan.FromMinutes(1);
 
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(
         int hostId,
@@ -45,7 +45,9 @@ public sealed class HostBotAccountAuthorizationService(
 
         var tokenStatus = await GetStoredTokenStatusAsync(db, settings, required, ct);
         if (tokenStatus.AccessToken is { Length: > 0 } accessToken)
+        {
             await RefreshProfileMetadataAsync(db, settings, accessToken, ct);
+        }
 
         return ToAuthorizationStatus(settings, tokenStatus);
     }
@@ -174,14 +176,20 @@ public sealed class HostBotAccountAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
+        {
             return;
+        }
 
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
+        {
             return;
+        }
 
         if (settings.OverrideEnabled == enabled)
+        {
             return;
+        }
 
         var restartRuntime =
             host.BotRuntimeState
@@ -189,7 +197,9 @@ public sealed class HostBotAccountAuthorizationService(
                 or BotChannelRuntimeState.Started;
         settings.OverrideEnabled = enabled;
         if (!enabled)
+        {
             settings.WhisperResponsesEnabled = false;
+        }
 
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
@@ -219,13 +229,19 @@ public sealed class HostBotAccountAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
+        {
             return false;
+        }
 
         if (enabled && !settings.OverrideEnabled)
+        {
             return false;
+        }
 
         if (settings.WhisperResponsesEnabled == enabled)
+        {
             return true;
+        }
 
         settings.WhisperResponsesEnabled = enabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
@@ -243,12 +259,16 @@ public sealed class HostBotAccountAuthorizationService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
+        {
             return BotAccountAuthorizationResult.Failure("Channel was not found.");
+        }
 
         if (!settings.OverrideEnabled)
+        {
             return BotAccountAuthorizationResult.Failure(
                 "Turn on custom bot before connecting it."
             );
+        }
 
         var missingScopes = TwitchScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
         if (missingScopes.Length > 0)
@@ -285,7 +305,9 @@ public sealed class HostBotAccountAuthorizationService(
             ct
         );
         if (settings is null)
+        {
             return;
+        }
 
         ClearAuthorization(settings);
         settings.UpdatedAtUtc = DateTime.UtcNow;
@@ -304,10 +326,14 @@ public sealed class HostBotAccountAuthorizationService(
             ct
         );
         if (settings is not null)
+        {
             return settings;
+        }
 
         if (!await db.Hosts.AnyAsync(x => x.Id == hostId, ct))
+        {
             return null;
+        }
 
         settings = new HostBotAccountSettings { HostId = hostId, UpdatedAtUtc = DateTime.UtcNow };
         db.HostBotAccountSettings.Add(settings);
@@ -323,19 +349,25 @@ public sealed class HostBotAccountAuthorizationService(
     {
         var required = TwitchScopeSet.NormalizeMany(requiredScopes);
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
+        {
             return Unavailable(required);
+        }
 
         var accessToken = settings.AccessToken;
         if (string.IsNullOrWhiteSpace(accessToken) || TokenExpiresSoon(settings))
         {
             if (!await RefreshTokenAsync(db, settings, ct))
+            {
                 return Invalid(required);
+            }
 
             accessToken = settings.AccessToken;
         }
 
         if (string.IsNullOrWhiteSpace(accessToken))
+        {
             return Unavailable(required);
+        }
 
         var validation = await oauth.ValidateTokenAsync(accessToken, ct);
         if (validation is null)
@@ -344,12 +376,16 @@ public sealed class HostBotAccountAuthorizationService(
                 !await RefreshTokenAsync(db, settings, ct)
                 || string.IsNullOrWhiteSpace(settings.AccessToken)
             )
+            {
                 return Invalid(required);
+            }
 
             accessToken = settings.AccessToken;
             validation = await oauth.ValidateTokenAsync(accessToken, ct);
             if (validation is null)
+            {
                 return Invalid(accessToken, required);
+            }
         }
 
         var granted = TwitchScopeSet.NormalizeMany(validation.Scopes);
@@ -379,7 +415,9 @@ public sealed class HostBotAccountAuthorizationService(
     )
     {
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
+        {
             return false;
+        }
 
         try
         {
@@ -418,7 +456,9 @@ public sealed class HostBotAccountAuthorizationService(
             ct
         );
         if (user is null)
+        {
             return;
+        }
 
         settings.DisplayName = string.IsNullOrWhiteSpace(user.DisplayName)
             ? settings.DisplayName
@@ -464,8 +504,9 @@ public sealed class HostBotAccountAuthorizationService(
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(
         HostBotAccountSettings settings,
         TwitchTokenStatus status
-    ) =>
-        status.State switch
+    )
+    {
+        return status.State switch
         {
             TwitchTokenStatusState.Unavailable => new(
                 null,
@@ -518,10 +559,13 @@ public sealed class HostBotAccountAuthorizationService(
                 "The custom bot account is ready."
             ),
         };
+    }
 
-    private static bool TokenExpiresSoon(HostBotAccountSettings settings) =>
-        settings.ExpiresAtUtc is null
-        || settings.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(RefreshSkew);
+    private static bool TokenExpiresSoon(HostBotAccountSettings settings)
+    {
+        return settings.ExpiresAtUtc is null
+        || settings.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
+    }
 
     private static void ClearAuthorization(HostBotAccountSettings settings)
     {
@@ -536,15 +580,23 @@ public sealed class HostBotAccountAuthorizationService(
         settings.TwitchUserId = null;
     }
 
-    private static IEnumerable<string> SplitStoredScopes(string? scopes) =>
-        (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    private static IEnumerable<string> SplitStoredScopes(string? scopes)
+    {
+        return (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    }
 
-    private static TwitchTokenStatus Unavailable(string[] required) =>
-        new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+    private static TwitchTokenStatus Unavailable(string[] required)
+    {
+        return new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+    }
 
-    private static TwitchTokenStatus Invalid(string[] required) =>
-        new(TwitchTokenStatusState.Invalid, null, null, required, [], required);
+    private static TwitchTokenStatus Invalid(string[] required)
+    {
+        return new(TwitchTokenStatusState.Invalid, null, null, required, [], required);
+    }
 
-    private static TwitchTokenStatus Invalid(string accessToken, string[] required) =>
-        new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+    private static TwitchTokenStatus Invalid(string accessToken, string[] required)
+    {
+        return new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+    }
 }

@@ -251,20 +251,24 @@ public sealed class GuessingAliasTests
 
     private static GuessingConfigurationService ConfigurationService(
         SqliteBlokeBotDbFactory dbFactory
-    ) =>
-        new(
+    )
+    {
+        return new(
             dbFactory,
             new CommandAliasRegistry(),
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
+    }
 
-    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory) =>
-        new(
+    private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory)
+    {
+        return new(
             dbFactory,
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new PointBalanceService(dbFactory),
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
+    }
 
     private static CommandStrategyContext<GuessCommandKind, AppCommandRouteState> CommandContext(
         string channel,

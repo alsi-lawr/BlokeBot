@@ -10,11 +10,103 @@ indent_size = 2
 
 [*.cs]
 indent_size = 4
-csharp_style_namespace_declarations = file_scoped:suggestion
-dotnet_style_qualification_for_event = false:suggestion
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_style_qualification_for_method = false:suggestion
-dotnet_style_qualification_for_property = false:suggestion
+
+# Naming violations must be visible in both the IDE and builds.
+dotnet_diagnostic.IDE1006.severity = warning
+
+# Naming rules
+dotnet_naming_rule.interfaces_should_have_i_prefix.severity = warning
+dotnet_naming_rule.interfaces_should_have_i_prefix.symbols = interfaces
+dotnet_naming_rule.interfaces_should_have_i_prefix.style = i_prefixed_pascal_case
+
+dotnet_naming_rule.type_parameters_should_have_t_prefix.severity = warning
+dotnet_naming_rule.type_parameters_should_have_t_prefix.symbols = type_parameters
+dotnet_naming_rule.type_parameters_should_have_t_prefix.style = t_prefixed_pascal_case
+
+dotnet_naming_rule.private_fields_and_properties_should_be_underscore_camel_case.severity = warning
+dotnet_naming_rule.private_fields_and_properties_should_be_underscore_camel_case.symbols = private_fields_and_properties
+dotnet_naming_rule.private_fields_and_properties_should_be_underscore_camel_case.style = underscore_camel_case
+
+dotnet_naming_rule.namespaces_and_types_should_be_pascal_case.severity = warning
+dotnet_naming_rule.namespaces_and_types_should_be_pascal_case.symbols = namespaces_and_types
+dotnet_naming_rule.namespaces_and_types_should_be_pascal_case.style = pascal_case
+
+dotnet_naming_rule.methods_and_events_should_be_pascal_case.severity = warning
+dotnet_naming_rule.methods_and_events_should_be_pascal_case.symbols = methods_and_events
+dotnet_naming_rule.methods_and_events_should_be_pascal_case.style = pascal_case
+
+dotnet_naming_rule.visible_members_should_be_pascal_case.severity = warning
+dotnet_naming_rule.visible_members_should_be_pascal_case.symbols = visible_members
+dotnet_naming_rule.visible_members_should_be_pascal_case.style = pascal_case
+
+dotnet_naming_rule.parameters_and_locals_should_be_camel_case.severity = warning
+dotnet_naming_rule.parameters_and_locals_should_be_camel_case.symbols = parameters_and_locals
+dotnet_naming_rule.parameters_and_locals_should_be_camel_case.style = camel_case
+
+dotnet_naming_rule.local_functions_should_be_pascal_case.severity = warning
+dotnet_naming_rule.local_functions_should_be_pascal_case.symbols = local_functions
+dotnet_naming_rule.local_functions_should_be_pascal_case.style = pascal_case
+
+# Naming symbol groups
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+
+dotnet_naming_symbols.private_fields_and_properties.applicable_kinds = field, property
+dotnet_naming_symbols.private_fields_and_properties.applicable_accessibilities = private
+
+dotnet_naming_symbols.namespaces_and_types.applicable_kinds = namespace, class, struct, enum, delegate
+dotnet_naming_symbols.namespaces_and_types.applicable_accessibilities = *
+
+dotnet_naming_symbols.methods_and_events.applicable_kinds = method, event
+dotnet_naming_symbols.methods_and_events.applicable_accessibilities = *
+
+dotnet_naming_symbols.visible_members.applicable_kinds = property, field, enum_member
+dotnet_naming_symbols.visible_members.applicable_accessibilities = public, internal, protected, protected_internal, private_protected
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter, local
+
+dotnet_naming_symbols.local_functions.applicable_kinds = local_function
+
+# Naming styles
+dotnet_naming_style.i_prefixed_pascal_case.required_prefix = I
+dotnet_naming_style.i_prefixed_pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.t_prefixed_pascal_case.required_prefix = T
+dotnet_naming_style.t_prefixed_pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+# Qualification and common C# style
+dotnet_style_qualification_for_event = false:warning
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_property = false:warning
+csharp_using_directive_placement = outside_namespace:warning
+csharp_prefer_braces = true:warning
+csharp_prefer_simple_using_statement = true:warning
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:warning
+dotnet_style_object_initializer = true:warning
+dotnet_style_collection_initializer = true:warning
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+
+# Preserve the repository's established expression-body preferences.
+csharp_style_expression_bodied_methods = false:warning
+csharp_style_expression_bodied_constructors = false:warning
+csharp_style_expression_bodied_operators = false:warning
+csharp_style_expression_bodied_properties = true:warning
+csharp_style_expression_bodied_indexers = true:warning
+csharp_style_expression_bodied_accessors = true:warning
+csharp_style_expression_bodied_lambdas = true:warning
+csharp_style_expression_bodied_local_functions = false:warning
 
 [*.{csproj,props,targets,slnx}]
 indent_size = 2

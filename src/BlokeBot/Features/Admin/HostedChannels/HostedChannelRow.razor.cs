@@ -42,8 +42,8 @@ namespace BlokeBot.Features.Admin.HostedChannels;
 
 public partial class HostedChannelRow
 {
-    private const int RemovalAnimationDelayMs = 150;
-    private bool pendingRemoval;
+    private const int _removalAnimationDelayMs = 150;
+    private bool _pendingRemoval;
 
     [Parameter, EditorRequired]
     public HostedChannelAdminView Host { get; set; } =
@@ -61,15 +61,15 @@ public partial class HostedChannelRow
     [Parameter, EditorRequired]
     public Func<int, Task> StopBot { get; set; } = _ => Task.CompletedTask;
 
-    private string EditHostHref =>
+    private string _editHostHref =>
         $"/admin/select-host?hostId={Host.Id}&returnUrl={Uri.EscapeDataString("/admin")}";
 
-    private string RowClass =>
-        pendingRemoval
+    private string _rowClass =>
+        _pendingRemoval
             ? "motion-list__item motion-list__item--removing flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
             : "motion-list__item flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between";
 
-    private string BotStartedBadgeClass
+    private string _botStartedBadgeClass
     {
         get
         {
@@ -85,7 +85,7 @@ public partial class HostedChannelRow
         }
     }
 
-    private string BotStartedDotClass =>
+    private string _botStartedDotClass =>
         Host.RuntimeState switch
         {
             BotChannelRuntimeState.Starting => "h-1.5 w-1.5 rounded-full bg-orange-500",
@@ -94,19 +94,13 @@ public partial class HostedChannelRow
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
-    private string BotStartedText
+    private string _botStartedText => Host.RuntimeState switch
     {
-        get
-        {
-            return Host.RuntimeState switch
-            {
-                BotChannelRuntimeState.Starting => "bot starting",
-                BotChannelRuntimeState.Started => "bot running",
-                BotChannelRuntimeState.Stopping => "bot stopping",
-                _ => "bot offline",
-            };
-        }
-    }
+        BotChannelRuntimeState.Starting => "bot starting",
+        BotChannelRuntimeState.Started => "bot running",
+        BotChannelRuntimeState.Stopping => "bot stopping",
+        _ => "bot offline",
+    };
 
     private static string Initials(string value)
     {
@@ -130,19 +124,21 @@ public partial class HostedChannelRow
 
     private async Task RemoveHostAsync()
     {
-        if (pendingRemoval)
+        if (_pendingRemoval)
+        {
             return;
+        }
 
-        pendingRemoval = true;
+        _pendingRemoval = true;
         StateHasChanged();
         try
         {
-            await Task.Delay(RemovalAnimationDelayMs);
+            await Task.Delay(_removalAnimationDelayMs);
             await RemoveHost(Host.Id);
         }
         finally
         {
-            pendingRemoval = false;
+            _pendingRemoval = false;
         }
     }
 }

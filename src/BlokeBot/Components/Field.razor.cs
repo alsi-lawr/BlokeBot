@@ -42,7 +42,7 @@ namespace BlokeBot.Components;
 
 public partial class Field
 {
-    private readonly string generatedId = $"field-{Guid.NewGuid():N}";
+    private readonly string _generatedId = $"field-{Guid.NewGuid():N}";
 
     [Parameter]
     public string? Id { get; set; }
@@ -59,8 +59,10 @@ public partial class Field
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
 
-    private string InputId => string.IsNullOrWhiteSpace(Id) ? generatedId : Id;
+    private string _inputId => string.IsNullOrWhiteSpace(Id) ? _generatedId : Id;
 
-    private Task OnInput(ChangeEventArgs e) =>
-        ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    private Task OnInput(ChangeEventArgs e)
+    {
+        return ValueChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty);
+    }
 }

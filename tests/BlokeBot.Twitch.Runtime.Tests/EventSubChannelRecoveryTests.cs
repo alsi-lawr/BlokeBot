@@ -13,7 +13,7 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class EventSubChannelRecoveryTests
 {
-    private static readonly DateTimeOffset Now = new(
+    private static readonly DateTimeOffset _now = new(
         2026,
         7,
         11,
@@ -38,7 +38,10 @@ public sealed class EventSubChannelRecoveryTests
             }
         );
         for (var attempt = 0; attempt < 3; attempt++)
+        {
             operations.EnqueueAccountFailure("bad", failure);
+        }
+
         await using var harness = CreateHarness(operations, attemptLimit: 3);
 
         harness.Session.Start(["bad", "good"], CancellationToken.None);
@@ -53,7 +56,7 @@ public sealed class EventSubChannelRecoveryTests
             "good",
             TwitchEventSubChannelRecoveryTrigger.Startup,
             attempt: 1,
-            Now
+            _now
         );
         releaseFailure.Writer.TryWrite(true).ShouldBeTrue();
         await initialization;
@@ -64,7 +67,7 @@ public sealed class EventSubChannelRecoveryTests
             "good",
             TwitchEventSubChannelRecoveryTrigger.Startup,
             attempt: 1,
-            Now
+            _now
         );
         AssertFailure(
             states["bad"].ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>(),
@@ -75,7 +78,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 3,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
-            Now
+            _now
         );
         states["bad"].ToString().ShouldNotContain("oauth:secret");
         harness.RuntimeStatus.Current.IsConnected.ShouldBeTrue();
@@ -118,7 +121,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.BeginRecoveryCycle,
-            Now.AddMinutes(1)
+            _now.AddMinutes(1)
         );
         harness.Status.Current.Channels.ShouldAllBe(state =>
             state is TwitchEventSubChannelStatus.Healthy
@@ -148,7 +151,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
-            Now
+            _now
         );
         degraded.ToString().ShouldNotContain("raw payload");
         var diagnostic = harness.Diagnostics.DiagnosticReports
@@ -217,7 +220,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.BeginRecoveryCycle,
-            Now
+            _now
         );
         AssertFailure(
             reports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
@@ -228,14 +231,14 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
-            Now
+            _now
         );
         AssertHealthy(
             reports[2].ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>(),
             "channel",
             TwitchEventSubChannelRecoveryTrigger.Startup,
             attempt: 1,
-            Now
+            _now
         );
         harness.Status.Current.Channels.ShouldHaveSingleItem().ShouldBe(reports[2]);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
@@ -267,7 +270,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.BeginRecoveryCycle,
-            Now
+            _now
         );
         AssertFailure(
             exhaustedReports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
@@ -278,7 +281,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
-            Now
+            _now
         );
         AssertFailure(
             exhaustedReports[2].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
@@ -289,7 +292,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 2,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
-            Now
+            _now
         );
         AssertFailure(
             exhaustedReports[3].ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>(),
@@ -300,7 +303,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 2,
             TwitchEventSubChannelRecoveryTrigger.Startup,
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
-            Now
+            _now
         );
         var failureReports = harness.Diagnostics.DiagnosticReports;
         failureReports[0]
@@ -335,14 +338,14 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
-            Now.AddMinutes(1)
+            _now.AddMinutes(1)
         );
         AssertHealthy(
             recoveredReports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Healthy>(),
             "channel",
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             attempt: 1,
-            Now.AddMinutes(1)
+            _now.AddMinutes(1)
         );
         harness.Diagnostics.DiagnosticReports[0]
             .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Recovering>()
@@ -478,7 +481,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             TwitchEventSubChannelNextAction.BeginRecoveryCycle,
-            Now
+            _now
         );
         AssertFailure(
             reports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
@@ -489,7 +492,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
-            Now
+            _now
         );
         var diagnostics = harness.Diagnostics.DiagnosticReports;
         diagnostics[0]
@@ -535,7 +538,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 2,
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
-            Now
+            _now
         );
         operations.CompleteStopCount("channel").ShouldBe(0);
         var pending = harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem();
@@ -588,7 +591,7 @@ public sealed class EventSubChannelRecoveryTests
             attempt: 1,
             TwitchEventSubChannelRecoveryTrigger.Explicit,
             TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
-            Now
+            _now
         );
         degraded.ToString().ShouldNotContain("terminal delete secret");
         harness.RuntimeStatus.Current.IsConnected.ShouldBeTrue();
@@ -929,7 +932,7 @@ public sealed class EventSubChannelRecoveryTests
         TwitchEventSubSubscriptionReconciliationStore? sharedPendingDeletions = null
     )
     {
-        var clock = new FixedTimeProvider(Now);
+        var clock = new FixedTimeProvider(_now);
         var attemptBuilder = new ResiliencePipelineBuilder { TimeProvider = clock };
         var recoveryBuilder = new ResiliencePipelineBuilder { TimeProvider = clock };
         var policy = new EventSubChannelRecoveryPolicy
@@ -1047,7 +1050,10 @@ public sealed class EventSubChannelRecoveryTests
 
         internal FixedTimeProvider Clock { get; } = clock;
 
-        public ValueTask DisposeAsync() => Session.DisposeAsync();
+        public ValueTask DisposeAsync()
+        {
+            return Session.DisposeAsync();
+        }
     }
 
     private sealed class ScriptedChannelOperations : ITwitchEventSubChannelOperations
@@ -1055,104 +1061,137 @@ public sealed class EventSubChannelRecoveryTests
         private readonly Dictionary<
             string,
             Queue<Func<CancellationToken, ValueTask<TwitchBotAccount>>>
-        > accountScripts = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, Queue<Exception>> createFailures = new(
+        > _accountScripts = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Queue<Exception>> _createFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, int> createCounts = new(
+        private readonly Dictionary<string, int> _createCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, Queue<Exception>> deleteFailures = new(
+        private readonly Dictionary<string, Queue<Exception>> _deleteFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, Queue<Action>> beforeDelete = new(
+        private readonly Dictionary<string, Queue<Action>> _beforeDelete = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, int> deleteCounts = new(
+        private readonly Dictionary<string, int> _deleteCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, List<ActiveEventSubSubscription>> deleteAttempts =
+        private readonly Dictionary<string, List<ActiveEventSubSubscription>> _deleteAttempts =
             new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, int> startupDeliveryCounts = new(
+        private readonly Dictionary<string, int> _startupDeliveryCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, int> channelStartedCounts = new(
+        private readonly Dictionary<string, int> _channelStartedCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, Queue<Exception>> channelStartedFailures = new(
+        private readonly Dictionary<string, Queue<Exception>> _channelStartedFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, int> completeStopCounts = new(
+        private readonly Dictionary<string, int> _completeStopCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, Queue<Exception>> completeStopFailures = new(
+        private readonly Dictionary<string, Queue<Exception>> _completeStopFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
 
         internal void EnqueueAccount(
             string channel,
             Func<CancellationToken, ValueTask<TwitchBotAccount>> operation
-        ) => GetQueue(accountScripts, channel).Enqueue(operation);
+        )
+        {
+            GetQueue(_accountScripts, channel).Enqueue(operation);
+        }
 
-        internal void EnqueueAccountFailure(string channel, Exception exception) =>
+        internal void EnqueueAccountFailure(string channel, Exception exception)
+        {
             EnqueueAccount(channel, _ => ValueTask.FromException<TwitchBotAccount>(exception));
+        }
 
-        internal void EnqueueAccountResult(string channel, string botLogin) =>
+        internal void EnqueueAccountResult(string channel, string botLogin)
+        {
             EnqueueAccount(
                 channel,
                 _ => ValueTask.FromResult(new TwitchBotAccount(botLogin, "secret"))
             );
+        }
 
-        internal void EnqueueCreateFailure(string channel, Exception exception) =>
-            GetQueue(createFailures, channel).Enqueue(exception);
+        internal void EnqueueCreateFailure(string channel, Exception exception)
+        {
+            GetQueue(_createFailures, channel).Enqueue(exception);
+        }
 
-        internal int CreateCount(string channel) =>
-            createCounts.GetValueOrDefault(channel);
+        internal int CreateCount(string channel)
+        {
+            return _createCounts.GetValueOrDefault(channel);
+        }
 
-        internal void EnqueueDeleteFailure(string channel, Exception exception) =>
-            GetQueue(deleteFailures, channel).Enqueue(exception);
+        internal void EnqueueDeleteFailure(string channel, Exception exception)
+        {
+            GetQueue(_deleteFailures, channel).Enqueue(exception);
+        }
 
-        internal void EnqueueBeforeDelete(string channel, Action action) =>
-            GetQueue(beforeDelete, channel).Enqueue(action);
+        internal void EnqueueBeforeDelete(string channel, Action action)
+        {
+            GetQueue(_beforeDelete, channel).Enqueue(action);
+        }
 
-        internal int DeleteCount(string channel) =>
-            deleteCounts.GetValueOrDefault(channel);
+        internal int DeleteCount(string channel)
+        {
+            return _deleteCounts.GetValueOrDefault(channel);
+        }
 
         internal IReadOnlyList<ActiveEventSubSubscription> DeleteAttempts(
             string channel
-        ) =>
-            deleteAttempts.TryGetValue(channel, out var attempts)
+        )
+        {
+            return _deleteAttempts.TryGetValue(channel, out var attempts)
                 ? attempts.ToArray()
                 : [];
+        }
 
-        internal int StartupDeliveryCount(string channel) =>
-            startupDeliveryCounts.GetValueOrDefault(channel);
+        internal int StartupDeliveryCount(string channel)
+        {
+            return _startupDeliveryCounts.GetValueOrDefault(channel);
+        }
 
-        internal int ChannelStartedCount(string channel) =>
-            channelStartedCounts.GetValueOrDefault(channel);
+        internal int ChannelStartedCount(string channel)
+        {
+            return _channelStartedCounts.GetValueOrDefault(channel);
+        }
 
         internal void EnqueueChannelStartedFailure(
             string channel,
             Exception exception
-        ) => GetQueue(channelStartedFailures, channel).Enqueue(exception);
+        )
+        {
+            GetQueue(_channelStartedFailures, channel).Enqueue(exception);
+        }
 
-        internal int CompleteStopCount(string channel) =>
-            completeStopCounts.GetValueOrDefault(channel);
+        internal int CompleteStopCount(string channel)
+        {
+            return _completeStopCounts.GetValueOrDefault(channel);
+        }
 
         internal void EnqueueCompleteStopFailure(
             string channel,
             Exception exception
-        ) => GetQueue(completeStopFailures, channel).Enqueue(exception);
+        )
+        {
+            GetQueue(_completeStopFailures, channel).Enqueue(exception);
+        }
 
         public ValueTask<TwitchBotAccount> ResolveAccountAsync(
             string channel,
             CancellationToken cancellationToken
-        ) =>
-            accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
+        )
+        {
+            return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
                 ? scripts.Dequeue()(cancellationToken)
                 : ValueTask.FromResult(
                     new TwitchBotAccount($"{channel}-bot", $"{channel}-secret")
                 );
+        }
 
         public ValueTask<ActiveEventSubSubscription> CreateSubscriptionAsync(
             string channel,
@@ -1161,9 +1200,9 @@ public sealed class EventSubChannelRecoveryTests
             CancellationToken cancellationToken
         )
         {
-            createCounts[channel] = CreateCount(channel) + 1;
+            _createCounts[channel] = CreateCount(channel) + 1;
             if (
-                createFailures.TryGetValue(channel, out var failures)
+                _createFailures.TryGetValue(channel, out var failures)
                 && failures.Count > 0
             )
             {
@@ -1189,7 +1228,7 @@ public sealed class EventSubChannelRecoveryTests
             CancellationToken cancellationToken
         )
         {
-            startupDeliveryCounts[channel] = StartupDeliveryCount(channel) + 1;
+            _startupDeliveryCounts[channel] = StartupDeliveryCount(channel) + 1;
             return ValueTask.CompletedTask;
         }
 
@@ -1198,9 +1237,9 @@ public sealed class EventSubChannelRecoveryTests
             CancellationToken cancellationToken
         )
         {
-            channelStartedCounts[channel] = ChannelStartedCount(channel) + 1;
+            _channelStartedCounts[channel] = ChannelStartedCount(channel) + 1;
             if (
-                channelStartedFailures.TryGetValue(channel, out var failures)
+                _channelStartedFailures.TryGetValue(channel, out var failures)
                 && failures.Count > 0
             )
             {
@@ -1215,16 +1254,16 @@ public sealed class EventSubChannelRecoveryTests
             CancellationToken cancellationToken
         )
         {
-            deleteCounts[subscription.Channel] = DeleteCount(subscription.Channel) + 1;
-            if (!deleteAttempts.TryGetValue(subscription.Channel, out var attempts))
+            _deleteCounts[subscription.Channel] = DeleteCount(subscription.Channel) + 1;
+            if (!_deleteAttempts.TryGetValue(subscription.Channel, out var attempts))
             {
                 attempts = [];
-                deleteAttempts[subscription.Channel] = attempts;
+                _deleteAttempts[subscription.Channel] = attempts;
             }
 
             attempts.Add(subscription);
             if (
-                beforeDelete.TryGetValue(subscription.Channel, out var actions)
+                _beforeDelete.TryGetValue(subscription.Channel, out var actions)
                 && actions.Count > 0
             )
             {
@@ -1232,7 +1271,7 @@ public sealed class EventSubChannelRecoveryTests
             }
 
             if (
-                !deleteFailures.TryGetValue(subscription.Channel, out var failures)
+                !_deleteFailures.TryGetValue(subscription.Channel, out var failures)
                 || failures.Count == 0
             )
             {
@@ -1269,8 +1308,8 @@ public sealed class EventSubChannelRecoveryTests
             CancellationToken cancellationToken
         )
         {
-            completeStopCounts[channel] = CompleteStopCount(channel) + 1;
-            return completeStopFailures.TryGetValue(channel, out var failures)
+            _completeStopCounts[channel] = CompleteStopCount(channel) + 1;
+            return _completeStopFailures.TryGetValue(channel, out var failures)
                 && failures.Count > 0
                 ? ValueTask.FromException(failures.Dequeue())
                 : ValueTask.CompletedTask;
@@ -1293,18 +1332,20 @@ public sealed class EventSubChannelRecoveryTests
 
     private sealed class RecordingDiagnostics : ITwitchEventSubChannelDiagnosticReporter
     {
-        private readonly object gate = new();
-        private readonly List<TwitchEventSubChannelDiagnosticReport> reports = [];
-        private readonly Queue<Exception> failures = [];
-        private readonly Channel<TwitchEventSubChannelStatus> transitions =
+        private readonly object _gate = new();
+        private readonly List<TwitchEventSubChannelDiagnosticReport> _reports = [];
+        private readonly Queue<Exception> _failures = [];
+        private readonly Channel<TwitchEventSubChannelStatus> _transitions =
             Channel.CreateUnbounded<TwitchEventSubChannelStatus>();
 
         internal IReadOnlyList<TwitchEventSubChannelStatus> Reports
         {
             get
             {
-                lock (gate)
-                    return reports.Select(report => report.Status).ToArray();
+                lock (_gate)
+                {
+                    return _reports.Select(report => report.Status).ToArray();
+                }
             }
         }
 
@@ -1312,39 +1353,50 @@ public sealed class EventSubChannelRecoveryTests
         {
             get
             {
-                lock (gate)
-                    return reports.ToArray();
+                lock (_gate)
+                {
+                    return _reports.ToArray();
+                }
             }
         }
 
         public void Report(TwitchEventSubChannelDiagnosticReport report)
         {
-            lock (gate)
+            lock (_gate)
             {
-                if (failures.TryDequeue(out var failure))
+                if (_failures.TryDequeue(out var failure))
+                {
                     throw failure;
+                }
 
-                reports.Add(report);
+                _reports.Add(report);
             }
 
-            transitions.Writer.TryWrite(report.Status).ShouldBeTrue();
+            _transitions.Writer.TryWrite(report.Status).ShouldBeTrue();
         }
 
         internal void EnqueueFailure(Exception failure)
         {
-            lock (gate)
-                failures.Enqueue(failure);
+            lock (_gate)
+            {
+                _failures.Enqueue(failure);
+            }
         }
 
         internal void Clear()
         {
-            lock (gate)
-                reports.Clear();
-            while (transitions.Reader.TryRead(out _)) { }
+            lock (_gate)
+            {
+                _reports.Clear();
+            }
+
+            while (_transitions.Reader.TryRead(out _)) { }
         }
 
-        internal ValueTask<TwitchEventSubChannelStatus> NextAsync() =>
-            transitions.Reader.ReadAsync();
+        internal ValueTask<TwitchEventSubChannelStatus> NextAsync()
+        {
+            return _transitions.Reader.ReadAsync();
+        }
     }
 
     private sealed class RecordingChatObserver : ITwitchChatMessageObserver
@@ -1367,24 +1419,32 @@ public sealed class EventSubChannelRecoveryTests
             TwitchChatMessage sourceMessage,
             TwitchCommandResponse response,
             CancellationToken cancellationToken
-        ) => throw new InvalidOperationException("No command response was expected.");
+        )
+        {
+            throw new InvalidOperationException("No command response was expected.");
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
-        private readonly object gate = new();
-        private readonly HashSet<ManualTimer> timers = [];
-        private DateTimeOffset now = initialNow;
+        private readonly object _gate = new();
+        private readonly HashSet<ManualTimer> _timers = [];
+        private DateTimeOffset _now = initialNow;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
         public override DateTimeOffset GetUtcNow()
         {
-            lock (gate)
-                return now;
+            lock (_gate)
+            {
+                return _now;
+            }
         }
 
-        public override long GetTimestamp() => GetUtcNow().UtcTicks;
+        public override long GetTimestamp()
+        {
+            return GetUtcNow().UtcTicks;
+        }
 
         public override ITimer CreateTimer(
             TimerCallback callback,
@@ -1401,26 +1461,32 @@ public sealed class EventSubChannelRecoveryTests
         internal void Advance(TimeSpan duration)
         {
             ManualTimer[] due;
-            lock (gate)
+            lock (_gate)
             {
-                now = now.Add(duration);
-                due = timers.Where(timer => timer.IsDue(now)).ToArray();
+                _now = _now.Add(duration);
+                due = _timers.Where(timer => timer.IsDue(_now)).ToArray();
             }
 
             foreach (var timer in due)
+            {
                 timer.Fire();
+            }
         }
 
         private void Add(ManualTimer timer)
         {
-            lock (gate)
-                timers.Add(timer);
+            lock (_gate)
+            {
+                _timers.Add(timer);
+            }
         }
 
         private void Remove(ManualTimer timer)
         {
-            lock (gate)
-                timers.Remove(timer);
+            lock (_gate)
+            {
+                _timers.Remove(timer);
+            }
         }
 
         private sealed class ManualTimer(
@@ -1429,25 +1495,29 @@ public sealed class EventSubChannelRecoveryTests
             object? state
         ) : ITimer
         {
-            private TimeSpan period = Timeout.InfiniteTimeSpan;
-            private DateTimeOffset dueAt = DateTimeOffset.MaxValue;
-            private bool disposed;
+            private TimeSpan _period = Timeout.InfiniteTimeSpan;
+            private DateTimeOffset _dueAt = DateTimeOffset.MaxValue;
+            private bool _disposed;
 
-            internal bool IsDue(DateTimeOffset current) =>
-                !disposed && dueAt <= current;
+            internal bool IsDue(DateTimeOffset current)
+            {
+                return !_disposed && _dueAt <= current;
+            }
 
             public bool Change(TimeSpan dueTime, TimeSpan period)
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (disposed)
+                    if (_disposed)
+                    {
                         return false;
+                    }
 
-                    this.period = period;
-                    dueAt =
+                    _period = period;
+                    _dueAt =
                         dueTime == Timeout.InfiniteTimeSpan
                             ? DateTimeOffset.MaxValue
-                            : owner.now.Add(dueTime);
+                            : owner._now.Add(dueTime);
                     owner.Add(this);
                     return true;
                 }
@@ -1455,15 +1525,17 @@ public sealed class EventSubChannelRecoveryTests
 
             internal void Fire()
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (!IsDue(owner.now))
+                    if (!IsDue(owner._now))
+                    {
                         return;
+                    }
 
-                    dueAt =
-                        period == Timeout.InfiniteTimeSpan
+                    _dueAt =
+                        _period == Timeout.InfiniteTimeSpan
                             ? DateTimeOffset.MaxValue
-                            : owner.now.Add(period);
+                            : owner._now.Add(_period);
                 }
 
                 callback(state);
@@ -1471,12 +1543,14 @@ public sealed class EventSubChannelRecoveryTests
 
             public void Dispose()
             {
-                lock (owner.gate)
+                lock (owner._gate)
                 {
-                    if (disposed)
+                    if (_disposed)
+                    {
                         return;
+                    }
 
-                    disposed = true;
+                    _disposed = true;
                     owner.Remove(this);
                 }
             }

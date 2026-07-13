@@ -810,8 +810,9 @@ public sealed class CustomAnnouncementSchedulerTests
         string[] variants,
         DateTime createdAtUtc,
         DateTime? lastSentAtUtc = null
-    ) =>
-        await SeedAnnouncementWithPolicyAsync(
+    )
+    {
+        return await SeedAnnouncementWithPolicyAsync(
             dbFactory,
             hostId,
             schedule,
@@ -821,6 +822,7 @@ public sealed class CustomAnnouncementSchedulerTests
             TimeSpan.FromSeconds(30),
             lastSentAtUtc
         );
+    }
 
     private static async Task<AnnouncementSeed> SeedAnnouncementWithPolicyAsync(
         SqliteBlokeBotDbFactory dbFactory,
@@ -878,8 +880,10 @@ public sealed class CustomAnnouncementSchedulerTests
         return new AnnouncementSeed(announcement.Id, entry.Id);
     }
 
-    private static TwitchChatMessage Message(string login, string channel, string text) =>
-        new(login, channel, text, text, new Dictionary<string, string>());
+    private static TwitchChatMessage Message(string login, string channel, string text)
+    {
+        return new(login, channel, text, text, new Dictionary<string, string>());
+    }
 
     private sealed record AnnouncementSeed(int AnnouncementId, int MessageLibraryEntryId);
 
@@ -895,7 +899,7 @@ public sealed class CustomAnnouncementSchedulerTests
         params AnnouncementEnqueueOutcome[] outcomes
     ) : ICustomAnnouncementSender
     {
-        private readonly Queue<AnnouncementEnqueueOutcome> remaining = new(outcomes);
+        private readonly Queue<AnnouncementEnqueueOutcome> _remaining = new(outcomes);
 
         public List<AnnouncementEnqueueCall> Calls { get; } = [];
 
@@ -909,8 +913,8 @@ public sealed class CustomAnnouncementSchedulerTests
             cancellationToken.ThrowIfCancellationRequested();
             Calls.Add(new AnnouncementEnqueueCall(channel, message, expiresAt));
             return ValueTask.FromResult(
-                remaining.Count > 0
-                    ? remaining.Dequeue()
+                _remaining.Count > 0
+                    ? _remaining.Dequeue()
                     : throw new InvalidOperationException("No scripted enqueue outcome remains.")
             );
         }
@@ -946,7 +950,9 @@ public sealed class CustomAnnouncementSchedulerTests
         )
         {
             if (channel == throwingChannel)
+            {
                 throw new InvalidOperationException("sensitive provider detail");
+            }
 
             AcceptedChannels.Add(channel);
             return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
@@ -960,9 +966,15 @@ public sealed class CustomAnnouncementSchedulerTests
         public List<string> Entries { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull => null;
+            where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,
@@ -970,7 +982,10 @@ public sealed class CustomAnnouncementSchedulerTests
             TState state,
             Exception? exception,
             Func<TState, Exception?, string> formatter
-        ) => Entries.Add(formatter(state, exception));
+        )
+        {
+            Entries.Add(formatter(state, exception));
+        }
     }
 
     private sealed class RecordingChatMessageSender : ICustomAnnouncementSender
@@ -1024,13 +1039,16 @@ public sealed class CustomAnnouncementSchedulerTests
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {
-        private DateTimeOffset current = now;
+        private DateTimeOffset _current = now;
 
-        public override DateTimeOffset GetUtcNow() => current;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return _current;
+        }
 
         public void SetUtcNow(DateTimeOffset value)
         {
-            current = value;
+            _current = value;
         }
     }
 }

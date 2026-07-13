@@ -4,13 +4,13 @@ internal sealed class TwitchAccessTokenCache
     : ITwitchAccessTokenCache,
         ITwitchAccessTokenCacheTransaction
 {
-    private readonly SemaphoreSlim gate = new(1, 1);
-    private TwitchTokenSet? current;
-    private bool loaded;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private TwitchTokenSet? _current;
+    private bool _loaded;
 
-    bool ITwitchAccessTokenCacheTransaction.IsLoaded => loaded;
+    bool ITwitchAccessTokenCacheTransaction.IsLoaded => _loaded;
 
-    TwitchTokenSet? ITwitchAccessTokenCacheTransaction.Current => current;
+    TwitchTokenSet? ITwitchAccessTokenCacheTransaction.Current => _current;
 
     async Task<TResult> ITwitchAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
         Func<ITwitchAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
@@ -19,34 +19,34 @@ internal sealed class TwitchAccessTokenCache
     {
         ArgumentNullException.ThrowIfNull(operation);
 
-        await gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken);
         try
         {
             return await operation(this, cancellationToken);
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
         }
     }
 
     public async Task ClearAsync(CancellationToken cancellationToken)
     {
-        await gate.WaitAsync(cancellationToken);
+        await _gate.WaitAsync(cancellationToken);
         try
         {
-            current = null;
-            loaded = true;
+            _current = null;
+            _loaded = true;
         }
         finally
         {
-            gate.Release();
+            _gate.Release();
         }
     }
 
     void ITwitchAccessTokenCacheTransaction.SetLoaded(TwitchTokenSet? tokenSet)
     {
-        current = tokenSet;
-        loaded = true;
+        _current = tokenSet;
+        _loaded = true;
     }
 }

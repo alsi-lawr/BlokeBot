@@ -4,8 +4,9 @@ namespace BlokeBot.Features.HostedChannels;
 
 public static class HostFeatureCatalog
 {
-    public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures) =>
-        [
+    public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures)
+    {
+        return [
             new(
                 HostFeatureFlags.Guessing,
                 "Guessing game",
@@ -25,7 +26,10 @@ public static class HostFeatureCatalog
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
         ];
+    }
 
-    public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature) =>
-        (enabledFeatures & feature) == feature;
+    public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature)
+    {
+        return (enabledFeatures & feature) == feature;
+    }
 }

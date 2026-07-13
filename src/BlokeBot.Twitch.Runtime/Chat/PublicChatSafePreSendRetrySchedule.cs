@@ -5,7 +5,10 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal readonly record struct PublicChatSafePreSendFailureCount(int Value)
 {
-    internal PublicChatSafePreSendFailureCount Next() => new(checked(Value + 1));
+    internal PublicChatSafePreSendFailureCount Next()
+    {
+        return new(checked(Value + 1));
+    }
 }
 
 internal abstract record PublicChatSafePreSendRetryDecision
@@ -51,8 +54,9 @@ internal static class PublicChatSafePreSendRetrySchedule
     private static TimeSpan DelayFor(
         PublicChatRetryPolicy policy,
         PublicChatSafePreSendFailureCount failureCount
-    ) =>
-        policy.DelayBackoffType switch
+    )
+    {
+        return policy.DelayBackoffType switch
         {
             DelayBackoffType.Constant => policy.Delay,
             DelayBackoffType.Linear => LinearDelay(
@@ -69,15 +73,18 @@ internal static class PublicChatSafePreSendRetrySchedule
                 $"Unknown public chat retry backoff type {policy.DelayBackoffType}."
             ),
         };
+    }
 
     private static TimeSpan LinearDelay(
         TimeSpan delay,
         TimeSpan maximumDelay,
         int retryNumber
-    ) =>
-        delay.Ticks > maximumDelay.Ticks / retryNumber
+    )
+    {
+        return delay.Ticks > maximumDelay.Ticks / retryNumber
             ? maximumDelay
             : TimeSpan.FromTicks(delay.Ticks * retryNumber);
+    }
 
     private static TimeSpan ExponentialDelay(
         TimeSpan delay,
@@ -89,7 +96,9 @@ internal static class PublicChatSafePreSendRetrySchedule
         for (var index = 1; index < retryNumber; index++)
         {
             if (backoff.Ticks > maximumDelay.Ticks / 2)
+            {
                 return maximumDelay;
+            }
 
             backoff = TimeSpan.FromTicks(backoff.Ticks * 2);
         }
