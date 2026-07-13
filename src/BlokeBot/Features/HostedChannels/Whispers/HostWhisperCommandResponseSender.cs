@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Net;
+using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -25,138 +28,274 @@ public sealed class HostWhisperCommandResponseSender(
     {
         if (response.Target != TwitchCommandResponseTarget.Whisper)
         {
-            await chat.SendAsync(
-                sourceMessage.Channel,
+            await SendPublicChatAsync(sourceMessage.Channel, response.Message, cancellationToken);
+            return;
+        }
+
+        var result = await Deliver(sourceMessage, response.Message).ExecuteAsync(cancellationToken);
+        await result.Match(
+            _ => ValueTask.CompletedTask,
+            error => HandlePrivateDeliveryErrorAsync(
+                sourceMessage,
                 response.Message,
-                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                error,
                 cancellationToken
-            );
-            return;
-        }
-
-        var result = await TrySendWhisperAsync(sourceMessage, response.Message, cancellationToken);
-        if (result.Outcome == HostWhisperSendOutcome.Sent)
-        {
-            return;
-        }
-
-        log.LogInformation(
-            "Falling back to public chat response for {Login} in #{Channel}. Whisper outcome: {Outcome}; StatusCode: {StatusCode}; Detail: {Detail}.",
-            sourceMessage.Login,
-            sourceMessage.Channel,
-            result.Outcome,
-            result.StatusCode?.ToString() ?? "n/a",
-            result.Detail ?? "n/a"
-        );
-        await chat.SendAsync(
-            sourceMessage.Channel,
-            response.Message,
-            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-            cancellationToken
+            )
         );
     }
 
-    private async Task<HostWhisperSendResult> TrySendWhisperAsync(
+    public IO<PrivateDeliveryReceipt, PrivateDeliveryError> Deliver(
+        TwitchChatMessage sourceMessage,
+        string message
+    )
+    {
+        ArgumentNullException.ThrowIfNull(sourceMessage);
+        ArgumentNullException.ThrowIfNull(message);
+        return IO<PrivateDeliveryReceipt, PrivateDeliveryError>.Create(cancellationToken =>
+            DeliverAsync(sourceMessage, message, cancellationToken)
+        );
+    }
+
+    private async ValueTask<Result<PrivateDeliveryReceipt, PrivateDeliveryError>> DeliverAsync(
         TwitchChatMessage sourceMessage,
         string message,
         CancellationToken cancellationToken
     )
     {
+        PreparedPrivateDelivery prepared;
         try
         {
-            var host = await ResolveHostAsync(sourceMessage.Channel, cancellationToken);
-            if (host is null)
+            var preparation = await PrepareAsync(sourceMessage, cancellationToken);
+            if (preparation is PrivateDeliveryPreparation.Failed failed)
             {
-                return new HostWhisperSendResult(HostWhisperSendOutcome.Disabled);
+                return Error(failed.Error);
             }
 
-            var tokenStatus = await botAccounts.GetCustomBotTokenStatusAsync(
-                host.Id,
-                [TwitchScopes.UserManageWhispers],
-                cancellationToken
-            );
-            if (
-                tokenStatus.State != TwitchTokenStatusState.Ready
-                || string.IsNullOrWhiteSpace(tokenStatus.AccessToken)
-                || tokenStatus.Validation is null
-            )
+            prepared = preparation switch
             {
-                return new HostWhisperSendResult(HostWhisperSendOutcome.CustomBotUnavailable);
-            }
-
-            var recipientUserId = await ResolveRecipientUserIdAsync(
-                sourceMessage,
-                tokenStatus.AccessToken,
-                cancellationToken
-            );
-            if (string.IsNullOrWhiteSpace(recipientUserId))
-            {
-                return new HostWhisperSendResult(HostWhisperSendOutcome.RecipientUnavailable);
-            }
-
-            var senderUserId = tokenStatus.Validation.UserId;
-            if (string.Equals(senderUserId, recipientUserId, StringComparison.Ordinal))
-            {
-                return new HostWhisperSendResult(
-                    HostWhisperSendOutcome.SelfRecipient,
-                    Detail: "sender and recipient user IDs match"
-                );
-            }
-
-            var reservation = await quota.ReserveRecipientAsync(
-                host.Id,
-                senderUserId,
-                recipientUserId,
-                sourceMessage.Login,
-                cancellationToken
-            );
-            if (!reservation.Allowed)
-            {
-                return new HostWhisperSendResult(HostWhisperSendOutcome.QuotaExceeded);
-            }
-
-            var result = await helix.SendWhisperAsync(
-                tokenStatus.AccessToken,
-                senderUserId,
-                recipientUserId,
-                message,
-                cancellationToken
-            );
-            if (result.IsAccepted)
-            {
-                return new HostWhisperSendResult(HostWhisperSendOutcome.Sent);
-            }
-
-            if (result.Status == TwitchWhisperSendStatus.RateLimited)
-            {
-                await quota.MarkExhaustedAsync(host.Id, senderUserId, cancellationToken);
-                return new HostWhisperSendResult(
-                    HostWhisperSendOutcome.RateLimited,
-                    result.StatusCode,
-                    result.ResponseBody
-                );
-            }
-
-            return new HostWhisperSendResult(
-                HostWhisperSendOutcome.Rejected,
-                result.StatusCode,
-                result.ResponseBody
-            );
+                PrivateDeliveryPreparation.Ready ready => ready.Delivery,
+                _ => throw new UnreachableException("Unknown private-delivery preparation."),
+            };
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex)
+        catch (HttpRequestException exception)
         {
-            log.LogWarning(
-                ex,
-                "Could not send Twitch whisper response to {Login} in #{Channel}.",
-                sourceMessage.Login,
-                sourceMessage.Channel
-            );
-            return new HostWhisperSendResult(HostWhisperSendOutcome.Rejected, Detail: ex.Message);
+            return Error(new PrivateDeliveryError.Transient(exception));
         }
+        catch (IOException exception)
+        {
+            return Error(new PrivateDeliveryError.Transient(exception));
+        }
+        catch (JsonException exception)
+        {
+            return Error(new PrivateDeliveryError.Transient(exception));
+        }
+        catch (TimeoutException exception)
+        {
+            return Error(new PrivateDeliveryError.Transient(exception));
+        }
+        catch (OperationCanceledException exception)
+        {
+            return Error(new PrivateDeliveryError.Transient(exception));
+        }
+        catch (Exception exception)
+        {
+            return Error(new PrivateDeliveryError.Unexpected(exception));
+        }
+
+        try
+        {
+            var result = await helix.SendWhisperAsync(
+                prepared.AccessToken,
+                prepared.SenderUserId,
+                prepared.RecipientUserId,
+                message,
+                cancellationToken
+            );
+            return result.Status switch
+            {
+                TwitchWhisperSendStatus.Accepted => Success(),
+                TwitchWhisperSendStatus.RateLimited => await RateLimitedAsync(
+                    prepared,
+                    result.StatusCode,
+                    cancellationToken
+                ),
+                TwitchWhisperSendStatus.Rejected => Error(
+                    new PrivateDeliveryError.Rejected(result.StatusCode)
+                ),
+                _ => throw new UnreachableException("Unknown Twitch whisper send status."),
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException exception)
+        {
+            return Error(new PrivateDeliveryError.Ambiguous(exception));
+        }
+        catch (IOException exception)
+        {
+            return Error(new PrivateDeliveryError.Ambiguous(exception));
+        }
+        catch (JsonException exception)
+        {
+            return Error(new PrivateDeliveryError.Ambiguous(exception));
+        }
+        catch (TimeoutException exception)
+        {
+            return Error(new PrivateDeliveryError.Ambiguous(exception));
+        }
+        catch (OperationCanceledException exception)
+        {
+            return Error(new PrivateDeliveryError.Ambiguous(exception));
+        }
+        catch (Exception exception)
+        {
+            return Error(new PrivateDeliveryError.Unexpected(exception));
+        }
+    }
+
+    private async ValueTask<PrivateDeliveryPreparation> PrepareAsync(
+        TwitchChatMessage sourceMessage,
+        CancellationToken cancellationToken
+    )
+    {
+        var host = await ResolveHostAsync(sourceMessage.Channel, cancellationToken);
+        if (host is null)
+        {
+            return new PrivateDeliveryPreparation.Failed(new PrivateDeliveryError.Disabled());
+        }
+
+        var tokenStatus = await botAccounts.GetCustomBotTokenStatusAsync(
+            host.Id,
+            [TwitchScopes.UserManageWhispers],
+            cancellationToken
+        );
+        if (
+            tokenStatus.State != TwitchTokenStatusState.Ready
+            || string.IsNullOrWhiteSpace(tokenStatus.AccessToken)
+            || tokenStatus.Validation is null
+        )
+        {
+            return new PrivateDeliveryPreparation.Failed(
+                new PrivateDeliveryError.SenderIdentityUnavailable()
+            );
+        }
+
+        var recipientUserId = await ResolveRecipientUserIdAsync(
+            sourceMessage,
+            tokenStatus.AccessToken,
+            cancellationToken
+        );
+        if (string.IsNullOrWhiteSpace(recipientUserId))
+        {
+            return new PrivateDeliveryPreparation.Failed(
+                new PrivateDeliveryError.RecipientUnavailable()
+            );
+        }
+
+        var senderUserId = tokenStatus.Validation.UserId;
+        if (string.Equals(senderUserId, recipientUserId, StringComparison.Ordinal))
+        {
+            return new PrivateDeliveryPreparation.Failed(new PrivateDeliveryError.SelfRecipient());
+        }
+
+        var reservation = await quota
+            .ReserveRecipient(host.Id, senderUserId, recipientUserId, sourceMessage.Login)
+            .ExecuteAsync(cancellationToken);
+        return reservation.Match<PrivateDeliveryPreparation>(
+            _ =>
+                new PrivateDeliveryPreparation.Ready(
+                    new PreparedPrivateDelivery(
+                        host.Id,
+                        tokenStatus.AccessToken,
+                        senderUserId,
+                        recipientUserId
+                    )
+                ),
+            error =>
+                error switch
+                {
+                    WhisperQuotaReservationError.InvalidIdentity =>
+                        new PrivateDeliveryPreparation.Failed(
+                            new PrivateDeliveryError.SenderIdentityUnavailable()
+                        ),
+                    WhisperQuotaReservationError.DailyRecipientLimitReached limit =>
+                        new PrivateDeliveryPreparation.Failed(
+                            new PrivateDeliveryError.QuotaExceeded(limit.Status)
+                        ),
+                    _ => throw new UnreachableException("Unknown whisper quota reservation error."),
+                }
+        );
+    }
+
+    private async ValueTask<Result<PrivateDeliveryReceipt, PrivateDeliveryError>> RateLimitedAsync(
+        PreparedPrivateDelivery prepared,
+        HttpStatusCode statusCode,
+        CancellationToken cancellationToken
+    )
+    {
+        await quota.MarkExhaustedAsync(
+            prepared.HostId,
+            prepared.SenderUserId,
+            cancellationToken
+        );
+        return Error(new PrivateDeliveryError.RateLimited(statusCode));
+    }
+
+    private async ValueTask HandlePrivateDeliveryErrorAsync(
+        TwitchChatMessage sourceMessage,
+        string message,
+        PrivateDeliveryError error,
+        CancellationToken cancellationToken
+    )
+    {
+        var diagnostic = error switch
+        {
+            PrivateDeliveryError.Disabled => new PrivateDeliveryDiagnostic(),
+            PrivateDeliveryError.SenderIdentityUnavailable => new PrivateDeliveryDiagnostic(),
+            PrivateDeliveryError.RecipientUnavailable => new PrivateDeliveryDiagnostic(),
+            PrivateDeliveryError.SelfRecipient => new PrivateDeliveryDiagnostic(),
+            PrivateDeliveryError.QuotaExceeded => new PrivateDeliveryDiagnostic(),
+            PrivateDeliveryError.RateLimited rateLimited =>
+                new PrivateDeliveryDiagnostic(StatusCode: rateLimited.StatusCode),
+            PrivateDeliveryError.Transient transient =>
+                new PrivateDeliveryDiagnostic(FailureType: transient.FailureType),
+            PrivateDeliveryError.Rejected rejected =>
+                new PrivateDeliveryDiagnostic(StatusCode: rejected.StatusCode),
+            PrivateDeliveryError.Ambiguous ambiguous =>
+                new PrivateDeliveryDiagnostic(FailureType: ambiguous.FailureType),
+            PrivateDeliveryError.Unexpected unexpected =>
+                new PrivateDeliveryDiagnostic(FailureType: unexpected.FailureType),
+            _ => throw new UnreachableException("Unknown private-delivery error."),
+        };
+        log.LogInformation(
+            "Falling back to public chat response for {Login} in #{Channel}. Whisper outcome: {Outcome}; StatusCode: {StatusCode}; FailureType: {FailureType}.",
+            sourceMessage.Login,
+            sourceMessage.Channel,
+            error.GetType().Name,
+            diagnostic.StatusCode?.ToString() ?? "n/a",
+            diagnostic.FailureType ?? "n/a"
+        );
+        await SendPublicChatAsync(sourceMessage.Channel, message, cancellationToken);
+    }
+
+    private Task SendPublicChatAsync(
+        string channel,
+        string message,
+        CancellationToken cancellationToken
+    )
+    {
+        return chat.SendAsync(
+            channel,
+            message,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
     }
 
     private async Task<WhisperHost?> ResolveHostAsync(
@@ -220,23 +359,41 @@ public sealed class HostWhisperCommandResponseSender(
             ?.Id;
     }
 
+    private static Result<PrivateDeliveryReceipt, PrivateDeliveryError> Success()
+    {
+        return Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Success(
+            new PrivateDeliveryReceipt()
+        );
+    }
+
+    private static Result<PrivateDeliveryReceipt, PrivateDeliveryError> Error(
+        PrivateDeliveryError error
+    )
+    {
+        return Result<PrivateDeliveryReceipt, PrivateDeliveryError>.Error(error);
+    }
+
     private sealed record WhisperHost(int Id);
 
-    private sealed record HostWhisperSendResult(
-        HostWhisperSendOutcome Outcome,
-        HttpStatusCode? StatusCode = null,
-        string? Detail = null
+    private sealed record PreparedPrivateDelivery(
+        int HostId,
+        string AccessToken,
+        string SenderUserId,
+        string RecipientUserId
     );
 
-    private enum HostWhisperSendOutcome
+    private abstract record PrivateDeliveryPreparation
     {
-        Sent,
-        Disabled,
-        CustomBotUnavailable,
-        RecipientUnavailable,
-        SelfRecipient,
-        QuotaExceeded,
-        RateLimited,
-        Rejected,
+        private PrivateDeliveryPreparation() { }
+
+        internal sealed record Ready(PreparedPrivateDelivery Delivery)
+            : PrivateDeliveryPreparation;
+
+        internal sealed record Failed(PrivateDeliveryError Error) : PrivateDeliveryPreparation;
     }
+
+    private sealed record PrivateDeliveryDiagnostic(
+        HttpStatusCode? StatusCode = null,
+        string? FailureType = null
+    );
 }

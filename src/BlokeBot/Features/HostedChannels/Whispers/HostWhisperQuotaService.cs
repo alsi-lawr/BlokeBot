@@ -1,5 +1,6 @@
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Functional;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
@@ -9,17 +10,27 @@ public sealed record WhisperQuotaStatus(int RecipientCount, int Limit, bool Exha
     public int Remaining => Math.Max(0, Limit - RecipientCount);
 }
 
-public enum WhisperQuotaReservationBlockReason
+public abstract record WhisperQuotaReservation
 {
-    DailyRecipientLimitReached,
+    private WhisperQuotaReservation() { }
+
+    public abstract WhisperQuotaStatus Status { get; init; }
+
+    public sealed record ExistingRecipient(WhisperQuotaStatus Status)
+        : WhisperQuotaReservation;
+
+    public sealed record NewRecipient(WhisperQuotaStatus Status) : WhisperQuotaReservation;
 }
 
-public sealed record WhisperQuotaReservationResult(
-    bool Allowed,
-    bool CountedNewRecipient,
-    WhisperQuotaReservationBlockReason? BlockReason,
-    WhisperQuotaStatus Status
-);
+public abstract record WhisperQuotaReservationError
+{
+    private WhisperQuotaReservationError() { }
+
+    public sealed record InvalidIdentity : WhisperQuotaReservationError;
+
+    public sealed record DailyRecipientLimitReached(WhisperQuotaStatus Status)
+        : WhisperQuotaReservationError;
+}
 
 public sealed class HostWhisperQuotaService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
@@ -53,7 +64,27 @@ public sealed class HostWhisperQuotaService(
             : new WhisperQuotaStatus(bucket.RecipientCount, UniqueRecipientLimit, bucket.Exhausted);
     }
 
-    public async Task<WhisperQuotaReservationResult> ReserveRecipientAsync(
+    public IO<WhisperQuotaReservation, WhisperQuotaReservationError> ReserveRecipient(
+        int hostId,
+        string botTwitchUserId,
+        string recipientTwitchUserId,
+        string recipientLogin
+    )
+    {
+        return IO<WhisperQuotaReservation, WhisperQuotaReservationError>.Create(ct =>
+            PersistReservationAsync(
+                hostId,
+                botTwitchUserId,
+                recipientTwitchUserId,
+                recipientLogin,
+                ct
+            )
+        );
+    }
+
+    private async ValueTask<
+        Result<WhisperQuotaReservation, WhisperQuotaReservationError>
+    > PersistReservationAsync(
         int hostId,
         string botTwitchUserId,
         string recipientTwitchUserId,
@@ -65,7 +96,9 @@ public sealed class HostWhisperQuotaService(
         var recipientUserId = NormalizeId(recipientTwitchUserId);
         if (string.IsNullOrWhiteSpace(botUserId) || string.IsNullOrWhiteSpace(recipientUserId))
         {
-            return Blocked(EmptyStatus());
+            return Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Error(
+                new WhisperQuotaReservationError.InvalidIdentity()
+            );
         }
 
         var now = clock.GetUtcNow().UtcDateTime;
@@ -95,7 +128,7 @@ public sealed class HostWhisperQuotaService(
         );
         if (existing)
         {
-            return Allowed(bucket, countedNewRecipient: false);
+            return Success(new WhisperQuotaReservation.ExistingRecipient(Status(bucket)));
         }
 
         if (bucket.Exhausted || bucket.Recipients.Count >= UniqueRecipientLimit)
@@ -103,7 +136,9 @@ public sealed class HostWhisperQuotaService(
             bucket.Exhausted = true;
             bucket.UpdatedAtUtc = now;
             await db.SaveChangesAsync(ct);
-            return Blocked(bucket);
+            return Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Error(
+                new WhisperQuotaReservationError.DailyRecipientLimitReached(Status(bucket))
+            );
         }
 
         bucket.Recipients.Add(
@@ -116,7 +151,7 @@ public sealed class HostWhisperQuotaService(
         );
         bucket.UpdatedAtUtc = now;
         await db.SaveChangesAsync(ct);
-        return Allowed(bucket, countedNewRecipient: true);
+        return Success(new WhisperQuotaReservation.NewRecipient(Status(bucket)));
     }
 
     public async Task MarkExhaustedAsync(int hostId, string botTwitchUserId, CancellationToken ct)
@@ -166,26 +201,15 @@ public sealed class HostWhisperQuotaService(
         return new(0, UniqueRecipientLimit, false);
     }
 
-    private static WhisperQuotaReservationResult Allowed(
-        WhisperQuotaBucket bucket,
-        bool countedNewRecipient
+    private static Result<WhisperQuotaReservation, WhisperQuotaReservationError> Success(
+        WhisperQuotaReservation reservation
     )
     {
-        return new(
-            true,
-            countedNewRecipient,
-            null,
-            new WhisperQuotaStatus(bucket.Recipients.Count, UniqueRecipientLimit, bucket.Exhausted)
-        );
+        return Result<WhisperQuotaReservation, WhisperQuotaReservationError>.Success(reservation);
     }
 
-    private static WhisperQuotaReservationResult Blocked(WhisperQuotaBucket bucket)
+    private static WhisperQuotaStatus Status(WhisperQuotaBucket bucket)
     {
-        return Blocked(new WhisperQuotaStatus(bucket.Recipients.Count, UniqueRecipientLimit, true));
-    }
-
-    private static WhisperQuotaReservationResult Blocked(WhisperQuotaStatus status)
-    {
-        return new(false, false, WhisperQuotaReservationBlockReason.DailyRecipientLimitReached, status);
+        return new(bucket.Recipients.Count, UniqueRecipientLimit, bucket.Exhausted);
     }
 }

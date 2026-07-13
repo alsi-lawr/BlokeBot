@@ -4,9 +4,9 @@ using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Whispers;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -17,223 +17,410 @@ namespace BlokeBot.Tests;
 public sealed class WhisperResponseTests
 {
     [Test]
-    public async Task SameRecipientSameDay_ReservingQuota_CountsOnce()
+    public async Task SameRecipientSameDay_ReservingQuota_ReturnsNewThenExistingRecipient()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var quota = new HostWhisperQuotaService(
-            dbFactory,
-            new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
-        );
+        var quota = CreateQuota(dbFactory);
 
-        var first = await quota.ReserveRecipientAsync(
-            hostId,
-            "bot-id",
-            "viewer-id",
-            "viewer",
-            CancellationToken.None
-        );
-        var second = await quota.ReserveRecipientAsync(
-            hostId,
-            "bot-id",
-            "viewer-id",
-            "Viewer",
-            CancellationToken.None
-        );
+        var first = await quota
+            .ReserveRecipient(hostId, "bot-id", "viewer-id", "viewer")
+            .ExecuteAsync(CancellationToken.None);
+        var second = await quota
+            .ReserveRecipient(hostId, "bot-id", "viewer-id", "Viewer")
+            .ExecuteAsync(CancellationToken.None);
 
-        first.Allowed.ShouldBeTrue();
-        first.CountedNewRecipient.ShouldBeTrue();
-        second.Allowed.ShouldBeTrue();
-        second.CountedNewRecipient.ShouldBeFalse();
-        second.Status.RecipientCount.ShouldBe(1);
+        first.Match(
+            success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+            _ => throw new InvalidOperationException("Expected a successful reservation.")
+        );
+        var existing = second.Match(
+            success => success.ShouldBeOfType<WhisperQuotaReservation.ExistingRecipient>(),
+            _ => throw new InvalidOperationException("Expected a successful reservation.")
+        );
+        existing.Status.RecipientCount.ShouldBe(1);
     }
 
     [Test]
-    public async Task QuotaAtLimit_ReservingExistingAndNewRecipient_AllowsExistingAndBlocksNew()
+    public async Task QuotaReservation_Construction_DefersPersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var quota = new HostWhisperQuotaService(
-            dbFactory,
-            new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
+        var quota = CreateQuota(dbFactory);
+
+        var reservation = quota.ReserveRecipient(hostId, "bot-id", "viewer-id", "viewer");
+        var beforeExecution = await quota.GetStatusAsync(
+            hostId,
+            "bot-id",
+            CancellationToken.None
         );
+        var result = await reservation.ExecuteAsync(CancellationToken.None);
+
+        beforeExecution.RecipientCount.ShouldBe(0);
+        result.Match(
+            success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+            _ => throw new InvalidOperationException("Expected a successful reservation.")
+        );
+    }
+
+    [Test]
+    public async Task InvalidIdentity_ReservingQuota_ReturnsTypedErrorWithoutPersistence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var quota = CreateQuota(dbFactory);
+
+        var result = await quota
+            .ReserveRecipient(hostId, " ", "viewer-id", "viewer")
+            .ExecuteAsync(CancellationToken.None);
+
+        result.Match(
+            _ => throw new InvalidOperationException("Expected an invalid identity error."),
+            error => error.ShouldBeOfType<WhisperQuotaReservationError.InvalidIdentity>()
+        );
+        (await quota.GetStatusAsync(hostId, "bot-id", CancellationToken.None))
+            .RecipientCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task QuotaAtLimit_ReservingExistingAndNewRecipient_ReturnsTypedCases()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var quota = CreateQuota(dbFactory);
 
         for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
         {
-            var result = await quota.ReserveRecipientAsync(
-                hostId,
-                "bot-id",
-                $"viewer-id-{index}",
-                $"viewer{index}",
-                CancellationToken.None
+            var result = await quota
+                .ReserveRecipient(
+                    hostId,
+                    "bot-id",
+                    $"viewer-id-{index}",
+                    $"viewer{index}"
+                )
+                .ExecuteAsync(CancellationToken.None);
+            result.Match(
+                success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
+                _ => throw new InvalidOperationException("Expected a successful reservation.")
             );
-            result.Allowed.ShouldBeTrue();
         }
 
-        var blocked = await quota.ReserveRecipientAsync(
-            hostId,
-            "bot-id",
-            "viewer-id-40",
-            "viewer40",
-            CancellationToken.None
-        );
-        var existing = await quota.ReserveRecipientAsync(
-            hostId,
-            "bot-id",
-            "viewer-id-0",
-            "viewer0",
-            CancellationToken.None
-        );
+        var blocked = await quota
+            .ReserveRecipient(hostId, "bot-id", "viewer-id-40", "viewer40")
+            .ExecuteAsync(CancellationToken.None);
+        var existing = await quota
+            .ReserveRecipient(hostId, "bot-id", "viewer-id-0", "viewer0")
+            .ExecuteAsync(CancellationToken.None);
 
-        blocked.Allowed.ShouldBeFalse();
-        blocked.Status.RecipientCount.ShouldBe(HostWhisperQuotaService.UniqueRecipientLimit);
-        blocked.Status.Exhausted.ShouldBeTrue();
-        existing.Allowed.ShouldBeTrue();
-        existing.Status.RecipientCount.ShouldBe(HostWhisperQuotaService.UniqueRecipientLimit);
-        existing.Status.Exhausted.ShouldBeTrue();
+        var limit = blocked.Match(
+            _ => throw new InvalidOperationException("Expected a quota error."),
+            error =>
+                error.ShouldBeOfType<
+                    WhisperQuotaReservationError.DailyRecipientLimitReached
+                >()
+        );
+        limit.Status.RecipientCount.ShouldBe(HostWhisperQuotaService.UniqueRecipientLimit);
+        limit.Status.Exhausted.ShouldBeTrue();
+        existing
+            .Match(
+                success => success,
+                _ => throw new InvalidOperationException("Expected an existing recipient.")
+            )
+            .ShouldBeOfType<WhisperQuotaReservation.ExistingRecipient>()
+            .Status.Exhausted.ShouldBeTrue();
     }
 
     [Test]
-    public async Task TwitchRateLimit_SendingWhisper_FallsBackToChatAndExhaustsQuota()
+    public async Task Delivery_Construction_DefersTokenQuotaAndHelixIo()
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCustomBotAsync(dbFactory, hostId);
-        var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.TooManyRequests);
-        var options = BotOptions();
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
-        var helixUsers = new TwitchHelixApiClient(httpClientFactory);
-        var hostBotAccounts = new HostBotAccountAuthorizationService(
-            dbFactory,
-            new HostBotAccountOAuthService(options, oauth, helixUsers),
-            oauth,
-            helixUsers,
-            new TwitchTokenStatusService(new ServiceCollection().BuildServiceProvider(), oauth),
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            options
-        );
-        var chat = new RecordingChatSender();
-        var quota = new HostWhisperQuotaService(
-            dbFactory,
-            new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
-        );
-        var sender = new HostWhisperCommandResponseSender(
-            chat,
-            hostBotAccounts,
-            quota,
-            helixUsers,
-            new TwitchHelixChatClient(
-                httpClientFactory,
-                options.Identity,
-                helixUsers
-            ),
-            dbFactory,
-            options.Identity,
-            NullLogger<HostWhisperCommandResponseSender>.Instance
-        );
-        var source = new TwitchChatMessage(
-            "viewer",
-            "streamer",
-            "!points",
-            "raw",
-            new Dictionary<string, string> { ["user-id"] = "viewer-id" }
+        await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
+
+        var delivery = harness.Sender.Deliver(harness.Source(), "your balance is 10");
+        var statusBeforeExecution = await harness.Quota.GetStatusAsync(
+            harness.HostId,
+            "custom-id",
+            CancellationToken.None
         );
 
-        await sender.SendAsync(
-            source,
+        harness.Http.ValidationRequestCount.ShouldBe(0);
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+        statusBeforeExecution.RecipientCount.ShouldBe(0);
+
+        var result = await delivery.ExecuteAsync(CancellationToken.None);
+
+        var receipt = result.Match(
+            receipt => receipt,
+            _ => throw new InvalidOperationException("Expected private delivery success.")
+        );
+        receipt.ShouldBe(new PrivateDeliveryReceipt());
+        harness.Http.ValidationRequestCount.ShouldBe(1);
+        harness.Http.WhisperRequestCount.ShouldBe(1);
+        (await harness.Quota.GetStatusAsync(
+                harness.HostId,
+                "custom-id",
+                CancellationToken.None
+            ))
+            .RecipientCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task DisabledWhispers_Delivering_ReturnsDisabledWithoutTokenOrHelixIo()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            whisperResponsesEnabled: false
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "message")
+        );
+
+        error.ShouldBeOfType<PrivateDeliveryError.Disabled>();
+        harness.Http.ValidationRequestCount.ShouldBe(0);
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task InvalidBotToken_Delivering_ReturnsSenderIdentityUnavailable()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            validationAccepted: false
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "message")
+        );
+
+        error.ShouldBeOfType<PrivateDeliveryError.SenderIdentityUnavailable>();
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task MissingRecipient_Delivering_ReturnsRecipientUnavailable()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            usersJson: """{"data":[]}"""
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(includeUserId: false), "message")
+        );
+
+        error.ShouldBeOfType<PrivateDeliveryError.RecipientUnavailable>();
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task SelfRecipient_Delivering_ReturnsSelfRecipientWithoutQuotaOrHelixIo()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(userId: "custom-id"), "message")
+        );
+
+        error.ShouldBeOfType<PrivateDeliveryError.SelfRecipient>();
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+        (await harness.Quota.GetStatusAsync(
+                harness.HostId,
+                "custom-id",
+                CancellationToken.None
+            ))
+            .RecipientCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ExhaustedQuota_Delivering_ReturnsQuotaExceededWithoutHelixIo()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
+        for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
+        {
+            _ = await harness.Quota
+                .ReserveRecipient(
+                    harness.HostId,
+                    "custom-id",
+                    $"recipient-{index}",
+                    $"viewer{index}"
+                )
+                .ExecuteAsync(CancellationToken.None);
+        }
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "message")
+        );
+
+        var quota = error.ShouldBeOfType<PrivateDeliveryError.QuotaExceeded>();
+        quota.Status.Exhausted.ShouldBeTrue();
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task TwitchRateLimit_Delivering_ReturnsRateLimitedAndExhaustsQuota()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.TooManyRequests,
+            whisperBody: "sensitive provider response"
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "sensitive private message")
+        );
+
+        var rateLimited = error.ShouldBeOfType<PrivateDeliveryError.RateLimited>();
+        rateLimited.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+        rateLimited.ToString().ShouldNotContain("sensitive");
+        (await harness.Quota.GetStatusAsync(
+                harness.HostId,
+                "custom-id",
+                CancellationToken.None
+            ))
+            .Exhausted.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task RejectedWhisper_Delivering_ReturnsRedactedStatus()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.BadRequest,
+            whisperBody: "sensitive provider response"
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "sensitive private message")
+        );
+
+        var rejected = error.ShouldBeOfType<PrivateDeliveryError.Rejected>();
+        rejected.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        rejected.ToString().ShouldNotContain("sensitive");
+    }
+
+    [Test]
+    public async Task RecipientLookupTransportFailure_Delivering_ReturnsTransientWithCause()
+    {
+        var cause = new HttpRequestException("sensitive lookup failure");
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            usersException: cause
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(includeUserId: false), "message")
+        );
+
+        var transient = error.ShouldBeOfType<PrivateDeliveryError.Transient>();
+        transient.Cause.ShouldBeSameAs(cause);
+        transient.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+        transient.ToString().ShouldNotContain("sensitive lookup failure");
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task WhisperTransportFailure_Delivering_ReturnsAmbiguousWithCause()
+    {
+        var cause = new IOException("sensitive send failure");
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            whisperException: cause
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(), "message")
+        );
+
+        var ambiguous = error.ShouldBeOfType<PrivateDeliveryError.Ambiguous>();
+        ambiguous.Cause.ShouldBeSameAs(cause);
+        ambiguous.FailureType.ShouldBe(typeof(IOException).FullName);
+        ambiguous.ToString().ShouldNotContain("sensitive send failure");
+    }
+
+    [Test]
+    public async Task UnexpectedPreparationFailure_Delivering_PreservesRedactedCause()
+    {
+        var cause = new SensitiveWhisperException("sensitive unexpected failure");
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            usersException: cause
+        );
+
+        var error = await ExecuteErrorAsync(
+            harness.Sender.Deliver(harness.Source(includeUserId: false), "message")
+        );
+
+        var unexpected = error.ShouldBeOfType<PrivateDeliveryError.Unexpected>();
+        unexpected.Cause.ShouldBeSameAs(cause);
+        unexpected.FailureType.ShouldBe(typeof(SensitiveWhisperException).FullName);
+        unexpected.ToString().ShouldNotContain("sensitive unexpected failure");
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CallerCancellation_Delivering_PropagatesCancellation()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var action = async () =>
+            await harness
+                .Sender.Deliver(harness.Source(), "message")
+                .ExecuteAsync(cancellation.Token);
+
+        await action.ShouldThrowAsync<OperationCanceledException>();
+        harness.Http.ValidationRequestCount.ShouldBe(0);
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CallerCancellationDuringWhisper_Delivering_PropagatesCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            cancelOnWhisper: cancellation
+        );
+
+        var action = async () =>
+            await harness
+                .Sender.Deliver(harness.Source(), "message")
+                .ExecuteAsync(cancellation.Token);
+
+        await action.ShouldThrowAsync<OperationCanceledException>();
+        harness.Http.WhisperRequestCount.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task TypedPrivateFailure_SendingCommandResponse_StillFallsBackUntilP5005()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.BadRequest);
+
+        await harness.Sender.SendAsync(
+            harness.Source(),
             TwitchCommandResponse.Whisper("your balance is 10"),
             CancellationToken.None
         );
-        var status = await quota.GetStatusAsync(hostId, "custom-id", CancellationToken.None);
 
-        chat.Messages.ShouldBe([new SentChatMessage("streamer", "your balance is 10")]);
-        status.Exhausted.ShouldBeTrue();
-        status.RecipientCount.ShouldBe(1);
-        httpClientFactory.WhisperRequestCount.ShouldBe(1);
+        harness.Chat.Messages.ShouldBe([new SentChatMessage("streamer", "your balance is 10")]);
     }
 
-    [Test]
-    public async Task SelfWhisper_SendingResponse_FallsBackWithoutRequestOrQuota()
+    private static HostWhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory)
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCustomBotAsync(dbFactory, hostId);
-        var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.NoContent);
-        var options = BotOptions();
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
-        var helixUsers = new TwitchHelixApiClient(httpClientFactory);
-        var hostBotAccounts = new HostBotAccountAuthorizationService(
-            dbFactory,
-            new HostBotAccountOAuthService(options, oauth, helixUsers),
-            oauth,
-            helixUsers,
-            new TwitchTokenStatusService(new ServiceCollection().BuildServiceProvider(), oauth),
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
-            options
-        );
-        var chat = new RecordingChatSender();
-        var quota = new HostWhisperQuotaService(
+        return new(
             dbFactory,
             new FixedTimeProvider(new DateTimeOffset(2026, 7, 9, 12, 0, 0, TimeSpan.Zero))
         );
-        var sender = new HostWhisperCommandResponseSender(
-            chat,
-            hostBotAccounts,
-            quota,
-            helixUsers,
-            new TwitchHelixChatClient(
-                httpClientFactory,
-                options.Identity,
-                helixUsers
-            ),
-            dbFactory,
-            options.Identity,
-            NullLogger<HostWhisperCommandResponseSender>.Instance
-        );
-        var source = new TwitchChatMessage(
-            "custombot",
-            "streamer",
-            "!points",
-            "raw",
-            new Dictionary<string, string> { ["user-id"] = "custom-id" }
-        );
-
-        await sender.SendAsync(
-            source,
-            TwitchCommandResponse.Whisper("your balance is 10"),
-            CancellationToken.None
-        );
-        var status = await quota.GetStatusAsync(hostId, "custom-id", CancellationToken.None);
-
-        chat.Messages.ShouldBe([new SentChatMessage("streamer", "your balance is 10")]);
-        status.RecipientCount.ShouldBe(0);
-        httpClientFactory.WhisperRequestCount.ShouldBe(0);
     }
 
-    [Test]
-    public async Task RejectedWhisper_SendingThroughHelix_PreservesStatusAndBody()
+    private static async Task<PrivateDeliveryError> ExecuteErrorAsync(
+        IO<PrivateDeliveryReceipt, PrivateDeliveryError> delivery
+    )
     {
-        var body = """{"status":400,"message":"cannot whisper yourself"}""";
-        var httpClientFactory = new WhisperHttpClientFactory(HttpStatusCode.BadRequest, body);
-        var options = BotOptions();
-        var helixUsers = new TwitchHelixApiClient(httpClientFactory);
-        var helix = new TwitchHelixChatClient(
-            httpClientFactory,
-            options.Identity,
-            helixUsers
+        var result = await delivery.ExecuteAsync(CancellationToken.None);
+        return result.Match(
+            _ => throw new InvalidOperationException("Expected private delivery to fail."),
+            error => error
         );
-
-        var result = await helix.SendWhisperAsync(
-            "override-whisper-token",
-            "custom-id",
-            "custom-id",
-            "message",
-            CancellationToken.None
-        );
-
-        result.Status.ShouldBe(TwitchWhisperSendStatus.Rejected);
-        result.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        result.ResponseBody.ShouldBe(body);
     }
 
     private static TwitchBotSettings BotOptions()
@@ -247,7 +434,11 @@ public sealed class WhisperResponseTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels],
+                    Scopes = [
+                        "chat:read",
+                        "chat:edit",
+                        TwitchScopes.UserReadModeratedChannels,
+                    ],
                 },
             }
         );
@@ -267,7 +458,11 @@ public sealed class WhisperResponseTests
         return host.Id;
     }
 
-    private static async Task SeedCustomBotAsync(SqliteBlokeBotDbFactory dbFactory, int hostId)
+    private static async Task SeedCustomBotAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        bool whisperResponsesEnabled
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         db.HostBotAccountSettings.Add(
@@ -275,7 +470,7 @@ public sealed class WhisperResponseTests
             {
                 HostId = hostId,
                 OverrideEnabled = true,
-                WhisperResponsesEnabled = true,
+                WhisperResponsesEnabled = whisperResponsesEnabled,
                 TwitchUserId = "custom-id",
                 Login = "custombot",
                 AccessToken = "override-whisper-token",
@@ -286,6 +481,108 @@ public sealed class WhisperResponseTests
             }
         );
         await db.SaveChangesAsync();
+    }
+
+    private sealed class WhisperHarness : IAsyncDisposable
+    {
+        private WhisperHarness(
+            SqliteBlokeBotDbFactory dbFactory,
+            int hostId,
+            WhisperHttpClientFactory http,
+            RecordingChatSender chat,
+            HostWhisperQuotaService quota,
+            HostWhisperCommandResponseSender sender
+        )
+        {
+            _dbFactory = dbFactory;
+            HostId = hostId;
+            Http = http;
+            Chat = chat;
+            Quota = quota;
+            Sender = sender;
+        }
+
+        private readonly SqliteBlokeBotDbFactory _dbFactory;
+
+        internal int HostId { get; }
+
+        internal WhisperHttpClientFactory Http { get; }
+
+        internal RecordingChatSender Chat { get; }
+
+        internal HostWhisperQuotaService Quota { get; }
+
+        internal HostWhisperCommandResponseSender Sender { get; }
+
+        internal static async Task<WhisperHarness> CreateAsync(
+            HttpStatusCode whisperStatus,
+            string? whisperBody = null,
+            string usersJson = """{"data":[{"id":"viewer-id","login":"viewer","display_name":"Viewer","profile_image_url":""}]}""",
+            Exception? usersException = null,
+            Exception? whisperException = null,
+            bool validationAccepted = true,
+            bool whisperResponsesEnabled = true,
+            CancellationTokenSource? cancelOnWhisper = null
+        )
+        {
+            var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostAsync(dbFactory, "streamer");
+            await SeedCustomBotAsync(dbFactory, hostId, whisperResponsesEnabled);
+
+            var http = new WhisperHttpClientFactory(
+                whisperStatus,
+                whisperBody,
+                usersJson,
+                usersException,
+                whisperException,
+                validationAccepted,
+                cancelOnWhisper
+            );
+            var options = BotOptions();
+            var oauth = new TwitchOAuthApiClient(http);
+            var helixUsers = new TwitchHelixApiClient(http);
+            var hostBotAccounts = new HostBotAccountAuthorizationService(
+                dbFactory,
+                new HostBotAccountOAuthService(options, oauth, helixUsers),
+                oauth,
+                helixUsers,
+                new TwitchTokenStatusService(
+                    new ServiceCollection().BuildServiceProvider(),
+                    oauth
+                ),
+                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+                options
+            );
+            var chat = new RecordingChatSender();
+            var quota = CreateQuota(dbFactory);
+            var sender = new HostWhisperCommandResponseSender(
+                chat,
+                hostBotAccounts,
+                quota,
+                helixUsers,
+                new TwitchHelixChatClient(http, options.Identity, helixUsers),
+                dbFactory,
+                options.Identity,
+                NullLogger<HostWhisperCommandResponseSender>.Instance
+            );
+            return new(dbFactory, hostId, http, chat, quota, sender);
+        }
+
+        internal TwitchChatMessage Source(
+            bool includeUserId = true,
+            string userId = "viewer-id"
+        )
+        {
+            IReadOnlyDictionary<string, string> tags = includeUserId
+                ? new Dictionary<string, string> { ["user-id"] = userId }
+                : new Dictionary<string, string>();
+            return new("viewer", "streamer", "!points", "raw", tags);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _dbFactory.DisposeAsync();
+        }
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
@@ -300,7 +597,7 @@ public sealed class WhisperResponseTests
 
     private sealed class RecordingChatSender : ITwitchChatMessageSender
     {
-        public List<SentChatMessage> Messages { get; } = [];
+        internal List<SentChatMessage> Messages { get; } = [];
 
         public Task SendAsync(
             string channel,
@@ -316,40 +613,65 @@ public sealed class WhisperResponseTests
 
     private sealed class WhisperHttpClientFactory(
         HttpStatusCode whisperStatus,
-        string? whisperBody = null
+        string? whisperBody,
+        string usersJson,
+        Exception? usersException,
+        Exception? whisperException,
+        bool validationAccepted,
+        CancellationTokenSource? cancelOnWhisper
     ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new(whisperStatus, whisperBody);
+        private readonly Handler _handler = new(
+            whisperStatus,
+            whisperBody,
+            usersJson,
+            usersException,
+            whisperException,
+            validationAccepted,
+            cancelOnWhisper
+        );
 
-        public int WhisperRequestCount => _handler.WhisperRequestCount;
+        internal int ValidationRequestCount => _handler.ValidationRequestCount;
+
+        internal int WhisperRequestCount => _handler.WhisperRequestCount;
 
         public HttpClient CreateClient(string name)
         {
             return new(_handler, disposeHandler: false);
         }
 
-        private sealed class Handler(HttpStatusCode whisperStatus, string? whisperBody)
-            : HttpMessageHandler
+        private sealed class Handler(
+            HttpStatusCode whisperStatus,
+            string? whisperBody,
+            string usersJson,
+            Exception? usersException,
+            Exception? whisperException,
+            bool validationAccepted,
+            CancellationTokenSource? cancelOnWhisper
+        ) : HttpMessageHandler
         {
-            public int WhisperRequestCount { get; private set; }
+            internal int ValidationRequestCount { get; private set; }
+
+            internal int WhisperRequestCount { get; private set; }
 
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
             )
             {
-                var response = request.RequestUri?.AbsolutePath switch
+                return request.RequestUri?.AbsolutePath switch
                 {
-                    "/oauth2/validate" => ValidationResponse(request),
-                    "/helix/users" => JsonResponse(
-                        """
-                        {"data":[{"id":"viewer-id","login":"viewer","display_name":"Viewer","profile_image_url":""}]}
-                        """
-                    ),
-                    "/helix/whispers" => WhisperResponse(),
-                    _ => new HttpResponseMessage(HttpStatusCode.NotFound),
+                    "/oauth2/validate" => Task.FromResult(ValidationResponse(request)),
+                    "/helix/users" when usersException is not null =>
+                        Task.FromException<HttpResponseMessage>(usersException),
+                    "/helix/users" => Task.FromResult(JsonResponse(usersJson)),
+                    "/helix/whispers" when whisperException is not null =>
+                        FailedWhisper(whisperException),
+                    "/helix/whispers" when cancelOnWhisper is { } cancellation =>
+                        CancelledWhisper(cancellation, cancellationToken),
+                    "/helix/whispers" => Task.FromResult(WhisperResponse()),
+                    _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
                 };
-                return Task.FromResult(response);
             }
 
             private HttpResponseMessage WhisperResponse()
@@ -368,17 +690,31 @@ public sealed class WhisperResponseTests
                 return response;
             }
 
-            private static HttpResponseMessage ValidationResponse(HttpRequestMessage request)
+            private Task<HttpResponseMessage> FailedWhisper(Exception exception)
             {
-                return request.Headers.Authorization?.Parameter switch
-                {
-                    "override-whisper-token" => JsonResponse(
-                        """
-                        {"user_id":"custom-id","login":"custombot","scopes":["user:manage:whispers"]}
-                        """
-                    ),
-                    _ => new HttpResponseMessage(HttpStatusCode.Unauthorized),
-                };
+                WhisperRequestCount++;
+                return Task.FromException<HttpResponseMessage>(exception);
+            }
+
+            private Task<HttpResponseMessage> CancelledWhisper(
+                CancellationTokenSource cancellation,
+                CancellationToken cancellationToken
+            )
+            {
+                WhisperRequestCount++;
+                cancellation.Cancel();
+                return Task.FromCanceled<HttpResponseMessage>(cancellationToken);
+            }
+
+            private HttpResponseMessage ValidationResponse(HttpRequestMessage request)
+            {
+                ValidationRequestCount++;
+                return validationAccepted
+                    && request.Headers.Authorization?.Parameter == "override-whisper-token"
+                    ? JsonResponse(
+                        """{"user_id":"custom-id","login":"custombot","scopes":["user:manage:whispers"]}"""
+                    )
+                    : new HttpResponseMessage(HttpStatusCode.Unauthorized);
             }
 
             private static HttpResponseMessage JsonResponse(string json)
@@ -390,4 +726,6 @@ public sealed class WhisperResponseTests
             }
         }
     }
+
+    private sealed class SensitiveWhisperException(string message) : Exception(message);
 }
