@@ -22,7 +22,7 @@ public sealed class NamingConventionTests
     }
 
     [Test]
-    public void OwnedSourceFiles_Inspecting_HaveNoRedundantVendorOrClientNames()
+    public void IncludedWorkingTreeSourceFiles_Inspecting_HaveNoRedundantVendorOrClientNames()
     {
         var repositoryRoot = FindRepositoryRoot();
         var declarations = new[] { "src", "tests" }
@@ -33,7 +33,7 @@ public sealed class NamingConventionTests
                     SearchOption.AllDirectories
                 )
             )
-            .Where(path => IsTrackedSourcePath(repositoryRoot, path))
+            .Where(path => IsIncludedWorkingTreeSourcePath(repositoryRoot, path))
             .Select(path => Path.GetFileNameWithoutExtension(path)!)
             .Where(HasRedundantName)
             .Order(StringComparer.Ordinal)
@@ -47,6 +47,9 @@ public sealed class NamingConventionTests
         return
         [
             typeof(ChatMessage).Assembly,
+            typeof(BlokeBot.Eventing.EventSubscriptionSet).Assembly,
+            typeof(BlokeBot.Functional.Option<>).Assembly,
+            typeof(BlokeBot.Persistence.BlokeBotDbContext).Assembly,
             typeof(HelixClient).Assembly,
             typeof(BotIdentity).Assembly,
             typeof(BotSettings).Assembly,
@@ -77,7 +80,7 @@ public sealed class NamingConventionTests
         throw new InvalidOperationException("The repository root could not be located.");
     }
 
-    private static bool IsTrackedSourcePath(string repositoryRoot, string path)
+    private static bool IsIncludedWorkingTreeSourcePath(string repositoryRoot, string path)
     {
         var segments = Path.GetRelativePath(repositoryRoot, path)
             .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
