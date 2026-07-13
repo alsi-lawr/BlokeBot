@@ -17,7 +17,10 @@ internal interface ITwitchEventSubChannelOperations
         CancellationToken cancellationToken
     );
 
-    ValueTask DeliverStartupMessageAsync(string channel, CancellationToken cancellationToken);
+    ValueTask<TwitchEventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
+        string channel,
+        CancellationToken cancellationToken
+    );
 
     ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken);
 
@@ -51,6 +54,8 @@ internal abstract record TwitchEventSubChannelReconciliationOutcome
 
     internal sealed record MissingBot : TwitchEventSubChannelReconciliationOutcome;
 
+    internal sealed record StartupMessageRejected : TwitchEventSubChannelReconciliationOutcome;
+
     internal sealed record UnresolvedDeletion : TwitchEventSubChannelReconciliationOutcome
     {
         internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
@@ -60,6 +65,15 @@ internal abstract record TwitchEventSubChannelReconciliationOutcome
             return nameof(UnresolvedDeletion);
         }
     }
+}
+
+internal abstract record TwitchEventSubStartupDeliveryOutcome
+{
+    private TwitchEventSubStartupDeliveryOutcome() { }
+
+    internal sealed record Completed : TwitchEventSubStartupDeliveryOutcome;
+
+    internal sealed record Rejected : TwitchEventSubStartupDeliveryOutcome;
 }
 
 internal sealed class TwitchEventSubChannelOperations(
@@ -138,20 +152,28 @@ internal sealed class TwitchEventSubChannelOperations(
         );
     }
 
-    public async ValueTask DeliverStartupMessageAsync(
+    public async ValueTask<TwitchEventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
         string channel,
         CancellationToken cancellationToken
     )
     {
-        if (!string.IsNullOrWhiteSpace(settings.StartupMessage))
+        if (string.IsNullOrWhiteSpace(settings.StartupMessage))
         {
-            await sender.SendAsync(
-                channel,
-                settings.StartupMessage,
-                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-                cancellationToken
-            );
+            return new TwitchEventSubStartupDeliveryOutcome.Completed();
         }
+
+        var outcome = await sender.SendAsync(
+            channel,
+            settings.StartupMessage,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
+        return outcome switch
+        {
+            PublicChatSendOutcome.Accepted => new TwitchEventSubStartupDeliveryOutcome.Completed(),
+            PublicChatSendOutcome.Rejected => new TwitchEventSubStartupDeliveryOutcome.Rejected(),
+            _ => throw new UnreachableException("Unknown public-chat send outcome."),
+        };
     }
 
     public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken)
@@ -572,6 +594,7 @@ internal sealed class TwitchEventSubChannelSession(
             case TwitchEventSubChannelReconciliationOutcome.Completed:
             case TwitchEventSubChannelReconciliationOutcome.MissingChannel:
             case TwitchEventSubChannelReconciliationOutcome.MissingBot:
+            case TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected:
                 PublishReconciliationOutcome(channel, target, trigger, attempt: 1, outcome);
                 return;
             case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved:
@@ -850,12 +873,24 @@ internal sealed class TwitchEventSubChannelSession(
         switch (active.Readiness)
         {
             case TwitchEventSubSubscriptionReadiness.PendingStartupDelivery:
-                await RunPhaseAsync(
+                var startupDelivery = await RunPhaseAsync(
                     context,
                     TwitchEventSubChannelPhase.SubscriptionSetup,
                     token => operations.DeliverStartupMessageAsync(channel, token),
                     cancellationToken
                 );
+                switch (startupDelivery)
+                {
+                    case TwitchEventSubStartupDeliveryOutcome.Completed:
+                        break;
+                    case TwitchEventSubStartupDeliveryOutcome.Rejected:
+                        return new TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected();
+                    default:
+                        throw new UnreachableException(
+                            "Unknown EventSub startup-delivery outcome."
+                        );
+                }
+
                 active = active with
                 {
                     Readiness = TwitchEventSubSubscriptionReadiness.PendingLifecycleStart,
@@ -1107,6 +1142,15 @@ internal sealed class TwitchEventSubChannelSession(
                     trigger,
                     attempt,
                     new TwitchEventSubChannelFailureContext.MissingBot(),
+                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                );
+                return;
+            case TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected:
+                PublishDegraded(
+                    channel,
+                    trigger,
+                    attempt,
+                    new TwitchEventSubChannelFailureContext.StartupMessageRejected(),
                     TwitchEventSubChannelNextAction.RetryOnNextReconciliation
                 );
                 return;

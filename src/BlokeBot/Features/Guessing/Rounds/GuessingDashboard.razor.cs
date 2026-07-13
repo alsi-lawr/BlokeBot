@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -351,15 +352,31 @@ public partial class GuessingDashboard
         var result = await operation();
         if (result.Succeeded)
         {
-            await _chat.SendAsync(
+            var outcome = await _chat.SendAsync(
                 Host!.Login,
                 result.Message,
                 new PublicChatDeliveryDeadline.ConfiguredMaximum(),
                 CancellationToken.None
             );
+            switch (outcome)
+            {
+                case PublicChatSendOutcome.Accepted:
+                    PublishResult(result);
+                    break;
+                case PublicChatSendOutcome.Rejected:
+                    _toasts.Publish(
+                        ToastKind.Warning,
+                        "The action completed, but its chat message could not be queued."
+                    );
+                    break;
+                default:
+                    throw new UnreachableException("Unknown public-chat send outcome.");
+            }
         }
-
-        PublishResult(result);
+        else
+        {
+            PublishResult(result);
+        }
         await LoadAsync();
 
         if (_leaderboard is not null)

@@ -6,7 +6,7 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class TwitchChatMessageSender(PublicChatMessageQueue queue)
     : ITwitchChatMessageSender
 {
-    public async Task SendAsync(
+    public async ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
         string message,
         PublicChatDeliveryDeadline deadline,
@@ -25,9 +25,9 @@ internal sealed class TwitchChatMessageSender(PublicChatMessageQueue queue)
         switch (outcome)
         {
             case PublicChatEnqueueOutcome.Accepted:
-                return;
+                return new PublicChatSendOutcome.Accepted();
             case PublicChatEnqueueOutcome.Rejected:
-                throw new InvalidOperationException("The public-chat message was rejected.");
+                return new PublicChatSendOutcome.Rejected();
             case PublicChatEnqueueOutcome.SafePreEnqueueTransient transient:
                 throw Rethrow(transient.Cause);
             case PublicChatEnqueueOutcome.Ambiguous ambiguous:

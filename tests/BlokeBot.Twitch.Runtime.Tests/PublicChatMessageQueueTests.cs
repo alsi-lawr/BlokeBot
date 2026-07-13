@@ -75,6 +75,160 @@ public sealed class PublicChatMessageQueueTests
     }
 
     [Test]
+    [Arguments("", "message")]
+    [Arguments("channel", "")]
+    [Arguments(" ", "message")]
+    [Arguments("channel", " ")]
+    public async Task InvalidMessage_Enqueueing_ReturnsRejectedWithoutWriteOrDelivery(
+        string channel,
+        string message
+    )
+    {
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
+        var transport = new RecordingTransport();
+        var queue = CreateQueue(new TwitchBotOptions(), outbox, transport);
+
+        var outcome = await queue.EnqueueAsync(Command(channel, message), CancellationToken.None);
+
+        outcome.ShouldBeOfType<PublicChatEnqueueOutcome.Rejected>();
+        outbox.EnqueueCount.ShouldBe(0);
+        outbox.PendingMessages.ShouldBeEmpty();
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ValidMessage_Sending_ReturnsAcceptedAfterDurableEnqueue()
+    {
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
+        var transport = new RecordingTransport();
+        var sender = new TwitchChatMessageSender(
+            CreateQueue(new TwitchBotOptions(), outbox, transport)
+        );
+        var deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
+            Utc(12, 0, 0).AddSeconds(30)
+        );
+
+        var outcome = await sender.SendAsync(
+            "channel",
+            "message",
+            deadline,
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
+        outbox.EnqueueCount.ShouldBe(1);
+        outbox.LastEnqueuedDeadline.ShouldBeSameAs(deadline);
+        outbox.PendingMessages.ShouldBe(["message"]);
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    [Arguments("", "message")]
+    [Arguments("channel", "")]
+    public async Task InvalidMessage_Sending_ReturnsRejectedWithoutWriteOrDelivery(
+        string channel,
+        string message
+    )
+    {
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
+        var transport = new RecordingTransport();
+        var sender = new TwitchChatMessageSender(
+            CreateQueue(new TwitchBotOptions(), outbox, transport)
+        );
+
+        var outcome = await sender.SendAsync(
+            channel,
+            message,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<PublicChatSendOutcome.Rejected>();
+        outbox.EnqueueCount.ShouldBe(0);
+        outbox.PendingMessages.ShouldBeEmpty();
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task InfrastructureFailure_Sending_PreservesOriginalException()
+    {
+        var failure = new IOException("private persistence detail");
+        var outbox = new InMemoryOutbox(_standardRetryPolicy) { EnqueueFailure = failure };
+        var transport = new RecordingTransport();
+        var sender = new TwitchChatMessageSender(
+            CreateQueue(new TwitchBotOptions(), outbox, transport)
+        );
+
+        var thrown = await Should.ThrowAsync<IOException>(() =>
+            sender
+                .SendAsync(
+                    "channel",
+                    "message",
+                    new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                    CancellationToken.None
+                )
+                .AsTask()
+        );
+
+        thrown.ShouldBeSameAs(failure);
+        outbox.PendingMessages.ShouldBeEmpty();
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task CallerCancellation_Sending_PropagatesWithoutWriteOrDelivery()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var outbox = new InMemoryOutbox(_standardRetryPolicy);
+        var transport = new RecordingTransport();
+        var sender = new TwitchChatMessageSender(
+            CreateQueue(new TwitchBotOptions(), outbox, transport)
+        );
+
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            sender
+                .SendAsync(
+                    "channel",
+                    "message",
+                    new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                    cancellation.Token
+                )
+                .AsTask()
+        );
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        outbox.PendingMessages.ShouldBeEmpty();
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task CallerCanceledAfterCommit_Sending_ReturnsAcceptedDurableOutcome()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var outbox = new InMemoryOutbox(_standardRetryPolicy)
+        {
+            AfterEnqueue = cancellation.Cancel,
+        };
+        var transport = new RecordingTransport();
+        var sender = new TwitchChatMessageSender(
+            CreateQueue(new TwitchBotOptions(), outbox, transport)
+        );
+
+        var outcome = await sender.SendAsync(
+            "channel",
+            "message",
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellation.Token
+        );
+
+        outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
+        cancellation.IsCancellationRequested.ShouldBeTrue();
+        outbox.PendingMessages.ShouldBe(["message"]);
+        transport.Deliveries.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task MessageOverLength_Enqueueing_PersistsEveryPartBeforeDelivery()
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
@@ -991,6 +1145,10 @@ public sealed class PublicChatMessageQueueTests
 
         public Exception? EnqueueFailure { get; init; }
 
+        public int EnqueueCount { get; private set; }
+
+        public PublicChatDeliveryDeadline? LastEnqueuedDeadline { get; private set; }
+
         public IReadOnlyList<string> PendingMessages
         {
             get
@@ -1045,6 +1203,7 @@ public sealed class PublicChatMessageQueueTests
             CancellationToken cancellationToken
         )
         {
+            EnqueueCount++;
             cancellationToken.ThrowIfCancellationRequested();
             if (EnqueueFailure is { } failure)
             {
@@ -1054,6 +1213,7 @@ public sealed class PublicChatMessageQueueTests
             long[] ids;
             lock (_gate)
             {
+                LastEnqueuedDeadline = batch.Deadline;
                 ids = batch
                     .Items.Select(item =>
                     {

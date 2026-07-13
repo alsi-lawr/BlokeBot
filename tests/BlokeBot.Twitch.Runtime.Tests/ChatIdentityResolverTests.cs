@@ -194,12 +194,80 @@ public sealed class ChatIdentityResolverTests
         missingBot.ToString().ShouldNotContain("access-token");
     }
 
+    [Test]
+    public async Task AcceptedStartupMessage_Delivering_ReturnsCompleted()
+    {
+        var chat = new ScriptedChatSender(new PublicChatSendOutcome.Accepted());
+        var operations = StartupOperations(chat);
+
+        var outcome = await operations.DeliverStartupMessageAsync(
+            "private-channel-login",
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<TwitchEventSubStartupDeliveryOutcome.Completed>();
+        chat.Messages.ShouldBe(["private startup payload"]);
+        chat.Channels.ShouldBe(["private-channel-login"]);
+        chat.Deadlines.ShouldHaveSingleItem()
+            .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
+    }
+
+    [Test]
+    public async Task RejectedStartupMessage_Delivering_ReturnsTypedRejection()
+    {
+        var chat = new ScriptedChatSender(new PublicChatSendOutcome.Rejected());
+        var operations = StartupOperations(chat);
+
+        var outcome = await operations.DeliverStartupMessageAsync(
+            "private-channel-login",
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<TwitchEventSubStartupDeliveryOutcome.Rejected>();
+        chat.Messages.ShouldBe(["private startup payload"]);
+        outcome.ToString().ShouldNotContain("private-channel-login");
+        outcome.ToString().ShouldNotContain("private startup payload");
+    }
+
+    [Test]
+    public async Task CallerCancellation_DeliveringStartupMessage_PropagatesWithoutAttempt()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var chat = new ScriptedChatSender(new PublicChatSendOutcome.Accepted());
+        var operations = StartupOperations(chat);
+
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
+            operations
+                .DeliverStartupMessageAsync("private-channel-login", cancellation.Token)
+                .AsTask()
+        );
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        chat.Messages.ShouldBeEmpty();
+    }
+
     private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory)
     {
         return new(Identity(), new HelixClient(factory));
     }
 
-    private static TwitchBotSettings Settings()
+    private static TwitchEventSubChannelOperations StartupOperations(
+        ITwitchChatMessageSender sender
+    )
+    {
+        var factory = new IdentityHttpClientFactory("""{"data":[]}""");
+        return new(
+            Settings("private startup payload"),
+            new UnusedAccountProvider(),
+            CreateResolver(factory),
+            new EventSubClient(factory),
+            sender,
+            new UnusedLifecycleNotifier()
+        );
+    }
+
+    private static TwitchBotSettings Settings(string startupMessage = "")
     {
         return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
@@ -213,6 +281,7 @@ public sealed class ChatIdentityResolverTests
                     Scopes = ["chat:read"],
                     TokenCachePath = "tokens.json",
                 },
+                StartupMessage = startupMessage,
             }
         );
     }
@@ -368,7 +437,7 @@ public sealed class ChatIdentityResolverTests
 
     private sealed class UnusedChatSender : ITwitchChatMessageSender
     {
-        public Task SendAsync(
+        public ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
             string message,
             PublicChatDeliveryDeadline deadline,
@@ -376,6 +445,30 @@ public sealed class ChatIdentityResolverTests
         )
         {
             throw new InvalidOperationException("Chat delivery was not expected.");
+        }
+    }
+
+    private sealed class ScriptedChatSender(PublicChatSendOutcome outcome)
+        : ITwitchChatMessageSender
+    {
+        internal List<string> Channels { get; } = [];
+
+        internal List<string> Messages { get; } = [];
+
+        internal List<PublicChatDeliveryDeadline> Deadlines { get; } = [];
+
+        public ValueTask<PublicChatSendOutcome> SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Channels.Add(channel);
+            Messages.Add(message);
+            Deadlines.Add(deadline);
+            return ValueTask.FromResult(outcome);
         }
     }
 

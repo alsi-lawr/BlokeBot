@@ -1,4 +1,5 @@
 using BlokeBot.Commands;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -48,6 +49,28 @@ public sealed class TwitchChatCommandResponseSenderTests
         chat.Deadlines.ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task RejectedChatResponse_SendingStandalone_ReportsRedactedNoDelivery()
+    {
+        var chat = new RecordingChatSender(new PublicChatSendOutcome.Rejected());
+        var logger = new RecordingLogger<TwitchChatCommandResponseSender>();
+        var sender = new TwitchChatCommandResponseSender(chat, logger);
+
+        await sender.SendAsync(
+            SourceMessage(),
+            TwitchCommandResponse.Chat("private response payload"),
+            CancellationToken.None
+        );
+
+        chat.Channels.ShouldBe(["streamer"]);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldContain("rejected");
+        entry.Message.ShouldNotContain("private response payload");
+        entry.Properties["HostChannel"].ShouldBe("streamer");
+    }
+
     private static TwitchChatMessage SourceMessage()
     {
         return new(
@@ -59,7 +82,8 @@ public sealed class TwitchChatCommandResponseSenderTests
         );
     }
 
-    private sealed class RecordingChatSender : ITwitchChatMessageSender
+    private sealed class RecordingChatSender(PublicChatSendOutcome? outcome = null)
+        : ITwitchChatMessageSender
     {
         public List<string> Channels { get; } = [];
 
@@ -67,7 +91,7 @@ public sealed class TwitchChatCommandResponseSenderTests
 
         public List<PublicChatDeliveryDeadline> Deadlines { get; } = [];
 
-        public Task SendAsync(
+        public ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
             string message,
             PublicChatDeliveryDeadline deadline,
@@ -77,7 +101,46 @@ public sealed class TwitchChatCommandResponseSenderTests
             Channels.Add(channel);
             Messages.Add(message);
             Deadlines.Add(deadline);
-            return Task.CompletedTask;
+            return ValueTask.FromResult<PublicChatSendOutcome>(
+                outcome ?? new PublicChatSendOutcome.Accepted()
+            );
         }
     }
+
+    private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
+    {
+        internal List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter
+        )
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record LogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties
+    );
 }

@@ -141,7 +141,8 @@ internal abstract record TwitchEventSubChannelFailureContext
     internal abstract TResult Match<TResult>(
         Func<ClassifiedException, TResult> classifiedException,
         Func<MissingChannel, TResult> missingChannel,
-        Func<MissingBot, TResult> missingBot
+        Func<MissingBot, TResult> missingBot,
+        Func<StartupMessageRejected, TResult> startupMessageRejected
     );
 
     internal TwitchEventSubChannelFailure ToPublicFailure()
@@ -164,7 +165,8 @@ internal abstract record TwitchEventSubChannelFailureContext
         internal override TResult Match<TResult>(
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
-            Func<MissingBot, TResult> missingBot
+            Func<MissingBot, TResult> missingBot,
+            Func<StartupMessageRejected, TResult> startupMessageRejected
         )
         {
             return classifiedException(this);
@@ -191,7 +193,8 @@ internal abstract record TwitchEventSubChannelFailureContext
         internal override TResult Match<TResult>(
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
-            Func<MissingBot, TResult> missingBot
+            Func<MissingBot, TResult> missingBot,
+            Func<StartupMessageRejected, TResult> startupMessageRejected
         )
         {
             return missingChannel(this);
@@ -213,10 +216,34 @@ internal abstract record TwitchEventSubChannelFailureContext
         internal override TResult Match<TResult>(
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
-            Func<MissingBot, TResult> missingBot
+            Func<MissingBot, TResult> missingBot,
+            Func<StartupMessageRejected, TResult> startupMessageRejected
         )
         {
             return missingBot(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record StartupMessageRejected : TwitchEventSubChannelFailureContext
+    {
+        internal override TwitchEventSubChannelPhase Phase =>
+            TwitchEventSubChannelPhase.SubscriptionSetup;
+
+        internal override TwitchEventSubChannelFailureClassification Classification =>
+            TwitchEventSubChannelFailureClassification.Terminal;
+
+        internal override string FailureType => "PublicChatEnqueueRejected";
+
+        internal override TResult Match<TResult>(
+            Func<ClassifiedException, TResult> classifiedException,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<StartupMessageRejected, TResult> startupMessageRejected
+        )
+        {
+            return startupMessageRejected(this);
         }
 
         private protected override void Seal() { }

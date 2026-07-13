@@ -244,6 +244,42 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
+    public async Task Startup_PublicChatEnqueueRejected_IsTerminalWithoutRetryOrLifecycleStart()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueStartupDeliveryOutcome(
+            "channel",
+            new TwitchEventSubStartupDeliveryOutcome.Rejected()
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 3);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        var degraded = harness
+            .Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>();
+        AssertFailure(
+            degraded,
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionSetup,
+            TwitchEventSubChannelFailureClassification.Terminal,
+            "PublicChatEnqueueRejected",
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Startup,
+            TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
+            _now
+        );
+        harness
+            .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelDiagnosticReport.Degraded>()
+            .Failure.ShouldBeOfType<TwitchEventSubChannelFailureContext.StartupMessageRejected>();
+        operations.CreateCount("channel").ShouldBe(1);
+        operations.StartupDeliveryCount("channel").ShouldBe(1);
+        operations.ChannelStartedCount("channel").ShouldBe(0);
+    }
+
+    [Test]
     public async Task Setup_LifecycleStartFailure_RetriesWithoutRepeatingStartupDelivery()
     {
         var failure = new IOException("lifecycle start temporarily unavailable");
@@ -1207,6 +1243,10 @@ public sealed class EventSubChannelRecoveryTests
         private readonly Dictionary<string, int> _startupDeliveryCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly Dictionary<
+            string,
+            Queue<TwitchEventSubStartupDeliveryOutcome>
+        > _startupDeliveryOutcomes = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _channelStartedCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -1287,6 +1327,14 @@ public sealed class EventSubChannelRecoveryTests
             return _startupDeliveryCounts.GetValueOrDefault(channel);
         }
 
+        internal void EnqueueStartupDeliveryOutcome(
+            string channel,
+            TwitchEventSubStartupDeliveryOutcome outcome
+        )
+        {
+            GetQueue(_startupDeliveryOutcomes, channel).Enqueue(outcome);
+        }
+
         internal int ChannelStartedCount(string channel)
         {
             return _channelStartedCounts.GetValueOrDefault(channel);
@@ -1344,13 +1392,18 @@ public sealed class EventSubChannelRecoveryTests
             );
         }
 
-        public ValueTask DeliverStartupMessageAsync(
+        public ValueTask<TwitchEventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
             string channel,
             CancellationToken cancellationToken
         )
         {
             _startupDeliveryCounts[channel] = StartupDeliveryCount(channel) + 1;
-            return ValueTask.CompletedTask;
+            TwitchEventSubStartupDeliveryOutcome outcome =
+                _startupDeliveryOutcomes.TryGetValue(channel, out var outcomes)
+                && outcomes.Count > 0
+                    ? outcomes.Dequeue()
+                    : new TwitchEventSubStartupDeliveryOutcome.Completed();
+            return ValueTask.FromResult(outcome);
         }
 
         public ValueTask NotifyChannelStartedAsync(

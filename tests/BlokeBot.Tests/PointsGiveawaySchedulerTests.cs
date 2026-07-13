@@ -548,6 +548,44 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
+    public async Task AcceptedTwitchNotification_Sending_CompletesWithoutFailureDiagnostic()
+    {
+        var chat = new ScriptedPublicChatSender(new PublicChatSendOutcome.Accepted());
+        var logger = new RecordingLogger<TwitchPointsGiveawaySchedulerNotification>();
+        var notification = new TwitchPointsGiveawaySchedulerNotification(chat, logger);
+
+        await notification.SendAsync(
+            ScheduleEndingAfter(new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero)),
+            "public giveaway payload",
+            CancellationToken.None
+        );
+
+        chat.Messages.ShouldBe(["public giveaway payload"]);
+        logger.Entries.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task RejectedTwitchNotification_Sending_ReportsRedactedNoDelivery()
+    {
+        var chat = new ScriptedPublicChatSender(new PublicChatSendOutcome.Rejected());
+        var logger = new RecordingLogger<TwitchPointsGiveawaySchedulerNotification>();
+        var notification = new TwitchPointsGiveawaySchedulerNotification(chat, logger);
+
+        await notification.SendAsync(
+            ScheduleEndingAfter(new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero)),
+            "private giveaway payload",
+            CancellationToken.None
+        );
+
+        chat.Messages.ShouldBe(["private giveaway payload"]);
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldContain("rejected");
+        entry.Message.ShouldNotContain("private giveaway payload");
+    }
+
+    [Test]
     public async Task MissingOptionalChatDelivery_RunningSchedule_CompletesReplyOnlyPolicy()
     {
         var now = new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero);
@@ -1420,6 +1458,24 @@ public sealed class PointsGiveawaySchedulerTests
         {
             Messages.Add(message);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class ScriptedPublicChatSender(PublicChatSendOutcome outcome)
+        : ITwitchChatMessageSender
+    {
+        internal List<string> Messages { get; } = [];
+
+        public ValueTask<PublicChatSendOutcome> SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Messages.Add(message);
+            return ValueTask.FromResult(outcome);
         }
     }
 

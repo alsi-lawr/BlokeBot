@@ -12,11 +12,29 @@ public interface ITwitchChatMessageSender
     /// <param name="message">The chat message text.</param>
     /// <param name="deadline">The explicit delivery-validity selection.</param>
     /// <param name="cancellationToken">A token that cancels the send operation.</param>
-    /// <returns>A task that completes when Twitch accepts or drops the message.</returns>
-    Task SendAsync(
+    /// <returns>The durable queue-admission outcome.</returns>
+    ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
         string message,
         PublicChatDeliveryDeadline deadline,
         CancellationToken cancellationToken
     );
+}
+
+/// <summary>
+/// Describes whether a public-chat message entered durable delivery processing.
+/// </summary>
+public abstract record PublicChatSendOutcome
+{
+    private PublicChatSendOutcome() { }
+
+    /// <summary>
+    /// The message was accepted into durable delivery processing.
+    /// </summary>
+    public sealed record Accepted : PublicChatSendOutcome;
+
+    /// <summary>
+    /// Queue admission rejected the message before any durable write or delivery attempt.
+    /// </summary>
+    public sealed record Rejected : PublicChatSendOutcome;
 }

@@ -5,6 +5,7 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
 
@@ -16,7 +17,8 @@ public sealed class HostWhisperCommandResponseSender(
     WhisperClient whispers,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TwitchBotIdentity identity,
-    IPrivateDeliveryFailureHandler failureHandler
+    IPrivateDeliveryFailureHandler failureHandler,
+    ILogger<HostWhisperCommandResponseSender> log
 ) : ITwitchCommandResponseSender
 {
     public async ValueTask SendAsync(
@@ -310,18 +312,31 @@ public sealed class HostWhisperCommandResponseSender(
         }
     }
 
-    private Task SendPublicChatAsync(
+    private async Task SendPublicChatAsync(
         string channel,
         string message,
         CancellationToken cancellationToken
     )
     {
-        return chat.SendAsync(
+        var outcome = await chat.SendAsync(
             channel,
             message,
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
+        switch (outcome)
+        {
+            case PublicChatSendOutcome.Accepted:
+                return;
+            case PublicChatSendOutcome.Rejected:
+                log.LogWarning(
+                    "Hosted public command response for channel #{Channel} was rejected before durable enqueue; no user-visible delivery was attempted.",
+                    Login.Normalize(channel)
+                );
+                return;
+            default:
+                throw new UnreachableException("Unknown public-chat send outcome.");
+        }
     }
 
     private async Task<WhisperHost?> ResolveHostAsync(

@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+
 namespace BlokeBot.Features.Points.Giveaways;
 
 public enum PointsGiveawayNotificationMode
@@ -30,24 +33,41 @@ internal sealed class ReplyOnlyPointsGiveawaySchedulerNotification
     }
 }
 
-internal sealed class TwitchPointsGiveawaySchedulerNotification(ITwitchChatMessageSender sender)
-    : IPointsGiveawaySchedulerNotification
+internal sealed class TwitchPointsGiveawaySchedulerNotification(
+    ITwitchChatMessageSender sender,
+    ILogger<TwitchPointsGiveawaySchedulerNotification> log
+) : IPointsGiveawaySchedulerNotification
 {
-    public ValueTask SendAsync(
+    public async ValueTask SendAsync(
         PointsGiveawaySchedule schedule,
         string message,
         CancellationToken cancellationToken
     )
     {
-        return schedule.Reply is { } reply
-            ? reply(message, cancellationToken)
-            : new ValueTask(
-                sender.SendAsync(
-                    schedule.HostLogin,
-                    message,
-                    new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-                    cancellationToken
-                )
-            );
+        if (schedule.Reply is { } reply)
+        {
+            await reply(message, cancellationToken);
+            return;
+        }
+
+        var outcome = await sender.SendAsync(
+            schedule.HostLogin,
+            message,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+            cancellationToken
+        );
+        switch (outcome)
+        {
+            case PublicChatSendOutcome.Accepted:
+                return;
+            case PublicChatSendOutcome.Rejected:
+                log.LogWarning(
+                    "Points giveaway notification for giveaway {GiveawayId} was rejected before durable public-chat enqueue; no delivery was attempted.",
+                    schedule.GiveawayId
+                );
+                return;
+            default:
+                throw new UnreachableException("Unknown public-chat send outcome.");
+        }
     }
 }

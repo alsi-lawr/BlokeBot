@@ -441,6 +441,34 @@ public sealed class WhisperResponseTests
     }
 
     [Test]
+    public async Task RejectedPublicTarget_SendingCommandResponse_ReportsRedactedNoDelivery()
+    {
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.NoContent,
+            publicChatOutcome: new PublicChatSendOutcome.Rejected()
+        );
+
+        await harness.Sender.SendAsync(
+            harness.Source(),
+            TwitchCommandResponse.Chat("private public response"),
+            CancellationToken.None
+        );
+
+        harness.Chat.Messages.ShouldBe([
+            new SentChatMessage("streamer", "private public response"),
+        ]);
+        var entry = harness.PublicChatLogger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Warning);
+        entry.Exception.ShouldBeNull();
+        entry.Message.ShouldContain("rejected");
+        entry.Message.ShouldNotContain("private public response");
+        entry.Properties["Channel"].ShouldBe("streamer");
+        harness.FailureHandler.Failures.ShouldBeEmpty();
+        harness.Http.ValidationRequestCount.ShouldBe(0);
+        harness.Http.WhisperRequestCount.ShouldBe(0);
+    }
+
+    [Test]
     public async Task PrivateFailureTelemetry_Handling_RecordsOnlyRedactedContext()
     {
         var logger = new RecordingLogger<PrivateDeliveryFailureTelemetryHandler>();
@@ -556,6 +584,7 @@ public sealed class WhisperResponseTests
             RecordingChatSender chat,
             HostWhisperQuotaService quota,
             RecordingPrivateDeliveryFailureHandler failureHandler,
+            RecordingLogger<HostWhisperCommandResponseSender> publicChatLogger,
             HostWhisperCommandResponseSender sender
         )
         {
@@ -565,6 +594,7 @@ public sealed class WhisperResponseTests
             Chat = chat;
             Quota = quota;
             FailureHandler = failureHandler;
+            PublicChatLogger = publicChatLogger;
             Sender = sender;
         }
 
@@ -580,6 +610,8 @@ public sealed class WhisperResponseTests
 
         internal RecordingPrivateDeliveryFailureHandler FailureHandler { get; }
 
+        internal RecordingLogger<HostWhisperCommandResponseSender> PublicChatLogger { get; }
+
         internal HostWhisperCommandResponseSender Sender { get; }
 
         internal static async Task<WhisperHarness> CreateAsync(
@@ -593,7 +625,8 @@ public sealed class WhisperResponseTests
             bool whisperResponsesEnabled = true,
             CancellationTokenSource? cancelOnWhisper = null,
             Exception? handlerException = null,
-            CancellationTokenSource? cancelOnHandling = null
+            CancellationTokenSource? cancelOnHandling = null,
+            PublicChatSendOutcome? publicChatOutcome = null
         )
         {
             var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -621,12 +654,15 @@ public sealed class WhisperResponseTests
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 options
             );
-            var chat = new RecordingChatSender();
+            var chat = new RecordingChatSender(
+                publicChatOutcome ?? new PublicChatSendOutcome.Accepted()
+            );
             var quota = CreateQuota(dbFactory);
             var failureHandler = new RecordingPrivateDeliveryFailureHandler(
                 handlerException,
                 cancelOnHandling
             );
+            var publicChatLogger = new RecordingLogger<HostWhisperCommandResponseSender>();
             var sender = new HostWhisperCommandResponseSender(
                 chat,
                 hostBotAccounts,
@@ -635,9 +671,19 @@ public sealed class WhisperResponseTests
                 new WhisperClient(http),
                 dbFactory,
                 options.Identity,
-                failureHandler
+                failureHandler,
+                publicChatLogger
             );
-            return new(dbFactory, hostId, http, chat, quota, failureHandler, sender);
+            return new(
+                dbFactory,
+                hostId,
+                http,
+                chat,
+                quota,
+                failureHandler,
+                publicChatLogger,
+                sender
+            );
         }
 
         internal TwitchChatMessage Source(bool includeUserId = true, string userId = "viewer-id")
@@ -694,11 +740,12 @@ public sealed class WhisperResponseTests
         }
     }
 
-    private sealed class RecordingChatSender : ITwitchChatMessageSender
+    private sealed class RecordingChatSender(PublicChatSendOutcome outcome)
+        : ITwitchChatMessageSender
     {
         internal List<SentChatMessage> Messages { get; } = [];
 
-        public Task SendAsync(
+        public ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
             string message,
             PublicChatDeliveryDeadline deadline,
@@ -706,7 +753,7 @@ public sealed class WhisperResponseTests
         )
         {
             Messages.Add(new SentChatMessage(channel, message));
-            return Task.CompletedTask;
+            return ValueTask.FromResult(outcome);
         }
     }
 

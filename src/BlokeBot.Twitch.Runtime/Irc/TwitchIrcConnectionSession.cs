@@ -222,12 +222,25 @@ internal sealed class TwitchIrcConnectionSession(
             return;
         }
 
-        await sender.SendAsync(
+        var outcome = await sender.SendAsync(
             channel,
             startupMessage,
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );
+        switch (outcome)
+        {
+            case PublicChatSendOutcome.Accepted:
+                return;
+            case PublicChatSendOutcome.Rejected:
+                _log.LogWarning(
+                    "IRC startup public-chat message for channel #{Channel} was rejected before durable enqueue; no delivery was attempted.",
+                    channel
+                );
+                return;
+            default:
+                throw new UnreachableException("Unknown public-chat send outcome.");
+        }
     }
 
     private async Task AwaitAuthenticationAsync(
