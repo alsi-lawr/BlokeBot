@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -166,7 +167,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.Count > 0;
+        return payload?.Data.Length > 0;
     }
 
     public async Task<TwitchFollowerStatus> GetFollowerStatusAsync(
@@ -199,7 +200,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.Count > 0
+        return payload?.Data.Length > 0
             ? TwitchFollowerStatus.Follows
             : TwitchFollowerStatus.DoesNotFollow;
     }
@@ -249,13 +250,73 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
     private sealed record TwitchStreamResponse
     {
         [JsonPropertyName("data")]
-        public IReadOnlyList<object> Data { get; init; } = [];
+        public required ImmutableArray<TwitchStreamItem> Data { get; init; }
     }
 
     private sealed record TwitchFollowerResponse
     {
         [JsonPropertyName("data")]
-        public IReadOnlyList<object> Data { get; init; } = [];
+        public required ImmutableArray<TwitchFollowerItem> Data { get; init; }
+    }
+
+    private sealed record TwitchStreamItem
+    {
+        [JsonPropertyName("id")]
+        public required string Id { get; init; }
+
+        [JsonPropertyName("user_id")]
+        public required string UserId { get; init; }
+
+        [JsonPropertyName("user_login")]
+        public required string UserLogin { get; init; }
+
+        [JsonPropertyName("user_name")]
+        public required string UserName { get; init; }
+
+        [JsonPropertyName("game_id")]
+        public required string GameId { get; init; }
+
+        [JsonPropertyName("game_name")]
+        public required string GameName { get; init; }
+
+        [JsonPropertyName("type")]
+        public required string Type { get; init; }
+
+        [JsonPropertyName("title")]
+        public required string Title { get; init; }
+
+        [JsonPropertyName("tags")]
+        public required ImmutableArray<string> Tags { get; init; }
+
+        [JsonPropertyName("viewer_count")]
+        public required int ViewerCount { get; init; }
+
+        [JsonPropertyName("started_at")]
+        public required DateTimeOffset StartedAt { get; init; }
+
+        [JsonPropertyName("language")]
+        public required string Language { get; init; }
+
+        [JsonPropertyName("thumbnail_url")]
+        public required string ThumbnailUrl { get; init; }
+
+        [JsonPropertyName("is_mature")]
+        public required bool IsMature { get; init; }
+    }
+
+    private sealed record TwitchFollowerItem
+    {
+        [JsonPropertyName("user_id")]
+        public required string UserId { get; init; }
+
+        [JsonPropertyName("user_login")]
+        public required string UserLogin { get; init; }
+
+        [JsonPropertyName("user_name")]
+        public required string UserName { get; init; }
+
+        [JsonPropertyName("followed_at")]
+        public required DateTimeOffset FollowedAt { get; init; }
     }
 
     private sealed record TwitchPagination

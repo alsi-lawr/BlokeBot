@@ -507,7 +507,32 @@ public sealed class HostBotStatusTests
                 StreamRequestCount++;
                 StreamRequestAccessToken = request.Headers.Authorization?.Parameter;
                 StreamRequestClientId = request.Headers.GetValues("Client-Id").Single();
-                return JsonResponse(StreamIsLive ? """{"data":[{}]}""" : """{"data":[]}""");
+                return JsonResponse(
+                    StreamIsLive
+                        ? """
+                        {
+                          "data": [
+                            {
+                              "id": "stream-id",
+                              "user_id": "channel-id",
+                              "user_login": "streamer",
+                              "user_name": "Streamer",
+                              "game_id": "game-id",
+                              "game_name": "Example Game",
+                              "type": "live",
+                              "title": "Representative stream",
+                              "tags": ["English"],
+                              "viewer_count": 42,
+                              "started_at": "2026-07-13T12:34:56Z",
+                              "language": "en",
+                              "thumbnail_url": "https://example.test/{width}x{height}.jpg",
+                              "is_mature": false
+                            }
+                          ]
+                        }
+                        """
+                        : """{"data":[]}"""
+                );
             }
 
             private HttpResponseMessage TokenResponse()
