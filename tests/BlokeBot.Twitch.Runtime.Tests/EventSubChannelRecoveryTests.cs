@@ -951,7 +951,7 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
-    public void ChannelReconciliationOutcome_Inspecting_IsClosedAndHandlerComplete()
+    public void ChannelReconciliationOutcome_Inspecting_HasDeclaredCasesAndCompleteHandlerSignatures()
     {
         var unionType = typeof(TwitchEventSubChannelReconciliationOutcome);
         var directCases = unionType
@@ -972,15 +972,28 @@ public sealed class EventSubChannelRecoveryTests
             ?? throw new InvalidOperationException(
                 "The channel reconciliation constructor is missing."
             );
-        var handledCases = match
-            .GetParameters()
-            .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
-            .OrderBy(type => type.Name)
-            .ToArray();
+        var matchResultType = match.GetGenericArguments().ShouldHaveSingleItem();
+        var handlerParameters = match.GetParameters();
+        var handledCases = new List<Type>(handlerParameters.Length);
 
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
         constructor.IsPrivate.ShouldBeTrue();
+        match.IsGenericMethodDefinition.ShouldBeTrue();
+        matchResultType.IsGenericParameter.ShouldBeTrue();
+        matchResultType.Name.ShouldBe("TResult");
+        handlerParameters.Length.ShouldBe(directCases.Length);
+        foreach (var handlerParameter in handlerParameters)
+        {
+            var handlerType = handlerParameter.ParameterType;
+            handlerType.IsGenericType.ShouldBeTrue();
+            handlerType.GetGenericTypeDefinition().ShouldBe(typeof(Func<,>));
+            var handlerTypeArguments = handlerType.GetGenericArguments();
+            directCases.ShouldContain(handlerTypeArguments[0]);
+            handlerTypeArguments[1].ShouldBe(matchResultType);
+            handledCases.Add(handlerTypeArguments[0]);
+        }
+
         directCases
             .Select(type => type.Name)
             .ShouldBe([
@@ -990,7 +1003,7 @@ public sealed class EventSubChannelRecoveryTests
                 "StartupMessageRejected",
                 "UnresolvedDeletion",
             ]);
-        handledCases.ShouldBe(directCases);
+        handledCases.OrderBy(type => type.Name).ShouldBe(directCases);
         directCases.ShouldAllBe(type => type.IsSealed);
     }
 
