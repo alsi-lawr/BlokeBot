@@ -10,7 +10,7 @@ public sealed class CommandTests
     [Test]
     public async Task CallbackCommand_DispatchingCaseInsensitiveRoute_PassesArgumentsAndReplies()
     {
-        List<TwitchCommandResponse> responses = [];
+        List<CommandResponse> responses = [];
         IReadOnlyList<string> capturedArgs = [];
 
         var dispatcher = BuildDispatcher(builder =>
@@ -32,7 +32,7 @@ public sealed class CommandTests
             CancellationToken.None
         );
 
-        responses.ShouldBe([TwitchCommandResponse.Chat("alice:12:extra")]);
+        responses.ShouldBe([CommandResponse.Chat("alice:12:extra")]);
         capturedArgs.ShouldBe(["12", "extra"]);
     }
 
@@ -100,7 +100,7 @@ public sealed class CommandTests
     [Test]
     public async Task RegisteredCommandModule_Dispatching_ExecutesModuleHandler()
     {
-        List<TwitchCommandResponse> responses = [];
+        List<CommandResponse> responses = [];
         var dispatcher = BuildDispatcher(builder => builder.AddCommandModule<TestModule>());
 
         await dispatcher.DispatchResponsesAsync(
@@ -109,7 +109,7 @@ public sealed class CommandTests
             CancellationToken.None
         );
 
-        responses.ShouldBe([TwitchCommandResponse.Chat("value")]);
+        responses.ShouldBe([CommandResponse.Chat("value")]);
     }
 
     private static TwitchCommandDispatcher BuildDispatcher(Action<ITwitchBotBuilder> configure)
@@ -120,7 +120,7 @@ public sealed class CommandTests
         return services.BuildServiceProvider().GetRequiredService<TwitchCommandDispatcher>();
     }
 
-    private static TwitchChatMessage Message(string login, string text)
+    private static ChatMessage Message(string login, string text)
     {
         return new(
             login,
@@ -131,7 +131,7 @@ public sealed class CommandTests
         );
     }
 
-    private static TwitchCommandResponder RecordResponses(List<TwitchCommandResponse> responses)
+    private static CommandResponder RecordResponses(List<CommandResponse> responses)
     {
         return (response, _) =>
         {

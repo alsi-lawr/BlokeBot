@@ -107,7 +107,7 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<ITwitchRuntimeIdleWait, TwitchRuntimeIdleWait>();
         RegisterPolicies(services, policies);
         services.AddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
-        services.AddSingleton<ITwitchCommandResponseSender, TwitchChatCommandResponseSender>();
+        services.AddSingleton<ICommandResponseSender, PublicChatCommandResponseSender>();
         services.AddSingleton<
             ITwitchBotChannelLifecycleNotifier,
             NoOpTwitchBotChannelLifecycleNotifier
@@ -116,13 +116,13 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddHelix();
         services.AddContinueAndReportObserverFanOut<
             IrcMessageObserverBoundary,
-            TwitchChatMessage,
-            TwitchChatObserverDeadLetter
+            ChatMessage,
+            ChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.IrcMessages);
         services.AddContinueAndReportObserverFanOut<
             EventSubMessageObserverBoundary,
-            TwitchChatMessage,
-            TwitchChatObserverDeadLetter
+            ChatMessage,
+            ChatObserverDeadLetter
         >(TwitchBotObserverBoundaries.EventSubMessages);
         services.AddContinueAndReportObserverFanOut<
             PublicChatQueueAlertObserverBoundary,
@@ -131,11 +131,11 @@ public static class TwitchBotServiceCollectionExtensions
         >(TwitchBotObserverBoundaries.PublicChatQueueAlerts);
         services.TryAddSingleton<PublicChatQueueBacklogMonitor>();
         services.TryAddSingleton<PublicChatQueueAlertDispatcher>();
-        services.TryAddSingleton<IPublicChatTransport, TwitchHelixPublicChatTransport>();
+        services.TryAddSingleton<IPublicChatTransport, HelixPublicChatTransport>();
         services.TryAddSingleton<ChatIdentityResolver>();
         services.TryAddSingleton<PublicChatMessageQueue>();
         services.AddHostedService<PublicChatOutboxWorker>();
-        services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
+        services.TryAddSingleton<IPublicChatMessageSender, PublicChatMessageSender>();
         services.AddSingleton<TwitchBotRuntimeStatusStore>();
         services.AddSingleton<ITwitchBotRuntimeStatusAccessor>(sp =>
             sp.GetRequiredService<TwitchBotRuntimeStatusStore>()

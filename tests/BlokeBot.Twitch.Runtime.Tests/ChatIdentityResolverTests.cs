@@ -137,13 +137,13 @@ public sealed class ChatIdentityResolverTests
             """{"data":[{"id":"bot-id","login":"private-bot-login"}]}"""
         );
         var identity = Identity();
-        var transport = new TwitchHelixPublicChatTransport(
+        var transport = new HelixPublicChatTransport(
             new AppAccessTokenProvider(factory, identity),
             new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
             new ChatClient(factory),
-            NullLogger<TwitchHelixPublicChatTransport>.Instance
+            NullLogger<HelixPublicChatTransport>.Instance
         );
 
         var result = await transport.PrepareAsync(
@@ -169,13 +169,13 @@ public sealed class ChatIdentityResolverTests
             """{"data":[{"id":"channel-id","login":"private-channel-login"}]}"""
         );
         var identity = Identity();
-        var transport = new TwitchHelixPublicChatTransport(
+        var transport = new HelixPublicChatTransport(
             new AppAccessTokenProvider(factory, identity),
             new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
             new ChatClient(factory),
-            NullLogger<TwitchHelixPublicChatTransport>.Instance
+            NullLogger<HelixPublicChatTransport>.Instance
         );
 
         var result = await transport.PrepareAsync(
@@ -252,7 +252,7 @@ public sealed class ChatIdentityResolverTests
         return new(Identity(), new HelixClient(factory));
     }
 
-    private static EventSubChannelOperations StartupOperations(ITwitchChatMessageSender sender)
+    private static EventSubChannelOperations StartupOperations(IPublicChatMessageSender sender)
     {
         var factory = new IdentityHttpClientFactory("""{"data":[]}""");
         return new(
@@ -433,7 +433,7 @@ public sealed class ChatIdentityResolverTests
         }
     }
 
-    private sealed class UnusedChatSender : ITwitchChatMessageSender
+    private sealed class UnusedChatSender : IPublicChatMessageSender
     {
         public ValueTask<PublicChatSendOutcome> SendAsync(
             string channel,
@@ -447,7 +447,7 @@ public sealed class ChatIdentityResolverTests
     }
 
     private sealed class ScriptedChatSender(PublicChatSendOutcome outcome)
-        : ITwitchChatMessageSender
+        : IPublicChatMessageSender
     {
         internal List<string> Channels { get; } = [];
 

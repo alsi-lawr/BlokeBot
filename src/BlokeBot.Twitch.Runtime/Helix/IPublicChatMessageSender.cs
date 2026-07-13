@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch.Runtime;
 /// <summary>
 /// Sends messages to Twitch chat channels.
 /// </summary>
-public interface ITwitchChatMessageSender
+public interface IPublicChatMessageSender
 {
     /// <summary>
     /// Sends a chat message as the configured bot account.

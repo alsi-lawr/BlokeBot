@@ -106,7 +106,7 @@ public sealed class GuessingVoteService(
         );
     }
 
-    private static async Task<TwitchCommandResponseTarget> AnswerReplyTargetAsync(
+    private static async Task<CommandResponseTarget> AnswerReplyTargetAsync(
         BlokeBotDbContext db,
         int profileId,
         CancellationToken ct
@@ -120,8 +120,8 @@ public sealed class GuessingVoteService(
                     && x.ReplyTarget == ReplyDeliveryTargets.Whisper,
                 ct
             )
-            ? TwitchCommandResponseTarget.Whisper
-            : TwitchCommandResponseTarget.Chat;
+            ? CommandResponseTarget.Whisper
+            : CommandResponseTarget.Chat;
     }
 
     private static string Format(string template, string name, string login)

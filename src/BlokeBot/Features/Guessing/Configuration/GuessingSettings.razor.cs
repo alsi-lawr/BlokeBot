@@ -102,8 +102,8 @@ public partial class GuessingSettings
             {
                 ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
                     _config.Profile.WhisperAnswerReplies
-                        ? TwitchCommandResponseTarget.Whisper
-                        : TwitchCommandResponseTarget.Chat
+                        ? CommandResponseTarget.Whisper
+                        : CommandResponseTarget.Chat
                 ),
             }
         );

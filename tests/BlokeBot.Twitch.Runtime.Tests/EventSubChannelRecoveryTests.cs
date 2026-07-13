@@ -535,8 +535,8 @@ public sealed class EventSubChannelRecoveryTests
             [observer],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
-                TwitchChatMessage,
-                TwitchChatObserverDeadLetter
+                ChatMessage,
+                ChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.EventSubMessages),
             NullLogger<EventSubConnectionSession>.Instance
         );
@@ -1613,12 +1613,12 @@ public sealed class EventSubChannelRecoveryTests
         }
     }
 
-    private sealed class RecordingChatObserver : ITwitchChatMessageObserver
+    private sealed class RecordingChatObserver : IChatMessageObserver
     {
         internal List<string> Channels { get; } = [];
 
         public ValueTask MessageReceivedAsync(
-            TwitchChatMessage message,
+            ChatMessage message,
             CancellationToken cancellationToken
         )
         {
@@ -1627,11 +1627,11 @@ public sealed class EventSubChannelRecoveryTests
         }
     }
 
-    private sealed class UnusedCommandResponseSender : ITwitchCommandResponseSender
+    private sealed class UnusedCommandResponseSender : ICommandResponseSender
     {
         public ValueTask SendAsync(
-            TwitchChatMessage sourceMessage,
-            TwitchCommandResponse response,
+            ChatMessage sourceMessage,
+            CommandResponse response,
             CancellationToken cancellationToken
         )
         {

@@ -102,7 +102,7 @@ public sealed class IrcConnectionSessionTests
         }
     }
 
-    private sealed class RejectingChatSender : ITwitchChatMessageSender
+    private sealed class RejectingChatSender : IPublicChatMessageSender
     {
         internal List<SentMessage> Messages { get; } = [];
 

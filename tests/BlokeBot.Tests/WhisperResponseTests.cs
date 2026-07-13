@@ -84,7 +84,7 @@ public sealed class WhisperResponseTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var quota = CreateQuota(dbFactory);
 
-        for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
+        for (var index = 0; index < WhisperQuotaService.UniqueRecipientLimit; index++)
         {
             var result = await quota
                 .ReserveRecipient(hostId, "bot-id", $"viewer-id-{index}", $"viewer{index}")
@@ -106,7 +106,7 @@ public sealed class WhisperResponseTests
             _ => throw new InvalidOperationException("Expected a quota error."),
             error => error.ShouldBeOfType<WhisperQuotaReservationError.DailyRecipientLimitReached>()
         );
-        limit.Status.RecipientCount.ShouldBe(HostWhisperQuotaService.UniqueRecipientLimit);
+        limit.Status.RecipientCount.ShouldBe(WhisperQuotaService.UniqueRecipientLimit);
         limit.Status.Exhausted.ShouldBeTrue();
         existing
             .Match(
@@ -210,7 +210,7 @@ public sealed class WhisperResponseTests
     public async Task ExhaustedQuota_Delivering_ReturnsQuotaExceededWithoutHelixIo()
     {
         await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
-        for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
+        for (var index = 0; index < WhisperQuotaService.UniqueRecipientLimit; index++)
         {
             _ = await harness
                 .Quota.ReserveRecipient(
@@ -374,7 +374,7 @@ public sealed class WhisperResponseTests
         var action = async () =>
             await harness.Sender.SendAsync(
                 harness.Source(),
-                TwitchCommandResponse.Whisper("sensitive private response"),
+                CommandResponse.Whisper("sensitive private response"),
                 CancellationToken.None
             );
 
@@ -393,7 +393,7 @@ public sealed class WhisperResponseTests
 
         await harness.Sender.SendAsync(
             harness.Source(),
-            TwitchCommandResponse.Whisper("private response"),
+            CommandResponse.Whisper("private response"),
             CancellationToken.None
         );
 
@@ -414,7 +414,7 @@ public sealed class WhisperResponseTests
         var action = async () =>
             await harness.Sender.SendAsync(
                 harness.Source(),
-                TwitchCommandResponse.Whisper("private response"),
+                CommandResponse.Whisper("private response"),
                 cancellation.Token
             );
 
@@ -430,7 +430,7 @@ public sealed class WhisperResponseTests
 
         await harness.Sender.SendAsync(
             harness.Source(),
-            TwitchCommandResponse.Chat("public response"),
+            CommandResponse.Chat("public response"),
             CancellationToken.None
         );
 
@@ -450,7 +450,7 @@ public sealed class WhisperResponseTests
 
         await harness.Sender.SendAsync(
             harness.Source(),
-            TwitchCommandResponse.Chat("private public response"),
+            CommandResponse.Chat("private public response"),
             CancellationToken.None
         );
 
@@ -494,7 +494,7 @@ public sealed class WhisperResponseTests
         entry.Properties["Classification"].ShouldBe(nameof(PrivateDeliveryError.Unexpected));
     }
 
-    private static HostWhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory)
+    private static WhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory)
     {
         return new(
             dbFactory,
@@ -504,13 +504,13 @@ public sealed class WhisperResponseTests
 
     private static async Task<PrivateDeliveryError> SendPrivateFailureAsync(
         WhisperHarness harness,
-        TwitchChatMessage source,
+        ChatMessage source,
         string message = "private response"
     )
     {
         await harness.Sender.SendAsync(
             source,
-            TwitchCommandResponse.Whisper(message),
+            CommandResponse.Whisper(message),
             CancellationToken.None
         );
         harness.Chat.Messages.ShouldBeEmpty();
@@ -582,10 +582,10 @@ public sealed class WhisperResponseTests
             int hostId,
             WhisperHttpClientFactory http,
             RecordingChatSender chat,
-            HostWhisperQuotaService quota,
+            WhisperQuotaService quota,
             RecordingPrivateDeliveryFailureHandler failureHandler,
-            RecordingLogger<HostWhisperCommandResponseSender> publicChatLogger,
-            HostWhisperCommandResponseSender sender
+            RecordingLogger<WhisperCommandResponseSender> publicChatLogger,
+            WhisperCommandResponseSender sender
         )
         {
             _dbFactory = dbFactory;
@@ -606,13 +606,13 @@ public sealed class WhisperResponseTests
 
         internal RecordingChatSender Chat { get; }
 
-        internal HostWhisperQuotaService Quota { get; }
+        internal WhisperQuotaService Quota { get; }
 
         internal RecordingPrivateDeliveryFailureHandler FailureHandler { get; }
 
-        internal RecordingLogger<HostWhisperCommandResponseSender> PublicChatLogger { get; }
+        internal RecordingLogger<WhisperCommandResponseSender> PublicChatLogger { get; }
 
-        internal HostWhisperCommandResponseSender Sender { get; }
+        internal WhisperCommandResponseSender Sender { get; }
 
         internal static async Task<WhisperHarness> CreateAsync(
             HttpStatusCode whisperStatus,
@@ -662,8 +662,8 @@ public sealed class WhisperResponseTests
                 handlerException,
                 cancelOnHandling
             );
-            var publicChatLogger = new RecordingLogger<HostWhisperCommandResponseSender>();
-            var sender = new HostWhisperCommandResponseSender(
+            var publicChatLogger = new RecordingLogger<WhisperCommandResponseSender>();
+            var sender = new WhisperCommandResponseSender(
                 chat,
                 hostBotAccounts,
                 quota,
@@ -686,7 +686,7 @@ public sealed class WhisperResponseTests
             );
         }
 
-        internal TwitchChatMessage Source(bool includeUserId = true, string userId = "viewer-id")
+        internal ChatMessage Source(bool includeUserId = true, string userId = "viewer-id")
         {
             IReadOnlyDictionary<string, string> tags = includeUserId
                 ? new Dictionary<string, string> { ["user-id"] = userId }
@@ -741,7 +741,7 @@ public sealed class WhisperResponseTests
     }
 
     private sealed class RecordingChatSender(PublicChatSendOutcome outcome)
-        : ITwitchChatMessageSender
+        : IPublicChatMessageSender
     {
         internal List<SentChatMessage> Messages { get; } = [];
 

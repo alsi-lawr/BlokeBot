@@ -36,11 +36,11 @@ public static class TwitchBotBuilderServiceOverrideExtensions
     public static ITwitchBotBuilder OverrideCommandResponseSenderWith<TSender>(
         this ITwitchBotBuilder builder
     )
-        where TSender : class, ITwitchCommandResponseSender
+        where TSender : class, ICommandResponseSender
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.RemoveAll<ITwitchCommandResponseSender>();
-        builder.Services.AddSingleton<ITwitchCommandResponseSender>(serviceProvider =>
+        builder.Services.RemoveAll<ICommandResponseSender>();
+        builder.Services.AddSingleton<ICommandResponseSender>(serviceProvider =>
             serviceProvider.GetRequiredService<TSender>()
         );
         return builder;

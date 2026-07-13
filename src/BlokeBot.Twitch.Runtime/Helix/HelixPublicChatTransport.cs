@@ -15,13 +15,13 @@ internal interface IPublicChatTransport
     );
 }
 
-internal sealed class TwitchHelixPublicChatTransport(
+internal sealed class HelixPublicChatTransport(
     AppAccessTokenProvider appTokens,
     ITwitchBotAccountProvider botAccounts,
     BotIdentity identity,
     ChatIdentityResolver identities,
     ChatClient chat,
-    ILogger<TwitchHelixPublicChatTransport> log
+    ILogger<HelixPublicChatTransport> log
 ) : IPublicChatTransport
 {
     public async ValueTask<PublicChatPreparationOutcome> PrepareAsync(

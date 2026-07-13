@@ -31,7 +31,7 @@ public abstract record WhisperQuotaReservationError
         : WhisperQuotaReservationError;
 }
 
-public sealed class HostWhisperQuotaService(
+public sealed class WhisperQuotaService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider clock
 )

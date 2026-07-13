@@ -15,7 +15,7 @@ public sealed class HostConfigService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostModAccessService modAccess,
     HostBotAccountAuthorizationService botAccounts,
-    HostWhisperQuotaService whisperQuota,
+    WhisperQuotaService whisperQuota,
     HostedChannelRuntimeStatusService runtimeStatus,
     SiteAccessService siteAccess
 )
@@ -50,7 +50,7 @@ public sealed class HostConfigService(
                     false,
                     DisabledBotOverrideStatus(),
                     false,
-                    new WhisperQuotaStatus(0, HostWhisperQuotaService.UniqueRecipientLimit, false)
+                    new WhisperQuotaStatus(0, WhisperQuotaService.UniqueRecipientLimit, false)
                 ),
                 [],
                 new HostModAccessState(true, true, [], [])

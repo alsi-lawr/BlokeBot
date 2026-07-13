@@ -11,7 +11,7 @@ namespace BlokeBot.Features.Guessing.Commands;
 
 public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
-    public async Task<TwitchCommandResponse> AvailableGuessesResponseAsync(
+    public async Task<CommandResponse> AvailableGuessesResponseAsync(
         string hostLogin,
         int? profileId,
         CancellationToken ct
@@ -49,7 +49,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             ? GuessingDefaults.Replies().AvailableGuessesReply
             : settings.AvailableGuessesReply;
 
-        return new TwitchCommandResponse(
+        return new CommandResponse(
             delivery.TargetFor(GuessingReplyKeys.AvailableGuesses),
             MessageTemplateFormatter.Format(
                 template,
@@ -71,7 +71,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         return (await AvailableGuessesResponseAsync(hostLogin, profileId, ct)).Message;
     }
 
-    public async Task<TwitchCommandResponse> ModeratorOnlyResponseAsync(
+    public async Task<CommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
         int? profileId,
         CancellationToken ct
@@ -92,7 +92,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
                 profileId,
                 ct
             );
-        return new TwitchCommandResponse(
+        return new CommandResponse(
             resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.ModeratorOnly),
             resolution.Settings.ModeratorOnlyReply
         );
@@ -107,7 +107,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         return (await ModeratorOnlyResponseAsync(hostLogin, profileId, ct)).Message;
     }
 
-    public async Task<TwitchCommandResponse> UsageResponseAsync(
+    public async Task<CommandResponse> UsageResponseAsync(
         string hostLogin,
         GuessCommandKind kind,
         string command,
@@ -139,9 +139,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         var target =
             kind == GuessCommandKind.Win
                 ? resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.WinUsage)
-            : kind == GuessCommandKind.Start ? TwitchCommandResponseTarget.Chat
+            : kind == GuessCommandKind.Start ? CommandResponseTarget.Chat
             : resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.GuessUsage);
-        return new TwitchCommandResponse(
+        return new CommandResponse(
             target,
             MessageTemplateFormatter.Format(
                 template,
@@ -169,9 +169,9 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         return new(false, "This channel is not set up.");
     }
 
-    private static TwitchCommandResponse NotConfiguredResponse()
+    private static CommandResponse NotConfiguredResponse()
     {
-        return TwitchCommandResponse.Chat(NotConfigured().Message);
+        return CommandResponse.Chat(NotConfigured().Message);
     }
 
     private static string FormatOptions(IEnumerable<string> options)

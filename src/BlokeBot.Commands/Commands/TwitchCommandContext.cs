@@ -8,7 +8,7 @@ public sealed record TwitchCommandContext
     /// <summary>
     /// Gets the received chat message.
     /// </summary>
-    public required TwitchChatMessage Message { get; init; }
+    public required ChatMessage Message { get; init; }
 
     /// <summary>
     /// Gets the command name that matched the received chat message.
@@ -18,7 +18,7 @@ public sealed record TwitchCommandContext
     /// <summary>
     /// Sets the focused response collaborator for this dispatch.
     /// </summary>
-    public required TwitchCommandResponder Responder { private get; init; }
+    public required CommandResponder Responder { private get; init; }
 
     /// <summary>
     /// Sends a chat reply to the configured channel.
@@ -28,13 +28,10 @@ public sealed record TwitchCommandContext
     /// <returns>A task that completes when the reply is sent.</returns>
     public ValueTask ReplyAsync(string message, CancellationToken cancellationToken)
     {
-        return Responder(TwitchCommandResponse.Chat(message), cancellationToken);
+        return Responder(CommandResponse.Chat(message), cancellationToken);
     }
 
-    public ValueTask RespondAsync(
-        TwitchCommandResponse response,
-        CancellationToken cancellationToken
-    )
+    public ValueTask RespondAsync(CommandResponse response, CancellationToken cancellationToken)
     {
         return Responder(response, cancellationToken);
     }

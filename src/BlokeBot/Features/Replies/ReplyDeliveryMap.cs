@@ -42,11 +42,9 @@ public sealed class ReplyDeliveryMap
         return new ReplyDeliveryMap(_whisperKeys.Where(allowed.Contains));
     }
 
-    public TwitchCommandResponseTarget TargetFor(string replyKey)
+    public CommandResponseTarget TargetFor(string replyKey)
     {
-        return IsWhisper(replyKey)
-            ? TwitchCommandResponseTarget.Whisper
-            : TwitchCommandResponseTarget.Chat;
+        return IsWhisper(replyKey) ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat;
     }
 
     public void SetWhisper(string replyKey, bool whisper)

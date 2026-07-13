@@ -27,14 +27,14 @@ public sealed class ChatActivityHookTests
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 IrcMessageObserverBoundary,
-                TwitchChatMessage,
-                TwitchChatObserverDeadLetter
+                ChatMessage,
+                ChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.IrcMessages),
             NullLogger<IrcConnectionSession>.Instance
         );
 
         await session.DispatchChatMessageAsync(
-            new TwitchChatMessage(
+            new ChatMessage(
                 "viewer",
                 "streamer",
                 "!ping",
@@ -61,8 +61,8 @@ public sealed class ChatActivityHookTests
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,
-                TwitchChatMessage,
-                TwitchChatObserverDeadLetter
+                ChatMessage,
+                ChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.EventSubMessages),
             NullLogger<EventSubConnectionSession>.Instance
         );
@@ -99,14 +99,14 @@ public sealed class ChatActivityHookTests
             [],
             RuntimeTestObserverFanOut.Continue<
                 IrcMessageObserverBoundary,
-                TwitchChatMessage,
-                TwitchChatObserverDeadLetter
+                ChatMessage,
+                ChatObserverDeadLetter
             >(TwitchBotObserverBoundaries.IrcMessages),
             logger
         );
 
         await session.DispatchChatMessageAsync(
-            new TwitchChatMessage(
+            new ChatMessage(
                 "viewer",
                 "streamer",
                 PrivateCommand,
@@ -148,10 +148,10 @@ public sealed class ChatActivityHookTests
     }
 
     private sealed class RecordingChatMessageObserver(RuntimeHookRecorder recorder)
-        : ITwitchChatMessageObserver
+        : IChatMessageObserver
     {
         public ValueTask MessageReceivedAsync(
-            TwitchChatMessage message,
+            ChatMessage message,
             CancellationToken cancellationToken
         )
         {
@@ -160,10 +160,10 @@ public sealed class ChatActivityHookTests
         }
     }
 
-    private sealed class ThrowingChatMessageObserver : ITwitchChatMessageObserver
+    private sealed class ThrowingChatMessageObserver : IChatMessageObserver
     {
         public ValueTask MessageReceivedAsync(
-            TwitchChatMessage message,
+            ChatMessage message,
             CancellationToken cancellationToken
         )
         {
@@ -172,11 +172,11 @@ public sealed class ChatActivityHookTests
     }
 
     private sealed class RecordingCommandResponseSender(RuntimeHookRecorder recorder)
-        : ITwitchCommandResponseSender
+        : ICommandResponseSender
     {
         public ValueTask SendAsync(
-            TwitchChatMessage sourceMessage,
-            TwitchCommandResponse response,
+            ChatMessage sourceMessage,
+            CommandResponse response,
             CancellationToken cancellationToken
         )
         {

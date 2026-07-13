@@ -10,8 +10,8 @@ public sealed class TwitchCommandDispatcher
     }
 
     public async ValueTask DispatchResponsesAsync(
-        TwitchChatMessage message,
-        TwitchCommandResponder respond,
+        ChatMessage message,
+        CommandResponder respond,
         CancellationToken cancellationToken
     )
     {

@@ -909,7 +909,7 @@ public sealed class CustomAnnouncementSchedulerTests
         return new AnnouncementSeed(announcement.Id, entry.Id);
     }
 
-    private static TwitchChatMessage Message(string login, string channel, string text)
+    private static ChatMessage Message(string login, string channel, string text)
     {
         return new(login, channel, text, text, new Dictionary<string, string>());
     }

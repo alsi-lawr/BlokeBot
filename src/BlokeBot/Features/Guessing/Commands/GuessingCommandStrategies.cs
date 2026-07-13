@@ -16,7 +16,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
 
     public abstract bool RequiresModerator { get; }
 
-    public async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
+    public async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -51,7 +51,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
         if (!string.IsNullOrWhiteSpace(result.Message))
         {
             await context.Command.RespondAsync(
-                new TwitchCommandResponse(result.Target, result.Message),
+                new CommandResponse(result.Target, result.Message),
                 cancellationToken
             );
         }

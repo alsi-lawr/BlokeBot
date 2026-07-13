@@ -14,7 +14,7 @@ internal static class TestCommandContext
         string channel,
         string commandName,
         IReadOnlyList<string> args,
-        TwitchCommandResponder respond
+        CommandResponder respond
     )
     {
         return new()
@@ -25,7 +25,7 @@ internal static class TestCommandContext
         };
     }
 
-    private static TwitchChatMessage Message(
+    private static ChatMessage Message(
         string login,
         string channel,
         string commandName,
@@ -33,7 +33,7 @@ internal static class TestCommandContext
     )
     {
         var text = args.Count == 0 ? $"!{commandName}" : $"!{commandName} {string.Join(' ', args)}";
-        return new TwitchChatMessage(
+        return new ChatMessage(
             login,
             channel,
             text,

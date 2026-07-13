@@ -548,11 +548,11 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task AcceptedTwitchNotification_Sending_CompletesWithoutFailureDiagnostic()
+    public async Task AcceptedPublicChatNotification_Sending_CompletesWithoutFailureDiagnostic()
     {
         var chat = new ScriptedPublicChatSender(new PublicChatSendOutcome.Accepted());
-        var logger = new RecordingLogger<TwitchPointsGiveawaySchedulerNotification>();
-        var notification = new TwitchPointsGiveawaySchedulerNotification(chat, logger);
+        var logger = new RecordingLogger<PublicChatPointsGiveawaySchedulerNotification>();
+        var notification = new PublicChatPointsGiveawaySchedulerNotification(chat, logger);
 
         await notification.SendAsync(
             ScheduleEndingAfter(new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero)),
@@ -565,11 +565,11 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task RejectedTwitchNotification_Sending_ReportsRedactedNoDelivery()
+    public async Task RejectedPublicChatNotification_Sending_ReportsRedactedNoDelivery()
     {
         var chat = new ScriptedPublicChatSender(new PublicChatSendOutcome.Rejected());
-        var logger = new RecordingLogger<TwitchPointsGiveawaySchedulerNotification>();
-        var notification = new TwitchPointsGiveawaySchedulerNotification(chat, logger);
+        var logger = new RecordingLogger<PublicChatPointsGiveawaySchedulerNotification>();
+        var notification = new PublicChatPointsGiveawaySchedulerNotification(chat, logger);
 
         await notification.SendAsync(
             ScheduleEndingAfter(new DateTimeOffset(2026, 7, 13, 12, 0, 0, TimeSpan.Zero)),
@@ -1462,7 +1462,7 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     private sealed class ScriptedPublicChatSender(PublicChatSendOutcome outcome)
-        : ITwitchChatMessageSender
+        : IPublicChatMessageSender
     {
         internal List<string> Messages { get; } = [];
 

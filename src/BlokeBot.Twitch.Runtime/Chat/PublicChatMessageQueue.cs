@@ -43,7 +43,7 @@ internal sealed class PublicChatMessageQueue(
             return new PublicChatEnqueueOutcome.Rejected();
         }
 
-        var parts = TwitchChatMessageSplitter
+        var parts = PublicChatMessageSplitter
             .Split(command.Message, _maxMessageLength)
             .ToImmutableArray();
         if (parts.IsDefaultOrEmpty)

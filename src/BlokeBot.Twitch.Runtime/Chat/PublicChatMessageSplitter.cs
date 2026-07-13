@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal static class TwitchChatMessageSplitter
+internal static class PublicChatMessageSplitter
 {
     public static IReadOnlyList<string> Split(string message, int maxLength)
     {

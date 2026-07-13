@@ -2,18 +2,18 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchChatCommandResponseSender(
-    ITwitchChatMessageSender sender,
-    ILogger<TwitchChatCommandResponseSender> log
-) : ITwitchCommandResponseSender
+internal sealed class PublicChatCommandResponseSender(
+    IPublicChatMessageSender sender,
+    ILogger<PublicChatCommandResponseSender> log
+) : ICommandResponseSender
 {
     public async ValueTask SendAsync(
-        TwitchChatMessage sourceMessage,
-        TwitchCommandResponse response,
+        ChatMessage sourceMessage,
+        CommandResponse response,
         CancellationToken cancellationToken
     )
     {
-        if (response.Target == TwitchCommandResponseTarget.Whisper)
+        if (response.Target == CommandResponseTarget.Whisper)
         {
             log.LogWarning(
                 "Private command response delivery is unavailable in public-chat-only mode for host channel #{HostChannel}; no user-visible delivery was attempted.",

@@ -21,7 +21,7 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
 
     public abstract bool RequiresModerator { get; }
 
-    public async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
+    public async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -66,16 +66,13 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         if (!string.IsNullOrWhiteSpace(result.Message))
         {
             await context.Command.RespondAsync(
-                new TwitchCommandResponse(result.Target, result.Message),
+                new CommandResponse(result.Target, result.Message),
                 cancellationToken
             );
         }
     }
 
-    protected static TwitchCommandResponse Response(
-        string message,
-        TwitchCommandResponseTarget target
-    )
+    protected static CommandResponse Response(string message, CommandResponseTarget target)
     {
         return new(target, message);
     }

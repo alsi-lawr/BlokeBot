@@ -77,8 +77,11 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     DisabledCustomAnnouncementSender
                 >();
                 break;
-            case CustomAnnouncementDeliveryMode.TwitchChat:
-                services.AddSingleton<ICustomAnnouncementSender, TwitchCustomAnnouncementSender>();
+            case CustomAnnouncementDeliveryMode.PublicChat:
+                services.AddSingleton<
+                    ICustomAnnouncementSender,
+                    PublicChatCustomAnnouncementSender
+                >();
                 break;
             default:
                 throw new ArgumentOutOfRangeException(
@@ -87,7 +90,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     "Unknown custom-announcement delivery mode."
                 );
         }
-        services.AddSingleton<ITwitchChatMessageObserver, CustomAnnouncementChatActivity>();
+        services.AddSingleton<IChatMessageObserver, CustomAnnouncementChatActivity>();
         services.AddSingleton<CustomAnnouncementScheduler>();
         services.AddHostedService(sp => sp.GetRequiredService<CustomAnnouncementScheduler>());
         services.TryAddSingleton<DurableAlertService>();
@@ -218,10 +221,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                     ReplyOnlyPointsGiveawaySchedulerNotification
                 >();
                 break;
-            case PointsGiveawayNotificationMode.TwitchChat:
+            case PointsGiveawayNotificationMode.PublicChat:
                 services.AddSingleton<
                     IPointsGiveawaySchedulerNotification,
-                    TwitchPointsGiveawaySchedulerNotification
+                    PublicChatPointsGiveawaySchedulerNotification
                 >();
                 break;
             default:
@@ -375,12 +378,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostedChannelRuntimeStatusService>();
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
-        services.AddSingleton<HostWhisperQuotaService>();
+        services.AddSingleton<WhisperQuotaService>();
         services.AddSingleton<
             IPrivateDeliveryFailureHandler,
             PrivateDeliveryFailureTelemetryHandler
         >();
-        services.AddSingleton<HostWhisperCommandResponseSender>();
+        services.AddSingleton<WhisperCommandResponseSender>();
         services.AddSingleton<ITwitchBotChannelProvider, HostedChannelProvider>();
         services.AddSingleton<HostedChannelLifecycleNotifier>();
         return services;

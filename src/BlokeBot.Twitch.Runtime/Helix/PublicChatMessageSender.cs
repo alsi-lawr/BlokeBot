@@ -3,8 +3,8 @@ using System.Runtime.ExceptionServices;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchChatMessageSender(PublicChatMessageQueue queue)
-    : ITwitchChatMessageSender
+internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
+    : IPublicChatMessageSender
 {
     public async ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,

@@ -104,7 +104,7 @@ public sealed class CommandStrategyDispatcherTests
         }
     }
 
-    private static TwitchChatMessage Message(string login, string text)
+    private static ChatMessage Message(string login, string text)
     {
         return new(
             login,
@@ -115,7 +115,7 @@ public sealed class CommandStrategyDispatcherTests
         );
     }
 
-    private static TwitchCommandResponder ReplyTo(List<string> replies)
+    private static CommandResponder ReplyTo(List<string> replies)
     {
         return (response, _) =>
         {

@@ -17,13 +17,13 @@ public interface ICommandStrategy<TKind, TState>
         CancellationToken cancellationToken
     );
 
-    async ValueTask<TwitchCommandResponse?> ModeratorOnlyResponseAsync(
+    async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
         CommandStrategyContext<TKind, TState> context,
         CancellationToken cancellationToken
     )
     {
         var reply = await ModeratorOnlyReplyAsync(context, cancellationToken);
-        return string.IsNullOrWhiteSpace(reply) ? null : TwitchCommandResponse.Chat(reply);
+        return string.IsNullOrWhiteSpace(reply) ? null : CommandResponse.Chat(reply);
     }
 
     ValueTask ExecuteAsync(

@@ -5,15 +5,15 @@ public static class ReplyDeliveryTargets
     public const string Chat = "chat";
     public const string Whisper = "whisper";
 
-    public static TwitchCommandResponseTarget ToCommandTarget(string? target)
+    public static CommandResponseTarget ToCommandTarget(string? target)
     {
         return string.Equals(target, Whisper, StringComparison.OrdinalIgnoreCase)
-            ? TwitchCommandResponseTarget.Whisper
-            : TwitchCommandResponseTarget.Chat;
+            ? CommandResponseTarget.Whisper
+            : CommandResponseTarget.Chat;
     }
 
-    public static string FromCommandTarget(TwitchCommandResponseTarget target)
+    public static string FromCommandTarget(CommandResponseTarget target)
     {
-        return target == TwitchCommandResponseTarget.Whisper ? Whisper : Chat;
+        return target == CommandResponseTarget.Whisper ? Whisper : Chat;
     }
 }

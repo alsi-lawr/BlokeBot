@@ -24,13 +24,13 @@ public sealed class PublicChatMessageQueueTests
     [Test]
     public void MessageWithMultipleBreakTypes_Splitting_PrefersLineSentenceThenWord()
     {
-        TwitchChatMessageSplitter
+        PublicChatMessageSplitter
             .Split("first line\nsecond line", 12)
             .ShouldBe(["first line", "second line"]);
-        TwitchChatMessageSplitter
+        PublicChatMessageSplitter
             .Split("First sentence. Second one.", 20)
             .ShouldBe(["First sentence.", "Second one."]);
-        TwitchChatMessageSplitter.Split("alpha beta gamma", 10).ShouldBe(["alpha", "beta gamma"]);
+        PublicChatMessageSplitter.Split("alpha beta gamma", 10).ShouldBe(["alpha", "beta gamma"]);
     }
 
     [Test]
@@ -101,7 +101,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new TwitchChatMessageSender(
+        var sender = new PublicChatMessageSender(
             CreateQueue(new TwitchBotOptions(), outbox, transport)
         );
         var deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
@@ -132,7 +132,7 @@ public sealed class PublicChatMessageQueueTests
     {
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new TwitchChatMessageSender(
+        var sender = new PublicChatMessageSender(
             CreateQueue(new TwitchBotOptions(), outbox, transport)
         );
 
@@ -155,7 +155,7 @@ public sealed class PublicChatMessageQueueTests
         var failure = new IOException("private persistence detail");
         var outbox = new InMemoryOutbox(_standardRetryPolicy) { EnqueueFailure = failure };
         var transport = new RecordingTransport();
-        var sender = new TwitchChatMessageSender(
+        var sender = new PublicChatMessageSender(
             CreateQueue(new TwitchBotOptions(), outbox, transport)
         );
 
@@ -182,7 +182,7 @@ public sealed class PublicChatMessageQueueTests
         cancellation.Cancel();
         var outbox = new InMemoryOutbox(_standardRetryPolicy);
         var transport = new RecordingTransport();
-        var sender = new TwitchChatMessageSender(
+        var sender = new PublicChatMessageSender(
             CreateQueue(new TwitchBotOptions(), outbox, transport)
         );
 
@@ -211,7 +211,7 @@ public sealed class PublicChatMessageQueueTests
             AfterEnqueue = cancellation.Cancel,
         };
         var transport = new RecordingTransport();
-        var sender = new TwitchChatMessageSender(
+        var sender = new PublicChatMessageSender(
             CreateQueue(new TwitchBotOptions(), outbox, transport)
         );
 

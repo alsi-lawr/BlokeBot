@@ -2,7 +2,7 @@ namespace BlokeBot.Commands;
 
 public static class TwitchModeratorPolicy
 {
-    public static bool IsModerator(TwitchChatMessage message)
+    public static bool IsModerator(ChatMessage message)
     {
         if (string.Equals(message.Login, message.Channel, StringComparison.OrdinalIgnoreCase))
         {

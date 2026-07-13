@@ -123,7 +123,7 @@ internal sealed class EventSubChannelOperations(
     ITwitchBotAccountProvider accounts,
     ChatIdentityResolver identities,
     EventSubClient eventSub,
-    ITwitchChatMessageSender sender,
+    IPublicChatMessageSender sender,
     ITwitchBotChannelLifecycleNotifier lifecycle
 ) : IEventSubChannelOperations
 {

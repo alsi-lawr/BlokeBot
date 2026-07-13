@@ -10,10 +10,10 @@ namespace BlokeBot.Features.CustomCommands;
 public sealed class CustomAnnouncementChatActivity(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TimeProvider clock
-) : ITwitchChatMessageObserver
+) : IChatMessageObserver
 {
     public async ValueTask MessageReceivedAsync(
-        TwitchChatMessage message,
+        ChatMessage message,
         CancellationToken cancellationToken
     )
     {

@@ -24,7 +24,7 @@ public sealed class GuessingDashboardRejectionTests
         var hostId = await SeedGuessingAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var chat = new RejectingChatSender();
-        context.Services.AddSingleton<ITwitchChatMessageSender>(chat);
+        context.Services.AddSingleton<IPublicChatMessageSender>(chat);
         context.Services.AddSingleton<GuessingDashboardService>();
         context.Services.AddSingleton<GuessingHistoryService>();
         context.Services.AddSingleton<GuessingChangeNotifier>();
@@ -75,7 +75,7 @@ public sealed class GuessingDashboardRejectionTests
         return host.Id;
     }
 
-    private sealed class RejectingChatSender : ITwitchChatMessageSender
+    private sealed class RejectingChatSender : IPublicChatMessageSender
     {
         internal List<SentMessage> Messages { get; } = [];
 

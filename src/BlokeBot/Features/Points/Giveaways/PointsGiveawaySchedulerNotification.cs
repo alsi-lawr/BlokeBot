@@ -5,7 +5,7 @@ namespace BlokeBot.Features.Points.Giveaways;
 public enum PointsGiveawayNotificationMode
 {
     ReplyOnly,
-    TwitchChat,
+    PublicChat,
 }
 
 internal interface IPointsGiveawaySchedulerNotification
@@ -32,9 +32,9 @@ internal sealed class ReplyOnlyPointsGiveawaySchedulerNotification
     }
 }
 
-internal sealed class TwitchPointsGiveawaySchedulerNotification(
-    ITwitchChatMessageSender sender,
-    ILogger<TwitchPointsGiveawaySchedulerNotification> log
+internal sealed class PublicChatPointsGiveawaySchedulerNotification(
+    IPublicChatMessageSender sender,
+    ILogger<PublicChatPointsGiveawaySchedulerNotification> log
 ) : IPointsGiveawaySchedulerNotification
 {
     public async ValueTask SendAsync(

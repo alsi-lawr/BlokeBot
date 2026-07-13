@@ -6,20 +6,20 @@ using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
-public sealed class TwitchChatCommandResponseSenderTests
+public sealed class PublicChatCommandResponseSenderTests
 {
     [Test]
     public async Task ChatResponse_SendingStandalone_DeliversToSourceChannel()
     {
         var chat = new RecordingChatSender();
-        var sender = new TwitchChatCommandResponseSender(
+        var sender = new PublicChatCommandResponseSender(
             chat,
-            NullLogger<TwitchChatCommandResponseSender>.Instance
+            NullLogger<PublicChatCommandResponseSender>.Instance
         );
 
         await sender.SendAsync(
             SourceMessage(),
-            TwitchCommandResponse.Chat("public response"),
+            CommandResponse.Chat("public response"),
             CancellationToken.None
         );
 
@@ -33,14 +33,14 @@ public sealed class TwitchChatCommandResponseSenderTests
     public async Task WhisperResponse_SendingStandalone_DoesNotUsePublicDelivery()
     {
         var chat = new RecordingChatSender();
-        var sender = new TwitchChatCommandResponseSender(
+        var sender = new PublicChatCommandResponseSender(
             chat,
-            NullLogger<TwitchChatCommandResponseSender>.Instance
+            NullLogger<PublicChatCommandResponseSender>.Instance
         );
 
         await sender.SendAsync(
             SourceMessage(),
-            TwitchCommandResponse.Whisper("private response"),
+            CommandResponse.Whisper("private response"),
             CancellationToken.None
         );
 
@@ -53,12 +53,12 @@ public sealed class TwitchChatCommandResponseSenderTests
     public async Task RejectedChatResponse_SendingStandalone_ReportsRedactedNoDelivery()
     {
         var chat = new RecordingChatSender(new PublicChatSendOutcome.Rejected());
-        var logger = new RecordingLogger<TwitchChatCommandResponseSender>();
-        var sender = new TwitchChatCommandResponseSender(chat, logger);
+        var logger = new RecordingLogger<PublicChatCommandResponseSender>();
+        var sender = new PublicChatCommandResponseSender(chat, logger);
 
         await sender.SendAsync(
             SourceMessage(),
-            TwitchCommandResponse.Chat("private response payload"),
+            CommandResponse.Chat("private response payload"),
             CancellationToken.None
         );
 
@@ -71,7 +71,7 @@ public sealed class TwitchChatCommandResponseSenderTests
         entry.Properties["HostChannel"].ShouldBe("streamer");
     }
 
-    private static TwitchChatMessage SourceMessage()
+    private static ChatMessage SourceMessage()
     {
         return new(
             "viewer",
@@ -83,7 +83,7 @@ public sealed class TwitchChatCommandResponseSenderTests
     }
 
     private sealed class RecordingChatSender(PublicChatSendOutcome? outcome = null)
-        : ITwitchChatMessageSender
+        : IPublicChatMessageSender
     {
         public List<string> Channels { get; } = [];
 

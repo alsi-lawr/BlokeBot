@@ -9,25 +9,25 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
 
-public sealed class HostWhisperCommandResponseSender(
-    ITwitchChatMessageSender chat,
+public sealed class WhisperCommandResponseSender(
+    IPublicChatMessageSender chat,
     HostBotAccountAuthorizationService botAccounts,
-    HostWhisperQuotaService quota,
+    WhisperQuotaService quota,
     HelixClient users,
     WhisperClient whispers,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     BotIdentity identity,
     IPrivateDeliveryFailureHandler failureHandler,
-    ILogger<HostWhisperCommandResponseSender> log
-) : ITwitchCommandResponseSender
+    ILogger<WhisperCommandResponseSender> log
+) : ICommandResponseSender
 {
     public async ValueTask SendAsync(
-        TwitchChatMessage sourceMessage,
-        TwitchCommandResponse response,
+        ChatMessage sourceMessage,
+        CommandResponse response,
         CancellationToken cancellationToken
     )
     {
-        if (response.Target != TwitchCommandResponseTarget.Whisper)
+        if (response.Target != CommandResponseTarget.Whisper)
         {
             await SendPublicChatAsync(sourceMessage.Channel, response.Message, cancellationToken);
             return;
@@ -41,7 +41,7 @@ public sealed class HostWhisperCommandResponseSender(
     }
 
     public IO<PrivateDeliveryReceipt, PrivateDeliveryError> Deliver(
-        TwitchChatMessage sourceMessage,
+        ChatMessage sourceMessage,
         string message
     )
     {
@@ -53,7 +53,7 @@ public sealed class HostWhisperCommandResponseSender(
     }
 
     private async ValueTask<Result<PrivateDeliveryReceipt, PrivateDeliveryError>> DeliverAsync(
-        TwitchChatMessage sourceMessage,
+        ChatMessage sourceMessage,
         string message,
         CancellationToken cancellationToken
     )
@@ -156,7 +156,7 @@ public sealed class HostWhisperCommandResponseSender(
     }
 
     private async ValueTask<PrivateDeliveryPreparation> PrepareAsync(
-        TwitchChatMessage sourceMessage,
+        ChatMessage sourceMessage,
         CancellationToken cancellationToken
     )
     {
@@ -242,7 +242,7 @@ public sealed class HostWhisperCommandResponseSender(
     }
 
     private async ValueTask HandlePrivateDeliveryErrorAsync(
-        TwitchChatMessage sourceMessage,
+        ChatMessage sourceMessage,
         PrivateDeliveryError error,
         CancellationToken cancellationToken
     )
@@ -369,7 +369,7 @@ public sealed class HostWhisperCommandResponseSender(
     }
 
     private async Task<string?> ResolveRecipientUserIdAsync(
-        TwitchChatMessage sourceMessage,
+        ChatMessage sourceMessage,
         string accessToken,
         CancellationToken cancellationToken
     )

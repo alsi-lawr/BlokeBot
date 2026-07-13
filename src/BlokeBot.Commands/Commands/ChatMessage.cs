@@ -5,7 +5,7 @@ namespace BlokeBot.Commands;
 /// <summary>
 /// Describes a Twitch chat message received by the bot.
 /// </summary>
-public sealed record TwitchChatMessage
+public sealed record ChatMessage
 {
     /// <summary>
     /// Creates a chat message.
@@ -15,7 +15,7 @@ public sealed record TwitchChatMessage
     /// <param name="text">The message text.</param>
     /// <param name="rawLine">The raw source payload.</param>
     /// <param name="tags">The raw tag values keyed by tag name.</param>
-    public TwitchChatMessage(
+    public ChatMessage(
         string login,
         string channel,
         string text,

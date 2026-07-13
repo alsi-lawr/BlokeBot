@@ -42,7 +42,7 @@ public sealed class TwitchModeratorPolicyTests
         TwitchModeratorPolicy.IsModerator(Message("viewer", "streamer")).ShouldBeFalse();
     }
 
-    private static TwitchChatMessage Message(
+    private static ChatMessage Message(
         string login,
         string channel,
         IReadOnlyDictionary<string, string>? tags = null

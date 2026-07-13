@@ -111,7 +111,7 @@ public sealed class GuessingAliasTests
             );
             await db.SaveChangesAsync();
         }
-        List<TwitchCommandResponse> responses = [];
+        List<CommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
             new GuessingCommandService(dbFactory),
             RoundService(dbFactory)
@@ -129,7 +129,7 @@ public sealed class GuessingAliasTests
         );
 
         var response = responses.Single();
-        response.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        response.Target.ShouldBe(CommandResponseTarget.Whisper);
         response.Message.ShouldBe("Already open.");
     }
 
@@ -152,7 +152,7 @@ public sealed class GuessingAliasTests
             );
             await db.SaveChangesAsync();
         }
-        List<TwitchCommandResponse> responses = [];
+        List<CommandResponse> responses = [];
         var strategy = new StartGuessingCommandStrategy(
             new GuessingCommandService(dbFactory),
             RoundService(dbFactory)
@@ -170,7 +170,7 @@ public sealed class GuessingAliasTests
         );
 
         var response = responses.Single();
-        response.Target.ShouldBe(TwitchCommandResponseTarget.Chat);
+        response.Target.ShouldBe(CommandResponseTarget.Chat);
         response.Message.ShouldBe("Started Special: blue");
     }
 
@@ -245,7 +245,7 @@ public sealed class GuessingAliasTests
             CancellationToken.None
         );
 
-        result.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        result.Target.ShouldBe(CommandResponseTarget.Whisper);
         result.Message.ShouldBe("Blue");
     }
 
@@ -283,7 +283,7 @@ public sealed class GuessingAliasTests
             channel,
             commandName,
             args,
-            (TwitchCommandResponse response, CancellationToken _) =>
+            (CommandResponse response, CancellationToken _) =>
             {
                 replies.Add(response.Message);
                 return ValueTask.CompletedTask;
@@ -306,7 +306,7 @@ public sealed class GuessingAliasTests
         string commandName,
         AppCommandRouteState routeState,
         IReadOnlyList<string> args,
-        List<TwitchCommandResponse> responses
+        List<CommandResponse> responses
     )
     {
         var command = TestCommandContext.Create(
@@ -314,7 +314,7 @@ public sealed class GuessingAliasTests
             channel,
             commandName,
             args,
-            (TwitchCommandResponse response, CancellationToken _) =>
+            (CommandResponse response, CancellationToken _) =>
             {
                 responses.Add(response);
                 return ValueTask.CompletedTask;

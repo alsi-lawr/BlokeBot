@@ -25,10 +25,10 @@ public sealed class TwitchBotServiceOverrideTests
             .GetRequiredService<ITwitchBotAccountProvider>()
             .GetBotAccountAsync("streamer", CancellationToken.None);
         await provider
-            .GetRequiredService<ITwitchCommandResponseSender>()
+            .GetRequiredService<ICommandResponseSender>()
             .SendAsync(
                 SourceMessage(),
-                TwitchCommandResponse.Chat("default response"),
+                CommandResponse.Chat("default response"),
                 CancellationToken.None
             );
         var lifecycle = provider.GetRequiredService<ITwitchBotChannelLifecycleNotifier>();
@@ -66,10 +66,10 @@ public sealed class TwitchBotServiceOverrideTests
             .GetRequiredService<ITwitchBotAccountProvider>()
             .GetBotAccountAsync("streamer", CancellationToken.None);
         await provider
-            .GetRequiredService<ITwitchCommandResponseSender>()
+            .GetRequiredService<ICommandResponseSender>()
             .SendAsync(
                 SourceMessage(),
-                TwitchCommandResponse.Whisper("feature response"),
+                CommandResponse.Whisper("feature response"),
                 CancellationToken.None
             );
         var lifecycle = provider.GetRequiredService<ITwitchBotChannelLifecycleNotifier>();
@@ -79,11 +79,7 @@ public sealed class TwitchBotServiceOverrideTests
         account.ShouldBe(new TwitchBotAccount("feature-bot", "feature-token"));
         accountProvider.Channels.ShouldBe(["streamer"]);
         responseSender.Responses.ShouldBe([
-            new RecordedResponse(
-                "streamer",
-                TwitchCommandResponseTarget.Whisper,
-                "feature response"
-            ),
+            new RecordedResponse("streamer", CommandResponseTarget.Whisper, "feature response"),
         ]);
         lifecycleNotifier.StartedChannels.ShouldBe(["streamer"]);
         lifecycleNotifier.StoppedChannels.ShouldBe(["streamer"]);
@@ -107,7 +103,7 @@ public sealed class TwitchBotServiceOverrideTests
         services.AddSingleton(firstResponseSender);
         services.AddSingleton(firstLifecycleNotifier);
         services.AddSingleton<ITwitchBotAccountProvider>(firstAccountProvider);
-        services.AddSingleton<ITwitchCommandResponseSender>(firstResponseSender);
+        services.AddSingleton<ICommandResponseSender>(firstResponseSender);
         services.AddSingleton<ITwitchBotChannelLifecycleNotifier>(firstLifecycleNotifier);
         services.AddSingleton(accountProvider);
         services.AddSingleton(responseSender);
@@ -126,7 +122,7 @@ public sealed class TwitchBotServiceOverrideTests
             .GetServices<ITwitchBotAccountProvider>()
             .ShouldHaveSingleItem();
         var responseContract = provider
-            .GetServices<ITwitchCommandResponseSender>()
+            .GetServices<ICommandResponseSender>()
             .ShouldHaveSingleItem();
         var lifecycleContract = provider
             .GetServices<ITwitchBotChannelLifecycleNotifier>()
@@ -141,7 +137,7 @@ public sealed class TwitchBotServiceOverrideTests
         );
         await responseContract.SendAsync(
             SourceMessage(),
-            TwitchCommandResponse.Whisper("last response"),
+            CommandResponse.Whisper("last response"),
             CancellationToken.None
         );
         await lifecycleContract.ChannelStartedAsync("configured-streamer", CancellationToken.None);
@@ -150,7 +146,7 @@ public sealed class TwitchBotServiceOverrideTests
         account.ShouldBe(new TwitchBotAccount("feature-bot", "feature-token"));
         accountProvider.Channels.ShouldBe(["configured-streamer"]);
         responseSender.Responses.ShouldBe([
-            new RecordedResponse("streamer", TwitchCommandResponseTarget.Whisper, "last response"),
+            new RecordedResponse("streamer", CommandResponseTarget.Whisper, "last response"),
         ]);
         lifecycleNotifier.StartedChannels.ShouldBe(["configured-streamer"]);
         lifecycleNotifier.StoppedChannels.ShouldBe(["configured-streamer"]);
@@ -165,9 +161,9 @@ public sealed class TwitchBotServiceOverrideTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAccessTokenProvider>(tokens);
-        services.AddSingleton<ITwitchChatMessageSender>(chat);
-        services.AddSingleton<ILogger<TwitchChatCommandResponseSender>>(
-            NullLogger<TwitchChatCommandResponseSender>.Instance
+        services.AddSingleton<IPublicChatMessageSender>(chat);
+        services.AddSingleton<ILogger<PublicChatCommandResponseSender>>(
+            NullLogger<PublicChatCommandResponseSender>.Instance
         );
         return services;
     }
@@ -271,7 +267,7 @@ public sealed class TwitchBotServiceOverrideTests
             .GetSection("TwitchBot");
     }
 
-    private static TwitchChatMessage SourceMessage()
+    private static ChatMessage SourceMessage()
     {
         return new("viewer", "streamer", "!command", "raw", new Dictionary<string, string>());
     }
@@ -288,7 +284,7 @@ public sealed class TwitchBotServiceOverrideTests
         }
     }
 
-    private sealed class RecordingChatMessageSender : ITwitchChatMessageSender
+    private sealed class RecordingChatMessageSender : IPublicChatMessageSender
     {
         internal List<SentMessage> Messages { get; } = [];
 
@@ -334,13 +330,13 @@ public sealed class TwitchBotServiceOverrideTests
         }
     }
 
-    private sealed class FeatureResponseSender : ITwitchCommandResponseSender
+    private sealed class FeatureResponseSender : ICommandResponseSender
     {
         internal List<RecordedResponse> Responses { get; } = [];
 
         public ValueTask SendAsync(
-            TwitchChatMessage sourceMessage,
-            TwitchCommandResponse response,
+            ChatMessage sourceMessage,
+            CommandResponse response,
             CancellationToken cancellationToken
         )
         {
@@ -350,11 +346,11 @@ public sealed class TwitchBotServiceOverrideTests
         }
     }
 
-    private sealed class FirstFeatureResponseSender : ITwitchCommandResponseSender
+    private sealed class FirstFeatureResponseSender : ICommandResponseSender
     {
         public ValueTask SendAsync(
-            TwitchChatMessage sourceMessage,
-            TwitchCommandResponse response,
+            ChatMessage sourceMessage,
+            CommandResponse response,
             CancellationToken cancellationToken
         )
         {
@@ -407,7 +403,7 @@ public sealed class TwitchBotServiceOverrideTests
 
     private sealed record RecordedResponse(
         string Channel,
-        TwitchCommandResponseTarget Target,
+        CommandResponseTarget Target,
         string Message
     );
 }

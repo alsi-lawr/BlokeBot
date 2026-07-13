@@ -74,7 +74,7 @@ builder
     .AddBlokeBotAlerts()
     .AddBlokeBotCustomCommands(
         botRuntimeConfigured
-            ? CustomAnnouncementDeliveryMode.TwitchChat
+            ? CustomAnnouncementDeliveryMode.PublicChat
             : CustomAnnouncementDeliveryMode.Disabled
     )
     .AddBlokeBotSiteAccess(
@@ -96,7 +96,7 @@ builder
     .AddBlokeBotGuessing()
     .AddBlokeBotPoints(
         botRuntimeConfigured
-            ? PointsGiveawayNotificationMode.TwitchChat
+            ? PointsGiveawayNotificationMode.PublicChat
             : PointsGiveawayNotificationMode.ReplyOnly
     )
     .AddBlokeBotToasts()
@@ -166,7 +166,7 @@ if (botRuntimeConfigured)
     builder
         .Services.AddTwitchBot(botSection)
         .UseBlokeBotHostedChannelProvider()
-        .UseBlokeBotHostedWhisperSender()
+        .UseWhisperCommandResponseSender()
         .UseBlokeBotHostedChannelLifecycleNotifier()
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()

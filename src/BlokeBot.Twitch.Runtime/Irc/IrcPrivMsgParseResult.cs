@@ -12,7 +12,7 @@ public enum IrcPrivMsgParseStatus
     MissingChannelOrText,
 }
 
-public sealed record IrcPrivMsgParseResult(IrcPrivMsgParseStatus Status, TwitchChatMessage Message)
+public sealed record IrcPrivMsgParseResult(IrcPrivMsgParseStatus Status, ChatMessage Message)
 {
     public bool Success => Status == IrcPrivMsgParseStatus.Parsed;
 }

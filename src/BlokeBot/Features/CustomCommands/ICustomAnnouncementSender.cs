@@ -57,7 +57,7 @@ internal sealed class DisabledCustomAnnouncementSender : ICustomAnnouncementSend
     }
 }
 
-internal sealed class TwitchCustomAnnouncementSender(PublicChatMessageQueue queue)
+internal sealed class PublicChatCustomAnnouncementSender(PublicChatMessageQueue queue)
     : ICustomAnnouncementSender
 {
     public async ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(

@@ -330,7 +330,7 @@ public sealed class PointsTests
             );
             await db.SaveChangesAsync();
         }
-        List<TwitchCommandResponse> responses = [];
+        List<CommandResponse> responses = [];
         var strategy = new PointsBalanceCommandStrategy(
             new PointsCommandService(dbFactory),
             new PointBalanceService(dbFactory)
@@ -350,7 +350,7 @@ public sealed class PointsTests
         );
 
         var response = responses.Single();
-        response.Target.ShouldBe(TwitchCommandResponseTarget.Whisper);
+        response.Target.ShouldBe(CommandResponseTarget.Whisper);
         response.Message.ShouldContain("viewer");
     }
 
@@ -524,7 +524,7 @@ public sealed class PointsTests
             channel,
             commandName,
             args,
-            (TwitchCommandResponse response, CancellationToken _) =>
+            (CommandResponse response, CancellationToken _) =>
             {
                 replies.Add(response.Message);
                 return ValueTask.CompletedTask;
@@ -614,7 +614,7 @@ public sealed class PointsTests
         string channel,
         string commandName,
         IReadOnlyList<string> args,
-        List<TwitchCommandResponse> responses,
+        List<CommandResponse> responses,
         PointsCommandKind kind
     )
     {
@@ -623,7 +623,7 @@ public sealed class PointsTests
             channel,
             commandName,
             args,
-            (TwitchCommandResponse response, CancellationToken _) =>
+            (CommandResponse response, CancellationToken _) =>
             {
                 responses.Add(response);
                 return ValueTask.CompletedTask;

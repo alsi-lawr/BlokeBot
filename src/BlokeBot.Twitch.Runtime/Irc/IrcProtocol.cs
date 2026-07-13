@@ -92,7 +92,7 @@ public static class IrcProtocol
 
         var channel = commandRest[Marker.Length..channelEnd];
         var text = commandRest[(channelEnd + 2)..];
-        var message = new TwitchChatMessage(login, channel, text, line, tags);
+        var message = new ChatMessage(login, channel, text, line, tags);
 
         return new IrcPrivMsgParseResult(IrcPrivMsgParseStatus.Parsed, message);
     }
@@ -101,7 +101,7 @@ public static class IrcProtocol
     {
         return new(
             status,
-            new TwitchChatMessage(string.Empty, string.Empty, string.Empty, line, _emptyTags)
+            new ChatMessage(string.Empty, string.Empty, string.Empty, line, _emptyTags)
         );
     }
 

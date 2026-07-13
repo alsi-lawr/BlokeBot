@@ -350,7 +350,7 @@ public sealed class CustomCommandExecutionTests
         return new CommandSeed(command.Id, entry.Id, counter?.Id);
     }
 
-    private static TwitchChatMessage Message(
+    private static ChatMessage Message(
         string login,
         string channel,
         string text,
@@ -381,7 +381,7 @@ public sealed class CustomCommandExecutionTests
         );
     }
 
-    private static TwitchCommandResponder RecordMessages(List<string> replies)
+    private static CommandResponder RecordMessages(List<string> replies)
     {
         return (response, _) =>
         {

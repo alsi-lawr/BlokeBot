@@ -223,8 +223,8 @@ public sealed class GuessingConfigurationService(
         db.GuessOptions.RemoveRange(profile.Options);
         var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
             config.Profile.WhisperAnswerReplies
-                ? TwitchCommandResponseTarget.Whisper
-                : TwitchCommandResponseTarget.Chat
+                ? CommandResponseTarget.Whisper
+                : CommandResponseTarget.Chat
         );
         foreach (
             var option in config
@@ -308,9 +308,7 @@ public sealed class GuessingConfigurationService(
             .ToList();
         var whisperAnswerReplies = options.Any(IsWhisperTarget);
         var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-            whisperAnswerReplies
-                ? TwitchCommandResponseTarget.Whisper
-                : TwitchCommandResponseTarget.Chat
+            whisperAnswerReplies ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat
         );
         foreach (var option in options)
         {
@@ -334,7 +332,7 @@ public sealed class GuessingConfigurationService(
     private static bool IsWhisperTarget(GuessOptionEditor option)
     {
         return ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
-            == TwitchCommandResponseTarget.Whisper;
+            == CommandResponseTarget.Whisper;
     }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(

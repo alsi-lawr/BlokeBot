@@ -22,14 +22,14 @@ internal sealed class IrcConnectionSession(
     IAccessTokenProvider tokens,
     TwitchCommandDispatcher dispatcher,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
-    ITwitchChatMessageSender sender,
-    ITwitchCommandResponseSender responses,
+    IPublicChatMessageSender sender,
+    ICommandResponseSender responses,
     TwitchBotRuntimeStatusStore status,
-    IEnumerable<ITwitchChatMessageObserver> messageObservers,
+    IEnumerable<IChatMessageObserver> messageObservers,
     ObserverFanOut<
         IrcMessageObserverBoundary,
-        TwitchChatMessage,
-        TwitchChatObserverDeadLetter
+        ChatMessage,
+        ChatObserverDeadLetter
     > messageObserverFanOut,
     ILogger<IrcConnectionSession> log
 ) : IIrcConnectionSession
@@ -37,7 +37,7 @@ internal sealed class IrcConnectionSession(
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
         "TwitchChatMessage"
     );
-    private readonly ITwitchChatMessageObserver[] _messageObservers = [.. messageObservers];
+    private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly TwitchBotSettings _opts = settings;
     private ILogger<IrcConnectionSession> _log { get; } = log;
 
@@ -123,7 +123,7 @@ internal sealed class IrcConnectionSession(
     }
 
     internal async Task DispatchChatMessageAsync(
-        TwitchChatMessage message,
+        ChatMessage message,
         CancellationToken cancellationToken
     )
     {
@@ -144,17 +144,17 @@ internal sealed class IrcConnectionSession(
     }
 
     private async ValueTask NotifyMessageObserversAsync(
-        TwitchChatMessage message,
+        ChatMessage message,
         CancellationToken cancellationToken
     )
     {
         _ = await messageObserverFanOut.DispatchAsync(
             _messageObservers,
-            _ => new ObserverDispatch<TwitchChatMessage, TwitchChatObserverDeadLetter>
+            _ => new ObserverDispatch<ChatMessage, ChatObserverDeadLetter>
             {
                 Event = message,
                 EventIdentity = _chatMessageEvent,
-                DeadLetter = new TwitchChatObserverDeadLetter(message.Channel),
+                DeadLetter = new ChatObserverDeadLetter(message.Channel),
             },
             observer => ObserverIdentity.For(observer.GetType()),
             static (observer, chatMessage, token) =>
