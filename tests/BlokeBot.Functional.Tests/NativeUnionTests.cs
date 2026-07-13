@@ -59,7 +59,7 @@ public sealed class NativeUnionTests
     }
 
     [Test]
-    public void UnionContract_Inspecting_IsClosedAndHandlerComplete()
+    public void UnionContract_Inspecting_HasDeclaredDirectCasesAndCompleteHandlers()
     {
         var unionType = typeof(SubmissionOutcome);
         var directCases = unionType

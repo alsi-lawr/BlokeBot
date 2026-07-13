@@ -935,7 +935,7 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
-    public void SubscriptionDeletionOutcome_Inspecting_IsClosed()
+    public void SubscriptionDeletionOutcome_Inspecting_HasDeclaredDirectCases()
     {
         var unionType = typeof(TwitchEventSubSubscriptionDeletionOutcome);
         var directCases = unionType
@@ -1008,7 +1008,7 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
-    public void ChannelLifecycleUnion_Inspecting_IsClosedAndHandlerComplete()
+    public void ChannelLifecycleUnion_Inspecting_HasDeclaredDirectCasesAndCompleteHandlers()
     {
         var unionType = typeof(TwitchEventSubChannelStatus);
         var directCases = unionType
