@@ -6,7 +6,7 @@ namespace BlokeBot.Auth.Users;
 internal sealed class UserLookupService(
     WebAuthConfiguration configuration,
     ITwitchAccessTokenProvider tokens,
-    TwitchHelixApiClient helix
+    HelixClient helix
 )
 {
     public async Task<Option<UserIdentity>> FindByLoginAsync(

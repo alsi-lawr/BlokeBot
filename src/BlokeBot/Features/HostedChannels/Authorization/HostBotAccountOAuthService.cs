@@ -5,7 +5,7 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 public sealed class HostBotAccountOAuthService(
     TwitchBotSettings settings,
     TwitchOAuthApiClient oauth,
-    TwitchHelixApiClient helix
+    HelixClient helix
 )
 {
     public Uri CreateAuthorizationUri(string state, IEnumerable<string?>? scopes = null)

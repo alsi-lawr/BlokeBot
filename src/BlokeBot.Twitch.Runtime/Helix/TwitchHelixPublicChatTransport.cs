@@ -18,7 +18,9 @@ internal interface IPublicChatTransport
 internal sealed class TwitchHelixPublicChatTransport(
     TwitchAppAccessTokenProvider appTokens,
     ITwitchBotAccountProvider botAccounts,
-    TwitchHelixChatClient helix,
+    TwitchBotIdentity identity,
+    ChatIdentityResolver identities,
+    ChatClient chat,
     ILogger<TwitchHelixPublicChatTransport> log
 ) : IPublicChatTransport
 {
@@ -33,23 +35,19 @@ internal sealed class TwitchHelixPublicChatTransport(
                 message.Channel,
                 cancellationToken
             );
-            var identities = await helix.ResolveChatIdentitiesAsync(
+            var resolution = await identities.ResolveAsync(
                 message.Channel,
                 botAccount.Login,
                 botAccount.AccessToken,
                 cancellationToken
             );
-            var appAccessToken = await appTokens.GetAccessTokenAsync(cancellationToken);
-            return new PublicChatPreparationOutcome.Ready
-            {
-                Send = new PublicChatPreparedSend
-                {
-                    Message = message,
-                    AppAccessToken = appAccessToken,
-                    BroadcasterId = identities.BroadcasterId,
-                    BotUserId = identities.BotUserId,
-                },
-            };
+            return await resolution.Match(
+                resolved => PrepareResolvedAsync(message, resolved, cancellationToken),
+                static _ =>
+                    TerminalIdentityFailure(new ChatIdentityResolutionException.MissingChannel()),
+                static _ =>
+                    TerminalIdentityFailure(new ChatIdentityResolutionException.MissingBot())
+            );
         }
         catch (Exception exception)
         {
@@ -65,8 +63,8 @@ internal sealed class TwitchHelixPublicChatTransport(
         CancellationToken cancellationToken
     )
     {
-        var result = await helix.SendChatMessageAsync(
-            prepared.AppAccessToken,
+        var result = await chat.SendMessageAsync(
+            new TwitchHelixRequestContext(identity.ClientId, prepared.AppAccessToken),
             prepared.BroadcasterId,
             prepared.BotUserId,
             prepared.Message.Message,
@@ -83,5 +81,36 @@ internal sealed class TwitchHelixPublicChatTransport(
             static _ => { }
         );
         return classified;
+    }
+
+    private async ValueTask<PublicChatPreparationOutcome> PrepareResolvedAsync(
+        PublicChatClaimedMessage message,
+        ChatIdentityResolution.Resolved identities,
+        CancellationToken cancellationToken
+    )
+    {
+        var appAccessToken = await appTokens.GetAccessTokenAsync(cancellationToken);
+        return new PublicChatPreparationOutcome.Ready
+        {
+            Send = new PublicChatPreparedSend
+            {
+                Message = message,
+                AppAccessToken = appAccessToken,
+                BroadcasterId = identities.BroadcasterId,
+                BotUserId = identities.BotUserId,
+            },
+        };
+    }
+
+    private static ValueTask<PublicChatPreparationOutcome> TerminalIdentityFailure(
+        ChatIdentityResolutionException exception
+    )
+    {
+        return ValueTask.FromResult(
+            PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                exception,
+                CancellationToken.None
+            )
+        );
     }
 }

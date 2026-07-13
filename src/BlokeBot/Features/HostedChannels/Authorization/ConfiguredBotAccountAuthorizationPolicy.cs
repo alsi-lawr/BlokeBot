@@ -7,7 +7,7 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     TwitchBotSettings settings,
     ITwitchAccessTokenCache tokenCache,
-    TwitchHelixApiClient helix,
+    HelixClient helix,
     ITwitchTokenStatusSource tokenStatus,
     HostedChannelChangeNotifier changes
 ) : IBotAccountAuthorizationPolicy

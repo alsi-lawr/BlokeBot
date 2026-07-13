@@ -156,7 +156,7 @@ public sealed class HostBotStatusTests
                 new TwitchAppAccessTokenProvider(httpClientFactory, settings.Identity)
             ),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
-            new TwitchHelixApiClient(httpClientFactory),
+            new HelixClient(httpClientFactory),
             settings
         );
 
@@ -266,7 +266,7 @@ public sealed class HostBotStatusTests
         return new(
             new UnavailableHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(tokenStatus),
-            new TwitchHelixApiClient(http),
+            new HelixClient(http),
             Settings()
         );
     }
@@ -279,7 +279,7 @@ public sealed class HostBotStatusTests
         return new(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
-            new TwitchHelixApiClient(httpClientFactory),
+            new HelixClient(httpClientFactory),
             Settings()
         );
     }

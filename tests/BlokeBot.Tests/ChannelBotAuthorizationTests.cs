@@ -161,7 +161,7 @@ public sealed class ChannelBotAuthorizationTests
             }
         );
         var oauth = new TwitchOAuthApiClient(httpClientFactory);
-        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var helix = new HelixClient(httpClientFactory);
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),

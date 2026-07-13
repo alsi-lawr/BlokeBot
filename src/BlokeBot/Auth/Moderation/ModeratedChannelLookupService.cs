@@ -2,7 +2,7 @@ using BlokeBot.Auth.OAuth;
 
 namespace BlokeBot.Auth.Moderation;
 
-internal sealed class ModeratedChannelLookupService(TwitchHelixApiClient helix)
+internal sealed class ModeratedChannelLookupService(HelixClient helix)
 {
     public async Task<IReadOnlyList<string>> LoadModeratedLoginsAsync(
         WebAuthOptions options,

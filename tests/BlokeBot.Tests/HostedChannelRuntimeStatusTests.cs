@@ -31,7 +31,7 @@ public sealed class HostedChannelRuntimeStatusTests
                 },
             }
         );
-        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var helix = new HelixClient(httpClientFactory);
         var service = new HostedChannelRuntimeStatusService(
             dbFactory,
             ChannelAuthorizationService(dbFactory, "channel:bot"),

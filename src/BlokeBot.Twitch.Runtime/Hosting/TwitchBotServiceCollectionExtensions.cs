@@ -173,6 +173,7 @@ public static class TwitchBotServiceCollectionExtensions
         services.TryAddSingleton<PublicChatQueueBacklogMonitor>();
         services.TryAddSingleton<PublicChatQueueAlertDispatcher>();
         services.TryAddSingleton<IPublicChatTransport, TwitchHelixPublicChatTransport>();
+        services.TryAddSingleton<ChatIdentityResolver>();
         services.TryAddSingleton<PublicChatMessageQueue>();
         services.AddHostedService<PublicChatOutboxWorker>();
         services.TryAddSingleton<ITwitchChatMessageSender, TwitchChatMessageSender>();
@@ -199,7 +200,6 @@ public static class TwitchBotServiceCollectionExtensions
             TwitchEventSubConnectionSession
         >();
         services.TryAddSingleton<TwitchEventSubRuntime>();
-        services.TryAddSingleton<TwitchHelixChatClient>();
         services.TryAddSingleton<ITwitchIrcConnectionSession, TwitchIrcConnectionSession>();
         services.TryAddSingleton<TwitchIrcRuntime>();
         services.AddSingleton<ITwitchBotRuntimeStrategy, TwitchEventSubRuntimeStrategy>();

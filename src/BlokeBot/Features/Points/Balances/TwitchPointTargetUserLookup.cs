@@ -2,7 +2,7 @@ namespace BlokeBot.Features.Points.Balances;
 
 public sealed class TwitchPointTargetUserLookup(
     TwitchAppAccessTokenProvider appTokens,
-    TwitchHelixApiClient helix,
+    HelixClient helix,
     TwitchBotSettings settings
 ) : IPointTargetUserLookup
 {

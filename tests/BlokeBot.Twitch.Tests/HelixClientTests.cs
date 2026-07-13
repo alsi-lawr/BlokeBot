@@ -7,7 +7,7 @@ using TUnit.Core;
 
 namespace BlokeBot.Twitch.Tests;
 
-public sealed class TwitchHelixApiClientTests
+public sealed class HelixClientTests
 {
     [Test]
     public async Task LiveStreamPayload_CheckingStreamStatus_ReturnsLive()
@@ -43,7 +43,7 @@ public sealed class TwitchHelixApiClientTests
                 """
             );
         });
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         var isLive = await client.IsStreamLiveAsync(Context(), "Streamer", CancellationToken.None);
 
@@ -54,7 +54,7 @@ public sealed class TwitchHelixApiClientTests
     public async Task EmptyStreamPayload_CheckingStreamStatus_ReturnsOffline()
     {
         var factory = RespondingWith("""{"data":[],"pagination":{}}""");
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         var isLive = await client.IsStreamLiveAsync(Context(), "streamer", CancellationToken.None);
 
@@ -88,7 +88,7 @@ public sealed class TwitchHelixApiClientTests
                 """
             );
         });
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         var status = await client.GetFollowerStatusAsync(
             Context(),
@@ -105,7 +105,7 @@ public sealed class TwitchHelixApiClientTests
     public async Task EmptyFollowerPayload_CheckingFollowerStatus_ReturnsDoesNotFollow()
     {
         var factory = RespondingWith("""{"total":8,"data":[],"pagination":{}}""");
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         var status = await client.GetFollowerStatusAsync(
             Context(),
@@ -144,7 +144,7 @@ public sealed class TwitchHelixApiClientTests
             }
             """
         );
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         await Should.ThrowAsync<JsonException>(() =>
             client.IsStreamLiveAsync(Context(), "streamer", CancellationToken.None)
@@ -167,7 +167,7 @@ public sealed class TwitchHelixApiClientTests
             }
             """
         );
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         await Should.ThrowAsync<JsonException>(() =>
             client.GetFollowerStatusAsync(
@@ -216,7 +216,7 @@ public sealed class TwitchHelixApiClientTests
                 """
             );
         });
-        var client = new TwitchHelixApiClient(factory);
+        var client = new HelixClient(factory);
 
         var channels = await client.GetModeratedChannelsAsync(
             new TwitchHelixRequestContext("client", "token"),

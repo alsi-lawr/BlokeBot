@@ -113,7 +113,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                 new ConfiguredBotAccountAuthorizationPolicy(
                     Settings(tokenCachePath),
                     cache,
-                    new TwitchHelixApiClient(new RejectingHttpClientFactory()),
+                    new HelixClient(new RejectingHttpClientFactory()),
                     new UnavailableTwitchTokenStatusSource(),
                     new HostedChannelChangeNotifier(events)
                 )
@@ -196,7 +196,7 @@ public sealed class BotAccountAuthorizationPolicyTests
             new ConfiguredBotAccountAuthorizationPolicy(
                 Settings("tokens.json"),
                 new RecordingAccessTokenCache(),
-                new TwitchHelixApiClient(new CurrentUserHttpClientFactory()),
+                new HelixClient(new CurrentUserHttpClientFactory()),
                 tokenStatus,
                 new HostedChannelChangeNotifier(events)
             )

@@ -30,7 +30,7 @@ public sealed class HostBotAccountAuthorizationTests
                 }
             ),
             new TwitchOAuthApiClient(httpClientFactory),
-            new TwitchHelixApiClient(httpClientFactory)
+            new HelixClient(httpClientFactory)
         );
 
         var uri = oauth.CreateAuthorizationUri("state");
@@ -278,7 +278,7 @@ public sealed class HostBotAccountAuthorizationTests
             }
         );
         var oauth = new TwitchOAuthApiClient(httpClientFactory);
-        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var helix = new HelixClient(httpClientFactory);
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),

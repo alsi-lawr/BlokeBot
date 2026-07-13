@@ -979,7 +979,7 @@ public sealed class PointsGiveawaySchedulerTests
     {
         var httpClientFactory = new FakeHttpClientFactory();
         var options = TwitchBotSettings.FromOptions(new TwitchBotOptions());
-        var helix = new TwitchHelixApiClient(httpClientFactory);
+        var helix = new HelixClient(httpClientFactory);
         var status = new HostBotStatusService(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new UnavailableHostBotAccountTokenStatusProvider(),

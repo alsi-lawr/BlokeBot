@@ -44,7 +44,7 @@ public sealed class AccessListProfileResolverTests
         var resolver = new AccessListProfileResolver(
             new TwitchAccessListProfileEnrichmentPolicy(
                 new TwitchAppAccessTokenProvider(http, identity),
-                new TwitchHelixApiClient(http),
+                new HelixClient(http),
                 identity
             )
         );

@@ -1,13 +1,12 @@
 using System.Collections.Immutable;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
+public sealed class HelixClient(IHttpClientFactory httpClientFactory)
 {
     private const string _usersEndpoint = "https://api.twitch.tv/helix/users";
     private const string _streamsEndpoint = "https://api.twitch.tv/helix/streams";
@@ -23,7 +22,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = CreateRequest(HttpMethod.Get, _usersEndpoint, context);
+        using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -51,7 +50,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
             + TwitchQueryString.Create(
                 normalized.Select(login => new KeyValuePair<string, string?>("login", login))
             );
-        using var request = CreateRequest(HttpMethod.Get, uri, context);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -72,7 +71,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
         string? cursor = null;
         do
         {
-            using var request = CreateRequest(
+            using var request = HelixRequest.Create(
                 HttpMethod.Get,
                 ModeratedChannelsUri(userId, cursor),
                 context
@@ -105,7 +104,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
         string? cursor = null;
         do
         {
-            using var request = CreateRequest(
+            using var request = HelixRequest.Create(
                 HttpMethod.Get,
                 ModeratedChannelsUri(userId, cursor),
                 context
@@ -159,7 +158,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
                     TwitchLogin.Normalize(channelLogin)
                 ),
             ]);
-        using var request = CreateRequest(HttpMethod.Get, uri, context);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -188,7 +187,7 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
                     ["user_id"] = userId,
                 }
             );
-        using var request = CreateRequest(HttpMethod.Get, uri, context);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
         {
@@ -215,21 +214,6 @@ public sealed class TwitchHelixApiClient(IHttpClientFactory httpClientFactory)
         }
 
         return $"{_moderatedChannelsEndpoint}?{TwitchQueryString.Create(query)}";
-    }
-
-    private static HttpRequestMessage CreateRequest(
-        HttpMethod method,
-        string uri,
-        TwitchHelixRequestContext context
-    )
-    {
-        var request = new HttpRequestMessage(method, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            context.AccessToken
-        );
-        request.Headers.Add("Client-Id", context.ClientId);
-        return request;
     }
 
     private sealed record TwitchUsersResponse

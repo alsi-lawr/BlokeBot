@@ -611,7 +611,7 @@ public sealed class WhisperResponseTests
             );
             var options = BotOptions();
             var oauth = new TwitchOAuthApiClient(http);
-            var helixUsers = new TwitchHelixApiClient(http);
+            var helixUsers = new HelixClient(http);
             var hostBotAccounts = new HostBotAccountAuthorizationService(
                 dbFactory,
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
@@ -632,7 +632,7 @@ public sealed class WhisperResponseTests
                 hostBotAccounts,
                 quota,
                 helixUsers,
-                new TwitchHelixChatClient(http, options.Identity, helixUsers),
+                new WhisperClient(http),
                 dbFactory,
                 options.Identity,
                 failureHandler

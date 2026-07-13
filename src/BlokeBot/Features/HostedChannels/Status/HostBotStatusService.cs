@@ -6,7 +6,7 @@ namespace BlokeBot.Features.HostedChannels.Status;
 public sealed class HostBotStatusService(
     IHostBotAppAccessTokenSource appTokens,
     IHostBotAccountTokenStatusProvider botAccounts,
-    TwitchHelixApiClient helix,
+    HelixClient helix,
     TwitchBotSettings settings
 )
 {

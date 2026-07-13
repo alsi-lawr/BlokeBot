@@ -89,16 +89,17 @@ public sealed class PublicChatDeliveryClassifierTests
     {
         PublicChatDeliveryClassifier
             .ClassifySendResult(
-                new TwitchChatMessageSendResult { IsSent = true, MessageId = "provider-message-id" }
+                new ChatMessageSendResult { IsSent = true, MessageId = "provider-message-id" }
             )
             .ShouldBeOfType<PublicChatTransportSendResult.Sent>();
 
         var coded = PublicChatDeliveryClassifier
             .ClassifySendResult(
-                new TwitchChatMessageSendResult
+                new ChatMessageSendResult
                 {
                     IsSent = false,
-                    DropReason = new TwitchChatMessageDropReason
+                    MessageId = string.Empty,
+                    DropReason = new ChatMessageDropReason
                     {
                         Code = "followers_only",
                         Message = "provider secret response",
@@ -115,10 +116,11 @@ public sealed class PublicChatDeliveryClassifierTests
 
         var unspecified = PublicChatDeliveryClassifier
             .ClassifySendResult(
-                new TwitchChatMessageSendResult
+                new ChatMessageSendResult
                 {
                     IsSent = false,
-                    DropReason = new TwitchChatMessageDropReason
+                    MessageId = string.Empty,
+                    DropReason = new ChatMessageDropReason
                     {
                         Code = "   ",
                         Message = "provider secret response",

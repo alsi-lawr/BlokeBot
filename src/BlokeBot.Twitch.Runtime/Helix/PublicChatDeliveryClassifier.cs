@@ -24,9 +24,7 @@ internal static class PublicChatDeliveryClassifier
             };
     }
 
-    internal static PublicChatTransportSendResult ClassifySendResult(
-        TwitchChatMessageSendResult result
-    )
+    internal static PublicChatTransportSendResult ClassifySendResult(ChatMessageSendResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
         if (result.IsSent)

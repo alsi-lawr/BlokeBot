@@ -2,7 +2,7 @@ namespace BlokeBot.Features.AccessLists;
 
 internal sealed class TwitchAccessListProfileEnrichmentPolicy(
     TwitchAppAccessTokenProvider appTokens,
-    TwitchHelixApiClient helix,
+    HelixClient helix,
     TwitchBotIdentity identity
 ) : IAccessListProfileEnrichmentPolicy
 {

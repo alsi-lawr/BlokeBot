@@ -45,7 +45,7 @@ public sealed class AuthorizedHostSelectionServiceTests
             ),
             modAccess,
             new ModeratedChannelLookupService(
-                new TwitchHelixApiClient(
+                new HelixClient(
                     new JsonHttpClientFactory(
                         """
                         {

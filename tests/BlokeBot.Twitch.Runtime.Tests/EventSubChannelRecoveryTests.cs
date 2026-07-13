@@ -172,6 +172,35 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
+    public async Task Startup_MissingChatIdentity_IsTerminalWithoutSubscriptionRetry()
+    {
+        var failure = new ChatIdentityResolutionException.MissingBot();
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueCreateFailure("channel", failure);
+        await using var harness = CreateHarness(operations, attemptLimit: 3);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        var degraded = harness
+            .Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>();
+        AssertFailure(
+            degraded,
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionSetup,
+            TwitchEventSubChannelFailureClassification.Terminal,
+            typeof(ChatIdentityResolutionException.MissingBot),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Startup,
+            TwitchEventSubChannelNextAction.RetryOnNextReconciliation,
+            _now
+        );
+        operations.CreateCount("channel").ShouldBe(1);
+        operations.StartupDeliveryCount("channel").ShouldBe(0);
+    }
+
+    [Test]
     public async Task Setup_LifecycleStartFailure_RetriesWithoutRepeatingStartupDelivery()
     {
         var failure = new IOException("lifecycle start temporarily unavailable");

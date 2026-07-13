@@ -200,7 +200,7 @@ public sealed class UserLookupServiceTests
         return new UserLookupService(
             configuration,
             new StaticAccessTokenProvider("access-token"),
-            new TwitchHelixApiClient(new JsonHttpClientFactory(response, statusCode))
+            new HelixClient(new JsonHttpClientFactory(response, statusCode))
         );
     }
 

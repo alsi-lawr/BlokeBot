@@ -12,8 +12,8 @@ public sealed class HostWhisperCommandResponseSender(
     ITwitchChatMessageSender chat,
     HostBotAccountAuthorizationService botAccounts,
     HostWhisperQuotaService quota,
-    TwitchHelixApiClient users,
-    TwitchHelixChatClient helix,
+    HelixClient users,
+    WhisperClient whispers,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TwitchBotIdentity identity,
     IPrivateDeliveryFailureHandler failureHandler
@@ -102,8 +102,8 @@ public sealed class HostWhisperCommandResponseSender(
 
         try
         {
-            var result = await helix.SendWhisperAsync(
-                prepared.AccessToken,
+            var result = await whispers.SendAsync(
+                new TwitchHelixRequestContext(identity.ClientId, prepared.AccessToken),
                 prepared.SenderUserId,
                 prepared.RecipientUserId,
                 message,
@@ -111,13 +111,13 @@ public sealed class HostWhisperCommandResponseSender(
             );
             return result.Status switch
             {
-                TwitchWhisperSendStatus.Accepted => Success(),
-                TwitchWhisperSendStatus.RateLimited => await RateLimitedAsync(
+                WhisperSendStatus.Accepted => Success(),
+                WhisperSendStatus.RateLimited => await RateLimitedAsync(
                     prepared,
                     result.StatusCode,
                     cancellationToken
                 ),
-                TwitchWhisperSendStatus.Rejected => Error(
+                WhisperSendStatus.Rejected => Error(
                     new PrivateDeliveryError.Rejected(result.StatusCode)
                 ),
                 _ => throw new UnreachableException("Unknown Twitch whisper send status."),

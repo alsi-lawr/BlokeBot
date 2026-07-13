@@ -10,7 +10,7 @@ public sealed class HostBotAccountAuthorizationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostBotAccountOAuthService hostBotOAuth,
     TwitchOAuthApiClient oauth,
-    TwitchHelixApiClient helix,
+    HelixClient helix,
     ITwitchTokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
     TwitchBotSettings botSettings

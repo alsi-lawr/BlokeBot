@@ -1,0 +1,106 @@
+namespace BlokeBot.Twitch.Runtime;
+
+internal sealed class ChatIdentityResolver(TwitchBotIdentity identity, HelixClient helix)
+{
+    internal async Task<ChatIdentityResolution> ResolveAsync(
+        string channelLogin,
+        string botLogin,
+        string accessToken,
+        CancellationToken cancellationToken
+    )
+    {
+        var channel = TwitchLogin.Normalize(channelLogin);
+        var bot = TwitchLogin.Normalize(botLogin);
+        var users = await helix.GetUsersByLoginAsync(
+            new TwitchHelixRequestContext(identity.ClientId, accessToken),
+            [channel, bot],
+            cancellationToken
+        );
+        var broadcaster = users.FirstOrDefault(user =>
+            user.Login.Equals(channel, StringComparison.OrdinalIgnoreCase)
+        );
+        if (string.IsNullOrWhiteSpace(broadcaster?.Id))
+        {
+            return new ChatIdentityResolution.MissingChannel();
+        }
+
+        var botUser = users.FirstOrDefault(user =>
+            user.Login.Equals(bot, StringComparison.OrdinalIgnoreCase)
+        );
+        return string.IsNullOrWhiteSpace(botUser?.Id)
+            ? new ChatIdentityResolution.MissingBot()
+            : new ChatIdentityResolution.Resolved
+            {
+                BroadcasterId = broadcaster.Id,
+                BotUserId = botUser.Id,
+            };
+    }
+}
+
+internal abstract record ChatIdentityResolution
+{
+    private protected ChatIdentityResolution() { }
+
+    internal abstract TResult Match<TResult>(
+        Func<Resolved, TResult> resolved,
+        Func<MissingChannel, TResult> missingChannel,
+        Func<MissingBot, TResult> missingBot
+    );
+
+    private protected abstract void Seal();
+
+    internal sealed record Resolved : ChatIdentityResolution
+    {
+        internal required string BroadcasterId { get; init; }
+
+        internal required string BotUserId { get; init; }
+
+        internal override TResult Match<TResult>(
+            Func<Resolved, TResult> resolved,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return resolved(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingChannel : ChatIdentityResolution
+    {
+        internal override TResult Match<TResult>(
+            Func<Resolved, TResult> resolved,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return missingChannel(this);
+        }
+
+        private protected override void Seal() { }
+    }
+
+    internal sealed record MissingBot : ChatIdentityResolution
+    {
+        internal override TResult Match<TResult>(
+            Func<Resolved, TResult> resolved,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot
+        )
+        {
+            return missingBot(this);
+        }
+
+        private protected override void Seal() { }
+    }
+}
+
+internal abstract class ChatIdentityResolutionException(string safeSummary) : Exception(safeSummary)
+{
+    internal sealed class MissingChannel()
+        : ChatIdentityResolutionException("The chat channel identity is unavailable.");
+
+    internal sealed class MissingBot()
+        : ChatIdentityResolutionException("The chat bot identity is unavailable.");
+}

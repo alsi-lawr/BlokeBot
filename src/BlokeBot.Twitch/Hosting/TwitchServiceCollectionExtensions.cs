@@ -9,7 +9,7 @@ namespace BlokeBot.Twitch;
 public static class TwitchServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the Twitch Helix API client.
+    /// Registers the Twitch Helix transport clients.
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     /// <returns>The same service collection.</returns>
@@ -18,7 +18,10 @@ public static class TwitchServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddHttpClient("twitch-helix");
-        services.TryAddSingleton<TwitchHelixApiClient>();
+        services.TryAddSingleton<HelixClient>();
+        services.TryAddSingleton<EventSubClient>();
+        services.TryAddSingleton<ChatClient>();
+        services.TryAddSingleton<WhisperClient>();
 
         return services;
     }

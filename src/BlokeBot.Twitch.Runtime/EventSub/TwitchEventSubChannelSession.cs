@@ -32,7 +32,8 @@ internal interface ITwitchEventSubChannelOperations
 internal sealed class TwitchEventSubChannelOperations(
     TwitchBotSettings settings,
     ITwitchBotAccountProvider accounts,
-    TwitchHelixChatClient helix,
+    ChatIdentityResolver identities,
+    EventSubClient eventSub,
     ITwitchChatMessageSender sender,
     ITwitchBotChannelLifecycleNotifier lifecycle
 ) : ITwitchEventSubChannelOperations
@@ -52,19 +53,24 @@ internal sealed class TwitchEventSubChannelOperations(
         CancellationToken cancellationToken
     )
     {
-        var identities = await helix.ResolveChatIdentitiesAsync(
+        var resolution = await identities.ResolveAsync(
             channel,
             account.Login,
             account.AccessToken,
             cancellationToken
         );
+        var resolved = resolution.Match(
+            static identities => identities,
+            static _ => throw new ChatIdentityResolutionException.MissingChannel(),
+            static _ => throw new ChatIdentityResolutionException.MissingBot()
+        );
         return new ActiveEventSubSubscription
         {
             Channel = channel,
-            SubscriptionId = await helix.CreateChatMessageSubscriptionAsync(
-                account.AccessToken,
-                identities.BroadcasterId,
-                identities.BotUserId,
+            SubscriptionId = await eventSub.CreateChatMessageSubscriptionAsync(
+                new TwitchHelixRequestContext(settings.Identity.ClientId, account.AccessToken),
+                resolved.BroadcasterId,
+                resolved.BotUserId,
                 sessionId,
                 cancellationToken
             ),
@@ -102,8 +108,8 @@ internal sealed class TwitchEventSubChannelOperations(
     {
         try
         {
-            await helix.DeleteEventSubSubscriptionAsync(
-                subscription.AccessToken,
+            await eventSub.DeleteSubscriptionAsync(
+                new TwitchHelixRequestContext(settings.Identity.ClientId, subscription.AccessToken),
                 subscription.SubscriptionId,
                 cancellationToken
             );
