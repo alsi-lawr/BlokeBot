@@ -69,7 +69,7 @@ public partial class TopBarControls : IDisposable
     {
         _alertsSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.AlertsChanged,
-            work => InvokeAsync(work),
+            InvokeAsync,
             LoadAlertCountAsync,
             StateHasChanged
         );

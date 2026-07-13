@@ -114,7 +114,7 @@ public partial class SelectedChannelBotStatus
     {
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            work => InvokeAsync(work),
+            InvokeAsync,
             ReloadForEventAsync,
             StateHasChanged
         );

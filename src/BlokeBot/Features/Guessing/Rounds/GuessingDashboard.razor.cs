@@ -108,7 +108,7 @@ public partial class GuessingDashboard
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.GuessingChanged, AppEventKind.HostedChannelsChanged],
-                work => InvokeAsync(work),
+                InvokeAsync,
                 ReloadForEventAsync,
                 StateHasChanged
             )

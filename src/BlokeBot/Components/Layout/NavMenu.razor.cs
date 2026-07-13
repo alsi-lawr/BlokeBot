@@ -64,7 +64,7 @@ public partial class NavMenu
     {
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            work => InvokeAsync(work),
+            InvokeAsync,
             LoadHostedFeaturesAsync,
             StateHasChanged
         );

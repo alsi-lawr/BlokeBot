@@ -118,18 +118,16 @@ public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
 
     public sealed record BoundedRetry : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
-        private int _attemptLimit;
-
         /// <summary>
         /// Gets the total invocation limit, including the first attempt.
         /// </summary>
         public required int AttemptLimit
         {
-            get => _attemptLimit;
+            get;
             init
             {
                 ArgumentOutOfRangeException.ThrowIfLessThan(value, 2);
-                _attemptLimit = value;
+                field = value;
             }
         }
 

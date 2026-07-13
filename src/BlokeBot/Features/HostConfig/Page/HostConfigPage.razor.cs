@@ -266,7 +266,7 @@ public partial class HostConfigPage
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
-                work => InvokeAsync(work),
+                InvokeAsync,
                 ReloadForEventAsync,
                 StateHasChanged
             )

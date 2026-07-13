@@ -67,7 +67,7 @@ public partial class GuessingSettings
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
-                work => InvokeAsync(work),
+                InvokeAsync,
                 LoadAsync,
                 StateHasChanged
             )

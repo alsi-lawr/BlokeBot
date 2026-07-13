@@ -365,7 +365,7 @@ public sealed class EventSubChannelRecoveryTests
         harness.Session.Start(["channel"], CancellationToken.None);
         var taskFailure = await Should.ThrowAsync<
             TwitchEventSubChannelStatusPublicationException
-        >(() => harness.Session.DrainAsync());
+        >(harness.Session.DrainAsync);
 
         taskFailure.InnerException.ShouldBeSameAs(reporterFailure);
         harness.Status.Current.Channels.ShouldHaveSingleItem()
@@ -670,8 +670,7 @@ public sealed class EventSubChannelRecoveryTests
             [],
             TwitchEventSubChannelRecoveryTrigger.Explicit
         );
-        var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
-            harness.Session.DrainAsync()
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(harness.Session.DrainAsync
         );
 
         thrown.CancellationToken.ShouldBe(cancellation.Token);

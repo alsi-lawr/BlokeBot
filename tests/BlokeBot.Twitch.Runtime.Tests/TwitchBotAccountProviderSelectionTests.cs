@@ -43,8 +43,7 @@ public sealed class TwitchBotAccountProviderSelectionTests
     {
         var selection = new TwitchBotAccountProviderSelection();
 
-        var exception = Should.Throw<InvalidOperationException>(() =>
-            selection.RequireSingle()
+        var exception = Should.Throw<InvalidOperationException>(selection.RequireSingle
         );
 
         exception.Message.ShouldContain("none was selected");
@@ -60,11 +59,9 @@ public sealed class TwitchBotAccountProviderSelectionTests
             .UseCustomProvider<CustomProvider>()
             .UseDefaultProvider();
 
-        var firstException = Should.Throw<InvalidOperationException>(() =>
-            defaultThenCustom.RequireSingle()
+        var firstException = Should.Throw<InvalidOperationException>(defaultThenCustom.RequireSingle
         );
-        var secondException = Should.Throw<InvalidOperationException>(() =>
-            customThenDefault.RequireSingle()
+        var secondException = Should.Throw<InvalidOperationException>(customThenDefault.RequireSingle
         );
 
         firstException.Message.ShouldContain("2 were selected");

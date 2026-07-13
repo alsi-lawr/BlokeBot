@@ -34,7 +34,7 @@ public static class CommandAliasPolicy
         return existingAliases
             .Where(alias => !ownedKinds.Contains(alias.Kind))
             .Select(alias => alias.Alias)
-            .FirstOrDefault(alias => requestedAliases.Contains(alias));
+            .FirstOrDefault(requestedAliases.Contains);
     }
 }
 

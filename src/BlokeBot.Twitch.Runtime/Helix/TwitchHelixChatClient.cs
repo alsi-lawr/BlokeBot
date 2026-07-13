@@ -191,8 +191,8 @@ public sealed class TwitchHelixChatClient(
             return null;
         }
 
-        const int maxLoggedBodyLength = 1000;
-        return body.Length <= maxLoggedBodyLength ? body : body[..maxLoggedBodyLength];
+        const int MaxLoggedBodyLength = 1000;
+        return body.Length <= MaxLoggedBodyLength ? body : body[..MaxLoggedBodyLength];
     }
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string uri, string accessToken)

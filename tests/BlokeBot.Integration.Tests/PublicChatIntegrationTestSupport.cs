@@ -450,7 +450,6 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     private readonly object _gate = new();
     private readonly List<ManualTimer> _timers = [];
     private readonly Channel<bool> _timerRegistrations = Channel.CreateUnbounded<bool>();
-    private DateTimeOffset _now = initialNow;
     private int _timerRegistrationCount;
     private int _observedTimerRegistrationCount;
     private bool _waitingForTimerRegistration;
@@ -461,7 +460,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
     {
         lock (_gate)
         {
-            return _now;
+            return _currentNowLocked;
         }
     }
 
@@ -487,8 +486,8 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
         List<ManualTimer> due;
         lock (_gate)
         {
-            _now = _now.Add(delta);
-            due = _timers.Where(timer => timer.IsDue(_now)).ToList();
+            _currentNowLocked = _currentNowLocked.Add(delta);
+            due = _timers.Where(timer => timer.IsDue(_currentNowLocked)).ToList();
         }
 
         foreach (var timer in due)
@@ -550,7 +549,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
         }
     }
 
-    private DateTimeOffset _currentNowLocked => _now;
+    private DateTimeOffset _currentNowLocked { get; set; } = initialNow;
 
     private sealed class ManualTimer(
         ManualTestTimeProvider owner,

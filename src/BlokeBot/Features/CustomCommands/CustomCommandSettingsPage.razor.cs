@@ -29,7 +29,7 @@ public partial class CustomCommandSettingsPage
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.CustomCommandsChanged],
-                work => InvokeAsync(work),
+                InvokeAsync,
                 LoadAsync,
                 StateHasChanged
             )

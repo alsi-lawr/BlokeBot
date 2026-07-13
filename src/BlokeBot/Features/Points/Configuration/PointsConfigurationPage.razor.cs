@@ -74,7 +74,7 @@ public partial class PointsConfigurationPage
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
-                work => InvokeAsync(work),
+                InvokeAsync,
                 LoadAsync,
                 StateHasChanged
             )

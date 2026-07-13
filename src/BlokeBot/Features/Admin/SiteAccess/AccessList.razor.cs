@@ -81,11 +81,11 @@ public partial class AccessList
 
     private string EntryRowClass(string entry)
     {
-        const string baseClass =
+        const string BaseClass =
             "motion-list__item surface-row flex items-center justify-between rounded-md px-3 py-2";
         return _pendingRemovals.Contains(entry)
-            ? $"{baseClass} motion-list__item--removing"
-            : baseClass;
+            ? $"{BaseClass} motion-list__item--removing"
+            : BaseClass;
     }
 
     private async Task RemoveEntryAsync(string entry)

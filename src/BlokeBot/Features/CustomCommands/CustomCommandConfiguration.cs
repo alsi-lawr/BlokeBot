@@ -40,8 +40,6 @@ public sealed class CustomMessageVariantEditor
 
 public sealed class CustomCommandEditor
 {
-    private ICustomCommandActionEditor _action = new MessageCustomCommandActionEditor();
-
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
@@ -59,9 +57,9 @@ public sealed class CustomCommandEditor
 
     public ICustomCommandActionEditor Action
     {
-        get => _action;
-        set => _action = value ?? throw new ArgumentNullException(nameof(value));
-    }
+        get;
+        set => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = new MessageCustomCommandActionEditor();
 
     public CustomCommandActionKind ActionKind
     {
@@ -129,9 +127,6 @@ public sealed class CustomCounterEditor
 
 public sealed class CustomAnnouncementEditor
 {
-    private ICustomAnnouncementScheduleEditor _schedule =
-        new IntervalCustomAnnouncementScheduleEditor();
-
     public int Id { get; set; }
 
     public string Name { get; set; } = string.Empty;
@@ -146,9 +141,9 @@ public sealed class CustomAnnouncementEditor
 
     public ICustomAnnouncementScheduleEditor Schedule
     {
-        get => _schedule;
-        set => _schedule = value ?? throw new ArgumentNullException(nameof(value));
-    }
+        get;
+        set => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = new IntervalCustomAnnouncementScheduleEditor();
 
     public CustomAnnouncementScheduleKind ScheduleKind
     {

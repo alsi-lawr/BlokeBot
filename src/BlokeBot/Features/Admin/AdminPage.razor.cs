@@ -67,7 +67,7 @@ public partial class AdminPage
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.HostedChannelsChanged, AppEventKind.SiteAccessChanged],
-                work => InvokeAsync(work),
+                InvokeAsync,
                 ReloadForEventAsync,
                 StateHasChanged
             )

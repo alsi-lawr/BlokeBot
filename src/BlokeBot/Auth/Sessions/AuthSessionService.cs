@@ -37,7 +37,7 @@ internal sealed class AuthSessionService(
             isBotAccount,
             null,
             null,
-            isBotAccount ? false : user.CanCreateHost
+            !isBotAccount && user.CanCreateHost
         );
 
         await SignInAsync(context, principal);

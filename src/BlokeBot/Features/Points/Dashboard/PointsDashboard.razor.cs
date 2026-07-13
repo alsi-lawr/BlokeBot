@@ -84,7 +84,7 @@ public partial class PointsDashboard
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.PointsChanged, AppEventKind.HostedChannelsChanged],
-                work => InvokeAsync(work),
+                InvokeAsync,
                 LoadAsync,
                 StateHasChanged
             )

@@ -107,11 +107,11 @@ public partial class GuessOptionsSettingsSection
 
     private string OptionRowClass(GuessOptionEditor option)
     {
-        const string baseClass =
+        const string BaseClass =
             "motion-list__item surface-muted grid gap-3 rounded-lg p-3 lg:grid-cols-[0.45fr_1fr_auto]";
         return _pendingRemovals.Contains(option)
-            ? $"{baseClass} motion-list__item--removing"
-            : baseClass;
+            ? $"{BaseClass} motion-list__item--removing"
+            : BaseClass;
     }
 
     private async Task RemoveOptionAsync(GuessOptionEditor option)

@@ -981,7 +981,6 @@ public sealed class PublicChatMessageQueueTests
         private readonly PublicChatRetryPolicy _safePreSendRetryPolicy =
             retryPolicy ?? throw new ArgumentNullException(nameof(retryPolicy));
         private long _nextId = 1;
-        private OutboxSnapshot? _lastDeletedSnapshot;
 
         public Action? AfterEnqueue { get; init; }
 
@@ -1009,13 +1008,15 @@ public sealed class PublicChatMessageQueueTests
                 {
                     if (_rows.Count == 0)
                     {
-                        return _lastDeletedSnapshot.ShouldNotBeNull();
+                        return field.ShouldNotBeNull();
                     }
 
                     var row = _rows.ShouldHaveSingleItem();
                     return Snapshot(row);
                 }
             }
+
+            private set;
         }
 
         private static OutboxSnapshot Snapshot(Row row)
@@ -1322,7 +1323,7 @@ public sealed class PublicChatMessageQueueTests
                 row.CompletedAt = completedAt;
                 row.Message = null;
                 row.ClaimToken = null;
-                _lastDeletedSnapshot = Snapshot(row);
+                SingleSnapshot = Snapshot(row);
                 _deliveries.Add(new Delivery(row.Item.DeduplicationKey, completedAt));
                 _rows.Remove(row);
                 NotifyCompletion(RowStatus.SentAndDeleted);
@@ -1573,7 +1574,6 @@ public sealed class PublicChatMessageQueueTests
         private readonly List<ManualTimer> _timers = [];
         private readonly Channel<ManualTimer> _timerRegistrations =
             Channel.CreateUnbounded<ManualTimer>();
-        private DateTimeOffset _now = initialNow;
 
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
@@ -1581,7 +1581,7 @@ public sealed class PublicChatMessageQueueTests
         {
             lock (_gate)
             {
-                return _now;
+                return _currentNowLocked;
             }
         }
 
@@ -1607,8 +1607,8 @@ public sealed class PublicChatMessageQueueTests
             List<ManualTimer> due;
             lock (_gate)
             {
-                _now = _now.Add(delta);
-                due = _timers.Where(timer => timer.IsDue(_now)).ToList();
+                _currentNowLocked = _currentNowLocked.Add(delta);
+                due = _timers.Where(timer => timer.IsDue(_currentNowLocked)).ToList();
             }
 
             foreach (var timer in due)
@@ -1673,7 +1673,7 @@ public sealed class PublicChatMessageQueueTests
             }
         }
 
-        private DateTimeOffset _currentNowLocked => _now;
+        private DateTimeOffset _currentNowLocked { get; set; } = initialNow;
 
         private sealed class ManualTimer(
             ManualTimeProvider owner,

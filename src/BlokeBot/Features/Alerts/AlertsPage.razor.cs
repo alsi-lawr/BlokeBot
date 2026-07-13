@@ -23,7 +23,7 @@ public partial class AlertsPage
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.AlertsChanged,
-                work => InvokeAsync(work),
+                InvokeAsync,
                 LoadAsync,
                 StateHasChanged
             )

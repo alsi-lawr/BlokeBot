@@ -8,9 +8,7 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-[*.cs]
-indent_size = 4
-
+[*.{cs,razor}]
 # Naming violations must be visible in both the IDE and builds.
 dotnet_diagnostic.IDE1006.severity = warning
 
@@ -39,6 +37,10 @@ dotnet_naming_rule.visible_members_should_be_pascal_case.severity = warning
 dotnet_naming_rule.visible_members_should_be_pascal_case.symbols = visible_members
 dotnet_naming_rule.visible_members_should_be_pascal_case.style = pascal_case
 
+dotnet_naming_rule.local_constants_should_be_pascal_case.severity = warning
+dotnet_naming_rule.local_constants_should_be_pascal_case.symbols = local_constants
+dotnet_naming_rule.local_constants_should_be_pascal_case.style = pascal_case
+
 dotnet_naming_rule.parameters_and_locals_should_be_camel_case.severity = warning
 dotnet_naming_rule.parameters_and_locals_should_be_camel_case.symbols = parameters_and_locals
 dotnet_naming_rule.parameters_and_locals_should_be_camel_case.style = camel_case
@@ -65,6 +67,9 @@ dotnet_naming_symbols.methods_and_events.applicable_accessibilities = *
 dotnet_naming_symbols.visible_members.applicable_kinds = property, field, enum_member
 dotnet_naming_symbols.visible_members.applicable_accessibilities = public, internal, protected, protected_internal, private_protected
 
+dotnet_naming_symbols.local_constants.applicable_kinds = local
+dotnet_naming_symbols.local_constants.required_modifiers = const
+
 dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter, local
 
 dotnet_naming_symbols.local_functions.applicable_kinds = local_function
@@ -83,6 +88,12 @@ dotnet_naming_style.pascal_case.capitalization = pascal_case
 
 dotnet_naming_style.camel_case.capitalization = camel_case
 
+[*.cs]
+indent_size = 4
+tab_width = 4
+max_line_length = 100
+csharp_indent_labels = one_less_than_current
+
 # Qualification and common C# style
 dotnet_style_qualification_for_event = false:warning
 dotnet_style_qualification_for_field = false:warning
@@ -92,10 +103,15 @@ csharp_using_directive_placement = outside_namespace:warning
 csharp_prefer_braces = true:warning
 csharp_prefer_simple_using_statement = true:warning
 csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_prefer_method_group_conversion = true:warning
+csharp_style_prefer_top_level_statements = true:warning
 dotnet_style_coalesce_expression = true:warning
 dotnet_style_null_propagation = true:warning
 dotnet_style_object_initializer = true:warning
 dotnet_style_collection_initializer = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_auto_properties = true:warning
+dotnet_style_prefer_simplified_boolean_expressions = true:warning
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
 
 # Preserve the repository's established expression-body preferences.

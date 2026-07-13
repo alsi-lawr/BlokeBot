@@ -68,7 +68,7 @@ public partial class HostSelector
     {
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
-            work => InvokeAsync(work),
+            InvokeAsync,
             ReloadForEventAsync,
             StateHasChanged
         );

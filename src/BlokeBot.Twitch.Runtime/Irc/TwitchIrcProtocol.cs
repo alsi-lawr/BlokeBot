@@ -78,19 +78,19 @@ public static class TwitchIrcProtocol
 
         var login = prefix[..bang];
         var commandRest = rest[(prefixEnd + 1)..];
-        const string marker = "PRIVMSG #";
-        if (!commandRest.StartsWith(marker, StringComparison.Ordinal))
+        const string Marker = "PRIVMSG #";
+        if (!commandRest.StartsWith(Marker, StringComparison.Ordinal))
         {
             return Failure(TwitchIrcPrivMsgParseStatus.MalformedCommand, line);
         }
 
         var channelEnd = commandRest.IndexOf(" :", StringComparison.Ordinal);
-        if (channelEnd <= marker.Length)
+        if (channelEnd <= Marker.Length)
         {
             return Failure(TwitchIrcPrivMsgParseStatus.MissingChannelOrText, line);
         }
 
-        var channel = commandRest[marker.Length..channelEnd];
+        var channel = commandRest[Marker.Length..channelEnd];
         var text = commandRest[(channelEnd + 2)..];
         var message = new TwitchChatMessage(login, channel, text, line, tags);
 

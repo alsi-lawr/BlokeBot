@@ -9,10 +9,6 @@ internal sealed class TwitchEventSubChannelStatusStore
     private readonly object _gate = new();
     private long _nextScopeId;
     private long _activeScopeId;
-    private TwitchEventSubChannelStatusSnapshot _current = new()
-    {
-        Channels = Array.Empty<TwitchEventSubChannelStatus>(),
-    };
 
     public event Action? Changed;
 
@@ -22,10 +18,15 @@ internal sealed class TwitchEventSubChannelStatusStore
         {
             lock (_gate)
             {
-                return _current;
+                return field;
             }
         }
-    }
+
+        private set;
+    } = new()
+    {
+        Channels = Array.Empty<TwitchEventSubChannelStatus>(),
+    };
 
     internal TwitchEventSubChannelStatusScope CreateScope()
     {
@@ -46,7 +47,7 @@ internal sealed class TwitchEventSubChannelStatusStore
         lock (_gate)
         {
             _activeScopeId = scope.Id;
-            _current = CreateSnapshot(scope.States);
+            Current = CreateSnapshot(scope.States);
             changed = Changed;
         }
 
@@ -64,7 +65,7 @@ internal sealed class TwitchEventSubChannelStatusStore
             scope.States[status.Channel] = status;
             if (_activeScopeId == scope.Id)
             {
-                _current = CreateSnapshot(scope.States);
+                Current = CreateSnapshot(scope.States);
                 changed = Changed;
             }
         }
@@ -82,7 +83,7 @@ internal sealed class TwitchEventSubChannelStatusStore
                 return;
             }
 
-            _current = CreateSnapshot(scope.States);
+            Current = CreateSnapshot(scope.States);
             changed = Changed;
         }
 
@@ -100,7 +101,7 @@ internal sealed class TwitchEventSubChannelStatusStore
             }
 
             _activeScopeId = 0;
-            _current = new TwitchEventSubChannelStatusSnapshot
+            Current = new TwitchEventSubChannelStatusSnapshot
             {
                 Channels = Array.Empty<TwitchEventSubChannelStatus>(),
             };

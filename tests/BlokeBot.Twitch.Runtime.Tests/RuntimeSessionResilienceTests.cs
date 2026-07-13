@@ -461,8 +461,8 @@ public sealed class RuntimeSessionResilienceTests
     [Test]
     public async Task EventSubProtocolHandoff_OldCleanupFailsAfterReplacementEstablishment_DisposesReplacementAndReportsBothFailures()
     {
-        const int previousAttempt = 3;
-        const int replacementAttempt = 2;
+        const int PreviousAttempt = 3;
+        const int ReplacementAttempt = 2;
         var reconnectEndpoint = new Uri("wss://example.test/reconnect");
         var previousCleanupFailure = new IOException("previous session cleanup failed");
         var replacementCleanupFailure = new IOException(
@@ -492,12 +492,12 @@ public sealed class RuntimeSessionResilienceTests
                 new TwitchRuntimeSessionOutcome.Established
                 {
                     Session = previousSession,
-                    Attempt = previousAttempt,
+                    Attempt = PreviousAttempt,
                 },
                 new TwitchRuntimeSessionOutcome.Established
                 {
                     Session = replacementSession,
-                    Attempt = replacementAttempt,
+                    Attempt = ReplacementAttempt,
                 },
             ]
         );
@@ -538,18 +538,18 @@ public sealed class RuntimeSessionResilienceTests
         report.Classification.ShouldBe(
             TwitchRuntimeSessionFailureClassification.Unexpected
         );
-        report.Attempt.ShouldBe(previousAttempt);
+        report.Attempt.ShouldBe(PreviousAttempt);
         var cleanup = report.Exception
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
-        cleanup.Attempt.ShouldBe(previousAttempt);
+        cleanup.Attempt.ShouldBe(PreviousAttempt);
         var combined = cleanup.InnerException.ShouldBeOfType<AggregateException>();
         var previousCleanup = combined.InnerExceptions[0]
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
-        previousCleanup.Attempt.ShouldBe(previousAttempt);
+        previousCleanup.Attempt.ShouldBe(PreviousAttempt);
         previousCleanup.InnerException.ShouldBeSameAs(previousCleanupFailure);
         var replacementCleanup = combined.InnerExceptions[1]
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
-        replacementCleanup.Attempt.ShouldBe(replacementAttempt);
+        replacementCleanup.Attempt.ShouldBe(ReplacementAttempt);
         replacementCleanup.InnerException.ShouldBeSameAs(replacementCleanupFailure);
     }
 
@@ -750,7 +750,7 @@ public sealed class RuntimeSessionResilienceTests
     [Test]
     public void StructuredHealthReport_Logging_ContainsSafeFieldsWithoutExceptionMessage()
     {
-        const string secret = "oauth:do-not-log";
+        const string Secret = "oauth:do-not-log";
         var logger = new RecordingLogger<TwitchRuntimeSessionHealthLogger>();
         var health = new TwitchRuntimeSessionHealthLogger(logger);
 
@@ -760,14 +760,14 @@ public sealed class RuntimeSessionResilienceTests
                 Runtime = TwitchBotRuntime.Irc,
                 Classification = TwitchRuntimeSessionFailureClassification.Unexpected,
                 Attempt = 2,
-                Exception = new ApplicationException(secret),
+                Exception = new ApplicationException(Secret),
             }
         );
 
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Error);
         entry.Exception.ShouldBeNull();
-        entry.Message.ShouldNotContain(secret);
+        entry.Message.ShouldNotContain(Secret);
         entry.Properties["Runtime"].ShouldBe(TwitchBotRuntime.Irc);
         entry.Properties["Classification"].ShouldBe(
             TwitchRuntimeSessionFailureClassification.Unexpected
@@ -779,7 +779,7 @@ public sealed class RuntimeSessionResilienceTests
     [Test]
     public void StructuredReconnectReport_Logging_ContainsSafeFieldsWithoutExceptionMessage()
     {
-        const string secret = "oauth:do-not-log";
+        const string Secret = "oauth:do-not-log";
         var logger = new RecordingLogger<TwitchRuntimeSessionHealthLogger>();
         var health = new TwitchRuntimeSessionHealthLogger(logger);
 
@@ -789,14 +789,14 @@ public sealed class RuntimeSessionResilienceTests
                 Runtime = TwitchBotRuntime.EventSub,
                 Classification = TwitchRuntimeSessionFailureClassification.Transient,
                 Attempt = 3,
-                Exception = new IOException(secret),
+                Exception = new IOException(Secret),
             }
         );
 
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Exception.ShouldBeNull();
-        entry.Message.ShouldNotContain(secret);
+        entry.Message.ShouldNotContain(Secret);
         entry.Properties["Runtime"].ShouldBe(TwitchBotRuntime.EventSub);
         entry.Properties["Classification"].ShouldBe(
             TwitchRuntimeSessionFailureClassification.Transient
