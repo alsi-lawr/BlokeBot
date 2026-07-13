@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="..\..\src\BlokeBot.Functional\BlokeBot.Functional.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
   </ItemGroup>
 

@@ -1610,16 +1610,14 @@ public sealed class PointsGiveawaySchedulerTests
         )
         {
             return Task.FromResult(
-                new ActiveBotAccountTokenStatus(
-                    string.Empty,
-                    null,
-                    TwitchTokenStatusState.Unavailable,
-                    null,
-                    null,
-                    [],
-                    [],
-                    []
-                )
+                new ActiveBotAccountTokenStatus
+                {
+                    BotLogin = string.Empty,
+                    Status = new TwitchTokenStatus.Unavailable(
+                        TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                        []
+                    ),
+                }
             );
         }
     }

@@ -6,7 +6,7 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
 
@@ -267,13 +267,6 @@ public sealed class HostBotAccountAuthorizationTests
     )
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
-        var services = new ServiceCollection();
-        if (tokenProvider is not null)
-        {
-            services.AddSingleton(tokenProvider);
-        }
-
-        var serviceProvider = services.BuildServiceProvider();
         var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
@@ -294,7 +287,13 @@ public sealed class HostBotAccountAuthorizationTests
             new HostBotAccountOAuthService(options, oauth, helix),
             oauth,
             helix,
-            new TwitchTokenStatusService(serviceProvider, oauth),
+            tokenProvider is null
+                ? new UnavailableTwitchTokenStatusSource()
+                : new TwitchTokenStatusService(
+                    tokenProvider,
+                    oauth,
+                    NullLogger<TwitchTokenStatusService>.Instance
+                ),
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             options
         );

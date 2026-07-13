@@ -19,7 +19,6 @@ public static class TwitchAuthServiceCollectionExtensions
 
         services.AddHttpClient("twitch-oauth");
         services.TryAddSingleton<TwitchOAuthApiClient>();
-        services.TryAddSingleton<TwitchTokenStatusService>();
 
         return services;
     }

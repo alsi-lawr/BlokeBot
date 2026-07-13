@@ -169,11 +169,14 @@ public sealed class HostWhisperCommandResponseSender(
             [TwitchScopes.UserManageWhispers],
             cancellationToken
         );
-        if (
-            tokenStatus.State != TwitchTokenStatusState.Ready
-            || string.IsNullOrWhiteSpace(tokenStatus.AccessToken)
-            || tokenStatus.Validation is null
-        )
+        var readyStatus = tokenStatus.Status.Match<TwitchTokenStatus.Ready?>(
+            _ => null,
+            _ => null,
+            _ => null,
+            _ => null,
+            ready => ready
+        );
+        if (readyStatus is null)
         {
             return new PrivateDeliveryPreparation.Failed(
                 new PrivateDeliveryError.SenderIdentityUnavailable()
@@ -182,7 +185,7 @@ public sealed class HostWhisperCommandResponseSender(
 
         var recipientUserId = await ResolveRecipientUserIdAsync(
             sourceMessage,
-            tokenStatus.AccessToken,
+            readyStatus.AccessToken,
             cancellationToken
         );
         if (string.IsNullOrWhiteSpace(recipientUserId))
@@ -192,7 +195,7 @@ public sealed class HostWhisperCommandResponseSender(
             );
         }
 
-        var senderUserId = tokenStatus.Validation.UserId;
+        var senderUserId = readyStatus.Validation.UserId;
         if (string.Equals(senderUserId, recipientUserId, StringComparison.Ordinal))
         {
             return new PrivateDeliveryPreparation.Failed(new PrivateDeliveryError.SelfRecipient());
@@ -206,7 +209,7 @@ public sealed class HostWhisperCommandResponseSender(
                 new PrivateDeliveryPreparation.Ready(
                     new PreparedPrivateDelivery(
                         host.Id,
-                        tokenStatus.AccessToken,
+                        readyStatus.AccessToken,
                         senderUserId,
                         recipientUserId
                     )

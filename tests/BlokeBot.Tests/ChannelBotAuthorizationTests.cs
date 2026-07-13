@@ -9,7 +9,6 @@ using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
@@ -163,13 +162,12 @@ public sealed class ChannelBotAuthorizationTests
         );
         var oauth = new TwitchOAuthApiClient(httpClientFactory);
         var helix = new TwitchHelixApiClient(httpClientFactory);
-        var services = new ServiceCollection().BuildServiceProvider();
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),
             oauth,
             helix,
-            new TwitchTokenStatusService(services, oauth),
+            new UnavailableTwitchTokenStatusSource(),
             ChangeNotifier(),
             options
         );

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Identity;
 
@@ -7,96 +8,43 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     TwitchBotSettings settings,
     ITwitchAccessTokenCache tokenCache,
     TwitchHelixApiClient helix,
-    BotAccountTokenStatusResolver tokenStatus,
+    ITwitchTokenStatusSource tokenStatus,
     HostedChannelChangeNotifier changes
 ) : IBotAccountAuthorizationPolicy
 {
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken ct)
     {
+        var inspection = await tokenStatus
+            .GetUserAccessTokenStatus(settings.Identity.Scopes)
+            .ExecuteAsync(ct);
+        var status = inspection.Match<TwitchTokenStatus>(
+            value => value,
+            error => new TwitchTokenStatus.Unknown(error)
+        );
         var configuredBotLogin = settings.Identity.BotUsername;
-        var status = await tokenStatus(settings.Identity.Scopes, ct);
 
-        if (status.State == TwitchTokenStatusState.Unavailable)
-        {
-            return new(
+        return await status.Match(
+            unknown => Task.FromResult(Unknown(configuredBotLogin, unknown)),
+            unavailable => Task.FromResult(NotAuthorized(configuredBotLogin, unavailable)),
+            invalid => Task.FromResult(NotAuthorized(configuredBotLogin, invalid)),
+            missingScopes => GetAuthorizedStatusAsync(
                 configuredBotLogin,
-                null,
-                null,
-                BotAccountAuthorizationState.NotAuthorized,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "No bot account is connected yet."
-            );
-        }
-
-        if (status.State == TwitchTokenStatusState.Invalid)
-        {
-            return new(
+                missingScopes.AccessToken,
+                missingScopes.Validation,
+                missingScopes.RequiredScopes,
+                missingScopes.GrantedScopes,
+                missingScopes.Missing,
+                ct
+            ),
+            ready => GetAuthorizedStatusAsync(
                 configuredBotLogin,
-                null,
-                null,
-                BotAccountAuthorizationState.NotAuthorized,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "BlokeBot could not check the connected bot account."
-            );
-        }
-
-        if (status.Validation is null)
-        {
-            return new(
-                configuredBotLogin,
-                null,
-                null,
-                BotAccountAuthorizationState.Unknown,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "BlokeBot could not check the bot account right now."
-            );
-        }
-
-        var authorizedLogin = LoginName.Parse(status.Validation.Login).Value;
-        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(status, ct);
-        if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
-        {
-            return new(
-                configuredBotLogin,
-                authorizedLogin,
-                authorizedProfileImageUrl,
-                BotAccountAuthorizationState.WrongAccount,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "The connected Twitch account is not the expected bot account."
-            );
-        }
-
-        if (status.MissingScopes.Count > 0)
-        {
-            return new(
-                configuredBotLogin,
-                authorizedLogin,
-                authorizedProfileImageUrl,
-                BotAccountAuthorizationState.MissingScopes,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "The bot account needs more Twitch access."
-            );
-        }
-
-        return new(
-            configuredBotLogin,
-            authorizedLogin,
-            authorizedProfileImageUrl,
-            BotAccountAuthorizationState.Ready,
-            status.RequiredScopes,
-            status.GrantedScopes,
-            [],
-            "The bot account is ready."
+                ready.AccessToken,
+                ready.Validation,
+                ready.RequiredScopes,
+                ready.GrantedScopes,
+                [],
+                ct
+            )
         );
     }
 
@@ -112,21 +60,119 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
         await changes.NotifyChangedAsync(ct);
     }
 
-    private async Task<string?> LoadAuthorizedProfileImageUrlAsync(
-        TwitchTokenStatus status,
+    private async Task<BotAccountAuthorizationStatus> GetAuthorizedStatusAsync(
+        string configuredBotLogin,
+        string accessToken,
+        TwitchTokenValidation validation,
+        ImmutableArray<string> requiredScopes,
+        ImmutableArray<string> grantedScopes,
+        ImmutableArray<string> missingScopes,
         CancellationToken ct
     )
     {
-        if (string.IsNullOrWhiteSpace(status.AccessToken))
+        var authorizedLogin = LoginName.Parse(validation.Login).Value;
+        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(
+            accessToken,
+            ct
+        );
+        if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
         {
-            return null;
+            return new(
+                configuredBotLogin,
+                authorizedLogin,
+                authorizedProfileImageUrl,
+                BotAccountAuthorizationState.WrongAccount,
+                requiredScopes,
+                grantedScopes,
+                missingScopes,
+                "The connected Twitch account is not the expected bot account."
+            );
         }
 
+        return missingScopes.IsEmpty
+            ? new(
+                configuredBotLogin,
+                authorizedLogin,
+                authorizedProfileImageUrl,
+                BotAccountAuthorizationState.Ready,
+                requiredScopes,
+                grantedScopes,
+                [],
+                "The bot account is ready."
+            )
+            : new(
+                configuredBotLogin,
+                authorizedLogin,
+                authorizedProfileImageUrl,
+                BotAccountAuthorizationState.MissingScopes,
+                requiredScopes,
+                grantedScopes,
+                missingScopes,
+                "The bot account needs more Twitch access."
+            );
+    }
+
+    private async Task<string?> LoadAuthorizedProfileImageUrlAsync(
+        string accessToken,
+        CancellationToken ct
+    )
+    {
         var user = await helix.GetCurrentUserAsync(
-            new TwitchHelixRequestContext(settings.Identity.ClientId, status.AccessToken),
+            new TwitchHelixRequestContext(settings.Identity.ClientId, accessToken),
             ct
         );
 
         return string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl;
+    }
+
+    private static BotAccountAuthorizationStatus Unknown(
+        string configuredBotLogin,
+        TwitchTokenStatus.Unknown status
+    )
+    {
+        return new(
+            configuredBotLogin,
+            null,
+            null,
+            BotAccountAuthorizationState.Unknown,
+            status.Error.RequiredScopes,
+            [],
+            status.Error.RequiredScopes,
+            "BlokeBot could not check the bot account right now."
+        );
+    }
+
+    private static BotAccountAuthorizationStatus NotAuthorized(
+        string configuredBotLogin,
+        TwitchTokenStatus.Unavailable status
+    )
+    {
+        return new(
+            configuredBotLogin,
+            null,
+            null,
+            BotAccountAuthorizationState.NotAuthorized,
+            status.RequiredScopes,
+            [],
+            status.RequiredScopes,
+            "No bot account is connected yet."
+        );
+    }
+
+    private static BotAccountAuthorizationStatus NotAuthorized(
+        string configuredBotLogin,
+        TwitchTokenStatus.Invalid status
+    )
+    {
+        return new(
+            configuredBotLogin,
+            null,
+            null,
+            BotAccountAuthorizationState.NotAuthorized,
+            status.RequiredScopes,
+            [],
+            status.RequiredScopes,
+            "BlokeBot could not check the connected bot account."
+        );
     }
 }

@@ -1,85 +1,239 @@
-using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Immutable;
+using System.Text.Json;
+using BlokeBot.Functional;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Auth;
 
-public sealed class TwitchTokenStatusService(IServiceProvider services, TwitchOAuthApiClient oauth)
+public sealed class TwitchTokenStatusService(
+    ITwitchAccessTokenProvider tokens,
+    TwitchOAuthApiClient oauth,
+    ILogger<TwitchTokenStatusService> log
+) : ITwitchTokenStatusSource
 {
-    public async Task<TwitchTokenStatus> GetUserAccessTokenStatusAsync(
-        IEnumerable<string?> requiredScopes,
+    public IO<TwitchTokenStatus, TwitchTokenStatusError> GetUserAccessTokenStatus(
+        IEnumerable<string?> requiredScopes
+    )
+    {
+        ArgumentNullException.ThrowIfNull(requiredScopes);
+        var required = ImmutableArray.CreateRange(
+            TwitchScopeSet.NormalizeMany(requiredScopes)
+        );
+        return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
+            InspectAsync(required, cancellationToken)
+        );
+    }
+
+    private async ValueTask<Result<TwitchTokenStatus, TwitchTokenStatusError>> InspectAsync(
+        ImmutableArray<string> requiredScopes,
         CancellationToken cancellationToken
     )
     {
-        var required = TwitchScopeSet.NormalizeMany(requiredScopes);
-        var provider = services.GetService<ITwitchAccessTokenProvider>();
-        if (provider is null)
-        {
-            return Unavailable(required);
-        }
-
         string accessToken;
         try
         {
-            accessToken = await provider.GetAccessTokenAsync(cancellationToken);
+            accessToken = await tokens
+                .GetAccessTokenAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
-        catch (TwitchAccessTokenUnavailableException)
-        {
-            return Unavailable(required);
-        }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch
+        catch (TwitchAccessTokenUnavailableException exception)
         {
-            return Unknown(required);
+            return Success(
+                new TwitchTokenStatus.Unavailable(exception.Reason, requiredScopes)
+            );
+        }
+        catch (HttpRequestException exception)
+        {
+            return AcquisitionError(
+                TwitchTokenStatusTransportFailureReason.RequestFailed,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (IOException exception)
+        {
+            return AcquisitionError(
+                TwitchTokenStatusTransportFailureReason.RequestFailed,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (JsonException exception)
+        {
+            return AcquisitionError(
+                TwitchTokenStatusTransportFailureReason.ResponseInvalid,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (TimeoutException exception)
+        {
+            return AcquisitionError(
+                TwitchTokenStatusTransportFailureReason.TimedOut,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (OperationCanceledException exception)
+        {
+            return AcquisitionError(
+                TwitchTokenStatusTransportFailureReason.TimedOut,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (Exception exception)
+        {
+            LogUnexpectedFailure("acquisition", exception);
+            throw;
         }
 
         try
         {
-            var validation = await oauth.ValidateTokenAsync(accessToken, cancellationToken);
+            var validation = await oauth
+                .ValidateTokenAsync(accessToken, cancellationToken)
+                .ConfigureAwait(false);
             if (validation is null)
             {
-                return Invalid(accessToken, required);
+                return Success(new TwitchTokenStatus.Invalid(requiredScopes));
             }
 
-            var granted = TwitchScopeSet.NormalizeMany(validation.Scopes);
-            var missing = TwitchScopeSet.Missing(granted, required);
-            var state =
-                missing.Length == 0
-                    ? TwitchTokenStatusState.Ready
-                    : TwitchTokenStatusState.MissingScopes;
-
-            return new TwitchTokenStatus(
-                state,
-                accessToken,
-                validation,
-                required,
-                granted,
-                missing
+            var grantedScopes = ImmutableArray.CreateRange(
+                TwitchScopeSet.NormalizeMany(validation.Scopes)
             );
+            var missingScopes = ImmutableArray.CreateRange(
+                TwitchScopeSet.Missing(grantedScopes, requiredScopes)
+            );
+            return missingScopes.IsEmpty
+                ? Success(
+                    new TwitchTokenStatus.Ready(
+                        accessToken,
+                        validation,
+                        requiredScopes,
+                        grantedScopes
+                    )
+                )
+                : Success(
+                    new TwitchTokenStatus.MissingScopes(
+                        accessToken,
+                        validation,
+                        requiredScopes,
+                        grantedScopes,
+                        missingScopes
+                    )
+                );
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch
+        catch (HttpRequestException exception)
         {
-            return Unknown(required, accessToken);
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.RequestFailed,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (IOException exception)
+        {
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.RequestFailed,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (JsonException exception)
+        {
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.ResponseInvalid,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (NotSupportedException exception)
+        {
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.ResponseInvalid,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (TimeoutException exception)
+        {
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.TimedOut,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (OperationCanceledException exception)
+        {
+            return ValidationError(
+                TwitchTokenStatusTransportFailureReason.TimedOut,
+                exception,
+                requiredScopes
+            );
+        }
+        catch (Exception exception)
+        {
+            LogUnexpectedFailure("validation", exception);
+            throw;
         }
     }
 
-    private static TwitchTokenStatus Unknown(string[] required, string? accessToken = null)
+    private static Result<TwitchTokenStatus, TwitchTokenStatusError> AcquisitionError(
+        TwitchTokenStatusTransportFailureReason reason,
+        Exception exception,
+        ImmutableArray<string> requiredScopes
+    )
     {
-        return new(TwitchTokenStatusState.Unknown, accessToken, null, required, [], required);
+        return Result<TwitchTokenStatus, TwitchTokenStatusError>.Error(
+            new TwitchTokenStatusError.AcquisitionUnavailable(
+                reason,
+                FailureType(exception),
+                requiredScopes
+            )
+        );
     }
 
-    private static TwitchTokenStatus Unavailable(string[] required)
+    private static Result<TwitchTokenStatus, TwitchTokenStatusError> ValidationError(
+        TwitchTokenStatusTransportFailureReason reason,
+        Exception exception,
+        ImmutableArray<string> requiredScopes
+    )
     {
-        return new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+        return Result<TwitchTokenStatus, TwitchTokenStatusError>.Error(
+            new TwitchTokenStatusError.ValidationUnavailable(
+                reason,
+                FailureType(exception),
+                requiredScopes
+            )
+        );
     }
 
-    private static TwitchTokenStatus Invalid(string accessToken, string[] required)
+    private static Result<TwitchTokenStatus, TwitchTokenStatusError> Success(
+        TwitchTokenStatus status
+    )
     {
-        return new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+        return Result<TwitchTokenStatus, TwitchTokenStatusError>.Success(status);
+    }
+
+    private void LogUnexpectedFailure(string operation, Exception exception)
+    {
+        log.LogError(
+            "Unexpected Twitch token status {Operation} failure of type {FailureType} was escalated.",
+            operation,
+            FailureType(exception)
+        );
+    }
+
+    private static string FailureType(Exception exception)
+    {
+        return exception.GetType().FullName ?? exception.GetType().Name;
     }
 }

@@ -6,8 +6,3 @@ public interface IBotAccountAuthorizationPolicy
 
     Task ClearAsync(CancellationToken cancellationToken);
 }
-
-internal delegate Task<TwitchTokenStatus> BotAccountTokenStatusResolver(
-    IEnumerable<string?> requiredScopes,
-    CancellationToken cancellationToken
-);

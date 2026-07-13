@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
@@ -31,6 +32,16 @@ public sealed class HostBotStatusTests
         var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
         outcome.Kind.ShouldBe(HostBotReadinessKind.InvalidToken);
+    }
+
+    [Test]
+    public async Task TokenInspectionUnavailable_CheckingReadiness_ReportsUnknown()
+    {
+        var service = CreateService(UnknownTokenStatus());
+
+        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+
+        outcome.Kind.ShouldBe(HostBotReadinessKind.Unknown);
     }
 
     [Test]
@@ -328,30 +339,40 @@ public sealed class HostBotStatusTests
 
     private static ActiveBotAccountTokenStatus UnavailableTokenStatus()
     {
-        return new(
-            "bot",
-            null,
-            TwitchTokenStatusState.Unavailable,
-            null,
-            null,
-            RequiredScopes(),
-            [],
-            RequiredScopes()
-        );
+        return new ActiveBotAccountTokenStatus
+        {
+            BotLogin = "bot",
+            Status = new TwitchTokenStatus.Unavailable(
+                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                ImmutableArray.CreateRange(RequiredScopes())
+            ),
+        };
     }
 
     private static ActiveBotAccountTokenStatus InvalidTokenStatus()
     {
-        return new(
-            "bot",
-            null,
-            TwitchTokenStatusState.Invalid,
-            "user-token",
-            null,
-            RequiredScopes(),
-            [],
-            RequiredScopes()
-        );
+        return new ActiveBotAccountTokenStatus
+        {
+            BotLogin = "bot",
+            Status = new TwitchTokenStatus.Invalid(
+                ImmutableArray.CreateRange(RequiredScopes())
+            ),
+        };
+    }
+
+    private static ActiveBotAccountTokenStatus UnknownTokenStatus()
+    {
+        return new ActiveBotAccountTokenStatus
+        {
+            BotLogin = "bot",
+            Status = new TwitchTokenStatus.Unknown(
+                new TwitchTokenStatusError.ValidationUnavailable(
+                    TwitchTokenStatusTransportFailureReason.RequestFailed,
+                    typeof(HttpRequestException).FullName!,
+                    ImmutableArray.CreateRange(RequiredScopes())
+                )
+            ),
+        };
     }
 
     private static ActiveBotAccountTokenStatus AuthorizedTokenStatus(
@@ -362,25 +383,34 @@ public sealed class HostBotStatusTests
         string accessToken = "user-token"
     )
     {
-        var requiredScopes = RequiredScopes();
-        var granted = grantedScopes.ToArray();
-        var missing = requiredScopes.Except(granted, StringComparer.Ordinal).ToArray();
-        return new(
-            botLogin,
-            null,
-            missing.Length == 0
-                ? TwitchTokenStatusState.Ready
-                : TwitchTokenStatusState.MissingScopes,
-            accessToken,
-            new TwitchTokenValidation(
+        var requiredScopes = ImmutableArray.CreateRange(RequiredScopes());
+        var granted = ImmutableArray.CreateRange(grantedScopes);
+        var missing = ImmutableArray.CreateRange(
+            requiredScopes.Except(granted, StringComparer.Ordinal)
+        );
+        var validation = new TwitchTokenValidation(
                 validationUserId,
                 validationLogin,
                 granted.ToHashSet(StringComparer.Ordinal)
-            ),
-            requiredScopes,
-            granted,
-            missing
-        );
+            );
+        return new ActiveBotAccountTokenStatus
+        {
+            BotLogin = botLogin,
+            Status = missing.IsEmpty
+                ? new TwitchTokenStatus.Ready(
+                    accessToken,
+                    validation,
+                    requiredScopes,
+                    granted
+                )
+                : new TwitchTokenStatus.MissingScopes(
+                    accessToken,
+                    validation,
+                    requiredScopes,
+                    granted,
+                    missing
+                ),
+        };
     }
 
     private sealed class StaticHostBotAccountTokenStatusProvider(

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -10,7 +11,7 @@ public sealed class HostBotAccountAuthorizationService(
     HostBotAccountOAuthService hostBotOAuth,
     TwitchOAuthApiClient oauth,
     TwitchHelixApiClient helix,
-    TwitchTokenStatusService globalTokenStatus,
+    ITwitchTokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
     TwitchBotSettings botSettings
 ) : ITwitchBotAccountProvider, IHostBotAccountTokenStatusProvider
@@ -44,10 +45,14 @@ public sealed class HostBotAccountAuthorizationService(
         }
 
         var tokenStatus = await GetStoredTokenStatusAsync(db, settings, required, ct);
-        if (tokenStatus.AccessToken is { Length: > 0 } accessToken)
-        {
-            await RefreshProfileMetadataAsync(db, settings, accessToken, ct);
-        }
+        await tokenStatus.Match(
+            _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            missingScopes =>
+                RefreshProfileMetadataAsync(db, settings, missingScopes.AccessToken, ct),
+            ready => RefreshProfileMetadataAsync(db, settings, ready.AccessToken, ct)
+        );
 
         return ToAuthorizationStatus(settings, tokenStatus);
     }
@@ -67,7 +72,9 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = TwitchScopeSet.NormalizeMany(requiredScopes);
+        var required = ImmutableArray.CreateRange(
+            TwitchScopeSet.NormalizeMany(requiredScopes)
+        );
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()
@@ -84,17 +91,19 @@ public sealed class HostBotAccountAuthorizationService(
             if (settings?.OverrideEnabled == true)
             {
                 var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
-                return ActiveBotAccountTokenStatus.FromStatus(
-                    status.Validation?.Login ?? settings.Login ?? string.Empty,
-                    settings.ProfileImageUrl,
-                    status
-                );
+                return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
             }
         }
 
         var configuredBotLogin = botSettings.Identity.BotUsername;
-        var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);
-        return ActiveBotAccountTokenStatus.FromStatus(configuredBotLogin, null, globalStatus);
+        var inspection = await globalTokenStatus
+            .GetUserAccessTokenStatus(required)
+            .ExecuteAsync(ct);
+        var globalStatus = inspection.Match<TwitchTokenStatus>(
+            status => status,
+            error => new TwitchTokenStatus.Unknown(error)
+        );
+        return ActiveStatus(configuredBotLogin, null, globalStatus);
     }
 
     public async Task<ActiveBotAccountTokenStatus> GetCustomBotTokenStatusAsync(
@@ -103,7 +112,9 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = TwitchScopeSet.NormalizeMany(requiredScopes);
+        var required = ImmutableArray.CreateRange(
+            TwitchScopeSet.NormalizeMany(requiredScopes)
+        );
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
@@ -111,24 +122,19 @@ public sealed class HostBotAccountAuthorizationService(
         );
         if (settings?.OverrideEnabled != true)
         {
-            return new(
-                string.Empty,
-                settings?.ProfileImageUrl,
-                TwitchTokenStatusState.Unavailable,
-                null,
-                null,
-                required,
-                SplitStoredScopes(settings?.AuthorizedScopes).ToArray(),
-                required
-            );
+            return new ActiveBotAccountTokenStatus
+            {
+                BotLogin = string.Empty,
+                ProfileImageUrl = settings?.ProfileImageUrl,
+                Status = new TwitchTokenStatus.Unavailable(
+                    TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                    required
+                ),
+            };
         }
 
         var status = await GetStoredTokenStatusAsync(db, settings, required, ct);
-        return ActiveBotAccountTokenStatus.FromStatus(
-            status.Validation?.Login ?? settings.Login ?? string.Empty,
-            settings.ProfileImageUrl,
-            status
-        );
+        return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
     }
 
     public async ValueTask<TwitchBotAccount> GetBotAccountAsync(
@@ -141,24 +147,19 @@ public sealed class HostBotAccountAuthorizationService(
             botSettings.Identity.Scopes,
             cancellationToken
         );
-        if (
-            status.State == TwitchTokenStatusState.Ready
-            && !string.IsNullOrWhiteSpace(status.AccessToken)
-            && status.Validation is not null
-        )
-        {
-            return new(TwitchLogin.Normalize(status.Validation.Login), status.AccessToken);
-        }
-
-        if (status.State == TwitchTokenStatusState.Unavailable)
-        {
-            throw new TwitchAccessTokenUnavailableException(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+        return status.Status.Match(
+            _ => throw BotNotReady(channelLogin),
+            unavailable => throw new TwitchAccessTokenUnavailableException(
+                unavailable.Reason,
                 TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
-            );
-        }
-
-        throw new InvalidOperationException($"The bot for #{channelLogin} is not ready yet.");
+            ),
+            _ => throw BotNotReady(channelLogin),
+            _ => throw BotNotReady(channelLogin),
+            ready => new TwitchBotAccount(
+                TwitchLogin.Normalize(ready.Validation.Login),
+                ready.AccessToken
+            )
+        );
     }
 
     public async Task<bool> CanAuthorizeAsync(int hostId, CancellationToken ct)
@@ -347,10 +348,15 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = TwitchScopeSet.NormalizeMany(requiredScopes);
+        var required = ImmutableArray.CreateRange(
+            TwitchScopeSet.NormalizeMany(requiredScopes)
+        );
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
         {
-            return Unavailable(required);
+            return new TwitchTokenStatus.Unavailable(
+                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                required
+            );
         }
 
         var accessToken = settings.AccessToken;
@@ -358,7 +364,7 @@ public sealed class HostBotAccountAuthorizationService(
         {
             if (!await RefreshTokenAsync(db, settings, ct))
             {
-                return Invalid(required);
+                return new TwitchTokenStatus.Invalid(required);
             }
 
             accessToken = settings.AccessToken;
@@ -366,7 +372,10 @@ public sealed class HostBotAccountAuthorizationService(
 
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            return Unavailable(required);
+            return new TwitchTokenStatus.Unavailable(
+                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                required
+            );
         }
 
         var validation = await oauth.ValidateTokenAsync(accessToken, ct);
@@ -377,14 +386,14 @@ public sealed class HostBotAccountAuthorizationService(
                 || string.IsNullOrWhiteSpace(settings.AccessToken)
             )
             {
-                return Invalid(required);
+                return new TwitchTokenStatus.Invalid(required);
             }
 
             accessToken = settings.AccessToken;
             validation = await oauth.ValidateTokenAsync(accessToken, ct);
             if (validation is null)
             {
-                return Invalid(accessToken, required);
+                return new TwitchTokenStatus.Invalid(required);
             }
         }
 
@@ -396,16 +405,22 @@ public sealed class HostBotAccountAuthorizationService(
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return new(
-            missing.Length == 0
-                ? TwitchTokenStatusState.Ready
-                : TwitchTokenStatusState.MissingScopes,
-            accessToken,
-            validation,
-            required,
-            granted,
-            missing
-        );
+        var immutableGranted = ImmutableArray.CreateRange(granted);
+        var immutableMissing = ImmutableArray.CreateRange(missing);
+        return immutableMissing.IsEmpty
+            ? new TwitchTokenStatus.Ready(
+                accessToken,
+                validation,
+                required,
+                immutableGranted
+            )
+            : new TwitchTokenStatus.MissingScopes(
+                accessToken,
+                validation,
+                required,
+                immutableGranted,
+                immutableMissing
+            );
     }
 
     private async Task<bool> RefreshTokenAsync(
@@ -480,8 +495,13 @@ public sealed class HostBotAccountAuthorizationService(
         var required = botSettings.Identity.Scopes;
         if (!overrideEnabled)
         {
-            var globalStatus = await globalTokenStatus.GetUserAccessTokenStatusAsync(required, ct);
-            return globalStatus.State == TwitchTokenStatusState.Ready;
+            var globalInspection = await globalTokenStatus
+                .GetUserAccessTokenStatus(required)
+                .ExecuteAsync(ct);
+            return globalInspection.Match(
+                IsReady,
+                _ => false
+            );
         }
 
         var customStatus = await GetStoredTokenStatusAsync(
@@ -490,7 +510,7 @@ public sealed class HostBotAccountAuthorizationService(
             RequiredScopes(settings),
             ct
         );
-        return customStatus.State == TwitchTokenStatusState.Ready;
+        return IsReady(customStatus);
     }
 
     private string[] RequiredScopes(HostBotAccountSettings? settings)
@@ -506,59 +526,58 @@ public sealed class HostBotAccountAuthorizationService(
         TwitchTokenStatus status
     )
     {
-        return status.State switch
-        {
-            TwitchTokenStatusState.Unavailable => new(
-                null,
-                settings.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.NotAuthorized,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "No custom bot account is connected yet."
-            ),
-            TwitchTokenStatusState.Invalid => new(
-                null,
-                settings.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.NotAuthorized,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
-                "BlokeBot could not check the custom bot account."
-            ),
-            TwitchTokenStatusState.Unknown => new(
+        return status.Match<BotAccountAuthorizationStatus>(
+            unknown => new(
                 null,
                 settings.Login,
                 settings.ProfileImageUrl,
                 BotAccountAuthorizationState.Unknown,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
+                unknown.Error.RequiredScopes,
+                [],
+                unknown.Error.RequiredScopes,
                 "BlokeBot could not check the custom bot account right now."
             ),
-            TwitchTokenStatusState.MissingScopes => new(
+            unavailable => new(
                 null,
-                status.Validation?.Login ?? settings.Login,
+                settings.Login,
+                settings.ProfileImageUrl,
+                BotAccountAuthorizationState.NotAuthorized,
+                unavailable.RequiredScopes,
+                [],
+                unavailable.RequiredScopes,
+                "No custom bot account is connected yet."
+            ),
+            invalid => new(
+                null,
+                settings.Login,
+                settings.ProfileImageUrl,
+                BotAccountAuthorizationState.NotAuthorized,
+                invalid.RequiredScopes,
+                [],
+                invalid.RequiredScopes,
+                "BlokeBot could not check the custom bot account."
+            ),
+            missingScopes => new(
+                null,
+                missingScopes.Validation.Login,
                 settings.ProfileImageUrl,
                 BotAccountAuthorizationState.MissingScopes,
-                status.RequiredScopes,
-                status.GrantedScopes,
-                status.MissingScopes,
+                missingScopes.RequiredScopes,
+                missingScopes.GrantedScopes,
+                missingScopes.Missing,
                 "The custom bot account needs more Twitch access."
             ),
-            _ => new(
+            ready => new(
                 null,
-                status.Validation?.Login ?? settings.Login,
+                ready.Validation.Login,
                 settings.ProfileImageUrl,
                 BotAccountAuthorizationState.Ready,
-                status.RequiredScopes,
-                status.GrantedScopes,
+                ready.RequiredScopes,
+                ready.GrantedScopes,
                 [],
                 "The custom bot account is ready."
-            ),
-        };
+            )
+        );
     }
 
     private static bool TokenExpiresSoon(HostBotAccountSettings settings)
@@ -585,18 +604,40 @@ public sealed class HostBotAccountAuthorizationService(
         return (scopes ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
     }
 
-    private static TwitchTokenStatus Unavailable(string[] required)
+    private static ActiveBotAccountTokenStatus ActiveStatus(
+        string? configuredLogin,
+        string? profileImageUrl,
+        TwitchTokenStatus status
+    )
     {
-        return new(TwitchTokenStatusState.Unavailable, null, null, required, [], required);
+        var botLogin = status.Match(
+            _ => configuredLogin,
+            _ => configuredLogin,
+            _ => configuredLogin,
+            missingScopes => missingScopes.Validation.Login,
+            ready => ready.Validation.Login
+        );
+        return new ActiveBotAccountTokenStatus
+        {
+            BotLogin = botLogin ?? string.Empty,
+            ProfileImageUrl = profileImageUrl,
+            Status = status,
+        };
     }
 
-    private static TwitchTokenStatus Invalid(string[] required)
+    private static bool IsReady(TwitchTokenStatus status)
     {
-        return new(TwitchTokenStatusState.Invalid, null, null, required, [], required);
+        return status.Match(
+            _ => false,
+            _ => false,
+            _ => false,
+            _ => false,
+            _ => true
+        );
     }
 
-    private static TwitchTokenStatus Invalid(string accessToken, string[] required)
+    private static InvalidOperationException BotNotReady(string channelLogin)
     {
-        return new(TwitchTokenStatusState.Invalid, accessToken, null, required, [], required);
+        return new($"The bot for #{channelLogin} is not ready yet.");
     }
 }

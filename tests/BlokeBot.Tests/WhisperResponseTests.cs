@@ -6,7 +6,6 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Whispers;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 using TUnit.Core;
@@ -655,10 +654,7 @@ public sealed class WhisperResponseTests
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
                 oauth,
                 helixUsers,
-                new TwitchTokenStatusService(
-                    new ServiceCollection().BuildServiceProvider(),
-                    oauth
-                ),
+                new UnavailableTwitchTokenStatusSource(),
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 options
             );

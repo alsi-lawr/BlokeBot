@@ -1,31 +1,10 @@
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
-public sealed record ActiveBotAccountTokenStatus(
-    string BotLogin,
-    string? ProfileImageUrl,
-    TwitchTokenStatusState State,
-    string? AccessToken,
-    TwitchTokenValidation? Validation,
-    IReadOnlyList<string> RequiredScopes,
-    IReadOnlyList<string> GrantedScopes,
-    IReadOnlyList<string> MissingScopes
-)
+public sealed record ActiveBotAccountTokenStatus
 {
-    public static ActiveBotAccountTokenStatus FromStatus(
-        string botLogin,
-        string? profileImageUrl,
-        TwitchTokenStatus status
-    )
-    {
-        return new(
-            botLogin,
-            profileImageUrl,
-            status.State,
-            status.AccessToken,
-            status.Validation,
-            status.RequiredScopes,
-            status.GrantedScopes,
-            status.MissingScopes
-        );
-    }
+    public required string BotLogin { get; init; }
+
+    public string? ProfileImageUrl { get; init; }
+
+    public required TwitchTokenStatus Status { get; init; }
 }

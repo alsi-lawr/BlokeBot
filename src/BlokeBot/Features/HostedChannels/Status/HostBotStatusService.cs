@@ -58,42 +58,52 @@ public sealed class HostBotStatusService(
             settings.Identity.Scopes,
             ct
         );
-        return tokenStatus.State switch
-        {
-            TwitchTokenStatusState.Unavailable => HostBotReadinessOutcome.TokenUnavailable(
-                configuredFlags
-            ),
-            TwitchTokenStatusState.Invalid => HostBotReadinessOutcome.InvalidToken(configuredFlags),
-            TwitchTokenStatusState.Unknown => HostBotReadinessOutcome.Unknown(configuredFlags),
-            _ when tokenStatus.AccessToken is null || tokenStatus.Validation is null =>
-                HostBotReadinessOutcome.Unknown(configuredFlags),
-            _ => await EvaluateAuthorizedReadinessAsync(
+        return await tokenStatus.Status.Match(
+            _ => Task.FromResult(HostBotReadinessOutcome.Unknown(configuredFlags)),
+            _ => Task.FromResult(HostBotReadinessOutcome.TokenUnavailable(configuredFlags)),
+            _ => Task.FromResult(HostBotReadinessOutcome.InvalidToken(configuredFlags)),
+            missingScopes => EvaluateAuthorizedReadinessAsync(
                 channelLogin,
-                tokenStatus,
+                tokenStatus.BotLogin,
+                missingScopes.AccessToken,
+                missingScopes.Validation,
+                missingScopes.GrantedScopes,
                 configuredFlags,
                 ct
             ),
-        };
+            ready => EvaluateAuthorizedReadinessAsync(
+                channelLogin,
+                tokenStatus.BotLogin,
+                ready.AccessToken,
+                ready.Validation,
+                ready.GrantedScopes,
+                configuredFlags,
+                ct
+            )
+        );
     }
 
     private async Task<HostBotReadinessOutcome> EvaluateAuthorizedReadinessAsync(
         string channelLogin,
-        ActiveBotAccountTokenStatus tokenStatus,
+        string botLogin,
+        string accessToken,
+        TwitchTokenValidation validation,
+        IReadOnlyList<string> grantedScopes,
         HostBotChannelStatusFlags configuredFlags,
         CancellationToken ct
     )
     {
-        var flags = GrantedFlags(configuredFlags, tokenStatus.GrantedScopes);
+        var flags = GrantedFlags(configuredFlags, grantedScopes);
         if (!HasAll(flags, HostBotChannelStatusFlags.ModeratorCheckGranted))
         {
             return HostBotReadinessOutcome.MissingModeratorCheckScope(flags);
         }
 
         if (
-            !string.IsNullOrWhiteSpace(tokenStatus.BotLogin)
+            !string.IsNullOrWhiteSpace(botLogin)
             && !string.Equals(
-                TwitchLogin.Normalize(tokenStatus.BotLogin),
-                TwitchLogin.Normalize(tokenStatus.Validation!.Login),
+                TwitchLogin.Normalize(botLogin),
+                TwitchLogin.Normalize(validation.Login),
                 StringComparison.OrdinalIgnoreCase
             )
         )
@@ -102,7 +112,7 @@ public sealed class HostBotStatusService(
         }
 
         var identities = await LookupUsersAsync(
-            tokenStatus.AccessToken!,
+            accessToken,
             [TwitchLogin.Normalize(channelLogin)],
             ct
         );
@@ -111,14 +121,14 @@ public sealed class HostBotStatusService(
             return HostBotReadinessOutcome.IdentityLookupFailed(flags);
         }
 
-        if (string.Equals(tokenStatus.Validation!.UserId, channelId, StringComparison.Ordinal))
+        if (string.Equals(validation.UserId, channelId, StringComparison.Ordinal))
         {
             return ChannelAuthorityReadyOutcome(flags);
         }
 
         var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
-            HelixContext(tokenStatus.AccessToken!),
-            tokenStatus.Validation!.UserId,
+            HelixContext(accessToken),
+            validation.UserId,
             channelId,
             ct
         );
@@ -236,7 +246,7 @@ public sealed class HostBotStatusService(
         }
 
         var tokenStatus = await GetValidatedUserAccessTokenAsync(channelLogin, ct);
-        var token = tokenStatus.AccessToken!;
+        var token = tokenStatus.AccessToken;
         var identities = await LookupUsersAsync(
             token,
             [TwitchLogin.Normalize(channelLogin), TwitchLogin.Normalize(viewerLogin)],
@@ -254,7 +264,7 @@ public sealed class HostBotStatusService(
             HelixContext(token),
             channelId,
             viewerId,
-            tokenStatus.Validation!.UserId,
+            tokenStatus.Validation.UserId,
             ct
         ) switch
         {
@@ -317,7 +327,7 @@ public sealed class HostBotStatusService(
         return (flags & required) == required;
     }
 
-    private async Task<ActiveBotAccountTokenStatus> GetValidatedUserAccessTokenAsync(
+    private async Task<ValidatedUserAccessToken> GetValidatedUserAccessTokenAsync(
         string channelLogin,
         CancellationToken ct
     )
@@ -327,12 +337,21 @@ public sealed class HostBotStatusService(
             settings.Identity.Scopes,
             ct
         );
-        if (status.AccessToken is not null && status.Validation is not null)
-        {
-            return status;
-        }
-
-        throw new InvalidOperationException("The Twitch bot runner is not connected.");
+        return status.Status.Match(
+            _ => throw BotRunnerNotConnected(),
+            _ => throw BotRunnerNotConnected(),
+            _ => throw BotRunnerNotConnected(),
+            missingScopes => new ValidatedUserAccessToken
+            {
+                AccessToken = missingScopes.AccessToken,
+                Validation = missingScopes.Validation,
+            },
+            ready => new ValidatedUserAccessToken
+            {
+                AccessToken = ready.AccessToken,
+                Validation = ready.Validation,
+            }
+        );
     }
 
     private async Task<Dictionary<string, string>> LookupUsersAsync(
@@ -360,5 +379,17 @@ public sealed class HostBotStatusService(
     )
     {
         return new(reason, cause);
+    }
+
+    private static InvalidOperationException BotRunnerNotConnected()
+    {
+        return new("The Twitch bot runner is not connected.");
+    }
+
+    private sealed record ValidatedUserAccessToken
+    {
+        internal required string AccessToken { get; init; }
+
+        internal required TwitchTokenValidation Validation { get; init; }
     }
 }
