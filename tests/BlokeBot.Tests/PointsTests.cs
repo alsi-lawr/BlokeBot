@@ -413,12 +413,10 @@ public sealed class PointsTests
             CancellationToken.None
         );
 
-        replies.ShouldBe(
-            [
-                "alice gambled 10 points and won. Balance: 110.",
-                "bob gambled 10 points and won. Balance: 110.",
-            ]
-        );
+        replies.ShouldBe([
+            "alice gambled 10 points and won. Balance: 110.",
+            "bob gambled 10 points and won. Balance: 110.",
+        ]);
     }
 
     [Test]
@@ -439,11 +437,7 @@ public sealed class PointsTests
             }
         );
         await AddBalanceAsync(dbFactory, hostId, "alice", "100");
-        var strategy = CreateGambleStrategy(
-            dbFactory,
-            clock,
-            minimumGamblingCooldownSeconds: 5
-        );
+        var strategy = CreateGambleStrategy(dbFactory, clock, minimumGamblingCooldownSeconds: 5);
         List<string> replies = [];
 
         await strategy.ExecuteAsync(
@@ -485,12 +479,10 @@ public sealed class PointsTests
             CancellationToken.None
         );
 
-        replies.ShouldBe(
-            [
-                "alice gambled 10 points and won. Balance: 110.",
-                "alice gambled 10 points and won. Balance: 120.",
-            ]
-        );
+        replies.ShouldBe([
+            "alice gambled 10 points and won. Balance: 110.",
+            "alice gambled 10 points and won. Balance: 120.",
+        ]);
         var balance = await new PointBalanceService(dbFactory).GetBalanceAsync(
             hostId,
             "alice",

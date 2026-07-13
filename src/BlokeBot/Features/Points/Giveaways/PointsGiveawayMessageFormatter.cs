@@ -11,10 +11,7 @@ public sealed class PointsGiveawayMessageFormatter
     private const string _streamLivenessUnavailableReply =
         "Stream status could not be checked right now.";
 
-    public PointOperationResult Reply(
-        PointsGiveawayStartOutcome outcome,
-        ReplyDeliveryMap delivery
-    )
+    public PointOperationResult Reply(PointsGiveawayStartOutcome outcome, ReplyDeliveryMap delivery)
     {
         return outcome.Kind switch
         {
@@ -60,10 +57,7 @@ public sealed class PointsGiveawayMessageFormatter
         };
     }
 
-    public PointOperationResult Reply(
-        PointsGiveawayJoinOutcome outcome,
-        ReplyDeliveryMap delivery
-    )
+    public PointOperationResult Reply(PointsGiveawayJoinOutcome outcome, ReplyDeliveryMap delivery)
     {
         return outcome.Kind switch
         {
@@ -115,10 +109,7 @@ public sealed class PointsGiveawayMessageFormatter
         };
     }
 
-    public PointOperationResult Reply(
-        PointsGiveawayDrawOutcome outcome,
-        ReplyDeliveryMap delivery
-    )
+    public PointOperationResult Reply(PointsGiveawayDrawOutcome outcome, ReplyDeliveryMap delivery)
     {
         return outcome.Kind switch
         {

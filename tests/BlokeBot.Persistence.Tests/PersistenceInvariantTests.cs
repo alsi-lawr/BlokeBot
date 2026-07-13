@@ -279,9 +279,7 @@ public sealed class PersistenceInvariantTests
             HostId = hostId,
             MessageLibraryEntryId = entry.Id,
         };
-        command.Aliases.Add(
-            new CustomCommandAlias { HostId = hostId, Alias = "command" }
-        );
+        command.Aliases.Add(new CustomCommandAlias { HostId = hostId, Alias = "command" });
         var announcement = Announcement(hostId, "announcement", entry);
         announcement.Schedule = new WeeklyCustomAnnouncementSchedule
         {
@@ -309,39 +307,35 @@ public sealed class PersistenceInvariantTests
     public void PersistedEnums_FormattingAndParsing_UseExactRoundTrippableTokens()
     {
         AssertTokens<AccessListEntryKind>(["blacklist", "whitelist"]);
-        AssertTokens<AnnouncementOccurrenceStatus>(
-            [
-                "Accepted",
-                "Attempting",
-                "None",
-                "Pending",
-                "RetryScheduled",
-                "SkippedExpired",
-                "TerminalAmbiguous",
-                "TerminalInvalidTimeZone",
-                "TerminalMissingMessage",
-                "TerminalRejected",
-                "TerminalUnexpected",
-            ]
-        );
-        AssertTokens<AppCommandKind>(
-            [
-                "AddPoints",
-                "CancelGiveaway",
-                "EndGiveaway",
-                "Gamble",
-                "Giveaway",
-                "GivePoints",
-                "Guess",
-                "Guesses",
-                "Join",
-                "Points",
-                "RemovePoints",
-                "Start",
-                "Stop",
-                "Win",
-            ]
-        );
+        AssertTokens<AnnouncementOccurrenceStatus>([
+            "Accepted",
+            "Attempting",
+            "None",
+            "Pending",
+            "RetryScheduled",
+            "SkippedExpired",
+            "TerminalAmbiguous",
+            "TerminalInvalidTimeZone",
+            "TerminalMissingMessage",
+            "TerminalRejected",
+            "TerminalUnexpected",
+        ]);
+        AssertTokens<AppCommandKind>([
+            "AddPoints",
+            "CancelGiveaway",
+            "EndGiveaway",
+            "Gamble",
+            "Giveaway",
+            "GivePoints",
+            "Guess",
+            "Guesses",
+            "Join",
+            "Points",
+            "RemovePoints",
+            "Start",
+            "Stop",
+            "Win",
+        ]);
         AssertTokens<CustomCommandCooldownScope>(["Global", "User"]);
         AssertTokens<CustomMessageSelectionMode>(["First", "Random", "Sequential"]);
         AssertTokens<DurableAlertSeverity>(["Critical", "Info", "Warning"]);
@@ -431,9 +425,7 @@ public sealed class PersistenceInvariantTests
         {
             HostId = hostId,
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
-            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                TimeSpan.FromSeconds(30)
-            ),
+            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
     }
 

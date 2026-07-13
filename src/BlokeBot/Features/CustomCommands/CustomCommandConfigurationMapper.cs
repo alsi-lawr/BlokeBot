@@ -71,8 +71,9 @@ internal static class CustomCommandConfigurationMapper
                 RequireRetryUntilExpiredThenSkip(announcement.DeliveryPolicy).RetryDelay.Value
             ),
             OccurrenceLifetimeSeconds = ToWholeSeconds(
-                RequireRetryUntilExpiredThenSkip(announcement.DeliveryPolicy)
-                    .OccurrenceLifetime.Value
+                RequireRetryUntilExpiredThenSkip(
+                    announcement.DeliveryPolicy
+                ).OccurrenceLifetime.Value
             ),
             Schedule = announcement.Schedule switch
             {
@@ -110,9 +111,7 @@ internal static class CustomCommandConfigurationMapper
         return new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         {
             HostId = hostId,
-            RetryDelay = new AnnouncementRetryDelay(
-                TimeSpan.FromSeconds(editor.RetryDelaySeconds)
-            ),
+            RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(editor.RetryDelaySeconds)),
             OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
                 TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
             ),
@@ -181,12 +180,16 @@ internal static class CustomCommandConfigurationMapper
     {
         return editor switch
         {
-            IntervalCustomAnnouncementScheduleEditor =>
-                new IntervalCustomAnnouncementSchedule { HostId = hostId },
+            IntervalCustomAnnouncementScheduleEditor => new IntervalCustomAnnouncementSchedule
+            {
+                HostId = hostId,
+            },
             IntervalAfterChatCustomAnnouncementScheduleEditor =>
                 new IntervalAfterChatCustomAnnouncementSchedule { HostId = hostId },
-            WeeklyCustomAnnouncementScheduleEditor =>
-                new WeeklyCustomAnnouncementSchedule { HostId = hostId },
+            WeeklyCustomAnnouncementScheduleEditor => new WeeklyCustomAnnouncementSchedule
+            {
+                HostId = hostId,
+            },
             _ => throw new InvalidOperationException("Unsupported custom announcement schedule."),
         };
     }
@@ -219,18 +222,19 @@ internal static class CustomCommandConfigurationMapper
                 stored.Time = edited.Time;
                 return;
             default:
-                throw new InvalidOperationException("Custom announcement schedule types do not match.");
+                throw new InvalidOperationException(
+                    "Custom announcement schedule types do not match."
+                );
         }
     }
 
-    public static bool ActionMatches(
-        CustomCommandAction action,
-        ICustomCommandActionEditor editor
-    )
+    public static bool ActionMatches(CustomCommandAction action, ICustomCommandActionEditor editor)
     {
-        return (action, editor) is
-            (MessageCustomCommandAction, MessageCustomCommandActionEditor)
-                or (CounterCustomCommandAction, CounterCustomCommandActionEditor);
+        return (action, editor)
+            is
+                (MessageCustomCommandAction, MessageCustomCommandActionEditor)
+                or
+                (CounterCustomCommandAction, CounterCustomCommandActionEditor);
     }
 
     public static bool ScheduleMatches(
@@ -238,20 +242,24 @@ internal static class CustomCommandConfigurationMapper
         ICustomAnnouncementScheduleEditor editor
     )
     {
-        return (schedule, editor) is
-            (IntervalCustomAnnouncementSchedule, IntervalCustomAnnouncementScheduleEditor)
-                or (
+        return (schedule, editor)
+            is
+                (IntervalCustomAnnouncementSchedule, IntervalCustomAnnouncementScheduleEditor)
+                or
+                (
                     IntervalAfterChatCustomAnnouncementSchedule,
                     IntervalAfterChatCustomAnnouncementScheduleEditor
                 )
-                or (WeeklyCustomAnnouncementSchedule, WeeklyCustomAnnouncementScheduleEditor);
+                or
+                (WeeklyCustomAnnouncementSchedule, WeeklyCustomAnnouncementScheduleEditor);
     }
 
-    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
-        RequireRetryUntilExpiredThenSkip(CustomAnnouncementDeliveryPolicy policy)
+    private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy RequireRetryUntilExpiredThenSkip(
+        CustomAnnouncementDeliveryPolicy policy
+    )
     {
         return policy as RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
-        ?? throw new UnreachableException("Unknown custom announcement delivery policy.");
+            ?? throw new UnreachableException("Unknown custom announcement delivery policy.");
     }
 
     private static int ToWholeSeconds(TimeSpan value)

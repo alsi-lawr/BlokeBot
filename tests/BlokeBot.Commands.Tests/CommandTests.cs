@@ -85,7 +85,7 @@ public sealed class CommandTests
                                 return ValueTask.CompletedTask;
                             }
                         )
-                    )
+                )
         );
 
         await dispatcher.DispatchResponsesAsync(
@@ -131,9 +131,7 @@ public sealed class CommandTests
         );
     }
 
-    private static TwitchCommandResponder RecordResponses(
-        List<TwitchCommandResponse> responses
-    )
+    private static TwitchCommandResponder RecordResponses(List<TwitchCommandResponse> responses)
     {
         return (response, _) =>
         {

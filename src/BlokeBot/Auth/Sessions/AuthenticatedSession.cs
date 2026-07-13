@@ -71,8 +71,8 @@ public sealed record AuthenticatedSession
     public bool CanUseBotFunctions(IReadOnlySet<int> existingHostIds)
     {
         return !IsBotAccount
-        && HostSelection is not null
-        && existingHostIds.Contains(HostSelection.Current.Id);
+            && HostSelection is not null
+            && existingHostIds.Contains(HostSelection.Current.Id);
     }
 
     public bool CanAuthorizeSelectedHost =>
@@ -212,6 +212,10 @@ public sealed record AuthenticatedSession
 
     private static bool BooleanClaim(ClaimsPrincipal user, string claimType)
     {
-        return string.Equals(user.FindFirstValue(claimType), "true", StringComparison.OrdinalIgnoreCase);
+        return string.Equals(
+            user.FindFirstValue(claimType),
+            "true",
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 }

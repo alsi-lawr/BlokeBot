@@ -83,13 +83,11 @@ internal static class TwitchRuntimeSessionFailureClassifier
     internal static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
     {
         return statusCode is null
-        || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
-        || (int)statusCode >= 500;
+            || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+            || (int)statusCode >= 500;
     }
 
-    internal static bool IsRetryable(
-        TwitchRuntimeSessionFailureClassification classification
-    )
+    internal static bool IsRetryable(TwitchRuntimeSessionFailureClassification classification)
     {
         return classification
             is TwitchRuntimeSessionFailureClassification.Transient

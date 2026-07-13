@@ -18,10 +18,7 @@ public abstract record HostStreamLivenessOutcome
 
     public sealed record Unavailable : HostStreamLivenessOutcome
     {
-        internal Unavailable(
-            HostStreamLivenessUnavailableReason reason,
-            Exception cause
-        )
+        internal Unavailable(HostStreamLivenessUnavailableReason reason, Exception cause)
         {
             ArgumentNullException.ThrowIfNull(cause);
             Reason = reason;

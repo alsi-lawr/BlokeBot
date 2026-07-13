@@ -33,8 +33,7 @@ public sealed class TwitchCommandResponseSenderSelectionTests
     {
         var selection = new TwitchCommandResponseSenderSelection();
 
-        var exception = Should.Throw<InvalidOperationException>(selection.RequireSingle
-        );
+        var exception = Should.Throw<InvalidOperationException>(selection.RequireSingle);
 
         exception.Message.ShouldContain("none was selected");
     }
@@ -49,9 +48,9 @@ public sealed class TwitchCommandResponseSenderSelectionTests
             .UseHostedWhisperSender<HostedWhisperSender>()
             .UseStandalonePublicChat();
 
-        var firstException = Should.Throw<InvalidOperationException>(chatThenWhisper.RequireSingle
-        );
-        var secondException = Should.Throw<InvalidOperationException>(whisperThenChat.RequireSingle
+        var firstException = Should.Throw<InvalidOperationException>(chatThenWhisper.RequireSingle);
+        var secondException = Should.Throw<InvalidOperationException>(
+            whisperThenChat.RequireSingle
         );
 
         firstException.Message.ShouldContain("2 were selected");

@@ -56,9 +56,7 @@ public sealed class EventBus<TKey>
         ArgumentNullException.ThrowIfNull(keys);
         ArgumentNullException.ThrowIfNull(handler);
 
-        return new EventSubscriptionSet(
-            keys.Select(key => Subscribe(key, observer, handler))
-        );
+        return new EventSubscriptionSet(keys.Select(key => Subscribe(key, observer, handler)));
     }
 
     public ValueTask<ObserverFanOutOutcome> PublishAsync(
@@ -69,9 +67,7 @@ public sealed class EventBus<TKey>
         RegisteredObserver[] handlers;
         lock (_gate)
         {
-            handlers = _subscriptions.TryGetValue(key, out var current)
-                ? [.. current]
-                : [];
+            handlers = _subscriptions.TryGetValue(key, out var current) ? [.. current] : [];
         }
 
         var identity = _eventIdentity.Project(key);
@@ -80,10 +76,7 @@ public sealed class EventBus<TKey>
             correlationId =>
             {
                 var notification = new EventNotification<TKey>(key, correlationId);
-                return new ObserverDispatch<
-                    EventNotification<TKey>,
-                    EventBusDeadLetter
-                >
+                return new ObserverDispatch<EventNotification<TKey>, EventBusDeadLetter>
                 {
                     Event = notification,
                     EventIdentity = identity,
@@ -91,8 +84,7 @@ public sealed class EventBus<TKey>
                 };
             },
             registration => registration.Identity,
-            (registration, notification, token) =>
-                registration.Handler(notification, token),
+            (registration, notification, token) => registration.Handler(notification, token),
             cancellationToken
         );
     }
@@ -119,11 +111,8 @@ public sealed class EventBus<TKey>
         Func<EventNotification<TKey>, CancellationToken, ValueTask> Handler
     );
 
-    private sealed class Subscription(
-        EventBus<TKey> owner,
-        TKey key,
-        RegisteredObserver observer
-    ) : IDisposable
+    private sealed class Subscription(EventBus<TKey> owner, TKey key, RegisteredObserver observer)
+        : IDisposable
     {
         private bool _disposed;
 
@@ -149,5 +138,4 @@ internal sealed record EventBusEventIdentity<TKey>
     internal required Func<TKey, ObserverEventIdentity> Project { get; init; }
 }
 
-internal sealed record EventBusDeadLetter(ObserverEventIdentity Event)
-    : IObserverDeadLetterPayload;
+internal sealed record EventBusDeadLetter(ObserverEventIdentity Event) : IObserverDeadLetterPayload;

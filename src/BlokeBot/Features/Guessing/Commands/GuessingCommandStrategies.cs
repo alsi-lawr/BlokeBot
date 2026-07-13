@@ -33,7 +33,8 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
         CancellationToken cancellationToken
     )
     {
-        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message
+            ?? string.Empty;
     }
 
     public abstract ValueTask ExecuteAsync(

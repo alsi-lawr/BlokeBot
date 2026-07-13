@@ -3,9 +3,7 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 internal sealed class DisabledBotAccountAuthorizationPolicy(TwitchBotSettings settings)
     : IBotAccountAuthorizationPolicy
 {
-    public Task<BotAccountAuthorizationStatus> GetStatusAsync(
-        CancellationToken cancellationToken
-    )
+    public Task<BotAccountAuthorizationStatus> GetStatusAsync(CancellationToken cancellationToken)
     {
         return Task.FromResult(
             new BotAccountAuthorizationStatus(

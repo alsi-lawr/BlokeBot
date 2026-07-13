@@ -34,9 +34,7 @@ public sealed class PublicChatOutboxPersistenceTests
         }
 
         await using var readDb = await dbFactory.CreateDbContextAsync();
-        var row = await readDb
-            .PublicChatOutboxMessages.AsNoTracking()
-            .SingleAsync();
+        var row = await readDb.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
         row.Channel.ShouldBe("streamer");
         row.Message.ShouldBe("durable message");
         row.DeduplicationKey.ShouldBe(_deduplicationKey);
@@ -50,27 +48,22 @@ public sealed class PublicChatOutboxPersistenceTests
         row.FailureType.ShouldBeNull();
         row.HttpStatusCode.ShouldBeNull();
         row.RejectionCode.ShouldBeNull();
-        var persistedStatus = await readDb.Database.SqlQueryRaw<string>(
-                "SELECT Status AS Value FROM public_chat_outbox"
-            )
+        var persistedStatus = await readDb
+            .Database.SqlQueryRaw<string>("SELECT Status AS Value FROM public_chat_outbox")
             .SingleAsync();
         persistedStatus.ShouldBe("Pending");
-        PersistedEnumTokens<PublicChatOutboxStatus>.Values.ShouldBe(
-            [
-                "Ambiguous",
-                "Claimed",
-                "Expired",
-                "Pending",
-                "Rejected",
-                "SafePreSendExhausted",
-                "SafePreSendTransient",
-                "Sending",
-                "Unexpected",
-            ]
-        );
-        PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ShouldBe(
-            ["Preparation", "Send"]
-        );
+        PersistedEnumTokens<PublicChatOutboxStatus>.Values.ShouldBe([
+            "Ambiguous",
+            "Claimed",
+            "Expired",
+            "Pending",
+            "Rejected",
+            "SafePreSendExhausted",
+            "SafePreSendTransient",
+            "Sending",
+            "Unexpected",
+        ]);
+        PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ShouldBe(["Preparation", "Send"]);
     }
 
     [Test]
@@ -183,7 +176,8 @@ public sealed class PublicChatOutboxPersistenceTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using var db = await dbFactory.CreateDbContextAsync();
-        var tableSql = await db.Database.SqlQueryRaw<string>(
+        var tableSql = await db
+            .Database.SqlQueryRaw<string>(
                 """
                 SELECT sql AS Value
                 FROM sqlite_master
@@ -206,7 +200,8 @@ public sealed class PublicChatOutboxPersistenceTests
         tableSql.ShouldContain("NextAttemptAtUtc IS NULL");
         tableSql.ShouldContain("'Expired'");
 
-        var receiptTableSql = await db.Database.SqlQueryRaw<string>(
+        var receiptTableSql = await db
+            .Database.SqlQueryRaw<string>(
                 """
                 SELECT sql AS Value
                 FROM sqlite_master
@@ -217,7 +212,8 @@ public sealed class PublicChatOutboxPersistenceTests
         receiptTableSql.ShouldContain("CK_public_chat_send_receipts_Delivery");
         receiptTableSql.ShouldContain("DeliveredDeduplicationKey");
 
-        var indexSql = await db.Database.SqlQueryRaw<string>(
+        var indexSql = await db
+            .Database.SqlQueryRaw<string>(
                 """
                 SELECT sql AS Value
                 FROM sqlite_master
@@ -241,24 +237,19 @@ public sealed class PublicChatOutboxPersistenceTests
             )
         );
         indexSql.ShouldContain(value =>
-            value.Contains(
-                "IX_public_chat_outbox_Status_ExpiresAtUtc",
-                StringComparison.Ordinal
-            )
+            value.Contains("IX_public_chat_outbox_Status_ExpiresAtUtc", StringComparison.Ordinal)
         );
         indexSql.ShouldContain(value =>
             value.Contains(
                 "UNIQUE INDEX \"IX_public_chat_outbox_ClaimToken\"",
                 StringComparison.Ordinal
-            )
-            && value.Contains("WHERE \"ClaimToken\" IS NOT NULL", StringComparison.Ordinal)
+            ) && value.Contains("WHERE \"ClaimToken\" IS NOT NULL", StringComparison.Ordinal)
         );
         indexSql.ShouldContain(value =>
             value.Contains(
                 "UNIQUE INDEX \"IX_public_chat_outbox_ClaimSlot\"",
                 StringComparison.Ordinal
-            )
-            && value.Contains("WHERE \"ClaimSlot\" IS NOT NULL", StringComparison.Ordinal)
+            ) && value.Contains("WHERE \"ClaimSlot\" IS NOT NULL", StringComparison.Ordinal)
         );
     }
 

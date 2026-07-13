@@ -47,11 +47,7 @@ public sealed class WhisperResponseTests
         var quota = CreateQuota(dbFactory);
 
         var reservation = quota.ReserveRecipient(hostId, "bot-id", "viewer-id", "viewer");
-        var beforeExecution = await quota.GetStatusAsync(
-            hostId,
-            "bot-id",
-            CancellationToken.None
-        );
+        var beforeExecution = await quota.GetStatusAsync(hostId, "bot-id", CancellationToken.None);
         var result = await reservation.ExecuteAsync(CancellationToken.None);
 
         beforeExecution.RecipientCount.ShouldBe(0);
@@ -76,8 +72,9 @@ public sealed class WhisperResponseTests
             _ => throw new InvalidOperationException("Expected an invalid identity error."),
             error => error.ShouldBeOfType<WhisperQuotaReservationError.InvalidIdentity>()
         );
-        (await quota.GetStatusAsync(hostId, "bot-id", CancellationToken.None))
-            .RecipientCount.ShouldBe(0);
+        (
+            await quota.GetStatusAsync(hostId, "bot-id", CancellationToken.None)
+        ).RecipientCount.ShouldBe(0);
     }
 
     [Test]
@@ -90,12 +87,7 @@ public sealed class WhisperResponseTests
         for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
         {
             var result = await quota
-                .ReserveRecipient(
-                    hostId,
-                    "bot-id",
-                    $"viewer-id-{index}",
-                    $"viewer{index}"
-                )
+                .ReserveRecipient(hostId, "bot-id", $"viewer-id-{index}", $"viewer{index}")
                 .ExecuteAsync(CancellationToken.None);
             result.Match(
                 success => success.ShouldBeOfType<WhisperQuotaReservation.NewRecipient>(),
@@ -112,10 +104,7 @@ public sealed class WhisperResponseTests
 
         var limit = blocked.Match(
             _ => throw new InvalidOperationException("Expected a quota error."),
-            error =>
-                error.ShouldBeOfType<
-                    WhisperQuotaReservationError.DailyRecipientLimitReached
-                >()
+            error => error.ShouldBeOfType<WhisperQuotaReservationError.DailyRecipientLimitReached>()
         );
         limit.Status.RecipientCount.ShouldBe(HostWhisperQuotaService.UniqueRecipientLimit);
         limit.Status.Exhausted.ShouldBeTrue();
@@ -155,12 +144,9 @@ public sealed class WhisperResponseTests
         harness.Http.WhisperRequestCount.ShouldBe(1);
         harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Chat.Messages.ShouldBeEmpty();
-        (await harness.Quota.GetStatusAsync(
-                harness.HostId,
-                "custom-id",
-                CancellationToken.None
-            ))
-            .RecipientCount.ShouldBe(1);
+        (
+            await harness.Quota.GetStatusAsync(harness.HostId, "custom-id", CancellationToken.None)
+        ).RecipientCount.ShouldBe(1);
     }
 
     [Test]
@@ -200,10 +186,7 @@ public sealed class WhisperResponseTests
             usersJson: """{"data":[]}"""
         );
 
-        var error = await SendPrivateFailureAsync(
-            harness,
-            harness.Source(includeUserId: false)
-        );
+        var error = await SendPrivateFailureAsync(harness, harness.Source(includeUserId: false));
 
         error.ShouldBeOfType<PrivateDeliveryError.RecipientUnavailable>();
         harness.Http.WhisperRequestCount.ShouldBe(0);
@@ -214,19 +197,13 @@ public sealed class WhisperResponseTests
     {
         await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
 
-        var error = await SendPrivateFailureAsync(
-            harness,
-            harness.Source(userId: "custom-id")
-        );
+        var error = await SendPrivateFailureAsync(harness, harness.Source(userId: "custom-id"));
 
         error.ShouldBeOfType<PrivateDeliveryError.SelfRecipient>();
         harness.Http.WhisperRequestCount.ShouldBe(0);
-        (await harness.Quota.GetStatusAsync(
-                harness.HostId,
-                "custom-id",
-                CancellationToken.None
-            ))
-            .RecipientCount.ShouldBe(0);
+        (
+            await harness.Quota.GetStatusAsync(harness.HostId, "custom-id", CancellationToken.None)
+        ).RecipientCount.ShouldBe(0);
     }
 
     [Test]
@@ -235,8 +212,8 @@ public sealed class WhisperResponseTests
         await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
         for (var index = 0; index < HostWhisperQuotaService.UniqueRecipientLimit; index++)
         {
-            _ = await harness.Quota
-                .ReserveRecipient(
+            _ = await harness
+                .Quota.ReserveRecipient(
                     harness.HostId,
                     "custom-id",
                     $"recipient-{index}",
@@ -269,12 +246,9 @@ public sealed class WhisperResponseTests
         var rateLimited = error.ShouldBeOfType<PrivateDeliveryError.RateLimited>();
         rateLimited.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
         rateLimited.ToString().ShouldNotContain("sensitive");
-        (await harness.Quota.GetStatusAsync(
-                harness.HostId,
-                "custom-id",
-                CancellationToken.None
-            ))
-            .Exhausted.ShouldBeTrue();
+        (
+            await harness.Quota.GetStatusAsync(harness.HostId, "custom-id", CancellationToken.None)
+        ).Exhausted.ShouldBeTrue();
     }
 
     [Test]
@@ -305,10 +279,7 @@ public sealed class WhisperResponseTests
             usersException: cause
         );
 
-        var error = await SendPrivateFailureAsync(
-            harness,
-            harness.Source(includeUserId: false)
-        );
+        var error = await SendPrivateFailureAsync(harness, harness.Source(includeUserId: false));
 
         var transient = error.ShouldBeOfType<PrivateDeliveryError.Transient>();
         transient.Cause.ShouldBeSameAs(cause);
@@ -343,10 +314,7 @@ public sealed class WhisperResponseTests
             usersException: cause
         );
 
-        var error = await SendPrivateFailureAsync(
-            harness,
-            harness.Source(includeUserId: false)
-        );
+        var error = await SendPrivateFailureAsync(harness, harness.Source(includeUserId: false));
 
         var unexpected = error.ShouldBeOfType<PrivateDeliveryError.Unexpected>();
         unexpected.Cause.ShouldBeSameAs(cause);
@@ -495,9 +463,7 @@ public sealed class WhisperResponseTests
         entry.Message.ShouldNotContain("private response");
         entry.Message.ShouldNotContain("viewer");
         entry.Properties["HostChannel"].ShouldBe("streamer");
-        entry.Properties["Classification"].ShouldBe(
-            nameof(PrivateDeliveryError.Unexpected)
-        );
+        entry.Properties["Classification"].ShouldBe(nameof(PrivateDeliveryError.Unexpected));
     }
 
     private static HostWhisperQuotaService CreateQuota(SqliteBlokeBotDbFactory dbFactory)
@@ -536,11 +502,7 @@ public sealed class WhisperResponseTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = [
-                        "chat:read",
-                        "chat:edit",
-                        TwitchScopes.UserReadModeratedChannels,
-                    ],
+                    Scopes = ["chat:read", "chat:edit", TwitchScopes.UserReadModeratedChannels],
                 },
             }
         );
@@ -623,7 +585,8 @@ public sealed class WhisperResponseTests
         internal static async Task<WhisperHarness> CreateAsync(
             HttpStatusCode whisperStatus,
             string? whisperBody = null,
-            string usersJson = """{"data":[{"id":"viewer-id","login":"viewer","display_name":"Viewer","profile_image_url":""}]}""",
+            string usersJson =
+                """{"data":[{"id":"viewer-id","login":"viewer","display_name":"Viewer","profile_image_url":""}]}""",
             Exception? usersException = null,
             Exception? whisperException = null,
             bool validationAccepted = true,
@@ -677,10 +640,7 @@ public sealed class WhisperResponseTests
             return new(dbFactory, hostId, http, chat, quota, failureHandler, sender);
         }
 
-        internal TwitchChatMessage Source(
-            bool includeUserId = true,
-            string userId = "viewer-id"
-        )
+        internal TwitchChatMessage Source(bool includeUserId = true, string userId = "viewer-id")
         {
             IReadOnlyDictionary<string, string> tags = includeUserId
                 ? new Dictionary<string, string> { ["user-id"] = userId }
@@ -712,8 +672,7 @@ public sealed class WhisperResponseTests
     private sealed class RecordingPrivateDeliveryFailureHandler(
         Exception? exception = null,
         CancellationTokenSource? cancelOnHandling = null
-    )
-        : IPrivateDeliveryFailureHandler
+    ) : IPrivateDeliveryFailureHandler
     {
         internal List<HandledPrivateDeliveryFailure> Failures { get; } = [];
 
@@ -731,9 +690,7 @@ public sealed class WhisperResponseTests
                 return ValueTask.FromCanceled(cancellationToken);
             }
 
-            return exception is null
-                ? ValueTask.CompletedTask
-                : ValueTask.FromException(exception);
+            return exception is null ? ValueTask.CompletedTask : ValueTask.FromException(exception);
         }
     }
 
@@ -807,10 +764,13 @@ public sealed class WhisperResponseTests
                     "/helix/users" when usersException is not null =>
                         Task.FromException<HttpResponseMessage>(usersException),
                     "/helix/users" => Task.FromResult(JsonResponse(usersJson)),
-                    "/helix/whispers" when whisperException is not null =>
-                        FailedWhisper(whisperException),
-                    "/helix/whispers" when cancelOnWhisper is { } cancellation =>
-                        CancelledWhisper(cancellation, cancellationToken),
+                    "/helix/whispers" when whisperException is not null => FailedWhisper(
+                        whisperException
+                    ),
+                    "/helix/whispers" when cancelOnWhisper is { } cancellation => CancelledWhisper(
+                        cancellation,
+                        cancellationToken
+                    ),
                     "/helix/whispers" => Task.FromResult(WhisperResponse()),
                     _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
                 };
@@ -851,7 +811,8 @@ public sealed class WhisperResponseTests
             private HttpResponseMessage ValidationResponse(HttpRequestMessage request)
             {
                 ValidationRequestCount++;
-                return validationAccepted
+                return
+                    validationAccepted
                     && request.Headers.Authorization?.Parameter == "override-whisper-token"
                     ? JsonResponse(
                         """{"user_id":"custom-id","login":"custombot","scopes":["user:manage:whispers"]}"""
@@ -897,9 +858,7 @@ public sealed class WhisperResponseTests
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
                 : new Dictionary<string, object?>();
-            Entries.Add(
-                new(logLevel, formatter(state, exception), exception, properties)
-            );
+            Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }
 

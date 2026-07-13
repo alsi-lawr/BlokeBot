@@ -107,7 +107,9 @@ public partial class PointsDashboard
 
     private Task EndGiveawayAsync()
     {
-        return RunAsync(() => _dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+        return RunAsync(() =>
+            _dashboard.EndGiveawayAsync(HostId, HostLogin, CancellationToken.None)
+        );
     }
 
     private Task GiveAsync()
@@ -125,7 +127,9 @@ public partial class PointsDashboard
         }
 
         await LoadFeatureStateAsync();
-        _state = _featureEnabled ? await _dashboard.LoadAsync(HostId, CancellationToken.None) : null;
+        _state = _featureEnabled
+            ? await _dashboard.LoadAsync(HostId, CancellationToken.None)
+            : null;
     }
 
     private async Task LookupAsync()
@@ -178,7 +182,9 @@ public partial class PointsDashboard
 
     private Task StartGiveawayAsync()
     {
-        return RunAsync(() => _dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None));
+        return RunAsync(() =>
+            _dashboard.StartGiveawayAsync(HostId, HostLogin, CancellationToken.None)
+        );
     }
 
     private async Task LoadFeatureStateAsync()

@@ -29,20 +29,12 @@ public sealed class ToastService
         return Publish(ToastKind.Status, message, title, tone);
     }
 
-    public ToastNotification Success(
-        string message,
-        string? title = null,
-        ToastTone? tone = null
-    )
+    public ToastNotification Success(string message, string? title = null, ToastTone? tone = null)
     {
         return Publish(ToastKind.Success, message, title, tone);
     }
 
-    public ToastNotification Warning(
-        string message,
-        string? title = null,
-        ToastTone? tone = null
-    )
+    public ToastNotification Warning(string message, string? title = null, ToastTone? tone = null)
     {
         return Publish(ToastKind.Warning, message, title, tone);
     }

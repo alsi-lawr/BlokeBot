@@ -11,16 +11,14 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
 {
     public static IServiceCollection AddBlokeBotPublicChat(this IServiceCollection services)
     {
-        services.TryAddSingleton<IPublicChatOutbox>(serviceProvider =>
-            new EfPublicChatOutbox(
-                serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
-                serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
-                    TwitchBotResiliencePipeline.PublicChatDelivery
-                ),
-                serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
-                serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>()
-            )
-        );
+        services.TryAddSingleton<IPublicChatOutbox>(serviceProvider => new EfPublicChatOutbox(
+            serviceProvider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
+            serviceProvider.GetRequiredKeyedService<PublicChatRetryPolicy>(
+                TwitchBotResiliencePipeline.PublicChatDelivery
+            ),
+            serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
+            serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>()
+        ));
         return services;
     }
 }

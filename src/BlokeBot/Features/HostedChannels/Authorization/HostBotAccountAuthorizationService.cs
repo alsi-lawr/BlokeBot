@@ -72,9 +72,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(
-            TwitchScopeSet.NormalizeMany(requiredScopes)
-        );
+        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()
@@ -112,9 +110,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(
-            TwitchScopeSet.NormalizeMany(requiredScopes)
-        );
+        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
@@ -149,10 +145,11 @@ public sealed class HostBotAccountAuthorizationService(
         );
         return status.Status.Match(
             _ => throw BotNotReady(channelLogin),
-            unavailable => throw new TwitchAccessTokenUnavailableException(
-                unavailable.Reason,
-                TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
-            ),
+            unavailable =>
+                throw new TwitchAccessTokenUnavailableException(
+                    unavailable.Reason,
+                    TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+                ),
             _ => throw BotNotReady(channelLogin),
             _ => throw BotNotReady(channelLogin),
             ready => new TwitchBotAccount(
@@ -348,9 +345,7 @@ public sealed class HostBotAccountAuthorizationService(
         CancellationToken ct
     )
     {
-        var required = ImmutableArray.CreateRange(
-            TwitchScopeSet.NormalizeMany(requiredScopes)
-        );
+        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
         {
             return new TwitchTokenStatus.Unavailable(
@@ -408,12 +403,7 @@ public sealed class HostBotAccountAuthorizationService(
         var immutableGranted = ImmutableArray.CreateRange(granted);
         var immutableMissing = ImmutableArray.CreateRange(missing);
         return immutableMissing.IsEmpty
-            ? new TwitchTokenStatus.Ready(
-                accessToken,
-                validation,
-                required,
-                immutableGranted
-            )
+            ? new TwitchTokenStatus.Ready(accessToken, validation, required, immutableGranted)
             : new TwitchTokenStatus.MissingScopes(
                 accessToken,
                 validation,
@@ -498,10 +488,7 @@ public sealed class HostBotAccountAuthorizationService(
             var globalInspection = await globalTokenStatus
                 .GetUserAccessTokenStatus(required)
                 .ExecuteAsync(ct);
-            return globalInspection.Match(
-                IsReady,
-                _ => false
-            );
+            return globalInspection.Match(IsReady, _ => false);
         }
 
         var customStatus = await GetStoredTokenStatusAsync(
@@ -527,63 +514,68 @@ public sealed class HostBotAccountAuthorizationService(
     )
     {
         return status.Match<BotAccountAuthorizationStatus>(
-            unknown => new(
-                null,
-                settings.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.Unknown,
-                unknown.Error.RequiredScopes,
-                [],
-                unknown.Error.RequiredScopes,
-                "BlokeBot could not check the custom bot account right now."
-            ),
-            unavailable => new(
-                null,
-                settings.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.NotAuthorized,
-                unavailable.RequiredScopes,
-                [],
-                unavailable.RequiredScopes,
-                "No custom bot account is connected yet."
-            ),
-            invalid => new(
-                null,
-                settings.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.NotAuthorized,
-                invalid.RequiredScopes,
-                [],
-                invalid.RequiredScopes,
-                "BlokeBot could not check the custom bot account."
-            ),
-            missingScopes => new(
-                null,
-                missingScopes.Validation.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.MissingScopes,
-                missingScopes.RequiredScopes,
-                missingScopes.GrantedScopes,
-                missingScopes.Missing,
-                "The custom bot account needs more Twitch access."
-            ),
-            ready => new(
-                null,
-                ready.Validation.Login,
-                settings.ProfileImageUrl,
-                BotAccountAuthorizationState.Ready,
-                ready.RequiredScopes,
-                ready.GrantedScopes,
-                [],
-                "The custom bot account is ready."
-            )
+            unknown =>
+                new(
+                    null,
+                    settings.Login,
+                    settings.ProfileImageUrl,
+                    BotAccountAuthorizationState.Unknown,
+                    unknown.Error.RequiredScopes,
+                    [],
+                    unknown.Error.RequiredScopes,
+                    "BlokeBot could not check the custom bot account right now."
+                ),
+            unavailable =>
+                new(
+                    null,
+                    settings.Login,
+                    settings.ProfileImageUrl,
+                    BotAccountAuthorizationState.NotAuthorized,
+                    unavailable.RequiredScopes,
+                    [],
+                    unavailable.RequiredScopes,
+                    "No custom bot account is connected yet."
+                ),
+            invalid =>
+                new(
+                    null,
+                    settings.Login,
+                    settings.ProfileImageUrl,
+                    BotAccountAuthorizationState.NotAuthorized,
+                    invalid.RequiredScopes,
+                    [],
+                    invalid.RequiredScopes,
+                    "BlokeBot could not check the custom bot account."
+                ),
+            missingScopes =>
+                new(
+                    null,
+                    missingScopes.Validation.Login,
+                    settings.ProfileImageUrl,
+                    BotAccountAuthorizationState.MissingScopes,
+                    missingScopes.RequiredScopes,
+                    missingScopes.GrantedScopes,
+                    missingScopes.Missing,
+                    "The custom bot account needs more Twitch access."
+                ),
+            ready =>
+                new(
+                    null,
+                    ready.Validation.Login,
+                    settings.ProfileImageUrl,
+                    BotAccountAuthorizationState.Ready,
+                    ready.RequiredScopes,
+                    ready.GrantedScopes,
+                    [],
+                    "The custom bot account is ready."
+                )
         );
     }
 
     private static bool TokenExpiresSoon(HostBotAccountSettings settings)
     {
         return settings.ExpiresAtUtc is null
-        || settings.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
+            || settings.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
     }
 
     private static void ClearAuthorization(HostBotAccountSettings settings)
@@ -627,13 +619,7 @@ public sealed class HostBotAccountAuthorizationService(
 
     private static bool IsReady(TwitchTokenStatus status)
     {
-        return status.Match(
-            _ => false,
-            _ => false,
-            _ => false,
-            _ => false,
-            _ => true
-        );
+        return status.Match(_ => false, _ => false, _ => false, _ => false, _ => true);
     }
 
     private static InvalidOperationException BotNotReady(string channelLogin)

@@ -27,24 +27,26 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
             unknown => Task.FromResult(Unknown(configuredBotLogin, unknown)),
             unavailable => Task.FromResult(NotAuthorized(configuredBotLogin, unavailable)),
             invalid => Task.FromResult(NotAuthorized(configuredBotLogin, invalid)),
-            missingScopes => GetAuthorizedStatusAsync(
-                configuredBotLogin,
-                missingScopes.AccessToken,
-                missingScopes.Validation,
-                missingScopes.RequiredScopes,
-                missingScopes.GrantedScopes,
-                missingScopes.Missing,
-                ct
-            ),
-            ready => GetAuthorizedStatusAsync(
-                configuredBotLogin,
-                ready.AccessToken,
-                ready.Validation,
-                ready.RequiredScopes,
-                ready.GrantedScopes,
-                [],
-                ct
-            )
+            missingScopes =>
+                GetAuthorizedStatusAsync(
+                    configuredBotLogin,
+                    missingScopes.AccessToken,
+                    missingScopes.Validation,
+                    missingScopes.RequiredScopes,
+                    missingScopes.GrantedScopes,
+                    missingScopes.Missing,
+                    ct
+                ),
+            ready =>
+                GetAuthorizedStatusAsync(
+                    configuredBotLogin,
+                    ready.AccessToken,
+                    ready.Validation,
+                    ready.RequiredScopes,
+                    ready.GrantedScopes,
+                    [],
+                    ct
+                )
         );
     }
 
@@ -71,10 +73,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     )
     {
         var authorizedLogin = LoginName.Parse(validation.Login).Value;
-        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(
-            accessToken,
-            ct
-        );
+        var authorizedProfileImageUrl = await LoadAuthorizedProfileImageUrlAsync(accessToken, ct);
         if (!string.Equals(configuredBotLogin, authorizedLogin, StringComparison.Ordinal))
         {
             return new(

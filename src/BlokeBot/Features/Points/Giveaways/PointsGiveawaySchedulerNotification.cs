@@ -30,9 +30,8 @@ internal sealed class ReplyOnlyPointsGiveawaySchedulerNotification
     }
 }
 
-internal sealed class TwitchPointsGiveawaySchedulerNotification(
-    ITwitchChatMessageSender sender
-) : IPointsGiveawaySchedulerNotification
+internal sealed class TwitchPointsGiveawaySchedulerNotification(ITwitchChatMessageSender sender)
+    : IPointsGiveawaySchedulerNotification
 {
     public ValueTask SendAsync(
         PointsGiveawaySchedule schedule,

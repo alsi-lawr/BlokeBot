@@ -1,7 +1,6 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchIrcRuntimeStrategy(TwitchIrcRuntime runtime)
-    : ITwitchBotRuntimeStrategy
+internal sealed class TwitchIrcRuntimeStrategy(TwitchIrcRuntime runtime) : ITwitchBotRuntimeStrategy
 {
     public TwitchBotRuntime Runtime => TwitchBotRuntime.Irc;
 

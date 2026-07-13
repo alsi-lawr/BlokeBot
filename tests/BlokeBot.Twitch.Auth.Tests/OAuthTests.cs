@@ -47,12 +47,7 @@ public sealed class OAuthTests
         };
         var states = new InMemoryTwitchOAuthStateStore();
         var store = new MemoryTokenStore();
-        var flow = new TwitchOAuthFlow(
-            IdentityWithPath("tokens.json"),
-            oauth,
-            states,
-            store
-        );
+        var flow = new TwitchOAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store);
         var state = flow.CreateAuthorizationUri().Query.Split("state=")[1];
 
         var token = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
@@ -302,11 +297,7 @@ public sealed class OAuthTests
             oauth
         );
         (await provider.GetAccessTokenAsync(CancellationToken.None)).ShouldBe("first");
-        store.Loaded = new TwitchTokenSet(
-            "second",
-            "refresh",
-            DateTimeOffset.UtcNow.AddHours(1)
-        );
+        store.Loaded = new TwitchTokenSet("second", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
         await cache.ClearAsync(CancellationToken.None);
         var accessToken = await provider.GetAccessTokenAsync(CancellationToken.None);

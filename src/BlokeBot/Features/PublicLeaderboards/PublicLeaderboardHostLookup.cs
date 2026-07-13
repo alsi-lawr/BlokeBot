@@ -18,12 +18,7 @@ public sealed class PublicLeaderboardHostLookup(IDbContextFactory<BlokeBotDbCont
         return await db
             .Hosts.AsNoTracking()
             .Where(x => x.Login == login)
-            .Select(x => new PublicLeaderboardHost(
-                x.Id,
-                x.Login,
-                x.DisplayName,
-                x.EnabledFeatures
-            ))
+            .Select(x => new PublicLeaderboardHost(x.Id, x.Login, x.DisplayName, x.EnabledFeatures))
             .SingleOrDefaultAsync(ct);
     }
 }

@@ -1,9 +1,7 @@
 namespace BlokeBot.Twitch.Auth;
 
-internal sealed class TwitchOAuthClient(
-    TwitchBotIdentity identity,
-    TwitchOAuthApiClient twitch
-) : ITwitchOAuthClient
+internal sealed class TwitchOAuthClient(TwitchBotIdentity identity, TwitchOAuthApiClient twitch)
+    : ITwitchOAuthClient
 {
     public Uri BuildAuthorizeUri(string state)
     {
@@ -49,10 +47,7 @@ internal sealed class TwitchOAuthClient(
         );
     }
 
-    public async Task<bool> ValidateAsync(
-        string accessToken,
-        CancellationToken cancellationToken
-    )
+    public async Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken)
     {
         return await twitch.ValidateTokenAsync(accessToken, cancellationToken) is not null;
     }

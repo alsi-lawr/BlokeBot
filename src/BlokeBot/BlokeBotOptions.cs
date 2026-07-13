@@ -30,8 +30,8 @@ public static class BlokeBotOptionsValidation
     public static bool IsValid(BlokeBotOptions options)
     {
         return options.BotStateChangeCooldownSeconds >= 0
-        && options.CustomCommands.MinimumCooldownSeconds >= 0
-        && options.CustomCommands.AnnouncementSchedulerTickSeconds > 0
-        && options.Points.MinimumGamblingCooldownSeconds >= 0;
+            && options.CustomCommands.MinimumCooldownSeconds >= 0
+            && options.CustomCommands.AnnouncementSchedulerTickSeconds > 0
+            && options.Points.MinimumGamblingCooldownSeconds >= 0;
     }
 }

@@ -19,13 +19,11 @@ public sealed class ValidationTests
         var mapInvoked = false;
         var validation = Validation<int, string>.Invalid("invalid");
 
-        var mapped = validation.Map(
-            _ =>
-            {
-                mapInvoked = true;
-                return 42;
-            }
-        );
+        var mapped = validation.Map(_ =>
+        {
+            mapInvoked = true;
+            return 42;
+        });
 
         GetErrors(mapped).ShouldBe(["invalid"]);
         mapInvoked.ShouldBeFalse();
@@ -36,14 +34,16 @@ public sealed class ValidationTests
     {
         var combineInvocations = 0;
 
-        var combined = Validation<int, string>.Valid(20).Combine(
-            Validation<int, string>.Valid(22),
-            (first, second) =>
-            {
-                combineInvocations++;
-                return first + second;
-            }
-        );
+        var combined = Validation<int, string>
+            .Valid(20)
+            .Combine(
+                Validation<int, string>.Valid(22),
+                (first, second) =>
+                {
+                    combineInvocations++;
+                    return first + second;
+                }
+            );
 
         combined.Match(value => value, _ => 0).ShouldBe(42);
         combineInvocations.ShouldBe(1);
@@ -52,10 +52,9 @@ public sealed class ValidationTests
     [Test]
     public void TwoInvalidValues_Combining_AccumulatesBothErrors()
     {
-        var combined = Validation<int, string>.Invalid("first").Combine(
-            Validation<int, string>.Invalid("second"),
-            (first, second) => first + second
-        );
+        var combined = Validation<int, string>
+            .Invalid("first")
+            .Combine(Validation<int, string>.Invalid("second"), (first, second) => first + second);
 
         GetErrors(combined).ShouldBe(["first", "second"]);
     }
@@ -65,10 +64,7 @@ public sealed class ValidationTests
     {
         var combined = Validation<int, string>
             .Invalid("first", "second")
-            .Combine(
-                Validation<int, string>.Invalid("third"),
-                (first, second) => first + second
-            )
+            .Combine(Validation<int, string>.Invalid("third"), (first, second) => first + second)
             .Combine(
                 Validation<int, string>.Invalid("fourth", "fifth"),
                 (first, second) => first + second
@@ -80,14 +76,12 @@ public sealed class ValidationTests
     [Test]
     public void MixedValidAndInvalidValues_Combining_PreservesInvalidErrors()
     {
-        var validThenInvalid = Validation<int, string>.Valid(1).Combine(
-            Validation<int, string>.Invalid("right"),
-            (first, second) => first + second
-        );
-        var invalidThenValid = Validation<int, string>.Invalid("left").Combine(
-            Validation<int, string>.Valid(2),
-            (first, second) => first + second
-        );
+        var validThenInvalid = Validation<int, string>
+            .Valid(1)
+            .Combine(Validation<int, string>.Invalid("right"), (first, second) => first + second);
+        var invalidThenValid = Validation<int, string>
+            .Invalid("left")
+            .Combine(Validation<int, string>.Valid(2), (first, second) => first + second);
 
         GetErrors(validThenInvalid).ShouldBe(["right"]);
         GetErrors(invalidThenValid).ShouldBe(["left"]);
@@ -138,13 +132,13 @@ public sealed class ValidationTests
     {
         var aggregateInvoked = false;
 
-        var result = Validation<int, string>.Valid(42).ToResult(
-            _ =>
+        var result = Validation<int, string>
+            .Valid(42)
+            .ToResult(_ =>
             {
                 aggregateInvoked = true;
                 return new AggregateError("unexpected");
-            }
-        );
+            });
 
         result.Match(value => value, _ => 0).ShouldBe(42);
         aggregateInvoked.ShouldBeFalse();
@@ -168,10 +162,9 @@ public sealed class ValidationTests
         var expected = new TestException();
 
         var thrown = Should.Throw<TestException>(() =>
-            Validation<int, string>.Valid(20).Combine<int, int>(
-                Validation<int, string>.Valid(22),
-                (_, _) => throw expected
-            )
+            Validation<int, string>
+                .Valid(20)
+                .Combine<int, int>(Validation<int, string>.Valid(22), (_, _) => throw expected)
         );
 
         thrown.ShouldBe(expected);
@@ -186,7 +179,5 @@ public sealed class ValidationTests
 
     private sealed record AggregateError(string Message);
 
-    private sealed class TestException : Exception
-    {
-    }
+    private sealed class TestException : Exception { }
 }

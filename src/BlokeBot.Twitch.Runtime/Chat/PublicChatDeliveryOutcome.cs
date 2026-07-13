@@ -195,11 +195,7 @@ internal abstract record PublicChatDeliveryOutcome
 
     internal sealed record SafePreSendTransient : PublicChatDeliveryOutcome
     {
-        internal required PublicChatFailureDiagnostic.Preparation Diagnostic
-        {
-            get;
-            init;
-        }
+        internal required PublicChatFailureDiagnostic.Preparation Diagnostic { get; init; }
 
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
@@ -286,11 +282,7 @@ internal abstract record PublicChatDeliveryOutcome
 
     internal sealed record Unexpected : PublicChatDeliveryOutcome
     {
-        internal required PublicChatFailureDiagnostic.Preparation Diagnostic
-        {
-            get;
-            init;
-        }
+        internal required PublicChatFailureDiagnostic.Preparation Diagnostic { get; init; }
 
         internal required Exception Cause { get; init; }
 
@@ -371,11 +363,7 @@ internal abstract record PublicChatPreparationOutcome
 
     internal sealed record SafePreSendTransient : PublicChatPreparationOutcome
     {
-        internal required PublicChatFailureDiagnostic.Preparation Diagnostic
-        {
-            get;
-            init;
-        }
+        internal required PublicChatFailureDiagnostic.Preparation Diagnostic { get; init; }
 
         internal override TResult Match<TResult>(
             Func<Ready, TResult> ready,
@@ -391,11 +379,7 @@ internal abstract record PublicChatPreparationOutcome
 
     internal sealed record Unexpected : PublicChatPreparationOutcome
     {
-        internal required PublicChatFailureDiagnostic.Preparation Diagnostic
-        {
-            get;
-            init;
-        }
+        internal required PublicChatFailureDiagnostic.Preparation Diagnostic { get; init; }
 
         internal required Exception Cause { get; init; }
 
@@ -426,10 +410,7 @@ internal abstract record PublicChatTransportSendResult
         Func<Rejected, TResult> rejected
     );
 
-    internal abstract void Match(
-        Action<Sent> sent,
-        Action<Rejected> rejected
-    );
+    internal abstract void Match(Action<Sent> sent, Action<Rejected> rejected);
 
     private protected abstract void Seal();
 
@@ -443,10 +424,7 @@ internal abstract record PublicChatTransportSendResult
             return sent(this);
         }
 
-        internal override void Match(
-            Action<Sent> sent,
-            Action<Rejected> rejected
-        )
+        internal override void Match(Action<Sent> sent, Action<Rejected> rejected)
         {
             sent(this);
         }
@@ -466,10 +444,7 @@ internal abstract record PublicChatTransportSendResult
             return rejected(this);
         }
 
-        internal override void Match(
-            Action<Sent> sent,
-            Action<Rejected> rejected
-        )
+        internal override void Match(Action<Sent> sent, Action<Rejected> rejected)
         {
             rejected(this);
         }

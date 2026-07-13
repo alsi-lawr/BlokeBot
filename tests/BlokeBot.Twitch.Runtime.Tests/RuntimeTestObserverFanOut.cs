@@ -62,8 +62,7 @@ internal static class RuntimeTestObserverFanOut
         }
     }
 
-    private sealed class ThrowingReporter(Exception failure)
-        : IObserverFailureDiagnosticReporter
+    private sealed class ThrowingReporter(Exception failure) : IObserverFailureDiagnosticReporter
     {
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,

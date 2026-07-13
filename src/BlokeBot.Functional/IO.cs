@@ -27,9 +27,7 @@ public sealed class IO<TValue, TError>
         );
     }
 
-    public async ValueTask<Result<TValue, TError>> ExecuteAsync(
-        CancellationToken cancellationToken
-    )
+    public async ValueTask<Result<TValue, TError>> ExecuteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var result = await _operation(cancellationToken).ConfigureAwait(false);
@@ -46,9 +44,7 @@ public sealed class IO<TValue, TError>
         });
     }
 
-    public IO<TMapped, TError> Bind<TMapped>(
-        Func<TValue, IO<TMapped, TError>> bind
-    )
+    public IO<TMapped, TError> Bind<TMapped>(Func<TValue, IO<TMapped, TError>> bind)
     {
         return IO<TMapped, TError>.Create(async cancellationToken =>
         {

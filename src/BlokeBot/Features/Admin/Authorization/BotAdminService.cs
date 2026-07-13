@@ -1,4 +1,5 @@
 using BlokeBot.Identity;
+
 namespace BlokeBot.Features.Admin.Authorization;
 
 public sealed class BotAdminService(BotAdminSettings settings)

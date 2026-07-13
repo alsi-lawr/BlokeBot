@@ -51,7 +51,9 @@ internal sealed class DisabledCustomAnnouncementSender : ICustomAnnouncementSend
         CancellationToken cancellationToken
     )
     {
-        return ValueTask.FromResult<AnnouncementEnqueueOutcome>(new AnnouncementEnqueueOutcome.Rejected());
+        return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
+            new AnnouncementEnqueueOutcome.Rejected()
+        );
     }
 }
 

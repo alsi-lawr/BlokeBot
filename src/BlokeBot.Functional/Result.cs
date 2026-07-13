@@ -19,10 +19,7 @@ public sealed record Result<TValue, TError>
         return new(new ErrorState(error));
     }
 
-    public TResult Match<TResult>(
-        Func<TValue, TResult> success,
-        Func<TError, TResult> error
-    )
+    public TResult Match<TResult>(Func<TValue, TResult> success, Func<TError, TResult> error)
     {
         return _state.Match(success, error);
     }
@@ -35,9 +32,7 @@ public sealed record Result<TValue, TError>
         );
     }
 
-    public Result<TMapped, TError> Bind<TMapped>(
-        Func<TValue, Result<TMapped, TError>> bind
-    )
+    public Result<TMapped, TError> Bind<TMapped>(Func<TValue, Result<TMapped, TError>> bind)
     {
         return Match(bind, Result<TMapped, TError>.Error);
     }
@@ -63,10 +58,7 @@ public sealed record Result<TValue, TError>
 
     private sealed record ErrorState(TError Value) : ResultState
     {
-        public override TResult Match<TResult>(
-            Func<TValue, TResult> _,
-            Func<TError, TResult> error
-        )
+        public override TResult Match<TResult>(Func<TValue, TResult> _, Func<TError, TResult> error)
         {
             return error(Value);
         }

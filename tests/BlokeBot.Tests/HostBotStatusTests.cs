@@ -1,6 +1,6 @@
+using System.Collections.Immutable;
 using System.Net;
 using System.Reflection;
-using System.Collections.Immutable;
 using System.Text;
 using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
@@ -47,9 +47,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task MissingModeratorScope_CheckingReadiness_ReportsScopeFailure()
     {
-        var service = CreateService(
-            AuthorizedTokenStatus([TwitchScopes.ModeratorReadFollowers])
-        );
+        var service = CreateService(AuthorizedTokenStatus([TwitchScopes.ModeratorReadFollowers]));
 
         var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
 
@@ -59,10 +57,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task BotNotModerator_CheckingReadiness_ReportsNotModerator()
     {
-        var httpClientFactory = new HostBotStatusHttpClientFactory
-        {
-            BotIsModerator = false,
-        };
+        var httpClientFactory = new HostBotStatusHttpClientFactory { BotIsModerator = false };
         var service = CreateService(AuthorizedTokenStatus(RequiredScopes()), httpClientFactory);
 
         var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
@@ -118,10 +113,7 @@ public sealed class HostBotStatusTests
     [Test]
     public async Task CustomBotIsBroadcaster_CheckingReadiness_TreatsAccountAsChannelAuthority()
     {
-        var httpClientFactory = new HostBotStatusHttpClientFactory
-        {
-            BotIsModerator = false,
-        };
+        var httpClientFactory = new HostBotStatusHttpClientFactory { BotIsModerator = false };
         var service = CreateService(
             AuthorizedTokenStatus(
                 RequiredScopes(),
@@ -146,18 +138,11 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(UnavailableTokenStatus());
 
-        var outcome = await service.GetStreamLivenessAsync(
-            "streamer",
-            CancellationToken.None
-        );
+        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
 
         var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
-        unavailable.Reason.ShouldBe(
-            HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable
-        );
-        var error = unavailable.Cause.ShouldBeOfType<
-            HostBotAppAccessTokenUnavailableException
-        >();
+        unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable);
+        var error = unavailable.Cause.ShouldBeOfType<HostBotAppAccessTokenUnavailableException>();
         error.Message.ShouldBe("The Twitch bot runner is not set up yet.");
     }
 
@@ -175,10 +160,7 @@ public sealed class HostBotStatusTests
             settings
         );
 
-        var outcome = await service.GetStreamLivenessAsync(
-            "streamer",
-            CancellationToken.None
-        );
+        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
 
         outcome.ShouldBeOfType<HostStreamLivenessOutcome.Live>();
         httpClientFactory.TokenRequestCount.ShouldBe(1);
@@ -193,10 +175,7 @@ public sealed class HostBotStatusTests
         var httpClientFactory = new HostBotStatusHttpClientFactory();
         var service = CreateStreamService(httpClientFactory);
 
-        var outcome = await service.GetStreamLivenessAsync(
-            "streamer",
-            CancellationToken.None
-        );
+        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
 
         outcome.ShouldBeOfType<HostStreamLivenessOutcome.Offline>();
     }
@@ -205,21 +184,13 @@ public sealed class HostBotStatusTests
     public async Task ProviderRequestFailure_CheckingStreamLiveness_RetainsUnavailableCause()
     {
         var expected = new HttpRequestException("provider secret");
-        var httpClientFactory = new HostBotStatusHttpClientFactory
-        {
-            StreamFailure = expected,
-        };
+        var httpClientFactory = new HostBotStatusHttpClientFactory { StreamFailure = expected };
         var service = CreateStreamService(httpClientFactory);
 
-        var outcome = await service.GetStreamLivenessAsync(
-            "streamer",
-            CancellationToken.None
-        );
+        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
 
         var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
-        unavailable.Reason.ShouldBe(
-            HostStreamLivenessUnavailableReason.ProviderRequestFailed
-        );
+        unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.ProviderRequestFailed);
         unavailable.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
         unavailable.Cause.ShouldBeSameAs(expected);
 
@@ -230,8 +201,7 @@ public sealed class HostBotStatusTests
             typeof(Exception).IsAssignableFrom(property.PropertyType)
         );
         publicProperties.Select(property => property.Name).ShouldNotContain("Cause");
-        string
-            .Join(
+        string.Join(
                 " | ",
                 publicProperties.Select(property => property.GetValue(unavailable)?.ToString())
             )
@@ -354,9 +324,7 @@ public sealed class HostBotStatusTests
         return new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
-            Status = new TwitchTokenStatus.Invalid(
-                ImmutableArray.CreateRange(RequiredScopes())
-            ),
+            Status = new TwitchTokenStatus.Invalid(ImmutableArray.CreateRange(RequiredScopes())),
         };
     }
 
@@ -389,20 +357,15 @@ public sealed class HostBotStatusTests
             requiredScopes.Except(granted, StringComparer.Ordinal)
         );
         var validation = new TwitchTokenValidation(
-                validationUserId,
-                validationLogin,
-                granted.ToHashSet(StringComparer.Ordinal)
-            );
+            validationUserId,
+            validationLogin,
+            granted.ToHashSet(StringComparer.Ordinal)
+        );
         return new ActiveBotAccountTokenStatus
         {
             BotLogin = botLogin,
             Status = missing.IsEmpty
-                ? new TwitchTokenStatus.Ready(
-                    accessToken,
-                    validation,
-                    requiredScopes,
-                    granted
-                )
+                ? new TwitchTokenStatus.Ready(accessToken, validation, requiredScopes, granted)
                 : new TwitchTokenStatus.MissingScopes(
                     accessToken,
                     validation,
@@ -413,9 +376,8 @@ public sealed class HostBotStatusTests
         };
     }
 
-    private sealed class StaticHostBotAccountTokenStatusProvider(
-        ActiveBotAccountTokenStatus status
-    ) : IHostBotAccountTokenStatusProvider
+    private sealed class StaticHostBotAccountTokenStatusProvider(ActiveBotAccountTokenStatus status)
+        : IHostBotAccountTokenStatusProvider
     {
         public Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
             string channelLogin,

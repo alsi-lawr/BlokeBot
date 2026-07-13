@@ -10,9 +10,7 @@ public sealed class UnavailableTwitchTokenStatusSource : ITwitchTokenStatusSourc
     )
     {
         ArgumentNullException.ThrowIfNull(requiredScopes);
-        var required = ImmutableArray.CreateRange(
-            TwitchScopeSet.NormalizeMany(requiredScopes)
-        );
+        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
         return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
         {
             cancellationToken.ThrowIfCancellationRequested();

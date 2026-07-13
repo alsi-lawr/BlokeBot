@@ -43,13 +43,7 @@ public sealed class CustomCommandExecutionTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        await SeedCommandAsync(
-            dbFactory,
-            hostId,
-            "secret",
-            ["Hi {user}"],
-            moderatorOnly: true
-        );
+        await SeedCommandAsync(dbFactory, hostId, "secret", ["Hi {user}"], moderatorOnly: true);
         await using var services = BuildServices(dbFactory);
         var dispatcher = services.GetRequiredService<TwitchCommandDispatcher>();
         List<string> replies = [];
@@ -97,20 +91,14 @@ public sealed class CustomCommandExecutionTests
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
-            Message(
-                "Viewer",
-                "Streamer",
-                "!echo one two three four five six seven eight nine ten"
-            ),
+            Message("Viewer", "Streamer", "!echo one two three four five six seven eight nine ten"),
             RecordMessages(replies),
             CancellationToken.None
         );
 
-        replies.ShouldBe(
-            [
-                "viewer|streamer|echo|one two three four five six seven eight nine ten|one|two|three|four|five|six|seven|eight|nine|{missing}",
-            ]
-        );
+        replies.ShouldBe([
+            "viewer|streamer|echo|one two three four five six seven eight nine ten|one|two|three|four|five|six|seven|eight|nine|{missing}",
+        ]);
     }
 
     [Test]
@@ -303,11 +291,9 @@ public sealed class CustomCommandExecutionTests
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
             Variants = variants
-                .Select((text, index) => new CustomMessageVariant
-                {
-                    SortOrder = index,
-                    Text = text,
-                })
+                .Select(
+                    (text, index) => new CustomMessageVariant { SortOrder = index, Text = text }
+                )
                 .ToList(),
         };
         db.CustomMessageLibraryEntries.Add(entry);
@@ -404,11 +390,7 @@ public sealed class CustomCommandExecutionTests
         };
     }
 
-    private sealed record CommandSeed(
-        int CommandId,
-        int MessageLibraryEntryId,
-        int? CounterId
-    );
+    private sealed record CommandSeed(int CommandId, int MessageLibraryEntryId, int? CounterId);
 
     private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     {

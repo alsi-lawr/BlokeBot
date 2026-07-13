@@ -52,11 +52,7 @@ internal static class TwitchRuntimeSessionResilience
         TimeSpan maximumDelay,
         DelayBackoffType delayBackoffType,
         TimeSpan attemptTimeout,
-        Func<
-            Exception,
-            CancellationToken,
-            TwitchRuntimeSessionFailureClassification
-        > classify,
+        Func<Exception, CancellationToken, TwitchRuntimeSessionFailureClassification> classify,
         ITwitchRuntimeSessionHealthReporter health
     )
     {
@@ -72,9 +68,9 @@ internal static class TwitchRuntimeSessionResilience
                     ShouldHandle = args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
-                            && TwitchRuntimeSessionFailureClassifier.IsRetryable(
-                                classify(exception, args.Context.CancellationToken)
-                            )
+                                && TwitchRuntimeSessionFailureClassifier.IsRetryable(
+                                    classify(exception, args.Context.CancellationToken)
+                                )
                         ),
                     OnRetry = args =>
                     {
@@ -113,9 +109,8 @@ internal sealed class TwitchIrcSessionResiliencePipeline(ResiliencePipeline pipe
     )
     {
         return pipeline.ExecuteAsync(
-            static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
-                callback(token)
-            ),
+            static (callback, token) =>
+                new ValueTask<TwitchRuntimeSessionEstablishment>(callback(token)),
             operation,
             cancellationToken
         );
@@ -130,9 +125,8 @@ internal sealed class TwitchEventSubSessionResiliencePipeline(ResiliencePipeline
     )
     {
         return pipeline.ExecuteAsync(
-            static (callback, token) => new ValueTask<TwitchRuntimeSessionEstablishment>(
-                callback(token)
-            ),
+            static (callback, token) =>
+                new ValueTask<TwitchRuntimeSessionEstablishment>(callback(token)),
             operation,
             cancellationToken
         );

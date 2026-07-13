@@ -14,8 +14,10 @@ internal static class PointsGiveawayQueries
         CancellationToken ct
     )
     {
-        return await db.PointsSettings.AsNoTracking().SingleOrDefaultAsync(x => x.HostId == hostId, ct)
-        ?? new PointsSettings { HostId = hostId };
+        return await db
+                .PointsSettings.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.HostId == hostId, ct)
+            ?? new PointsSettings { HostId = hostId };
     }
 
     public static async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(

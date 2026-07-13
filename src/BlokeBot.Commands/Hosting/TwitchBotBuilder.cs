@@ -10,30 +10,21 @@ internal sealed class TwitchBotBuilder(IServiceCollection services) : ITwitchBot
     public ITwitchBotBuilder AddCommands(Action<ITwitchCommandBuilder> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        Services.AddSingleton(
-            new TwitchCommandRegistration
-            {
-                Configure = configure,
-            }
-        );
+        Services.AddSingleton(new TwitchCommandRegistration { Configure = configure });
         return this;
     }
 
     public ITwitchBotBuilder AddCommandModule<TModule>()
         where TModule : class, ITwitchCommandModule
     {
-        Services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ITwitchCommandModule, TModule>()
-        );
+        Services.TryAddEnumerable(ServiceDescriptor.Singleton<ITwitchCommandModule, TModule>());
         return this;
     }
 
     public ITwitchBotBuilder AddCommandFilter<TFilter>()
         where TFilter : class, ITwitchCommandFilter
     {
-        Services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<ITwitchCommandFilter, TFilter>()
-        );
+        Services.TryAddEnumerable(ServiceDescriptor.Singleton<ITwitchCommandFilter, TFilter>());
         return this;
     }
 }

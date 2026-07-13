@@ -49,11 +49,11 @@ public sealed class EventBusTests
         var outcome = await events.PublishAsync("changed", CancellationToken.None);
 
         received.ShouldBe(["first", "failing", "third"]);
-        correlations.Distinct().ShouldHaveSingleItem()
+        correlations
+            .Distinct()
+            .ShouldHaveSingleItem()
             .ShouldBe(ObserverCorrelationId.Named("event-correlation"));
-        var handled = outcome.ShouldBeOfType<
-            ObserverFanOutOutcome.CompletedWithFailures
-        >();
+        var handled = outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
         var summary = handled.Failures.ShouldHaveSingleItem();
         summary.Boundary.ShouldBe(ObserverBoundary.Named("Test.EventBus"));
         summary.Event.ShouldBe(ObserverEventIdentity.Named("Event.changed"));

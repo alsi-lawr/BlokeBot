@@ -37,7 +37,9 @@ public sealed class TwitchBotIdentityTests
         );
 
         result.Failed.ShouldBeTrue();
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(options.Scopes), StringComparison.Ordinal));
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(nameof(options.Scopes), StringComparison.Ordinal)
+        );
         string.Join(' ', result.Failures).ShouldNotContain("client-secret-value");
     }
 

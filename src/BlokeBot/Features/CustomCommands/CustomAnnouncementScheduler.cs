@@ -98,7 +98,7 @@ internal sealed class CustomAnnouncementScheduler(
             .CustomAnnouncements.Include(x => x.Schedule)
             .Include(x => x.DeliveryPolicy)
             .Include(x => x.MessageLibraryEntry)
-            .ThenInclude(x => x!.Variants)
+                .ThenInclude(x => x!.Variants)
             .SingleOrDefaultAsync(x => x.Id == candidate.AnnouncementId, cancellationToken);
         if (announcement is null || !announcement.Enabled)
         {
@@ -129,11 +129,7 @@ internal sealed class CustomAnnouncementScheduler(
     {
         if (announcement.OccurrenceStatus == AnnouncementOccurrenceStatus.Attempting)
         {
-            CompleteOccurrence(
-                announcement,
-                AnnouncementOccurrenceStatus.TerminalAmbiguous,
-                now
-            );
+            CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.TerminalAmbiguous, now);
             await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "InterruptedAttempt");
             return;
@@ -177,11 +173,7 @@ internal sealed class CustomAnnouncementScheduler(
         var expiresAt = RequireUtc(announcement.OccurrenceExpiresAtUtc, "expiry");
         if (now >= expiresAt)
         {
-            CompleteOccurrence(
-                announcement,
-                AnnouncementOccurrenceStatus.SkippedExpired,
-                now
-            );
+            CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.SkippedExpired, now);
             await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "Expired");
             return;
@@ -208,10 +200,10 @@ internal sealed class CustomAnnouncementScheduler(
 
         var message = announcement.OccurrenceStatus switch
         {
-            AnnouncementOccurrenceStatus.Pending =>
-                messageSelector.SelectMessage(announcement.MessageLibraryEntry),
-            AnnouncementOccurrenceStatus.RetryScheduled =>
-                announcement.OccurrenceMessage
+            AnnouncementOccurrenceStatus.Pending => messageSelector.SelectMessage(
+                announcement.MessageLibraryEntry
+            ),
+            AnnouncementOccurrenceStatus.RetryScheduled => announcement.OccurrenceMessage
                 ?? throw new UnreachableException(
                     "A retry-scheduled announcement occurrence requires its selected message."
                 ),
@@ -248,11 +240,7 @@ internal sealed class CustomAnnouncementScheduler(
         switch (outcome)
         {
             case AnnouncementEnqueueOutcome.Accepted:
-                CompleteOccurrence(
-                    announcement,
-                    AnnouncementOccurrenceStatus.Accepted,
-                    now
-                );
+                CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.Accepted, now);
                 announcement.LastSentAtUtc = dueAt.UtcDateTime;
                 announcement.ChatMessagesSinceLastSent = 0;
                 break;
@@ -320,14 +308,9 @@ internal sealed class CustomAnnouncementScheduler(
                 ),
             IntervalAfterChatCustomAnnouncementSchedule intervalAfterChat =>
                 new AnnouncementScheduleEvaluation.Evaluated(
-                    announcement.ChatMessagesSinceLastSent
-                        < intervalAfterChat.RequiredChatMessages
+                    announcement.ChatMessagesSinceLastSent < intervalAfterChat.RequiredChatMessages
                         ? new AnnouncementDueResult.NotDue()
-                        : IsIntervalDue(
-                            announcement,
-                            intervalAfterChat.IntervalMinutes,
-                            now
-                        )
+                        : IsIntervalDue(announcement, intervalAfterChat.IntervalMinutes, now)
                 ),
             WeeklyCustomAnnouncementSchedule weekly => EvaluateWeeklySchedule(
                 announcement,
@@ -373,9 +356,7 @@ internal sealed class CustomAnnouncementScheduler(
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(utcNow, timeZone);
         if (localNow.DayOfWeek != schedule.Day)
         {
-            return new AnnouncementScheduleEvaluation.Evaluated(
-                new AnnouncementDueResult.NotDue()
-            );
+            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
 
         var scheduledLocal = DateOnly
@@ -383,9 +364,7 @@ internal sealed class CustomAnnouncementScheduler(
             .ToDateTime(schedule.Time, DateTimeKind.Unspecified);
         if (scheduledLocal > localNow)
         {
-            return new AnnouncementScheduleEvaluation.Evaluated(
-                new AnnouncementDueResult.NotDue()
-            );
+            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
 
         if (timeZone.IsInvalidTime(scheduledLocal))
@@ -397,14 +376,9 @@ internal sealed class CustomAnnouncementScheduler(
             TimeZoneInfo.ConvertTimeToUtc(scheduledLocal, timeZone),
             TimeSpan.Zero
         );
-        if (
-            (announcement.LastOccurrenceAtUtc ?? announcement.LastSentAtUtc)
-            >= dueAt.UtcDateTime
-        )
+        if ((announcement.LastOccurrenceAtUtc ?? announcement.LastSentAtUtc) >= dueAt.UtcDateTime)
         {
-            return new AnnouncementScheduleEvaluation.Evaluated(
-                new AnnouncementDueResult.NotDue()
-            );
+            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
 
         if (
@@ -412,14 +386,10 @@ internal sealed class CustomAnnouncementScheduler(
             && changedAtUtc > dueAt.UtcDateTime
         )
         {
-            return new AnnouncementScheduleEvaluation.Evaluated(
-                new AnnouncementDueResult.NotDue()
-            );
+            return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
 
-        return new AnnouncementScheduleEvaluation.Evaluated(
-            new AnnouncementDueResult.Due(dueAt)
-        );
+        return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.Due(dueAt));
     }
 
     private static TimeZoneInfo? ResolveTimeZone(string? timeZoneId)
@@ -532,12 +502,12 @@ internal sealed class CustomAnnouncementScheduler(
     private static bool IsTerminal(AnnouncementOccurrenceStatus status)
     {
         return status
-        is AnnouncementOccurrenceStatus.SkippedExpired
-            or AnnouncementOccurrenceStatus.TerminalRejected
-            or AnnouncementOccurrenceStatus.TerminalAmbiguous
-            or AnnouncementOccurrenceStatus.TerminalUnexpected
-            or AnnouncementOccurrenceStatus.TerminalInvalidTimeZone
-            or AnnouncementOccurrenceStatus.TerminalMissingMessage;
+            is AnnouncementOccurrenceStatus.SkippedExpired
+                or AnnouncementOccurrenceStatus.TerminalRejected
+                or AnnouncementOccurrenceStatus.TerminalAmbiguous
+                or AnnouncementOccurrenceStatus.TerminalUnexpected
+                or AnnouncementOccurrenceStatus.TerminalInvalidTimeZone
+                or AnnouncementOccurrenceStatus.TerminalMissingMessage;
     }
 
     private TimeSpan TickInterval()

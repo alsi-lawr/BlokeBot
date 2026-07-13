@@ -202,5 +202,4 @@ public sealed class HostFeatureTests
         await db.SaveChangesAsync();
         return host.Id;
     }
-
 }

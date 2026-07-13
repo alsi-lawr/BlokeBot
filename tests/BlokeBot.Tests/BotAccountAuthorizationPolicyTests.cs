@@ -168,10 +168,11 @@ public sealed class BotAccountAuthorizationPolicyTests
     )
     {
         return await ConfiguredService(
-            new StaticTokenStatusSource(
-                Result<TwitchTokenStatus, TwitchTokenStatusError>.Success(status)
+                new StaticTokenStatusSource(
+                    Result<TwitchTokenStatus, TwitchTokenStatusError>.Success(status)
+                )
             )
-        ).GetStatusAsync(CancellationToken.None);
+            .GetStatusAsync(CancellationToken.None);
     }
 
     private static async Task<BotAccountAuthorizationStatus> LoadConfiguredStatusAsync(
@@ -179,10 +180,11 @@ public sealed class BotAccountAuthorizationPolicyTests
     )
     {
         return await ConfiguredService(
-            new StaticTokenStatusSource(
-                Result<TwitchTokenStatus, TwitchTokenStatusError>.Error(error)
+                new StaticTokenStatusSource(
+                    Result<TwitchTokenStatus, TwitchTokenStatusError>.Error(error)
+                )
             )
-        ).GetStatusAsync(CancellationToken.None);
+            .GetStatusAsync(CancellationToken.None);
     }
 
     private static BotAccountAuthorizationService ConfiguredService(
@@ -238,13 +240,11 @@ public sealed class BotAccountAuthorizationPolicyTests
             IEnumerable<string?> requiredScopes
         )
         {
-            return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(
-                cancellationToken =>
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    return ValueTask.FromResult(result);
-                }
-            );
+            return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(result);
+            });
         }
     }
 

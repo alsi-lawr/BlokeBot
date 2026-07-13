@@ -1,5 +1,5 @@
-using BlokeBot.Eventing;
 using BlokeBot.Components;
+using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
@@ -145,11 +145,7 @@ public partial class CustomCommandSettingsPage
         entry.CurrentVariantIndex = Math.Min(entry.CurrentVariantIndex, entry.Variants.Count - 1);
     }
 
-    private static void MoveVariant(
-        CustomMessageLibraryEntryEditor entry,
-        int index,
-        int direction
-    )
+    private static void MoveVariant(CustomMessageLibraryEntryEditor entry, int index, int direction)
     {
         var nextIndex = index + direction;
         if (nextIndex < 0 || nextIndex >= entry.Variants.Count)
@@ -198,11 +194,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.Counters.Add(
-            new CustomCounterEditor
-            {
-                Id = NextTemporaryId(),
-                Name = "New counter",
-            }
+            new CustomCounterEditor { Id = NextTemporaryId(), Name = "New counter" }
         );
     }
 
@@ -244,10 +236,7 @@ public partial class CustomCommandSettingsPage
                 MessageLibraryEntryId = _config.MessageEntries[0].Id,
                 RetryDelaySeconds = 0,
                 OccurrenceLifetimeSeconds = 0,
-                Schedule = new IntervalCustomAnnouncementScheduleEditor
-                {
-                    IntervalMinutes = 30,
-                },
+                Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
             }
         );
     }
@@ -263,11 +252,10 @@ public partial class CustomCommandSettingsPage
     }
 
     private string _selectedTimeZoneLabel =>
-        _config is null
-            ? string.Empty
-            : _timeZones.FirstOrDefault(x => x.Id == _config.TimeZoneId) is { } timeZone
-                ? TimeZoneLabel(timeZone)
-                : _config.TimeZoneId;
+        _config is null ? string.Empty
+        : _timeZones.FirstOrDefault(x => x.Id == _config.TimeZoneId) is { } timeZone
+            ? TimeZoneLabel(timeZone)
+        : _config.TimeZoneId;
 
     private static string CountLabel(int count, string singular)
     {
@@ -310,8 +298,7 @@ public partial class CustomCommandSettingsPage
         return schedule switch
         {
             CustomAnnouncementScheduleKind.Interval => "On a timer",
-            CustomAnnouncementScheduleKind.IntervalAfterChat =>
-                "On a timer, after chat activity",
+            CustomAnnouncementScheduleKind.IntervalAfterChat => "On a timer, after chat activity",
             CustomAnnouncementScheduleKind.Weekly => "Once a week",
             _ => "Choose when to send",
         };

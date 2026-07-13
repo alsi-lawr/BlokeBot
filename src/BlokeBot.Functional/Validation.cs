@@ -16,15 +16,10 @@ public sealed record Validation<T, TError>
         return new(new ValidState(value));
     }
 
-    public static Validation<T, TError> Invalid(
-        TError firstError,
-        params TError[] additionalErrors
-    )
+    public static Validation<T, TError> Invalid(TError firstError, params TError[] additionalErrors)
     {
         return new(
-            new InvalidState(
-                NonEmptyValidationErrors<TError>.Create(firstError, additionalErrors)
-            )
+            new InvalidState(NonEmptyValidationErrors<TError>.Create(firstError, additionalErrors))
         );
     }
 
@@ -59,9 +54,7 @@ public sealed record Validation<T, TError>
                 other.MatchState(
                     _ => Validation<TResult, TError>.FromInvalid(firstErrors),
                     secondErrors =>
-                        Validation<TResult, TError>.FromInvalid(
-                            firstErrors.Append(secondErrors)
-                        )
+                        Validation<TResult, TError>.FromInvalid(firstErrors.Append(secondErrors))
                 )
         );
     }
@@ -76,9 +69,7 @@ public sealed record Validation<T, TError>
         );
     }
 
-    private static Validation<T, TError> FromInvalid(
-        NonEmptyValidationErrors<TError> errors
-    )
+    private static Validation<T, TError> FromInvalid(NonEmptyValidationErrors<TError> errors)
     {
         return new(new InvalidState(errors));
     }
@@ -148,9 +139,7 @@ internal sealed class NonEmptyValidationErrors<TError>
         return new(errors);
     }
 
-    internal NonEmptyValidationErrors<TError> Append(
-        NonEmptyValidationErrors<TError> other
-    )
+    internal NonEmptyValidationErrors<TError> Append(NonEmptyValidationErrors<TError> other)
     {
         var errors = new TError[Count + other.Count];
         _errors.CopyTo(errors, 0);

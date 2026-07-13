@@ -144,10 +144,7 @@ internal sealed class PointsGiveawayScheduler(
         throw new PointsGiveawaySchedulerUnhealthyException(report);
     }
 
-    internal async Task ExecuteScheduleAsync(
-        PointsGiveawaySchedule schedule,
-        CancellationToken ct
-    )
+    internal async Task ExecuteScheduleAsync(PointsGiveawaySchedule schedule, CancellationToken ct)
     {
         if (schedule.EndsAtUtc <= GetUtcNow())
         {
@@ -180,12 +177,7 @@ internal sealed class PointsGiveawayScheduler(
         }
 
         var drawMessage = await BuildDrawNotificationAsync(schedule, drawOutcome, ct);
-        await SendAsync(
-            schedule,
-            drawMessage,
-            PointsGiveawayNotificationKind.DrawResult,
-            ct
-        );
+        await SendAsync(schedule, drawMessage, PointsGiveawayNotificationKind.DrawResult, ct);
     }
 
     private async Task RunScheduledAsync(
@@ -343,9 +335,7 @@ internal sealed class PointsGiveawayScheduler(
     )
     {
         var result = ToAttempt(
-            await operations
-                .BuildUpdate(schedule.GiveawayId, schedule.EndsAtUtc)
-                .ExecuteAsync(ct)
+            await operations.BuildUpdate(schedule.GiveawayId, schedule.EndsAtUtc).ExecuteAsync(ct)
         );
         switch (result)
         {
@@ -375,9 +365,7 @@ internal sealed class PointsGiveawayScheduler(
         CancellationToken ct
     )
     {
-        var result = ToAttempt(
-            await operations.BuildDrawNotification(outcome).ExecuteAsync(ct)
-        );
+        var result = ToAttempt(await operations.BuildDrawNotification(outcome).ExecuteAsync(ct));
         switch (result)
         {
             case OperationAttempt<
@@ -460,10 +448,7 @@ internal sealed class PointsGiveawayScheduler(
         CancellationToken ct
     )
     {
-        await message.Match(
-            Send,
-            static () => ValueTask.CompletedTask
-        );
+        await message.Match(Send, static () => ValueTask.CompletedTask);
         return;
 
         async ValueTask Send(string value)
@@ -477,9 +462,7 @@ internal sealed class PointsGiveawayScheduler(
                 throw;
             }
             catch (Exception exception)
-                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(
-                    exception
-                ))
+                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(exception))
             {
                 ReportNotificationFailure(schedule.GiveawayId, kind, exception);
             }
@@ -630,9 +613,7 @@ internal sealed class PointsGiveawayScheduler(
         {
             Operation = operation,
             GiveawayId = giveawayId,
-            Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(
-                exception
-            ),
+            Classification = PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(exception),
             Cause = exception,
         };
     }

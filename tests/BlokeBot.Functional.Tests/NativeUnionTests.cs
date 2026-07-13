@@ -44,14 +44,18 @@ public sealed class NativeUnionTests
     [Test]
     public void EquivalentCases_Comparing_HaveValueSemantics()
     {
-        new SubmissionOutcome.Accepted("receipt-42")
-            .ShouldBe(new SubmissionOutcome.Accepted("receipt-42"));
-        new SubmissionOutcome.Deferred(TimeSpan.FromMinutes(5))
-            .ShouldBe(new SubmissionOutcome.Deferred(TimeSpan.FromMinutes(5)));
-        new SubmissionOutcome.Rejected("not eligible")
-            .ShouldBe(new SubmissionOutcome.Rejected("not eligible"));
-        new SubmissionOutcome.Accepted("receipt-42")
-            .ShouldNotBe(new SubmissionOutcome.Accepted("receipt-41"));
+        new SubmissionOutcome.Accepted("receipt-42").ShouldBe(
+            new SubmissionOutcome.Accepted("receipt-42")
+        );
+        new SubmissionOutcome.Deferred(TimeSpan.FromMinutes(5)).ShouldBe(
+            new SubmissionOutcome.Deferred(TimeSpan.FromMinutes(5))
+        );
+        new SubmissionOutcome.Rejected("not eligible").ShouldBe(
+            new SubmissionOutcome.Rejected("not eligible")
+        );
+        new SubmissionOutcome.Accepted("receipt-42").ShouldNotBe(
+            new SubmissionOutcome.Accepted("receipt-41")
+        );
     }
 
     [Test]
@@ -63,12 +67,11 @@ public sealed class NativeUnionTests
             .Where(type => type.BaseType == unionType)
             .OrderBy(type => type.Name)
             .ToArray();
-        var seal = unionType.GetMethod(
-                "Seal",
-                BindingFlags.Instance | BindingFlags.NonPublic
-            )
+        var seal =
+            unionType.GetMethod("Seal", BindingFlags.Instance | BindingFlags.NonPublic)
             ?? throw new InvalidOperationException("The union seal contract is missing.");
-        var match = unionType.GetMethod(nameof(SubmissionOutcome.Match))
+        var match =
+            unionType.GetMethod(nameof(SubmissionOutcome.Match))
             ?? throw new InvalidOperationException("The exhaustive Match contract is missing.");
         var handledCases = match
             .GetParameters()
@@ -77,9 +80,7 @@ public sealed class NativeUnionTests
             .ToArray();
 
         unionType.IsAbstract.ShouldBeTrue();
-        unionType
-            .GetConstructors(BindingFlags.Instance | BindingFlags.Public)
-            .ShouldBeEmpty();
+        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
         seal.IsAbstract.ShouldBeTrue();
         seal.IsFamilyAndAssembly.ShouldBeTrue();
         directCases.Select(type => type.Name).ShouldBe(["Accepted", "Deferred", "Rejected"]);
@@ -88,11 +89,14 @@ public sealed class NativeUnionTests
         foreach (var caseType in directCases)
         {
             caseType.IsSealed.ShouldBeTrue();
-            var caseSeal = caseType.GetMethod(
+            var caseSeal =
+                caseType.GetMethod(
                     "Seal",
                     BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
                 )
-                ?? throw new InvalidOperationException($"{caseType.Name} does not implement the seal.");
+                ?? throw new InvalidOperationException(
+                    $"{caseType.Name} does not implement the seal."
+                );
             caseSeal.GetBaseDefinition().ShouldBe(seal);
         }
     }

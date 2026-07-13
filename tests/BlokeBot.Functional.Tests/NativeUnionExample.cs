@@ -2,9 +2,7 @@ namespace BlokeBot.Functional.Tests.Examples;
 
 public abstract record SubmissionOutcome
 {
-    private protected SubmissionOutcome()
-    {
-    }
+    private protected SubmissionOutcome() { }
 
     public abstract TResult Match<TResult>(
         Func<Accepted, TResult> accepted,
@@ -35,9 +33,7 @@ public abstract record SubmissionOutcome
             return accepted(this);
         }
 
-        private protected override void Seal()
-        {
-        }
+        private protected override void Seal() { }
     }
 
     public sealed record Deferred : SubmissionOutcome
@@ -67,9 +63,7 @@ public abstract record SubmissionOutcome
             return deferred(this);
         }
 
-        private protected override void Seal()
-        {
-        }
+        private protected override void Seal() { }
     }
 
     public sealed record Rejected : SubmissionOutcome
@@ -91,9 +85,7 @@ public abstract record SubmissionOutcome
             return rejected(this);
         }
 
-        private protected override void Seal()
-        {
-        }
+        private protected override void Seal() { }
     }
 }
 

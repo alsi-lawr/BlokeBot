@@ -16,10 +16,7 @@ internal sealed class MemoryTokenStore : ITwitchTokenStore
 
     public TwitchTokenSet? Saved { get; private set; }
 
-    public async Task<TwitchTokenSet?> LoadAsync(
-        string path,
-        CancellationToken cancellationToken
-    )
+    public async Task<TwitchTokenSet?> LoadAsync(string path, CancellationToken cancellationToken)
     {
         LoadCalls++;
         await Task.Yield();

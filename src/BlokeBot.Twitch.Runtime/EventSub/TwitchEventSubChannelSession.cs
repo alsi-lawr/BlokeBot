@@ -17,15 +17,9 @@ internal interface ITwitchEventSubChannelOperations
         CancellationToken cancellationToken
     );
 
-    ValueTask DeliverStartupMessageAsync(
-        string channel,
-        CancellationToken cancellationToken
-    );
+    ValueTask DeliverStartupMessageAsync(string channel, CancellationToken cancellationToken);
 
-    ValueTask NotifyChannelStartedAsync(
-        string channel,
-        CancellationToken cancellationToken
-    );
+    ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken);
 
     ValueTask<TwitchEventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
         ActiveEventSubSubscription subscription,
@@ -96,10 +90,7 @@ internal sealed class TwitchEventSubChannelOperations(
         }
     }
 
-    public ValueTask NotifyChannelStartedAsync(
-        string channel,
-        CancellationToken cancellationToken
-    )
+    public ValueTask NotifyChannelStartedAsync(string channel, CancellationToken cancellationToken)
     {
         return new(lifecycle.ChannelStartedAsync(channel, cancellationToken));
     }
@@ -135,10 +126,7 @@ internal sealed class TwitchEventSubChannelOperations(
         }
     }
 
-    public ValueTask CompleteStopAsync(
-        string channel,
-        CancellationToken cancellationToken
-    )
+    public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken)
     {
         return new(lifecycle.ChannelStoppedAsync(channel, cancellationToken));
     }
@@ -154,8 +142,7 @@ internal sealed class TwitchEventSubChannelSessionFactory(
     TimeProvider timeProvider
 )
 {
-    internal bool HasPendingReconciliation =>
-        pendingDeletions.HasPendingReconciliation;
+    internal bool HasPendingReconciliation => pendingDeletions.HasPendingReconciliation;
 
     internal TwitchEventSubChannelSession Create(string sessionId)
     {
@@ -184,15 +171,16 @@ internal sealed class TwitchEventSubChannelSession(
 ) : IAsyncDisposable
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, ActiveEventSubSubscription> _subscriptions =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, TwitchEventSubChannelStatus> _states =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, TwitchEventSubChannelFailureDetails> _failures =
-        new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _authorizedChannels = new(
+    private readonly Dictionary<string, ActiveEventSubSubscription> _subscriptions = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private readonly Dictionary<string, TwitchEventSubChannelStatus> _states = new(
+        StringComparer.OrdinalIgnoreCase
+    );
+    private readonly Dictionary<string, TwitchEventSubChannelFailureDetails> _failures = new(
+        StringComparer.OrdinalIgnoreCase
+    );
+    private readonly HashSet<string> _authorizedChannels = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _sessionStop = new();
     private CancellationTokenSource? _lifetime;
     private Task _currentWork = Task.CompletedTask;
@@ -210,27 +198,18 @@ internal sealed class TwitchEventSubChannelSession(
             }
 
             return active
-                .Union(
-                    pendingDeletions.PendingDeletionChannels,
-                    StringComparer.OrdinalIgnoreCase
-                )
+                .Union(pendingDeletions.PendingDeletionChannels, StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
     }
 
-    internal void Start(
-        IReadOnlyList<string> desiredChannels,
-        CancellationToken cancellationToken
-    )
+    internal void Start(IReadOnlyList<string> desiredChannels, CancellationToken cancellationToken)
     {
         var desired = TwitchChannelList.Normalize(desiredChannels);
         var desiredSet = desired.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var initial = desired
-            .Union(
-                pendingDeletions.ReconciliationChannels,
-                StringComparer.OrdinalIgnoreCase
-            )
+            .Union(pendingDeletions.ReconciliationChannels, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         lock (_gate)
         {
@@ -388,25 +367,19 @@ internal sealed class TwitchEventSubChannelSession(
 
     private void ScheduleLocked(Func<CancellationToken, Task> operation)
     {
-        var token = _lifetime?.Token
+        var token =
+            _lifetime?.Token
             ?? throw new InvalidOperationException(
                 "EventSub channel recovery does not have a session lifetime."
             );
         _currentWork = Task.Run(() => operation(token), CancellationToken.None);
     }
 
-    private static Exception CombineCleanupFailures(
-        Exception? previous,
-        Exception current
-    )
+    private static Exception CombineCleanupFailures(Exception? previous, Exception current)
     {
         return previous is null
             ? current
-            : new AggregateException(
-                "EventSub channel session cleanup failed.",
-                previous,
-                current
-            );
+            : new AggregateException("EventSub channel session cleanup failed.", previous, current);
     }
 
     private async Task RunReconciliationAsync(
@@ -422,16 +395,11 @@ internal sealed class TwitchEventSubChannelSession(
         }
 
         trackedChannels = trackedChannels
-            .Union(
-                pendingDeletions.ReconciliationChannels,
-                StringComparer.OrdinalIgnoreCase
-            )
+            .Union(pendingDeletions.ReconciliationChannels, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         var desired = TwitchChannelList.Normalize(desiredChannels);
-        var removed = trackedChannels
-            .Except(desired, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        var removed = trackedChannels.Except(desired, StringComparer.OrdinalIgnoreCase).ToArray();
         await Task.WhenAll(
             desired
                 .Select(channel =>
@@ -480,12 +448,7 @@ internal sealed class TwitchEventSubChannelSession(
             return;
         }
 
-        await RunImmediateAsync(
-            channel,
-            target,
-            trigger,
-            cancellationToken
-        );
+        await RunImmediateAsync(channel, target, trigger, cancellationToken);
     }
 
     private async Task RunImmediateAsync(
@@ -530,13 +493,7 @@ internal sealed class TwitchEventSubChannelSession(
 
             if (isRecoverable)
             {
-                await RunRecoveryCycleAsync(
-                    channel,
-                    target,
-                    trigger,
-                    failure,
-                    cancellationToken
-                );
+                await RunRecoveryCycleAsync(channel, target, trigger, failure, cancellationToken);
             }
 
             return;
@@ -564,8 +521,7 @@ internal sealed class TwitchEventSubChannelSession(
     {
         if (
             failure.Phase is not TwitchEventSubChannelPhase.SubscriptionDeletion
-            || failure.Classification
-                is TwitchEventSubChannelFailureClassification.Cancellation
+            || failure.Classification is TwitchEventSubChannelFailureClassification.Cancellation
         )
         {
             return;
@@ -591,10 +547,7 @@ internal sealed class TwitchEventSubChannelSession(
     {
         var attempt = 0;
         var latestFailure = initialFailure;
-        var context = new TwitchEventSubChannelAttemptContext
-        {
-            Phase = initialFailure.Phase,
-        };
+        var context = new TwitchEventSubChannelAttemptContext { Phase = initialFailure.Phase };
         try
         {
             await recovery.ExecuteRecoveryAsync(
@@ -605,12 +558,7 @@ internal sealed class TwitchEventSubChannelSession(
                         attempt++;
                     }
 
-                    PublishRecovering(
-                        channel,
-                        trigger,
-                        attempt,
-                        latestFailure
-                    );
+                    PublishRecovering(channel, trigger, attempt, latestFailure);
                     try
                     {
                         await ReconcileAsync(channel, target, context, attemptToken);
@@ -667,13 +615,17 @@ internal sealed class TwitchEventSubChannelSession(
     {
         return target switch
         {
-            TwitchEventSubChannelReconciliationTarget.Present =>
-                EnsurePresentAsync(channel, context, cancellationToken),
-            TwitchEventSubChannelReconciliationTarget.Absent =>
-                EnsureAbsentAsync(channel, context, cancellationToken),
-            _ => throw new UnreachableException(
-                "Unknown EventSub channel reconciliation target."
+            TwitchEventSubChannelReconciliationTarget.Present => EnsurePresentAsync(
+                channel,
+                context,
+                cancellationToken
             ),
+            TwitchEventSubChannelReconciliationTarget.Absent => EnsureAbsentAsync(
+                channel,
+                context,
+                cancellationToken
+            ),
+            _ => throw new UnreachableException("Unknown EventSub channel reconciliation target."),
         };
     }
 
@@ -707,11 +659,7 @@ internal sealed class TwitchEventSubChannelSession(
             && !active.BotLogin.Equals(account.Login, StringComparison.OrdinalIgnoreCase)
         )
         {
-            await ReconcileSubscriptionDeletionAsync(
-                active,
-                context,
-                cancellationToken
-            );
+            await ReconcileSubscriptionDeletionAsync(active, context, cancellationToken);
             await CompletePendingStopAsync(channel, context, cancellationToken);
             active = null;
         }
@@ -721,13 +669,7 @@ internal sealed class TwitchEventSubChannelSession(
             active = await RunPhaseAsync(
                 context,
                 TwitchEventSubChannelPhase.SubscriptionSetup,
-                token =>
-                    operations.CreateSubscriptionAsync(
-                        channel,
-                        account,
-                        sessionId,
-                        token
-                    ),
+                token => operations.CreateSubscriptionAsync(channel, account, sessionId, token),
                 cancellationToken
             );
             lock (_gate)
@@ -762,10 +704,7 @@ internal sealed class TwitchEventSubChannelSession(
                     token => operations.NotifyChannelStartedAsync(channel, token),
                     cancellationToken
                 );
-                active = active with
-                {
-                    Readiness = TwitchEventSubSubscriptionReadiness.Ready,
-                };
+                active = active with { Readiness = TwitchEventSubSubscriptionReadiness.Ready };
                 lock (_gate)
                 {
                     _subscriptions[channel] = active;
@@ -775,9 +714,7 @@ internal sealed class TwitchEventSubChannelSession(
             case TwitchEventSubSubscriptionReadiness.Ready:
                 break;
             default:
-                throw new UnreachableException(
-                    "Unknown EventSub subscription setup stage."
-                );
+                throw new UnreachableException("Unknown EventSub subscription setup stage.");
         }
 
         context.Phase = TwitchEventSubChannelPhase.Reconciliation;
@@ -799,11 +736,7 @@ internal sealed class TwitchEventSubChannelSession(
 
         if (active is not null)
         {
-            await ReconcileSubscriptionDeletionAsync(
-                active,
-                context,
-                cancellationToken
-            );
+            await ReconcileSubscriptionDeletionAsync(active, context, cancellationToken);
             await CompletePendingStopAsync(channel, context, cancellationToken);
         }
 
@@ -826,11 +759,7 @@ internal sealed class TwitchEventSubChannelSession(
             return;
         }
 
-        await ReconcileSubscriptionDeletionAsync(
-            pending.Subscription,
-            context,
-            cancellationToken
-        );
+        await ReconcileSubscriptionDeletionAsync(pending.Subscription, context, cancellationToken);
     }
 
     private async ValueTask ReconcileSubscriptionDeletionAsync(
@@ -869,17 +798,10 @@ internal sealed class TwitchEventSubChannelSession(
                 }
                 return;
             case TwitchEventSubSubscriptionDeletionOutcome.Unresolved unresolved:
-                pendingDeletions.RetainUnresolved(
-                    subscription,
-                    unresolved.Failure
-                );
-                throw new TwitchEventSubSubscriptionDeletionUnresolvedException(
-                    unresolved.Failure
-                );
+                pendingDeletions.RetainUnresolved(subscription, unresolved.Failure);
+                throw new TwitchEventSubSubscriptionDeletionUnresolvedException(unresolved.Failure);
             default:
-                throw new UnreachableException(
-                    "Unknown EventSub subscription-deletion outcome."
-                );
+                throw new UnreachableException("Unknown EventSub subscription-deletion outcome.");
         }
     }
 
@@ -981,9 +903,7 @@ internal sealed class TwitchEventSubChannelSession(
                 }
                 return;
             default:
-                throw new UnreachableException(
-                    "Unknown EventSub channel reconciliation target."
-                );
+                throw new UnreachableException("Unknown EventSub channel reconciliation target.");
         }
     }
 
@@ -1085,8 +1005,8 @@ internal sealed class TwitchEventSubChannelSession(
 
     private void UpdateRuntimeStatusLocked()
     {
-        var healthyChannels = _states.Values
-            .OfType<TwitchEventSubChannelStatus.Healthy>()
+        var healthyChannels = _states
+            .Values.OfType<TwitchEventSubChannelStatus.Healthy>()
             .Select(state => state.Channel)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -1110,9 +1030,8 @@ internal enum TwitchEventSubChannelReconciliationTarget
     Absent,
 }
 
-internal sealed class TwitchEventSubChannelStatusPublicationException(
-    Exception innerException
-) : Exception("EventSub channel status publication failed.", innerException);
+internal sealed class TwitchEventSubChannelStatusPublicationException(Exception innerException)
+    : Exception("EventSub channel status publication failed.", innerException);
 
 internal enum TwitchEventSubSubscriptionReadiness
 {

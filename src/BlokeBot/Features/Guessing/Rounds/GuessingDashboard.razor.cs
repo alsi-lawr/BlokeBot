@@ -168,7 +168,9 @@ public partial class GuessingDashboard
             return;
         }
 
-        await RunAsync(() => _rounds.DeclareWinnerAsync(HostId, _winnerName, CancellationToken.None));
+        await RunAsync(() =>
+            _rounds.DeclareWinnerAsync(HostId, _winnerName, CancellationToken.None)
+        );
         _winnerName = string.Empty;
     }
 
@@ -297,7 +299,9 @@ public partial class GuessingDashboard
 
     private Task StartRoundAsync()
     {
-        return RunAsync(() => _rounds.StartRoundAsync(HostId, _selectedProfileId, CancellationToken.None));
+        return RunAsync(() =>
+            _rounds.StartRoundAsync(HostId, _selectedProfileId, CancellationToken.None)
+        );
     }
 
     private static DateTime? StartOfLocalDateUtc(DateTime? value)

@@ -49,11 +49,33 @@ public sealed class TwitchBotPolicyTests
         );
 
         result.Failed.ShouldBeTrue();
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(IrcSessionResilienceOptions.AttemptLimit), StringComparison.Ordinal));
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(IrcSessionResilienceOptions.Delay), StringComparison.Ordinal));
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(IrcSessionResilienceOptions.MaximumDelay), StringComparison.Ordinal));
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(IrcSessionResilienceOptions.DelayBackoffType), StringComparison.Ordinal));
-        result.Failures.ShouldContain(failure => failure.Contains(nameof(IrcSessionResilienceOptions.AttemptTimeout), StringComparison.Ordinal));
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(
+                nameof(IrcSessionResilienceOptions.AttemptLimit),
+                StringComparison.Ordinal
+            )
+        );
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(nameof(IrcSessionResilienceOptions.Delay), StringComparison.Ordinal)
+        );
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(
+                nameof(IrcSessionResilienceOptions.MaximumDelay),
+                StringComparison.Ordinal
+            )
+        );
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(
+                nameof(IrcSessionResilienceOptions.DelayBackoffType),
+                StringComparison.Ordinal
+            )
+        );
+        result.Failures.ShouldContain(failure =>
+            failure.Contains(
+                nameof(IrcSessionResilienceOptions.AttemptTimeout),
+                StringComparison.Ordinal
+            )
+        );
     }
 
     [Test]
@@ -123,8 +145,7 @@ public sealed class TwitchBotPolicyTests
         ValidateLifetime(null).Failed.ShouldBeTrue();
         ValidateLifetime(TimeSpan.Zero).Failed.ShouldBeTrue();
         ValidateLifetime(TimeSpan.FromTicks(-1)).Failed.ShouldBeTrue();
-        ValidateLifetime(TimeSpan.FromSeconds(60).Add(TimeSpan.FromTicks(1)))
-            .Failed.ShouldBeTrue();
+        ValidateLifetime(TimeSpan.FromSeconds(60).Add(TimeSpan.FromTicks(1))).Failed.ShouldBeTrue();
         ValidateLifetime(TimeSpan.FromSeconds(60)).Failed.ShouldBeFalse();
     }
 
@@ -139,10 +160,7 @@ public sealed class TwitchBotPolicyTests
     {
         var values = ValidConfiguration()
             .Where(pair =>
-                !pair.Key.StartsWith(
-                    $"TwitchBot:Policies:{sectionName}:",
-                    StringComparison.Ordinal
-                )
+                !pair.Key.StartsWith($"TwitchBot:Policies:{sectionName}:", StringComparison.Ordinal)
             )
             .ToDictionary();
         var section = new ConfigurationBuilder()
@@ -163,17 +181,15 @@ public sealed class TwitchBotPolicyTests
     public void MaximumDelayBeforeDelay_Mapping_FailsExplicitCrossFieldRule()
     {
         var options = ValidOptions();
-        options.EventSubChannelRecovery.MaximumDelay = options.EventSubChannelRecovery.Delay
-            - TimeSpan.FromTicks(1);
+        options.EventSubChannelRecovery.MaximumDelay =
+            options.EventSubChannelRecovery.Delay - TimeSpan.FromTicks(1);
 
         var exception = Should.Throw<OptionsValidationException>(() =>
             TwitchBotPolicies.FromOptions(options)
         );
 
         exception.OptionsName.ShouldContain(nameof(TwitchBotPolicyOptions.EventSubChannelRecovery));
-        exception.Failures.ShouldContain(
-            "MaximumDelay must be greater than or equal to Delay."
-        );
+        exception.Failures.ShouldContain("MaximumDelay must be greater than or equal to Delay.");
     }
 
     [Test]
@@ -188,9 +204,7 @@ public sealed class TwitchBotPolicyTests
 
         policies.IrcSession.AttemptLimit.ShouldBe(5);
         policies.EventSubSession.AttemptTimeout.ShouldBe(TimeSpan.FromMinutes(2));
-        policies.EventSubChannelRecovery.DelayBackoffType.ShouldBe(
-            DelayBackoffType.Exponential
-        );
+        policies.EventSubChannelRecovery.DelayBackoffType.ShouldBe(DelayBackoffType.Exponential);
         policies.PublicChatRetry.MaximumDelay.ShouldBe(TimeSpan.FromSeconds(30));
         policies.PublicChatDeliveryLifetime.MaximumAge.ShouldBe(TimeSpan.FromSeconds(30));
         policies.PublicChatTerminalRetention.Duration.ShouldBe(TimeSpan.FromDays(7));

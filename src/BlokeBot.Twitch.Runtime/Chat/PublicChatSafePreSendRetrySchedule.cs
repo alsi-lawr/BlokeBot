@@ -40,10 +40,7 @@ internal static class PublicChatSafePreSendRetrySchedule
 
         var failureCount = previousFailureCount.Next();
         return failureCount.Value >= policy.AttemptLimit
-            ? new PublicChatSafePreSendRetryDecision.Exhausted
-            {
-                FailureCount = failureCount,
-            }
+            ? new PublicChatSafePreSendRetryDecision.Exhausted { FailureCount = failureCount }
             : new PublicChatSafePreSendRetryDecision.Scheduled
             {
                 FailureCount = failureCount,
@@ -75,22 +72,14 @@ internal static class PublicChatSafePreSendRetrySchedule
         };
     }
 
-    private static TimeSpan LinearDelay(
-        TimeSpan delay,
-        TimeSpan maximumDelay,
-        int retryNumber
-    )
+    private static TimeSpan LinearDelay(TimeSpan delay, TimeSpan maximumDelay, int retryNumber)
     {
         return delay.Ticks > maximumDelay.Ticks / retryNumber
             ? maximumDelay
             : TimeSpan.FromTicks(delay.Ticks * retryNumber);
     }
 
-    private static TimeSpan ExponentialDelay(
-        TimeSpan delay,
-        TimeSpan maximumDelay,
-        int retryNumber
-    )
+    private static TimeSpan ExponentialDelay(TimeSpan delay, TimeSpan maximumDelay, int retryNumber)
     {
         var backoff = delay;
         for (var index = 1; index < retryNumber; index++)

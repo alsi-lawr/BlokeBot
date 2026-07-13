@@ -220,10 +220,7 @@ public sealed class ChatActivityHookTests
         }
     }
 
-    private sealed record LogEntry(
-        string Message,
-        IReadOnlyDictionary<string, object?> Properties
-    );
+    private sealed record LogEntry(string Message, IReadOnlyDictionary<string, object?> Properties);
 
     private sealed class Scope : IDisposable
     {

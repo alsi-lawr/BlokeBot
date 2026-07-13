@@ -14,10 +14,11 @@ public abstract record TwitchTokenStatusError
 {
     private TwitchTokenStatusError() { }
 
-    public ImmutableArray<string> RequiredScopes => Match(
-        acquisition => acquisition.RequiredScopesSnapshot,
-        validation => validation.RequiredScopesSnapshot
-    );
+    public ImmutableArray<string> RequiredScopes =>
+        Match(
+            acquisition => acquisition.RequiredScopesSnapshot,
+            validation => validation.RequiredScopesSnapshot
+        );
 
     public sealed record AcquisitionUnavailable(
         TwitchTokenStatusTransportFailureReason Reason,

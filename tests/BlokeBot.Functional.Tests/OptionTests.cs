@@ -70,13 +70,11 @@ public sealed class OptionTests
     {
         var mapInvoked = false;
 
-        var mapped = Option<int>.None.Map(
-            _ =>
-            {
-                mapInvoked = true;
-                return 42;
-            }
-        );
+        var mapped = Option<int>.None.Map(_ =>
+        {
+            mapInvoked = true;
+            return 42;
+        });
 
         mapped.ShouldBe(Option<int>.None);
         mapInvoked.ShouldBeFalse();
@@ -103,13 +101,11 @@ public sealed class OptionTests
     {
         var bindInvoked = false;
 
-        var bound = Option<int>.None.Bind(
-            _ =>
-            {
-                bindInvoked = true;
-                return Option<string>.Some("unexpected");
-            }
-        );
+        var bound = Option<int>.None.Bind(_ =>
+        {
+            bindInvoked = true;
+            return Option<string>.Some("unexpected");
+        });
 
         bound.ShouldBe(Option<string>.None);
         bindInvoked.ShouldBeFalse();

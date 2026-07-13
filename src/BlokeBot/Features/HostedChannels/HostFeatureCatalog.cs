@@ -6,7 +6,8 @@ public static class HostFeatureCatalog
 {
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures)
     {
-        return [
+        return
+        [
             new(
                 HostFeatureFlags.Guessing,
                 "Guessing game",

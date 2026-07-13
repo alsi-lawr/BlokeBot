@@ -6,10 +6,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace BlokeBot.Auth.Sessions;
 
-internal sealed class AuthSessionService(
-    BotAdminService admins,
-    TwitchBotSettings botSettings
-)
+internal sealed class AuthSessionService(BotAdminService admins, TwitchBotSettings botSettings)
 {
     public async Task SignInAsync(
         HttpContext context,
@@ -164,11 +161,11 @@ internal sealed class AuthSessionService(
     public bool IsConfiguredBotAccount(string login)
     {
         return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
-        && string.Equals(
-            TwitchLogin.Normalize(login),
-            botSettings.Identity.BotUsername,
-            StringComparison.Ordinal
-        );
+            && string.Equals(
+                TwitchLogin.Normalize(login),
+                botSettings.Identity.BotUsername,
+                StringComparison.Ordinal
+            );
     }
 
     private static BotHostChoice? SelectInitialHost(

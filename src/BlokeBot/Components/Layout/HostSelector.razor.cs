@@ -129,8 +129,8 @@ public partial class HostSelector
     private bool IsAlternateHost(BotHostChoice host)
     {
         return host.Role != AuthRole.Admin
-        && host.Role != AuthRole.Streamer
-        && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+            && host.Role != AuthRole.Streamer
+            && !string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
     }
 
     private BotHostChoice? SelectedVisibleHost()
@@ -166,12 +166,13 @@ public partial class HostSelector
     private bool IsOwnHost(BotHostChoice host)
     {
         return host.Role == AuthRole.Streamer
-        && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
+            && string.Equals(host.Login, Session.Login, StringComparison.OrdinalIgnoreCase);
     }
 
     private string HostItemClass(BotHostChoice host)
     {
-        var selected = host.Id == _selectedHostId ? "bg-purple-50 text-[#6f2bdc]" : "text-slate-800";
+        var selected =
+            host.Id == _selectedHostId ? "bg-purple-50 text-[#6f2bdc]" : "text-slate-800";
 
         return $"menu-item grid grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 px-2.5 py-2 text-sm font-semibold {selected}";
     }

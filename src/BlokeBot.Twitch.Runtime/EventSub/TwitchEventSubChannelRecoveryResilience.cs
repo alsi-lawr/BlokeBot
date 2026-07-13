@@ -27,13 +27,15 @@ internal static class TwitchEventSubChannelRecoveryResilience
                     ShouldHandle = args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
-                            && TwitchEventSubChannelFailureClassifier.IsRecoverable(
-                                TwitchEventSubChannelFailureClassifier.Classify(
-                                    exception,
-                                    TwitchEventSubChannelPhase.Reconciliation,
-                                    args.Context.CancellationToken
-                                ).Classification
-                            )
+                                && TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                                    TwitchEventSubChannelFailureClassifier
+                                        .Classify(
+                                            exception,
+                                            TwitchEventSubChannelPhase.Reconciliation,
+                                            args.Context.CancellationToken
+                                        )
+                                        .Classification
+                                )
                         ),
                 }
             );
@@ -66,16 +68,17 @@ internal static class TwitchEventSubChannelFailureClassifier
 
         var (phase, failure) = exception switch
         {
-            TwitchEventSubChannelOperationException operation =>
-                (operation.Phase, operation.Failure),
+            TwitchEventSubChannelOperationException operation => (
+                operation.Phase,
+                operation.Failure
+            ),
             _ => (fallbackPhase, exception),
         };
         var classification = failure switch
         {
             OperationCanceledException when cancellationToken.IsCancellationRequested =>
                 TwitchEventSubChannelFailureClassification.Cancellation,
-            OperationCanceledException =>
-                TwitchEventSubChannelFailureClassification.Timeout,
+            OperationCanceledException => TwitchEventSubChannelFailureClassification.Timeout,
             TimeoutRejectedException or TimeoutException =>
                 TwitchEventSubChannelFailureClassification.Timeout,
             HttpRequestException http when IsTransientHttpStatus(http.StatusCode) =>
@@ -99,9 +102,7 @@ internal static class TwitchEventSubChannelFailureClassifier
         );
     }
 
-    internal static bool IsRecoverable(
-        TwitchEventSubChannelFailureClassification classification
-    )
+    internal static bool IsRecoverable(TwitchEventSubChannelFailureClassification classification)
     {
         return classification
             is TwitchEventSubChannelFailureClassification.Timeout

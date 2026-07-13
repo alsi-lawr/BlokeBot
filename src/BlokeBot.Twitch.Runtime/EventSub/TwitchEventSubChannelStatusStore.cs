@@ -3,8 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class TwitchEventSubChannelStatusStore
-    : ITwitchEventSubChannelStatusAccessor
+internal sealed class TwitchEventSubChannelStatusStore : ITwitchEventSubChannelStatusAccessor
 {
     private readonly object _gate = new();
     private long _nextScopeId;
@@ -21,12 +20,8 @@ internal sealed class TwitchEventSubChannelStatusStore
                 return field;
             }
         }
-
         private set;
-    } = new()
-    {
-        Channels = Array.Empty<TwitchEventSubChannelStatus>(),
-    };
+    } = new() { Channels = Array.Empty<TwitchEventSubChannelStatus>() };
 
     internal TwitchEventSubChannelStatusScope CreateScope()
     {
@@ -54,10 +49,7 @@ internal sealed class TwitchEventSubChannelStatusStore
         changed?.Invoke();
     }
 
-    private void Set(
-        TwitchEventSubChannelStatusScope scope,
-        TwitchEventSubChannelStatus status
-    )
+    private void Set(TwitchEventSubChannelStatusScope scope, TwitchEventSubChannelStatus status)
     {
         Action? changed = null;
         lock (_gate)
@@ -118,8 +110,8 @@ internal sealed class TwitchEventSubChannelStatusStore
         return new()
         {
             Channels = Array.AsReadOnly(
-                states.Values
-                    .OrderBy(state => state.Channel, StringComparer.OrdinalIgnoreCase)
+                states
+                    .Values.OrderBy(state => state.Channel, StringComparer.OrdinalIgnoreCase)
                     .ToArray()
             ),
         };
@@ -167,11 +159,7 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
 
     internal sealed record Healthy : TwitchEventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Healthy ChannelStatus
-        {
-            get;
-            init;
-        }
+        internal required TwitchEventSubChannelStatus.Healthy ChannelStatus { get; init; }
 
         internal override TwitchEventSubChannelStatus Status => ChannelStatus;
 
@@ -180,11 +168,7 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
 
     internal sealed record Recovering : TwitchEventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Recovering ChannelStatus
-        {
-            get;
-            init;
-        }
+        internal required TwitchEventSubChannelStatus.Recovering ChannelStatus { get; init; }
 
         internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
 
@@ -195,11 +179,7 @@ internal abstract record TwitchEventSubChannelDiagnosticReport
 
     internal sealed record Degraded : TwitchEventSubChannelDiagnosticReport
     {
-        internal required TwitchEventSubChannelStatus.Degraded ChannelStatus
-        {
-            get;
-            init;
-        }
+        internal required TwitchEventSubChannelStatus.Degraded ChannelStatus { get; init; }
 
         internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
 
@@ -222,10 +202,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
     {
         switch (report)
         {
-            case TwitchEventSubChannelDiagnosticReport.Healthy
-            {
-                ChannelStatus: var healthy,
-            }:
+            case TwitchEventSubChannelDiagnosticReport.Healthy { ChannelStatus: var healthy }:
                 log.LogInformation(
                     "EventSub channel {Channel} is healthy after {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}.",
                     healthy.Channel,
@@ -235,10 +212,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
                     healthy.Trigger
                 );
                 return;
-            case TwitchEventSubChannelDiagnosticReport.Recovering
-            {
-                ChannelStatus: var recovering,
-            }:
+            case TwitchEventSubChannelDiagnosticReport.Recovering { ChannelStatus: var recovering }:
                 log.LogWarning(
                     "EventSub channel {Channel} is recovering at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
                     recovering.Channel,
@@ -251,10 +225,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
                     recovering.NextAction
                 );
                 return;
-            case TwitchEventSubChannelDiagnosticReport.Degraded
-            {
-                ChannelStatus: var degraded,
-            }:
+            case TwitchEventSubChannelDiagnosticReport.Degraded { ChannelStatus: var degraded }:
                 log.LogError(
                     "EventSub channel {Channel} is degraded at {Phase} attempt {Attempt} at {ChangedAt} from {Trigger}; classified {Classification} ({FailureType}), next {NextAction}.",
                     degraded.Channel,
@@ -268,9 +239,7 @@ internal sealed class TwitchEventSubChannelDiagnosticLogger(
                 );
                 return;
             default:
-                throw new UnreachableException(
-                    "Unknown EventSub channel diagnostic report."
-                );
+                throw new UnreachableException("Unknown EventSub channel diagnostic report.");
         }
     }
 }

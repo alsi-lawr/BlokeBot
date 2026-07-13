@@ -16,9 +16,7 @@ public sealed class TwitchTokenStatusService(
     )
     {
         ArgumentNullException.ThrowIfNull(requiredScopes);
-        var required = ImmutableArray.CreateRange(
-            TwitchScopeSet.NormalizeMany(requiredScopes)
-        );
+        var required = ImmutableArray.CreateRange(TwitchScopeSet.NormalizeMany(requiredScopes));
         return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
             InspectAsync(required, cancellationToken)
         );
@@ -32,9 +30,7 @@ public sealed class TwitchTokenStatusService(
         string accessToken;
         try
         {
-            accessToken = await tokens
-                .GetAccessTokenAsync(cancellationToken)
-                .ConfigureAwait(false);
+            accessToken = await tokens.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -42,9 +38,7 @@ public sealed class TwitchTokenStatusService(
         }
         catch (TwitchAccessTokenUnavailableException exception)
         {
-            return Success(
-                new TwitchTokenStatus.Unavailable(exception.Reason, requiredScopes)
-            );
+            return Success(new TwitchTokenStatus.Unavailable(exception.Reason, requiredScopes));
         }
         catch (HttpRequestException exception)
         {

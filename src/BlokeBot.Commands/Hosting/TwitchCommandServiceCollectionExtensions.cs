@@ -19,11 +19,9 @@ public static class TwitchCommandServiceCollectionExtensions
 
         services.TryAddSingleton<TwitchCommandRegistrationSnapshot>();
         services.TryAddSingleton<TwitchCommandRegistry>();
-        services.TryAddSingleton(serviceProvider =>
-            new TwitchCommandDispatcher(
-                serviceProvider.GetRequiredService<TwitchCommandRegistry>()
-            )
-        );
+        services.TryAddSingleton(serviceProvider => new TwitchCommandDispatcher(
+            serviceProvider.GetRequiredService<TwitchCommandRegistry>()
+        ));
 
         return new TwitchBotBuilder(services);
     }

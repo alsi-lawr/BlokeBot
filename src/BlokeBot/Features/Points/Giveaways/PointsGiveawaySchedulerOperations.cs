@@ -16,9 +16,7 @@ internal interface IPointsGiveawaySchedulerOperations
         DateTime endsAtUtc
     );
 
-    IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(
-        int giveawayId
-    );
+    IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure> Draw(int giveawayId);
 
     IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
         PointsGiveawayDrawOutcome outcome
@@ -72,10 +70,9 @@ internal sealed class PointsGiveawaySchedulerOperations(
         return CaptureNotification(ct => BuildDrawNotificationAsync(outcome, ct));
     }
 
-    public IO<
-        PointsGiveawayExpirationOutcome,
-        PointsGiveawaySchedulerTransientFailure
-    > Expire(int giveawayId)
+    public IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure> Expire(
+        int giveawayId
+    )
     {
         return CaptureDurable(ct => ExpireAsync(giveawayId, ct));
     }
@@ -244,9 +241,10 @@ internal sealed class PointsGiveawaySchedulerOperations(
         });
     }
 
-    private static IO<TValue, PointsGiveawaySchedulerNotificationFailure> CaptureNotification<
-        TValue
-    >(Func<CancellationToken, ValueTask<TValue>> operation)
+    private static IO<
+        TValue,
+        PointsGiveawaySchedulerNotificationFailure
+    > CaptureNotification<TValue>(Func<CancellationToken, ValueTask<TValue>> operation)
     {
         return IO<TValue, PointsGiveawaySchedulerNotificationFailure>.Create(async ct =>
         {
@@ -257,9 +255,7 @@ internal sealed class PointsGiveawaySchedulerOperations(
                 );
             }
             catch (Exception exception)
-                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(
-                    exception
-                ))
+                when (PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(exception))
             {
                 ct.ThrowIfCancellationRequested();
                 return Result<TValue, PointsGiveawaySchedulerNotificationFailure>.Error(
@@ -281,10 +277,7 @@ internal sealed class PointsGiveawaySchedulerOperations(
         return timeProvider.GetUtcNow().UtcDateTime;
     }
 
-    private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(
-        int hostId,
-        CancellationToken ct
-    )
+    private async Task<ReplyDeliveryMap> LoadReplyDeliveryAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await PointsGiveawayQueries.LoadReplyDeliveryAsync(db, hostId, ct);
@@ -303,10 +296,7 @@ internal sealed class PointsGiveawaySchedulerOperations(
         }
         catch (Exception exception)
         {
-            throw new PointsGiveawayExpirationCommitAmbiguousException(
-                giveawayId,
-                exception
-            );
+            throw new PointsGiveawayExpirationCommitAmbiguousException(giveawayId, exception);
         }
     }
 }

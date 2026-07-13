@@ -94,13 +94,14 @@ public partial class HostedChannelRow
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
-    private string _botStartedText => Host.RuntimeState switch
-    {
-        BotChannelRuntimeState.Starting => "bot starting",
-        BotChannelRuntimeState.Started => "bot running",
-        BotChannelRuntimeState.Stopping => "bot stopping",
-        _ => "bot offline",
-    };
+    private string _botStartedText =>
+        Host.RuntimeState switch
+        {
+            BotChannelRuntimeState.Starting => "bot starting",
+            BotChannelRuntimeState.Started => "bot running",
+            BotChannelRuntimeState.Stopping => "bot stopping",
+            _ => "bot offline",
+        };
 
     private static string Initials(string value)
     {

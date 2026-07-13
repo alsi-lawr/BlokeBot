@@ -152,14 +152,12 @@ public partial class BotAccountAuthorizationSection
         {
             BotAccountAuthorizationState.Disabled =>
                 "Turn this on when you want to connect this account.",
-            BotAccountAuthorizationState.Ready =>
-                "This account has everything BlokeBot needs.",
+            BotAccountAuthorizationState.Ready => "This account has everything BlokeBot needs.",
             BotAccountAuthorizationState.WrongAccount =>
                 "Reconnect with the Twitch account shown above.",
             BotAccountAuthorizationState.MissingScopes =>
                 "Reconnect this account so Twitch can give BlokeBot the access it needs.",
-            BotAccountAuthorizationState.NotAuthorized =>
-                "Connect a Twitch account to continue.",
+            BotAccountAuthorizationState.NotAuthorized => "Connect a Twitch account to continue.",
             _ => "Refresh to check this Twitch connection.",
         };
 

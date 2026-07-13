@@ -191,7 +191,9 @@ public partial class HostConfigPage
 
     private static string AccessModeTabClass(bool active)
     {
-        return active ? "segmented-motion__tab segmented-motion__tab--active" : "segmented-motion__tab";
+        return active
+            ? "segmented-motion__tab segmented-motion__tab--active"
+            : "segmented-motion__tab";
     }
 
     private static string FeatureBadgeClass(HostFeatureCardState feature)

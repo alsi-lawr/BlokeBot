@@ -32,8 +32,7 @@ public sealed class TwitchBotChannelLifecycleNotifierSelectionTests
     {
         var selection = new TwitchBotChannelLifecycleNotifierSelection();
 
-        var exception = Should.Throw<InvalidOperationException>(selection.RequireSingle
-        );
+        var exception = Should.Throw<InvalidOperationException>(selection.RequireSingle);
 
         exception.Message.ShouldContain("none was selected");
     }
@@ -48,10 +47,8 @@ public sealed class TwitchBotChannelLifecycleNotifierSelectionTests
             .UseHostedNotifier<HostedNotifier>()
             .UseNoOpNotifier();
 
-        var firstException = Should.Throw<InvalidOperationException>(noOpThenHosted.RequireSingle
-        );
-        var secondException = Should.Throw<InvalidOperationException>(hostedThenNoOp.RequireSingle
-        );
+        var firstException = Should.Throw<InvalidOperationException>(noOpThenHosted.RequireSingle);
+        var secondException = Should.Throw<InvalidOperationException>(hostedThenNoOp.RequireSingle);
 
         firstException.Message.ShouldContain("2 were selected");
         secondException.Message.ShouldContain("2 were selected");
@@ -68,18 +65,12 @@ public sealed class TwitchBotChannelLifecycleNotifierSelectionTests
 
     private sealed class HostedNotifier : ITwitchBotChannelLifecycleNotifier
     {
-        public Task ChannelStartedAsync(
-            string channel,
-            CancellationToken cancellationToken
-        )
+        public Task ChannelStartedAsync(string channel, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }
 
-        public Task ChannelStoppedAsync(
-            string channel,
-            CancellationToken cancellationToken
-        )
+        public Task ChannelStoppedAsync(string channel, CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

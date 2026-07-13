@@ -127,10 +127,9 @@ public sealed record TwitchBotPolicies
                 PublicChatRetry = BindRequired<PublicChatRetryOptions>(
                     policies.GetSection(nameof(PublicChatRetry))
                 ),
-                PublicChatDeliveryLifetime =
-                    BindRequired<PublicChatDeliveryLifetimeOptions>(
-                        policies.GetSection(nameof(PublicChatDeliveryLifetime))
-                    ),
+                PublicChatDeliveryLifetime = BindRequired<PublicChatDeliveryLifetimeOptions>(
+                    policies.GetSection(nameof(PublicChatDeliveryLifetime))
+                ),
                 PublicChatTerminalRetention = BindRequired<PublicChatTerminalRetentionOptions>(
                     policies.GetSection(nameof(PublicChatTerminalRetention))
                 ),

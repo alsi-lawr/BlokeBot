@@ -39,9 +39,7 @@ public sealed class AlertUiTests
 
         var button = cut.Find("button[aria-label='1 active alert']");
         button.Click();
-        context
-            .Services.GetRequiredService<NavigationManager>()
-            .Uri.ShouldEndWith("/alerts");
+        context.Services.GetRequiredService<NavigationManager>().Uri.ShouldEndWith("/alerts");
     }
 
     [Test]
@@ -53,8 +51,7 @@ public sealed class AlertUiTests
 
         var cut = context.Render<NavMenu>();
 
-        var alertsLink = cut
-            .FindAll("a")
+        var alertsLink = cut.FindAll("a")
             .Single(link => link.TextContent.Trim().Equals("Alerts", StringComparison.Ordinal));
         alertsLink.GetAttribute("href").ShouldBe("alerts");
     }

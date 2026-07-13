@@ -39,10 +39,7 @@ public sealed class CustomCommandTemplateRenderer
 
         return _tokenPattern.Replace(
             template,
-            match =>
-                values.TryGetValue(match.Groups[1].Value, out var value)
-                    ? value
-                    : match.Value
+            match => values.TryGetValue(match.Groups[1].Value, out var value) ? value : match.Value
         );
     }
 }

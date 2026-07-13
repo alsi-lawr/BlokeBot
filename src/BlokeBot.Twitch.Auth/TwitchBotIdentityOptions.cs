@@ -59,6 +59,4 @@ public sealed record TwitchBotIdentityOptions
 /// </summary>
 [OptionsValidator]
 public sealed partial class TwitchBotIdentityOptionsValidator
-    : IValidateOptions<TwitchBotIdentityOptions>
-{
-}
+    : IValidateOptions<TwitchBotIdentityOptions> { }

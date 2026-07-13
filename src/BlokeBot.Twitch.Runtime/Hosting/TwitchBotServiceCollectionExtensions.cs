@@ -41,7 +41,8 @@ public static class TwitchBotServiceCollectionExtensions
         var responseSender = SelectResponseSender(selectResponseSender);
         var lifecycleNotifier = SelectLifecycleNotifier(selectLifecycleNotifier);
 
-        var options = configuration.Get<TwitchBotOptions>()
+        var options =
+            configuration.Get<TwitchBotOptions>()
             ?? throw new OptionsValidationException(
                 configuration is IConfigurationSection section ? section.Path : "TwitchBot",
                 typeof(TwitchBotOptions),
@@ -243,10 +244,7 @@ public static class TwitchBotServiceCollectionExtensions
         switch (registration.Kind)
         {
             case TwitchBotAccountProviderKind.Default:
-                services.AddSingleton<
-                    ITwitchBotAccountProvider,
-                    DefaultTwitchBotAccountProvider
-                >();
+                services.AddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
                 return;
             case TwitchBotAccountProviderKind.HostedChannel:
                 services.AddSingleton<ITwitchBotAccountProvider>(serviceProvider =>
@@ -255,15 +253,10 @@ public static class TwitchBotServiceCollectionExtensions
                 );
                 return;
             case TwitchBotAccountProviderKind.Custom:
-                services.AddSingleton(
-                    typeof(ITwitchBotAccountProvider),
-                    registration.ProviderType
-                );
+                services.AddSingleton(typeof(ITwitchBotAccountProvider), registration.ProviderType);
                 return;
             default:
-                throw new UnreachableException(
-                    "Unknown Twitch bot account-provider policy."
-                );
+                throw new UnreachableException("Unknown Twitch bot account-provider policy.");
         }
     }
 
@@ -287,9 +280,7 @@ public static class TwitchBotServiceCollectionExtensions
                 );
                 return;
             default:
-                throw new UnreachableException(
-                    "Unknown Twitch command-response sender policy."
-                );
+                throw new UnreachableException("Unknown Twitch command-response sender policy.");
         }
     }
 
@@ -319,25 +310,16 @@ public static class TwitchBotServiceCollectionExtensions
         }
     }
 
-    private static void RegisterSettings(
-        IServiceCollection services,
-        TwitchBotSettings settings
-    )
+    private static void RegisterSettings(IServiceCollection services, TwitchBotSettings settings)
     {
         services.AddSingleton(settings);
         services.AddSingleton(settings.Identity);
     }
 
-    private static void RegisterPolicies(
-        IServiceCollection services,
-        TwitchBotPolicies policies
-    )
+    private static void RegisterPolicies(IServiceCollection services, TwitchBotPolicies policies)
     {
         services.AddSingleton(policies);
-        services.AddKeyedSingleton(
-            TwitchBotResiliencePipeline.IrcSession,
-            policies.IrcSession
-        );
+        services.AddKeyedSingleton(TwitchBotResiliencePipeline.IrcSession, policies.IrcSession);
         services.AddKeyedSingleton(
             TwitchBotResiliencePipeline.EventSubSession,
             policies.EventSubSession
@@ -360,9 +342,7 @@ public static class TwitchBotServiceCollectionExtensions
                 TwitchRuntimeSessionResilience.ConfigureIrc(
                     builder,
                     policies.IrcSession,
-                    context.ServiceProvider.GetRequiredService<
-                        ITwitchRuntimeSessionHealthReporter
-                    >()
+                    context.ServiceProvider.GetRequiredService<ITwitchRuntimeSessionHealthReporter>()
                 );
             }
         );
@@ -374,9 +354,7 @@ public static class TwitchBotServiceCollectionExtensions
                 TwitchRuntimeSessionResilience.ConfigureEventSub(
                     builder,
                     policies.EventSubSession,
-                    context.ServiceProvider.GetRequiredService<
-                        ITwitchRuntimeSessionHealthReporter
-                    >()
+                    context.ServiceProvider.GetRequiredService<ITwitchRuntimeSessionHealthReporter>()
                 );
             }
         );
@@ -391,24 +369,16 @@ public static class TwitchBotServiceCollectionExtensions
                 );
             }
         );
-        services.AddSingleton(serviceProvider =>
-            new TwitchIrcSessionResiliencePipeline(
-                serviceProvider
-                    .GetRequiredService<
-                        ResiliencePipelineProvider<TwitchBotResiliencePipeline>
-                    >()
-                    .GetPipeline(TwitchBotResiliencePipeline.IrcSession)
-            )
-        );
-        services.AddSingleton(serviceProvider =>
-            new TwitchEventSubSessionResiliencePipeline(
-                serviceProvider
-                    .GetRequiredService<
-                        ResiliencePipelineProvider<TwitchBotResiliencePipeline>
-                    >()
-                    .GetPipeline(TwitchBotResiliencePipeline.EventSubSession)
-            )
-        );
+        services.AddSingleton(serviceProvider => new TwitchIrcSessionResiliencePipeline(
+            serviceProvider
+                .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
+                .GetPipeline(TwitchBotResiliencePipeline.IrcSession)
+        ));
+        services.AddSingleton(serviceProvider => new TwitchEventSubSessionResiliencePipeline(
+            serviceProvider
+                .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
+                .GetPipeline(TwitchBotResiliencePipeline.EventSubSession)
+        ));
         services.AddSingleton(serviceProvider =>
         {
             var attempt = new ResiliencePipelineBuilder
@@ -422,9 +392,7 @@ public static class TwitchBotServiceCollectionExtensions
             return new TwitchEventSubChannelRecoveryPipeline(
                 attempt.Build(),
                 serviceProvider
-                    .GetRequiredService<
-                        ResiliencePipelineProvider<TwitchBotResiliencePipeline>
-                    >()
+                    .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
                     .GetPipeline(TwitchBotResiliencePipeline.EventSubChannelRecovery)
             );
         });

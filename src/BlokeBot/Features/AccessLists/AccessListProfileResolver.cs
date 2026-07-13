@@ -1,8 +1,6 @@
 namespace BlokeBot.Features.AccessLists;
 
-public sealed class AccessListProfileResolver(
-    IAccessListProfileEnrichmentPolicy enrichment
-)
+public sealed class AccessListProfileResolver(IAccessListProfileEnrichmentPolicy enrichment)
 {
     public async Task<IReadOnlyList<AccessListEntryProfile>> ResolveAsync(
         IEnumerable<string> logins,

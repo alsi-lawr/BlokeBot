@@ -16,10 +16,7 @@ internal static class PublicChatDeliveryClassifier
         PropagateCallerCancellation(exception, cancellationToken);
         var diagnostic = PreparationDiagnostic(exception);
         return IsSafePreSendTransient(exception)
-            ? new PublicChatPreparationOutcome.SafePreSendTransient
-            {
-                Diagnostic = diagnostic,
-            }
+            ? new PublicChatPreparationOutcome.SafePreSendTransient { Diagnostic = diagnostic }
             : new PublicChatPreparationOutcome.Unexpected
             {
                 Diagnostic = diagnostic,
@@ -55,10 +52,7 @@ internal static class PublicChatDeliveryClassifier
     {
         ArgumentNullException.ThrowIfNull(exception);
         PropagateCallerCancellation(exception, cancellationToken);
-        return new PublicChatDeliveryOutcome.Ambiguous
-        {
-            Diagnostic = SendDiagnostic(exception),
-        };
+        return new PublicChatDeliveryOutcome.Ambiguous { Diagnostic = SendDiagnostic(exception) };
     }
 
     internal static PublicChatFailureDiagnostic.Send PostBoundaryInterruption(
@@ -74,31 +68,27 @@ internal static class PublicChatDeliveryClassifier
     )
     {
         return outcome.Match<PublicChatDeliveryOutcome>(
-            _ => throw new InvalidOperationException(
-                "A ready public chat preparation is not a delivery failure."
-            ),
-            transient =>
-                new PublicChatDeliveryOutcome.SafePreSendTransient
-                {
-                    Diagnostic = transient.Diagnostic,
-                },
-            unexpected =>
-                new PublicChatDeliveryOutcome.Unexpected
-                {
-                    Diagnostic = unexpected.Diagnostic,
-                    Cause = unexpected.Cause,
-                }
+            _ =>
+                throw new InvalidOperationException(
+                    "A ready public chat preparation is not a delivery failure."
+                ),
+            transient => new PublicChatDeliveryOutcome.SafePreSendTransient
+            {
+                Diagnostic = transient.Diagnostic,
+            },
+            unexpected => new PublicChatDeliveryOutcome.Unexpected
+            {
+                Diagnostic = unexpected.Diagnostic,
+                Cause = unexpected.Cause,
+            }
         );
     }
 
-    internal static PublicChatDeliveryOutcome MapSendResult(
-        PublicChatTransportSendResult result
-    )
+    internal static PublicChatDeliveryOutcome MapSendResult(PublicChatTransportSendResult result)
     {
         return result.Match<PublicChatDeliveryOutcome>(
             _ => new PublicChatDeliveryOutcome.Sent(),
-            rejected =>
-                new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
+            rejected => new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
         );
     }
 
@@ -106,8 +96,7 @@ internal static class PublicChatDeliveryClassifier
     {
         return exception switch
         {
-            TimeoutRejectedException or TimeoutException or OperationCanceledException =>
-                true,
+            TimeoutRejectedException or TimeoutException or OperationCanceledException => true,
             HttpRequestException http => IsTransientHttpStatus(http.StatusCode),
             SocketException or IOException => true,
             _ => false,
@@ -117,9 +106,9 @@ internal static class PublicChatDeliveryClassifier
     private static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
     {
         return statusCode is null
-        || statusCode is HttpStatusCode.RequestTimeout
-        || (int)statusCode == 429
-        || (int)statusCode >= 500;
+            || statusCode is HttpStatusCode.RequestTimeout
+            || (int)statusCode == 429
+            || (int)statusCode >= 500;
     }
 
     private static PublicChatFailureDiagnostic.Preparation PreparationDiagnostic(
@@ -130,24 +119,18 @@ internal static class PublicChatDeliveryClassifier
         {
             FailureType = PublicChatFailureType.From(exception),
             HttpStatus = exception is HttpRequestException { StatusCode: { } status }
-                ? new PublicChatHttpStatus.Known(
-                    PublicChatHttpStatusCode.From(status)
-                )
+                ? new PublicChatHttpStatus.Known(PublicChatHttpStatusCode.From(status))
                 : new PublicChatHttpStatus.Unavailable(),
         };
     }
 
-    private static PublicChatFailureDiagnostic.Send SendDiagnostic(
-        Exception exception
-    )
+    private static PublicChatFailureDiagnostic.Send SendDiagnostic(Exception exception)
     {
         return new()
         {
             FailureType = PublicChatFailureType.From(exception),
             HttpStatus = exception is HttpRequestException { StatusCode: { } status }
-                ? new PublicChatHttpStatus.Known(
-                    PublicChatHttpStatusCode.From(status)
-                )
+                ? new PublicChatHttpStatus.Known(PublicChatHttpStatusCode.From(status))
                 : new PublicChatHttpStatus.Unavailable(),
         };
     }
@@ -157,7 +140,10 @@ internal static class PublicChatDeliveryClassifier
         CancellationToken cancellationToken
     )
     {
-        if (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        if (
+            exception is not OperationCanceledException
+            || !cancellationToken.IsCancellationRequested
+        )
         {
             return;
         }

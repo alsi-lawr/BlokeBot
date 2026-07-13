@@ -48,10 +48,7 @@ internal static class PublicChatIntegrationTestSupport
         );
     }
 
-    public static async Task StopAsync(
-        CancellationTokenSource stopping,
-        Task worker
-    )
+    public static async Task StopAsync(CancellationTokenSource stopping, Task worker)
     {
         await stopping.CancelAsync();
         await worker;
@@ -62,10 +59,7 @@ internal static class PublicChatIntegrationTestSupport
         return new(2026, 7, 12, hour, minute, second, TimeSpan.Zero);
     }
 
-    public static PublicChatEnqueueCommand Command(
-        string channel,
-        string message
-    )
+    public static PublicChatEnqueueCommand Command(string channel, string message)
     {
         return new()
         {
@@ -75,9 +69,7 @@ internal static class PublicChatIntegrationTestSupport
         };
     }
 
-    public static PublicChatPreparedSend Prepared(
-        PublicChatClaimedMessage message
-    )
+    public static PublicChatPreparedSend Prepared(PublicChatClaimedMessage message)
     {
         return new()
         {
@@ -136,9 +128,7 @@ internal sealed class RecordingPublicChatTransport : IPublicChatTransport
         Interlocked.Increment(ref _deliveryCount);
         if (!_deliveries.Writer.TryWrite(prepared.Message))
         {
-            throw new InvalidOperationException(
-                "The public chat delivery could not be observed."
-            );
+            throw new InvalidOperationException("The public chat delivery could not be observed.");
         }
 
         return ValueTask.FromResult<PublicChatTransportSendResult>(
@@ -158,11 +148,7 @@ internal sealed class ScriptedPublicChatTransport(
         CancellationToken,
         ValueTask<PublicChatPreparationOutcome>
     > prepare,
-    Func<
-        PublicChatPreparedSend,
-        CancellationToken,
-        ValueTask<PublicChatTransportSendResult>
-    > send
+    Func<PublicChatPreparedSend, CancellationToken, ValueTask<PublicChatTransportSendResult>> send
 ) : IPublicChatTransport
 {
     private int _prepareCount;
@@ -239,12 +225,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
         CancellationToken cancellationToken
     )
     {
-        return inner.BeginSendAsync(
-            message,
-            sendStartedAt,
-            claimExpiresAt,
-            cancellationToken
-        );
+        return inner.BeginSendAsync(message, sendStartedAt, claimExpiresAt, cancellationToken);
     }
 
     public async ValueTask<PublicChatClaimUpdate> RecordDeliveryOutcomeAsync(
@@ -339,8 +320,7 @@ internal sealed class CompletionObservingPublicChatOutbox(IPublicChatOutbox inne
     }
 }
 
-internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
-    : IPublicChatOutbox
+internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner) : IPublicChatOutbox
 {
     private readonly Channel<PublicChatClaimedMessage> _beginAttempts =
         Channel.CreateUnbounded<PublicChatClaimedMessage>();
@@ -399,12 +379,7 @@ internal sealed class BlockingBeginSendPublicChatOutbox(IPublicChatOutbox inner)
         CancellationToken cancellationToken
     )
     {
-        return inner.RecordDeliveryOutcomeAsync(
-            message,
-            outcome,
-            recordedAt,
-            cancellationToken
-        );
+        return inner.RecordDeliveryOutcomeAsync(message, outcome, recordedAt, cancellationToken);
     }
 
     public ValueTask<PublicChatClaimUpdate> RecordPostBoundaryInterruptionAsync(
@@ -534,9 +509,7 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
             _observedTimerRegistrationCount = _timerRegistrationCount;
             if (!_timerRegistrations.Writer.TryWrite(true))
             {
-                throw new InvalidOperationException(
-                    "The timer observer could not be notified."
-                );
+                throw new InvalidOperationException("The timer observer could not be notified.");
             }
         }
     }
@@ -571,9 +544,10 @@ internal sealed class ManualTestTimeProvider(DateTimeOffset initialNow) : TimePr
                 }
 
                 _period = period;
-                _dueAt = dueTime == Timeout.InfiniteTimeSpan
-                    ? DateTimeOffset.MaxValue
-                    : owner._currentNowLocked.Add(dueTime);
+                _dueAt =
+                    dueTime == Timeout.InfiniteTimeSpan
+                        ? DateTimeOffset.MaxValue
+                        : owner._currentNowLocked.Add(dueTime);
                 owner.AddTimer(this);
             }
 

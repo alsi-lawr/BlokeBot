@@ -21,8 +21,7 @@ internal sealed class TwitchEventSubMessageObserverBoundary;
 
 internal sealed class PublicChatQueueAlertObserverBoundary;
 
-internal sealed record TwitchChatObserverDeadLetter(string Channel)
-    : IObserverDeadLetterPayload;
+internal sealed record TwitchChatObserverDeadLetter(string Channel) : IObserverDeadLetterPayload;
 
 internal sealed record PublicChatQueueAlertDeadLetter(
     string Channel,

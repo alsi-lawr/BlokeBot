@@ -33,11 +33,7 @@ public enum TwitchEventSubChannelNextAction
 
 public sealed record TwitchEventSubChannelFailure
 {
-    public required TwitchEventSubChannelFailureClassification Classification
-    {
-        get;
-        init;
-    }
+    public required TwitchEventSubChannelFailureClassification Classification { get; init; }
 
     public required string FailureType { get; init; }
 }
@@ -66,15 +62,15 @@ public abstract record TwitchEventSubChannelStatus
 
     public sealed record Healthy : TwitchEventSubChannelStatus
     {
-        public required override string Channel { get; init; }
+        public override required string Channel { get; init; }
 
-        public required override TwitchEventSubChannelPhase Phase { get; init; }
+        public override required TwitchEventSubChannelPhase Phase { get; init; }
 
-        public required override int Attempt { get; init; }
+        public override required int Attempt { get; init; }
 
-        public required override DateTimeOffset ChangedAt { get; init; }
+        public override required DateTimeOffset ChangedAt { get; init; }
 
-        public required override TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
 
         public override TResult Match<TResult>(
             Func<Healthy, TResult> healthy,
@@ -90,15 +86,15 @@ public abstract record TwitchEventSubChannelStatus
 
     public sealed record Recovering : TwitchEventSubChannelStatus
     {
-        public required override string Channel { get; init; }
+        public override required string Channel { get; init; }
 
-        public required override TwitchEventSubChannelPhase Phase { get; init; }
+        public override required TwitchEventSubChannelPhase Phase { get; init; }
 
-        public required override int Attempt { get; init; }
+        public override required int Attempt { get; init; }
 
-        public required override DateTimeOffset ChangedAt { get; init; }
+        public override required DateTimeOffset ChangedAt { get; init; }
 
-        public required override TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
 
         public required TwitchEventSubChannelFailure Failure { get; init; }
 
@@ -118,15 +114,15 @@ public abstract record TwitchEventSubChannelStatus
 
     public sealed record Degraded : TwitchEventSubChannelStatus
     {
-        public required override string Channel { get; init; }
+        public override required string Channel { get; init; }
 
-        public required override TwitchEventSubChannelPhase Phase { get; init; }
+        public override required TwitchEventSubChannelPhase Phase { get; init; }
 
-        public required override int Attempt { get; init; }
+        public override required int Attempt { get; init; }
 
-        public required override DateTimeOffset ChangedAt { get; init; }
+        public override required DateTimeOffset ChangedAt { get; init; }
 
-        public required override TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
+        public override required TwitchEventSubChannelRecoveryTrigger Trigger { get; init; }
 
         public required TwitchEventSubChannelFailure Failure { get; init; }
 

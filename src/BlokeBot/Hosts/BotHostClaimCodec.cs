@@ -56,10 +56,10 @@ internal static class BotHostClaimCodec
     public static bool Equivalent(BotHostChoice left, BotHostChoice right)
     {
         return left.Id == right.Id
-        && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
-        && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
-        && left.Role == right.Role
-        && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
+            && string.Equals(left.Login, right.Login, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.DisplayName, right.DisplayName, StringComparison.Ordinal)
+            && left.Role == right.Role
+            && string.Equals(left.ProfileImageUrl, right.ProfileImageUrl, StringComparison.Ordinal);
     }
 
     private sealed record Payload

@@ -62,24 +62,26 @@ public sealed class HostBotStatusService(
             _ => Task.FromResult(HostBotReadinessOutcome.Unknown(configuredFlags)),
             _ => Task.FromResult(HostBotReadinessOutcome.TokenUnavailable(configuredFlags)),
             _ => Task.FromResult(HostBotReadinessOutcome.InvalidToken(configuredFlags)),
-            missingScopes => EvaluateAuthorizedReadinessAsync(
-                channelLogin,
-                tokenStatus.BotLogin,
-                missingScopes.AccessToken,
-                missingScopes.Validation,
-                missingScopes.GrantedScopes,
-                configuredFlags,
-                ct
-            ),
-            ready => EvaluateAuthorizedReadinessAsync(
-                channelLogin,
-                tokenStatus.BotLogin,
-                ready.AccessToken,
-                ready.Validation,
-                ready.GrantedScopes,
-                configuredFlags,
-                ct
-            )
+            missingScopes =>
+                EvaluateAuthorizedReadinessAsync(
+                    channelLogin,
+                    tokenStatus.BotLogin,
+                    missingScopes.AccessToken,
+                    missingScopes.Validation,
+                    missingScopes.GrantedScopes,
+                    configuredFlags,
+                    ct
+                ),
+            ready =>
+                EvaluateAuthorizedReadinessAsync(
+                    channelLogin,
+                    tokenStatus.BotLogin,
+                    ready.AccessToken,
+                    ready.Validation,
+                    ready.GrantedScopes,
+                    configuredFlags,
+                    ct
+                )
         );
     }
 
@@ -219,17 +221,11 @@ public sealed class HostBotStatusService(
         }
         catch (TimeoutException exception)
         {
-            return Unavailable(
-                HostStreamLivenessUnavailableReason.ProviderTimedOut,
-                exception
-            );
+            return Unavailable(HostStreamLivenessUnavailableReason.ProviderTimedOut, exception);
         }
         catch (OperationCanceledException exception)
         {
-            return Unavailable(
-                HostStreamLivenessUnavailableReason.ProviderTimedOut,
-                exception
-            );
+            return Unavailable(HostStreamLivenessUnavailableReason.ProviderTimedOut, exception);
         }
     }
 
@@ -319,10 +315,7 @@ public sealed class HostBotStatusService(
             );
     }
 
-    private static bool HasAll(
-        HostBotChannelStatusFlags flags,
-        HostBotChannelStatusFlags required
-    )
+    private static bool HasAll(HostBotChannelStatusFlags flags, HostBotChannelStatusFlags required)
     {
         return (flags & required) == required;
     }

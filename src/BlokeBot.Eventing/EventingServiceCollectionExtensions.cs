@@ -5,11 +5,7 @@ namespace BlokeBot.Eventing;
 
 public static class EventingServiceCollectionExtensions
 {
-    public static IServiceCollection AddObserverFanOut<
-        TBoundary,
-        TEvent,
-        TDeadLetter
-    >(
+    public static IServiceCollection AddObserverFanOut<TBoundary, TEvent, TDeadLetter>(
         this IServiceCollection services,
         ObserverFailurePolicy<TBoundary, TDeadLetter> policy
     )
@@ -23,22 +19,14 @@ public static class EventingServiceCollectionExtensions
             IObserverFailureDiagnosticReporter,
             ObserverFailureDiagnosticLogger
         >();
-        services.TryAddSingleton<
-            IObserverCorrelationIdProvider,
-            ObserverCorrelationIdProvider
-        >();
+        services.TryAddSingleton<IObserverCorrelationIdProvider, ObserverCorrelationIdProvider>();
         services.AddSingleton(policy);
         services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>(
-            serviceProvider =>
-                new ObserverFanOut<TBoundary, TEvent, TDeadLetter>(
-                    serviceProvider.GetRequiredService<
-                        ObserverFailurePolicy<TBoundary, TDeadLetter>
-                    >(),
-                    serviceProvider.GetRequiredService<
-                        IObserverFailureDiagnosticReporter
-                    >(),
-                    serviceProvider.GetRequiredService<IObserverCorrelationIdProvider>()
-                )
+            serviceProvider => new ObserverFanOut<TBoundary, TEvent, TDeadLetter>(
+                serviceProvider.GetRequiredService<ObserverFailurePolicy<TBoundary, TDeadLetter>>(),
+                serviceProvider.GetRequiredService<IObserverFailureDiagnosticReporter>(),
+                serviceProvider.GetRequiredService<IObserverCorrelationIdProvider>()
+            )
         );
         return services;
     }
@@ -47,10 +35,7 @@ public static class EventingServiceCollectionExtensions
         TBoundary,
         TEvent,
         TDeadLetter
-    >(
-        this IServiceCollection services,
-        ObserverBoundary boundary
-    )
+    >(this IServiceCollection services, ObserverBoundary boundary)
         where TDeadLetter : IObserverDeadLetterPayload
     {
         return services.AddObserverFanOut<TBoundary, TEvent, TDeadLetter>(
@@ -76,21 +61,17 @@ public static class EventingServiceCollectionExtensions
             EventNotification<TKey>,
             EventBusDeadLetter
         >(boundary);
-        services.AddSingleton(
-            new EventBusEventIdentity<TKey> { Project = eventIdentity }
-        );
-        services.AddSingleton<EventBus<TKey>>(serviceProvider =>
-            new EventBus<TKey>(
-                serviceProvider.GetRequiredService<
-                    ObserverFanOut<
-                        EventBusObserverBoundary<TKey>,
-                        EventNotification<TKey>,
-                        EventBusDeadLetter
-                    >
-                >(),
-                serviceProvider.GetRequiredService<EventBusEventIdentity<TKey>>()
-            )
-        );
+        services.AddSingleton(new EventBusEventIdentity<TKey> { Project = eventIdentity });
+        services.AddSingleton<EventBus<TKey>>(serviceProvider => new EventBus<TKey>(
+            serviceProvider.GetRequiredService<
+                ObserverFanOut<
+                    EventBusObserverBoundary<TKey>,
+                    EventNotification<TKey>,
+                    EventBusDeadLetter
+                >
+            >(),
+            serviceProvider.GetRequiredService<EventBusEventIdentity<TKey>>()
+        ));
         return services;
     }
 }

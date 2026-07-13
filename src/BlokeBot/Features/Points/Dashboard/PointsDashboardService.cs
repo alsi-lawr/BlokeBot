@@ -20,11 +20,7 @@ public sealed class PointsDashboardService(
         );
     }
 
-    public async Task<PointBalanceEntry> LookupAsync(
-        int hostId,
-        string login,
-        CancellationToken ct
-    )
+    public async Task<PointBalanceEntry> LookupAsync(int hostId, string login, CancellationToken ct)
     {
         return await balances.GetBalanceAsync(hostId, login, ct);
     }

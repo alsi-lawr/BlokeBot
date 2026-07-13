@@ -1,6 +1,6 @@
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
-using BlokeBot.Functional;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
@@ -16,8 +16,7 @@ public abstract record WhisperQuotaReservation
 
     public abstract WhisperQuotaStatus Status { get; init; }
 
-    public sealed record ExistingRecipient(WhisperQuotaStatus Status)
-        : WhisperQuotaReservation;
+    public sealed record ExistingRecipient(WhisperQuotaStatus Status) : WhisperQuotaReservation;
 
     public sealed record NewRecipient(WhisperQuotaStatus Status) : WhisperQuotaReservation;
 }

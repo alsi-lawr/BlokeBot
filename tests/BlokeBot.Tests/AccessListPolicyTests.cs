@@ -294,9 +294,7 @@ public sealed class AccessListPolicyTests
         return new SiteAccessService(
             dbFactory,
             new BotAdminService(
-                BotAdminSettings.FromOptions(
-                    new BlokeBotOptions { BotAdmins = botAdmins ?? [] }
-                )
+                BotAdminSettings.FromOptions(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
             ),
             new SiteAccessChangeNotifier(events)
         );

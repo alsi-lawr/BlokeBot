@@ -39,9 +39,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
     private readonly Dictionary<string, TwitchEventSubPendingDeletion> _pending = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private readonly HashSet<string> _pendingStops = new(
-        StringComparer.OrdinalIgnoreCase
-    );
+    private readonly HashSet<string> _pendingStops = new(StringComparer.OrdinalIgnoreCase);
 
     internal IReadOnlyList<TwitchEventSubPendingDeletion> PendingDeletions
     {
@@ -49,8 +47,8 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         {
             lock (_gate)
             {
-                return _pending.Values
-                    .OrderBy(
+                return _pending
+                    .Values.OrderBy(
                         deletion => deletion.Subscription.Channel,
                         StringComparer.OrdinalIgnoreCase
                     )
@@ -68,8 +66,8 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         {
             lock (_gate)
             {
-                return _pending.Keys
-                    .Union(_pendingStops, StringComparer.OrdinalIgnoreCase)
+                return _pending
+                    .Keys.Union(_pendingStops, StringComparer.OrdinalIgnoreCase)
                     .Order(StringComparer.OrdinalIgnoreCase)
                     .ToArray();
             }
@@ -87,10 +85,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         }
     }
 
-    internal bool TryGet(
-        string channel,
-        out TwitchEventSubPendingDeletion deletion
-    )
+    internal bool TryGet(string channel, out TwitchEventSubPendingDeletion deletion)
     {
         lock (_gate)
         {
@@ -142,10 +137,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
             _pending[subscription.Channel] = new TwitchEventSubPendingDeletion
             {
                 Subscription = subscription,
-                State = new TwitchEventSubPendingDeletionState.Unresolved
-                {
-                    Failure = failure,
-                },
+                State = new TwitchEventSubPendingDeletionState.Unresolved { Failure = failure },
             };
         }
     }
@@ -195,10 +187,7 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
     {
         if (
             expected.Channel.Equals(actual.Channel, StringComparison.OrdinalIgnoreCase)
-            && expected.SubscriptionId.Equals(
-                actual.SubscriptionId,
-                StringComparison.Ordinal
-            )
+            && expected.SubscriptionId.Equals(actual.SubscriptionId, StringComparison.Ordinal)
         )
         {
             return;

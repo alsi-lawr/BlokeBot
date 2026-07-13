@@ -58,13 +58,13 @@ public sealed class ResultTests
         var mapInvoked = false;
         var expected = new TestError("invalid");
 
-        var mapped = Result<int, TestError>.Error(expected).Map(
-            _ =>
+        var mapped = Result<int, TestError>
+            .Error(expected)
+            .Map(_ =>
             {
                 mapInvoked = true;
                 return 42;
-            }
-        );
+            });
 
         mapped.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
         mapInvoked.ShouldBeFalse();
@@ -73,9 +73,9 @@ public sealed class ResultTests
     [Test]
     public void Success_Binding_ComposesResult()
     {
-        var bound = Result<int, TestError>.Success(21).Bind(value =>
-            Result<string, TestError>.Success((value * 2).ToString())
-        );
+        var bound = Result<int, TestError>
+            .Success(21)
+            .Bind(value => Result<string, TestError>.Success((value * 2).ToString()));
 
         bound.Match(value => value, _ => string.Empty).ShouldBe("42");
     }
@@ -85,9 +85,9 @@ public sealed class ResultTests
     {
         var expected = new TestError("invalid");
 
-        var bound = Result<int, TestError>.Success(21).Bind(_ =>
-            Result<string, TestError>.Error(expected)
-        );
+        var bound = Result<int, TestError>
+            .Success(21)
+            .Bind(_ => Result<string, TestError>.Error(expected));
 
         bound.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
     }
@@ -98,13 +98,13 @@ public sealed class ResultTests
         var bindInvoked = false;
         var expected = new TestError("invalid");
 
-        var bound = Result<int, TestError>.Error(expected).Bind(
-            _ =>
+        var bound = Result<int, TestError>
+            .Error(expected)
+            .Bind(_ =>
             {
                 bindInvoked = true;
                 return Result<string, TestError>.Success("unexpected");
-            }
-        );
+            });
 
         bound.Match(_ => new TestError("unexpected"), error => error).ShouldBe(expected);
         bindInvoked.ShouldBeFalse();

@@ -14,22 +14,25 @@ public sealed class CooldownStoreTests
         var clock = new ManualTimeProvider();
         var store = new CustomCommandCooldownStore(clock);
 
-        store.TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
+        store
+            .TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
             .ShouldBeTrue();
-        store.TryRecord(2, CustomCommandCooldownScope.Global, "bob", TimeSpan.FromSeconds(5))
+        store
+            .TryRecord(2, CustomCommandCooldownScope.Global, "bob", TimeSpan.FromSeconds(5))
             .ShouldBeTrue();
         clock.Advance(TimeSpan.FromSeconds(5));
-        store.TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
+        store
+            .TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
             .ShouldBeFalse();
         store.EntryCount.ShouldBe(1);
 
         clock.Advance(TimeSpan.FromSeconds(5));
-        store.TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
+        store
+            .TryRecord(1, CustomCommandCooldownScope.User, "alice", TimeSpan.FromSeconds(10))
             .ShouldBeTrue();
         store.EntryCount.ShouldBe(1);
         clock.Advance(TimeSpan.FromSeconds(10));
-        store.TryRecord(99, CustomCommandCooldownScope.Global, "", TimeSpan.Zero)
-            .ShouldBeTrue();
+        store.TryRecord(99, CustomCommandCooldownScope.Global, "", TimeSpan.Zero).ShouldBeTrue();
         store.EntryCount.ShouldBe(0);
     }
 

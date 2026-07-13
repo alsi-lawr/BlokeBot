@@ -105,9 +105,9 @@ public sealed class PointsGiveawaySchedulerTests
         await firstContext.Database.OpenConnectionAsync();
         await secondContext.Database.OpenConnectionAsync();
 
-        firstContext.Database.GetDbConnection().ShouldNotBeSameAs(
-            secondContext.Database.GetDbConnection()
-        );
+        firstContext
+            .Database.GetDbConnection()
+            .ShouldNotBeSameAs(secondContext.Database.GetDbConnection());
         await Task.WhenAll(
             Task.Run(() =>
                 scheduler.ExecuteScheduleAsync(
@@ -139,15 +139,13 @@ public sealed class PointsGiveawaySchedulerTests
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var statuses = await db
-            .PointsGiveaways.Where(x =>
-                x.Id == firstGiveawayId || x.Id == secondGiveawayId
-            )
+            .PointsGiveaways.Where(x => x.Id == firstGiveawayId || x.Id == secondGiveawayId)
             .Select(x => x.Status)
             .ToArrayAsync();
-        statuses.ShouldBe([
-            PointsGiveawayStatus.Expired,
-            PointsGiveawayStatus.Expired,
-        ], ignoreOrder: true);
+        statuses.ShouldBe(
+            [PointsGiveawayStatus.Expired, PointsGiveawayStatus.Expired],
+            ignoreOrder: true
+        );
         var connections = recordingFactory.Connections;
         connections.Length.ShouldBeGreaterThanOrEqualTo(4);
         connections
@@ -221,10 +219,7 @@ public sealed class PointsGiveawaySchedulerTests
     public async Task SqliteConstraintWrappedByDbUpdate_Rehydrating_IsTerminalWithoutRetry()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var constraint = new SqliteException(
-            "constraint secret",
-            SQLitePCL.raw.SQLITE_CONSTRAINT
-        );
+        var constraint = new SqliteException("constraint secret", SQLitePCL.raw.SQLITE_CONSTRAINT);
         var terminal = new DbUpdateException("update secret", constraint);
         var genericDatabaseFailure = new TestDatabaseException();
         var flakyFactory = new FailingOnceDbContextFactory(dbFactory, terminal);
@@ -256,22 +251,19 @@ public sealed class PointsGiveawaySchedulerTests
         PointsGiveawaySchedulerFailureClassifier
             .IsTransient(genericDatabaseFailure)
             .ShouldBeFalse();
-        PointsGiveawaySchedulerFailureClassifier
-            .IsNotificationFailure(terminal)
-            .ShouldBeFalse();
+        PointsGiveawaySchedulerFailureClassifier.IsNotificationFailure(terminal).ShouldBeFalse();
         PointsGiveawaySchedulerFailureClassifier
             .IsNotificationFailure(genericDatabaseFailure)
             .ShouldBeFalse();
-        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(constraint).ShouldBe(
-            PointsGiveawaySchedulerFailureClassification.Terminal
-        );
+        PointsGiveawaySchedulerFailureClassifier
+            .ClassifyUnhealthy(constraint)
+            .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         PointsGiveawaySchedulerFailureClassifier
             .ClassifyUnhealthy(genericDatabaseFailure)
             .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         flakyFactory.Attempts.ShouldBe(1);
-        var report = thrown.Report.ShouldBeOfType<
-            PointsGiveawaySchedulerUnhealthyReport.Rehydration
-        >();
+        var report =
+            thrown.Report.ShouldBeOfType<PointsGiveawaySchedulerUnhealthyReport.Rehydration>();
         report.Classification.ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         report.Cause.ShouldBeSameAs(terminal);
         thrown.InnerException.ShouldBeSameAs(terminal);
@@ -295,9 +287,7 @@ public sealed class PointsGiveawaySchedulerTests
         var logger = new RecordingLogger<PointsGiveawayScheduler>();
         var scheduler = CreateScheduler(
             operations,
-            new StaticTimeProvider(
-                new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero)
-            ),
+            new StaticTimeProvider(new DateTimeOffset(2026, 7, 11, 12, 0, 0, TimeSpan.Zero)),
             new ReplyOnlyPointsGiveawaySchedulerNotification(),
             logger
         );
@@ -404,14 +394,11 @@ public sealed class PointsGiveawaySchedulerTests
 
         operations.DrawAttempts.ShouldBe(1);
         scheduler.IsScheduled(42).ShouldBeFalse();
-        var report = thrown.Report.ShouldBeOfType<
-            PointsGiveawaySchedulerUnhealthyReport.Giveaway
-        >();
+        var report =
+            thrown.Report.ShouldBeOfType<PointsGiveawaySchedulerUnhealthyReport.Giveaway>();
         report.GiveawayId.ShouldBe(42);
         report.Operation.ShouldBe(PointsGiveawaySchedulerOperation.Draw);
-        report.Classification.ShouldBe(
-            PointsGiveawaySchedulerFailureClassification.Unexpected
-        );
+        report.Classification.ShouldBe(PointsGiveawaySchedulerFailureClassification.Unexpected);
         ReferenceEquals(report.Cause, expected).ShouldBeTrue();
         ReferenceEquals(thrown.InnerException, expected).ShouldBeTrue();
         var diagnostic = logger.Entries.Single();
@@ -424,9 +411,7 @@ public sealed class PointsGiveawaySchedulerTests
     [Test]
     public void AmbiguousCommit_Classifying_IsTerminalRatherThanRetryable()
     {
-        var intendedDraw = PointsGiveawayDrawOutcome.NoEntrants(
-            new PointsSettings { HostId = 7 }
-        );
+        var intendedDraw = PointsGiveawayDrawOutcome.NoEntrants(new PointsSettings { HostId = 7 });
         var draw = new PointsGiveawayDrawCommitAmbiguousException(
             42,
             intendedDraw,
@@ -438,15 +423,15 @@ public sealed class PointsGiveawaySchedulerTests
         );
 
         PointsGiveawaySchedulerFailureClassifier.IsTransient(draw).ShouldBeFalse();
-        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(draw).ShouldBe(
-            PointsGiveawaySchedulerFailureClassification.Terminal
-        );
+        PointsGiveawaySchedulerFailureClassifier
+            .ClassifyUnhealthy(draw)
+            .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         draw.GiveawayId.ShouldBe(42);
         draw.IntendedOutcome.ShouldBeSameAs(intendedDraw);
         PointsGiveawaySchedulerFailureClassifier.IsTransient(expiration).ShouldBeFalse();
-        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(expiration).ShouldBe(
-            PointsGiveawaySchedulerFailureClassification.Terminal
-        );
+        PointsGiveawaySchedulerFailureClassifier
+            .ClassifyUnhealthy(expiration)
+            .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         expiration.GiveawayId.ShouldBe(42);
         expiration.IntendedOutcome.ShouldBe(PointsGiveawayExpirationOutcome.Expired);
     }
@@ -479,9 +464,9 @@ public sealed class PointsGiveawaySchedulerTests
         thrown.IntendedOutcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.Winners);
         thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
         PointsGiveawaySchedulerFailureClassifier.IsTransient(thrown).ShouldBeFalse();
-        PointsGiveawaySchedulerFailureClassifier.ClassifyUnhealthy(thrown).ShouldBe(
-            PointsGiveawaySchedulerFailureClassification.Terminal
-        );
+        PointsGiveawaySchedulerFailureClassifier
+            .ClassifyUnhealthy(thrown)
+            .ShouldBe(PointsGiveawaySchedulerFailureClassification.Terminal);
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Active);
@@ -641,11 +626,13 @@ public sealed class PointsGiveawaySchedulerTests
 
         changeNotification.Attempts.ShouldBe(1);
         chat.Messages.ShouldBe(["Giveaway winners: entrant (10)."]);
-        logger.Entries.Count(entry =>
-            entry.Level == LogLevel.Error
-            && entry.Message.Contains("Draw failed", StringComparison.Ordinal)
-            && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
-        ).ShouldBe(1);
+        logger
+            .Entries.Count(entry =>
+                entry.Level == LogLevel.Error
+                && entry.Message.Contains("Draw failed", StringComparison.Ordinal)
+                && entry.Message.Contains("retry scheduled", StringComparison.Ordinal)
+            )
+            .ShouldBe(1);
         logger.Entries.ShouldContain(entry =>
             entry.Level == LogLevel.Information
             && entry.Message.Contains("Draw recovered", StringComparison.Ordinal)
@@ -814,18 +801,13 @@ public sealed class PointsGiveawaySchedulerTests
 
         outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable);
         var unavailable = outcome.StreamLivenessFailure.ShouldNotBeNull();
-        unavailable.Reason.ShouldBe(
-            HostStreamLivenessUnavailableReason.ProviderRequestFailed
-        );
+        unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.ProviderRequestFailed);
         unavailable.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
         unavailable.Cause.ShouldBeSameAs(expected);
         unavailable.ToString().ShouldNotContain("provider secret");
         outcome.ToString().ShouldNotContain("provider secret");
         JsonSerializer.Serialize(outcome).ShouldNotContain("provider secret");
-        var result = new PointsGiveawayMessageFormatter().Reply(
-            outcome,
-            new ReplyDeliveryMap()
-        );
+        var result = new PointsGiveawayMessageFormatter().Reply(outcome, new ReplyDeliveryMap());
         result.Success.ShouldBeFalse();
         result.Message.ShouldBe("Stream status could not be checked right now.");
         result.Message.ShouldNotBe(outcome.Settings.StreamOfflineReply);
@@ -1021,11 +1003,7 @@ public sealed class PointsGiveawaySchedulerTests
         IDbContextFactory<BlokeBotDbContext> dbFactory
     )
     {
-        return new(
-            dbFactory,
-            new PointBalanceService(dbFactory),
-            new FixedPointsRandom()
-        );
+        return new(dbFactory, new PointBalanceService(dbFactory), new FixedPointsRandom());
     }
 
     private static PointsGiveawaySchedule ScheduleEndingAfter(DateTimeOffset now)
@@ -1127,41 +1105,31 @@ public sealed class PointsGiveawaySchedulerTests
         public Exception? DrawException { get; init; }
 
         public Queue<
-            Result<
-                IReadOnlyList<PointsGiveawaySchedule>,
-                PointsGiveawaySchedulerTransientFailure
-            >
-        > LoadOutcomes
-        { get; } = [];
+            Result<IReadOnlyList<PointsGiveawaySchedule>, PointsGiveawaySchedulerTransientFailure>
+        > LoadOutcomes { get; } = [];
 
-        public Queue<Result<Option<string>, PointsGiveawaySchedulerNotificationFailure>>
-            UpdateOutcomes
-        { get; } = [];
+        public Queue<
+            Result<Option<string>, PointsGiveawaySchedulerNotificationFailure>
+        > UpdateOutcomes { get; } = [];
 
         public Queue<
             Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>
-        > DrawOutcomes
-        { get; } = [];
-
-        public Queue<Result<Option<string>, PointsGiveawaySchedulerNotificationFailure>>
-            DrawNotificationOutcomes
-        { get; } = [];
+        > DrawOutcomes { get; } = [];
 
         public Queue<
-            Result<
-                PointsGiveawayExpirationOutcome,
-                PointsGiveawaySchedulerTransientFailure
-            >
-        > ExpirationOutcomes
-        { get; } = [];
+            Result<Option<string>, PointsGiveawaySchedulerNotificationFailure>
+        > DrawNotificationOutcomes { get; } = [];
+
+        public Queue<
+            Result<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure>
+        > ExpirationOutcomes { get; } = [];
 
         public Queue<
             Result<
                 PointsGiveawayChangeNotificationCompleted,
                 PointsGiveawaySchedulerNotificationFailure
             >
-        > ChangeNotificationOutcomes
-        { get; } = [];
+        > ChangeNotificationOutcomes { get; } = [];
 
         public int LoadAttempts { get; private set; }
 
@@ -1207,26 +1175,25 @@ public sealed class PointsGiveawaySchedulerTests
             int giveawayId
         )
         {
-            return IO<
-                PointsGiveawayDrawOutcome,
-                PointsGiveawaySchedulerTransientFailure
-            >.Create(_ =>
-            {
-                DrawAttempts++;
-                if (DrawException is { } exception)
+            return IO<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>.Create(
+                _ =>
                 {
-                    return ValueTask.FromException<
-                        Result<
-                            PointsGiveawayDrawOutcome,
-                            PointsGiveawaySchedulerTransientFailure
-                        >
-                    >(exception);
-                }
+                    DrawAttempts++;
+                    if (DrawException is { } exception)
+                    {
+                        return ValueTask.FromException<
+                            Result<
+                                PointsGiveawayDrawOutcome,
+                                PointsGiveawaySchedulerTransientFailure
+                            >
+                        >(exception);
+                    }
 
-                return ValueTask.FromResult(
-                    Next(DrawOutcomes, PointsGiveawayDrawOutcome.Missing())
-                );
-            });
+                    return ValueTask.FromResult(
+                        Next(DrawOutcomes, PointsGiveawayDrawOutcome.Missing())
+                    );
+                }
+            );
         }
 
         public IO<Option<string>, PointsGiveawaySchedulerNotificationFailure> BuildDrawNotification(
@@ -1236,16 +1203,13 @@ public sealed class PointsGiveawaySchedulerTests
             return IO<Option<string>, PointsGiveawaySchedulerNotificationFailure>.Create(_ =>
             {
                 DrawNotificationAttempts++;
-                return ValueTask.FromResult(
-                    Next(DrawNotificationOutcomes, Option<string>.None)
-                );
+                return ValueTask.FromResult(Next(DrawNotificationOutcomes, Option<string>.None));
             });
         }
 
-        public IO<
-            PointsGiveawayExpirationOutcome,
-            PointsGiveawaySchedulerTransientFailure
-        > Expire(int giveawayId)
+        public IO<PointsGiveawayExpirationOutcome, PointsGiveawaySchedulerTransientFailure> Expire(
+            int giveawayId
+        )
         {
             return IO<
                 PointsGiveawayExpirationOutcome,
@@ -1320,9 +1284,8 @@ public sealed class PointsGiveawaySchedulerTests
         }
     }
 
-    private sealed class RecordingDbContextFactory(
-        IDbContextFactory<BlokeBotDbContext> inner
-    ) : IDbContextFactory<BlokeBotDbContext>
+    private sealed class RecordingDbContextFactory(IDbContextFactory<BlokeBotDbContext> inner)
+        : IDbContextFactory<BlokeBotDbContext>
     {
         private readonly ConcurrentQueue<DbConnection> _connections = [];
 
@@ -1445,8 +1408,7 @@ public sealed class PointsGiveawaySchedulerTests
         }
     }
 
-    private sealed class RecordingSchedulerNotification
-        : IPointsGiveawaySchedulerNotification
+    private sealed class RecordingSchedulerNotification : IPointsGiveawaySchedulerNotification
     {
         public List<string> Messages { get; } = [];
 
@@ -1491,8 +1453,7 @@ public sealed class PointsGiveawaySchedulerTests
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     }
 
-    private sealed class AutoAdvanceTimeProvider(DateTimeOffset utcNow)
-        : StaticTimeProvider(utcNow)
+    private sealed class AutoAdvanceTimeProvider(DateTimeOffset utcNow) : StaticTimeProvider(utcNow)
     {
         public override ITimer CreateTimer(
             TimerCallback callback,

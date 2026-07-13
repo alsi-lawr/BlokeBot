@@ -55,9 +55,9 @@ public static class ComponentRefreshEventSubscriptions
     private static Type RequireTargetType(Action callback)
     {
         return callback.Target?.GetType()
-        ?? throw new ArgumentException(
-            "Component refresh callbacks must target a component instance.",
-            nameof(callback)
-        );
+            ?? throw new ArgumentException(
+                "Component refresh callbacks must target a component instance.",
+                nameof(callback)
+            );
     }
 }

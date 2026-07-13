@@ -12,10 +12,7 @@ public sealed class CustomMessageSelector(TimeProvider clock)
             return null;
         }
 
-        var variants = entry
-            .Variants.OrderBy(x => x.SortOrder)
-            .ThenBy(x => x.Id)
-            .ToArray();
+        var variants = entry.Variants.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).ToArray();
         if (variants.Length == 0)
         {
             return null;

@@ -57,7 +57,10 @@ public partial class Field
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
 
-    private string _inputId { get => string.IsNullOrWhiteSpace(Id) ? field : Id; } = $"field-{Guid.NewGuid():N}";
+    private string _inputId
+    {
+        get => string.IsNullOrWhiteSpace(Id) ? field : Id;
+    } = $"field-{Guid.NewGuid():N}";
 
     private Task OnInput(ChangeEventArgs e)
     {

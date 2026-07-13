@@ -89,7 +89,11 @@ public partial class NavMenu
                 _guessingOpenStorageKey,
                 true
             );
-            _pointsOpen = await _module.InvokeAsync<bool>("readBoolean", _pointsOpenStorageKey, true);
+            _pointsOpen = await _module.InvokeAsync<bool>(
+                "readBoolean",
+                _pointsOpenStorageKey,
+                true
+            );
             _customCommandsOpen = await _module.InvokeAsync<bool>(
                 "readBoolean",
                 _customCommandsOpenStorageKey,

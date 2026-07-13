@@ -4,9 +4,7 @@ namespace BlokeBot.BotStatus;
 
 internal static class OfflineBotStatusServiceCollectionExtensions
 {
-    internal static IServiceCollection AddOfflineBotRuntimeStatus(
-        this IServiceCollection services
-    )
+    internal static IServiceCollection AddOfflineBotRuntimeStatus(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 

@@ -205,15 +205,14 @@ public sealed class HostWhisperCommandResponseSender(
             .ReserveRecipient(host.Id, senderUserId, recipientUserId, sourceMessage.Login)
             .ExecuteAsync(cancellationToken);
         return reservation.Match<PrivateDeliveryPreparation>(
-            _ =>
-                new PrivateDeliveryPreparation.Ready(
-                    new PreparedPrivateDelivery(
-                        host.Id,
-                        readyStatus.AccessToken,
-                        senderUserId,
-                        recipientUserId
-                    )
-                ),
+            _ => new PrivateDeliveryPreparation.Ready(
+                new PreparedPrivateDelivery(
+                    host.Id,
+                    readyStatus.AccessToken,
+                    senderUserId,
+                    recipientUserId
+                )
+            ),
             error =>
                 error switch
                 {
@@ -236,11 +235,7 @@ public sealed class HostWhisperCommandResponseSender(
         CancellationToken cancellationToken
     )
     {
-        await quota.MarkExhaustedAsync(
-            prepared.HostId,
-            prepared.SenderUserId,
-            cancellationToken
-        );
+        await quota.MarkExhaustedAsync(prepared.HostId, prepared.SenderUserId, cancellationToken);
         return Error(new PrivateDeliveryError.RateLimited(statusCode));
     }
 
@@ -257,24 +252,39 @@ public sealed class HostWhisperCommandResponseSender(
         var handling = error switch
         {
             PrivateDeliveryError.Disabled => HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.SenderIdentityUnavailable =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.RecipientUnavailable =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.SelfRecipient =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.QuotaExceeded =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.RateLimited =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.Transient =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.Rejected =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.Ambiguous =>
-                HandleFailureAsync(error, context, cancellationToken),
-            PrivateDeliveryError.Unexpected =>
-                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.SenderIdentityUnavailable => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
+            PrivateDeliveryError.RecipientUnavailable => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
+            PrivateDeliveryError.SelfRecipient => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
+            PrivateDeliveryError.QuotaExceeded => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
+            PrivateDeliveryError.RateLimited => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
+            PrivateDeliveryError.Transient => HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Rejected => HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Ambiguous => HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Unexpected => HandleFailureAsync(
+                error,
+                context,
+                cancellationToken
+            ),
             _ => throw new UnreachableException("Unknown private-delivery error."),
         };
         await handling;
@@ -402,8 +412,7 @@ public sealed class HostWhisperCommandResponseSender(
     {
         private PrivateDeliveryPreparation() { }
 
-        internal sealed record Ready(PreparedPrivateDelivery Delivery)
-            : PrivateDeliveryPreparation;
+        internal sealed record Ready(PreparedPrivateDelivery Delivery) : PrivateDeliveryPreparation;
 
         internal sealed record Failed(PrivateDeliveryError Error) : PrivateDeliveryPreparation;
     }

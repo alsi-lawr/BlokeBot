@@ -19,7 +19,11 @@ public sealed class CustomAnnouncementSchedulerTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
-        var hostId = await SeedHostAsync(dbFactory, "streamer", changedAtUtc: now.AddHours(-1).UtcDateTime);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
         var seed = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
@@ -35,7 +39,9 @@ public sealed class CustomAnnouncementSchedulerTests
 
         sender.Messages.ShouldBe([new SentChatMessage("streamer", "First")]);
         await using var db = await dbFactory.CreateDbContextAsync();
-        var announcement = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+        var announcement = await db.CustomAnnouncements.SingleAsync(x =>
+            x.Id == seed.AnnouncementId
+        );
         announcement.LastSentAtUtc.ShouldBe(now.UtcDateTime);
         announcement.ChatMessagesSinceLastSent.ShouldBe(0);
         var currentIndex = await db
@@ -82,7 +88,11 @@ public sealed class CustomAnnouncementSchedulerTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
         var clock = new ManualTimeProvider(now);
-        var hostId = await SeedHostAsync(dbFactory, "streamer", changedAtUtc: now.AddHours(-1).UtcDateTime);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
         var seed = await SeedAnnouncementAsync(
             dbFactory,
             hostId,
@@ -98,7 +108,10 @@ public sealed class CustomAnnouncementSchedulerTests
         var sender = new RecordingChatMessageSender();
         var scheduler = CreateScheduler(dbFactory, clock, sender);
 
-        await activity.MessageReceivedAsync(Message("viewer", "streamer", "hello"), CancellationToken.None);
+        await activity.MessageReceivedAsync(
+            Message("viewer", "streamer", "hello"),
+            CancellationToken.None
+        );
         await scheduler.RunTickAsync(CancellationToken.None);
 
         sender.Messages.ShouldBeEmpty();
@@ -111,13 +124,18 @@ public sealed class CustomAnnouncementSchedulerTests
             count.ShouldBe(1);
         }
 
-        await activity.MessageReceivedAsync(Message("viewer", "streamer", "!hello"), CancellationToken.None);
+        await activity.MessageReceivedAsync(
+            Message("viewer", "streamer", "!hello"),
+            CancellationToken.None
+        );
         await scheduler.RunTickAsync(CancellationToken.None);
 
         sender.Messages.ShouldBe([new SentChatMessage("streamer", "After chat")]);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            var announcement = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+            var announcement = await db.CustomAnnouncements.SingleAsync(x =>
+                x.Id == seed.AnnouncementId
+            );
             announcement.ChatMessagesSinceLastSent.ShouldBe(0);
             announcement.LastSentAtUtc.ShouldBe(now.UtcDateTime);
         }
@@ -286,11 +304,7 @@ public sealed class CustomAnnouncementSchedulerTests
             ["Message"],
             now.AddMinutes(-30).UtcDateTime
         );
-        var scheduler = CreateScheduler(
-            dbFactory,
-            clock,
-            new DisabledCustomAnnouncementSender()
-        );
+        var scheduler = CreateScheduler(dbFactory, clock, new DisabledCustomAnnouncementSender());
 
         await scheduler.RunTickAsync(CancellationToken.None);
 
@@ -369,10 +383,12 @@ public sealed class CustomAnnouncementSchedulerTests
 
         sender.Messages.ShouldBe([new SentChatMessage("second", "Second")]);
         await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.CustomAnnouncements.FindAsync(first.AnnouncementId))!
-            .LastSentAtUtc.ShouldBeNull();
-        (await db.CustomAnnouncements.FindAsync(second.AnnouncementId))!
-            .LastSentAtUtc.ShouldBe(now.UtcDateTime);
+        (
+            await db.CustomAnnouncements.FindAsync(first.AnnouncementId)
+        )!.LastSentAtUtc.ShouldBeNull();
+        (await db.CustomAnnouncements.FindAsync(second.AnnouncementId))!.LastSentAtUtc.ShouldBe(
+            now.UtcDateTime
+        );
     }
 
     [Test]
@@ -456,7 +472,9 @@ public sealed class CustomAnnouncementSchedulerTests
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var rows = await db
-                .CustomAnnouncements.Where(x => x.Id == first.AnnouncementId || x.Id == second.AnnouncementId)
+                .CustomAnnouncements.Where(x =>
+                    x.Id == first.AnnouncementId || x.Id == second.AnnouncementId
+                )
                 .OrderBy(x => x.Id)
                 .ToArrayAsync();
             rows[0].OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.RetryScheduled);
@@ -473,13 +491,13 @@ public sealed class CustomAnnouncementSchedulerTests
         clock.SetUtcNow(now.AddSeconds(5));
         await CreateScheduler(dbFactory, clock, sender).RunTickAsync(CancellationToken.None);
         sender.Calls.Count.ShouldBe(4);
-        sender.Calls.Select(x => x.Message).ShouldBe(
-            ["First", "Second", "First", "Second"]
-        );
+        sender.Calls.Select(x => x.Message).ShouldBe(["First", "Second", "First", "Second"]);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         var completed = await verify
-            .CustomAnnouncements.Where(x => x.Id == first.AnnouncementId || x.Id == second.AnnouncementId)
+            .CustomAnnouncements.Where(x =>
+                x.Id == first.AnnouncementId || x.Id == second.AnnouncementId
+            )
             .OrderBy(x => x.Id)
             .ToArrayAsync();
         completed.ShouldAllBe(x => x.OccurrenceStatus == AnnouncementOccurrenceStatus.Accepted);
@@ -524,7 +542,9 @@ public sealed class CustomAnnouncementSchedulerTests
 
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            var skipped = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+            var skipped = await db.CustomAnnouncements.SingleAsync(x =>
+                x.Id == seed.AnnouncementId
+            );
             skipped.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.SkippedExpired);
             skipped.LastOccurrenceAtUtc.ShouldBe(dueAt.UtcDateTime);
             skipped.Enabled.ShouldBeTrue();
@@ -534,8 +554,9 @@ public sealed class CustomAnnouncementSchedulerTests
         await scheduler.RunTickAsync(CancellationToken.None);
         sender.Calls.Count.ShouldBe(2);
         await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
-            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
+        (
+            await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId)
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
     }
 
     [Test]
@@ -571,7 +592,10 @@ public sealed class CustomAnnouncementSchedulerTests
     {
         var cases = new (AnnouncementEnqueueOutcome Outcome, AnnouncementOccurrenceStatus Status)[]
         {
-            (new AnnouncementEnqueueOutcome.Rejected(), AnnouncementOccurrenceStatus.TerminalRejected),
+            (
+                new AnnouncementEnqueueOutcome.Rejected(),
+                AnnouncementOccurrenceStatus.TerminalRejected
+            ),
             (
                 new AnnouncementEnqueueOutcome.Ambiguous(
                     new AnnouncementEnqueueFailureType("Ambiguous")
@@ -612,7 +636,9 @@ public sealed class CustomAnnouncementSchedulerTests
 
             sender.Calls.Count.ShouldBe(1);
             await using var db = await dbFactory.CreateDbContextAsync();
-            var announcement = await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+            var announcement = await db.CustomAnnouncements.SingleAsync(x =>
+                x.Id == seed.AnnouncementId
+            );
             announcement.OccurrenceStatus.ShouldBe(testCase.Status);
             announcement.OccurrenceNextAttemptAtUtc.ShouldBeNull();
         }
@@ -659,10 +685,15 @@ public sealed class CustomAnnouncementSchedulerTests
 
         sender.Messages.ShouldBeEmpty();
         await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.CustomAnnouncements.SingleAsync(x => x.Id == invalid.AnnouncementId))
-            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalInvalidTimeZone);
-        var blankAnnouncement = await db.CustomAnnouncements.SingleAsync(x => x.Id == blank.AnnouncementId);
-        blankAnnouncement.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalMissingMessage);
+        (
+            await db.CustomAnnouncements.SingleAsync(x => x.Id == invalid.AnnouncementId)
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalInvalidTimeZone);
+        var blankAnnouncement = await db.CustomAnnouncements.SingleAsync(x =>
+            x.Id == blank.AnnouncementId
+        );
+        blankAnnouncement.OccurrenceStatus.ShouldBe(
+            AnnouncementOccurrenceStatus.TerminalMissingMessage
+        );
         blankAnnouncement.OccurrenceAttemptCount.ShouldBe(0);
     }
 
@@ -688,22 +719,22 @@ public sealed class CustomAnnouncementSchedulerTests
         var cancellingSender = new CancellingAnnouncementSender(cancellation);
 
         await Should.ThrowAsync<OperationCanceledException>(() =>
-            CreateScheduler(dbFactory, clock, cancellingSender)
-                .RunTickAsync(cancellation.Token)
+            CreateScheduler(dbFactory, clock, cancellingSender).RunTickAsync(cancellation.Token)
         );
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
-            (await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
-                .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
+            (
+                await db.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId)
+            ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
         }
 
         var replacement = new RecordingChatMessageSender();
-        await CreateScheduler(dbFactory, clock, replacement)
-            .RunTickAsync(CancellationToken.None);
+        await CreateScheduler(dbFactory, clock, replacement).RunTickAsync(CancellationToken.None);
         replacement.Messages.ShouldBeEmpty();
         await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId))
-            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalAmbiguous);
+        (
+            await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId)
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.TerminalAmbiguous);
     }
 
     [Test]
@@ -747,10 +778,12 @@ public sealed class CustomAnnouncementSchedulerTests
         failure.ShouldContain("FailureType: InvalidOperationException");
         failure.ShouldNotContain("private first payload");
         await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.CustomAnnouncements.SingleAsync(x => x.Id == first.AnnouncementId))
-            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
-        (await db.CustomAnnouncements.SingleAsync(x => x.Id == second.AnnouncementId))
-            .OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
+        (
+            await db.CustomAnnouncements.SingleAsync(x => x.Id == first.AnnouncementId)
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Attempting);
+        (
+            await db.CustomAnnouncements.SingleAsync(x => x.Id == second.AnnouncementId)
+        ).OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.Accepted);
     }
 
     private static CustomAnnouncementScheduler CreateScheduler(
@@ -844,11 +877,9 @@ public sealed class CustomAnnouncementSchedulerTests
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
             Variants = variants
-                .Select((text, index) => new CustomMessageVariant
-                {
-                    SortOrder = index,
-                    Text = text,
-                })
+                .Select(
+                    (text, index) => new CustomMessageVariant { SortOrder = index, Text = text }
+                )
                 .ToList(),
         };
         db.CustomMessageLibraryEntries.Add(entry);
@@ -867,9 +898,7 @@ public sealed class CustomAnnouncementSchedulerTests
             {
                 HostId = hostId,
                 RetryDelay = new AnnouncementRetryDelay(retryDelay),
-                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                    occurrenceLifetime
-                ),
+                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(occurrenceLifetime),
             },
             LastSentAtUtc = lastSentAtUtc,
             CreatedAtUtc = createdAtUtc,
@@ -895,9 +924,8 @@ public sealed class CustomAnnouncementSchedulerTests
         DateTimeOffset ExpiresAt
     );
 
-    private sealed class ScriptedAnnouncementSender(
-        params AnnouncementEnqueueOutcome[] outcomes
-    ) : ICustomAnnouncementSender
+    private sealed class ScriptedAnnouncementSender(params AnnouncementEnqueueOutcome[] outcomes)
+        : ICustomAnnouncementSender
     {
         private readonly Queue<AnnouncementEnqueueOutcome> _remaining = new(outcomes);
 
@@ -931,9 +959,7 @@ public sealed class CustomAnnouncementSchedulerTests
         )
         {
             cancellation.Cancel();
-            return ValueTask.FromCanceled<AnnouncementEnqueueOutcome>(
-                cancellationToken
-            );
+            return ValueTask.FromCanceled<AnnouncementEnqueueOutcome>(cancellationToken);
         }
     }
 
@@ -1009,8 +1035,7 @@ public sealed class CustomAnnouncementSchedulerTests
         }
     }
 
-    private sealed class FailingChannelSender(string failingChannel)
-        : ICustomAnnouncementSender
+    private sealed class FailingChannelSender(string failingChannel) : ICustomAnnouncementSender
     {
         public List<SentChatMessage> Messages { get; } = [];
 

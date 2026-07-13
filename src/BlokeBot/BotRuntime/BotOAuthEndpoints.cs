@@ -402,10 +402,7 @@ internal static class BotOAuthEndpoints
         );
     }
 
-    private static CookieOptions ChannelBotStateCookieOptions(
-        HttpRequest request,
-        TimeSpan? maxAge
-    )
+    private static CookieOptions ChannelBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)
     {
         return new()
         {

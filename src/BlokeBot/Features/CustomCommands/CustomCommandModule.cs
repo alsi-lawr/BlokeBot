@@ -2,7 +2,8 @@ using BlokeBot.Commands;
 
 namespace BlokeBot.Features.CustomCommands;
 
-public sealed class CustomCommandModule(CustomCommandExecutionService execution) : ITwitchCommandModule
+public sealed class CustomCommandModule(CustomCommandExecutionService execution)
+    : ITwitchCommandModule
 {
     public void AddCommands(ITwitchCommandBuilder commands)
     {

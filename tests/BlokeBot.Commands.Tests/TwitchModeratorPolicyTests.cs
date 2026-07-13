@@ -48,6 +48,12 @@ public sealed class TwitchModeratorPolicyTests
         IReadOnlyDictionary<string, string>? tags = null
     )
     {
-        return new(login, channel, "!command", string.Empty, tags ?? new Dictionary<string, string>());
+        return new(
+            login,
+            channel,
+            "!command",
+            string.Empty,
+            tags ?? new Dictionary<string, string>()
+        );
     }
 }

@@ -14,14 +14,13 @@ public sealed class PersistedTokenAttribute(string token) : Attribute
 public static class PersistedEnumTokens<TEnum>
     where TEnum : struct, Enum
 {
-    private static readonly IReadOnlyDictionary<TEnum, string> _tokensByValue = BuildTokensByValue();
-    private static readonly IReadOnlyDictionary<string, TEnum> _valuesByToken = BuildValuesByToken();
+    private static readonly IReadOnlyDictionary<TEnum, string> _tokensByValue =
+        BuildTokensByValue();
+    private static readonly IReadOnlyDictionary<string, TEnum> _valuesByToken =
+        BuildValuesByToken();
 
     public static IReadOnlyList<string> Values { get; } =
-        Enum.GetValues<TEnum>()
-            .Select(Format)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        Enum.GetValues<TEnum>().Select(Format).Order(StringComparer.OrdinalIgnoreCase).ToArray();
 
     public static string Format(TEnum value)
     {
@@ -35,9 +34,7 @@ public static class PersistedEnumTokens<TEnum>
         ArgumentNullException.ThrowIfNull(token);
         return _valuesByToken.TryGetValue(token.Trim(), out var value)
             ? value
-            : throw new FormatException(
-                $"Unknown persisted {typeof(TEnum).Name} token '{token}'."
-            );
+            : throw new FormatException($"Unknown persisted {typeof(TEnum).Name} token '{token}'.");
     }
 
     private static IReadOnlyDictionary<TEnum, string> BuildTokensByValue()

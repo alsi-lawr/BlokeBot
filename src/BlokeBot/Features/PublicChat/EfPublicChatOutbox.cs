@@ -38,7 +38,10 @@ internal sealed class EfPublicChatOutbox(
             )
         )
         {
-            throw new ArgumentException("At least one non-blank message is required.", nameof(batch));
+            throw new ArgumentException(
+                "At least one non-blank message is required.",
+                nameof(batch)
+            );
         }
 
         var createdAtUtc = batch.EnqueuedAt.UtcDateTime;
@@ -46,22 +49,22 @@ internal sealed class EfPublicChatOutbox(
         var expiresAtUtc = batch.Deadline switch
         {
             PublicChatDeliveryDeadline.ConfiguredMaximum => configuredExpiry.UtcDateTime,
-            PublicChatDeliveryDeadline.ProducerAbsolute producer =>
-                Min(configuredExpiry, producer.ExpiresAt).UtcDateTime,
+            PublicChatDeliveryDeadline.ProducerAbsolute producer => Min(
+                configuredExpiry,
+                producer.ExpiresAt
+            ).UtcDateTime,
             _ => throw new UnreachableException("Unknown public-chat delivery deadline."),
         };
-        var rows = batch.Items
-            .Select(item =>
-                new PublicChatOutboxMessage
-                {
-                    Channel = batch.Channel,
-                    Message = item.Message,
-                    DeduplicationKey = item.DeduplicationKey.Value,
-                    CreatedAtUtc = createdAtUtc,
-                    ExpiresAtUtc = expiresAtUtc,
-                    NextAttemptAtUtc = createdAtUtc,
-                }
-            )
+        var rows = batch
+            .Items.Select(item => new PublicChatOutboxMessage
+            {
+                Channel = batch.Channel,
+                Message = item.Message,
+                DeduplicationKey = item.DeduplicationKey.Value,
+                CreatedAtUtc = createdAtUtc,
+                ExpiresAtUtc = expiresAtUtc,
+                NextAttemptAtUtc = createdAtUtc,
+            })
             .ToArray();
 
         try
@@ -155,18 +158,9 @@ internal sealed class EfPublicChatOutbox(
                     update =>
                         update
                             .SetProperty(row => row.Status, PublicChatOutboxStatus.Sending)
-                            .SetProperty(
-                                row => row.SendStartedAtUtc,
-                                sendStartedAt.UtcDateTime
-                            )
-                            .SetProperty(
-                                row => row.ClaimExpiresAtUtc,
-                                claimExpiresAt.UtcDateTime
-                            )
-                            .SetProperty(
-                                row => row.AttemptCount,
-                                row => row.AttemptCount + 1
-                            )
+                            .SetProperty(row => row.SendStartedAtUtc, sendStartedAt.UtcDateTime)
+                            .SetProperty(row => row.ClaimExpiresAtUtc, claimExpiresAt.UtcDateTime)
+                            .SetProperty(row => row.AttemptCount, row => row.AttemptCount + 1)
                             .SetProperty(
                                 row => row.FailurePhase,
                                 (PublicChatOutboxFailurePhase?)null
@@ -217,26 +211,11 @@ internal sealed class EfPublicChatOutbox(
                     cancellationToken
                 ),
             rejection =>
-                RecordRejectionAsync(
-                    message,
-                    rejection.Reason,
-                    recordedAt,
-                    cancellationToken
-                ),
+                RecordRejectionAsync(message, rejection.Reason, recordedAt, cancellationToken),
             ambiguous =>
-                RecordAmbiguousAsync(
-                    message,
-                    ambiguous.Diagnostic,
-                    recordedAt,
-                    cancellationToken
-                ),
+                RecordAmbiguousAsync(message, ambiguous.Diagnostic, recordedAt, cancellationToken),
             unexpected =>
-                RecordUnexpectedAsync(
-                    message,
-                    unexpected.Diagnostic,
-                    recordedAt,
-                    cancellationToken
-                )
+                RecordUnexpectedAsync(message, unexpected.Diagnostic, recordedAt, cancellationToken)
         );
     }
 
@@ -248,12 +227,7 @@ internal sealed class EfPublicChatOutbox(
     )
     {
         ArgumentNullException.ThrowIfNull(diagnostic);
-        return RecordAmbiguousAsync(
-            message,
-            diagnostic,
-            interruptedAt,
-            cancellationToken
-        );
+        return RecordAmbiguousAsync(message, diagnostic, interruptedAt, cancellationToken);
     }
 
     public async ValueTask<PublicChatClaimUpdate> ReleaseClaimAsync(
@@ -266,12 +240,8 @@ internal sealed class EfPublicChatOutbox(
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             if (
-                await ExpireOwnedClaimAsync(
-                    db,
-                    message,
-                    releasedAt.UtcDateTime,
-                    cancellationToken
-                ) == 1
+                await ExpireOwnedClaimAsync(db, message, releasedAt.UtcDateTime, cancellationToken)
+                == 1
             )
             {
                 return new PublicChatClaimUpdate.Expired();
@@ -288,16 +258,10 @@ internal sealed class EfPublicChatOutbox(
                 .ExecuteUpdateAsync(
                     update =>
                         update
-                            .SetProperty(
-                                row => row.Status,
-                                PublicChatOutboxStatus.Pending
-                            )
+                            .SetProperty(row => row.Status, PublicChatOutboxStatus.Pending)
                             .SetProperty(row => row.ClaimToken, (Guid?)null)
                             .SetProperty(row => row.ClaimSlot, (int?)null)
-                            .SetProperty(
-                                row => row.ClaimExpiresAtUtc,
-                                (DateTime?)null
-                            ),
+                            .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
                     cancellationToken
                 );
             if (initialClaimReleased == 1)
@@ -322,10 +286,7 @@ internal sealed class EfPublicChatOutbox(
                             )
                             .SetProperty(row => row.ClaimToken, (Guid?)null)
                             .SetProperty(row => row.ClaimSlot, (int?)null)
-                            .SetProperty(
-                                row => row.ClaimExpiresAtUtc,
-                                (DateTime?)null
-                            ),
+                            .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
                     cancellationToken
                 );
             return Changed(retryClaimReleased);
@@ -353,8 +314,7 @@ internal sealed class EfPublicChatOutbox(
                     && (
                         row.Status == PublicChatOutboxStatus.Pending
                         || row.Status == PublicChatOutboxStatus.Claimed
-                        || row.Status
-                            == PublicChatOutboxStatus.SafePreSendTransient
+                        || row.Status == PublicChatOutboxStatus.SafePreSendTransient
                     )
                 )
             )
@@ -362,10 +322,10 @@ internal sealed class EfPublicChatOutbox(
             .ThenBy(row => row.Id)
             .Select(row => new { row.Channel, row.CreatedAtUtc })
             .ToArrayAsync(cancellationToken);
-        return rows
-            .Select(row =>
-                new PublicChatPendingMessage(row.Channel, ToDateTimeOffset(row.CreatedAtUtc))
-            )
+        return rows.Select(row => new PublicChatPendingMessage(
+                row.Channel,
+                ToDateTimeOffset(row.CreatedAtUtc)
+            ))
             .ToArray();
     }
 
@@ -389,11 +349,7 @@ internal sealed class EfPublicChatOutbox(
             Max(sendInterval, duplicateCooldown),
             cancellationToken
         );
-        var nextTerminalPurgeAt = await NextTerminalPurgeAtAsync(
-            db,
-            now,
-            cancellationToken
-        );
+        var nextTerminalPurgeAt = await NextTerminalPurgeAtAsync(db, now, cancellationToken);
         var nextSendReceiptPurgeAt = await NextSendReceiptPurgeAtAsync(
             db,
             now,
@@ -403,8 +359,10 @@ internal sealed class EfPublicChatOutbox(
         var nextExpiryAt = await NextUnsentExpiryAtAsync(db, cancellationToken);
         var nextMaintenanceAt = nextTerminalPurgeAt switch
         {
-            { } terminalPurgeAt when nextSendReceiptPurgeAt is { } receiptPurgeAt =>
-                Min(terminalPurgeAt, receiptPurgeAt),
+            { } terminalPurgeAt when nextSendReceiptPurgeAt is { } receiptPurgeAt => Min(
+                terminalPurgeAt,
+                receiptPurgeAt
+            ),
             { } terminalPurgeAt => terminalPurgeAt,
             null => nextSendReceiptPurgeAt,
         };
@@ -418,8 +376,10 @@ internal sealed class EfPublicChatOutbox(
         var activeClaim = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
-                (row.Status == PublicChatOutboxStatus.Claimed
-                    || row.Status == PublicChatOutboxStatus.Sending)
+                (
+                    row.Status == PublicChatOutboxStatus.Claimed
+                    || row.Status == PublicChatOutboxStatus.Sending
+                )
                 && row.ClaimExpiresAtUtc > nowUtc
             )
             .OrderBy(row => row.ClaimExpiresAtUtc)
@@ -445,8 +405,7 @@ internal sealed class EfPublicChatOutbox(
                     row.Status == PublicChatOutboxStatus.Pending
                     || (
                         row.Status == PublicChatOutboxStatus.SafePreSendTransient
-                        && row.SafePreSendFailureCount
-                            < _safePreSendRetryPolicy.AttemptLimit
+                        && row.SafePreSendFailureCount < _safePreSendRetryPolicy.AttemptLimit
                     )
                 )
                 && row.ExpiresAtUtc > nowUtc
@@ -486,18 +445,16 @@ internal sealed class EfPublicChatOutbox(
                 StringComparer.Ordinal
             );
         var candidate = claimable
-            .Select(row =>
-                new ClaimCandidate(
+            .Select(row => new ClaimCandidate(
+                row,
+                EligibleAt(
                     row,
-                    EligibleAt(
-                        row,
-                        previousAttemptAt,
-                        deliveredAtByKey,
-                        sendInterval,
-                        duplicateCooldown
-                    )
+                    previousAttemptAt,
+                    deliveredAtByKey,
+                    sendInterval,
+                    duplicateCooldown
                 )
-            )
+            ))
             .OrderBy(value => value.EligibleAtUtc)
             .ThenBy(value => value.Row.CreatedAtUtc)
             .ThenBy(value => value.Row.Id)
@@ -521,8 +478,7 @@ internal sealed class EfPublicChatOutbox(
                     row.Status == PublicChatOutboxStatus.Pending
                     || (
                         row.Status == PublicChatOutboxStatus.SafePreSendTransient
-                        && row.SafePreSendFailureCount
-                            < _safePreSendRetryPolicy.AttemptLimit
+                        && row.SafePreSendFailureCount < _safePreSendRetryPolicy.AttemptLimit
                     )
                 )
             )
@@ -532,10 +488,7 @@ internal sealed class EfPublicChatOutbox(
                         .SetProperty(row => row.Status, PublicChatOutboxStatus.Claimed)
                         .SetProperty(row => row.ClaimToken, claimToken)
                         .SetProperty(row => row.ClaimSlot, 1)
-                        .SetProperty(
-                            row => row.ClaimExpiresAtUtc,
-                            claimExpiresAt.UtcDateTime
-                        ),
+                        .SetProperty(row => row.ClaimExpiresAtUtc, claimExpiresAt.UtcDateTime),
                 cancellationToken
             );
         if (changed == 0)
@@ -543,12 +496,14 @@ internal sealed class EfPublicChatOutbox(
             return new PublicChatClaimOutcome.Contended();
         }
 
-        var claimed = await db
-            .PublicChatOutboxMessages.AsNoTracking()
-            .SingleOrDefaultAsync(row =>
-                row.Id == candidate.Row.Id && row.ClaimToken == claimToken,
-                cancellationToken
-            ) ?? throw new UnreachableException(
+        var claimed =
+            await db
+                .PublicChatOutboxMessages.AsNoTracking()
+                .SingleOrDefaultAsync(
+                    row => row.Id == candidate.Row.Id && row.ClaimToken == claimToken,
+                    cancellationToken
+                )
+            ?? throw new UnreachableException(
                 "A successfully claimed public chat outbox row disappeared."
             );
         return new PublicChatClaimOutcome.Claimed(MapClaimed(claimed));
@@ -602,10 +557,7 @@ internal sealed class EfPublicChatOutbox(
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
                         .SetProperty(row => row.SendStartedAtUtc, (DateTime?)null)
                         .SetProperty(row => row.CompletedAtUtc, nowUtc)
-                        .SetProperty(
-                            row => row.FailurePhase,
-                            (PublicChatOutboxFailurePhase?)null
-                        )
+                        .SetProperty(row => row.FailurePhase, (PublicChatOutboxFailurePhase?)null)
                         .SetProperty(row => row.FailureType, (string?)null)
                         .SetProperty(row => row.HttpStatusCode, (int?)null)
                         .SetProperty(row => row.RejectionCode, (string?)null),
@@ -620,8 +572,8 @@ internal sealed class EfPublicChatOutbox(
         CancellationToken cancellationToken
     )
     {
-        return db.PublicChatOutboxMessages
-            .Where(row =>
+        return db
+            .PublicChatOutboxMessages.Where(row =>
                 row.Id == message.Id
                 && row.Status == PublicChatOutboxStatus.Claimed
                 && row.ClaimToken == message.ClaimToken.Value
@@ -639,10 +591,7 @@ internal sealed class EfPublicChatOutbox(
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
                         .SetProperty(row => row.SendStartedAtUtc, (DateTime?)null)
                         .SetProperty(row => row.CompletedAtUtc, nowUtc)
-                        .SetProperty(
-                            row => row.FailurePhase,
-                            (PublicChatOutboxFailurePhase?)null
-                        )
+                        .SetProperty(row => row.FailurePhase, (PublicChatOutboxFailurePhase?)null)
                         .SetProperty(row => row.FailureType, (string?)null)
                         .SetProperty(row => row.HttpStatusCode, (int?)null)
                         .SetProperty(row => row.RejectionCode, (string?)null),
@@ -677,8 +626,7 @@ internal sealed class EfPublicChatOutbox(
         var expiredSendingIds = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
-                row.Status == PublicChatOutboxStatus.Sending
-                && row.ClaimExpiresAtUtc <= nowUtc
+                row.Status == PublicChatOutboxStatus.Sending && row.ClaimExpiresAtUtc <= nowUtc
             )
             .Select(row => row.Id)
             .ToArrayAsync(cancellationToken);
@@ -690,24 +638,19 @@ internal sealed class EfPublicChatOutbox(
                     && receipt.CompletedAtUtc == null
                 )
                 .ExecuteUpdateAsync(
-                    update =>
-                        update.SetProperty(receipt => receipt.CompletedAtUtc, nowUtc),
+                    update => update.SetProperty(receipt => receipt.CompletedAtUtc, nowUtc),
                     cancellationToken
                 );
         }
 
         await db
             .PublicChatOutboxMessages.Where(row =>
-                row.Status == PublicChatOutboxStatus.Sending
-                && row.ClaimExpiresAtUtc <= nowUtc
+                row.Status == PublicChatOutboxStatus.Sending && row.ClaimExpiresAtUtc <= nowUtc
             )
             .ExecuteUpdateAsync(
                 update =>
                     update
-                        .SetProperty(
-                            row => row.Status,
-                            PublicChatOutboxStatus.Ambiguous
-                        )
+                        .SetProperty(row => row.Status, PublicChatOutboxStatus.Ambiguous)
                         .SetProperty(row => row.Message, (string?)null)
                         .SetProperty(row => row.DeduplicationKey, (string?)null)
                         .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
@@ -715,10 +658,7 @@ internal sealed class EfPublicChatOutbox(
                         .SetProperty(row => row.ClaimSlot, (int?)null)
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
                         .SetProperty(row => row.CompletedAtUtc, nowUtc)
-                        .SetProperty(
-                            row => row.FailurePhase,
-                            PublicChatOutboxFailurePhase.Send
-                        )
+                        .SetProperty(row => row.FailurePhase, PublicChatOutboxFailurePhase.Send)
                         .SetProperty(
                             row => row.FailureType,
                             typeof(PublicChatSendLeaseExpired).FullName
@@ -749,10 +689,7 @@ internal sealed class EfPublicChatOutbox(
             .ExecuteUpdateAsync(
                 update =>
                     update
-                        .SetProperty(
-                            row => row.Status,
-                            PublicChatOutboxStatus.SafePreSendTransient
-                        )
+                        .SetProperty(row => row.Status, PublicChatOutboxStatus.SafePreSendTransient)
                         .SetProperty(row => row.ClaimToken, (Guid?)null)
                         .SetProperty(row => row.ClaimSlot, (int?)null)
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
@@ -766,8 +703,8 @@ internal sealed class EfPublicChatOutbox(
         CancellationToken cancellationToken
     )
     {
-        return db.PublicChatOutboxMessages
-            .Where(row =>
+        return db
+            .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.SafePreSendTransient
                 && row.SafePreSendFailureCount >= _safePreSendRetryPolicy.AttemptLimit
                 && row.ExpiresAtUtc > nowUtc
@@ -775,10 +712,7 @@ internal sealed class EfPublicChatOutbox(
             .ExecuteUpdateAsync(
                 update =>
                     update
-                        .SetProperty(
-                            row => row.Status,
-                            PublicChatOutboxStatus.SafePreSendExhausted
-                        )
+                        .SetProperty(row => row.Status, PublicChatOutboxStatus.SafePreSendExhausted)
                         .SetProperty(row => row.Message, (string?)null)
                         .SetProperty(row => row.DeduplicationKey, (string?)null)
                         .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
@@ -902,9 +836,7 @@ internal sealed class EfPublicChatOutbox(
         return Min(exactPurgeAt, AddOrMaximum(now, _maximumMaintenanceWake));
     }
 
-    private static IQueryable<PublicChatOutboxMessage> TerminalRows(
-        BlokeBotDbContext db
-    )
+    private static IQueryable<PublicChatOutboxMessage> TerminalRows(BlokeBotDbContext db)
     {
         return db.PublicChatOutboxMessages.Where(row =>
             row.Status == PublicChatOutboxStatus.SafePreSendExhausted
@@ -940,9 +872,7 @@ internal sealed class EfPublicChatOutbox(
             }
 
             var receiptUpdated = await db
-                .PublicChatSendReceipts.Where(receipt =>
-                    receipt.OutboxMessageId == message.Id
-                )
+                .PublicChatSendReceipts.Where(receipt => receipt.OutboxMessageId == message.Id)
                 .ExecuteUpdateAsync(
                     update =>
                         update
@@ -950,10 +880,7 @@ internal sealed class EfPublicChatOutbox(
                                 receipt => receipt.DeliveredDeduplicationKey,
                                 message.DeduplicationKey.Value
                             )
-                            .SetProperty(
-                                receipt => receipt.CompletedAtUtc,
-                                completedAt.UtcDateTime
-                            )
+                            .SetProperty(receipt => receipt.CompletedAtUtc, completedAt.UtcDateTime)
                             .SetProperty(
                                 receipt => receipt.DeliveredAtUtc,
                                 completedAt.UtcDateTime
@@ -996,11 +923,7 @@ internal sealed class EfPublicChatOutbox(
                     && row.Status == PublicChatOutboxStatus.Claimed
                     && row.ClaimToken == message.ClaimToken.Value
                 )
-                .Select(row => new
-                {
-                    row.SafePreSendFailureCount,
-                    row.ExpiresAtUtc,
-                })
+                .Select(row => new { row.SafePreSendFailureCount, row.ExpiresAtUtc })
                 .SingleOrDefaultAsync(cancellationToken);
             if (persisted is null)
             {
@@ -1065,14 +988,8 @@ internal sealed class EfPublicChatOutbox(
                                     )
                                     .SetProperty(row => row.ClaimToken, (Guid?)null)
                                     .SetProperty(row => row.ClaimSlot, (int?)null)
-                                    .SetProperty(
-                                        row => row.ClaimExpiresAtUtc,
-                                        (DateTime?)null
-                                    )
-                                    .SetProperty(
-                                        row => row.CompletedAtUtc,
-                                        (DateTime?)null
-                                    )
+                                    .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                    .SetProperty(row => row.CompletedAtUtc, (DateTime?)null)
                                     .SetProperty(
                                         row => row.FailurePhase,
                                         PublicChatOutboxFailurePhase.Preparation
@@ -1085,10 +1002,7 @@ internal sealed class EfPublicChatOutbox(
                                         row => row.HttpStatusCode,
                                         HttpStatusCode(diagnostic.HttpStatus)
                                     )
-                                    .SetProperty(
-                                        row => row.RejectionCode,
-                                        (string?)null
-                                    ),
+                                    .SetProperty(row => row.RejectionCode, (string?)null),
                             cancellationToken
                         )
                 ),
@@ -1114,24 +1028,12 @@ internal sealed class EfPublicChatOutbox(
                                         row => row.SafePreSendFailureCount,
                                         exhausted.FailureCount.Value
                                     )
-                                    .SetProperty(
-                                        row => row.NextAttemptAtUtc,
-                                        (DateTime?)null
-                                    )
+                                    .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
                                     .SetProperty(row => row.ClaimToken, (Guid?)null)
                                     .SetProperty(row => row.ClaimSlot, (int?)null)
-                                    .SetProperty(
-                                        row => row.ClaimExpiresAtUtc,
-                                        (DateTime?)null
-                                    )
-                                    .SetProperty(
-                                        row => row.SendStartedAtUtc,
-                                        (DateTime?)null
-                                    )
-                                    .SetProperty(
-                                        row => row.CompletedAtUtc,
-                                        recordedAt.UtcDateTime
-                                    )
+                                    .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                    .SetProperty(row => row.SendStartedAtUtc, (DateTime?)null)
+                                    .SetProperty(row => row.CompletedAtUtc, recordedAt.UtcDateTime)
                                     .SetProperty(
                                         row => row.FailurePhase,
                                         PublicChatOutboxFailurePhase.Preparation
@@ -1144,10 +1046,7 @@ internal sealed class EfPublicChatOutbox(
                                         row => row.HttpStatusCode,
                                         HttpStatusCode(diagnostic.HttpStatus)
                                     )
-                                    .SetProperty(
-                                        row => row.RejectionCode,
-                                        (string?)null
-                                    ),
+                                    .SetProperty(row => row.RejectionCode, (string?)null),
                             cancellationToken
                         )
                 ),
@@ -1174,8 +1073,8 @@ internal sealed class EfPublicChatOutbox(
         return ExecuteSendTerminalTransitionAsync(
             message,
             (db, ct) =>
-                db.PublicChatOutboxMessages
-                    .Where(row =>
+                db
+                    .PublicChatOutboxMessages.Where(row =>
                         row.Id == message.Id
                         && row.Status == PublicChatOutboxStatus.Sending
                         && row.ClaimToken == message.ClaimToken.Value
@@ -1183,31 +1082,19 @@ internal sealed class EfPublicChatOutbox(
                     .ExecuteUpdateAsync(
                         update =>
                             update
-                                .SetProperty(
-                                    row => row.Status,
-                                    PublicChatOutboxStatus.Rejected
-                                )
+                                .SetProperty(row => row.Status, PublicChatOutboxStatus.Rejected)
                                 .SetProperty(row => row.Message, (string?)null)
                                 .SetProperty(row => row.DeduplicationKey, (string?)null)
                                 .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
                                 .SetProperty(row => row.ClaimToken, (Guid?)null)
                                 .SetProperty(row => row.ClaimSlot, (int?)null)
-                                .SetProperty(
-                                    row => row.ClaimExpiresAtUtc,
-                                    (DateTime?)null
-                                )
-                                .SetProperty(
-                                    row => row.CompletedAtUtc,
-                                    recordedAt.UtcDateTime
-                                )
+                                .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                .SetProperty(row => row.CompletedAtUtc, recordedAt.UtcDateTime)
                                 .SetProperty(
                                     row => row.FailurePhase,
                                     PublicChatOutboxFailurePhase.Send
                                 )
-                                .SetProperty(
-                                    row => row.RejectionCode,
-                                    rejectionCode
-                                ),
+                                .SetProperty(row => row.RejectionCode, rejectionCode),
                         ct
                     ),
             recordedAt,
@@ -1225,8 +1112,8 @@ internal sealed class EfPublicChatOutbox(
         return ExecuteSendTerminalTransitionAsync(
             message,
             (db, ct) =>
-                db.PublicChatOutboxMessages
-                    .Where(row =>
+                db
+                    .PublicChatOutboxMessages.Where(row =>
                         row.Id == message.Id
                         && row.Status == PublicChatOutboxStatus.Sending
                         && row.ClaimToken == message.ClaimToken.Value
@@ -1234,31 +1121,19 @@ internal sealed class EfPublicChatOutbox(
                     .ExecuteUpdateAsync(
                         update =>
                             update
-                                .SetProperty(
-                                    row => row.Status,
-                                    PublicChatOutboxStatus.Ambiguous
-                                )
+                                .SetProperty(row => row.Status, PublicChatOutboxStatus.Ambiguous)
                                 .SetProperty(row => row.Message, (string?)null)
                                 .SetProperty(row => row.DeduplicationKey, (string?)null)
                                 .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
                                 .SetProperty(row => row.ClaimToken, (Guid?)null)
                                 .SetProperty(row => row.ClaimSlot, (int?)null)
-                                .SetProperty(
-                                    row => row.ClaimExpiresAtUtc,
-                                    (DateTime?)null
-                                )
-                                .SetProperty(
-                                    row => row.CompletedAtUtc,
-                                    recordedAt.UtcDateTime
-                                )
+                                .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                .SetProperty(row => row.CompletedAtUtc, recordedAt.UtcDateTime)
                                 .SetProperty(
                                     row => row.FailurePhase,
                                     PublicChatOutboxFailurePhase.Send
                                 )
-                                .SetProperty(
-                                    row => row.FailureType,
-                                    diagnostic.FailureType.Value
-                                )
+                                .SetProperty(row => row.FailureType, diagnostic.FailureType.Value)
                                 .SetProperty(
                                     row => row.HttpStatusCode,
                                     HttpStatusCode(diagnostic.HttpStatus)
@@ -1292,8 +1167,8 @@ internal sealed class EfPublicChatOutbox(
 
         return await ExecuteStateTransitionAsync(
             (db, ct) =>
-                db.PublicChatOutboxMessages
-                    .Where(row =>
+                db
+                    .PublicChatOutboxMessages.Where(row =>
                         row.Id == message.Id
                         && row.Status == PublicChatOutboxStatus.Claimed
                         && row.ClaimToken == message.ClaimToken.Value
@@ -1302,31 +1177,19 @@ internal sealed class EfPublicChatOutbox(
                     .ExecuteUpdateAsync(
                         update =>
                             update
-                                .SetProperty(
-                                    row => row.Status,
-                                    PublicChatOutboxStatus.Unexpected
-                                )
+                                .SetProperty(row => row.Status, PublicChatOutboxStatus.Unexpected)
                                 .SetProperty(row => row.Message, (string?)null)
                                 .SetProperty(row => row.DeduplicationKey, (string?)null)
                                 .SetProperty(row => row.NextAttemptAtUtc, (DateTime?)null)
                                 .SetProperty(row => row.ClaimToken, (Guid?)null)
                                 .SetProperty(row => row.ClaimSlot, (int?)null)
-                                .SetProperty(
-                                    row => row.ClaimExpiresAtUtc,
-                                    (DateTime?)null
-                                )
-                                .SetProperty(
-                                    row => row.CompletedAtUtc,
-                                    recordedAt.UtcDateTime
-                                )
+                                .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null)
+                                .SetProperty(row => row.CompletedAtUtc, recordedAt.UtcDateTime)
                                 .SetProperty(
                                     row => row.FailurePhase,
                                     PublicChatOutboxFailurePhase.Preparation
                                 )
-                                .SetProperty(
-                                    row => row.FailureType,
-                                    diagnostic.FailureType.Value
-                                )
+                                .SetProperty(row => row.FailureType, diagnostic.FailureType.Value)
                                 .SetProperty(
                                     row => row.HttpStatusCode,
                                     HttpStatusCode(diagnostic.HttpStatus)
@@ -1439,7 +1302,8 @@ internal sealed class EfPublicChatOutbox(
         TimeSpan duplicateCooldown
     )
     {
-        var eligibleAt = row.NextAttemptAtUtc
+        var eligibleAt =
+            row.NextAttemptAtUtc
             ?? throw new UnreachableException(
                 "A claimable public chat outbox row has no next-attempt time."
             );
@@ -1448,7 +1312,8 @@ internal sealed class EfPublicChatOutbox(
             eligibleAt = Max(eligibleAt, attemptAt + sendInterval);
         }
 
-        var deduplicationKey = row.DeduplicationKey
+        var deduplicationKey =
+            row.DeduplicationKey
             ?? throw new UnreachableException(
                 "A claimable public chat outbox row has no deduplication key."
             );
@@ -1479,13 +1344,8 @@ internal sealed class EfPublicChatOutbox(
     {
         return exception switch
         {
-            SqliteException
-            {
-                SqliteErrorCode: 19,
-                SqliteExtendedErrorCode: 2067,
-            } => true,
-            DbUpdateException { InnerException: { } inner } =>
-                IsClaimSlotContention(inner),
+            SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 } => true,
+            DbUpdateException { InnerException: { } inner } => IsClaimSlotContention(inner),
             _ => false,
         };
     }
@@ -1524,10 +1384,7 @@ internal sealed class EfPublicChatOutbox(
             : value - duration;
     }
 
-    private static DateTimeOffset AddOrMaximum(
-        DateTimeOffset value,
-        TimeSpan duration
-    )
+    private static DateTimeOffset AddOrMaximum(DateTimeOffset value, TimeSpan duration)
     {
         return duration.Ticks >= DateTimeOffset.MaxValue.UtcTicks - value.UtcTicks
             ? DateTimeOffset.MaxValue
@@ -1539,8 +1396,5 @@ internal sealed class EfPublicChatOutbox(
         return new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
     }
 
-    private sealed record ClaimCandidate(
-        PublicChatOutboxMessage Row,
-        DateTime EligibleAtUtc
-    );
+    private sealed record ClaimCandidate(PublicChatOutboxMessage Row, DateTime EligibleAtUtc);
 }

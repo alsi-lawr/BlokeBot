@@ -183,9 +183,7 @@ public sealed class GuessingConfigurationService(
         );
         if (duplicate)
         {
-            throw new InvalidOperationException(
-                "A round type with that name already exists."
-            );
+            throw new InvalidOperationException("A round type with that name already exists.");
         }
 
         profile.Name = profileName;
@@ -336,7 +334,7 @@ public sealed class GuessingConfigurationService(
     private static bool IsWhisperTarget(GuessOptionEditor option)
     {
         return ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
-        == TwitchCommandResponseTarget.Whisper;
+            == TwitchCommandResponseTarget.Whisper;
     }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(

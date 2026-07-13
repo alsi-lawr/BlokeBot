@@ -28,10 +28,7 @@ public sealed record Option<T>
 
     public Option<TMapped> Map<TMapped>(Func<T, TMapped?> map)
     {
-        return Match(
-            value => Option<TMapped>.FromNullable(map(value)),
-            () => Option<TMapped>.None
-        );
+        return Match(value => Option<TMapped>.FromNullable(map(value)), () => Option<TMapped>.None);
     }
 
     public Option<TMapped> Bind<TMapped>(Func<T, Option<TMapped>> bind)

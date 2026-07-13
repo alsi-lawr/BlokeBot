@@ -29,8 +29,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
     public DbSet<DurableAlert> DurableAlerts => Set<DurableAlert>();
     public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
         Set<PublicChatOutboxMessage>();
-    public DbSet<PublicChatSendReceipt> PublicChatSendReceipts =>
-        Set<PublicChatSendReceipt>();
+    public DbSet<PublicChatSendReceipt> PublicChatSendReceipts => Set<PublicChatSendReceipt>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();
@@ -91,11 +90,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasKey(x => x.Id);
             b.Property(x => x.BotTwitchUserId).HasMaxLength(64);
             b.HasIndex(x => new
-            {
-                x.HostId,
-                x.BotTwitchUserId,
-                x.DayUtc,
-            })
+                {
+                    x.HostId,
+                    x.BotTwitchUserId,
+                    x.DayUtc,
+                })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -124,12 +123,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.ReplyKey).HasMaxLength(128);
             b.Property(x => x.Target).HasMaxLength(32);
             b.HasIndex(x => new
-            {
-                x.HostId,
-                x.Feature,
-                x.ScopeId,
-                x.ReplyKey,
-            })
+                {
+                    x.HostId,
+                    x.Feature,
+                    x.ScopeId,
+                    x.ReplyKey,
+                })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -148,7 +147,10 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.ToTable(
                 "site_access_entries",
                 t =>
-                    t.HasCheckConstraint("CK_site_access_entries_Kind", KindIn("Kind", _accessKinds))
+                    t.HasCheckConstraint(
+                        "CK_site_access_entries_Kind",
+                        KindIn("Kind", _accessKinds)
+                    )
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Login).HasMaxLength(128);
@@ -192,11 +194,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 )
                 .HasMaxLength(32);
             b.HasIndex(x => new
-            {
-                x.HostId,
-                x.Kind,
-                x.Login,
-            })
+                {
+                    x.HostId,
+                    x.Kind,
+                    x.Login,
+                })
                 .IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -356,11 +358,13 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<CounterCustomCommandAction>(b => b.HasOne(x => x.Counter)
+        modelBuilder.Entity<CounterCustomCommandAction>(b =>
+            b.HasOne(x => x.Counter)
                 .WithMany()
                 .HasForeignKey(x => new { x.HostId, x.CounterId })
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
-                .OnDelete(DeleteBehavior.Restrict));
+                .OnDelete(DeleteBehavior.Restrict)
+        );
 
         modelBuilder.Entity<CustomCommandAlias>(b =>
         {
@@ -449,19 +453,17 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .OnDelete(DeleteBehavior.Restrict);
             b.HasOne(x => x.Schedule)
                 .WithOne(x => x.Announcement)
-                .HasForeignKey<CustomAnnouncementSchedule>(x =>
-                    new { x.HostId, x.CustomAnnouncementId }
-                )
+                .HasForeignKey<CustomAnnouncementSchedule>(x => new
+                {
+                    x.HostId,
+                    x.CustomAnnouncementId,
+                })
                 .HasPrincipalKey<CustomAnnouncement>(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Cascade);
             b.HasOne(x => x.DeliveryPolicy)
                 .WithOne(x => x.Announcement)
-                .HasForeignKey<CustomAnnouncement>(x =>
-                    new { x.HostId, x.DeliveryPolicyId }
-                )
-                .HasPrincipalKey<CustomAnnouncementDeliveryPolicy>(x =>
-                    new { x.HostId, x.Id }
-                )
+                .HasForeignKey<CustomAnnouncement>(x => new { x.HostId, x.DeliveryPolicyId })
+                .HasPrincipalKey<CustomAnnouncementDeliveryPolicy>(x => new { x.HostId, x.Id })
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Restrict);
             b.Navigation(x => x.DeliveryPolicy).IsRequired();
@@ -593,11 +595,11 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.Property(x => x.AcknowledgedByLogin).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.AcknowledgedAtUtc });
             b.HasIndex(x => new
-            {
-                x.HostId,
-                x.Source,
-                x.SourceKey,
-            })
+                {
+                    x.HostId,
+                    x.Source,
+                    x.SourceKey,
+                })
                 .IsUnique()
                 .HasFilter("\"AcknowledgedAtUtc\" IS NULL");
             b.HasOne<BotHost>()
@@ -616,10 +618,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                         "CK_public_chat_outbox_Status",
                         KindIn("Status", _publicChatOutboxStatuses)
                     );
-                    t.HasCheckConstraint(
-                        "CK_public_chat_outbox_AttemptCount",
-                        "AttemptCount >= 0"
-                    );
+                    t.HasCheckConstraint("CK_public_chat_outbox_AttemptCount", "AttemptCount >= 0");
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_SafePreSendFailureCount",
                         "SafePreSendFailureCount >= 0"
@@ -634,10 +633,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                     );
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_FailurePhase",
-                        KindInOrNull(
-                            "FailurePhase",
-                            _publicChatOutboxFailurePhases
-                        )
+                        KindInOrNull("FailurePhase", _publicChatOutboxFailurePhases)
                     );
                     t.HasCheckConstraint(
                         "CK_public_chat_outbox_State",
@@ -726,16 +722,12 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
                 .HasConversion(
                     phase =>
                         phase.HasValue
-                            ? PersistedEnumTokens<PublicChatOutboxFailurePhase>.Format(
-                                phase.Value
-                            )
+                            ? PersistedEnumTokens<PublicChatOutboxFailurePhase>.Format(phase.Value)
                             : null,
                     value =>
                         value == null
                             ? null
-                            : PersistedEnumTokens<PublicChatOutboxFailurePhase>.Parse(
-                                value
-                            )
+                            : PersistedEnumTokens<PublicChatOutboxFailurePhase>.Parse(value)
                 )
                 .HasMaxLength(32);
             b.Property(x => x.FailureType).HasMaxLength(512);
@@ -755,12 +747,8 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             });
             b.HasIndex(x => new { x.Status, x.ClaimExpiresAtUtc });
             b.HasIndex(x => new { x.Status, x.ExpiresAtUtc });
-            b.HasIndex(x => x.ClaimToken)
-                .IsUnique()
-                .HasFilter("\"ClaimToken\" IS NOT NULL");
-            b.HasIndex(x => x.ClaimSlot)
-                .IsUnique()
-                .HasFilter("\"ClaimSlot\" IS NOT NULL");
+            b.HasIndex(x => x.ClaimToken).IsUnique().HasFilter("\"ClaimToken\" IS NOT NULL");
+            b.HasIndex(x => x.ClaimSlot).IsUnique().HasFilter("\"ClaimSlot\" IS NOT NULL");
         });
 
         modelBuilder.Entity<PublicChatSendReceipt>(b =>
@@ -1031,10 +1019,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
         return $"{columnName} IN ({string.Join(", ", values.Select(value => $"'{value}'"))})";
     }
 
-    private static string KindInOrNull(
-        string columnName,
-        IEnumerable<string> values
-    )
+    private static string KindInOrNull(string columnName, IEnumerable<string> values)
     {
         return $"{columnName} IS NULL OR {KindIn(columnName, values)}";
     }

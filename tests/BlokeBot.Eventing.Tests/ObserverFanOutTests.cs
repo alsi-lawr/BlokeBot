@@ -7,12 +7,15 @@ namespace BlokeBot.Eventing.Tests;
 
 public sealed class ObserverFanOutTests
 {
-    private static readonly ObserverBoundary _boundary =
-        ObserverBoundary.Named("Test.ObserverFanOut");
-    private static readonly ObserverEventIdentity _eventIdentity =
-        ObserverEventIdentity.Named("TestEvent");
-    private static readonly ObserverCorrelationId _correlationId =
-        ObserverCorrelationId.Named("correlation-123");
+    private static readonly ObserverBoundary _boundary = ObserverBoundary.Named(
+        "Test.ObserverFanOut"
+    );
+    private static readonly ObserverEventIdentity _eventIdentity = ObserverEventIdentity.Named(
+        "TestEvent"
+    );
+    private static readonly ObserverCorrelationId _correlationId = ObserverCorrelationId.Named(
+        "correlation-123"
+    );
 
     [Test]
     public async Task ContinueAndReport_FailingObserver_ContinuesInOrderWithRedactedOutcome()
@@ -31,9 +34,7 @@ public sealed class ObserverFanOutTests
         var outcome = await DispatchAsync(fanOut, observers, CancellationToken.None);
 
         order.ShouldBe(["first", "failing", "third"]);
-        var handled = outcome.ShouldBeOfType<
-            ObserverFanOutOutcome.CompletedWithFailures
-        >();
+        var handled = outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
         var summary = handled.Failures.ShouldHaveSingleItem();
         AssertFailure(
             summary,
@@ -110,10 +111,7 @@ public sealed class ObserverFanOutTests
         var reporter = new RecordingReporter();
         var observers = new[]
         {
-            new TestObserver(
-                "exhausting",
-                _ => ValueTask.FromException(failures[attempts++])
-            ),
+            new TestObserver("exhausting", _ => ValueTask.FromException(failures[attempts++])),
             Observer("later", () => laterCalled = true),
         };
         var fanOut = CreateFanOut(Retry(attemptLimit: 3), reporter);
@@ -122,9 +120,7 @@ public sealed class ObserverFanOutTests
 
         attempts.ShouldBe(3);
         laterCalled.ShouldBeTrue();
-        var handled = outcome.ShouldBeOfType<
-            ObserverFanOutOutcome.CompletedWithFailures
-        >();
+        var handled = outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>();
         handled.Failures.Select(failure => failure.Attempt).ShouldBe([1, 2, 3]);
         handled.Failures.ShouldAllBe(failure =>
             failure.Classification == ObserverFailureClassification.Transient
@@ -143,16 +139,15 @@ public sealed class ObserverFanOutTests
             _ =>
             {
                 attempts++;
-                return ValueTask.FromException(
-                    new InvalidOperationException("terminal")
-                );
+                return ValueTask.FromException(new InvalidOperationException("terminal"));
             }
         );
 
         var outcome = await DispatchAsync(fanOut, [observer], CancellationToken.None);
 
         attempts.ShouldBe(1);
-        outcome.ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>()
+        outcome
+            .ShouldBeOfType<ObserverFanOutOutcome.CompletedWithFailures>()
             .Failures.ShouldHaveSingleItem()
             .Classification.ShouldBe(ObserverFailureClassification.Terminal);
     }
@@ -213,9 +208,9 @@ public sealed class ObserverFanOutTests
         laterCalled.ShouldBeTrue();
         reporter.Attempts.ShouldBe(1);
         exception.Causes.ShouldBe([observerFailure, reporterFailure]);
-        exception.Failures.ShouldHaveSingleItem().Observer.ShouldBe(
-            ObserverIdentity.Named("failing")
-        );
+        exception
+            .Failures.ShouldHaveSingleItem()
+            .Observer.ShouldBe(ObserverIdentity.Named("failing"));
         var handlingFailure = exception.HandlingFailures.ShouldHaveSingleItem();
         handlingFailure.Stage.ShouldBe(ObserverFailureHandlingStage.Reporter);
         handlingFailure.FailureType.ShouldBe(typeof(IOException).FullName);
@@ -252,7 +247,8 @@ public sealed class ObserverFanOutTests
         sink.Attempts.ShouldBe(1);
         exception.Causes.ShouldBe([observerFailure, reporterFailure, sinkFailure]);
         exception.Failures.ShouldHaveSingleItem();
-        exception.HandlingFailures.Select(failure => failure.Stage)
+        exception
+            .HandlingFailures.Select(failure => failure.Stage)
             .ShouldBe([
                 ObserverFailureHandlingStage.Reporter,
                 ObserverFailureHandlingStage.DeadLetterSink,
@@ -316,9 +312,7 @@ public sealed class ObserverFanOutTests
         };
     }
 
-    private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Retry(
-        int attemptLimit
-    )
+    private static ObserverFailurePolicy<TestBoundary, TestDeadLetter> Retry(int attemptLimit)
     {
         return new ObserverFailurePolicy<TestBoundary, TestDeadLetter>.BoundedRetry
         {
@@ -354,13 +348,12 @@ public sealed class ObserverFanOutTests
     {
         return fanOut.DispatchAsync(
             observers,
-            _ =>
-                new ObserverDispatch<TestEvent, TestDeadLetter>
-                {
-                    Event = new TestEvent("private chat text", "raw oauth payload"),
-                    EventIdentity = _eventIdentity,
-                    DeadLetter = new TestDeadLetter("event-42"),
-                },
+            _ => new ObserverDispatch<TestEvent, TestDeadLetter>
+            {
+                Event = new TestEvent("private chat text", "raw oauth payload"),
+                EventIdentity = _eventIdentity,
+                DeadLetter = new TestDeadLetter("event-42"),
+            },
             observer => ObserverIdentity.Named(observer.Name),
             static (observer, _, token) => observer.InvokeAsync(token),
             cancellationToken
@@ -418,10 +411,7 @@ public sealed class ObserverFanOutTests
 
     private sealed record TestDeadLetter(string EventId) : IObserverDeadLetterPayload;
 
-    private sealed class TestObserver(
-        string name,
-        Func<CancellationToken, ValueTask> invoke
-    )
+    private sealed class TestObserver(string name, Func<CancellationToken, ValueTask> invoke)
     {
         internal string Name { get; } = name;
 

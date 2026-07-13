@@ -6,8 +6,7 @@ public abstract record PublicChatDeliveryDeadline
 
     public sealed record ConfiguredMaximum : PublicChatDeliveryDeadline;
 
-    public sealed record ProducerAbsolute(DateTimeOffset ExpiresAt)
-        : PublicChatDeliveryDeadline;
+    public sealed record ProducerAbsolute(DateTimeOffset ExpiresAt) : PublicChatDeliveryDeadline;
 }
 
 internal sealed record PublicChatEnqueueCommand

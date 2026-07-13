@@ -31,19 +31,22 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         }
 
         await using var readDb = await dbFactory.CreateDbContextAsync();
-        var stored = await readDb.CustomAnnouncements
-            .Include(x => x.DeliveryPolicy)
+        var stored = await readDb
+            .CustomAnnouncements.Include(x => x.DeliveryPolicy)
             .SingleAsync(x => x.Id == announcementId);
-        var policy = stored.DeliveryPolicy.ShouldBeOfType<
-            RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
-        >();
+        var policy =
+            stored.DeliveryPolicy.ShouldBeOfType<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>();
         policy.RetryDelay.Value.ShouldBe(TimeSpan.FromSeconds(2));
         policy.OccurrenceLifetime.Value.ShouldBe(TimeSpan.FromSeconds(30));
 
-        var discriminator = await readDb.Database.SqlQueryRaw<string>(
-            "SELECT PolicyType AS Value FROM custom_announcement_delivery_policies"
-        ).SingleAsync();
-        discriminator.ShouldBe(nameof(CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip));
+        var discriminator = await readDb
+            .Database.SqlQueryRaw<string>(
+                "SELECT PolicyType AS Value FROM custom_announcement_delivery_policies"
+            )
+            .SingleAsync();
+        discriminator.ShouldBe(
+            nameof(CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip)
+        );
     }
 
     [Test]
@@ -177,15 +180,15 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         discriminator.ShouldNotBeNull();
         discriminator.ClrType.ShouldBe(typeof(CustomAnnouncementDeliveryPolicyKind));
         discriminator.IsNullable.ShouldBeFalse();
-        baseType.FindPrimaryKey()!.Properties.Select(x => x.Name).ShouldBe(
-            [nameof(CustomAnnouncementDeliveryPolicy.Id)]
-        );
-        baseType.FindKey(
-                [
-                    baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.HostId))!,
-                    baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.Id))!,
-                ]
-            )
+        baseType
+            .FindPrimaryKey()!
+            .Properties.Select(x => x.Name)
+            .ShouldBe([nameof(CustomAnnouncementDeliveryPolicy.Id)]);
+        baseType
+            .FindKey([
+                baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.HostId))!,
+                baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.Id))!,
+            ])
             .ShouldNotBeNull();
 
         var announcementType = model.FindEntityType(typeof(CustomAnnouncement));
@@ -193,20 +196,26 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         var relationship = announcementType
             .GetForeignKeys()
             .Single(x => x.PrincipalEntityType == baseType);
-        relationship.Properties.Select(x => x.Name).ShouldBe(
-            [nameof(CustomAnnouncement.HostId), nameof(CustomAnnouncement.DeliveryPolicyId)]
-        );
+        relationship
+            .Properties.Select(x => x.Name)
+            .ShouldBe([
+                nameof(CustomAnnouncement.HostId),
+                nameof(CustomAnnouncement.DeliveryPolicyId),
+            ]);
         relationship.IsUnique.ShouldBeTrue();
         relationship.IsRequired.ShouldBeTrue();
         relationship.DeleteBehavior.ShouldBe(DeleteBehavior.Restrict);
 
-        baseType.GetCheckConstraints().Select(x => x.Name).ShouldBe(
-            [
-                "CK_custom_announcement_delivery_policies_Payload",
-                "CK_custom_announcement_delivery_policies_PolicyType",
-            ],
-            ignoreOrder: true
-        );
+        baseType
+            .GetCheckConstraints()
+            .Select(x => x.Name)
+            .ShouldBe(
+                [
+                    "CK_custom_announcement_delivery_policies_Payload",
+                    "CK_custom_announcement_delivery_policies_PolicyType",
+                ],
+                ignoreOrder: true
+            );
     }
 
     [Test]
@@ -309,9 +318,7 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
     [Test]
     public void TimingValues_InvalidDurations_AreRejected()
     {
-        Should.Throw<ArgumentOutOfRangeException>(() =>
-            new AnnouncementRetryDelay(TimeSpan.Zero)
-        );
+        Should.Throw<ArgumentOutOfRangeException>(() => new AnnouncementRetryDelay(TimeSpan.Zero));
         Should.Throw<ArgumentOutOfRangeException>(() =>
             new AnnouncementRetryDelay(TimeSpan.FromTicks(-1))
         );
@@ -377,16 +384,11 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         {
             HostId = hostId,
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
-            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                TimeSpan.FromSeconds(30)
-            ),
+            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
     }
 
-    private static async Task<int> CreateMessageEntryAsync(
-        BlokeBotDbContext db,
-        int hostId
-    )
+    private static async Task<int> CreateMessageEntryAsync(BlokeBotDbContext db, int hostId)
     {
         var now = DateTime.UtcNow;
         var entry = new CustomMessageLibraryEntry

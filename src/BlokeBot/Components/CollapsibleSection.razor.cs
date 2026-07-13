@@ -67,8 +67,7 @@ public partial class CollapsibleSection
 
     private string _resolvedContentId
     {
-        get =>
-        string.IsNullOrWhiteSpace(ContentId) ? field : ContentId;
+        get => string.IsNullOrWhiteSpace(ContentId) ? field : ContentId;
     } = $"disclosure-{Guid.NewGuid():N}";
 
     protected override void OnInitialized()

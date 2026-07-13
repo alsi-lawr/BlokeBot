@@ -157,8 +157,7 @@ public sealed class CustomAnnouncementEditor
 
             var intervalMinutes = Schedule switch
             {
-                IntervalCustomAnnouncementScheduleEditor interval =>
-                    interval.IntervalMinutes,
+                IntervalCustomAnnouncementScheduleEditor interval => interval.IntervalMinutes,
                 IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat =>
                     intervalAfterChat.IntervalMinutes,
                 _ => 30,
@@ -175,12 +174,11 @@ public sealed class CustomAnnouncementEditor
                     {
                         IntervalMinutes = intervalMinutes,
                     },
-                CustomAnnouncementScheduleKind.Weekly =>
-                    new WeeklyCustomAnnouncementScheduleEditor
-                    {
-                        Day = DayOfWeek.Monday,
-                        Time = new TimeOnly(12, 0),
-                    },
+                CustomAnnouncementScheduleKind.Weekly => new WeeklyCustomAnnouncementScheduleEditor
+                {
+                    Day = DayOfWeek.Monday,
+                    Time = new TimeOnly(12, 0),
+                },
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
             };
         }
@@ -213,8 +211,7 @@ public sealed class IntervalCustomAnnouncementScheduleEditor : ICustomAnnounceme
 public sealed class IntervalAfterChatCustomAnnouncementScheduleEditor
     : ICustomAnnouncementScheduleEditor
 {
-    public CustomAnnouncementScheduleKind Kind =>
-        CustomAnnouncementScheduleKind.IntervalAfterChat;
+    public CustomAnnouncementScheduleKind Kind => CustomAnnouncementScheduleKind.IntervalAfterChat;
 
     public int IntervalMinutes { get; set; } = 30;
 

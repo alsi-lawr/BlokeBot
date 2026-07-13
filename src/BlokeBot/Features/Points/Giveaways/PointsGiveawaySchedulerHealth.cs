@@ -23,11 +23,7 @@ internal abstract record PointsGiveawaySchedulerUnhealthyReport
 {
     private protected PointsGiveawaySchedulerUnhealthyReport() { }
 
-    internal required PointsGiveawaySchedulerFailureClassification Classification
-    {
-        get;
-        init;
-    }
+    internal required PointsGiveawaySchedulerFailureClassification Classification { get; init; }
 
     internal required Exception Cause { get; init; }
 
@@ -64,8 +60,9 @@ internal static class PointsGiveawaySchedulerFailureClassifier
         return exception switch
         {
             SqliteException sqliteException => IsTransient(sqliteException),
-            DbUpdateException { InnerException: SqliteException sqliteException } =>
-                IsTransient(sqliteException),
+            DbUpdateException { InnerException: SqliteException sqliteException } => IsTransient(
+                sqliteException
+            ),
             TimeoutException => true,
             _ => false,
         };
@@ -74,28 +71,29 @@ internal static class PointsGiveawaySchedulerFailureClassifier
     internal static bool IsNotificationFailure(Exception exception)
     {
         return IsTransient(exception)
-        || exception
-            is HttpRequestException
-                or IOException
-                or ObserverFanOutEscalationException
-                or OperationCanceledException;
+            || exception
+                is HttpRequestException
+                    or IOException
+                    or ObserverFanOutEscalationException
+                    or OperationCanceledException;
     }
 
     internal static PointsGiveawaySchedulerFailureClassification ClassifyUnhealthy(
         Exception exception
     )
     {
-        return exception
-            is ArgumentException
-                or InvalidOperationException
-                or NotSupportedException
-                or UnreachableException
-                or DbException
-                or DbUpdateException
-                or PointsGiveawayDrawCommitAmbiguousException
-                or PointsGiveawayDrawPostCommitException
-                or PointsGiveawayExpirationCommitAmbiguousException
-                or PointsGiveawayExpirationPostCommitException
+        return
+            exception
+                is ArgumentException
+                    or InvalidOperationException
+                    or NotSupportedException
+                    or UnreachableException
+                    or DbException
+                    or DbUpdateException
+                    or PointsGiveawayDrawCommitAmbiguousException
+                    or PointsGiveawayDrawPostCommitException
+                    or PointsGiveawayExpirationCommitAmbiguousException
+                    or PointsGiveawayExpirationPostCommitException
             ? PointsGiveawaySchedulerFailureClassification.Terminal
             : PointsGiveawaySchedulerFailureClassification.Unexpected;
     }

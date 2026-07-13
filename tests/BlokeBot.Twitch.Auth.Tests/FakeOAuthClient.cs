@@ -19,10 +19,7 @@ internal sealed class FakeOAuthClient : ITwitchOAuthClient
         return new($"https://id.twitch.tv/oauth2/authorize?state={state}");
     }
 
-    public Task<TwitchTokenSet> ExchangeCodeAsync(
-        string code,
-        CancellationToken cancellationToken
-    )
+    public Task<TwitchTokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {
         return Task.FromResult(ExchangeResult);
     }

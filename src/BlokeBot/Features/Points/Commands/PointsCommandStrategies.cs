@@ -40,7 +40,8 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         CancellationToken cancellationToken
     )
     {
-        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message ?? string.Empty;
+        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message
+            ?? string.Empty;
     }
 
     public abstract ValueTask ExecuteAsync(

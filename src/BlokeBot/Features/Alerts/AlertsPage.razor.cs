@@ -48,10 +48,7 @@ public partial class AlertsPage
     {
         await LoadPageContextAsync();
         _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
-        _state =
-            HostId == 0
-                ? null
-                : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
+        _state = HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
     }
 
     private Task RefreshAsync()

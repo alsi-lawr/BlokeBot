@@ -31,16 +31,8 @@ public sealed class CustomCommandConfigurationTests
                         CurrentVariantIndex = 1,
                         Variants =
                         [
-                            new CustomMessageVariantEditor
-                            {
-                                Id = -2,
-                                Text = "Hi {user}.",
-                            },
-                            new CustomMessageVariantEditor
-                            {
-                                Id = -3,
-                                Text = "Hello {channel}.",
-                            },
+                            new CustomMessageVariantEditor { Id = -2, Text = "Hi {user}." },
+                            new CustomMessageVariantEditor { Id = -3, Text = "Hello {channel}." },
                         ],
                     },
                 ],
@@ -122,7 +114,8 @@ public sealed class CustomCommandConfigurationTests
         announcement.MessageLibraryEntryId.ShouldBe(entry.Id);
         announcement.RetryDelaySeconds.ShouldBe(3);
         announcement.OccurrenceLifetimeSeconds.ShouldBe(45);
-        var schedule = announcement.Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
+        var schedule =
+            announcement.Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
         schedule.Day.ShouldBe(DayOfWeek.Friday);
         schedule.Time.ShouldBe(new TimeOnly(19, 30));
     }
@@ -173,13 +166,7 @@ public sealed class CustomCommandConfigurationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory);
         var draft = ConfigurationWithCommands(("Command", "old-alias"));
-        draft.Counters.Add(
-            new CustomCounterEditor
-            {
-                Id = -10,
-                Name = "Count",
-            }
-        );
+        draft.Counters.Add(new CustomCounterEditor { Id = -10, Name = "Count" });
         draft.Announcements.Add(
             new CustomAnnouncementEditor
             {
@@ -195,12 +182,13 @@ public sealed class CustomCommandConfigurationTests
         var command = update.Commands.Single();
         command.Aliases = "new-alias";
         command.ActionKind = CustomCommandActionKind.Counter;
-        command.Action.ShouldBeOfType<CounterCustomCommandActionEditor>().CounterId =
-            update.Counters.Single().Id;
+        command.Action.ShouldBeOfType<CounterCustomCommandActionEditor>().CounterId = update
+            .Counters.Single()
+            .Id;
         var announcement = update.Announcements.Single();
         announcement.ScheduleKind = CustomAnnouncementScheduleKind.IntervalAfterChat;
-        var intervalAfterChat = announcement.Schedule
-            .ShouldBeOfType<IntervalAfterChatCustomAnnouncementScheduleEditor>();
+        var intervalAfterChat =
+            announcement.Schedule.ShouldBeOfType<IntervalAfterChatCustomAnnouncementScheduleEditor>();
         intervalAfterChat.IntervalMinutes = 20;
         intervalAfterChat.RequiredChatMessages = 4;
 
@@ -244,13 +232,7 @@ public sealed class CustomCommandConfigurationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory);
         var draft = ConfigurationWithCommands(("Command", "command"));
-        draft.Counters.Add(
-            new CustomCounterEditor
-            {
-                Id = -10,
-                Name = "Counter",
-            }
-        );
+        draft.Counters.Add(new CustomCounterEditor { Id = -10, Name = "Counter" });
         draft.Announcements.Add(
             new CustomAnnouncementEditor
             {
@@ -363,9 +345,7 @@ public sealed class CustomCommandConfigurationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory);
-        var missing = ConfigurationWithAnnouncement(
-            new IntervalCustomAnnouncementScheduleEditor()
-        );
+        var missing = ConfigurationWithAnnouncement(new IntervalCustomAnnouncementScheduleEditor());
         missing.Announcements.Single().RetryDelaySeconds = 0;
         var missingError = await Should.ThrowAsync<InvalidOperationException>(() =>
             service.SaveConfigurationAsync(hostId, missing, CancellationToken.None)
@@ -408,14 +388,7 @@ public sealed class CustomCommandConfigurationTests
                 {
                     Id = -1,
                     Name = "Reply",
-                    Variants =
-                    [
-                        new CustomMessageVariantEditor
-                        {
-                            Id = -2,
-                            Text = "Reply text.",
-                        },
-                    ],
+                    Variants = [new CustomMessageVariantEditor { Id = -2, Text = "Reply text." }],
                 },
             ],
         };
@@ -429,10 +402,7 @@ public sealed class CustomCommandConfigurationTests
                     Id = nextId--,
                     Name = command.Name,
                     Aliases = command.Aliases,
-                    Action = new MessageCustomCommandActionEditor
-                    {
-                        MessageLibraryEntryId = -1,
-                    },
+                    Action = new MessageCustomCommandActionEditor { MessageLibraryEntryId = -1 },
                 }
             );
         }
@@ -473,10 +443,7 @@ public sealed class CustomCommandConfigurationTests
         );
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost

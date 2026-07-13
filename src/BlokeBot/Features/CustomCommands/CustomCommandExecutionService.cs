@@ -53,8 +53,8 @@ public sealed class CustomCommandExecutionService(
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var command = await db
             .CustomCommands.Include(x => x.Action)
-            .ThenInclude(x => x.MessageLibraryEntry)
-            .ThenInclude(x => x!.Variants)
+                .ThenInclude(x => x.MessageLibraryEntry)
+                    .ThenInclude(x => x!.Variants)
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
         {
@@ -66,7 +66,14 @@ public sealed class CustomCommandExecutionService(
             return true;
         }
 
-        if (!cooldowns.TryRecord(command.Id, command.CooldownScope, context.Message.Login, Cooldown(command)))
+        if (
+            !cooldowns.TryRecord(
+                command.Id,
+                command.CooldownScope,
+                context.Message.Login,
+                Cooldown(command)
+            )
+        )
         {
             return true;
         }

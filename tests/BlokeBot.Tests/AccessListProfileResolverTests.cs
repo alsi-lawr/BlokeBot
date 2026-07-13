@@ -20,12 +20,10 @@ public sealed class AccessListProfileResolverTests
             CancellationToken.None
         );
 
-        profiles.ShouldBe(
-        [
+        profiles.ShouldBe([
             new AccessListEntryProfile("Viewer", null),
             new AccessListEntryProfile("MODERATOR", null),
-        ]
-        );
+        ]);
     }
 
     [Test]
@@ -56,13 +54,11 @@ public sealed class AccessListProfileResolverTests
             CancellationToken.None
         );
 
-        profiles.ShouldBe(
-        [
+        profiles.ShouldBe([
             new AccessListEntryProfile("Viewer", "https://cdn.example/viewer.png"),
             new AccessListEntryProfile("missing", null),
             new AccessListEntryProfile("BLANK", null),
-        ]
-        );
+        ]);
         http.TokenRequestCount.ShouldBe(1);
         http.UserRequestCount.ShouldBe(1);
         http.UserRequestClientId.ShouldBe("client-id");

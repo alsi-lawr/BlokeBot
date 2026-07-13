@@ -67,9 +67,7 @@ public sealed record HostBotChannelStatus(
         );
     }
 
-    public static HostBotChannelStatus NeedsAuthorization(
-        HostBotChannelStatusFlags configuredFlags
-    )
+    public static HostBotChannelStatus NeedsAuthorization(HostBotChannelStatusFlags configuredFlags)
     {
         return new(
             configuredFlags

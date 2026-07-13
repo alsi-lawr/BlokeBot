@@ -83,7 +83,7 @@ public sealed class TwitchOAuthApiClientTests
     private static string ReadContent(HttpRequestMessage request)
     {
         return request.Content?.ReadAsStringAsync(CancellationToken.None).GetAwaiter().GetResult()
-        ?? string.Empty;
+            ?? string.Empty;
     }
 
     private static HttpResponseMessage JsonResponse(string json)

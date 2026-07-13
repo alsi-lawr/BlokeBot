@@ -12,9 +12,7 @@ public sealed class AnnouncementDeliveryPolicyTests
     public void RetryUntilExpiredThenSkipEntity_Mapping_ReturnsImmutableClosedPolicy()
     {
         var retryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2));
-        var occurrenceLifetime = new AnnouncementOccurrenceLifetime(
-            TimeSpan.FromSeconds(30)
-        );
+        var occurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30));
         var entity = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         {
             RetryDelay = retryDelay,
@@ -44,14 +42,10 @@ public sealed class AnnouncementDeliveryPolicyTests
         var entity = new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         {
             RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(30)),
-            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                TimeSpan.FromSeconds(30)
-            ),
+            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
         };
 
-        Should.Throw<ArgumentException>(() =>
-            AnnouncementDeliveryPolicyMapper.ToDomain(entity)
-        );
+        Should.Throw<ArgumentException>(() => AnnouncementDeliveryPolicyMapper.ToDomain(entity));
     }
 
     [Test]
@@ -64,8 +58,8 @@ public sealed class AnnouncementDeliveryPolicyTests
 
         leaf.ShouldNotBeNull();
         leaf.IsSealed.ShouldBeTrue();
-        typeof(AnnouncementDeliveryPolicy).Assembly
-            .GetTypes()
+        typeof(AnnouncementDeliveryPolicy)
+            .Assembly.GetTypes()
             .Where(type => type.BaseType == typeof(AnnouncementDeliveryPolicy))
             .ShouldBe([leaf]);
     }

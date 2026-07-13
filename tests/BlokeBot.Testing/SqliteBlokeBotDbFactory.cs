@@ -9,10 +9,7 @@ public sealed class SqliteBlokeBotDbFactory : IDbContextFactory<BlokeBotDbContex
     private readonly SqliteConnection _keeperConnection;
     private readonly DbContextOptions<BlokeBotDbContext> _options;
 
-    private SqliteBlokeBotDbFactory(
-        SqliteConnection keeperConnection,
-        string connectionString
-    )
+    private SqliteBlokeBotDbFactory(SqliteConnection keeperConnection, string connectionString)
     {
         _keeperConnection = keeperConnection;
         _options = new DbContextOptionsBuilder<BlokeBotDbContext>()

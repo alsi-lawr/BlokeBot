@@ -12,11 +12,7 @@ internal static class TwitchRuntimeSessionRunner
             CancellationToken,
             Task<TwitchRuntimeSessionOutcome>
         > establishSession,
-        Func<
-            Exception,
-            CancellationToken,
-            TwitchRuntimeSessionFailureClassification
-        > classify,
+        Func<Exception, CancellationToken, TwitchRuntimeSessionFailureClassification> classify,
         ITwitchRuntimeSessionHealthReporter health,
         TwitchBotRuntimeStatusStore status,
         ITwitchRuntimeIdleWait idleWait,
@@ -104,10 +100,9 @@ internal static class TwitchRuntimeSessionRunner
         catch (Exception exception)
         {
             status.SetConnected(false, []);
-            var attempt =
-                exception is TwitchRuntimeSessionCleanupException cleanup
-                    ? cleanup.Attempt
-                    : currentAttempt;
+            var attempt = exception is TwitchRuntimeSessionCleanupException cleanup
+                ? cleanup.Attempt
+                : currentAttempt;
             var report = CreateUnhealthyReport(
                 runtime,
                 classify,
@@ -127,11 +122,7 @@ internal static class TwitchRuntimeSessionRunner
             CancellationToken,
             ValueTask<TwitchRuntimeSessionEstablishment>
         > execute,
-        Func<
-            Exception,
-            CancellationToken,
-            TwitchRuntimeSessionFailureClassification
-        > classify,
+        Func<Exception, CancellationToken, TwitchRuntimeSessionFailureClassification> classify,
         ITwitchRuntimeSessionHealthReporter health,
         TwitchBotRuntimeStatusStore status,
         CancellationToken stoppingToken
@@ -153,17 +144,14 @@ internal static class TwitchRuntimeSessionRunner
 
             return establishment switch
             {
-                TwitchRuntimeSessionEstablishment.Idle =>
-                    new TwitchRuntimeSessionOutcome.Idle(),
+                TwitchRuntimeSessionEstablishment.Idle => new TwitchRuntimeSessionOutcome.Idle(),
                 TwitchRuntimeSessionEstablishment.Established established =>
                     new TwitchRuntimeSessionOutcome.Established
                     {
                         Session = established.Session,
                         Attempt = attempt,
                     },
-                _ => throw new UnreachableException(
-                    "Unknown runtime session establishment."
-                ),
+                _ => throw new UnreachableException("Unknown runtime session establishment."),
             };
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -185,10 +173,7 @@ internal static class TwitchRuntimeSessionRunner
                 stoppingToken
             );
             health.Report(report);
-            return new TwitchRuntimeSessionOutcome.Unhealthy
-            {
-                Report = report,
-            };
+            return new TwitchRuntimeSessionOutcome.Unhealthy { Report = report };
         }
 
         async Task<TwitchRuntimeSessionEstablishment> RunAttemptAsync(
@@ -219,11 +204,7 @@ internal static class TwitchRuntimeSessionRunner
     private static async Task<TwitchRuntimeListenOutcome> ListenAsync(
         TwitchBotRuntime runtime,
         TwitchRuntimeSessionOutcome.Established established,
-        Func<
-            Exception,
-            CancellationToken,
-            TwitchRuntimeSessionFailureClassification
-        > classify,
+        Func<Exception, CancellationToken, TwitchRuntimeSessionFailureClassification> classify,
         ITwitchRuntimeSessionHealthReporter health,
         TwitchBotRuntimeStatusStore status,
         CancellationToken stoppingToken
@@ -272,11 +253,7 @@ internal static class TwitchRuntimeSessionRunner
                 status.SetAuthorized(false);
             }
 
-            var failure = await IncludeCleanupFailureAsync(
-                session,
-                established.Attempt,
-                exception
-            );
+            var failure = await IncludeCleanupFailureAsync(session, established.Attempt, exception);
             status.SetConnected(false, []);
             var classification = classify(failure, stoppingToken);
             if (TwitchRuntimeSessionFailureClassifier.IsRetryable(classification))
@@ -333,9 +310,7 @@ internal static class TwitchRuntimeSessionRunner
         }
     }
 
-    private static async ValueTask DisposeHandoffAsync(
-        TwitchRuntimeSessionHandoff handoff
-    )
+    private static async ValueTask DisposeHandoffAsync(TwitchRuntimeSessionHandoff handoff)
     {
         switch (handoff)
         {
@@ -377,10 +352,9 @@ internal static class TwitchRuntimeSessionRunner
             }
             catch (Exception replacementException)
             {
-                var attempt =
-                    handoffException is TwitchRuntimeSessionCleanupException cleanup
-                        ? cleanup.Attempt
-                        : replacement.Attempt;
+                var attempt = handoffException is TwitchRuntimeSessionCleanupException cleanup
+                    ? cleanup.Attempt
+                    : replacement.Attempt;
                 throw new TwitchRuntimeSessionCleanupException(
                     attempt,
                     "EventSub protocol handoff and replacement session cleanup both failed.",
@@ -417,11 +391,7 @@ internal static class TwitchRuntimeSessionRunner
 
     private static TwitchRuntimeSessionHealthReport.Unhealthy CreateUnhealthyReport(
         TwitchBotRuntime runtime,
-        Func<
-            Exception,
-            CancellationToken,
-            TwitchRuntimeSessionFailureClassification
-        > classify,
+        Func<Exception, CancellationToken, TwitchRuntimeSessionFailureClassification> classify,
         int attempt,
         Exception exception,
         CancellationToken cancellationToken

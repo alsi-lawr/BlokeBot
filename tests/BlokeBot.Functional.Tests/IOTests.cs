@@ -11,13 +11,12 @@ public sealed class IOTests
         var operationInvocations = 0;
         var mapInvocations = 0;
         var bindInvocations = 0;
-        var io = IO<int, TestError>.Create(
-                _ =>
-                {
-                    operationInvocations++;
-                    return ValueTask.FromResult(Result<int, TestError>.Success(21));
-                }
-            )
+        var io = IO<int, TestError>
+            .Create(_ =>
+            {
+                operationInvocations++;
+                return ValueTask.FromResult(Result<int, TestError>.Success(21));
+            })
             .Map(value =>
             {
                 mapInvocations++;
@@ -137,13 +136,12 @@ public sealed class IOTests
     public async Task MapAndBind_Executing_RunInCompositionOrder()
     {
         var events = new List<string>();
-        var io = IO<int, TestError>.Create(
-                _ =>
-                {
-                    events.Add("source");
-                    return ValueTask.FromResult(Result<int, TestError>.Success(20));
-                }
-            )
+        var io = IO<int, TestError>
+            .Create(_ =>
+            {
+                events.Add("source");
+                return ValueTask.FromResult(Result<int, TestError>.Success(20));
+            })
             .Map(value =>
             {
                 events.Add("map");
@@ -174,22 +172,18 @@ public sealed class IOTests
         var bindInvoked = false;
         var io = IO<int, TestError>
             .Create(_ => ValueTask.FromResult(Result<int, TestError>.Error(expected)))
-            .Map(
-                _ =>
-                {
-                    mapInvoked = true;
-                    return 42;
-                }
-            )
-            .Bind(
-                _ =>
-                {
-                    bindInvoked = true;
-                    return IO<int, TestError>.Create(_ =>
-                        ValueTask.FromResult(Result<int, TestError>.Success(42))
-                    );
-                }
-            );
+            .Map(_ =>
+            {
+                mapInvoked = true;
+                return 42;
+            })
+            .Bind(_ =>
+            {
+                bindInvoked = true;
+                return IO<int, TestError>.Create(_ =>
+                    ValueTask.FromResult(Result<int, TestError>.Success(42))
+                );
+            });
 
         var result = await io.ExecuteAsync(CancellationToken.None);
 
@@ -220,13 +214,11 @@ public sealed class IOTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
         var operationInvocations = 0;
-        var io = IO<int, TestError>.Create(
-            _ =>
-            {
-                operationInvocations++;
-                return ValueTask.FromResult(Result<int, TestError>.Success(42));
-            }
-        );
+        var io = IO<int, TestError>.Create(_ =>
+        {
+            operationInvocations++;
+            return ValueTask.FromResult(Result<int, TestError>.Success(42));
+        });
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
             io.ExecuteAsync(cancellation.Token).AsTask()
@@ -255,7 +247,5 @@ public sealed class IOTests
 
     private sealed class ExpectedException(string message) : Exception(message);
 
-    private sealed class UnexpectedException : Exception
-    {
-    }
+    private sealed class UnexpectedException : Exception { }
 }

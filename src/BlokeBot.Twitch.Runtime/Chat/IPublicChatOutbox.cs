@@ -29,13 +29,11 @@ internal abstract record PublicChatEnqueueOutcome
 {
     private PublicChatEnqueueOutcome() { }
 
-    internal sealed record Accepted(PublicChatOutboxReceipt Receipt)
-        : PublicChatEnqueueOutcome;
+    internal sealed record Accepted(PublicChatOutboxReceipt Receipt) : PublicChatEnqueueOutcome;
 
     internal sealed record Rejected : PublicChatEnqueueOutcome;
 
-    internal sealed record SafePreEnqueueTransient(Exception Cause)
-        : PublicChatEnqueueOutcome;
+    internal sealed record SafePreEnqueueTransient(Exception Cause) : PublicChatEnqueueOutcome;
 
     internal sealed record Ambiguous(Exception Cause) : PublicChatEnqueueOutcome;
 
@@ -67,20 +65,15 @@ internal sealed record PublicChatClaimedMessage
     public required PublicChatDeduplicationKey DeduplicationKey { get; init; }
 }
 
-internal readonly record struct PublicChatPendingMessage(
-    string Channel,
-    DateTimeOffset EnqueuedAt
-);
+internal readonly record struct PublicChatPendingMessage(string Channel, DateTimeOffset EnqueuedAt);
 
 internal abstract record PublicChatClaimOutcome
 {
     private PublicChatClaimOutcome() { }
 
-    public sealed record Claimed(PublicChatClaimedMessage Message)
-        : PublicChatClaimOutcome;
+    public sealed record Claimed(PublicChatClaimedMessage Message) : PublicChatClaimOutcome;
 
-    public sealed record AwaitingAvailability(DateTimeOffset AvailableAt)
-        : PublicChatClaimOutcome;
+    public sealed record AwaitingAvailability(DateTimeOffset AvailableAt) : PublicChatClaimOutcome;
 
     public sealed record Empty : PublicChatClaimOutcome;
 

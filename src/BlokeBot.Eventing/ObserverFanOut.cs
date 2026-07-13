@@ -242,9 +242,11 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
                         result
                         is ObserverAttemptOutcome.Succeeded
                             or ObserverAttemptOutcome.Failed
-                        {
-                            Details.Summary.Classification: not ObserverFailureClassification.Transient,
-                        }
+                            {
+                                Details
+                                    .Summary
+                                    .Classification: not ObserverFailureClassification.Transient,
+                            }
                     )
                     {
                         return;
@@ -299,9 +301,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
 
                 return;
             default:
-                throw new UnreachableException(
-                    "Unknown observer failure policy."
-                );
+                throw new UnreachableException("Unknown observer failure policy.");
         }
     }
 
@@ -417,9 +417,8 @@ internal interface IObserverFailureDiagnosticReporter
     );
 }
 
-internal sealed class ObserverFailureDiagnosticLogger(
-    ILogger<ObserverFailureDiagnosticLogger> log
-) : IObserverFailureDiagnosticReporter
+internal sealed class ObserverFailureDiagnosticLogger(ILogger<ObserverFailureDiagnosticLogger> log)
+    : IObserverFailureDiagnosticReporter
 {
     public ValueTask ReportAsync(
         ObserverFailureDiagnosticReport report,
@@ -529,9 +528,8 @@ internal static class ObserverFailureClassifier
     private static bool IsTransientHttpStatus(HttpStatusCode? statusCode)
     {
         return statusCode is null
-        || statusCode is HttpStatusCode.RequestTimeout
-            or HttpStatusCode.TooManyRequests
-        || (int)statusCode >= 500;
+            || statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+            || (int)statusCode >= 500;
     }
 }
 
@@ -550,11 +548,7 @@ internal abstract record ObserverAttemptOutcome
     {
         internal required ObserverFailureDetails Details { get; init; }
 
-        internal required IReadOnlyList<ObserverFailureHandlingDetails> HandlingFailures
-        {
-            get;
-            init;
-        }
+        internal required IReadOnlyList<ObserverFailureHandlingDetails> HandlingFailures { get; init; }
 
         private protected override void Seal() { }
     }

@@ -110,11 +110,7 @@ public sealed record PublicChatRetryOptions
 public sealed record PublicChatDeliveryLifetimeOptions
 {
     [Required]
-    [Range(
-        typeof(TimeSpan),
-        PolicyDuration.Minimum,
-        PolicyDuration.MaximumPublicChatAge
-    )]
+    [Range(typeof(TimeSpan), PolicyDuration.Minimum, PolicyDuration.MaximumPublicChatAge)]
     public required TimeSpan? MaximumAge { get; set; }
 }
 
@@ -130,39 +126,27 @@ public sealed record PublicChatTerminalRetentionOptions
 
 [OptionsValidator]
 public sealed partial class IrcSessionResilienceOptionsValidator
-    : IValidateOptions<IrcSessionResilienceOptions>
-{
-}
+    : IValidateOptions<IrcSessionResilienceOptions> { }
 
 [OptionsValidator]
 public sealed partial class EventSubSessionResilienceOptionsValidator
-    : IValidateOptions<EventSubSessionResilienceOptions>
-{
-}
+    : IValidateOptions<EventSubSessionResilienceOptions> { }
 
 [OptionsValidator]
 public sealed partial class EventSubChannelRecoveryOptionsValidator
-    : IValidateOptions<EventSubChannelRecoveryOptions>
-{
-}
+    : IValidateOptions<EventSubChannelRecoveryOptions> { }
 
 [OptionsValidator]
 public sealed partial class PublicChatRetryOptionsValidator
-    : IValidateOptions<PublicChatRetryOptions>
-{
-}
+    : IValidateOptions<PublicChatRetryOptions> { }
 
 [OptionsValidator]
 public sealed partial class PublicChatDeliveryLifetimeOptionsValidator
-    : IValidateOptions<PublicChatDeliveryLifetimeOptions>
-{
-}
+    : IValidateOptions<PublicChatDeliveryLifetimeOptions> { }
 
 [OptionsValidator]
 public sealed partial class PublicChatTerminalRetentionOptionsValidator
-    : IValidateOptions<PublicChatTerminalRetentionOptions>
-{
-}
+    : IValidateOptions<PublicChatTerminalRetentionOptions> { }
 
 internal static class PolicyDuration
 {

@@ -60,8 +60,9 @@ public sealed class CustomCommandSettingsUiTests
         error.Kind.ShouldBe(ToastKind.Error);
         error.Message.ShouldBe("Reply name is required.");
         await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId))!
-            .Name.ShouldBe("Message");
+        (await db.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId))!.Name.ShouldBe(
+            "Message"
+        );
     }
 
     private static async Task<SeededConfiguration> SeedConfigurationAsync(
@@ -118,9 +119,7 @@ public sealed class CustomCommandSettingsUiTests
             {
                 HostId = host.Id,
                 RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2)),
-                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                    TimeSpan.FromSeconds(30)
-                ),
+                OccurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30)),
             },
             Schedule = new IntervalAfterChatCustomAnnouncementSchedule
             {

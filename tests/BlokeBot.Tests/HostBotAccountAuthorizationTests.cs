@@ -128,11 +128,7 @@ public sealed class HostBotAccountAuthorizationTests
         var lookups = Enumerable
             .Range(0, 8)
             .SelectMany(_ =>
-                new[]
-                {
-                    ResolveAsync("custom-channel"),
-                    ResolveAsync("global-channel"),
-                }
+                new[] { ResolveAsync("custom-channel"), ResolveAsync("global-channel") }
             )
             .ToArray();
 
@@ -140,9 +136,10 @@ public sealed class HostBotAccountAuthorizationTests
 
         foreach (var result in results)
         {
-            var expected = result.Channel == "custom-channel"
-                ? new TwitchBotAccount("custombot", "override-token")
-                : new TwitchBotAccount("bot", "global-token");
+            var expected =
+                result.Channel == "custom-channel"
+                    ? new TwitchBotAccount("custombot", "override-token")
+                    : new TwitchBotAccount("bot", "global-token");
             result.Account.ShouldBe(expected);
         }
 

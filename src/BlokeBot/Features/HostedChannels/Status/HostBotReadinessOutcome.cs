@@ -75,9 +75,7 @@ public sealed record HostBotReadinessOutcome(
         return new(HostBotReadinessKind.NotModerator, flags);
     }
 
-    public static HostBotReadinessOutcome MissingFollowerReadScope(
-        HostBotChannelStatusFlags flags
-    )
+    public static HostBotReadinessOutcome MissingFollowerReadScope(HostBotChannelStatusFlags flags)
     {
         return new(HostBotReadinessKind.MissingFollowerReadScope, flags);
     }

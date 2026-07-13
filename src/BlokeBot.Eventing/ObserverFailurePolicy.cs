@@ -110,8 +110,7 @@ public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
 
     private protected abstract void Seal();
 
-    public sealed record ContinueAndReport
-        : ObserverFailurePolicy<TBoundary, TDeadLetter>
+    public sealed record ContinueAndReport : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
         private protected override void Seal() { }
     }
@@ -136,11 +135,7 @@ public abstract record ObserverFailurePolicy<TBoundary, TDeadLetter>
 
     public sealed record DeadLetter : ObserverFailurePolicy<TBoundary, TDeadLetter>
     {
-        public required IDurableObserverDeadLetterSink<TBoundary, TDeadLetter> Sink
-        {
-            get;
-            init;
-        }
+        public required IDurableObserverDeadLetterSink<TBoundary, TDeadLetter> Sink { get; init; }
 
         private protected override void Seal() { }
     }

@@ -112,11 +112,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             var entry =
                 editor.Id > 0
                     ? existingById[editor.Id]
-                    : new CustomMessageLibraryEntry
-                    {
-                        HostId = hostId,
-                        CreatedAtUtc = now,
-                    };
+                    : new CustomMessageLibraryEntry { HostId = hostId, CreatedAtUtc = now };
             if (editor.Id <= 0)
             {
                 db.CustomMessageLibraryEntries.Add(entry);
@@ -242,11 +238,10 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     {
                         HostId = hostId,
                         CreatedAtUtc = now,
-                        DeliveryPolicy =
-                            CustomCommandConfigurationMapper.CreateDeliveryPolicy(
-                                hostId,
-                                editor
-                            ),
+                        DeliveryPolicy = CustomCommandConfigurationMapper.CreateDeliveryPolicy(
+                            hostId,
+                            editor
+                        ),
                     };
             if (editor.Id <= 0)
             {
@@ -262,10 +257,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             )
                 ? announcement.Schedule
                 : CustomCommandConfigurationMapper.CreateSchedule(hostId, editor.Schedule);
-            CustomCommandConfigurationMapper.ApplySchedule(
-                announcement.Schedule,
-                editor.Schedule
-            );
+            CustomCommandConfigurationMapper.ApplySchedule(announcement.Schedule, editor.Schedule);
             CustomCommandConfigurationMapper.ApplyDeliveryPolicy(
                 announcement.DeliveryPolicy,
                 editor
@@ -291,19 +283,14 @@ public sealed class CustomCommandConfigurationGraphWriter(
         {
             if (
                 commandEditors.TryGetValue(command.Id, out var editor)
-                && !CustomCommandConfigurationMapper.ActionMatches(
-                    command.Action,
-                    editor.Action
-                )
+                && !CustomCommandConfigurationMapper.ActionMatches(command.Action, editor.Action)
             )
             {
                 db.CustomCommandActions.Remove(command.Action);
             }
         }
 
-        var announcementEditors = config
-            .Announcements.Where(x => x.Id > 0)
-            .ToDictionary(x => x.Id);
+        var announcementEditors = config.Announcements.Where(x => x.Id > 0).ToDictionary(x => x.Id);
         foreach (var announcement in existingAnnouncements)
         {
             if (
@@ -335,13 +322,13 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .Select(x => x.Id)
             .ToHashSet();
 
-        db.CustomCommands.RemoveRange(existingCommands.Where(x => !retainedCommandIds.Contains(x.Id)));
+        db.CustomCommands.RemoveRange(
+            existingCommands.Where(x => !retainedCommandIds.Contains(x.Id))
+        );
         var removedAnnouncements = existingAnnouncements
             .Where(x => !retainedAnnouncementIds.Contains(x.Id))
             .ToArray();
-        var removedDeliveryPolicies = removedAnnouncements
-            .Select(x => x.DeliveryPolicy)
-            .ToArray();
+        var removedDeliveryPolicies = removedAnnouncements.Select(x => x.DeliveryPolicy).ToArray();
         db.CustomAnnouncements.RemoveRange(removedAnnouncements);
         await db.SaveChangesAsync(ct);
         db.CustomAnnouncementDeliveryPolicies.RemoveRange(removedDeliveryPolicies);
@@ -362,7 +349,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .ToHashSet();
         var retainedCounterIds = config.Counters.Where(x => x.Id > 0).Select(x => x.Id).ToHashSet();
 
-        db.CustomCounters.RemoveRange(existingCounters.Where(x => !retainedCounterIds.Contains(x.Id)));
+        db.CustomCounters.RemoveRange(
+            existingCounters.Where(x => !retainedCounterIds.Contains(x.Id))
+        );
         db.CustomMessageLibraryEntries.RemoveRange(
             existingMessageEntries.Where(x => !retainedMessageEntryIds.Contains(x.Id))
         );
@@ -442,10 +431,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         foreach (var editor in config.MessageEntries)
         {
             var entry = messageEntries[editor.Id];
-            entry.Name = CustomCommandConfigurationValidator.RequiredName(
-                editor.Name,
-                "Reply"
-            );
+            entry.Name = CustomCommandConfigurationValidator.RequiredName(editor.Name, "Reply");
             entry.SelectionMode = editor.SelectionMode;
             entry.CurrentVariantIndex = ClampVariantIndex(
                 editor.CurrentVariantIndex,
@@ -457,10 +443,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         foreach (var editor in config.Counters)
         {
             var counter = counters[editor.Id];
-            counter.Name = CustomCommandConfigurationValidator.RequiredName(
-                editor.Name,
-                "Counter"
-            );
+            counter.Name = CustomCommandConfigurationValidator.RequiredName(editor.Name, "Counter");
             counter.Value = editor.Value;
             counter.UpdatedAtUtc = now;
         }

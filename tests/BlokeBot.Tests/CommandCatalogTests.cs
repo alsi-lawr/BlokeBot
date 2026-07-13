@@ -297,10 +297,7 @@ public sealed class CommandCatalogTests
         return host.Id;
     }
 
-    private static CommandStrategyCatalog<
-        GuessCommandKind,
-        AppCommandRouteState
-    > GuessingCatalog()
+    private static CommandStrategyCatalog<GuessCommandKind, AppCommandRouteState> GuessingCatalog()
     {
         return new([
             new StartGuessingCommandStrategy(null!, null!),
@@ -311,10 +308,7 @@ public sealed class CommandCatalogTests
         ]);
     }
 
-    private static CommandStrategyCatalog<
-        PointsCommandKind,
-        AppCommandRouteState
-    > PointsCatalog()
+    private static CommandStrategyCatalog<PointsCommandKind, AppCommandRouteState> PointsCatalog()
     {
         return new([
             new PointsBalanceCommandStrategy(null!, null!),

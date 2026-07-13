@@ -48,7 +48,11 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
             ),
             ct
         );
-        var validation = await oauth.ValidateTokenAsync(token.AccessToken, ct) ?? throw new InvalidOperationException("Twitch did not finish connecting this channel.");
+        var validation =
+            await oauth.ValidateTokenAsync(token.AccessToken, ct)
+            ?? throw new InvalidOperationException(
+                "Twitch did not finish connecting this channel."
+            );
         return new ChannelBotAuthorizationGrant(
             validation.UserId,
             LoginName.Parse(validation.Login),
@@ -58,8 +62,9 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
 
     public string[] RequestedScopes()
     {
-        return configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>()
-            is { } scopes
+        return
+            configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>()
+                is { } scopes
             ? TwitchScopeSet.NormalizeMany(scopes)
             : [];
     }

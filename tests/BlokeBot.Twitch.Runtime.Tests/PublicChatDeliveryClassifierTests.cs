@@ -16,16 +16,8 @@ public sealed class PublicChatDeliveryClassifierTests
         Exception[] failures =
         [
             new HttpRequestException("connection failed"),
-            new HttpRequestException(
-                "request timed out",
-                null,
-                HttpStatusCode.RequestTimeout
-            ),
-            new HttpRequestException(
-                "rate limited",
-                null,
-                HttpStatusCode.TooManyRequests
-            ),
+            new HttpRequestException("request timed out", null, HttpStatusCode.RequestTimeout),
+            new HttpRequestException("rate limited", null, HttpStatusCode.TooManyRequests),
             new HttpRequestException(
                 "provider unavailable",
                 null,
@@ -45,15 +37,10 @@ public sealed class PublicChatDeliveryClassifierTests
                 CancellationToken.None
             );
 
-            var transient = outcome.ShouldBeOfType<
-                PublicChatPreparationOutcome.SafePreSendTransient
-            >();
-            transient.Diagnostic.FailureType.ShouldBe(
-                PublicChatFailureType.From(failure)
-            );
-            transient.Diagnostic.ShouldBeOfType<
-                PublicChatFailureDiagnostic.Preparation
-            >();
+            var transient =
+                outcome.ShouldBeOfType<PublicChatPreparationOutcome.SafePreSendTransient>();
+            transient.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
+            transient.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
         }
     }
 
@@ -62,11 +49,7 @@ public sealed class PublicChatDeliveryClassifierTests
     {
         Exception[] failures =
         [
-            new HttpRequestException(
-                "bad request",
-                null,
-                HttpStatusCode.BadRequest
-            ),
+            new HttpRequestException("bad request", null, HttpStatusCode.BadRequest),
             new TwitchAppAccessTokenResponseException(),
             new TwitchAccessTokenUnavailableException(
                 TwitchAccessTokenUnavailableReason.MissingRefreshToken,
@@ -82,12 +65,8 @@ public sealed class PublicChatDeliveryClassifierTests
                 .ShouldBeOfType<PublicChatPreparationOutcome.Unexpected>();
 
             unexpected.Cause.ShouldBeSameAs(failure);
-            unexpected.Diagnostic.FailureType.ShouldBe(
-                PublicChatFailureType.From(failure)
-            );
-            unexpected.Diagnostic.ShouldBeOfType<
-                PublicChatFailureDiagnostic.Preparation
-            >();
+            unexpected.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
+            unexpected.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Preparation>();
         }
     }
 
@@ -99,10 +78,7 @@ public sealed class PublicChatDeliveryClassifierTests
         var cancellation = new OperationCanceledException(caller.Token);
 
         var thrown = Should.Throw<OperationCanceledException>(() =>
-            PublicChatDeliveryClassifier.ClassifyPreparationFailure(
-                cancellation,
-                caller.Token
-            )
+            PublicChatDeliveryClassifier.ClassifyPreparationFailure(cancellation, caller.Token)
         );
 
         thrown.ShouldBeSameAs(cancellation);
@@ -113,11 +89,7 @@ public sealed class PublicChatDeliveryClassifierTests
     {
         PublicChatDeliveryClassifier
             .ClassifySendResult(
-                new TwitchChatMessageSendResult
-                {
-                    IsSent = true,
-                    MessageId = "provider-message-id",
-                }
+                new TwitchChatMessageSendResult { IsSent = true, MessageId = "provider-message-id" }
             )
             .ShouldBeOfType<PublicChatTransportSendResult.Sent>();
 
@@ -162,11 +134,7 @@ public sealed class PublicChatDeliveryClassifierTests
     {
         Exception[] failures =
         [
-            new HttpRequestException(
-                "rejected after post",
-                null,
-                HttpStatusCode.BadRequest
-            ),
+            new HttpRequestException("rejected after post", null, HttpStatusCode.BadRequest),
             new HttpRequestException(
                 "provider unavailable after post",
                 null,
@@ -186,9 +154,7 @@ public sealed class PublicChatDeliveryClassifierTests
                 .ClassifyPostBoundaryFailure(failure, CancellationToken.None)
                 .ShouldBeOfType<PublicChatDeliveryOutcome.Ambiguous>();
 
-            ambiguous.Diagnostic.FailureType.ShouldBe(
-                PublicChatFailureType.From(failure)
-            );
+            ambiguous.Diagnostic.FailureType.ShouldBe(PublicChatFailureType.From(failure));
             ambiguous.Diagnostic.ShouldBeOfType<PublicChatFailureDiagnostic.Send>();
         }
     }
@@ -201,10 +167,7 @@ public sealed class PublicChatDeliveryClassifierTests
         var cancellation = new OperationCanceledException(caller.Token);
 
         var thrown = Should.Throw<OperationCanceledException>(() =>
-            PublicChatDeliveryClassifier.ClassifyPostBoundaryFailure(
-                cancellation,
-                caller.Token
-            )
+            PublicChatDeliveryClassifier.ClassifyPostBoundaryFailure(cancellation, caller.Token)
         );
 
         thrown.ShouldBeSameAs(cancellation);
@@ -229,10 +192,7 @@ public sealed class PublicChatDeliveryClassifierTests
         prepared.ToString().ShouldNotContain("secret chat payload");
     }
 
-    private static PublicChatPreparedSend Prepared(
-        string accessToken,
-        string message
-    )
+    private static PublicChatPreparedSend Prepared(string accessToken, string message)
     {
         return new()
         {

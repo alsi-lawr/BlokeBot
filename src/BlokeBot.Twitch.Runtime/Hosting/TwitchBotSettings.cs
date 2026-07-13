@@ -79,10 +79,7 @@ public sealed record TwitchBotSettings
         return Create(options, identity);
     }
 
-    private static TwitchBotSettings Create(
-        TwitchBotOptions options,
-        TwitchBotIdentity identity
-    )
+    private static TwitchBotSettings Create(TwitchBotOptions options, TwitchBotIdentity identity)
     {
         return new()
         {

@@ -1,8 +1,8 @@
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
-using BlokeBot.Hosts;
 using BlokeBot.Hosting;
+using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
@@ -19,9 +19,7 @@ public sealed class DurableAlertTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var clock = new FixedTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
 
         await alerts.CreateAsync(
@@ -62,7 +60,10 @@ public sealed class DurableAlertTests
     [Arguments(AuthRole.Moderator, true)]
     [Arguments(AuthRole.Admin, true)]
     [Arguments(AuthRole.Bot, false)]
-    public void SelectedHostRole_CheckingAcknowledgePermission_MatchesOperatorCapability(AuthRole role, bool expected)
+    public void SelectedHostRole_CheckingAcknowledgePermission_MatchesOperatorCapability(
+        AuthRole role,
+        bool expected
+    )
     {
         var selectedHost = new BotHostChoice(42, "streamer", "Streamer", role);
         var principal = TestPrincipals.BlokeBotUser(
@@ -91,9 +92,7 @@ public sealed class DurableAlertTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var clock = new FixedTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var events = TestEventBus.Create<AppEventKind>();
         var notificationCount = 0;
         using var subscription = events.Subscribe(
@@ -136,9 +135,7 @@ public sealed class DurableAlertTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await SeedHostAsync(dbFactory, "streamer");
-        var clock = new FixedTimeProvider(
-            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
-        );
+        var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var events = TestEventBus.Create<AppEventKind>();
         var notificationCount = 0;
         using var subscription = events.Subscribe(
@@ -158,12 +155,7 @@ public sealed class DurableAlertTests
         );
 
         await observer.QueueBackedUpAsync(
-            new PublicChatQueueBacklog(
-                "streamer",
-                3,
-                TimeSpan.FromSeconds(31),
-                clock.GetUtcNow()
-            ),
+            new PublicChatQueueBacklog("streamer", 3, TimeSpan.FromSeconds(31), clock.GetUtcNow()),
             CancellationToken.None
         );
         await observer.QueueBackedUpAsync(
@@ -183,10 +175,7 @@ public sealed class DurableAlertTests
         notificationCount.ShouldBe(2);
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost

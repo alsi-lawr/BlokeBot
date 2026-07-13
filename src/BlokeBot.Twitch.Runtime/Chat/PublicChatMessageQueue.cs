@@ -37,8 +37,7 @@ internal sealed class PublicChatMessageQueue(
     {
         ArgumentNullException.ThrowIfNull(command);
         if (
-            string.IsNullOrWhiteSpace(command.Channel)
-            || string.IsNullOrWhiteSpace(command.Message)
+            string.IsNullOrWhiteSpace(command.Channel) || string.IsNullOrWhiteSpace(command.Message)
         )
         {
             return new PublicChatEnqueueOutcome.Rejected();
@@ -53,16 +52,11 @@ internal sealed class PublicChatMessageQueue(
         }
 
         var items = parts
-            .Select(part =>
-                new PublicChatOutboxItem
-                {
-                    Message = part,
-                    DeduplicationKey = PublicChatMessageDeduplication.Key(
-                        command.Channel,
-                        part
-                    ),
-                }
-            )
+            .Select(part => new PublicChatOutboxItem
+            {
+                Message = part,
+                DeduplicationKey = PublicChatMessageDeduplication.Key(command.Channel, part),
+            })
             .ToImmutableArray();
         var outcome = await outbox.EnqueueAsync(
             new PublicChatOutboxBatch
@@ -86,7 +80,9 @@ internal sealed class PublicChatMessageQueue(
     {
         if (Interlocked.Exchange(ref _running, 1) != 0)
         {
-            throw new InvalidOperationException("The public chat outbox worker is already running.");
+            throw new InvalidOperationException(
+                "The public chat outbox worker is already running."
+            );
         }
 
         try
@@ -242,9 +238,7 @@ internal sealed class PublicChatMessageQueue(
         catch (OperationCanceledException exception)
             when (cancellationToken.IsCancellationRequested)
         {
-            var diagnostic = PublicChatDeliveryClassifier.PostBoundaryInterruption(
-                exception
-            );
+            var diagnostic = PublicChatDeliveryClassifier.PostBoundaryInterruption(exception);
             await RecordPostBoundaryInterruptionAsync(message, diagnostic);
             LogFailure(LogLevel.Warning, message, "Ambiguous", diagnostic);
             throw;
@@ -260,19 +254,12 @@ internal sealed class PublicChatMessageQueue(
         await RecordOutcomeAsync(message, outcome, CancellationToken.None);
     }
 
-    private async Task ReleaseClaimAfterCancellationAsync(
-        PublicChatClaimedMessage message
-    )
+    private async Task ReleaseClaimAfterCancellationAsync(PublicChatClaimedMessage message)
     {
         try
         {
             _ = await ApplyClaimUpdateAsync(
-                () =>
-                    outbox.ReleaseClaimAsync(
-                        message,
-                        UtcNow(),
-                        CancellationToken.None
-                    ),
+                () => outbox.ReleaseClaimAsync(message, UtcNow(), CancellationToken.None),
                 CancellationToken.None
             );
         }
@@ -321,13 +308,7 @@ internal sealed class PublicChatMessageQueue(
     )
     {
         var recorded = await ApplyClaimUpdateAsync(
-            () =>
-                outbox.RecordDeliveryOutcomeAsync(
-                    message,
-                    outcome,
-                    UtcNow(),
-                    cancellationToken
-                ),
+            () => outbox.RecordDeliveryOutcomeAsync(message, outcome, UtcNow(), cancellationToken),
             cancellationToken
         );
         if (recorded is PublicChatClaimUpdate.OwnershipLost)
@@ -345,20 +326,12 @@ internal sealed class PublicChatMessageQueue(
         }
     }
 
-    private void LogOutcome(
-        PublicChatClaimedMessage message,
-        PublicChatDeliveryOutcome outcome
-    )
+    private void LogOutcome(PublicChatClaimedMessage message, PublicChatDeliveryOutcome outcome)
     {
         outcome.Match(
             static _ => { },
             transient =>
-                LogFailure(
-                    LogLevel.Warning,
-                    message,
-                    "SafePreSendTransient",
-                    transient.Diagnostic
-                ),
+                LogFailure(LogLevel.Warning, message, "SafePreSendTransient", transient.Diagnostic),
             rejection =>
                 log.LogWarning(
                     "Twitch rejected public chat outbox message {OutboxMessageId} in #{Channel} with code {RejectionCode}.",
@@ -366,20 +339,8 @@ internal sealed class PublicChatMessageQueue(
                     message.Channel,
                     rejection.Reason.Match(code => code.Value, () => "Unspecified")
                 ),
-            ambiguous =>
-                LogFailure(
-                    LogLevel.Warning,
-                    message,
-                    "Ambiguous",
-                    ambiguous.Diagnostic
-                ),
-            unexpected =>
-                LogFailure(
-                    LogLevel.Error,
-                    message,
-                    "Unexpected",
-                    unexpected.Diagnostic
-                )
+            ambiguous => LogFailure(LogLevel.Warning, message, "Ambiguous", ambiguous.Diagnostic),
+            unexpected => LogFailure(LogLevel.Error, message, "Unexpected", unexpected.Diagnostic)
         );
     }
 
@@ -429,9 +390,7 @@ internal sealed class PublicChatMessageQueue(
         );
     }
 
-    private async Task NotifyQueueAlertsAsync(
-        IReadOnlyList<PublicChatQueueBacklog> alerts
-    )
+    private async Task NotifyQueueAlertsAsync(IReadOnlyList<PublicChatQueueBacklog> alerts)
     {
         try
         {
@@ -470,9 +429,7 @@ internal sealed class PublicChatMessageQueue(
             delay,
             Timeout.InfiniteTimeSpan
         );
-        var scheduledWake = scheduledWakeSignals.Reader
-            .ReadAsync(waitCancellation.Token)
-            .AsTask();
+        var scheduledWake = scheduledWakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
         var signal = _wakeSignals.Reader.ReadAsync(waitCancellation.Token).AsTask();
         var completed = await Task.WhenAny(scheduledWake, signal);
         await waitCancellation.CancelAsync();
@@ -516,36 +473,28 @@ internal sealed class PublicChatMessageQueue(
     private TimeSpan _queueStuckThreshold =>
         TimeSpan.FromSeconds(Math.Max(0, settings.PublicChatQueueAlerts.StuckAfterSeconds));
 
-    private void ReportAlertEscalation(
-        ObserverFanOutEscalationException escalation,
-        int alertCount
-    )
+    private void ReportAlertEscalation(ObserverFanOutEscalationException escalation, int alertCount)
     {
-        var boundaries =
-            escalation.Failures
-                .Select(failure => failure.Boundary.Value)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-        var events =
-            escalation.Failures
-                .Select(failure => failure.Event.Value)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-        var correlations =
-            escalation.Failures
-                .Select(failure => failure.CorrelationId.Value)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
-        var handlingStages =
-            escalation.HandlingFailures
-                .Select(failure => failure.Stage)
-                .Distinct()
-                .ToArray();
-        var handlingFailureTypes =
-            escalation.HandlingFailures
-                .Select(failure => failure.FailureType)
-                .Distinct(StringComparer.Ordinal)
-                .ToArray();
+        var boundaries = escalation
+            .Failures.Select(failure => failure.Boundary.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var events = escalation
+            .Failures.Select(failure => failure.Event.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var correlations = escalation
+            .Failures.Select(failure => failure.CorrelationId.Value)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var handlingStages = escalation
+            .HandlingFailures.Select(failure => failure.Stage)
+            .Distinct()
+            .ToArray();
+        var handlingFailureTypes = escalation
+            .HandlingFailures.Select(failure => failure.FailureType)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         log.LogError(
             "Public chat queue alert handling escalated for {AlertCount} alerts after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures at {Boundaries} for {Events}; stages {HandlingStages}, failure types {HandlingFailureTypes}, correlations {CorrelationIds}. Continuing queued chat processing.",
             alertCount,
@@ -572,8 +521,7 @@ internal sealed class PublicChatMessageQueue(
     }
 }
 
-internal sealed class PublicChatOutboxWorker(PublicChatMessageQueue queue)
-    : BackgroundService
+internal sealed class PublicChatOutboxWorker(PublicChatMessageQueue queue) : BackgroundService
 {
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {

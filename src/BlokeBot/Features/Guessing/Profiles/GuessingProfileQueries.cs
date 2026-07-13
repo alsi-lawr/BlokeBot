@@ -34,12 +34,12 @@ internal static class GuessingProfileQueries
     )
     {
         return await LoadProfileWithSettingsAsync(
-            db,
-            hostId,
-            await DefaultProfileIdAsync(db, hostId, ct),
-            ct,
-            includeOptions
-        ) ?? throw new InvalidOperationException("Default profile is missing.");
+                db,
+                hostId,
+                await DefaultProfileIdAsync(db, hostId, ct),
+                ct,
+                includeOptions
+            ) ?? throw new InvalidOperationException("Default profile is missing.");
     }
 
     public static async Task<GuessRoundProfile?> LoadProfileByNameAsync(

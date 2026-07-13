@@ -44,7 +44,12 @@ public sealed class PublicChatQueueAlertIntegrationTests
             NullLogger<DurablePublicChatQueueAlertObserver>.Instance
         );
         var outbox = new CompletionObservingPublicChatOutbox(
-            new EfPublicChatOutbox(dbFactory, StandardRetryPolicy, StandardLifetimePolicy, StandardRetentionPolicy)
+            new EfPublicChatOutbox(
+                dbFactory,
+                StandardRetryPolicy,
+                StandardLifetimePolicy,
+                StandardRetentionPolicy
+            )
         );
         var transport = new RecordingPublicChatTransport();
         var queue = CreateQueue(
@@ -55,26 +60,17 @@ public sealed class PublicChatQueueAlertIntegrationTests
             {
                 ChatMessageSendIntervalSeconds = 10,
                 DuplicateChatMessageCooldownSeconds = 0,
-                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
-                {
-                    StuckAfterSeconds = 5,
-                },
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions { StuckAfterSeconds = 5 },
             },
             [durableObserver]
         );
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        _ = await queue.EnqueueAsync(
-            Command("streamer", "first"),
-            CancellationToken.None
-        );
+        _ = await queue.EnqueueAsync(Command("streamer", "first"), CancellationToken.None);
         _ = await transport.ReadAsync();
         _ = await outbox.ReadDeliveryAsync();
-        _ = await queue.EnqueueAsync(
-            Command("streamer", "second"),
-            CancellationToken.None
-        );
+        _ = await queue.EnqueueAsync(Command("streamer", "second"), CancellationToken.None);
         await clock.WaitForTimerRegistrationAsync();
         clock.Advance(TimeSpan.FromSeconds(5));
         _ = await notifications.Reader.ReadAsync();
@@ -137,10 +133,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
             clock,
             new TwitchBotOptions
             {
-                PublicChatQueueAlerts = new PublicChatQueueAlertOptions
-                {
-                    StuckAfterSeconds = 5,
-                },
+                PublicChatQueueAlerts = new PublicChatQueueAlertOptions { StuckAfterSeconds = 5 },
             },
             [durableObserver]
         );
@@ -158,9 +151,7 @@ public sealed class PublicChatQueueAlertIntegrationTests
         expired.Status.ShouldBe(PublicChatOutboxStatus.Expired);
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost

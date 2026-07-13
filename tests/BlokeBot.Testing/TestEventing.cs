@@ -8,15 +8,11 @@ public static class TestEventBus
         where TKey : notnull
     {
         return Create<TKey>(key =>
-            ObserverEventIdentity.Named(
-                $"Test.{typeof(TKey).Name}.{RequireKeyText(key)}"
-            )
+            ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
         );
     }
 
-    public static EventBus<TKey> Create<TKey>(
-        Func<TKey, ObserverEventIdentity> eventIdentity
-    )
+    public static EventBus<TKey> Create<TKey>(Func<TKey, ObserverEventIdentity> eventIdentity)
         where TKey : notnull
     {
         var fanOut = TestObserverFanOut.Continue<
@@ -58,8 +54,7 @@ public static class TestObserverFanOut
         );
     }
 
-    private sealed class TestObserverFailureReporter
-        : IObserverFailureDiagnosticReporter
+    private sealed class TestObserverFailureReporter : IObserverFailureDiagnosticReporter
     {
         private readonly List<ObserverFailureDiagnosticReport> _reports = [];
 
@@ -73,8 +68,7 @@ public static class TestObserverFanOut
         }
     }
 
-    private sealed class TestObserverCorrelationIdProvider
-        : IObserverCorrelationIdProvider
+    private sealed class TestObserverCorrelationIdProvider : IObserverCorrelationIdProvider
     {
         private int _next;
 

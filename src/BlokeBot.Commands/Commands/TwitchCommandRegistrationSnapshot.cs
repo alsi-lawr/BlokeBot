@@ -6,9 +6,7 @@ namespace BlokeBot.Commands;
 internal sealed record TwitchCommandRegistrationSnapshot
 {
     [SetsRequiredMembers]
-    public TwitchCommandRegistrationSnapshot(
-        IEnumerable<TwitchCommandRegistration> registrations
-    )
+    public TwitchCommandRegistrationSnapshot(IEnumerable<TwitchCommandRegistration> registrations)
     {
         ArgumentNullException.ThrowIfNull(registrations);
 

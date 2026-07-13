@@ -245,9 +245,7 @@ public sealed class AuthSessionTests
     {
         var appEvents = TestEventBus.Create<AppEventKind>();
         var admins = new BotAdminService(
-            BotAdminSettings.FromOptions(
-                new BlokeBotOptions { BotAdmins = botAdmins ?? [] }
-            )
+            BotAdminSettings.FromOptions(new BlokeBotOptions { BotAdmins = botAdmins ?? [] })
         );
         return new AuthCookieValidator(
             dbFactory,

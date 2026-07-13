@@ -49,9 +49,7 @@ internal abstract record AnnouncementDeliveryPolicy
 
 internal static class AnnouncementDeliveryPolicyMapper
 {
-    internal static AnnouncementDeliveryPolicy ToDomain(
-        CustomAnnouncementDeliveryPolicy? policy
-    )
+    internal static AnnouncementDeliveryPolicy ToDomain(CustomAnnouncementDeliveryPolicy? policy)
     {
         return policy switch
         {

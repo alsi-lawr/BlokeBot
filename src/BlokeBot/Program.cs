@@ -168,8 +168,7 @@ if (botRuntimeConfigured)
             botSection,
             accountProvider => accountProvider.UseBlokeBotHostedChannelProvider(),
             responseSender => responseSender.UseBlokeBotHostedWhisperSender(),
-            lifecycleNotifier =>
-                lifecycleNotifier.UseBlokeBotHostedChannelLifecycleNotifier()
+            lifecycleNotifier => lifecycleNotifier.UseBlokeBotHostedChannelLifecycleNotifier()
         )
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()

@@ -116,10 +116,10 @@ internal sealed class WebAuthService(
     private bool IsConfiguredBotAccount(string login)
     {
         return !string.IsNullOrWhiteSpace(botSettings.Identity.BotUsername)
-        && string.Equals(
-            TwitchLogin.Normalize(login),
-            botSettings.Identity.BotUsername,
-            StringComparison.Ordinal
-        );
+            && string.Equals(
+                TwitchLogin.Normalize(login),
+                botSettings.Identity.BotUsername,
+                StringComparison.Ordinal
+            );
     }
 }

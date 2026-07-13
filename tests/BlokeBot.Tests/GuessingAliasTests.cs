@@ -394,5 +394,4 @@ public sealed class GuessingAliasTests
         GuessRoundProfile DefaultProfile,
         GuessRoundProfile SpecialProfile
     );
-
 }

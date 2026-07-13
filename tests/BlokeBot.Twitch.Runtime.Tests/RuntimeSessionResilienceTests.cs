@@ -22,11 +22,13 @@ public sealed class RuntimeSessionResilienceTests
     {
         var harness = CreateHarness(runtime, attemptLimit: 3);
         var listening = new ScriptedEstablishedSession();
-        harness.Session.Enqueue((_, _) =>
-        {
-            harness.Status.SetConnected(true, ["channel"]);
-            return EstablishedAsync(listening);
-        });
+        harness.Session.Enqueue(
+            (_, _) =>
+            {
+                harness.Status.SetConnected(true, ["channel"]);
+                return EstablishedAsync(listening);
+            }
+        );
 
         var outcome = await harness.EstablishSessionAsync(
             new TwitchRuntimeConnectionTarget.Initial(),
@@ -56,16 +58,20 @@ public sealed class RuntimeSessionResilienceTests
         var connectedTransitions = new List<bool>();
         harness.Status.Changed += () =>
             connectedTransitions.Add(harness.Status.Current.IsConnected);
-        harness.Session.Enqueue((_, _) =>
-        {
-            harness.Status.SetConnected(true, ["stale"]);
-            return FailedEstablishmentAsync(failure);
-        });
-        harness.Session.Enqueue((_, _) =>
-        {
-            harness.Status.SetConnected(true, ["fresh"]);
-            return EstablishedAsync(listening);
-        });
+        harness.Session.Enqueue(
+            (_, _) =>
+            {
+                harness.Status.SetConnected(true, ["stale"]);
+                return FailedEstablishmentAsync(failure);
+            }
+        );
+        harness.Session.Enqueue(
+            (_, _) =>
+            {
+                harness.Status.SetConnected(true, ["fresh"]);
+                return EstablishedAsync(listening);
+            }
+        );
 
         var outcome = await harness.EstablishSessionAsync(
             new TwitchRuntimeConnectionTarget.Initial(),
@@ -78,7 +84,8 @@ public sealed class RuntimeSessionResilienceTests
         connectedTransitions.ShouldBe([true, false, true]);
         harness.Status.Current.ConnectedChannels.ShouldBe(["fresh"]);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -100,11 +107,13 @@ public sealed class RuntimeSessionResilienceTests
             TwitchAccessTokenUnavailableReason.MissingRefreshToken,
             TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
         );
-        harness.Session.Enqueue((_, _) =>
-        {
-            harness.Status.SetConnected(true, ["stale"]);
-            return FailedEstablishmentAsync(failure);
-        });
+        harness.Session.Enqueue(
+            (_, _) =>
+            {
+                harness.Status.SetConnected(true, ["stale"]);
+                return FailedEstablishmentAsync(failure);
+            }
+        );
 
         var outcome = await harness.EstablishSessionAsync(
             new TwitchRuntimeConnectionTarget.Initial(),
@@ -115,7 +124,8 @@ public sealed class RuntimeSessionResilienceTests
         harness.Session.CallCount.ShouldBe(1);
         harness.Status.Current.IsAuthorized.ShouldBeFalse();
         harness.Status.Current.IsConnected.ShouldBeFalse();
-        var report = harness.Health.Reports.ShouldHaveSingleItem()
+        var report = harness
+            .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
         unhealthy.Report.ShouldBeSameAs(report);
         AssertReport(
@@ -146,7 +156,8 @@ public sealed class RuntimeSessionResilienceTests
         outcome.ShouldBeOfType<TwitchRuntimeSessionOutcome.Unhealthy>();
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Unexpected,
@@ -177,7 +188,8 @@ public sealed class RuntimeSessionResilienceTests
         established.Attempt.ShouldBe(2);
         harness.Session.CallCount.ShouldBe(2);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Timeout,
@@ -211,7 +223,8 @@ public sealed class RuntimeSessionResilienceTests
         harness.Session.CallCount.ShouldBe(3);
         harness.Health.Reports.Count.ShouldBe(3);
         AssertReport(
-            harness.Health.Reports[0]
+            harness
+                .Health.Reports[0]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -219,14 +232,16 @@ public sealed class RuntimeSessionResilienceTests
             first
         );
         AssertReport(
-            harness.Health.Reports[1]
+            harness
+                .Health.Reports[1]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
             attempt: 2,
             second
         );
-        var finalReport = harness.Health.Reports[2]
+        var finalReport = harness
+            .Health.Reports[2]
             .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
         unhealthy.Report.ShouldBeSameAs(finalReport);
         AssertReport(
@@ -257,7 +272,8 @@ public sealed class RuntimeSessionResilienceTests
         outcome.ShouldBeOfType<TwitchRuntimeSessionOutcome.Unhealthy>();
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -275,11 +291,13 @@ public sealed class RuntimeSessionResilienceTests
     {
         using var cancellation = new CancellationTokenSource();
         var harness = CreateHarness(runtime, attemptLimit: 3);
-        harness.Session.Enqueue((_, attemptToken) =>
-        {
-            cancellation.Cancel();
-            return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
-        });
+        harness.Session.Enqueue(
+            (_, attemptToken) =>
+            {
+                cancellation.Cancel();
+                return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
+            }
+        );
 
         var outcome = await harness.EstablishSessionAsync(
             new TwitchRuntimeConnectionTarget.Initial(),
@@ -301,11 +319,13 @@ public sealed class RuntimeSessionResilienceTests
         using var cancellation = new CancellationTokenSource();
         var harness = CreateHarness(runtime, attemptLimit: 3);
         harness.Session.Enqueue((_, _) => IdleAsync());
-        harness.Session.Enqueue((_, attemptToken) =>
-        {
-            cancellation.Cancel();
-            return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
-        });
+        harness.Session.Enqueue(
+            (_, attemptToken) =>
+            {
+                cancellation.Cancel();
+                return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
+            }
+        );
 
         await harness.RunRuntimeAsync(cancellation.Token);
 
@@ -361,16 +381,10 @@ public sealed class RuntimeSessionResilienceTests
             cancellation.Cancel();
             return Task.FromCanceled<TwitchRuntimeReconnectRequest>(listeningToken);
         });
-        harness.Session.Enqueue((_, _) =>
-            FailedEstablishmentAsync(firstEstablishmentFailure)
-        );
+        harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(firstEstablishmentFailure));
         harness.Session.Enqueue((_, _) => EstablishedAsync(firstListening));
-        harness.Session.Enqueue((_, _) =>
-            FailedEstablishmentAsync(secondCycleFirstFailure)
-        );
-        harness.Session.Enqueue((_, _) =>
-            FailedEstablishmentAsync(secondCycleSecondFailure)
-        );
+        harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(secondCycleFirstFailure));
+        harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(secondCycleSecondFailure));
         harness.Session.Enqueue((_, _) => EstablishedAsync(secondListening));
 
         await harness.RunRuntimeAsync(cancellation.Token);
@@ -380,7 +394,8 @@ public sealed class RuntimeSessionResilienceTests
         secondListening.DisposeCount.ShouldBe(1);
         harness.Health.Reports.Count.ShouldBe(4);
         AssertReport(
-            harness.Health.Reports[0]
+            harness
+                .Health.Reports[0]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -388,7 +403,8 @@ public sealed class RuntimeSessionResilienceTests
             firstEstablishmentFailure
         );
         AssertReport(
-            harness.Health.Reports[1]
+            harness
+                .Health.Reports[1]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.ReconnectScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -396,7 +412,8 @@ public sealed class RuntimeSessionResilienceTests
             disconnect
         );
         AssertReport(
-            harness.Health.Reports[2]
+            harness
+                .Health.Reports[2]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -404,7 +421,8 @@ public sealed class RuntimeSessionResilienceTests
             secondCycleFirstFailure
         );
         AssertReport(
-            harness.Health.Reports[3]
+            harness
+                .Health.Reports[3]
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.RetryScheduled>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Transient,
@@ -438,13 +456,15 @@ public sealed class RuntimeSessionResilienceTests
             return Task.FromCanceled<TwitchRuntimeReconnectRequest>(listeningToken);
         });
         harness.Session.Enqueue((_, _) => EstablishedAsync(firstListening));
-        harness.Session.Enqueue((target, _) =>
-        {
-            target
-                .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
-                .Uri.ShouldBe(reconnectEndpoint);
-            return EstablishedAsync(secondListening);
-        });
+        harness.Session.Enqueue(
+            (target, _) =>
+            {
+                target
+                    .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
+                    .Uri.ShouldBe(reconnectEndpoint);
+                return EstablishedAsync(secondListening);
+            }
+        );
 
         await harness.RunRuntimeAsync(cancellation.Token);
 
@@ -465,9 +485,7 @@ public sealed class RuntimeSessionResilienceTests
         const int ReplacementAttempt = 2;
         var reconnectEndpoint = new Uri("wss://example.test/reconnect");
         var previousCleanupFailure = new IOException("previous session cleanup failed");
-        var replacementCleanupFailure = new IOException(
-            "replacement session cleanup failed"
-        );
+        var replacementCleanupFailure = new IOException("replacement session cleanup failed");
         var previousSession = new ScriptedEstablishedSession
         {
             DisposeException = previousCleanupFailure,
@@ -487,20 +505,18 @@ public sealed class RuntimeSessionResilienceTests
         {
             DisposeException = replacementCleanupFailure,
         };
-        var outcomes = new Queue<TwitchRuntimeSessionOutcome>(
-            [
-                new TwitchRuntimeSessionOutcome.Established
-                {
-                    Session = previousSession,
-                    Attempt = PreviousAttempt,
-                },
-                new TwitchRuntimeSessionOutcome.Established
-                {
-                    Session = replacementSession,
-                    Attempt = ReplacementAttempt,
-                },
-            ]
-        );
+        var outcomes = new Queue<TwitchRuntimeSessionOutcome>([
+            new TwitchRuntimeSessionOutcome.Established
+            {
+                Session = previousSession,
+                Attempt = PreviousAttempt,
+            },
+            new TwitchRuntimeSessionOutcome.Established
+            {
+                Session = replacementSession,
+                Attempt = ReplacementAttempt,
+            },
+        ]);
         var health = new RecordingHealthReporter();
         var status = new TwitchBotRuntimeStatusStore();
         var idleWait = new RecordingIdleWait();
@@ -532,22 +548,22 @@ public sealed class RuntimeSessionResilienceTests
         replacementSession.ListenCount.ShouldBe(0);
         replacementSession.DisposeCount.ShouldBe(1);
         status.Current.IsConnected.ShouldBeFalse();
-        var report = health.Reports.ShouldHaveSingleItem()
+        var report = health
+            .Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
         report.Runtime.ShouldBe(TwitchBotRuntime.EventSub);
-        report.Classification.ShouldBe(
-            TwitchRuntimeSessionFailureClassification.Unexpected
-        );
+        report.Classification.ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
         report.Attempt.ShouldBe(PreviousAttempt);
-        var cleanup = report.Exception
-            .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
+        var cleanup = report.Exception.ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
         cleanup.Attempt.ShouldBe(PreviousAttempt);
         var combined = cleanup.InnerException.ShouldBeOfType<AggregateException>();
-        var previousCleanup = combined.InnerExceptions[0]
+        var previousCleanup = combined
+            .InnerExceptions[0]
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
         previousCleanup.Attempt.ShouldBe(PreviousAttempt);
         previousCleanup.InnerException.ShouldBeSameAs(previousCleanupFailure);
-        var replacementCleanup = combined.InnerExceptions[1]
+        var replacementCleanup = combined
+            .InnerExceptions[1]
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
         replacementCleanup.Attempt.ShouldBe(ReplacementAttempt);
         replacementCleanup.InnerException.ShouldBeSameAs(replacementCleanupFailure);
@@ -572,19 +588,23 @@ public sealed class RuntimeSessionResilienceTests
             )
         );
         harness.Session.Enqueue((_, _) => EstablishedAsync(previousSession));
-        harness.Session.Enqueue((target, _) =>
-        {
-            target
-                .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
-                .Uri.ShouldBe(reconnectEndpoint);
-            return IdleAsync();
-        });
-        harness.Session.Enqueue((target, attemptToken) =>
-        {
-            target.ShouldBeOfType<TwitchRuntimeConnectionTarget.Initial>();
-            cancellation.Cancel();
-            return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
-        });
+        harness.Session.Enqueue(
+            (target, _) =>
+            {
+                target
+                    .ShouldBeOfType<TwitchRuntimeConnectionTarget.EventSubReconnect>()
+                    .Uri.ShouldBe(reconnectEndpoint);
+                return IdleAsync();
+            }
+        );
+        harness.Session.Enqueue(
+            (target, attemptToken) =>
+            {
+                target.ShouldBeOfType<TwitchRuntimeConnectionTarget.Initial>();
+                cancellation.Cancel();
+                return Task.FromCanceled<TwitchRuntimeSessionEstablishment>(attemptToken);
+            }
+        );
 
         await harness.RunRuntimeAsync(cancellation.Token);
 
@@ -612,7 +632,8 @@ public sealed class RuntimeSessionResilienceTests
 
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Terminal,
@@ -638,7 +659,8 @@ public sealed class RuntimeSessionResilienceTests
 
         harness.Session.CallCount.ShouldBe(1);
         AssertReport(
-            harness.Health.Reports.ShouldHaveSingleItem()
+            harness
+                .Health.Reports.ShouldHaveSingleItem()
                 .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>(),
             runtime,
             TwitchRuntimeSessionFailureClassification.Unexpected,
@@ -657,32 +679,31 @@ public sealed class RuntimeSessionResilienceTests
         var harness = CreateHarness(runtime, attemptLimit: 3);
         var listeningFailure = new IOException("established session disconnected");
         var cleanupFailure = new IOException("session cleanup failed");
-        var listening = new ScriptedEstablishedSession
-        {
-            DisposeException = cleanupFailure,
-        };
+        var listening = new ScriptedEstablishedSession { DisposeException = cleanupFailure };
         listening.Enqueue(_ => FailedListeningAsync(listeningFailure));
-        harness.Session.Enqueue((_, _) =>
-        {
-            harness.Status.SetConnected(true, ["channel"]);
-            return EstablishedAsync(listening);
-        });
+        harness.Session.Enqueue(
+            (_, _) =>
+            {
+                harness.Status.SetConnected(true, ["channel"]);
+                return EstablishedAsync(listening);
+            }
+        );
 
         await harness.RunRuntimeAsync(CancellationToken.None);
 
         harness.Session.CallCount.ShouldBe(1);
         listening.DisposeCount.ShouldBe(1);
         harness.Status.Current.IsConnected.ShouldBeFalse();
-        var report = harness.Health.Reports.ShouldHaveSingleItem()
+        var report = harness
+            .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<TwitchRuntimeSessionHealthReport.Unhealthy>();
         report.Runtime.ShouldBe(runtime);
-        report.Classification.ShouldBe(
-            TwitchRuntimeSessionFailureClassification.Unexpected
-        );
+        report.Classification.ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
         report.Attempt.ShouldBe(1);
         var combined = report.Exception.ShouldBeOfType<AggregateException>();
         combined.InnerExceptions[0].ShouldBeSameAs(listeningFailure);
-        var cleanup = combined.InnerExceptions[1]
+        var cleanup = combined
+            .InnerExceptions[1]
             .ShouldBeOfType<TwitchRuntimeSessionCleanupException>();
         cleanup.Attempt.ShouldBe(1);
         cleanup.InnerException.ShouldBeSameAs(cleanupFailure);
@@ -705,45 +726,43 @@ public sealed class RuntimeSessionResilienceTests
             System.Net.HttpStatusCode.Unauthorized
         );
 
-        TwitchIrcSessionFailureClassifier.Classify(cancellation, canceled.Token)
+        TwitchIrcSessionFailureClassifier
+            .Classify(cancellation, canceled.Token)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Cancellation);
-        TwitchEventSubSessionFailureClassifier.Classify(cancellation, CancellationToken.None)
+        TwitchEventSubSessionFailureClassifier
+            .Classify(cancellation, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
-        TwitchIrcSessionFailureClassifier.Classify(transientHttp, CancellationToken.None)
+        TwitchIrcSessionFailureClassifier
+            .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchEventSubSessionFailureClassifier.Classify(
-                transientHttp,
-                CancellationToken.None
-            )
+        TwitchEventSubSessionFailureClassifier
+            .Classify(transientHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchIrcSessionFailureClassifier.Classify(terminalHttp, CancellationToken.None)
+        TwitchIrcSessionFailureClassifier
+            .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
-        TwitchEventSubSessionFailureClassifier.Classify(terminalHttp, CancellationToken.None)
+        TwitchEventSubSessionFailureClassifier
+            .Classify(terminalHttp, CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
     }
 
     [Test]
     public void BoundaryClassifiers_ClassifyingTransportAndProtocolFaults_UseBoundaryCases()
     {
-        TwitchIrcSessionFailureClassifier.Classify(
-                new SocketException((int)SocketError.ConnectionReset),
-                CancellationToken.None
-            )
+        TwitchIrcSessionFailureClassifier
+            .Classify(new SocketException((int)SocketError.ConnectionReset), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchEventSubSessionFailureClassifier.Classify(
+        TwitchEventSubSessionFailureClassifier
+            .Classify(
                 new WebSocketException(WebSocketError.ConnectionClosedPrematurely),
                 CancellationToken.None
             )
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
-        TwitchIrcSessionFailureClassifier.Classify(
-                new JsonException("invalid payload"),
-                CancellationToken.None
-            )
+        TwitchIrcSessionFailureClassifier
+            .Classify(new JsonException("invalid payload"), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Terminal);
-        TwitchEventSubSessionFailureClassifier.Classify(
-                new TimeoutException("establishment timeout"),
-                CancellationToken.None
-            )
+        TwitchEventSubSessionFailureClassifier
+            .Classify(new TimeoutException("establishment timeout"), CancellationToken.None)
             .ShouldBe(TwitchRuntimeSessionFailureClassification.Timeout);
     }
 
@@ -769,9 +788,9 @@ public sealed class RuntimeSessionResilienceTests
         entry.Exception.ShouldBeNull();
         entry.Message.ShouldNotContain(Secret);
         entry.Properties["Runtime"].ShouldBe(TwitchBotRuntime.Irc);
-        entry.Properties["Classification"].ShouldBe(
-            TwitchRuntimeSessionFailureClassification.Unexpected
-        );
+        entry
+            .Properties["Classification"]
+            .ShouldBe(TwitchRuntimeSessionFailureClassification.Unexpected);
         entry.Properties["Attempt"].ShouldBe(2);
         entry.Properties["FailureType"].ShouldBe(typeof(ApplicationException).FullName);
     }
@@ -798,9 +817,9 @@ public sealed class RuntimeSessionResilienceTests
         entry.Exception.ShouldBeNull();
         entry.Message.ShouldNotContain(Secret);
         entry.Properties["Runtime"].ShouldBe(TwitchBotRuntime.EventSub);
-        entry.Properties["Classification"].ShouldBe(
-            TwitchRuntimeSessionFailureClassification.Transient
-        );
+        entry
+            .Properties["Classification"]
+            .ShouldBe(TwitchRuntimeSessionFailureClassification.Transient);
         entry.Properties["Attempt"].ShouldBe(3);
         entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
     }
@@ -828,9 +847,7 @@ public sealed class RuntimeSessionResilienceTests
         return Task.FromException<TwitchRuntimeSessionEstablishment>(exception);
     }
 
-    private static Task<TwitchRuntimeReconnectRequest> FailedListeningAsync(
-        Exception exception
-    )
+    private static Task<TwitchRuntimeReconnectRequest> FailedListeningAsync(Exception exception)
     {
         return Task.FromException<TwitchRuntimeReconnectRequest>(exception);
     }
@@ -849,10 +866,7 @@ public sealed class RuntimeSessionResilienceTests
         report.Exception.ShouldBeSameAs(exception);
     }
 
-    private static RuntimeHarness CreateHarness(
-        TwitchBotRuntime runtime,
-        int attemptLimit
-    )
+    private static RuntimeHarness CreateHarness(TwitchBotRuntime runtime, int attemptLimit)
     {
         var session = new ScriptedConnectionSession();
         var health = new RecordingHealthReporter();
@@ -1007,16 +1021,12 @@ public sealed class RuntimeSessionResilienceTests
 
         internal Exception? DisposeException { get; init; }
 
-        internal void Enqueue(
-            Func<CancellationToken, Task<TwitchRuntimeReconnectRequest>> listener
-        )
+        internal void Enqueue(Func<CancellationToken, Task<TwitchRuntimeReconnectRequest>> listener)
         {
             _listeners.Enqueue(listener);
         }
 
-        public Task<TwitchRuntimeReconnectRequest> ListenAsync(
-            CancellationToken cancellationToken
-        )
+        public Task<TwitchRuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)
         {
             ListenCount++;
             return _listeners.Dequeue()(cancellationToken);
@@ -1078,9 +1088,7 @@ public sealed class RuntimeSessionResilienceTests
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
                 : new Dictionary<string, object?>();
-            Entries.Add(
-                new LogEntry(logLevel, formatter(state, exception), exception, properties)
-            );
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception), exception, properties));
         }
     }
 

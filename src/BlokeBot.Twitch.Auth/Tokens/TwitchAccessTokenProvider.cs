@@ -43,10 +43,7 @@ internal sealed class TwitchAccessTokenProvider(
         CancellationToken cancellationToken
     )
     {
-        var loadedToken = await tokenStore.LoadAsync(
-            identity.TokenCachePath,
-            cancellationToken
-        );
+        var loadedToken = await tokenStore.LoadAsync(identity.TokenCachePath, cancellationToken);
         transaction.SetLoaded(loadedToken);
     }
 

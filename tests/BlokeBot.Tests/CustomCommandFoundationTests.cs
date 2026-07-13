@@ -94,21 +94,11 @@ public sealed class CustomCommandFoundationTests
             Name = name,
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow,
-            Variants =
-            [
-                new CustomMessageVariant
-                {
-                    SortOrder = 0,
-                    Text = "Hello {user}.",
-                },
-            ],
+            Variants = [new CustomMessageVariant { SortOrder = 0, Text = "Hello {user}." }],
         };
     }
 
-    private static async Task<int> SeedHostAsync(
-        SqliteBlokeBotDbFactory dbFactory,
-        string login
-    )
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost

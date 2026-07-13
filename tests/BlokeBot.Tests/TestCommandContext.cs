@@ -4,19 +4,9 @@ namespace BlokeBot.Tests;
 
 internal static class TestCommandContext
 {
-    public static TwitchCommandContext Create(
-        string login,
-        string channel,
-        string commandName
-    )
+    public static TwitchCommandContext Create(string login, string channel, string commandName)
     {
-        return Create(
-            login,
-            channel,
-            commandName,
-            [],
-            (_, _) => ValueTask.CompletedTask
-        );
+        return Create(login, channel, commandName, [], (_, _) => ValueTask.CompletedTask);
     }
 
     public static TwitchCommandContext Create(
@@ -42,9 +32,7 @@ internal static class TestCommandContext
         IReadOnlyList<string> args
     )
     {
-        var text = args.Count == 0
-            ? $"!{commandName}"
-            : $"!{commandName} {string.Join(' ', args)}";
+        var text = args.Count == 0 ? $"!{commandName}" : $"!{commandName} {string.Join(' ', args)}";
         return new TwitchChatMessage(
             login,
             channel,

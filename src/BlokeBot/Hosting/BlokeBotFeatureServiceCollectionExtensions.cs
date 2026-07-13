@@ -4,10 +4,10 @@ using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
-using BlokeBot.Features.Alerts;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.Admin.Authorization;
 using BlokeBot.Features.Admin.HostedChannels;
+using BlokeBot.Features.Alerts;
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.CustomCommands;
 using BlokeBot.Features.Guessing.Commands;
@@ -36,8 +36,8 @@ using BlokeBot.Features.PublicLeaderboards;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Hosting;
 
@@ -65,11 +65,17 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
-        services.TryAddSingleton<ICustomAnnouncementTickScheduler, TimeProviderCustomAnnouncementTickScheduler>();
+        services.TryAddSingleton<
+            ICustomAnnouncementTickScheduler,
+            TimeProviderCustomAnnouncementTickScheduler
+        >();
         switch (announcementDelivery)
         {
             case CustomAnnouncementDeliveryMode.Disabled:
-                services.AddSingleton<ICustomAnnouncementSender, DisabledCustomAnnouncementSender>();
+                services.AddSingleton<
+                    ICustomAnnouncementSender,
+                    DisabledCustomAnnouncementSender
+                >();
                 break;
             case CustomAnnouncementDeliveryMode.TwitchChat:
                 services.AddSingleton<ICustomAnnouncementSender, TwitchCustomAnnouncementSender>();
@@ -202,10 +208,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             PointsGiveawaySchedulerOperations
         >();
         services.AddSingleton(
-            new PointsGiveawaySchedulerRecoveryPolicy
-            {
-                RetryDelay = TimeSpan.FromSeconds(30),
-            }
+            new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.FromSeconds(30) }
         );
         switch (notificationMode)
         {

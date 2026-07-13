@@ -123,8 +123,7 @@ public sealed class TwitchTokenStatusServiceTests
             .GetUserAccessTokenStatus(["chat:read"])
             .ExecuteAsync(CancellationToken.None);
 
-        var error = Error(result)
-            .ShouldBeOfType<TwitchTokenStatusError.AcquisitionUnavailable>();
+        var error = Error(result).ShouldBeOfType<TwitchTokenStatusError.AcquisitionUnavailable>();
         error.Reason.ShouldBe(TwitchTokenStatusTransportFailureReason.RequestFailed);
         error.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
         error.RequiredScopesSnapshot.ShouldBe(["chat:read"]);
@@ -134,17 +133,13 @@ public sealed class TwitchTokenStatusServiceTests
     [Test]
     public async Task InvalidValidationPayload_InspectingStatus_ReturnsTypedError()
     {
-        var service = Service(
-            new RecordingTokenProvider("saved-token"),
-            OAuthClient("not-json")
-        );
+        var service = Service(new RecordingTokenProvider("saved-token"), OAuthClient("not-json"));
 
         var result = await service
             .GetUserAccessTokenStatus(["chat:read"])
             .ExecuteAsync(CancellationToken.None);
 
-        var error = Error(result)
-            .ShouldBeOfType<TwitchTokenStatusError.ValidationUnavailable>();
+        var error = Error(result).ShouldBeOfType<TwitchTokenStatusError.ValidationUnavailable>();
         error.Reason.ShouldBe(TwitchTokenStatusTransportFailureReason.ResponseInvalid);
         error.FailureType.ShouldBe("System.Text.Json.JsonException");
         error.RequiredScopesSnapshot.ShouldBe(["chat:read"]);
@@ -156,15 +151,10 @@ public sealed class TwitchTokenStatusServiceTests
     public async Task RequestedCancellation_InspectingStatus_PropagatesCancellation()
     {
         using var cancellation = new CancellationTokenSource();
-        var service = Service(
-            new CancellingTokenProvider(cancellation),
-            OAuthClient(null)
-        );
+        var service = Service(new CancellingTokenProvider(cancellation), OAuthClient(null));
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await service
-                .GetUserAccessTokenStatus(["chat:read"])
-                .ExecuteAsync(cancellation.Token)
+            await service.GetUserAccessTokenStatus(["chat:read"]).ExecuteAsync(cancellation.Token)
         );
 
         thrown.CancellationToken.ShouldBe(cancellation.Token);
@@ -177,15 +167,11 @@ public sealed class TwitchTokenStatusServiceTests
         var provider = new RecordingTokenProvider("saved-token");
         var service = Service(
             provider,
-            new TwitchOAuthApiClient(
-                new CancellingValidationHttpClientFactory(cancellation)
-            )
+            new TwitchOAuthApiClient(new CancellingValidationHttpClientFactory(cancellation))
         );
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(async () =>
-            await service
-                .GetUserAccessTokenStatus(["chat:read"])
-                .ExecuteAsync(cancellation.Token)
+            await service.GetUserAccessTokenStatus(["chat:read"]).ExecuteAsync(cancellation.Token)
         );
 
         provider.CallCount.ShouldBe(1);
@@ -198,11 +184,7 @@ public sealed class TwitchTokenStatusServiceTests
         const string SensitiveMessage = "token=provider-secret";
         var failure = new InvalidOperationException(SensitiveMessage);
         var logger = new RecordingLogger<TwitchTokenStatusService>();
-        var service = Service(
-            new ThrowingTokenProvider(failure),
-            OAuthClient(null),
-            logger
-        );
+        var service = Service(new ThrowingTokenProvider(failure), OAuthClient(null), logger);
 
         var thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await service
@@ -216,9 +198,11 @@ public sealed class TwitchTokenStatusServiceTests
         entry.Exception.ShouldBeNull();
         entry.Properties["Operation"].ShouldBe("acquisition");
         entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
-        entry.Properties["{OriginalFormat}"].ShouldBe(
-            "Unexpected Twitch token status {Operation} failure of type {FailureType} was escalated."
-        );
+        entry
+            .Properties["{OriginalFormat}"]
+            .ShouldBe(
+                "Unexpected Twitch token status {Operation} failure of type {FailureType} was escalated."
+            );
         entry.Message.ShouldNotContain(SensitiveMessage);
     }
 
@@ -273,9 +257,10 @@ public sealed class TwitchTokenStatusServiceTests
     {
         return result.Match(
             status => status,
-            error => throw new InvalidOperationException(
-                $"Expected token status success, received {error.GetType().Name}."
-            )
+            error =>
+                throw new InvalidOperationException(
+                    $"Expected token status success, received {error.GetType().Name}."
+                )
         );
     }
 
@@ -284,9 +269,10 @@ public sealed class TwitchTokenStatusServiceTests
     )
     {
         return result.Match(
-            status => throw new InvalidOperationException(
-                $"Expected token status error, received {status.GetType().Name}."
-            ),
+            status =>
+                throw new InvalidOperationException(
+                    $"Expected token status error, received {status.GetType().Name}."
+                ),
             error => error
         );
     }
@@ -331,10 +317,8 @@ public sealed class TwitchTokenStatusServiceTests
         }
     }
 
-    private sealed class StatusHttpClientFactory(
-        string? validationJson,
-        Exception? exception
-    ) : IHttpClientFactory
+    private sealed class StatusHttpClientFactory(string? validationJson, Exception? exception)
+        : IHttpClientFactory
     {
         public HttpClient CreateClient(string name)
         {
@@ -373,17 +357,15 @@ public sealed class TwitchTokenStatusServiceTests
         }
     }
 
-    private sealed class CancellingValidationHttpClientFactory(
-        CancellationTokenSource cancellation
-    ) : IHttpClientFactory
+    private sealed class CancellingValidationHttpClientFactory(CancellationTokenSource cancellation)
+        : IHttpClientFactory
     {
         public HttpClient CreateClient(string name)
         {
             return new(new Handler(cancellation), disposeHandler: false);
         }
 
-        private sealed class Handler(CancellationTokenSource cancellation)
-            : HttpMessageHandler
+        private sealed class Handler(CancellationTokenSource cancellation) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
@@ -422,9 +404,7 @@ public sealed class TwitchTokenStatusServiceTests
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
                 : new Dictionary<string, object?>();
-            Entries.Add(
-                new(logLevel, formatter(state, exception), exception, properties)
-            );
+            Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
         }
     }
 
