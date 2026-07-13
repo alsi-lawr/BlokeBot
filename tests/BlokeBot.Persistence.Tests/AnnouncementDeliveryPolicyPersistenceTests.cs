@@ -231,6 +231,82 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
     }
 
     [Test]
+    public async Task InvalidOccurrenceStateCombinations_Updating_AreRejectedByDatabaseConstraint()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var hostId = await CreateHostAsync(db);
+        var announcement = CreateAnnouncement(hostId);
+        db.Add(announcement);
+        await db.SaveChangesAsync();
+        var dueAt = DateTime.UtcNow;
+        var expiresAt = dueAt.AddSeconds(30);
+
+        foreach (
+            var status in new[]
+            {
+                "Accepted",
+                "TerminalRejected",
+                "TerminalAmbiguous",
+                "TerminalUnexpected",
+            }
+        )
+        {
+            await Should.ThrowAsync<SqliteException>(() =>
+                db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    UPDATE custom_announcements
+                    SET OccurrenceStatus = {status}, OccurrenceDueAtUtc = {dueAt},
+                        OccurrenceExpiresAtUtc = {expiresAt}, OccurrenceNextAttemptAtUtc = NULL,
+                        OccurrenceCompletedAtUtc = {dueAt}, OccurrenceAttemptCount = 0,
+                        OccurrenceMessage = NULL
+                    WHERE Id = {announcement.Id}
+                    """
+                )
+            );
+        }
+
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE custom_announcements
+                SET OccurrenceStatus = 'TerminalMissingMessage', OccurrenceDueAtUtc = {dueAt},
+                    OccurrenceExpiresAtUtc = {expiresAt}, OccurrenceNextAttemptAtUtc = NULL,
+                    OccurrenceCompletedAtUtc = {dueAt}, OccurrenceAttemptCount = 1,
+                    OccurrenceMessage = NULL
+                WHERE Id = {announcement.Id}
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE custom_announcements
+                SET OccurrenceStatus = 'Pending', OccurrenceDueAtUtc = {dueAt},
+                    OccurrenceExpiresAtUtc = {expiresAt},
+                    OccurrenceNextAttemptAtUtc = {expiresAt.AddSeconds(1)},
+                    OccurrenceCompletedAtUtc = NULL, OccurrenceAttemptCount = 0,
+                    OccurrenceMessage = NULL
+                WHERE Id = {announcement.Id}
+                """
+            )
+        );
+        await Should.ThrowAsync<SqliteException>(() =>
+            db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                UPDATE custom_announcements
+                SET OccurrenceStatus = 'RetryScheduled', OccurrenceDueAtUtc = {dueAt},
+                    OccurrenceExpiresAtUtc = {expiresAt},
+                    OccurrenceNextAttemptAtUtc = {dueAt.AddSeconds(-1)},
+                    OccurrenceCompletedAtUtc = NULL, OccurrenceAttemptCount = 1,
+                    OccurrenceMessage = 'message'
+                WHERE Id = {announcement.Id}
+                """
+            )
+        );
+    }
+
+    [Test]
     public void TimingValues_InvalidDurations_AreRejected()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>

@@ -410,7 +410,7 @@ public sealed class PersistenceInvariantTests
     }
 
     [Test]
-    public async Task OccurrenceStateMigration_Applying_PreservesConfiguredAnnouncementAsIdle()
+    public async Task OccurrenceStateMigration_Applying_PreservesHistoricalIntervalAndWeeklyAcceptances()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
@@ -422,22 +422,30 @@ public sealed class PersistenceInvariantTests
         await migrator.MigrateAsync(AnnouncementPolicySchemaMigration);
         var hostId = await SeedHostAsync(db);
         var entry = MessageEntry(hostId, "message");
-        var policy = DeliveryPolicy(hostId);
-        db.AddRange(entry, policy);
+        var intervalPolicy = DeliveryPolicy(hostId);
+        var weeklyPolicy = DeliveryPolicy(hostId);
+        db.AddRange(entry, intervalPolicy, weeklyPolicy);
         await db.SaveChangesAsync();
         var now = DateTime.UtcNow;
+        var intervalLastSentAt = now.AddMinutes(-10);
+        var weeklyLastSentAt = now.AddDays(-2);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO custom_announcements
                 (HostId, Name, Enabled, MessageLibraryEntryId, DeliveryPolicyId,
                  LastSentAtUtc, ChatMessagesSinceLastSent, CreatedAtUtc, UpdatedAtUtc)
             VALUES
-                ({hostId}, 'announcement', 1, {entry.Id}, {policy.Id},
-                 NULL, 0, {now}, {now})
+                ({hostId}, 'interval', 1, {entry.Id}, {intervalPolicy.Id},
+                 {intervalLastSentAt}, 0, {now.AddDays(-30)}, {now}),
+                ({hostId}, 'weekly', 1, {entry.Id}, {weeklyPolicy.Id},
+                 {weeklyLastSentAt}, 0, {now.AddDays(-30)}, {now})
             """
         );
-        var announcementId = await db.Database.SqlQueryRaw<int>(
-            "SELECT Id AS Value FROM custom_announcements"
+        var intervalAnnouncementId = await db.Database.SqlQueryRaw<int>(
+            "SELECT Id AS Value FROM custom_announcements WHERE Name = 'interval'"
+        ).SingleAsync();
+        var weeklyAnnouncementId = await db.Database.SqlQueryRaw<int>(
+            "SELECT Id AS Value FROM custom_announcements WHERE Name = 'weekly'"
         ).SingleAsync();
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
@@ -445,19 +453,31 @@ public sealed class PersistenceInvariantTests
                 (CustomAnnouncementId, HostId, ScheduleType, IntervalMinutes,
                  RequiredChatMessages, WeeklyDay, WeeklyTime)
             VALUES
-                ({announcementId}, {hostId}, 'Interval', 30, NULL, NULL, NULL)
+                ({intervalAnnouncementId}, {hostId}, 'Interval', 30, NULL, NULL, NULL),
+                ({weeklyAnnouncementId}, {hostId}, 'Weekly', NULL, NULL, 5, '12:00:00')
             """
         );
 
         await migrator.MigrateAsync();
         db.ChangeTracker.Clear();
 
-        var announcement = await db.CustomAnnouncements.SingleAsync();
-        announcement.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.None);
-        announcement.OccurrenceDueAtUtc.ShouldBeNull();
-        announcement.OccurrenceMessage.ShouldBeNull();
-        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(1);
-        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(1);
+        var announcements = await db
+            .CustomAnnouncements.OrderBy(x => x.Name)
+            .ToListAsync();
+        announcements.Count.ShouldBe(2);
+        announcements.ShouldAllBe(x =>
+            x.OccurrenceStatus == AnnouncementOccurrenceStatus.None
+        );
+        announcements.ShouldAllBe(x => x.OccurrenceDueAtUtc == null);
+        announcements.ShouldAllBe(x => x.OccurrenceMessage == null);
+        announcements.Single(x => x.Name == "interval").LastOccurrenceAtUtc.ShouldBe(
+            intervalLastSentAt
+        );
+        announcements.Single(x => x.Name == "weekly").LastOccurrenceAtUtc.ShouldBe(
+            weeklyLastSentAt
+        );
+        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(2);
+        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(2);
     }
 
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>

@@ -339,7 +339,11 @@ internal sealed class CustomAnnouncementScheduler(
         DateTimeOffset now
     )
     {
-        var baseline = AsUtc(announcement.LastOccurrenceAtUtc ?? announcement.CreatedAtUtc);
+        var baseline = AsUtc(
+            announcement.LastOccurrenceAtUtc
+                ?? announcement.LastSentAtUtc
+                ?? announcement.CreatedAtUtc
+        );
         var dueAt = baseline.AddMinutes(intervalMinutes);
         return dueAt <= now
             ? new AnnouncementDueResult.Due(dueAt)
@@ -383,7 +387,10 @@ internal sealed class CustomAnnouncementScheduler(
             TimeZoneInfo.ConvertTimeToUtc(scheduledLocal, timeZone),
             TimeSpan.Zero
         );
-        if (announcement.LastOccurrenceAtUtc >= dueAt.UtcDateTime)
+        if (
+            (announcement.LastOccurrenceAtUtc ?? announcement.LastSentAtUtc)
+            >= dueAt.UtcDateTime
+        )
         {
             return new AnnouncementScheduleEvaluation.Evaluated(
                 new AnnouncementDueResult.NotDue()

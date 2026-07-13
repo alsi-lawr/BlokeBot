@@ -46,6 +46,37 @@ public sealed class CustomAnnouncementSchedulerTests
     }
 
     [Test]
+    public async Task IntervalAnnouncementWithHistoricalSend_RunningTicks_UsesHistoryThenSendsLaterRecurrence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var lastSentAt = new DateTimeOffset(2026, 7, 10, 11, 50, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(lastSentAt.AddMinutes(29));
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: lastSentAt.AddHours(-1).UtcDateTime
+        );
+        await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Interval"],
+            createdAtUtc: lastSentAt.AddHours(-6).UtcDateTime,
+            lastSentAtUtc: lastSentAt.UtcDateTime
+        );
+        var sender = new RecordingChatMessageSender();
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+        sender.Messages.ShouldBeEmpty();
+
+        clock.SetUtcNow(lastSentAt.AddMinutes(30));
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBe([new SentChatMessage("streamer", "Interval")]);
+    }
+
+    [Test]
     public async Task IntervalAfterChatBelowAndAtThreshold_RunningTicks_SendsOnlyAtThresholdAndResets()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -127,6 +158,41 @@ public sealed class CustomAnnouncementSchedulerTests
             .CustomAnnouncements.Select(x => x.LastSentAtUtc)
             .SingleAsync(CancellationToken.None);
         lastSent.ShouldBe(new DateTime(2026, 7, 10, 12, 0, 0, DateTimeKind.Utc));
+    }
+
+    [Test]
+    public async Task WeeklyAnnouncementWithHistoricalSend_RunningTicks_DoesNotReplayAndSendsNextWeek()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var lastSentAt = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var clock = new ManualTimeProvider(lastSentAt.AddSeconds(20));
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: lastSentAt.AddHours(-1).UtcDateTime
+        );
+        await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new WeeklyCustomAnnouncementSchedule
+            {
+                Day = DayOfWeek.Friday,
+                Time = new TimeOnly(12, 0),
+            },
+            ["Weekly"],
+            createdAtUtc: lastSentAt.AddDays(-14).UtcDateTime,
+            lastSentAtUtc: lastSentAt.UtcDateTime
+        );
+        var sender = new RecordingChatMessageSender();
+        var scheduler = CreateScheduler(dbFactory, clock, sender);
+
+        await scheduler.RunTickAsync(CancellationToken.None);
+        sender.Messages.ShouldBeEmpty();
+
+        clock.SetUtcNow(lastSentAt.AddDays(7).AddSeconds(20));
+        await scheduler.RunTickAsync(CancellationToken.None);
+
+        sender.Messages.ShouldBe([new SentChatMessage("streamer", "Weekly")]);
     }
 
     [Test]
@@ -742,7 +808,8 @@ public sealed class CustomAnnouncementSchedulerTests
         int hostId,
         CustomAnnouncementSchedule schedule,
         string[] variants,
-        DateTime createdAtUtc
+        DateTime createdAtUtc,
+        DateTime? lastSentAtUtc = null
     ) =>
         await SeedAnnouncementWithPolicyAsync(
             dbFactory,
@@ -751,7 +818,8 @@ public sealed class CustomAnnouncementSchedulerTests
             variants,
             createdAtUtc,
             TimeSpan.FromSeconds(2),
-            TimeSpan.FromSeconds(30)
+            TimeSpan.FromSeconds(30),
+            lastSentAtUtc
         );
 
     private static async Task<AnnouncementSeed> SeedAnnouncementWithPolicyAsync(
@@ -761,7 +829,8 @@ public sealed class CustomAnnouncementSchedulerTests
         string[] variants,
         DateTime createdAtUtc,
         TimeSpan retryDelay,
-        TimeSpan occurrenceLifetime
+        TimeSpan occurrenceLifetime,
+        DateTime? lastSentAtUtc = null
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -800,6 +869,7 @@ public sealed class CustomAnnouncementSchedulerTests
                     occurrenceLifetime
                 ),
             },
+            LastSentAtUtc = lastSentAtUtc,
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc,
         };
