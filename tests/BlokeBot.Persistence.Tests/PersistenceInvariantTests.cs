@@ -3,8 +3,6 @@ using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Shouldly;
 using TUnit.Core;
 
@@ -12,9 +10,6 @@ namespace BlokeBot.Persistence.Tests;
 
 public sealed class PersistenceInvariantTests
 {
-    private const string AnnouncementPolicySchemaMigration =
-        "20260712233825_ReplaceAnnouncementPolicySchema";
-
     [Test]
     public async Task TwoActiveGiveawaysForHost_Saving_ThrowsDatabaseError()
     {
@@ -353,131 +348,6 @@ public sealed class PersistenceInvariantTests
         AssertTokens<GuessRoundStatus>(["Closed", "Completed", "Open"]);
         AssertTokens<PointsEligibilityMode>(["everyone", "followers", "subscribers"]);
         AssertTokens<PointsGiveawayStatus>(["Active", "Cancelled", "Completed", "Expired"]);
-    }
-
-    [Test]
-    public async Task AnnouncementPolicySchema_ApplyingDirectReplacement_DropsOnlyAnnouncements()
-    {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
-            .UseSqlite(connection)
-            .Options;
-        await using var db = new BlokeBotDbContext(options);
-        var migrator = db.Database.GetService<IMigrator>();
-        await migrator.MigrateAsync("20260710011753_CustomCommandsAlerts");
-        var hostId = await SeedHostAsync(db);
-        var entry = MessageEntry(hostId, "message");
-        var counter = Counter(hostId, "counter");
-        db.AddRange(entry, counter);
-        await db.SaveChangesAsync();
-        var now = DateTime.UtcNow;
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO custom_commands
-                (HostId, Name, Enabled, ModeratorOnly, CooldownSeconds, CooldownScope,
-                 ActionType, MessageLibraryEntryId, CounterId, CreatedAtUtc, UpdatedAtUtc)
-            VALUES
-                ({hostId}, 'counter-command', 1, 0, 5, 'Global', 'Counter',
-                 {entry.Id}, {counter.Id}, {now}, {now})
-            """
-        );
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO custom_announcements
-                (HostId, Name, Enabled, MessageLibraryEntryId, ScheduleType, IntervalMinutes,
-                 RequiredChatMessages, WeeklyDay, WeeklyTime, LastSentAtUtc,
-                 ChatMessagesSinceLastSent, CreatedAtUtc, UpdatedAtUtc)
-            VALUES
-                ({hostId}, 'weekly', 1, {entry.Id}, 'Weekly', 30, 0, 5, '19:30:00',
-                 NULL, 0, {now}, {now})
-            """
-        );
-
-        await migrator.MigrateAsync();
-        db.ChangeTracker.Clear();
-
-        var action = await db.CustomCommandActions.SingleAsync();
-        var counterAction = action.ShouldBeOfType<CounterCustomCommandAction>();
-        counterAction.MessageLibraryEntryId.ShouldBe(entry.Id);
-        counterAction.CounterId.ShouldBe(counter.Id);
-        (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
-        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(0);
-        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
-        (await db.CustomMessageLibraryEntries.CountAsync()).ShouldBe(1);
-        (await db.CustomCounters.CountAsync()).ShouldBe(1);
-        (await db.CustomCommands.CountAsync()).ShouldBe(1);
-    }
-
-    [Test]
-    public async Task OccurrenceStateMigration_Applying_PreservesHistoricalIntervalAndWeeklyAcceptances()
-    {
-        await using var connection = new SqliteConnection("Data Source=:memory:");
-        await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<BlokeBotDbContext>()
-            .UseSqlite(connection)
-            .Options;
-        await using var db = new BlokeBotDbContext(options);
-        var migrator = db.Database.GetService<IMigrator>();
-        await migrator.MigrateAsync(AnnouncementPolicySchemaMigration);
-        var hostId = await SeedHostAsync(db);
-        var entry = MessageEntry(hostId, "message");
-        var intervalPolicy = DeliveryPolicy(hostId);
-        var weeklyPolicy = DeliveryPolicy(hostId);
-        db.AddRange(entry, intervalPolicy, weeklyPolicy);
-        await db.SaveChangesAsync();
-        var now = DateTime.UtcNow;
-        var intervalLastSentAt = now.AddMinutes(-10);
-        var weeklyLastSentAt = now.AddDays(-2);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO custom_announcements
-                (HostId, Name, Enabled, MessageLibraryEntryId, DeliveryPolicyId,
-                 LastSentAtUtc, ChatMessagesSinceLastSent, CreatedAtUtc, UpdatedAtUtc)
-            VALUES
-                ({hostId}, 'interval', 1, {entry.Id}, {intervalPolicy.Id},
-                 {intervalLastSentAt}, 0, {now.AddDays(-30)}, {now}),
-                ({hostId}, 'weekly', 1, {entry.Id}, {weeklyPolicy.Id},
-                 {weeklyLastSentAt}, 0, {now.AddDays(-30)}, {now})
-            """
-        );
-        var intervalAnnouncementId = await db.Database.SqlQueryRaw<int>(
-            "SELECT Id AS Value FROM custom_announcements WHERE Name = 'interval'"
-        ).SingleAsync();
-        var weeklyAnnouncementId = await db.Database.SqlQueryRaw<int>(
-            "SELECT Id AS Value FROM custom_announcements WHERE Name = 'weekly'"
-        ).SingleAsync();
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO custom_announcement_schedules
-                (CustomAnnouncementId, HostId, ScheduleType, IntervalMinutes,
-                 RequiredChatMessages, WeeklyDay, WeeklyTime)
-            VALUES
-                ({intervalAnnouncementId}, {hostId}, 'Interval', 30, NULL, NULL, NULL),
-                ({weeklyAnnouncementId}, {hostId}, 'Weekly', NULL, NULL, 5, '12:00:00')
-            """
-        );
-
-        await migrator.MigrateAsync();
-        db.ChangeTracker.Clear();
-
-        var announcements = await db
-            .CustomAnnouncements.OrderBy(x => x.Name)
-            .ToListAsync();
-        announcements.Count.ShouldBe(2);
-        announcements.ShouldAllBe(x =>
-            x.OccurrenceStatus == AnnouncementOccurrenceStatus.None
-        );
-        announcements.ShouldAllBe(x => x.OccurrenceDueAtUtc == null);
-        announcements.ShouldAllBe(x => x.OccurrenceMessage == null);
-        announcements.Single(x => x.Name == "interval").LastOccurrenceAtUtc.ShouldBe(
-            intervalLastSentAt
-        );
-        announcements.Single(x => x.Name == "weekly").LastOccurrenceAtUtc.ShouldBe(
-            weeklyLastSentAt
-        );
-        (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(2);
-        (await db.CustomAnnouncementSchedules.CountAsync()).ShouldBe(2);
     }
 
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status) =>

@@ -24,7 +24,7 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
             }.ToString();
             db.UseSqlite(connectionString);
         });
-        services.AddSingleton<BlokeBotDatabaseMigrator>();
+        services.AddSingleton<BlokeBotDatabaseInitializer>();
 
         return services;
     }

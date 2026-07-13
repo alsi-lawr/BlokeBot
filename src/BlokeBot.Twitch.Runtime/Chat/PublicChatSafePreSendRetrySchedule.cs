@@ -48,23 +48,6 @@ internal static class PublicChatSafePreSendRetrySchedule
             };
     }
 
-    internal static PublicChatSafePreSendRetryDecision CreateForPersistedFailure(
-        PublicChatRetryPolicy policy,
-        PublicChatSafePreSendFailureCount failureCount,
-        DateTimeOffset failedAtUtc
-    )
-    {
-        ArgumentNullException.ThrowIfNull(policy);
-
-        return failureCount.Value >= policy.AttemptLimit
-            ? new PublicChatSafePreSendRetryDecision.Exhausted { FailureCount = failureCount }
-            : new PublicChatSafePreSendRetryDecision.Scheduled
-            {
-                FailureCount = failureCount,
-                NextAttemptAtUtc = failedAtUtc.Add(DelayFor(policy, failureCount)),
-            };
-    }
-
     private static TimeSpan DelayFor(
         PublicChatRetryPolicy policy,
         PublicChatSafePreSendFailureCount failureCount

@@ -79,28 +79,6 @@ public sealed class PublicChatMessageQueueTests
     }
 
     [Test]
-    public void MigratedSafePreSendFailure_Scheduling_PreservesCountAndAppliesFirstDelayOnce()
-    {
-        var failedAt = Utc(12, 0, 0);
-        var failureCount = new PublicChatSafePreSendFailureCount(1);
-
-        var scheduled = PublicChatSafePreSendRetrySchedule
-            .CreateForPersistedFailure(StandardRetryPolicy, failureCount, failedAt)
-            .ShouldBeOfType<PublicChatSafePreSendRetryDecision.Scheduled>();
-        scheduled.FailureCount.ShouldBe(failureCount);
-        scheduled.NextAttemptAtUtc.ShouldBe(failedAt.AddSeconds(1));
-
-        PublicChatSafePreSendRetrySchedule
-            .CreateForPersistedFailure(
-                StandardRetryPolicy with { AttemptLimit = 1 },
-                failureCount,
-                failedAt
-            )
-            .ShouldBeOfType<PublicChatSafePreSendRetryDecision.Exhausted>()
-            .FailureCount.ShouldBe(failureCount);
-    }
-
-    [Test]
     public async Task MessageOverLength_Enqueueing_PersistsEveryPartBeforeDelivery()
     {
         var outbox = new InMemoryOutbox(StandardRetryPolicy);

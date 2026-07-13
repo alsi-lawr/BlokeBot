@@ -184,8 +184,8 @@ else
 var app = builder.Build();
 
 await app
-    .Services.GetRequiredService<BlokeBotDatabaseMigrator>()
-    .ApplyMigrationsAsync(CancellationToken.None);
+    .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
+    .InitializeAsync(CancellationToken.None);
 
 if (!app.Environment.IsDevelopment())
 {

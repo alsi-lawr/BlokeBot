@@ -55,9 +55,6 @@ public enum PublicChatOutboxStatus
     [PersistedToken("SafePreSendTransient")]
     SafePreSendTransient,
 
-    [PersistedToken("SafePreSendScheduling")]
-    SafePreSendScheduling,
-
     [PersistedToken("SafePreSendExhausted")]
     SafePreSendExhausted,
 

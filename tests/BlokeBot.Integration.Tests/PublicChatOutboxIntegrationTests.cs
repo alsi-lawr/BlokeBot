@@ -6,8 +6,6 @@ using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Polly;
 using Shouldly;
 using TUnit.Core;
@@ -17,15 +15,6 @@ namespace BlokeBot.Integration.Tests;
 
 public sealed class PublicChatOutboxIntegrationTests
 {
-    private const string ClassifiedOutboxMigration =
-        "20260712184117_ClassifyPublicChatDeliveryOutcomes";
-    private const string MarkedRetryOutboxMigration =
-        "20260712212037_MarkMigratedSafePreSendRetriesForScheduling";
-    private const string RetainedTerminalOutboxMigration =
-        "20260712214026_RetainRedactedTerminalDeliveries";
-    private const string MigratedDeduplicationKey =
-        "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
-
     [Test]
     public async Task SplitMessage_Enqueueing_PersistsWholeBatchBeforeAcknowledgement()
     {
@@ -583,71 +572,6 @@ public sealed class PublicChatOutboxIntegrationTests
             .ShouldBeOfType<PublicChatClaimOutcome.Empty>();
         await using var afterSecondBatch = await dbFactory.CreateDbContextAsync();
         (await afterSecondBatch.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
-    }
-
-    [Test]
-    public async Task DeliveredOnlyMigration_NextIdentityExceedsReceiptAndBeginSendDoesNotCollide()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
-        var now = Utc(12, 0, 0);
-        await using (var migrationDb = await dbFactory.CreateDbContextAsync())
-        {
-            var migrator = migrationDb.Database.GetService<IMigrator>();
-            await migrator.MigrateAsync(MarkedRetryOutboxMigration);
-            await migrationDb.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO public_chat_outbox
-                    (Id, Channel, Message, DeduplicationKey, CreatedAtUtc,
-                     NextAttemptAtUtc, Status, AttemptCount, SafePreSendFailureCount,
-                     SendStartedAtUtc, CompletedAtUtc)
-                VALUES
-                    (41, 'streamer', NULL, {MigratedDeduplicationKey},
-                     {now.UtcDateTime}, {now.UtcDateTime}, 'Delivered', 1, 0,
-                     {now.UtcDateTime}, {now.UtcDateTime})
-                """
-            );
-            await migrator.MigrateAsync(RetainedTerminalOutboxMigration);
-        }
-        await using (var correctedMigrationDb = await dbFactory.CreateDbContextAsync())
-        {
-            var migrator = correctedMigrationDb.Database.GetService<IMigrator>();
-            await migrator.MigrateAsync();
-        }
-
-        var outbox = new EfPublicChatOutbox(
-            dbFactory,
-            StandardRetryPolicy,
-            StandardLifetimePolicy, StandardRetentionPolicy
-        );
-        var enqueueReceipt = await outbox.EnqueueAsync(
-            Batch("streamer", now, "identity after migrated success"),
-            CancellationToken.None
-        );
-        var newId = enqueueReceipt
-            .ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
-            .Receipt.MessageIds.ShouldHaveSingleItem();
-        newId.ShouldBeGreaterThan(41);
-        var claimed = await ClaimAsync(
-            outbox,
-            now,
-            TimeSpan.Zero,
-            TimeSpan.FromDays(1)
-        );
-        (await outbox.BeginSendAsync(
-                claimed,
-                now,
-                now.AddMinutes(5),
-                CancellationToken.None
-            ))
-            .ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-
-        await using var verification = await dbFactory.CreateDbContextAsync();
-        (await verification
-                .PublicChatSendReceipts.AsNoTracking()
-                .OrderBy(receipt => receipt.OutboxMessageId)
-                .Select(receipt => receipt.OutboxMessageId)
-                .ToArrayAsync())
-            .ShouldBe([41L, newId]);
     }
 
     [Test]
@@ -1332,92 +1256,6 @@ public sealed class PublicChatOutboxIntegrationTests
     }
 
     [Test]
-    public async Task MigratedSafePreSendRetry_ConcurrentStores_NeverReviveExpiredLegacyWork()
-    {
-        var failedAt = Utc(12, 0, 0);
-        await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
-        var retryPolicy = CreateRetryPolicy(
-            3,
-            TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(30),
-            DelayBackoffType.Exponential
-        );
-        var firstStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
-        var secondStore = new EfPublicChatOutbox(dbFactory, retryPolicy, StandardLifetimePolicy, StandardRetentionPolicy);
-
-        var outcomes = await Task.WhenAll(
-            firstStore
-                .TryClaimNextAsync(
-                    failedAt,
-                    failedAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask(),
-            secondStore
-                .TryClaimNextAsync(
-                    failedAt,
-                    failedAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask()
-        );
-        outcomes.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Status.ShouldBe(PublicChatOutboxStatus.Expired);
-        row.ExpiresAtUtc.ShouldBe(failedAt.UtcDateTime);
-        row.Message.ShouldBeNull();
-        row.DeduplicationKey.ShouldBeNull();
-        row.NextAttemptAtUtc.ShouldBeNull();
-        row.CompletedAtUtc.ShouldNotBeNull();
-        row.FailurePhase.ShouldBeNull();
-        row.FailureType.ShouldBeNull();
-    }
-
-    [Test]
-    public async Task MigratedSafePreSendRetry_AttemptPolicyCannotReviveExpiredLegacyWork()
-    {
-        var failedAt = Utc(12, 0, 0);
-        await using var dbFactory = await CreateMigratedSafePreSendRetryAsync(failedAt);
-        var retryPolicy = CreateRetryPolicy(
-            1,
-            TimeSpan.FromSeconds(5),
-            TimeSpan.FromSeconds(30),
-            DelayBackoffType.Exponential
-        );
-
-        var outcome = await new EfPublicChatOutbox(
-            dbFactory,
-            retryPolicy,
-            StandardLifetimePolicy, StandardRetentionPolicy
-        ).TryClaimNextAsync(
-            failedAt,
-            failedAt.AddMinutes(5),
-            TimeSpan.Zero,
-            TimeSpan.Zero,
-            CancellationToken.None
-        );
-
-        outcome.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var row = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Status.ShouldBe(PublicChatOutboxStatus.Expired);
-        row.Message.ShouldBeNull();
-        row.AttemptCount.ShouldBe(0);
-        row.SafePreSendFailureCount.ShouldBe(1);
-        row.CompletedAtUtc.ShouldNotBeNull();
-        row.SendStartedAtUtc.ShouldBeNull();
-        row.ClaimToken.ShouldBeNull();
-        row.ClaimSlot.ShouldBeNull();
-        row.FailurePhase.ShouldBeNull();
-        row.FailureType.ShouldBeNull();
-    }
-
-    [Test]
     public async Task SafePreparationFailure_RestartingQueue_DeliversOnceAfterConfiguredRetryTime()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -2015,7 +1853,6 @@ public sealed class PublicChatOutboxIntegrationTests
             PublicChatOutboxStatus.Pending,
             PublicChatOutboxStatus.Claimed,
             PublicChatOutboxStatus.Sending,
-            PublicChatOutboxStatus.SafePreSendScheduling,
             PublicChatOutboxStatus.SafePreSendTransient,
         ];
         var now = Utc(12, 0, 0);
@@ -2372,7 +2209,6 @@ public sealed class PublicChatOutboxIntegrationTests
                 row.ClaimExpiresAtUtc = now.AddHours(1).UtcDateTime;
                 row.SendStartedAtUtc = now.UtcDateTime;
                 break;
-            case PublicChatOutboxStatus.SafePreSendScheduling:
             case PublicChatOutboxStatus.SafePreSendTransient:
                 row.SafePreSendFailureCount = 1;
                 row.FailurePhase = PublicChatOutboxFailurePhase.Preparation;
@@ -2385,29 +2221,6 @@ public sealed class PublicChatOutboxIntegrationTests
         }
 
         return row;
-    }
-
-    private static async Task<SqliteBlokeBotDbFactory> CreateMigratedSafePreSendRetryAsync(
-        DateTimeOffset failedAt
-    )
-    {
-        var dbFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var migrator = db.Database.GetService<IMigrator>();
-        await migrator.MigrateAsync(ClassifiedOutboxMigration);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-            INSERT INTO public_chat_outbox
-                (Channel, Message, DeduplicationKey, CreatedAtUtc, NextAttemptAtUtc,
-                 Status, AttemptCount, CompletedAtUtc, FailurePhase, FailureType)
-            VALUES
-                ('streamer', 'migrated safe retry', {MigratedDeduplicationKey},
-                 {failedAt.UtcDateTime}, {failedAt.UtcDateTime}, 'SafePreSendTransient', 0,
-                 {failedAt.UtcDateTime}, 'Preparation', {typeof(IOException).FullName})
-            """
-        );
-        await migrator.MigrateAsync();
-        return dbFactory;
     }
 
     private sealed record TerminalScenario
