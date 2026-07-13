@@ -1,4 +1,4 @@
-@page "/guessing/_leaderboard/{Channel}"
+@page "/guessing/leaderboard/{Channel}"
 @using System.Globalization
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
@@ -8,13 +8,13 @@
 <PageTitle>BlokeBot | Guessing Leaderboard</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Public _leaderboard"
-                Title="Guessing _leaderboard"
+    <PageHeader Kicker="Public leaderboard"
+                Title="Guessing leaderboard"
                 Description="@_headerDescription" />
 
     @if (!_loaded)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading _leaderboard...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
     }
     else if (_host is null)
     {

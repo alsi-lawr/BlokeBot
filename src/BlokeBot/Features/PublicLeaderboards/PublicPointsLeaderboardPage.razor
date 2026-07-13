@@ -1,4 +1,4 @@
-@page "/points/_leaderboard/{Channel}"
+@page "/points/leaderboard/{Channel}"
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject PointBalanceService _balances
@@ -7,13 +7,13 @@
 <PageTitle>BlokeBot | Points Leaderboard</PageTitle>
 
 <div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Public _leaderboard"
-                Title="Points _leaderboard"
+    <PageHeader Kicker="Public leaderboard"
+                Title="Points leaderboard"
                 Description="@_headerDescription" />
 
     @if (!_loaded)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading _leaderboard...</div>
+        <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
     }
     else if (_host is null)
     {

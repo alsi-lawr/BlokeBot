@@ -22,7 +22,7 @@
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
 <div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Kicker="_dashboard"
+    <PageHeader Kicker="Dashboard"
                 Title="Guessing game"
                 Description="Run live rounds and look back at viewer results.">
         <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
@@ -138,7 +138,7 @@
         }
         else
         {
-            <section id="_leaderboard" class="card">
+            <section id="leaderboard" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
@@ -163,14 +163,14 @@
                         </select>
                     </div>
                     <div>
-                        <label class="label" for="_leaderboardUsername">Username</label>
-                        <input id="_leaderboardUsername" class="input mt-2" placeholder="any player" @bind="_leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
+                        <label class="label" for="leaderboardUsername">Username</label>
+                        <input id="leaderboardUsername" class="input mt-2" placeholder="any player" @bind="_leaderboardUsername" @bind:event="oninput" @bind:after="ResetAndLoadLeaderboardAsync" />
                     </div>
                 </div>
 
                 @if (_leaderboard is null)
                 {
-                    <div class="p-8 text-sm text-muted-foreground">Loading _leaderboard...</div>
+                    <div class="p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
                 }
                 else
                 {
@@ -206,7 +206,7 @@
                                         <th class="px-5 py-3 font-semibold">Rank</th>
                                         <th class="px-5 py-3 font-semibold">Player</th>
                                         <th class="px-5 py-3 font-semibold">Correct</th>
-                                        <th class="px-5 py-3 font-semibold">_rounds</th>
+                                        <th class="px-5 py-3 font-semibold">Rounds</th>
                                         <th class="px-5 py-3 font-semibold">Accuracy</th>
                                         <th class="px-5 py-3 font-semibold">Latest</th>
                                     </tr>
@@ -230,8 +230,8 @@
 
                     <div class="flex flex-col gap-3 border-t border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
-                            <label class="label" for="_leaderboardPageSize">Rows</label>
-                            <select id="_leaderboardPageSize" class="control-surface h-9 rounded-md px-2 text-sm font-medium" @bind="_leaderboardPageSize" @bind:after="ResetAndLoadLeaderboardAsync">
+                            <label class="label" for="leaderboardPageSize">Rows</label>
+                            <select id="leaderboardPageSize" class="control-surface h-9 rounded-md px-2 text-sm font-medium" @bind="_leaderboardPageSize" @bind:after="ResetAndLoadLeaderboardAsync">
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
