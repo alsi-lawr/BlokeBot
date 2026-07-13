@@ -13,12 +13,13 @@ Use a native record union for a finite domain state or outcome with more than tw
 
 At the repository's C# 14 language level, use all of these parts together:
 
-1. A public abstract record base with a `private protected` constructor.
-2. A `private protected abstract` seal member implemented by every case. This blocks an unsupported concrete case in another assembly, including derivation through a record's synthesized protected copy constructor.
-3. Sealed record cases, normally nested under the base, with get-only case-local payloads.
-4. An abstract `Match` method with one typed handler per case. Each case dispatches only to its own handler.
-5. A contract test that compares every direct descendant with the `Match` handlers and verifies the seal and sealed cases.
+1. A public abstract record base with a private constructor.
+2. Every supported repository case declared as a sealed record nested directly under the base, with get-only case-local payloads.
+3. An abstract `Match` method with one typed handler per declared case. Each case dispatches only to its own handler.
+4. A contract test that verifies private base construction, verifies that every direct supported case is nested and sealed, and compares those cases with the `Match` handlers.
+
+This convention defines the repository's declared finite case API and makes `Match` complete for that declared set. It does not claim absolute hierarchy closure across assemblies: C# records synthesize a protected copy constructor.
 
 C# 14 does not consider a type-pattern switch over an abstract record hierarchy exhaustive. Handle the union through `Match` instead. Do not add a wildcard, default handler, or fallback exception: those paths let a new case compile without updating consumers. When adding a case, extend `Match`; the resulting compiler errors identify every case implementation and call site that must become exhaustive.
 
-The compiling convention example is [`NativeUnionExample.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionExample.cs), and [`NativeUnionTests.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionTests.cs) verifies case behavior, invariants, value semantics, closure, and handler coverage.
+The compiling convention example is [`NativeUnionExample.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionExample.cs), and [`NativeUnionTests.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionTests.cs) verifies case behavior, invariants, value semantics, private construction, nested and sealed direct cases, and handler coverage.
