@@ -1,8 +1,10 @@
+using BlokeBot.Persistence.Models;
+
 namespace BlokeBot.Features.Points.Balances;
 
 public sealed record PointLedgerEntryView(
     DateTime CreatedAtUtc,
-    string Kind,
+    PointLedgerKind Kind,
     string Login,
     string Delta,
     string BalanceAfter,

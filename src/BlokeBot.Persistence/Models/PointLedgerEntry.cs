@@ -8,7 +8,7 @@ public sealed class PointLedgerEntry
 
     public DateTime CreatedAtUtc { get; set; }
 
-    public string Kind { get; set; } = string.Empty;
+    public required PointLedgerKind Kind { get; set; }
 
     public string Login { get; set; } = string.Empty;
 

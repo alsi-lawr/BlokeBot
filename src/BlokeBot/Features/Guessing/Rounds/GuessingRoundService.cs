@@ -165,7 +165,7 @@ public sealed class GuessingRoundService(
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Guessing,
+            ReplyFeature.Guessing,
             profile.Id,
             ct
         );

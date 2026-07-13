@@ -29,7 +29,7 @@ internal static class PointsGiveawayQueries
         return await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Points,
+            ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
             ct
         );

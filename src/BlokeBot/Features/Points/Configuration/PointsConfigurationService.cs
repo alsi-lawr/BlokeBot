@@ -32,7 +32,7 @@ public sealed class PointsConfigurationService(
         var replyDelivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Points,
+            ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
             ct
         );
@@ -87,7 +87,7 @@ public sealed class PointsConfigurationService(
         await ReplyDeliverySettingWriter.ReplaceAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Points,
+            ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
             config.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
             ct

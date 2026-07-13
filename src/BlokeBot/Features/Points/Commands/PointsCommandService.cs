@@ -23,7 +23,7 @@ public sealed class PointsCommandService(IDbContextFactory<BlokeBotDbContext> db
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Points,
+            ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
             ct
         );

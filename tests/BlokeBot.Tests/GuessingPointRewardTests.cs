@@ -68,8 +68,8 @@ public sealed class GuessingPointRewardTests
         ledger
             .Select(x => (x.Kind, x.Login, x.Delta, x.BalanceAfter, x.Note))
             .ShouldBe([
-                ("GuessWin", "one", "25", "25", $"guess round {seed.RoundId}"),
-                ("GuessWin", "three", "25", "25", $"guess round {seed.RoundId}"),
+                (PointLedgerKind.GuessWin, "one", "25", "25", $"guess round {seed.RoundId}"),
+                (PointLedgerKind.GuessWin, "three", "25", "25", $"guess round {seed.RoundId}"),
             ]);
     }
 

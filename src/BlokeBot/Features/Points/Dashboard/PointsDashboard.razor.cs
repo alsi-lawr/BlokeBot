@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -62,20 +63,20 @@ public partial class PointsDashboard
             ? "No giveaway running."
             : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Count} people joined.";
 
-    private static string LedgerChangeLabel(string kind)
+    internal static string LedgerChangeLabel(PointLedgerKind kind)
     {
         return kind switch
         {
-            "Add" => "Points added",
-            "Remove" => "Points removed",
-            "DeleteBalance" => "Balance deleted",
-            "TransferOut" => "Points given",
-            "TransferIn" => "Points received",
-            "GambleWin" => "Gamble won",
-            "GambleLoss" => "Gamble lost",
-            "GiveawayWin" => "Giveaway prize",
-            "GuessWin" => "Guessing prize",
-            _ => "Points changed",
+            PointLedgerKind.Add => "Points added",
+            PointLedgerKind.Remove => "Points removed",
+            PointLedgerKind.DeleteBalance => "Balance deleted",
+            PointLedgerKind.TransferOut => "Points given",
+            PointLedgerKind.TransferIn => "Points received",
+            PointLedgerKind.GambleWin => "Gamble won",
+            PointLedgerKind.GambleLoss => "Gamble lost",
+            PointLedgerKind.GiveawayWin => "Giveaway prize",
+            PointLedgerKind.GuessWin => "Guessing prize",
+            _ => throw new UnreachableException("Unknown point ledger kind."),
         };
     }
 

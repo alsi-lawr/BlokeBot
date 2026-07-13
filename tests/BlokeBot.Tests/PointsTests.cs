@@ -215,7 +215,7 @@ public sealed class PointsTests
         result.Message.ShouldBe("Point balance removed.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         ledger.Count.ShouldBe(2);
-        ledger[^1].Kind.ShouldBe("DeleteBalance");
+        ledger[^1].Kind.ShouldBe(PointLedgerKind.DeleteBalance);
         ledger[^1].Login.ShouldBe("viewer");
         ledger[^1].Delta.ShouldBe("-25");
         ledger[^1].BalanceAfter.ShouldBe("0");
@@ -322,10 +322,10 @@ public sealed class PointsTests
                 new ReplyDeliverySetting
                 {
                     HostId = hostId,
-                    Feature = ReplyDeliveryFeature.Points,
+                    Feature = ReplyFeature.Points,
                     ScopeId = ReplyDeliverySettingWriter.HostScopeId,
                     ReplyKey = PointsReplyKeys.Balance,
-                    Target = ReplyDeliveryTargets.Whisper,
+                    Target = ReplyDeliveryTarget.Whisper,
                 }
             );
             await db.SaveChangesAsync();

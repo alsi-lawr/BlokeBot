@@ -105,7 +105,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "Add",
+            PointLedgerKind.Add,
             target.Login,
             amount.Value,
             next,
@@ -154,7 +154,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "Remove",
+            PointLedgerKind.Remove,
             target.Login,
             -amount.Value,
             next,
@@ -195,7 +195,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "DeleteBalance",
+            PointLedgerKind.DeleteBalance,
             normalized,
             -current.Value,
             PointAmount.Zero,
@@ -264,7 +264,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "TransferOut",
+            PointLedgerKind.TransferOut,
             source.Login,
             -amount.Value,
             sourceNext,
@@ -277,7 +277,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "TransferIn",
+            PointLedgerKind.TransferIn,
             target.Login,
             amount.Value,
             targetNext,
@@ -346,7 +346,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            won ? "GambleWin" : "GambleLoss",
+            won ? PointLedgerKind.GambleWin : PointLedgerKind.GambleLoss,
             row.Login,
             delta,
             next,
@@ -388,7 +388,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "GiveawayWin",
+            PointLedgerKind.GiveawayWin,
             row.Login,
             amount.Value,
             next,
@@ -433,7 +433,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         AddLedger(
             db,
             hostId,
-            "GuessWin",
+            PointLedgerKind.GuessWin,
             row.Login,
             amount.Value,
             next,
@@ -449,7 +449,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     private static void AddLedger(
         BlokeBotDbContext db,
         int hostId,
-        string kind,
+        PointLedgerKind kind,
         string login,
         BigInteger delta,
         PointAmount balanceAfter,

@@ -117,11 +117,34 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<ReplyDeliverySetting>(b =>
         {
-            b.ToTable("reply_delivery_settings");
+            b.ToTable(
+                "reply_delivery_settings",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_reply_delivery_settings_Feature",
+                        KindIn("Feature", ReplyFeaturePersistence.Tokens)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_reply_delivery_settings_Target",
+                        KindIn("Target", ReplyDeliveryTargetPersistence.Tokens)
+                    );
+                }
+            );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Feature).HasMaxLength(64);
+            b.Property(x => x.Feature)
+                .HasConversion(
+                    feature => ReplyFeaturePersistence.ToToken(feature),
+                    token => ReplyFeaturePersistence.FromToken(token)
+                )
+                .HasMaxLength(64);
             b.Property(x => x.ReplyKey).HasMaxLength(128);
-            b.Property(x => x.Target).HasMaxLength(32);
+            b.Property(x => x.Target)
+                .HasConversion(
+                    target => ReplyDeliveryTargetPersistence.ToToken(target),
+                    token => ReplyDeliveryTargetPersistence.FromToken(token)
+                )
+                .HasMaxLength(32);
             b.HasIndex(x => new
                 {
                     x.HostId,
@@ -823,9 +846,21 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<PointLedgerEntry>(b =>
         {
-            b.ToTable("point_ledger_entries");
+            b.ToTable(
+                "point_ledger_entries",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_point_ledger_entries_Kind",
+                        KindIn("Kind", PointLedgerKindPersistence.Tokens)
+                    )
+            );
             b.HasKey(x => x.Id);
-            b.Property(x => x.Kind).HasMaxLength(64);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    kind => PointLedgerKindPersistence.ToToken(kind),
+                    token => PointLedgerKindPersistence.FromToken(token)
+                )
+                .HasMaxLength(64);
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.Delta).HasMaxLength(128);
             b.Property(x => x.BalanceAfter).HasMaxLength(128);
@@ -902,10 +937,23 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
 
         modelBuilder.Entity<GuessOption>(b =>
         {
-            b.ToTable("guess_options");
+            b.ToTable(
+                "guess_options",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_guess_options_ReplyTarget",
+                        KindIn("ReplyTarget", ReplyDeliveryTargetPersistence.Tokens)
+                    )
+            );
             b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(128);
-            b.Property(x => x.ReplyTarget).HasMaxLength(32).HasDefaultValue("chat");
+            b.Property(x => x.ReplyTarget)
+                .HasConversion(
+                    target => ReplyDeliveryTargetPersistence.ToToken(target),
+                    token => ReplyDeliveryTargetPersistence.FromToken(token)
+                )
+                .HasMaxLength(32)
+                .HasDefaultValue(ReplyDeliveryTarget.Chat);
             b.HasIndex(x => new { x.GuessRoundProfileId, x.Name }).IsUnique();
             b.HasOne(x => x.GuessRoundProfile)
                 .WithMany(x => x.Options)

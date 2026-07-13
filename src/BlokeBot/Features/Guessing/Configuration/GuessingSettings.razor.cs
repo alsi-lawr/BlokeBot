@@ -100,11 +100,9 @@ public partial class GuessingSettings
         _config.Profile.Options.Add(
             new GuessOptionEditor
             {
-                ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-                    _config.Profile.WhisperAnswerReplies
-                        ? CommandResponseTarget.Whisper
-                        : CommandResponseTarget.Chat
-                ),
+                ReplyTarget = _config.Profile.WhisperAnswerReplies
+                    ? ReplyDeliveryTarget.Whisper
+                    : ReplyDeliveryTarget.Chat,
             }
         );
     }

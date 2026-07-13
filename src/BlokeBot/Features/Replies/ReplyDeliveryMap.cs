@@ -18,17 +18,7 @@ public sealed class ReplyDeliveryMap
 
     public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings)
     {
-        return new(
-            settings
-                .Where(x =>
-                    string.Equals(
-                        x.Target,
-                        ReplyDeliveryTargets.Whisper,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                .Select(x => x.ReplyKey)
-        );
+        return new(settings.Where(x => x.Target.IsWhisper()).Select(x => x.ReplyKey));
     }
 
     public bool IsWhisper(string replyKey)

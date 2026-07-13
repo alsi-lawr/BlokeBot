@@ -160,7 +160,7 @@ public sealed class HostLifecycleTests
             {
                 HostId = host.Id,
                 CreatedAtUtc = DateTime.UtcNow,
-                Kind = "test",
+                Kind = PointLedgerKind.Add,
                 Login = "viewer",
                 Delta = "10",
                 BalanceAfter = "10",

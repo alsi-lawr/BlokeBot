@@ -87,13 +87,12 @@ public sealed class GuessingConfigurationService(
         }
 
         var wasDefault = profile.IsDefault;
-        var deliverySettings = await db
-            .ReplyDeliverySettings.Where(x =>
-                x.HostId == hostId
-                && x.Feature == ReplyDeliveryFeature.Guessing
-                && x.ScopeId == profileId
-            )
+        var scopedDeliverySettings = await db
+            .ReplyDeliverySettings.Where(x => x.HostId == hostId && x.ScopeId == profileId)
             .ToListAsync(ct);
+        var deliverySettings = scopedDeliverySettings.Where(x =>
+            x.Feature == ReplyFeature.Guessing
+        );
         db.ReplyDeliverySettings.RemoveRange(deliverySettings);
         db.Profiles.Remove(profile);
         await db.SaveChangesAsync(ct);
@@ -132,7 +131,7 @@ public sealed class GuessingConfigurationService(
         var replyDelivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Guessing,
+            ReplyFeature.Guessing,
             selectedProfileId,
             ct
         );
@@ -214,18 +213,16 @@ public sealed class GuessingConfigurationService(
         await ReplyDeliverySettingWriter.ReplaceAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Guessing,
+            ReplyFeature.Guessing,
             profile.Id,
             config.ReplyDelivery.Only(GuessingReplyKeys.WhisperableKeys),
             ct
         );
 
         db.GuessOptions.RemoveRange(profile.Options);
-        var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-            config.Profile.WhisperAnswerReplies
-                ? CommandResponseTarget.Whisper
-                : CommandResponseTarget.Chat
-        );
+        var answerReplyTarget = config.Profile.WhisperAnswerReplies
+            ? ReplyDeliveryTarget.Whisper
+            : ReplyDeliveryTarget.Chat;
         foreach (
             var option in config
                 .Profile.Options.Where(x => !string.IsNullOrWhiteSpace(x.Name))
@@ -301,15 +298,13 @@ public sealed class GuessingConfigurationService(
             {
                 Name = x.Name,
                 ReplyText = x.ReplyText,
-                ReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-                    ReplyDeliveryTargets.ToCommandTarget(x.ReplyTarget)
-                ),
+                ReplyTarget = x.ReplyTarget,
             })
             .ToList();
         var whisperAnswerReplies = options.Any(IsWhisperTarget);
-        var answerReplyTarget = ReplyDeliveryTargets.FromCommandTarget(
-            whisperAnswerReplies ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat
-        );
+        var answerReplyTarget = whisperAnswerReplies
+            ? ReplyDeliveryTarget.Whisper
+            : ReplyDeliveryTarget.Chat;
         foreach (var option in options)
         {
             option.ReplyTarget = answerReplyTarget;
@@ -331,8 +326,7 @@ public sealed class GuessingConfigurationService(
 
     private static bool IsWhisperTarget(GuessOptionEditor option)
     {
-        return ReplyDeliveryTargets.ToCommandTarget(option.ReplyTarget)
-            == CommandResponseTarget.Whisper;
+        return option.ReplyTarget.IsWhisper();
     }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(

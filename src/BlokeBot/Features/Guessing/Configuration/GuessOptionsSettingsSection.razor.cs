@@ -95,9 +95,7 @@ public partial class GuessOptionsSettingsSection
 
     private void ApplyAnswerTarget(bool whisper)
     {
-        var target = ReplyDeliveryTargets.FromCommandTarget(
-            whisper ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat
-        );
+        var target = whisper ? ReplyDeliveryTarget.Whisper : ReplyDeliveryTarget.Chat;
 
         foreach (var option in Options)
         {

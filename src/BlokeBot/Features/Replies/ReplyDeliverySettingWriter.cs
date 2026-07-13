@@ -11,32 +11,31 @@ internal static class ReplyDeliverySettingWriter
     public static async Task<ReplyDeliveryMap> LoadAsync(
         BlokeBotDbContext db,
         int hostId,
-        string feature,
+        ReplyFeature feature,
         int scopeId,
         CancellationToken ct
     )
     {
-        var settings = await db
+        var scopedSettings = await db
             .ReplyDeliverySettings.AsNoTracking()
-            .Where(x => x.HostId == hostId && x.Feature == feature && x.ScopeId == scopeId)
+            .Where(x => x.HostId == hostId && x.ScopeId == scopeId)
             .ToListAsync(ct);
-        return ReplyDeliveryMap.FromSettings(settings);
+        return ReplyDeliveryMap.FromSettings(scopedSettings.Where(x => x.Feature == feature));
     }
 
     public static async Task ReplaceAsync(
         BlokeBotDbContext db,
         int hostId,
-        string feature,
+        ReplyFeature feature,
         int scopeId,
         ReplyDeliveryMap delivery,
         CancellationToken ct
     )
     {
-        var existing = await db
-            .ReplyDeliverySettings.Where(x =>
-                x.HostId == hostId && x.Feature == feature && x.ScopeId == scopeId
-            )
+        var scopedSettings = await db
+            .ReplyDeliverySettings.Where(x => x.HostId == hostId && x.ScopeId == scopeId)
             .ToListAsync(ct);
+        var existing = scopedSettings.Where(x => x.Feature == feature);
         db.ReplyDeliverySettings.RemoveRange(existing);
 
         foreach (var replyKey in delivery.WhisperKeys.Order(StringComparer.OrdinalIgnoreCase))
@@ -48,7 +47,7 @@ internal static class ReplyDeliverySettingWriter
                     Feature = feature,
                     ScopeId = scopeId,
                     ReplyKey = replyKey,
-                    Target = ReplyDeliveryTargets.Whisper,
+                    Target = ReplyDeliveryTarget.Whisper,
                 }
             );
         }

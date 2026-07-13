@@ -129,7 +129,7 @@ internal static class GuessingProfileQueries
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
-            ReplyDeliveryFeature.Guessing,
+            ReplyFeature.Guessing,
             selectedProfileId,
             ct
         );

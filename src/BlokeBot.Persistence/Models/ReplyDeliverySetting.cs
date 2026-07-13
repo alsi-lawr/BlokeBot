@@ -4,8 +4,8 @@ public sealed class ReplyDeliverySetting
 {
     public int Id { get; set; }
     public int HostId { get; set; }
-    public string Feature { get; set; } = string.Empty;
+    public required ReplyFeature Feature { get; set; }
     public int ScopeId { get; set; }
     public string ReplyKey { get; set; } = string.Empty;
-    public string Target { get; set; } = "chat";
+    public required ReplyDeliveryTarget Target { get; set; }
 }

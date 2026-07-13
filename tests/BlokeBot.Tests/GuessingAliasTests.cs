@@ -103,10 +103,10 @@ public sealed class GuessingAliasTests
                 new ReplyDeliverySetting
                 {
                     HostId = seed.Host.Id,
-                    Feature = ReplyDeliveryFeature.Guessing,
+                    Feature = ReplyFeature.Guessing,
                     ScopeId = seed.SpecialProfile.Id,
                     ReplyKey = GuessingReplyKeys.RoundAlreadyOpen,
-                    Target = ReplyDeliveryTargets.Whisper,
+                    Target = ReplyDeliveryTarget.Whisper,
                 }
             );
             await db.SaveChangesAsync();
@@ -144,10 +144,10 @@ public sealed class GuessingAliasTests
                 new ReplyDeliverySetting
                 {
                     HostId = seed.Host.Id,
-                    Feature = ReplyDeliveryFeature.Guessing,
+                    Feature = ReplyFeature.Guessing,
                     ScopeId = seed.SpecialProfile.Id,
                     ReplyKey = "round_started",
-                    Target = ReplyDeliveryTargets.Whisper,
+                    Target = ReplyDeliveryTarget.Whisper,
                 }
             );
             await db.SaveChangesAsync();
@@ -191,7 +191,7 @@ public sealed class GuessingAliasTests
             {
                 Name = "green",
                 ReplyText = "Green",
-                ReplyTarget = ReplyDeliveryTargets.Chat,
+                ReplyTarget = ReplyDeliveryTarget.Chat,
             }
         );
 
@@ -203,7 +203,7 @@ public sealed class GuessingAliasTests
             .Select(x => x.ReplyTarget)
             .ToListAsync(CancellationToken.None);
         targets.Count.ShouldBe(2);
-        targets.ShouldAllBe(x => x == ReplyDeliveryTargets.Whisper);
+        targets.ShouldAllBe(x => x == ReplyDeliveryTarget.Whisper);
     }
 
     [Test]
@@ -228,7 +228,7 @@ public sealed class GuessingAliasTests
                     GuessRoundProfileId = seed.SpecialProfile.Id,
                     Name = "green",
                     ReplyText = "Green",
-                    ReplyTarget = ReplyDeliveryTargets.Whisper,
+                    ReplyTarget = ReplyDeliveryTarget.Whisper,
                 }
             );
             await db.SaveChangesAsync();

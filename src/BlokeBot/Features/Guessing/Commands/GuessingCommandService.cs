@@ -5,6 +5,7 @@ using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Replies;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.Guessing.Commands;
@@ -39,7 +40,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         var delivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId.Value,
-            ReplyDeliveryFeature.Guessing,
+            ReplyFeature.Guessing,
             selectedProfileId,
             ct
         );

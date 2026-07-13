@@ -112,14 +112,13 @@ public sealed class GuessingVoteService(
         CancellationToken ct
     )
     {
-        return await db
+        var targets = await db
             .GuessOptions.AsNoTracking()
-            .AnyAsync(
-                x =>
-                    x.GuessRoundProfileId == profileId
-                    && x.ReplyTarget == ReplyDeliveryTargets.Whisper,
-                ct
-            )
+            .Where(x => x.GuessRoundProfileId == profileId)
+            .Select(x => x.ReplyTarget)
+            .ToListAsync(ct);
+
+        return targets.Any(x => x.IsWhisper())
             ? CommandResponseTarget.Whisper
             : CommandResponseTarget.Chat;
     }
