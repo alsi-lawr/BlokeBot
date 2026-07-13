@@ -358,7 +358,10 @@ public static class TwitchBotServiceCollectionExtensions
                 );
             }
         );
-        services.AddResiliencePipeline(
+        services.AddResiliencePipeline<
+            TwitchBotResiliencePipeline,
+            TwitchEventSubChannelReconciliationOutcome
+        >(
             TwitchBotResiliencePipeline.EventSubChannelRecovery,
             (builder, context) =>
             {
@@ -393,7 +396,9 @@ public static class TwitchBotServiceCollectionExtensions
                 attempt.Build(),
                 serviceProvider
                     .GetRequiredService<ResiliencePipelineProvider<TwitchBotResiliencePipeline>>()
-                    .GetPipeline(TwitchBotResiliencePipeline.EventSubChannelRecovery)
+                    .GetPipeline<TwitchEventSubChannelReconciliationOutcome>(
+                        TwitchBotResiliencePipeline.EventSubChannelRecovery
+                    )
             );
         });
     }

@@ -576,6 +576,50 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
+    public async Task Reconciliation_TimeoutDeleteFailure_RecoversThroughOwnedPolicy()
+    {
+        var failure = new TimeoutException("remote delete timed out once");
+        var operations = new ScriptedChannelOperations();
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        operations.EnqueueDeleteFailure("channel", failure);
+        harness.Diagnostics.Clear();
+
+        harness.Session.TriggerReconciliation([], TwitchEventSubChannelRecoveryTrigger.Explicit);
+        await harness.Session.DrainAsync();
+
+        operations.DeleteCount("channel").ShouldBe(2);
+        operations.CompleteStopCount("channel").ShouldBe(1);
+        harness.Session.ActiveChannels.ShouldBeEmpty();
+        harness.PendingDeletions.PendingDeletions.ShouldBeEmpty();
+        harness.Status.Current.Channels.ShouldBeEmpty();
+        var reports = harness.Diagnostics.Reports;
+        AssertFailure(
+            reports[0].ShouldBeOfType<TwitchEventSubChannelStatus.Degraded>(),
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            TwitchEventSubChannelFailureClassification.Timeout,
+            typeof(TimeoutException),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Explicit,
+            TwitchEventSubChannelNextAction.BeginRecoveryCycle,
+            _now
+        );
+        AssertFailure(
+            reports[1].ShouldBeOfType<TwitchEventSubChannelStatus.Recovering>(),
+            "channel",
+            TwitchEventSubChannelPhase.SubscriptionDeletion,
+            TwitchEventSubChannelFailureClassification.Timeout,
+            typeof(TimeoutException),
+            attempt: 1,
+            TwitchEventSubChannelRecoveryTrigger.Explicit,
+            TwitchEventSubChannelNextAction.ContinueRecoveryCycle,
+            _now
+        );
+    }
+
+    [Test]
     public async Task Reconciliation_TransientDeleteExhaustion_RetainsPendingEvidence()
     {
         var failure = new IOException("remote delete secret");
@@ -951,11 +995,6 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelPhase.SubscriptionDeletion,
             CancellationToken.None
         );
-        var preservedDeletion = TwitchEventSubChannelFailureClassifier.Classify(
-            new TwitchEventSubSubscriptionDeletionUnresolvedException(deletionFailure),
-            TwitchEventSubChannelPhase.Reconciliation,
-            CancellationToken.None
-        );
 
         cancellation.Classification.ShouldBe(
             TwitchEventSubChannelFailureClassification.Cancellation
@@ -969,8 +1008,11 @@ public sealed class EventSubChannelRecoveryTests
             TwitchEventSubChannelFailureClassification.Terminal
         );
         unexpected.Classification.ShouldBe(TwitchEventSubChannelFailureClassification.Unexpected);
-        preservedDeletion.ShouldBe(deletionFailure);
-        preservedDeletion.Exception.ShouldBeSameAs(deletionCause);
+        deletionFailure.Phase.ShouldBe(TwitchEventSubChannelPhase.SubscriptionDeletion);
+        deletionFailure.Classification.ShouldBe(
+            TwitchEventSubChannelFailureClassification.Transient
+        );
+        deletionFailure.Exception.ShouldBeSameAs(deletionCause);
     }
 
     private static RecoveryHarness CreateHarness(
@@ -983,7 +1025,11 @@ public sealed class EventSubChannelRecoveryTests
     {
         var clock = new FixedTimeProvider(_now);
         var attemptBuilder = new ResiliencePipelineBuilder { TimeProvider = clock };
-        var recoveryBuilder = new ResiliencePipelineBuilder { TimeProvider = clock };
+        var recoveryBuilder =
+            new ResiliencePipelineBuilder<TwitchEventSubChannelReconciliationOutcome>
+            {
+                TimeProvider = clock,
+            };
         var policy = new EventSubChannelRecoveryPolicy
         {
             AttemptLimit = attemptLimit,

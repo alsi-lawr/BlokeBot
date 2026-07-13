@@ -50,6 +50,16 @@ internal abstract record TwitchEventSubChannelReconciliationOutcome
     internal sealed record MissingChannel : TwitchEventSubChannelReconciliationOutcome;
 
     internal sealed record MissingBot : TwitchEventSubChannelReconciliationOutcome;
+
+    internal sealed record UnresolvedDeletion : TwitchEventSubChannelReconciliationOutcome
+    {
+        internal required TwitchEventSubChannelFailureDetails Failure { get; init; }
+
+        public override string ToString()
+        {
+            return nameof(UnresolvedDeletion);
+        }
+    }
 }
 
 internal sealed class TwitchEventSubChannelOperations(
@@ -557,7 +567,44 @@ internal sealed class TwitchEventSubChannelSession(
             return;
         }
 
-        PublishReconciliationOutcome(channel, target, trigger, attempt: 1, outcome);
+        switch (outcome)
+        {
+            case TwitchEventSubChannelReconciliationOutcome.Completed:
+            case TwitchEventSubChannelReconciliationOutcome.MissingChannel:
+            case TwitchEventSubChannelReconciliationOutcome.MissingBot:
+                PublishReconciliationOutcome(channel, target, trigger, attempt: 1, outcome);
+                return;
+            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved:
+                var failure = new TwitchEventSubChannelFailureContext.ClassifiedException(
+                    unresolved.Failure
+                );
+                var isRecoverable = TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                    failure.Classification
+                );
+                PublishDegraded(
+                    channel,
+                    trigger,
+                    attempt: 1,
+                    failure,
+                    isRecoverable
+                        ? TwitchEventSubChannelNextAction.BeginRecoveryCycle
+                        : TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                );
+                if (isRecoverable)
+                {
+                    await RunRecoveryCycleAsync(
+                        channel,
+                        target,
+                        trigger,
+                        failure,
+                        cancellationToken
+                    );
+                }
+
+                return;
+            default:
+                throw new UnreachableException("Unknown EventSub channel reconciliation outcome.");
+        }
     }
 
     private TwitchEventSubChannelFailureContext GetFailureContext(string channel)
@@ -620,7 +667,19 @@ internal sealed class TwitchEventSubChannelSession(
                     PublishRecovering(channel, trigger, attempt, latestFailure);
                     try
                     {
-                        return await ReconcileAsync(channel, target, context, attemptToken);
+                        var outcome = await ReconcileAsync(channel, target, context, attemptToken);
+                        if (
+                            outcome
+                            is TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
+                        )
+                        {
+                            latestFailure =
+                                new TwitchEventSubChannelFailureContext.ClassifiedException(
+                                    unresolved.Failure
+                                );
+                        }
+
+                        return outcome;
                     }
                     catch (Exception exception)
                     {
@@ -700,7 +759,23 @@ internal sealed class TwitchEventSubChannelSession(
         CancellationToken cancellationToken
     )
     {
-        await ReconcilePendingDeletionAsync(channel, context, cancellationToken);
+        var pendingDeletion = await ReconcilePendingDeletionAsync(
+            channel,
+            context,
+            cancellationToken
+        );
+        switch (pendingDeletion)
+        {
+            case TwitchEventSubChannelReconciliationOutcome.Completed:
+                break;
+            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion:
+                return pendingDeletion;
+            default:
+                throw new UnreachableException(
+                    "Pending EventSub deletion produced a non-deletion reconciliation outcome."
+                );
+        }
+
         await CompletePendingStopAsync(channel, context, cancellationToken);
         var account = await RunPhaseAsync(
             context,
@@ -724,7 +799,23 @@ internal sealed class TwitchEventSubChannelSession(
             && !active.BotLogin.Equals(account.Login, StringComparison.OrdinalIgnoreCase)
         )
         {
-            await ReconcileSubscriptionDeletionAsync(active, context, cancellationToken);
+            var deletion = await ReconcileSubscriptionDeletionAsync(
+                active,
+                context,
+                cancellationToken
+            );
+            switch (deletion)
+            {
+                case TwitchEventSubChannelReconciliationOutcome.Completed:
+                    break;
+                case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion:
+                    return deletion;
+                default:
+                    throw new UnreachableException(
+                        "EventSub subscription deletion produced a non-deletion reconciliation outcome."
+                    );
+            }
+
             await CompletePendingStopAsync(channel, context, cancellationToken);
             active = null;
         }
@@ -805,7 +896,23 @@ internal sealed class TwitchEventSubChannelSession(
         CancellationToken cancellationToken
     )
     {
-        await ReconcilePendingDeletionAsync(channel, context, cancellationToken);
+        var pendingDeletion = await ReconcilePendingDeletionAsync(
+            channel,
+            context,
+            cancellationToken
+        );
+        switch (pendingDeletion)
+        {
+            case TwitchEventSubChannelReconciliationOutcome.Completed:
+                break;
+            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion:
+                return pendingDeletion;
+            default:
+                throw new UnreachableException(
+                    "Pending EventSub deletion produced a non-deletion reconciliation outcome."
+                );
+        }
+
         await CompletePendingStopAsync(channel, context, cancellationToken);
         ActiveEventSubSubscription? active;
         lock (_gate)
@@ -815,7 +922,23 @@ internal sealed class TwitchEventSubChannelSession(
 
         if (active is not null)
         {
-            await ReconcileSubscriptionDeletionAsync(active, context, cancellationToken);
+            var deletion = await ReconcileSubscriptionDeletionAsync(
+                active,
+                context,
+                cancellationToken
+            );
+            switch (deletion)
+            {
+                case TwitchEventSubChannelReconciliationOutcome.Completed:
+                    break;
+                case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion:
+                    return deletion;
+                default:
+                    throw new UnreachableException(
+                        "EventSub subscription deletion produced a non-deletion reconciliation outcome."
+                    );
+            }
+
             await CompletePendingStopAsync(channel, context, cancellationToken);
         }
 
@@ -828,7 +951,7 @@ internal sealed class TwitchEventSubChannelSession(
         return new TwitchEventSubChannelReconciliationOutcome.Completed();
     }
 
-    private async ValueTask ReconcilePendingDeletionAsync(
+    private async ValueTask<TwitchEventSubChannelReconciliationOutcome> ReconcilePendingDeletionAsync(
         string channel,
         TwitchEventSubChannelAttemptContext context,
         CancellationToken cancellationToken
@@ -836,13 +959,17 @@ internal sealed class TwitchEventSubChannelSession(
     {
         if (!pendingDeletions.TryGet(channel, out var pending))
         {
-            return;
+            return new TwitchEventSubChannelReconciliationOutcome.Completed();
         }
 
-        await ReconcileSubscriptionDeletionAsync(pending.Subscription, context, cancellationToken);
+        return await ReconcileSubscriptionDeletionAsync(
+            pending.Subscription,
+            context,
+            cancellationToken
+        );
     }
 
-    private async ValueTask ReconcileSubscriptionDeletionAsync(
+    private async ValueTask<TwitchEventSubChannelReconciliationOutcome> ReconcileSubscriptionDeletionAsync(
         ActiveEventSubSubscription subscription,
         TwitchEventSubChannelAttemptContext context,
         CancellationToken cancellationToken
@@ -876,10 +1003,13 @@ internal sealed class TwitchEventSubChannelSession(
                     pendingDeletions.ConfirmDeleted(subscription);
                     _subscriptions.Remove(subscription.Channel);
                 }
-                return;
+                return new TwitchEventSubChannelReconciliationOutcome.Completed();
             case TwitchEventSubSubscriptionDeletionOutcome.Unresolved unresolved:
                 pendingDeletions.RetainUnresolved(subscription, unresolved.Failure);
-                throw new TwitchEventSubSubscriptionDeletionUnresolvedException(unresolved.Failure);
+                return new TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion
+                {
+                    Failure = unresolved.Failure,
+                };
             default:
                 throw new UnreachableException("Unknown EventSub subscription-deletion outcome.");
         }
@@ -977,6 +1107,15 @@ internal sealed class TwitchEventSubChannelSession(
                     trigger,
                     attempt,
                     new TwitchEventSubChannelFailureContext.MissingBot(),
+                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                );
+                return;
+            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved:
+                PublishDegraded(
+                    channel,
+                    trigger,
+                    attempt,
+                    new TwitchEventSubChannelFailureContext.ClassifiedException(unresolved.Failure),
                     TwitchEventSubChannelNextAction.RetryOnNextReconciliation
                 );
                 return;

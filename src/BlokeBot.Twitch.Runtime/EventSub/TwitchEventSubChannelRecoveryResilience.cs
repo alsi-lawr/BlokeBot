@@ -11,14 +11,14 @@ namespace BlokeBot.Twitch.Runtime;
 internal static class TwitchEventSubChannelRecoveryResilience
 {
     internal static void Configure(
-        ResiliencePipelineBuilder builder,
+        ResiliencePipelineBuilder<TwitchEventSubChannelReconciliationOutcome> builder,
         EventSubChannelRecoveryPolicy policy
     )
     {
         if (policy.AttemptLimit > 1)
         {
             builder.AddRetry(
-                new RetryStrategyOptions
+                new RetryStrategyOptions<TwitchEventSubChannelReconciliationOutcome>
                 {
                     MaxRetryAttempts = policy.AttemptLimit - 1,
                     Delay = policy.Delay,
@@ -27,7 +27,7 @@ internal static class TwitchEventSubChannelRecoveryResilience
                     ShouldHandle = args =>
                         ValueTask.FromResult(
                             args.Outcome.Exception is { } exception
-                                && TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                                ? TwitchEventSubChannelFailureClassifier.IsRecoverable(
                                     TwitchEventSubChannelFailureClassifier
                                         .Classify(
                                             exception,
@@ -36,12 +36,17 @@ internal static class TwitchEventSubChannelRecoveryResilience
                                         )
                                         .Classification
                                 )
+                                : args.Outcome.Result
+                                    is TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
+                                    && TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                                        unresolved.Failure.Classification
+                                    )
                         ),
                 }
             );
         }
 
-        ConfigureAttempt(builder, policy);
+        builder.AddTimeout(policy.AttemptTimeout);
     }
 
     internal static void ConfigureAttempt(
@@ -61,11 +66,6 @@ internal static class TwitchEventSubChannelFailureClassifier
         CancellationToken cancellationToken
     )
     {
-        if (exception is TwitchEventSubSubscriptionDeletionUnresolvedException deletion)
-        {
-            return deletion.Failure;
-        }
-
         var (phase, failure) = exception switch
         {
             TwitchEventSubChannelOperationException operation => (
@@ -235,7 +235,7 @@ internal sealed class TwitchEventSubChannelOperationException(
 
 internal sealed class TwitchEventSubChannelRecoveryPipeline(
     ResiliencePipeline attemptPipeline,
-    ResiliencePipeline recoveryPipeline
+    ResiliencePipeline<TwitchEventSubChannelReconciliationOutcome> recoveryPipeline
 )
 {
     internal ValueTask<TResult> ExecuteAttemptAsync<TResult>(
@@ -246,8 +246,8 @@ internal sealed class TwitchEventSubChannelRecoveryPipeline(
         return attemptPipeline.ExecuteAsync(operation, cancellationToken);
     }
 
-    internal ValueTask<TResult> ExecuteRecoveryAsync<TResult>(
-        Func<CancellationToken, ValueTask<TResult>> operation,
+    internal ValueTask<TwitchEventSubChannelReconciliationOutcome> ExecuteRecoveryAsync(
+        Func<CancellationToken, ValueTask<TwitchEventSubChannelReconciliationOutcome>> operation,
         CancellationToken cancellationToken
     )
     {

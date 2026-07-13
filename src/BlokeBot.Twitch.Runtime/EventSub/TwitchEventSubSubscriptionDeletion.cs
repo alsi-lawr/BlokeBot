@@ -198,10 +198,3 @@ internal sealed class TwitchEventSubSubscriptionReconciliationStore
         );
     }
 }
-
-internal sealed class TwitchEventSubSubscriptionDeletionUnresolvedException(
-    TwitchEventSubChannelFailureDetails failure
-) : Exception("EventSub subscription deletion remains unresolved.", failure.Exception)
-{
-    internal TwitchEventSubChannelFailureDetails Failure { get; } = failure;
-}
