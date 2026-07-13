@@ -46,7 +46,26 @@ internal abstract record TwitchEventSubSubscriptionSetupOutcome
 
 internal abstract record TwitchEventSubChannelReconciliationOutcome
 {
-    private protected TwitchEventSubChannelReconciliationOutcome() { }
+    private TwitchEventSubChannelReconciliationOutcome() { }
+
+    internal TResult Match<TResult>(
+        Func<Completed, TResult> completed,
+        Func<MissingChannel, TResult> missingChannel,
+        Func<MissingBot, TResult> missingBot,
+        Func<StartupMessageRejected, TResult> startupMessageRejected,
+        Func<UnresolvedDeletion, TResult> unresolvedDeletion
+    )
+    {
+        return this switch
+        {
+            Completed outcome => completed(outcome),
+            MissingChannel outcome => missingChannel(outcome),
+            MissingBot outcome => missingBot(outcome),
+            StartupMessageRejected outcome => startupMessageRejected(outcome),
+            UnresolvedDeletion outcome => unresolvedDeletion(outcome),
+            _ => throw new UnreachableException("Unknown EventSub channel reconciliation outcome."),
+        };
+    }
 
     internal sealed record Completed : TwitchEventSubChannelReconciliationOutcome;
 
@@ -589,44 +608,44 @@ internal sealed class TwitchEventSubChannelSession(
             return;
         }
 
-        switch (outcome)
-        {
-            case TwitchEventSubChannelReconciliationOutcome.Completed:
-            case TwitchEventSubChannelReconciliationOutcome.MissingChannel:
-            case TwitchEventSubChannelReconciliationOutcome.MissingBot:
-            case TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected:
-                PublishReconciliationOutcome(channel, target, trigger, attempt: 1, outcome);
-                return;
-            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved:
-                var failure = new TwitchEventSubChannelFailureContext.ClassifiedException(
-                    unresolved.Failure
-                );
-                var isRecoverable = TwitchEventSubChannelFailureClassifier.IsRecoverable(
-                    failure.Classification
-                );
-                PublishDegraded(
-                    channel,
-                    trigger,
-                    attempt: 1,
-                    failure,
-                    isRecoverable
-                        ? TwitchEventSubChannelNextAction.BeginRecoveryCycle
-                        : TwitchEventSubChannelNextAction.RetryOnNextReconciliation
-                );
-                if (isRecoverable)
-                {
-                    await RunRecoveryCycleAsync(
-                        channel,
-                        target,
-                        trigger,
-                        failure,
-                        cancellationToken
-                    );
-                }
+        await outcome.Match(
+            PublishOutcomeAsync,
+            PublishOutcomeAsync,
+            PublishOutcomeAsync,
+            PublishOutcomeAsync,
+            HandleUnresolvedDeletionAsync
+        );
+        return;
 
-                return;
-            default:
-                throw new UnreachableException("Unknown EventSub channel reconciliation outcome.");
+        ValueTask PublishOutcomeAsync(TwitchEventSubChannelReconciliationOutcome result)
+        {
+            PublishReconciliationOutcome(channel, target, trigger, attempt: 1, result);
+            return ValueTask.CompletedTask;
+        }
+
+        async ValueTask HandleUnresolvedDeletionAsync(
+            TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved
+        )
+        {
+            var failure = new TwitchEventSubChannelFailureContext.ClassifiedException(
+                unresolved.Failure
+            );
+            var isRecoverable = TwitchEventSubChannelFailureClassifier.IsRecoverable(
+                failure.Classification
+            );
+            PublishDegraded(
+                channel,
+                trigger,
+                attempt: 1,
+                failure,
+                isRecoverable
+                    ? TwitchEventSubChannelNextAction.BeginRecoveryCycle
+                    : TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+            );
+            if (isRecoverable)
+            {
+                await RunRecoveryCycleAsync(channel, target, trigger, failure, cancellationToken);
+            }
         }
     }
 
@@ -1122,50 +1141,49 @@ internal sealed class TwitchEventSubChannelSession(
         TwitchEventSubChannelReconciliationOutcome outcome
     )
     {
-        switch (outcome)
-        {
-            case TwitchEventSubChannelReconciliationOutcome.Completed:
-                PublishSuccess(channel, target, attempt, trigger);
-                return;
-            case TwitchEventSubChannelReconciliationOutcome.MissingChannel:
-                PublishDegraded(
-                    channel,
-                    trigger,
-                    attempt,
-                    new TwitchEventSubChannelFailureContext.MissingChannel(),
-                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
-                );
-                return;
-            case TwitchEventSubChannelReconciliationOutcome.MissingBot:
-                PublishDegraded(
-                    channel,
-                    trigger,
-                    attempt,
-                    new TwitchEventSubChannelFailureContext.MissingBot(),
-                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
-                );
-                return;
-            case TwitchEventSubChannelReconciliationOutcome.StartupMessageRejected:
-                PublishDegraded(
-                    channel,
-                    trigger,
-                    attempt,
-                    new TwitchEventSubChannelFailureContext.StartupMessageRejected(),
-                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
-                );
-                return;
-            case TwitchEventSubChannelReconciliationOutcome.UnresolvedDeletion unresolved:
-                PublishDegraded(
-                    channel,
-                    trigger,
-                    attempt,
-                    new TwitchEventSubChannelFailureContext.ClassifiedException(unresolved.Failure),
-                    TwitchEventSubChannelNextAction.RetryOnNextReconciliation
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown EventSub channel reconciliation outcome.");
-        }
+        outcome
+            .Match<Action>(
+                _ => () => PublishSuccess(channel, target, attempt, trigger),
+                _ =>
+                    () =>
+                        PublishDegraded(
+                            channel,
+                            trigger,
+                            attempt,
+                            new TwitchEventSubChannelFailureContext.MissingChannel(),
+                            TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                        ),
+                _ =>
+                    () =>
+                        PublishDegraded(
+                            channel,
+                            trigger,
+                            attempt,
+                            new TwitchEventSubChannelFailureContext.MissingBot(),
+                            TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                        ),
+                _ =>
+                    () =>
+                        PublishDegraded(
+                            channel,
+                            trigger,
+                            attempt,
+                            new TwitchEventSubChannelFailureContext.StartupMessageRejected(),
+                            TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                        ),
+                unresolved =>
+                    () =>
+                        PublishDegraded(
+                            channel,
+                            trigger,
+                            attempt,
+                            new TwitchEventSubChannelFailureContext.ClassifiedException(
+                                unresolved.Failure
+                            ),
+                            TwitchEventSubChannelNextAction.RetryOnNextReconciliation
+                        )
+            )
+            .Invoke();
     }
 
     private void PublishSuccess(

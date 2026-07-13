@@ -946,6 +946,51 @@ public sealed class EventSubChannelRecoveryTests
     }
 
     [Test]
+    public void ChannelReconciliationOutcome_Inspecting_IsClosedAndHandlerComplete()
+    {
+        var unionType = typeof(TwitchEventSubChannelReconciliationOutcome);
+        var directCases = unionType
+            .GetNestedTypes(BindingFlags.NonPublic)
+            .Where(type => type.BaseType == unionType)
+            .OrderBy(type => type.Name)
+            .ToArray();
+        var match =
+            unionType.GetMethod("Match", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("The channel reconciliation Match is missing.");
+        var constructor =
+            unionType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                Type.EmptyTypes,
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException(
+                "The channel reconciliation constructor is missing."
+            );
+        var handledCases = match
+            .GetParameters()
+            .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
+            .OrderBy(type => type.Name)
+            .ToArray();
+
+        unionType.IsAbstract.ShouldBeTrue();
+        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
+        constructor.IsPrivate.ShouldBeTrue();
+        unionType.GetMethod("Seal", BindingFlags.Instance | BindingFlags.NonPublic).ShouldBeNull();
+        directCases
+            .Select(type => type.Name)
+            .ShouldBe([
+                "Completed",
+                "MissingBot",
+                "MissingChannel",
+                "StartupMessageRejected",
+                "UnresolvedDeletion",
+            ]);
+        handledCases.ShouldBe(directCases);
+        directCases.ShouldAllBe(type => type.IsSealed);
+    }
+
+    [Test]
     public void ChannelLifecycleUnion_Inspecting_IsClosedAndHandlerComplete()
     {
         var unionType = typeof(TwitchEventSubChannelStatus);
