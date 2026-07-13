@@ -6,7 +6,7 @@ namespace BlokeBot.Features.HostedChannels.Whispers;
 public static class HostedWhisperResponseSenderSelectionExtensions
 {
     /// <summary>
-    /// Uses hosted-channel whisper delivery with public-chat fallback.
+    /// Uses hosted-channel whisper delivery for private command responses.
     /// </summary>
     public static TwitchCommandResponseSenderSelection UseBlokeBotHostedWhisperSender(
         this TwitchCommandResponseSenderSelection selection

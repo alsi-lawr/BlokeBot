@@ -15,11 +15,11 @@ internal sealed class TwitchChatCommandResponseSender(
     {
         if (response.Target == TwitchCommandResponseTarget.Whisper)
         {
-            log.LogInformation(
-                "Whisper response requested for {Login} in #{Channel}, but no whisper sender is registered. Falling back to chat.",
-                sourceMessage.Login,
-                sourceMessage.Channel
+            log.LogWarning(
+                "Private command response delivery is unavailable in public-chat-only mode for host channel #{HostChannel}; no user-visible delivery was attempted.",
+                TwitchLogin.Normalize(sourceMessage.Channel)
             );
+            return;
         }
 
         await sender.SendAsync(

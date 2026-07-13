@@ -29,7 +29,7 @@ public sealed class TwitchChatCommandResponseSenderTests
     }
 
     [Test]
-    public async Task WhisperResponse_SendingStandalone_FallsBackToSourceChannel()
+    public async Task WhisperResponse_SendingStandalone_DoesNotUsePublicDelivery()
     {
         var chat = new RecordingChatSender();
         var sender = new TwitchChatCommandResponseSender(
@@ -43,10 +43,9 @@ public sealed class TwitchChatCommandResponseSenderTests
             CancellationToken.None
         );
 
-        chat.Channels.ShouldBe(["streamer"]);
-        chat.Messages.ShouldBe(["private response"]);
-        chat.Deadlines.ShouldHaveSingleItem()
-            .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();
+        chat.Channels.ShouldBeEmpty();
+        chat.Messages.ShouldBeEmpty();
+        chat.Deadlines.ShouldBeEmpty();
     }
 
     private static TwitchChatMessage SourceMessage()
