@@ -164,12 +164,10 @@ builder.Services.AddAuthorization(options =>
 if (botRuntimeConfigured)
 {
     builder
-        .Services.AddTwitchBot(
-            botSection,
-            accountProvider => accountProvider.UseBlokeBotHostedChannelProvider(),
-            responseSender => responseSender.UseBlokeBotHostedWhisperSender(),
-            lifecycleNotifier => lifecycleNotifier.UseBlokeBotHostedChannelLifecycleNotifier()
-        )
+        .Services.AddTwitchBot(botSection)
+        .UseBlokeBotHostedChannelProvider()
+        .UseBlokeBotHostedWhisperSender()
+        .UseBlokeBotHostedChannelLifecycleNotifier()
         .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
         .AddCommandModule<CustomCommandModule>();

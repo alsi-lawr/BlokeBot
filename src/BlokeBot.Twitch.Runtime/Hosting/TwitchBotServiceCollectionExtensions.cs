@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using BlokeBot.Eventing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,27 +18,14 @@ public static class TwitchBotServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configuration">The configuration section that contains bot settings.</param>
-    /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
-    /// <param name="selectResponseSender">Selects exactly one command-response sender policy.</param>
-    /// <param name="selectLifecycleNotifier">Selects exactly one channel-lifecycle notifier policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
-        IConfiguration configuration,
-        Action<TwitchBotAccountProviderSelection> selectAccountProvider,
-        Action<TwitchCommandResponseSenderSelection> selectResponseSender,
-        Action<TwitchBotChannelLifecycleNotifierSelection> selectLifecycleNotifier
+        IConfiguration configuration
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
-        ArgumentNullException.ThrowIfNull(selectAccountProvider);
-        ArgumentNullException.ThrowIfNull(selectResponseSender);
-        ArgumentNullException.ThrowIfNull(selectLifecycleNotifier);
-
-        var accountProvider = SelectAccountProvider(selectAccountProvider);
-        var responseSender = SelectResponseSender(selectResponseSender);
-        var lifecycleNotifier = SelectLifecycleNotifier(selectLifecycleNotifier);
 
         var options =
             configuration.Get<TwitchBotOptions>()
@@ -58,14 +44,7 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.BindRequired(configuration);
 
-        return AddTwitchBotCore(
-            services,
-            settings,
-            policies,
-            accountProvider,
-            responseSender,
-            lifecycleNotifier
-        );
+        return AddTwitchBotCore(services, settings, policies);
     }
 
     /// <summary>
@@ -90,29 +69,16 @@ public static class TwitchBotServiceCollectionExtensions
     /// <param name="services">The service collection to configure.</param>
     /// <param name="configure">The options configuration callback.</param>
     /// <param name="policyOptions">Every required boundary-specific policy.</param>
-    /// <param name="selectAccountProvider">Selects exactly one account-provider policy.</param>
-    /// <param name="selectResponseSender">Selects exactly one command-response sender policy.</param>
-    /// <param name="selectLifecycleNotifier">Selects exactly one channel-lifecycle notifier policy.</param>
     /// <returns>A builder for command and service customization.</returns>
     public static ITwitchBotBuilder AddTwitchBot(
         this IServiceCollection services,
         Action<TwitchBotOptions> configure,
-        TwitchBotPolicyOptions policyOptions,
-        Action<TwitchBotAccountProviderSelection> selectAccountProvider,
-        Action<TwitchCommandResponseSenderSelection> selectResponseSender,
-        Action<TwitchBotChannelLifecycleNotifierSelection> selectLifecycleNotifier
+        TwitchBotPolicyOptions policyOptions
     )
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configure);
         ArgumentNullException.ThrowIfNull(policyOptions);
-        ArgumentNullException.ThrowIfNull(selectAccountProvider);
-        ArgumentNullException.ThrowIfNull(selectResponseSender);
-        ArgumentNullException.ThrowIfNull(selectLifecycleNotifier);
-
-        var accountProvider = SelectAccountProvider(selectAccountProvider);
-        var responseSender = SelectResponseSender(selectResponseSender);
-        var lifecycleNotifier = SelectLifecycleNotifier(selectLifecycleNotifier);
 
         var options = new TwitchBotOptions();
         configure(options);
@@ -123,23 +89,13 @@ public static class TwitchBotServiceCollectionExtensions
         );
         var policies = TwitchBotPolicies.FromOptions(policyOptions);
 
-        return AddTwitchBotCore(
-            services,
-            settings,
-            policies,
-            accountProvider,
-            responseSender,
-            lifecycleNotifier
-        );
+        return AddTwitchBotCore(services, settings, policies);
     }
 
     private static ITwitchBotBuilder AddTwitchBotCore(
         IServiceCollection services,
         TwitchBotSettings settings,
-        TwitchBotPolicies policies,
-        TwitchBotAccountProviderRegistration accountProvider,
-        TwitchCommandResponseSenderRegistration responseSender,
-        TwitchBotChannelLifecycleNotifierRegistration lifecycleNotifier
+        TwitchBotPolicies policies
     )
     {
         RegisterSettings(services, settings);
@@ -150,9 +106,12 @@ public static class TwitchBotServiceCollectionExtensions
         >();
         services.TryAddSingleton<ITwitchRuntimeIdleWait, TwitchRuntimeIdleWait>();
         RegisterPolicies(services, policies);
-        RegisterAccountProvider(services, accountProvider);
-        RegisterResponseSender(services, responseSender);
-        RegisterLifecycleNotifier(services, lifecycleNotifier);
+        services.AddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
+        services.AddSingleton<ITwitchCommandResponseSender, TwitchChatCommandResponseSender>();
+        services.AddSingleton<
+            ITwitchBotChannelLifecycleNotifier,
+            NoOpTwitchBotChannelLifecycleNotifier
+        >();
         services.AddTwitchAuth();
         services.AddHelix();
         services.AddContinueAndReportObserverFanOut<
@@ -205,107 +164,6 @@ public static class TwitchBotServiceCollectionExtensions
         services.AddHostedService<TwitchBotRuntimeHostedService>();
 
         return services.AddTwitchCommands();
-    }
-
-    private static TwitchBotAccountProviderRegistration SelectAccountProvider(
-        Action<TwitchBotAccountProviderSelection> select
-    )
-    {
-        var selection = new TwitchBotAccountProviderSelection();
-        select(selection);
-        return selection.RequireSingle();
-    }
-
-    private static TwitchCommandResponseSenderRegistration SelectResponseSender(
-        Action<TwitchCommandResponseSenderSelection> select
-    )
-    {
-        var selection = new TwitchCommandResponseSenderSelection();
-        select(selection);
-        return selection.RequireSingle();
-    }
-
-    private static TwitchBotChannelLifecycleNotifierRegistration SelectLifecycleNotifier(
-        Action<TwitchBotChannelLifecycleNotifierSelection> select
-    )
-    {
-        var selection = new TwitchBotChannelLifecycleNotifierSelection();
-        select(selection);
-        return selection.RequireSingle();
-    }
-
-    private static void RegisterAccountProvider(
-        IServiceCollection services,
-        TwitchBotAccountProviderRegistration registration
-    )
-    {
-        switch (registration.Kind)
-        {
-            case TwitchBotAccountProviderKind.Default:
-                services.AddSingleton<ITwitchBotAccountProvider, DefaultTwitchBotAccountProvider>();
-                return;
-            case TwitchBotAccountProviderKind.HostedChannel:
-                services.AddSingleton<ITwitchBotAccountProvider>(serviceProvider =>
-                    (ITwitchBotAccountProvider)
-                        serviceProvider.GetRequiredService(registration.ProviderType)
-                );
-                return;
-            case TwitchBotAccountProviderKind.Custom:
-                services.AddSingleton(typeof(ITwitchBotAccountProvider), registration.ProviderType);
-                return;
-            default:
-                throw new UnreachableException("Unknown Twitch bot account-provider policy.");
-        }
-    }
-
-    private static void RegisterResponseSender(
-        IServiceCollection services,
-        TwitchCommandResponseSenderRegistration registration
-    )
-    {
-        switch (registration.Kind)
-        {
-            case TwitchCommandResponseSenderKind.StandalonePublicChat:
-                services.AddSingleton<
-                    ITwitchCommandResponseSender,
-                    TwitchChatCommandResponseSender
-                >();
-                return;
-            case TwitchCommandResponseSenderKind.HostedWhisper:
-                services.AddSingleton<ITwitchCommandResponseSender>(serviceProvider =>
-                    (ITwitchCommandResponseSender)
-                        serviceProvider.GetRequiredService(registration.SenderType)
-                );
-                return;
-            default:
-                throw new UnreachableException("Unknown Twitch command-response sender policy.");
-        }
-    }
-
-    private static void RegisterLifecycleNotifier(
-        IServiceCollection services,
-        TwitchBotChannelLifecycleNotifierRegistration registration
-    )
-    {
-        switch (registration.Kind)
-        {
-            case TwitchBotChannelLifecycleNotifierKind.NoOp:
-                services.AddSingleton<
-                    ITwitchBotChannelLifecycleNotifier,
-                    NoOpTwitchBotChannelLifecycleNotifier
-                >();
-                return;
-            case TwitchBotChannelLifecycleNotifierKind.Hosted:
-                services.AddSingleton<ITwitchBotChannelLifecycleNotifier>(serviceProvider =>
-                    (ITwitchBotChannelLifecycleNotifier)
-                        serviceProvider.GetRequiredService(registration.NotifierType)
-                );
-                return;
-            default:
-                throw new UnreachableException(
-                    "Unknown Twitch bot channel-lifecycle notifier policy."
-                );
-        }
     }
 
     private static void RegisterSettings(IServiceCollection services, TwitchBotSettings settings)
