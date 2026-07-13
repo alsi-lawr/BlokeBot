@@ -5,7 +5,7 @@ namespace BlokeBot.Auth.Users;
 
 internal sealed class UserLookupService(
     WebAuthConfiguration configuration,
-    ITwitchAccessTokenProvider tokens,
+    IAccessTokenProvider tokens,
     HelixClient helix
 )
 {

@@ -4,7 +4,7 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public sealed class HostBotAccountOAuthService(
     TwitchBotSettings settings,
-    TwitchOAuthApiClient oauth,
+    OAuthTransport transport,
     HelixClient helix
 )
 {
@@ -13,8 +13,8 @@ public sealed class HostBotAccountOAuthService(
         var identity = settings.Identity;
         ValidateConfiguredIdentity(identity, requireSecret: false);
 
-        return oauth.CreateAuthorizationUri(
-            new TwitchAuthorizationUriRequest(
+        return transport.CreateAuthorizationUri(
+            new AuthorizationUriRequest(
                 identity.ClientId,
                 identity.RedirectUri,
                 scopes is null ? RequestedScopes() : ScopeSet.NormalizeMany(scopes),
@@ -31,8 +31,8 @@ public sealed class HostBotAccountOAuthService(
         var identity = settings.Identity;
         ValidateConfiguredIdentity(identity, requireSecret: true);
 
-        var token = await oauth.ExchangeCodeAsync(
-            new TwitchAuthorizationCodeExchange(
+        var token = await transport.ExchangeCodeAsync(
+            new AuthorizationCodeExchange(
                 identity.ClientId,
                 identity.ClientSecret,
                 identity.RedirectUri,
@@ -41,7 +41,7 @@ public sealed class HostBotAccountOAuthService(
             ct
         );
         var validation =
-            await oauth.ValidateTokenAsync(token.AccessToken, ct)
+            await transport.ValidateTokenAsync(token.AccessToken, ct)
             ?? throw new InvalidOperationException(
                 "Twitch did not validate the bot account grant."
             );
@@ -51,7 +51,7 @@ public sealed class HostBotAccountOAuthService(
         );
 
         return new HostBotAccountAuthorizationGrant(
-            new TwitchTokenSet(
+            new TokenSet(
                 token.AccessToken,
                 token.RefreshToken,
                 DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
@@ -69,7 +69,7 @@ public sealed class HostBotAccountOAuthService(
         return ScopeSet.NormalizeMany(settings.Identity.Scopes);
     }
 
-    private static void ValidateConfiguredIdentity(TwitchBotIdentity identity, bool requireSecret)
+    private static void ValidateConfiguredIdentity(BotIdentity identity, bool requireSecret)
     {
         if (
             string.IsNullOrWhiteSpace(identity.ClientId)

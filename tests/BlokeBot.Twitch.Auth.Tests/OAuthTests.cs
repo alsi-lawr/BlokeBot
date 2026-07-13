@@ -9,7 +9,7 @@ public sealed class OAuthTests
     [Test]
     public void IssuedOAuthState_ConsumingTwice_SucceedsOnlyOnce()
     {
-        ITwitchOAuthStateStore store = new InMemoryTwitchOAuthStateStore();
+        IOAuthStateStore store = new InMemoryOAuthStateStore();
 
         var state = store.Issue();
 
@@ -22,10 +22,10 @@ public sealed class OAuthTests
     [Test]
     public async Task InvalidOAuthState_CompletingFlow_RejectsAuthorization()
     {
-        var flow = new TwitchOAuthFlow(
+        var flow = new OAuthFlow(
             IdentityWithPath("tokens.json"),
             new FakeOAuthClient(),
-            new InMemoryTwitchOAuthStateStore(),
+            new InMemoryOAuthStateStore(),
             new MemoryTokenStore()
         );
 
@@ -39,15 +39,11 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient
         {
-            ExchangeResult = new TwitchTokenSet(
-                "access",
-                "refresh",
-                DateTimeOffset.UtcNow.AddHours(1)
-            ),
+            ExchangeResult = new TokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
         };
-        var states = new InMemoryTwitchOAuthStateStore();
+        var states = new InMemoryOAuthStateStore();
         var store = new MemoryTokenStore();
-        var flow = new TwitchOAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store);
+        var flow = new OAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store);
         var state = flow.CreateAuthorizationUri().Query.Split("state=")[1];
 
         var token = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
@@ -62,10 +58,10 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet("cached", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
+            Loaded = new TokenSet("cached", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
         };
-        var cache = new TwitchAccessTokenCache();
-        var provider = new TwitchAccessTokenProvider(
+        var cache = new AccessTokenCache();
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
             cache,
             store,
@@ -85,11 +81,11 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet("cached", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
+            Loaded = new TokenSet("cached", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
         };
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             oauth
         );
@@ -108,7 +104,7 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient
         {
-            RefreshResult = new TwitchTokenSet(
+            RefreshResult = new TokenSet(
                 "new-access",
                 "new-refresh",
                 DateTimeOffset.UtcNow.AddHours(1)
@@ -116,14 +112,14 @@ public sealed class OAuthTests
         };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet(
+            Loaded = new TokenSet(
                 "old-access",
                 "old-refresh",
                 DateTimeOffset.UtcNow.AddMinutes(-1)
             ),
         };
-        var cache = new TwitchAccessTokenCache();
-        var provider = new TwitchAccessTokenProvider(
+        var cache = new AccessTokenCache();
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
             cache,
             store,
@@ -143,7 +139,7 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient
         {
             ValidateResult = true,
-            RefreshResult = new TwitchTokenSet(
+            RefreshResult = new TokenSet(
                 "new-access",
                 "new-refresh",
                 DateTimeOffset.UtcNow.AddHours(1)
@@ -151,15 +147,15 @@ public sealed class OAuthTests
         };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet(
+            Loaded = new TokenSet(
                 "old-access",
                 "old-refresh",
                 DateTimeOffset.UtcNow.AddMinutes(-1)
             ),
         };
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             oauth
         );
@@ -179,7 +175,7 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient
         {
-            RefreshResult = new TwitchTokenSet(
+            RefreshResult = new TokenSet(
                 "new-access",
                 string.Empty,
                 DateTimeOffset.UtcNow.AddHours(1)
@@ -187,15 +183,15 @@ public sealed class OAuthTests
         };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet(
+            Loaded = new TokenSet(
                 "old-access",
                 "old-refresh",
                 DateTimeOffset.UtcNow.AddMinutes(-1)
             ),
         };
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             oauth
         );
@@ -212,7 +208,7 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient
         {
             ValidateResult = true,
-            RefreshResult = new TwitchTokenSet(
+            RefreshResult = new TokenSet(
                 "new-access",
                 "new-refresh",
                 DateTimeOffset.UtcNow.AddHours(1)
@@ -221,16 +217,16 @@ public sealed class OAuthTests
         var saveError = new IOException("Token save failed.");
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet(
+            Loaded = new TokenSet(
                 "old-access",
                 "old-refresh",
                 DateTimeOffset.UtcNow.AddMinutes(-1)
             ),
             SaveException = saveError,
         };
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             oauth
         );
@@ -256,24 +252,20 @@ public sealed class OAuthTests
     {
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore();
-        var cache = new TwitchAccessTokenCache();
-        var provider = new TwitchAccessTokenProvider(
+        var cache = new AccessTokenCache();
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
             cache,
             store,
             oauth
         );
 
-        var exception = await Should.ThrowAsync<TwitchAccessTokenUnavailableException>(() =>
+        var exception = await Should.ThrowAsync<AccessTokenUnavailableException>(() =>
             provider.GetAccessTokenAsync(CancellationToken.None)
         );
-        exception.Reason.ShouldBe(TwitchAccessTokenUnavailableReason.MissingRefreshToken);
+        exception.Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
 
-        store.Loaded = new TwitchTokenSet(
-            "authorized",
-            "refresh",
-            DateTimeOffset.UtcNow.AddHours(1)
-        );
+        store.Loaded = new TokenSet("authorized", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
         var accessToken = await provider.GetAccessTokenAsync(CancellationToken.None);
 
@@ -287,17 +279,17 @@ public sealed class OAuthTests
         var oauth = new FakeOAuthClient { ValidateResult = true };
         var store = new MemoryTokenStore
         {
-            Loaded = new TwitchTokenSet("first", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
+            Loaded = new TokenSet("first", "refresh", DateTimeOffset.UtcNow.AddHours(1)),
         };
-        var cache = new TwitchAccessTokenCache();
-        var provider = new TwitchAccessTokenProvider(
+        var cache = new AccessTokenCache();
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
             cache,
             store,
             oauth
         );
         (await provider.GetAccessTokenAsync(CancellationToken.None)).ShouldBe("first");
-        store.Loaded = new TwitchTokenSet("second", "refresh", DateTimeOffset.UtcNow.AddHours(1));
+        store.Loaded = new TokenSet("second", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
         await cache.ClearAsync(CancellationToken.None);
         var accessToken = await provider.GetAccessTokenAsync(CancellationToken.None);
@@ -310,9 +302,9 @@ public sealed class OAuthTests
     public async Task PreCancelledRequest_RequestingAccess_PropagatesCancellationBeforeLoad()
     {
         var store = new MemoryTokenStore();
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             new FakeOAuthClient()
         );
@@ -331,9 +323,9 @@ public sealed class OAuthTests
     {
         var loadError = new IOException("Token load failed.");
         var store = new MemoryTokenStore { LoadException = loadError };
-        var provider = new TwitchAccessTokenProvider(
+        var provider = new AccessTokenProvider(
             IdentityWithPath("tokens.json"),
-            new TwitchAccessTokenCache(),
+            new AccessTokenCache(),
             store,
             new FakeOAuthClient()
         );
@@ -350,8 +342,8 @@ public sealed class OAuthTests
     public async Task TokenSet_SavingAndLoadingJsonStore_RoundTrips()
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "tokens.json");
-        var store = new JsonTwitchTokenStore();
-        var token = new TwitchTokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1));
+        var store = new JsonTokenStore();
+        var token = new TokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
         await store.SaveAsync(path, token, CancellationToken.None);
         var loaded = await store.LoadAsync(path, CancellationToken.None);
@@ -362,10 +354,10 @@ public sealed class OAuthTests
         loaded.ExpiresAtUtc.ShouldBe(token.ExpiresAtUtc);
     }
 
-    private static TwitchBotIdentity IdentityWithPath(string path)
+    private static BotIdentity IdentityWithPath(string path)
     {
-        return TwitchBotIdentity.FromOptions(
-            new TwitchBotIdentityOptions
+        return BotIdentity.FromOptions(
+            new BotIdentityOptions
             {
                 BotUsername = "bot",
                 ClientId = "client",

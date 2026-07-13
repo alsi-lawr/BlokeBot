@@ -1075,9 +1075,9 @@ public sealed class EventSubChannelRecoveryTests
         var unavailableAccount = TwitchEventSubChannelFailureClassifier.Classify(
             new TwitchEventSubChannelOperationException(
                 TwitchEventSubChannelPhase.AccountResolution,
-                new TwitchAccessTokenUnavailableException(
-                    TwitchAccessTokenUnavailableReason.MissingRefreshToken,
-                    TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+                new AccessTokenUnavailableException(
+                    AccessTokenUnavailableReason.MissingRefreshToken,
+                    AccessTokenUnavailableException.MissingRefreshTokenMessage
                 )
             ),
             TwitchEventSubChannelPhase.SubscriptionSetup,

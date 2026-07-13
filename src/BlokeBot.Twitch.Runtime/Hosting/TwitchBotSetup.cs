@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch.Runtime;
 internal static class TwitchBotSetup
 {
     public const string MissingRefreshTokenMessage =
-        TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage;
+        AccessTokenUnavailableException.MissingRefreshTokenMessage;
 
     public static string CreateOAuthStartUri(string redirectUri)
     {

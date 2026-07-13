@@ -86,7 +86,7 @@ internal static class TwitchEventSubChannelFailureClassifier
             HttpRequestException => TwitchEventSubChannelFailureClassification.Terminal,
             SocketException or WebSocketException or IOException =>
                 TwitchEventSubChannelFailureClassification.Transient,
-            TwitchAccessTokenUnavailableException
+            AccessTokenUnavailableException
             or AuthenticationException
             or InvalidDataException
             or InvalidOperationException

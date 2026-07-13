@@ -2,12 +2,12 @@ using BlokeBot.Twitch.Auth;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 
-internal sealed class FakeOAuthClient : ITwitchOAuthClient
+internal sealed class FakeOAuthClient : IOAuthClient
 {
-    public TwitchTokenSet ExchangeResult { get; init; } =
+    public TokenSet ExchangeResult { get; init; } =
         new("exchanged", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
-    public TwitchTokenSet RefreshResult { get; init; } =
+    public TokenSet RefreshResult { get; init; } =
         new("refreshed", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
     public bool ValidateResult { get; init; }
@@ -19,15 +19,12 @@ internal sealed class FakeOAuthClient : ITwitchOAuthClient
         return new($"https://id.twitch.tv/oauth2/authorize?state={state}");
     }
 
-    public Task<TwitchTokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
+    public Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {
         return Task.FromResult(ExchangeResult);
     }
 
-    public Task<TwitchTokenSet> RefreshAsync(
-        string refreshToken,
-        CancellationToken cancellationToken
-    )
+    public Task<TokenSet> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
         RefreshCalls++;
         return Task.FromResult(RefreshResult);

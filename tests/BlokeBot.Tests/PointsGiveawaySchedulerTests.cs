@@ -1630,8 +1630,8 @@ public sealed class PointsGiveawaySchedulerTests
                 new ActiveBotAccountTokenStatus
                 {
                     BotLogin = string.Empty,
-                    Status = new TwitchTokenStatus.Unavailable(
-                        TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                    Status = new TokenStatus.Unavailable(
+                        AccessTokenUnavailableReason.MissingRefreshToken,
                         []
                     ),
                 }

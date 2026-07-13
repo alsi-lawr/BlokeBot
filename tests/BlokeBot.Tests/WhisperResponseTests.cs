@@ -524,7 +524,7 @@ public sealed class WhisperResponseTests
         return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -643,14 +643,14 @@ public sealed class WhisperResponseTests
                 cancelOnWhisper
             );
             var options = BotOptions();
-            var oauth = new TwitchOAuthApiClient(http);
+            var oauth = new OAuthTransport(http);
             var helixUsers = new HelixClient(http);
             var hostBotAccounts = new HostBotAccountAuthorizationService(
                 dbFactory,
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
                 oauth,
                 helixUsers,
-                new UnavailableTwitchTokenStatusSource(),
+                new UnavailableTokenStatusSource(),
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 options
             );

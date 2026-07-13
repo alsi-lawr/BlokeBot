@@ -204,7 +204,7 @@ public sealed class UserLookupServiceTests
         );
     }
 
-    private sealed class StaticAccessTokenProvider(string accessToken) : ITwitchAccessTokenProvider
+    private sealed class StaticAccessTokenProvider(string accessToken) : IAccessTokenProvider
     {
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
         {

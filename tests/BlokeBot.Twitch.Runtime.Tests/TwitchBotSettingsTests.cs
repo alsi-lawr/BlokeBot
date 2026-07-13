@@ -31,7 +31,7 @@ public sealed class TwitchBotSettingsTests
         {
             StartupMessage = "private startup message",
             Connection = new TwitchBotConnectionOptions { Host = " irc.example.test " },
-            Identity = new TwitchBotIdentityOptions
+            Identity = new BotIdentityOptions
             {
                 BotUsername = " TestBot ",
                 ClientId = " client ",

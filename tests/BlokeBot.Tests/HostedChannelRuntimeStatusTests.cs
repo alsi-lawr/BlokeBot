@@ -22,7 +22,7 @@ public sealed class HostedChannelRuntimeStatusTests
         var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -79,7 +79,7 @@ public sealed class HostedChannelRuntimeStatusTests
 
         return new(
             new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
-            new TwitchOAuthApiClient(new CountingHttpClientFactory())
+            new OAuthTransport(new CountingHttpClientFactory())
         );
     }
 

@@ -3,7 +3,7 @@ using BlokeBot.Identity;
 
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
-public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchOAuthApiClient oauth)
+public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTransport transport)
 {
     private const string _callbackPath = "/oauth/channel-bot/callback";
 
@@ -16,8 +16,8 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
         }
 
         var scopes = RequestedScopes();
-        return oauth.CreateAuthorizationUri(
-            new TwitchAuthorizationUriRequest(
+        return transport.CreateAuthorizationUri(
+            new AuthorizationUriRequest(
                 clientId,
                 OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
                 scopes,
@@ -39,8 +39,8 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
             throw new InvalidOperationException("TwitchBot client credentials are missing.");
         }
 
-        var token = await oauth.ExchangeCodeAsync(
-            new TwitchAuthorizationCodeExchange(
+        var token = await transport.ExchangeCodeAsync(
+            new AuthorizationCodeExchange(
                 clientId,
                 clientSecret,
                 OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
@@ -49,7 +49,7 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, TwitchO
             ct
         );
         var validation =
-            await oauth.ValidateTokenAsync(token.AccessToken, ct)
+            await transport.ValidateTokenAsync(token.AccessToken, ct)
             ?? throw new InvalidOperationException(
                 "Twitch did not finish connecting this channel."
             );

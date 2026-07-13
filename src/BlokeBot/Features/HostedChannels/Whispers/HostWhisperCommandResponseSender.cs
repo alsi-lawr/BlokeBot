@@ -16,7 +16,7 @@ public sealed class HostWhisperCommandResponseSender(
     HelixClient users,
     WhisperClient whispers,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    TwitchBotIdentity identity,
+    BotIdentity identity,
     IPrivateDeliveryFailureHandler failureHandler,
     ILogger<HostWhisperCommandResponseSender> log
 ) : ITwitchCommandResponseSender
@@ -171,7 +171,7 @@ public sealed class HostWhisperCommandResponseSender(
             [Scopes.UserManageWhispers],
             cancellationToken
         );
-        var readyStatus = tokenStatus.Status.Match<TwitchTokenStatus.Ready?>(
+        var readyStatus = tokenStatus.Status.Match<TokenStatus.Ready?>(
             _ => null,
             _ => null,
             _ => null,

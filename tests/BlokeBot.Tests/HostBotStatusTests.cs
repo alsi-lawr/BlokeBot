@@ -151,7 +151,7 @@ public sealed class HostBotStatusTests
         var settings = Settings();
         var service = new HostBotStatusService(
             new TwitchHostBotAppAccessTokenSource(
-                new TwitchAppAccessTokenProvider(httpClientFactory, settings.Identity)
+                new AppAccessTokenProvider(httpClientFactory, settings.Identity)
             ),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
             new HelixClient(httpClientFactory),
@@ -287,7 +287,7 @@ public sealed class HostBotStatusTests
         return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -310,8 +310,8 @@ public sealed class HostBotStatusTests
         return new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
-            Status = new TwitchTokenStatus.Unavailable(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            Status = new TokenStatus.Unavailable(
+                AccessTokenUnavailableReason.MissingRefreshToken,
                 ImmutableArray.CreateRange(RequiredScopes())
             ),
         };
@@ -322,7 +322,7 @@ public sealed class HostBotStatusTests
         return new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
-            Status = new TwitchTokenStatus.Invalid(ImmutableArray.CreateRange(RequiredScopes())),
+            Status = new TokenStatus.Invalid(ImmutableArray.CreateRange(RequiredScopes())),
         };
     }
 
@@ -331,9 +331,9 @@ public sealed class HostBotStatusTests
         return new ActiveBotAccountTokenStatus
         {
             BotLogin = "bot",
-            Status = new TwitchTokenStatus.Unknown(
-                new TwitchTokenStatusError.ValidationUnavailable(
-                    TwitchTokenStatusTransportFailureReason.RequestFailed,
+            Status = new TokenStatus.Unknown(
+                new TokenStatusError.ValidationUnavailable(
+                    TokenStatusTransportFailureReason.RequestFailed,
                     typeof(HttpRequestException).FullName!,
                     ImmutableArray.CreateRange(RequiredScopes())
                 )
@@ -354,7 +354,7 @@ public sealed class HostBotStatusTests
         var missing = ImmutableArray.CreateRange(
             requiredScopes.Except(granted, StringComparer.Ordinal)
         );
-        var validation = new TwitchTokenValidation(
+        var validation = new TokenValidation(
             validationUserId,
             validationLogin,
             granted.ToHashSet(StringComparer.Ordinal)
@@ -363,8 +363,8 @@ public sealed class HostBotStatusTests
         {
             BotLogin = botLogin,
             Status = missing.IsEmpty
-                ? new TwitchTokenStatus.Ready(accessToken, validation, requiredScopes, granted)
-                : new TwitchTokenStatus.MissingScopes(
+                ? new TokenStatus.Ready(accessToken, validation, requiredScopes, granted)
+                : new TokenStatus.MissingScopes(
                     accessToken,
                     validation,
                     requiredScopes,

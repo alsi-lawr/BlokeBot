@@ -2,9 +2,9 @@ using BlokeBot.Twitch.Auth;
 
 namespace BlokeBot.Twitch.Auth.Tests;
 
-internal sealed class MemoryTokenStore : ITwitchTokenStore
+internal sealed class MemoryTokenStore : ITokenStore
 {
-    public TwitchTokenSet? Loaded { get; set; }
+    public TokenSet? Loaded { get; set; }
 
     public Exception? LoadException { get; set; }
 
@@ -14,9 +14,9 @@ internal sealed class MemoryTokenStore : ITwitchTokenStore
 
     public int SaveCalls { get; private set; }
 
-    public TwitchTokenSet? Saved { get; private set; }
+    public TokenSet? Saved { get; private set; }
 
-    public async Task<TwitchTokenSet?> LoadAsync(string path, CancellationToken cancellationToken)
+    public async Task<TokenSet?> LoadAsync(string path, CancellationToken cancellationToken)
     {
         LoadCalls++;
         await Task.Yield();
@@ -28,11 +28,7 @@ internal sealed class MemoryTokenStore : ITwitchTokenStore
         return Loaded;
     }
 
-    public async Task SaveAsync(
-        string path,
-        TwitchTokenSet tokenSet,
-        CancellationToken cancellationToken
-    )
+    public async Task SaveAsync(string path, TokenSet tokenSet, CancellationToken cancellationToken)
     {
         SaveCalls++;
         await Task.Yield();

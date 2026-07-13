@@ -89,7 +89,7 @@ public sealed class HostBotStatusService(
         string channelLogin,
         string botLogin,
         string accessToken,
-        TwitchTokenValidation validation,
+        TokenValidation validation,
         IReadOnlyList<string> grantedScopes,
         HostBotChannelStatusFlags configuredFlags,
         CancellationToken ct
@@ -187,7 +187,7 @@ public sealed class HostBotStatusService(
                 exception
             );
         }
-        catch (TwitchAppAccessTokenResponseException exception)
+        catch (AppAccessTokenResponseException exception)
         {
             return Unavailable(
                 HostStreamLivenessUnavailableReason.ProviderResponseInvalid,
@@ -379,6 +379,6 @@ public sealed class HostBotStatusService(
     {
         internal required string AccessToken { get; init; }
 
-        internal required TwitchTokenValidation Validation { get; init; }
+        internal required TokenValidation Validation { get; init; }
     }
 }

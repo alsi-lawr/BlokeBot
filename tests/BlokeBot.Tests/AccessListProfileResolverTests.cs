@@ -30,8 +30,8 @@ public sealed class AccessListProfileResolverTests
     public async Task TwitchEnrichment_ResolvingLogins_ReturnsAvailableProfileImages()
     {
         var http = new ProfileHttpClientFactory();
-        var identity = TwitchBotIdentity.FromOptions(
-            new TwitchBotIdentityOptions
+        var identity = BotIdentity.FromOptions(
+            new BotIdentityOptions
             {
                 BotUsername = "bot",
                 ClientId = "client-id",
@@ -43,7 +43,7 @@ public sealed class AccessListProfileResolverTests
         );
         var resolver = new AccessListProfileResolver(
             new TwitchAccessListProfileEnrichmentPolicy(
-                new TwitchAppAccessTokenProvider(http, identity),
+                new AppAccessTokenProvider(http, identity),
                 new HelixClient(http),
                 identity
             )

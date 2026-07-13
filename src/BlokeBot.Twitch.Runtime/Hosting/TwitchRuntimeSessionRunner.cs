@@ -160,7 +160,7 @@ internal static class TwitchRuntimeSessionRunner
         }
         catch (Exception exception)
         {
-            if (exception is TwitchAccessTokenUnavailableException)
+            if (exception is AccessTokenUnavailableException)
             {
                 status.SetAuthorized(false);
             }
@@ -248,7 +248,7 @@ internal static class TwitchRuntimeSessionRunner
         }
         catch (Exception exception)
         {
-            if (exception is TwitchAccessTokenUnavailableException)
+            if (exception is AccessTokenUnavailableException)
             {
                 status.SetAuthorized(false);
             }

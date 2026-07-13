@@ -24,7 +24,7 @@ internal static class TwitchIrcSessionFailureClassifier
             SocketException => TwitchRuntimeSessionFailureClassification.Transient,
             InvalidDataException => TwitchRuntimeSessionFailureClassification.Terminal,
             IOException => TwitchRuntimeSessionFailureClassification.Transient,
-            TwitchAccessTokenUnavailableException
+            AccessTokenUnavailableException
             or AuthenticationException
             or InvalidOperationException
             or JsonException => TwitchRuntimeSessionFailureClassification.Terminal,
@@ -60,7 +60,7 @@ internal static class TwitchEventSubSessionFailureClassifier
                 TwitchRuntimeSessionFailureClassification.Transient,
             InvalidDataException => TwitchRuntimeSessionFailureClassification.Terminal,
             IOException => TwitchRuntimeSessionFailureClassification.Transient,
-            TwitchAccessTokenUnavailableException
+            AccessTokenUnavailableException
             or AuthenticationException
             or InvalidOperationException
             or JsonException => TwitchRuntimeSessionFailureClassification.Terminal,

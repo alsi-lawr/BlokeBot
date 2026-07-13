@@ -112,7 +112,7 @@ public static class TwitchBotServiceCollectionExtensions
             ITwitchBotChannelLifecycleNotifier,
             NoOpTwitchBotChannelLifecycleNotifier
         >();
-        services.AddTwitchAuth();
+        services.AddAuth();
         services.AddHelix();
         services.AddContinueAndReportObserverFanOut<
             TwitchIrcMessageObserverBoundary,

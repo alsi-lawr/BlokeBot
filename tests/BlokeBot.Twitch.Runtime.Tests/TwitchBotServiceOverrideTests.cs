@@ -164,7 +164,7 @@ public sealed class TwitchBotServiceOverrideTests
     )
     {
         var services = new ServiceCollection();
-        services.AddSingleton<ITwitchAccessTokenProvider>(tokens);
+        services.AddSingleton<IAccessTokenProvider>(tokens);
         services.AddSingleton<ITwitchChatMessageSender>(chat);
         services.AddSingleton<ILogger<TwitchChatCommandResponseSender>>(
             NullLogger<TwitchChatCommandResponseSender>.Instance
@@ -174,7 +174,7 @@ public sealed class TwitchBotServiceOverrideTests
 
     private static void ConfigureBot(TwitchBotOptions options)
     {
-        options.Identity = new TwitchBotIdentityOptions
+        options.Identity = new BotIdentityOptions
         {
             BotUsername = "MainBot",
             ClientId = "client-id",
@@ -276,7 +276,7 @@ public sealed class TwitchBotServiceOverrideTests
         return new("viewer", "streamer", "!command", "raw", new Dictionary<string, string>());
     }
 
-    private sealed class RecordingAccessTokenProvider : ITwitchAccessTokenProvider
+    private sealed class RecordingAccessTokenProvider : IAccessTokenProvider
     {
         internal int CallCount { get; private set; }
 

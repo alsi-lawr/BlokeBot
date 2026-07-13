@@ -138,7 +138,7 @@ public sealed class ChatIdentityResolverTests
         );
         var identity = Identity();
         var transport = new TwitchHelixPublicChatTransport(
-            new TwitchAppAccessTokenProvider(factory, identity),
+            new AppAccessTokenProvider(factory, identity),
             new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
@@ -170,7 +170,7 @@ public sealed class ChatIdentityResolverTests
         );
         var identity = Identity();
         var transport = new TwitchHelixPublicChatTransport(
-            new TwitchAppAccessTokenProvider(factory, identity),
+            new AppAccessTokenProvider(factory, identity),
             new StaticAccountProvider(new TwitchBotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
@@ -272,7 +272,7 @@ public sealed class ChatIdentityResolverTests
         return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client-id",
@@ -286,9 +286,9 @@ public sealed class ChatIdentityResolverTests
         );
     }
 
-    private static TwitchBotIdentity Identity()
+    private static BotIdentity Identity()
     {
-        return new TwitchBotIdentity
+        return new BotIdentity
         {
             BotUsername = "bot",
             ClientId = "client-id",

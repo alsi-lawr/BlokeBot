@@ -19,7 +19,7 @@ internal interface ITwitchIrcConnectionSession
 internal sealed class TwitchIrcConnectionSession(
     TwitchBotSettings settings,
     ITwitchBotChannelProvider channels,
-    ITwitchAccessTokenProvider tokens,
+    IAccessTokenProvider tokens,
     TwitchCommandDispatcher dispatcher,
     ITwitchBotChannelLifecycleNotifier lifecycleNotifier,
     ITwitchChatMessageSender sender,

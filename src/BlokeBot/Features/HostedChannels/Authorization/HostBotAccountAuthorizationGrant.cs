@@ -3,7 +3,7 @@ using BlokeBot.Identity;
 namespace BlokeBot.Features.HostedChannels.Authorization;
 
 public sealed record HostBotAccountAuthorizationGrant(
-    TwitchTokenSet Token,
+    TokenSet Token,
     string UserId,
     LoginName Login,
     string DisplayName,

@@ -25,8 +25,7 @@ internal static class BotOAuthEndpoints
         botOAuth
             .MapGet(
                 "/start",
-                (ITwitchOAuthFlow oauth) =>
-                    Results.Redirect(oauth.CreateAuthorizationUri().ToString())
+                (IOAuthFlow oauth) => Results.Redirect(oauth.CreateAuthorizationUri().ToString())
             )
             .RequireAuthorization("BotAdmin");
 
@@ -38,7 +37,7 @@ internal static class BotOAuthEndpoints
                     string? code,
                     string? state,
                     string? error,
-                    ITwitchOAuthFlow oauth,
+                    IOAuthFlow oauth,
                     HostBotAccountOAuthService hostBotOAuth,
                     HostBotAccountAuthorizationService hostBotAuthorization,
                     HostedChannelChangeNotifier changes,

@@ -1,9 +1,9 @@
 namespace BlokeBot.Features.AccessLists;
 
 internal sealed class TwitchAccessListProfileEnrichmentPolicy(
-    TwitchAppAccessTokenProvider appTokens,
+    AppAccessTokenProvider appTokens,
     HelixClient helix,
-    TwitchBotIdentity identity
+    BotIdentity identity
 ) : IAccessListProfileEnrichmentPolicy
 {
     public async Task<IReadOnlyList<AccessListEntryProfile>> EnrichAsync(

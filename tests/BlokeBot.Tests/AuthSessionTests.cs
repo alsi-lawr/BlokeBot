@@ -258,7 +258,7 @@ public sealed class AuthSessionTests
                 TwitchBotSettings.FromOptions(
                     new TwitchBotOptions
                     {
-                        Identity = new TwitchBotIdentityOptions { BotUsername = botUsername },
+                        Identity = new BotIdentityOptions { BotUsername = botUsername },
                     }
                 )
             )

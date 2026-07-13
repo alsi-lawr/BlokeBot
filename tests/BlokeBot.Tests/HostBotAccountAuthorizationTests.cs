@@ -22,14 +22,14 @@ public sealed class HostBotAccountAuthorizationTests
             TwitchBotSettings.FromOptions(
                 new TwitchBotOptions
                 {
-                    Identity = new TwitchBotIdentityOptions
+                    Identity = new BotIdentityOptions
                     {
                         ClientId = "client",
                         RedirectUri = "https://localhost:7107/oauth/callback",
                     },
                 }
             ),
-            new TwitchOAuthApiClient(httpClientFactory),
+            new OAuthTransport(httpClientFactory),
             new HelixClient(httpClientFactory)
         );
 
@@ -74,7 +74,7 @@ public sealed class HostBotAccountAuthorizationTests
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
 
-        await Should.ThrowAsync<TwitchAccessTokenUnavailableException>(async () =>
+        await Should.ThrowAsync<AccessTokenUnavailableException>(async () =>
             await service.GetBotAccountAsync("streamer", CancellationToken.None)
         );
     }
@@ -90,7 +90,7 @@ public sealed class HostBotAccountAuthorizationTests
         var result = await service.AuthorizeAsync(
             hostId,
             new HostBotAccountAuthorizationGrant(
-                new TwitchTokenSet(
+                new TokenSet(
                     "override-token",
                     "override-refresh",
                     DateTimeOffset.UtcNow.AddHours(1)
@@ -260,14 +260,14 @@ public sealed class HostBotAccountAuthorizationTests
 
     private static HostBotAccountAuthorizationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
-        ITwitchAccessTokenProvider? tokenProvider
+        IAccessTokenProvider? tokenProvider
     )
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -277,7 +277,7 @@ public sealed class HostBotAccountAuthorizationTests
                 },
             }
         );
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var oauth = new OAuthTransport(httpClientFactory);
         var helix = new HelixClient(httpClientFactory);
         return new HostBotAccountAuthorizationService(
             dbFactory,
@@ -285,11 +285,11 @@ public sealed class HostBotAccountAuthorizationTests
             oauth,
             helix,
             tokenProvider is null
-                ? new UnavailableTwitchTokenStatusSource()
-                : new TwitchTokenStatusService(
+                ? new UnavailableTokenStatusSource()
+                : new TokenStatusService(
                     tokenProvider,
                     oauth,
-                    NullLogger<TwitchTokenStatusService>.Instance
+                    NullLogger<TokenStatusService>.Instance
                 ),
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
             options
@@ -333,7 +333,7 @@ public sealed class HostBotAccountAuthorizationTests
     )
     {
         return new(
-            new TwitchTokenSet(accessToken, "override-refresh", DateTimeOffset.UtcNow.AddHours(1)),
+            new TokenSet(accessToken, "override-refresh", DateTimeOffset.UtcNow.AddHours(1)),
             "custom-id",
             LoginName.Parse("custombot"),
             "CustomBot",
@@ -355,7 +355,7 @@ public sealed class HostBotAccountAuthorizationTests
         await db.SaveChangesAsync();
     }
 
-    private sealed class StaticTokenProvider(string accessToken) : ITwitchAccessTokenProvider
+    private sealed class StaticTokenProvider(string accessToken) : IAccessTokenProvider
     {
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
         {

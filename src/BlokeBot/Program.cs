@@ -101,7 +101,7 @@ builder
     )
     .AddBlokeBotToasts()
     .AddBlokeBotAuth();
-builder.Services.AddTwitchOAuthApi();
+builder.Services.AddOAuthTransport();
 builder.Services.AddHelix();
 builder.Services.AddHttpClient();
 builder

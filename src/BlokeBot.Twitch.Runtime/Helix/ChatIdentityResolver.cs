@@ -1,6 +1,6 @@
 namespace BlokeBot.Twitch.Runtime;
 
-internal sealed class ChatIdentityResolver(TwitchBotIdentity identity, HelixClient helix)
+internal sealed class ChatIdentityResolver(BotIdentity identity, HelixClient helix)
 {
     internal async Task<ChatIdentityResolution> ResolveAsync(
         string channelLogin,

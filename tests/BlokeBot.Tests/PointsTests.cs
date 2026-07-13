@@ -92,7 +92,7 @@ public sealed class PointsTests
         var httpClientFactory = new FakeHttpClientFactory();
         var service = new ChannelBotOAuthService(
             configuration,
-            new TwitchOAuthApiClient(httpClientFactory)
+            new OAuthTransport(httpClientFactory)
         );
         var scopes = service.RequestedScopes();
 

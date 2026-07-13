@@ -1,13 +1,13 @@
 namespace BlokeBot.Auth.OAuth;
 
-internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)
+internal sealed class WebOAuthClient(OAuthTransport transport)
 {
     private static readonly string[] _scopes = [Scopes.UserReadModeratedChannels];
 
     public Uri CreateAuthorizationUri(HttpRequest request, WebAuthOptions options, string state)
     {
-        return oauth.CreateAuthorizationUri(
-            new TwitchAuthorizationUriRequest(
+        return transport.CreateAuthorizationUri(
+            new AuthorizationUriRequest(
                 options.ClientId,
                 OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 _scopes,
@@ -23,8 +23,8 @@ internal sealed class WebOAuthClient(TwitchOAuthApiClient oauth)
         CancellationToken ct
     )
     {
-        var token = await oauth.ExchangeCodeAsync(
-            new TwitchAuthorizationCodeExchange(
+        var token = await transport.ExchangeCodeAsync(
+            new AuthorizationCodeExchange(
                 options.ClientId,
                 options.ClientSecret,
                 OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),

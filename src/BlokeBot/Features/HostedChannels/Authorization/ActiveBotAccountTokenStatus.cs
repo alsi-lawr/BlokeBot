@@ -6,5 +6,5 @@ public sealed record ActiveBotAccountTokenStatus
 
     public string? ProfileImageUrl { get; init; }
 
-    public required TwitchTokenStatus Status { get; init; }
+    public required TokenStatus Status { get; init; }
 }

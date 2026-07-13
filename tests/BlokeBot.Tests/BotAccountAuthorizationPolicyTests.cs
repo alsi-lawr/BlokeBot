@@ -16,8 +16,8 @@ public sealed class BotAccountAuthorizationPolicyTests
     public async Task UnavailableToken_LoadingConfiguredStatus_ReportsNotAuthorized()
     {
         var status = await LoadConfiguredStatusAsync(
-            new TwitchTokenStatus.Unavailable(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            new TokenStatus.Unavailable(
+                AccessTokenUnavailableReason.MissingRefreshToken,
                 RequiredScopes()
             )
         );
@@ -29,9 +29,7 @@ public sealed class BotAccountAuthorizationPolicyTests
     [Test]
     public async Task InvalidToken_LoadingConfiguredStatus_ReportsNotAuthorized()
     {
-        var status = await LoadConfiguredStatusAsync(
-            new TwitchTokenStatus.Invalid(RequiredScopes())
-        );
+        var status = await LoadConfiguredStatusAsync(new TokenStatus.Invalid(RequiredScopes()));
 
         status.State.ShouldBe(BotAccountAuthorizationState.NotAuthorized);
         status.MissingScopes.ShouldBe(RequiredScopes());
@@ -40,8 +38,8 @@ public sealed class BotAccountAuthorizationPolicyTests
     [Test]
     public async Task TokenInspectionFailure_LoadingConfiguredStatus_ReportsUnknown()
     {
-        var error = new TwitchTokenStatusError.ValidationUnavailable(
-            TwitchTokenStatusTransportFailureReason.RequestFailed,
+        var error = new TokenStatusError.ValidationUnavailable(
+            TokenStatusTransportFailureReason.RequestFailed,
             typeof(HttpRequestException).FullName!,
             RequiredScopes()
         );
@@ -56,7 +54,7 @@ public sealed class BotAccountAuthorizationPolicyTests
     public async Task MissingTokenScopes_LoadingConfiguredStatus_ReportsMissingScopes()
     {
         var status = await LoadConfiguredStatusAsync(
-            new TwitchTokenStatus.MissingScopes(
+            new TokenStatus.MissingScopes(
                 "saved-token",
                 Validation([]),
                 RequiredScopes(),
@@ -74,7 +72,7 @@ public sealed class BotAccountAuthorizationPolicyTests
     public async Task ReadyToken_LoadingConfiguredStatus_ReportsReady()
     {
         var status = await LoadConfiguredStatusAsync(
-            new TwitchTokenStatus.Ready(
+            new TokenStatus.Ready(
                 "saved-token",
                 Validation(RequiredScopes()),
                 RequiredScopes(),
@@ -114,7 +112,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                     Settings(tokenCachePath),
                     cache,
                     new HelixClient(new RejectingHttpClientFactory()),
-                    new UnavailableTwitchTokenStatusSource(),
+                    new UnavailableTokenStatusSource(),
                     new HostedChannelChangeNotifier(events)
                 )
             );
@@ -150,7 +148,7 @@ public sealed class BotAccountAuthorizationPolicyTests
         return TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -164,32 +162,26 @@ public sealed class BotAccountAuthorizationPolicyTests
     }
 
     private static async Task<BotAccountAuthorizationStatus> LoadConfiguredStatusAsync(
-        TwitchTokenStatus status
+        TokenStatus status
     )
     {
         return await ConfiguredService(
-                new StaticTokenStatusSource(
-                    Result<TwitchTokenStatus, TwitchTokenStatusError>.Success(status)
-                )
+                new StaticTokenStatusSource(Result<TokenStatus, TokenStatusError>.Success(status))
             )
             .GetStatusAsync(CancellationToken.None);
     }
 
     private static async Task<BotAccountAuthorizationStatus> LoadConfiguredStatusAsync(
-        TwitchTokenStatusError error
+        TokenStatusError error
     )
     {
         return await ConfiguredService(
-                new StaticTokenStatusSource(
-                    Result<TwitchTokenStatus, TwitchTokenStatusError>.Error(error)
-                )
+                new StaticTokenStatusSource(Result<TokenStatus, TokenStatusError>.Error(error))
             )
             .GetStatusAsync(CancellationToken.None);
     }
 
-    private static BotAccountAuthorizationService ConfiguredService(
-        ITwitchTokenStatusSource tokenStatus
-    )
+    private static BotAccountAuthorizationService ConfiguredService(ITokenStatusSource tokenStatus)
     {
         var events = TestEventBus.Create<AppEventKind>();
         return new(
@@ -208,17 +200,17 @@ public sealed class BotAccountAuthorizationPolicyTests
         return [Scopes.UserReadModeratedChannels];
     }
 
-    private static TwitchTokenValidation Validation(IEnumerable<string> scopes)
+    private static TokenValidation Validation(IEnumerable<string> scopes)
     {
         return new("bot-id", "bot", scopes.ToHashSet(StringComparer.Ordinal));
     }
 
-    private sealed class RecordingAccessTokenCache : ITwitchAccessTokenCache
+    private sealed class RecordingAccessTokenCache : IAccessTokenCache
     {
         public int ClearCount { get; private set; }
 
-        Task<TResult> ITwitchAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
-            Func<ITwitchAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
+        Task<TResult> IAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
+            Func<IAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
             CancellationToken cancellationToken
         )
         {
@@ -232,15 +224,14 @@ public sealed class BotAccountAuthorizationPolicyTests
         }
     }
 
-    private sealed class StaticTokenStatusSource(
-        Result<TwitchTokenStatus, TwitchTokenStatusError> result
-    ) : ITwitchTokenStatusSource
+    private sealed class StaticTokenStatusSource(Result<TokenStatus, TokenStatusError> result)
+        : ITokenStatusSource
     {
-        public IO<TwitchTokenStatus, TwitchTokenStatusError> GetUserAccessTokenStatus(
+        public IO<TokenStatus, TokenStatusError> GetUserAccessTokenStatus(
             IEnumerable<string?> requiredScopes
         )
         {
-            return IO<TwitchTokenStatus, TwitchTokenStatusError>.Create(cancellationToken =>
+            return IO<TokenStatus, TokenStatusError>.Create(cancellationToken =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 return ValueTask.FromResult(result);

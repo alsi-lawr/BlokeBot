@@ -9,9 +9,9 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 public sealed class HostBotAccountAuthorizationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostBotAccountOAuthService hostBotOAuth,
-    TwitchOAuthApiClient oauth,
+    OAuthTransport transport,
     HelixClient helix,
-    ITwitchTokenStatusSource globalTokenStatus,
+    ITokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
     TwitchBotSettings botSettings
 ) : ITwitchBotAccountProvider, IHostBotAccountTokenStatusProvider
@@ -97,9 +97,9 @@ public sealed class HostBotAccountAuthorizationService(
         var inspection = await globalTokenStatus
             .GetUserAccessTokenStatus(required)
             .ExecuteAsync(ct);
-        var globalStatus = inspection.Match<TwitchTokenStatus>(
+        var globalStatus = inspection.Match<TokenStatus>(
             status => status,
-            error => new TwitchTokenStatus.Unknown(error)
+            error => new TokenStatus.Unknown(error)
         );
         return ActiveStatus(configuredBotLogin, null, globalStatus);
     }
@@ -122,8 +122,8 @@ public sealed class HostBotAccountAuthorizationService(
             {
                 BotLogin = string.Empty,
                 ProfileImageUrl = settings?.ProfileImageUrl,
-                Status = new TwitchTokenStatus.Unavailable(
-                    TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+                Status = new TokenStatus.Unavailable(
+                    AccessTokenUnavailableReason.MissingRefreshToken,
                     required
                 ),
             };
@@ -146,9 +146,9 @@ public sealed class HostBotAccountAuthorizationService(
         return status.Status.Match(
             _ => throw BotNotReady(channelLogin),
             unavailable =>
-                throw new TwitchAccessTokenUnavailableException(
+                throw new AccessTokenUnavailableException(
                     unavailable.Reason,
-                    TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+                    AccessTokenUnavailableException.MissingRefreshTokenMessage
                 ),
             _ => throw BotNotReady(channelLogin),
             _ => throw BotNotReady(channelLogin),
@@ -338,7 +338,7 @@ public sealed class HostBotAccountAuthorizationService(
         return settings;
     }
 
-    private async Task<TwitchTokenStatus> GetStoredTokenStatusAsync(
+    private async Task<TokenStatus> GetStoredTokenStatusAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         IEnumerable<string?> requiredScopes,
@@ -348,8 +348,8 @@ public sealed class HostBotAccountAuthorizationService(
         var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
         if (string.IsNullOrWhiteSpace(settings.RefreshToken))
         {
-            return new TwitchTokenStatus.Unavailable(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            return new TokenStatus.Unavailable(
+                AccessTokenUnavailableReason.MissingRefreshToken,
                 required
             );
         }
@@ -359,7 +359,7 @@ public sealed class HostBotAccountAuthorizationService(
         {
             if (!await RefreshTokenAsync(db, settings, ct))
             {
-                return new TwitchTokenStatus.Invalid(required);
+                return new TokenStatus.Invalid(required);
             }
 
             accessToken = settings.AccessToken;
@@ -367,13 +367,13 @@ public sealed class HostBotAccountAuthorizationService(
 
         if (string.IsNullOrWhiteSpace(accessToken))
         {
-            return new TwitchTokenStatus.Unavailable(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            return new TokenStatus.Unavailable(
+                AccessTokenUnavailableReason.MissingRefreshToken,
                 required
             );
         }
 
-        var validation = await oauth.ValidateTokenAsync(accessToken, ct);
+        var validation = await transport.ValidateTokenAsync(accessToken, ct);
         if (validation is null)
         {
             if (
@@ -381,14 +381,14 @@ public sealed class HostBotAccountAuthorizationService(
                 || string.IsNullOrWhiteSpace(settings.AccessToken)
             )
             {
-                return new TwitchTokenStatus.Invalid(required);
+                return new TokenStatus.Invalid(required);
             }
 
             accessToken = settings.AccessToken;
-            validation = await oauth.ValidateTokenAsync(accessToken, ct);
+            validation = await transport.ValidateTokenAsync(accessToken, ct);
             if (validation is null)
             {
-                return new TwitchTokenStatus.Invalid(required);
+                return new TokenStatus.Invalid(required);
             }
         }
 
@@ -403,8 +403,8 @@ public sealed class HostBotAccountAuthorizationService(
         var immutableGranted = ImmutableArray.CreateRange(granted);
         var immutableMissing = ImmutableArray.CreateRange(missing);
         return immutableMissing.IsEmpty
-            ? new TwitchTokenStatus.Ready(accessToken, validation, required, immutableGranted)
-            : new TwitchTokenStatus.MissingScopes(
+            ? new TokenStatus.Ready(accessToken, validation, required, immutableGranted)
+            : new TokenStatus.MissingScopes(
                 accessToken,
                 validation,
                 required,
@@ -426,7 +426,7 @@ public sealed class HostBotAccountAuthorizationService(
 
         try
         {
-            var refreshed = await oauth.RefreshAsync(
+            var refreshed = await transport.RefreshAsync(
                 botSettings.Identity.ClientId,
                 botSettings.Identity.ClientSecret,
                 settings.RefreshToken,
@@ -510,7 +510,7 @@ public sealed class HostBotAccountAuthorizationService(
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(
         HostBotAccountSettings settings,
-        TwitchTokenStatus status
+        TokenStatus status
     )
     {
         return status.Match<BotAccountAuthorizationStatus>(
@@ -599,7 +599,7 @@ public sealed class HostBotAccountAuthorizationService(
     private static ActiveBotAccountTokenStatus ActiveStatus(
         string? configuredLogin,
         string? profileImageUrl,
-        TwitchTokenStatus status
+        TokenStatus status
     )
     {
         var botLogin = status.Match(
@@ -617,7 +617,7 @@ public sealed class HostBotAccountAuthorizationService(
         };
     }
 
-    private static bool IsReady(TwitchTokenStatus status)
+    private static bool IsReady(TokenStatus status)
     {
         return status.Match(_ => false, _ => false, _ => false, _ => false, _ => true);
     }

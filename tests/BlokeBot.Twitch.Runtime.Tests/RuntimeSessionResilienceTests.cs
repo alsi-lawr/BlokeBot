@@ -103,9 +103,9 @@ public sealed class RuntimeSessionResilienceTests
     )
     {
         var harness = CreateHarness(runtime, attemptLimit: 3);
-        var failure = new TwitchAccessTokenUnavailableException(
-            TwitchAccessTokenUnavailableReason.MissingRefreshToken,
-            TwitchAccessTokenUnavailableException.MissingRefreshTokenMessage
+        var failure = new AccessTokenUnavailableException(
+            AccessTokenUnavailableReason.MissingRefreshToken,
+            AccessTokenUnavailableException.MissingRefreshTokenMessage
         );
         harness.Session.Enqueue(
             (_, _) =>

@@ -266,17 +266,14 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         switch (botAccountAuthorization)
         {
             case BotAccountAuthorizationMode.Disabled:
-                services.AddSingleton<
-                    ITwitchTokenStatusSource,
-                    UnavailableTwitchTokenStatusSource
-                >();
+                services.AddSingleton<ITokenStatusSource, UnavailableTokenStatusSource>();
                 services.AddSingleton<
                     IBotAccountAuthorizationPolicy,
                     DisabledBotAccountAuthorizationPolicy
                 >();
                 break;
             case BotAccountAuthorizationMode.Twitch:
-                services.AddSingleton<ITwitchTokenStatusSource, TwitchTokenStatusService>();
+                services.AddSingleton<ITokenStatusSource, TokenStatusService>();
                 services.AddSingleton<
                     IBotAccountAuthorizationPolicy,
                     ConfiguredBotAccountAuthorizationPolicy

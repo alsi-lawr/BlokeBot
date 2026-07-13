@@ -52,7 +52,7 @@ public sealed record TwitchBotOptions
     /// Gets the Twitch identity and OAuth settings.
     /// </summary>
     [Required]
-    public TwitchBotIdentityOptions Identity { get; set; } = new();
+    public BotIdentityOptions Identity { get; set; } = new();
 }
 
 public sealed record PublicChatQueueAlertOptions

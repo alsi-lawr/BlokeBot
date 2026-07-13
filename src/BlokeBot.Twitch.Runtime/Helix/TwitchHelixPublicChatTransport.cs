@@ -16,9 +16,9 @@ internal interface IPublicChatTransport
 }
 
 internal sealed class TwitchHelixPublicChatTransport(
-    TwitchAppAccessTokenProvider appTokens,
+    AppAccessTokenProvider appTokens,
     ITwitchBotAccountProvider botAccounts,
-    TwitchBotIdentity identity,
+    BotIdentity identity,
     ChatIdentityResolver identities,
     ChatClient chat,
     ILogger<TwitchHelixPublicChatTransport> log

@@ -6,9 +6,9 @@ namespace BlokeBot.Features.HostedChannels.Authorization;
 
 internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     TwitchBotSettings settings,
-    ITwitchAccessTokenCache tokenCache,
+    IAccessTokenCache tokenCache,
     HelixClient helix,
-    ITwitchTokenStatusSource tokenStatus,
+    ITokenStatusSource tokenStatus,
     HostedChannelChangeNotifier changes
 ) : IBotAccountAuthorizationPolicy
 {
@@ -17,9 +17,9 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
         var inspection = await tokenStatus
             .GetUserAccessTokenStatus(settings.Identity.Scopes)
             .ExecuteAsync(ct);
-        var status = inspection.Match<TwitchTokenStatus>(
+        var status = inspection.Match<TokenStatus>(
             value => value,
-            error => new TwitchTokenStatus.Unknown(error)
+            error => new TokenStatus.Unknown(error)
         );
         var configuredBotLogin = settings.Identity.BotUsername;
 
@@ -65,7 +65,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
     private async Task<BotAccountAuthorizationStatus> GetAuthorizedStatusAsync(
         string configuredBotLogin,
         string accessToken,
-        TwitchTokenValidation validation,
+        TokenValidation validation,
         ImmutableArray<string> requiredScopes,
         ImmutableArray<string> grantedScopes,
         ImmutableArray<string> missingScopes,
@@ -126,7 +126,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
 
     private static BotAccountAuthorizationStatus Unknown(
         string configuredBotLogin,
-        TwitchTokenStatus.Unknown status
+        TokenStatus.Unknown status
     )
     {
         return new(
@@ -143,7 +143,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
 
     private static BotAccountAuthorizationStatus NotAuthorized(
         string configuredBotLogin,
-        TwitchTokenStatus.Unavailable status
+        TokenStatus.Unavailable status
     )
     {
         return new(
@@ -160,7 +160,7 @@ internal sealed class ConfiguredBotAccountAuthorizationPolicy(
 
     private static BotAccountAuthorizationStatus NotAuthorized(
         string configuredBotLogin,
-        TwitchTokenStatus.Invalid status
+        TokenStatus.Invalid status
     )
     {
         return new(

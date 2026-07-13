@@ -23,7 +23,7 @@ public sealed class ChannelBotAuthorizationTests
         var httpClientFactory = new TwitchOAuthHttpClientFactory();
         var service = new ChannelBotOAuthService(
             ConfigurationWithScopes("channel:bot"),
-            new TwitchOAuthApiClient(httpClientFactory)
+            new OAuthTransport(httpClientFactory)
         );
 
         var grant = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
@@ -141,7 +141,7 @@ public sealed class ChannelBotAuthorizationTests
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
         var httpClientFactory = new EmptyHttpClientFactory();
-        return new(ConfigurationWithScopes(scopes), new TwitchOAuthApiClient(httpClientFactory));
+        return new(ConfigurationWithScopes(scopes), new OAuthTransport(httpClientFactory));
     }
 
     private static HostBotAccountAuthorizationService HostBotAccounts(
@@ -152,7 +152,7 @@ public sealed class ChannelBotAuthorizationTests
         var options = TwitchBotSettings.FromOptions(
             new TwitchBotOptions
             {
-                Identity = new TwitchBotIdentityOptions
+                Identity = new BotIdentityOptions
                 {
                     BotUsername = "bot",
                     ClientId = "client",
@@ -160,14 +160,14 @@ public sealed class ChannelBotAuthorizationTests
                 },
             }
         );
-        var oauth = new TwitchOAuthApiClient(httpClientFactory);
+        var oauth = new OAuthTransport(httpClientFactory);
         var helix = new HelixClient(httpClientFactory);
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),
             oauth,
             helix,
-            new UnavailableTwitchTokenStatusSource(),
+            new UnavailableTokenStatusSource(),
             ChangeNotifier(),
             options
         );

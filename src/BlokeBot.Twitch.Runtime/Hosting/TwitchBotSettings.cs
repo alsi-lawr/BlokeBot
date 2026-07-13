@@ -39,7 +39,7 @@ public sealed record TwitchBotSettings
 
     public required TwitchBotConnectionSettings Connection { get; init; }
 
-    public required TwitchBotIdentity Identity { get; init; }
+    public required BotIdentity Identity { get; init; }
 
     /// <summary>
     /// Maps a mutable configuration transport into an immutable snapshot for configuration-only use.
@@ -48,7 +48,7 @@ public sealed record TwitchBotSettings
     {
         ArgumentNullException.ThrowIfNull(options);
 
-        return Create(options, TwitchBotIdentity.FromOptions(options.Identity));
+        return Create(options, BotIdentity.FromOptions(options.Identity));
     }
 
     /// <summary>
@@ -73,13 +73,13 @@ public sealed record TwitchBotSettings
         }
 
         var identity = requireConfiguredIdentity
-            ? TwitchBotIdentity.FromValidatedOptions(options.Identity, boundary)
-            : TwitchBotIdentity.FromOptions(options.Identity);
+            ? BotIdentity.FromValidatedOptions(options.Identity, boundary)
+            : BotIdentity.FromOptions(options.Identity);
 
         return Create(options, identity);
     }
 
-    private static TwitchBotSettings Create(TwitchBotOptions options, TwitchBotIdentity identity)
+    private static TwitchBotSettings Create(TwitchBotOptions options, BotIdentity identity)
     {
         return new()
         {

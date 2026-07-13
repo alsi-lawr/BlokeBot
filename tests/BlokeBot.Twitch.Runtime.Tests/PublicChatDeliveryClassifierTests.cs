@@ -50,9 +50,9 @@ public sealed class PublicChatDeliveryClassifierTests
         Exception[] failures =
         [
             new HttpRequestException("bad request", null, HttpStatusCode.BadRequest),
-            new TwitchAppAccessTokenResponseException(),
-            new TwitchAccessTokenUnavailableException(
-                TwitchAccessTokenUnavailableReason.MissingRefreshToken,
+            new AppAccessTokenResponseException(),
+            new AccessTokenUnavailableException(
+                AccessTokenUnavailableReason.MissingRefreshToken,
                 "credential detail"
             ),
             new InvalidOperationException("invalid identity response"),

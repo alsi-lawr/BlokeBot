@@ -2,7 +2,7 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class DefaultTwitchBotAccountProvider(
     TwitchBotSettings settings,
-    ITwitchAccessTokenProvider tokens
+    IAccessTokenProvider tokens
 ) : ITwitchBotAccountProvider
 {
     public async ValueTask<TwitchBotAccount> GetBotAccountAsync(
