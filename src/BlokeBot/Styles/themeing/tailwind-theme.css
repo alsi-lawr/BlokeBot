@@ -17,12 +17,3 @@
     --color-accent-foreground: hsl(180 100% 97%);
     --shadow-soft: 0 18px 60px -30px rgb(15 23 42 / 0.45);
 }
-
-@theme static {
-    --color-black: #000;
-    --color-muted: hsl(210 40% 96%);
-    --color-primary: hsl(221 83% 53%);
-    --color-secondary: hsl(210 40% 96%);
-    --ease-out: cubic-bezier(0, 0, 0.2, 1);
-    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-}
