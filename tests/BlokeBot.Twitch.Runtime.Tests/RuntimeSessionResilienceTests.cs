@@ -26,7 +26,7 @@ public sealed class RuntimeSessionResilienceTests
         harness.Session.Enqueue(
             (_, _) =>
             {
-                harness.Status.SetConnected(true, ["channel"]);
+                harness.Status.MarkConnected(["channel"]);
                 return EstablishedAsync(listening);
             }
         );
@@ -41,8 +41,9 @@ public sealed class RuntimeSessionResilienceTests
         established.Session.ShouldBeSameAs(listening);
         harness.Session.CallCount.ShouldBe(1);
         harness.Health.Reports.ShouldBeEmpty();
-        harness.Status.Current.IsConnected.ShouldBeTrue();
-        harness.Status.Current.ConnectedChannels.ShouldBe(["channel"]);
+        harness
+            .Status.Current.ShouldBeOfType<BotRuntimeStatus.Connected>()
+            .Channels.ShouldBe(["channel"]);
         await established.Session.DisposeAsync();
     }
 
@@ -58,18 +59,18 @@ public sealed class RuntimeSessionResilienceTests
         var listening = new ScriptedEstablishedSession();
         var connectedTransitions = new List<bool>();
         harness.Status.Changed += () =>
-            connectedTransitions.Add(harness.Status.Current.IsConnected);
+            connectedTransitions.Add(IsConnected(harness.Status.Current));
         harness.Session.Enqueue(
             (_, _) =>
             {
-                harness.Status.SetConnected(true, ["stale"]);
+                harness.Status.MarkConnected(["stale"]);
                 return FailedEstablishmentAsync(failure);
             }
         );
         harness.Session.Enqueue(
             (_, _) =>
             {
-                harness.Status.SetConnected(true, ["fresh"]);
+                harness.Status.MarkConnected(["fresh"]);
                 return EstablishedAsync(listening);
             }
         );
@@ -83,7 +84,9 @@ public sealed class RuntimeSessionResilienceTests
         established.Attempt.ShouldBe(2);
         harness.Session.CallCount.ShouldBe(2);
         connectedTransitions.ShouldBe([true, false, true]);
-        harness.Status.Current.ConnectedChannels.ShouldBe(["fresh"]);
+        harness
+            .Status.Current.ShouldBeOfType<BotRuntimeStatus.Connected>()
+            .Channels.ShouldBe(["fresh"]);
         AssertReport(
             harness
                 .Health.Reports.ShouldHaveSingleItem()
@@ -111,7 +114,7 @@ public sealed class RuntimeSessionResilienceTests
         harness.Session.Enqueue(
             (_, _) =>
             {
-                harness.Status.SetConnected(true, ["stale"]);
+                harness.Status.MarkConnected(["stale"]);
                 return FailedEstablishmentAsync(failure);
             }
         );
@@ -123,8 +126,7 @@ public sealed class RuntimeSessionResilienceTests
 
         var unhealthy = outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
         harness.Session.CallCount.ShouldBe(1);
-        harness.Status.Current.IsAuthorized.ShouldBeFalse();
-        harness.Status.Current.IsConnected.ShouldBeFalse();
+        harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
         var report = harness
             .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
@@ -517,7 +519,7 @@ public sealed class RuntimeSessionResilienceTests
             (target, _) =>
             {
                 targets.Add(target);
-                status.SetConnected(true, ["channel"]);
+                status.MarkConnected(["channel"]);
                 return Task.FromResult(outcomes.Dequeue());
             },
             EventSubSessionFailureClassifier.Classify,
@@ -536,7 +538,7 @@ public sealed class RuntimeSessionResilienceTests
         previousSession.DisposeCount.ShouldBe(1);
         replacementSession.ListenCount.ShouldBe(0);
         replacementSession.DisposeCount.ShouldBe(1);
-        status.Current.IsConnected.ShouldBeFalse();
+        status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         var report = health
             .Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
@@ -673,7 +675,7 @@ public sealed class RuntimeSessionResilienceTests
         harness.Session.Enqueue(
             (_, _) =>
             {
-                harness.Status.SetConnected(true, ["channel"]);
+                harness.Status.MarkConnected(["channel"]);
                 return EstablishedAsync(listening);
             }
         );
@@ -682,7 +684,7 @@ public sealed class RuntimeSessionResilienceTests
 
         harness.Session.CallCount.ShouldBe(1);
         listening.DisposeCount.ShouldBe(1);
-        harness.Status.Current.IsConnected.ShouldBeFalse();
+        harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         var report = harness
             .Health.Reports.ShouldHaveSingleItem()
             .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
@@ -924,6 +926,11 @@ public sealed class RuntimeSessionResilienceTests
     private static Task<RuntimeSessionEstablishment> IdleAsync()
     {
         return Task.FromResult<RuntimeSessionEstablishment>(new RuntimeSessionEstablishment.Idle());
+    }
+
+    private static bool IsConnected(BotRuntimeStatus status)
+    {
+        return status.Match(static _ => false, static _ => false, static _ => true);
     }
 
     private static Task<RuntimeSessionEstablishment> EstablishedAsync(

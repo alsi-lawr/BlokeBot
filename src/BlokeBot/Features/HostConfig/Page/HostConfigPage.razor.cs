@@ -359,7 +359,15 @@ public partial class HostConfigPage
 
     private async Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
     {
-        await _modAccess.SetModsEnabledAsync(hostId, args.Value is true, CancellationToken.None);
+        if (args.Value is true)
+        {
+            await _modAccess.EnableModeratorAccessAsync(hostId, CancellationToken.None);
+        }
+        else
+        {
+            await _modAccess.DisableModeratorAccessAsync(hostId, CancellationToken.None);
+        }
+
         await LoadAsync();
     }
 
@@ -402,7 +410,14 @@ public partial class HostConfigPage
         try
         {
             await Task.Delay(_accessModeSaveDebounce, cancellationToken);
-            await _modAccess.SetAllowModsByDefaultAsync(hostId, allowByDefault, cancellationToken);
+            if (allowByDefault)
+            {
+                await _modAccess.AllowAllModeratorsAsync(hostId, cancellationToken);
+            }
+            else
+            {
+                await _modAccess.RequireModeratorAllowlistAsync(hostId, cancellationToken);
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
             if (version == _allowModsByDefaultSaveVersion)
@@ -445,7 +460,15 @@ public partial class HostConfigPage
 
     private async Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
     {
-        await _features.SetEnabledAsync(hostId, feature, enabled, CancellationToken.None);
+        if (enabled)
+        {
+            await _features.EnableAsync(hostId, feature, CancellationToken.None);
+        }
+        else
+        {
+            await _features.DisableAsync(hostId, feature, CancellationToken.None);
+        }
+
         await LoadAsync();
         ToastFeatureChange(feature, enabled);
     }
@@ -456,7 +479,15 @@ public partial class HostConfigPage
             _state?.RuntimeStatus?.RuntimeState
             is BotChannelRuntimeState.Starting
                 or BotChannelRuntimeState.Started;
-        await _hostBotAccounts.SetOverrideEnabledAsync(hostId, enabled, CancellationToken.None);
+        if (enabled)
+        {
+            await _hostBotAccounts.UseCustomBotAsync(hostId, CancellationToken.None);
+        }
+        else
+        {
+            await _hostBotAccounts.UseMainBotAsync(hostId, CancellationToken.None);
+        }
+
         await LoadAsync();
         if (runtimeWasActive)
         {
@@ -474,29 +505,37 @@ public partial class HostConfigPage
 
     private async Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
     {
-        var saved = await _hostBotAccounts.SetWhisperResponsesEnabledAsync(
-            hostId,
-            enabled,
-            CancellationToken.None
-        );
+        var outcome = enabled
+            ? await _hostBotAccounts.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
+            : await _hostBotAccounts.DisableWhisperResponsesAsync(hostId, CancellationToken.None);
         await LoadAsync();
 
-        if (!saved && enabled)
+        outcome
+            .Match<Action>(
+                _ => ShowSavedStatus,
+                _ => enabled ? ShowRejectedStatus : ShowSavedStatus,
+                _ => ShowRejectedStatus
+            )
+            .Invoke();
+
+        void ShowRejectedStatus()
         {
             _toasts.Error(
                 "Turn on custom bot before enabling whisper responses.",
                 "Whisper responses not saved"
             );
-            return;
         }
 
-        _toasts.Status(
-            enabled
-                ? "Command replies will use custom-bot whispers when available."
-                : "Command replies will use public chat.",
-            enabled ? "Whisper responses on" : "Whisper responses off",
-            enabled ? ToastTone.Positive : ToastTone.Caution
-        );
+        void ShowSavedStatus()
+        {
+            _toasts.Status(
+                enabled
+                    ? "Command replies will use custom-bot whispers when available."
+                    : "Command replies will use public chat.",
+                enabled ? "Whisper responses on" : "Whisper responses off",
+                enabled ? ToastTone.Positive : ToastTone.Caution
+            );
+        }
     }
 
     private async Task LoadAccessEntriesAsync(HostModAccessState access)

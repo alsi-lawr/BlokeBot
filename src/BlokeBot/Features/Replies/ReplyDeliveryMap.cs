@@ -37,15 +37,13 @@ public sealed class ReplyDeliveryMap
         return IsWhisper(replyKey) ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat;
     }
 
-    public void SetWhisper(string replyKey, bool whisper)
+    public void DeliverAsWhisper(string replyKey)
     {
-        if (whisper)
-        {
-            _whisperKeys.Add(replyKey);
-        }
-        else
-        {
-            _whisperKeys.Remove(replyKey);
-        }
+        _whisperKeys.Add(replyKey);
+    }
+
+    public void DeliverInChat(string replyKey)
+    {
+        _whisperKeys.Remove(replyKey);
     }
 }

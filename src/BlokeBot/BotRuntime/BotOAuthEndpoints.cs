@@ -8,18 +8,14 @@ namespace BlokeBot.BotRuntime;
 
 internal static class BotOAuthEndpoints
 {
-    public static void MapBotOAuthEndpoints(this WebApplication app, bool runtimeConfigured)
+    public static void MapUnavailableBotOAuthEndpoint(this WebApplication app)
     {
-        if (!runtimeConfigured)
-        {
-            app.MapGet(
-                    "/oauth/start",
-                    () => Results.BadRequest("The bot account is not set up yet.")
-                )
-                .RequireAuthorization("BotAdmin");
-            return;
-        }
+        app.MapGet("/oauth/start", () => Results.BadRequest("The bot account is not set up yet."))
+            .RequireAuthorization("BotAdmin");
+    }
 
+    public static void MapBotOAuthEndpoints(this WebApplication app)
+    {
         var botOAuth = app.MapGroup("/oauth").RequireAuthorization();
 
         botOAuth

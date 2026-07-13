@@ -1336,11 +1336,11 @@ internal sealed class EventSubChannelSession(
             .Select(state => state.Channel)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        runtimeStatus.SetEventSubStatus(
-            statusScope.Id,
-            _authorizedChannels.Count > 0,
-            healthyChannels
-        );
+        BotRuntimeStatus status =
+            healthyChannels.Length > 0 ? new BotRuntimeStatus.Connected(healthyChannels)
+            : _authorizedChannels.Count > 0 ? new BotRuntimeStatus.Authorized()
+            : new BotRuntimeStatus.Unauthorized();
+        runtimeStatus.SetEventSubStatus(statusScope.Id, status);
     }
 
     private sealed class EventSubChannelAttemptContext

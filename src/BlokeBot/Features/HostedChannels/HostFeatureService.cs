@@ -43,10 +43,20 @@ public sealed class HostFeatureService(
         return features?.Contains(feature) == true;
     }
 
-    public async Task SetEnabledAsync(
+    public Task EnableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct)
+    {
+        return UpdateAsync(hostId, feature, static (current, selected) => current | selected, ct);
+    }
+
+    public Task DisableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct)
+    {
+        return UpdateAsync(hostId, feature, static (current, selected) => current & ~selected, ct);
+    }
+
+    private async Task UpdateAsync(
         int hostId,
         HostFeatureFlags feature,
-        bool enabled,
+        Func<HostFeatureFlags, HostFeatureFlags, HostFeatureFlags> update,
         CancellationToken ct
     )
     {
@@ -62,9 +72,7 @@ public sealed class HostFeatureService(
             return;
         }
 
-        host.EnabledFeatures = enabled
-            ? host.EnabledFeatures | feature
-            : host.EnabledFeatures & ~feature;
+        host.EnabledFeatures = update(host.EnabledFeatures, feature);
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);

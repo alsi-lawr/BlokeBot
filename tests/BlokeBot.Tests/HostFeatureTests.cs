@@ -33,24 +33,14 @@ public sealed class HostFeatureTests
 
         (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(HostFeatureFlags.All);
 
-        await service.SetEnabledAsync(
-            hostId,
-            HostFeatureFlags.Guessing,
-            enabled: false,
-            CancellationToken.None
-        );
+        await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(
             HostFeatureFlags.Points | HostFeatureFlags.CustomCommands
         );
         publishCount.ShouldBe(1);
 
-        await service.SetEnabledAsync(
-            hostId,
-            HostFeatureFlags.Guessing,
-            enabled: true,
-            CancellationToken.None
-        );
+        await service.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(HostFeatureFlags.All);
         publishCount.ShouldBe(2);
@@ -84,18 +74,8 @@ public sealed class HostFeatureTests
         enabledPoints.ShouldNotBeNull();
         enabledPoints.Kind.ShouldBe(PointsCommandKind.Points);
 
-        await features.SetEnabledAsync(
-            hostId,
-            HostFeatureFlags.Guessing,
-            enabled: true,
-            CancellationToken.None
-        );
-        await features.SetEnabledAsync(
-            hostId,
-            HostFeatureFlags.Points,
-            enabled: false,
-            CancellationToken.None
-        );
+        await features.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
+        await features.DisableAsync(hostId, HostFeatureFlags.Points, CancellationToken.None);
 
         var enabledGuessing = await guessing.ResolveAsync(
             CommandContext("streamer", "startguessing"),

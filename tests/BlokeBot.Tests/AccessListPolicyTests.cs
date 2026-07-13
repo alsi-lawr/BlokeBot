@@ -114,11 +114,17 @@ public sealed class AccessListPolicyTests
             await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
         ).ShouldBeTrue();
 
-        await service.SetModsEnabledAsync(hostId, false, CancellationToken.None);
+        await service.DisableModeratorAccessAsync(hostId, CancellationToken.None);
 
         (
             await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
         ).ShouldBeFalse();
+
+        await service.EnableModeratorAccessAsync(hostId, CancellationToken.None);
+
+        (
+            await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
+        ).ShouldBeTrue();
     }
 
     [Test]
@@ -131,7 +137,7 @@ public sealed class AccessListPolicyTests
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
-        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
+        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
         await service.AddEntryAsync(
             hostId,
             AccessListEntryKind.Whitelist,
@@ -187,7 +193,7 @@ public sealed class AccessListPolicyTests
         state.Whitelist.ShouldBe(["moderator"]);
         state.Blacklist.ShouldBe(["moderator"]);
 
-        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
+        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
 
         (
             await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
@@ -199,6 +205,12 @@ public sealed class AccessListPolicyTests
         state.AllowModsByDefault.ShouldBeFalse();
         state.Whitelist.ShouldBe(["moderator"]);
         state.Blacklist.ShouldBe(["moderator"]);
+
+        await service.AllowAllModeratorsAsync(hostId, CancellationToken.None);
+
+        (
+            await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None)
+        ).ShouldBeTrue();
     }
 
     [Test]
@@ -279,8 +291,8 @@ public sealed class AccessListPolicyTests
             "moderator",
             CancellationToken.None
         );
-        await service.SetModsEnabledAsync(hostId, false, CancellationToken.None);
-        await service.SetAllowModsByDefaultAsync(hostId, false, CancellationToken.None);
+        await service.DisableModeratorAccessAsync(hostId, CancellationToken.None);
+        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
 
         eventCount.ShouldBe(4);
     }

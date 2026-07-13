@@ -1,13 +1,83 @@
+using System.Collections.Immutable;
+
 namespace BlokeBot.Twitch.Runtime;
 
 /// <summary>
-/// Describes the latest observed Twitch bot runtime status.
+/// Describes the latest observed Twitch bot runtime lifecycle state.
 /// </summary>
-/// <param name="IsAuthorized">Whether the bot has a usable chat token.</param>
-/// <param name="IsConnected">Whether the bot runtime is connected to Twitch chat.</param>
-/// <param name="ConnectedChannels">The channel logins currently connected by the runtime.</param>
-public sealed record BotRuntimeStatus(
-    bool IsAuthorized,
-    bool IsConnected,
-    IReadOnlyList<string> ConnectedChannels
-);
+public abstract record BotRuntimeStatus
+{
+    private BotRuntimeStatus() { }
+
+    /// <summary>
+    /// Dispatches to the handler for the current lifecycle state.
+    /// </summary>
+    public abstract TResult Match<TResult>(
+        Func<Unauthorized, TResult> unauthorized,
+        Func<Authorized, TResult> authorized,
+        Func<Connected, TResult> connected
+    );
+
+    /// <summary>
+    /// The runtime does not currently have a usable bot access token.
+    /// </summary>
+    public sealed record Unauthorized : BotRuntimeStatus
+    {
+        public override TResult Match<TResult>(
+            Func<Unauthorized, TResult> unauthorized,
+            Func<Authorized, TResult> authorized,
+            Func<Connected, TResult> connected
+        )
+        {
+            return unauthorized(this);
+        }
+    }
+
+    /// <summary>
+    /// The runtime has a usable bot access token but no active chat connection.
+    /// </summary>
+    public sealed record Authorized : BotRuntimeStatus
+    {
+        public override TResult Match<TResult>(
+            Func<Unauthorized, TResult> unauthorized,
+            Func<Authorized, TResult> authorized,
+            Func<Connected, TResult> connected
+        )
+        {
+            return authorized(this);
+        }
+    }
+
+    /// <summary>
+    /// The runtime is connected to one or more channels with a usable bot access token.
+    /// </summary>
+    public sealed record Connected : BotRuntimeStatus
+    {
+        public Connected(IEnumerable<string> channels)
+        {
+            ArgumentNullException.ThrowIfNull(channels);
+            Channels = channels.ToImmutableArray();
+            if (Channels.IsEmpty)
+            {
+                throw new ArgumentException(
+                    "A connected runtime must include at least one channel.",
+                    nameof(channels)
+                );
+            }
+        }
+
+        /// <summary>
+        /// Gets the channels currently connected by the runtime.
+        /// </summary>
+        public ImmutableArray<string> Channels { get; }
+
+        public override TResult Match<TResult>(
+            Func<Unauthorized, TResult> unauthorized,
+            Func<Authorized, TResult> authorized,
+            Func<Connected, TResult> connected
+        )
+        {
+            return connected(this);
+        }
+    }
+}

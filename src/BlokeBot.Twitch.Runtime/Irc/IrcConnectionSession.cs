@@ -62,7 +62,7 @@ internal sealed class IrcConnectionSession(
         );
         if (channelLogins.Length == 0)
         {
-            status.SetConnected(false, []);
+            status.MarkDisconnected();
             _log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );
@@ -70,7 +70,7 @@ internal sealed class IrcConnectionSession(
         }
 
         var accessToken = await tokens.GetAccessTokenAsync(cancellationToken);
-        status.SetAuthorized(true);
+        status.MarkAuthorized();
 
         var tcp = new TcpClient();
         StreamReader? reader = null;
@@ -96,7 +96,7 @@ internal sealed class IrcConnectionSession(
                 startedChannels.Add(channel);
             }
             await AwaitAuthenticationAsync(reader, writer, cancellationToken);
-            status.SetConnected(joinedChannels.Count > 0, joinedChannels.ToArray());
+            status.MarkConnected(joinedChannels);
             foreach (var channel in startedChannels)
             {
                 await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
@@ -201,7 +201,14 @@ internal sealed class IrcConnectionSession(
             _log.LogInformation("Joined Twitch IRC channel #{Channel}.", channel);
         }
 
-        status.SetConnected(joinedChannels.Count > 0, joinedChannels.ToArray());
+        if (joinedChannels.Count == 0)
+        {
+            status.MarkDisconnected();
+        }
+        else
+        {
+            status.MarkConnected(joinedChannels);
+        }
         foreach (var channel in stoppedChannels)
         {
             await lifecycleNotifier.ChannelStoppedAsync(channel, cancellationToken);

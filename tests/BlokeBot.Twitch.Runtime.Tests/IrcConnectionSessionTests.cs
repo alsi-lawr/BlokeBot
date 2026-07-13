@@ -54,8 +54,7 @@ public sealed class IrcConnectionSessionTests
         joinedChannels.ShouldBe(["channel"]);
         lifecycle.StartedChannels.ShouldBe(["channel"]);
         lifecycle.StoppedChannels.ShouldBeEmpty();
-        status.Current.IsConnected.ShouldBeTrue();
-        status.Current.ConnectedChannels.ShouldBe(["channel"]);
+        status.Current.ShouldBeOfType<BotRuntimeStatus.Connected>().Channels.ShouldBe(["channel"]);
         chat.Messages.ShouldBe([new SentMessage("channel", PrivateStartupMessage)]);
         chat.Deadlines.ShouldHaveSingleItem()
             .ShouldBeOfType<PublicChatDeliveryDeadline.ConfiguredMaximum>();

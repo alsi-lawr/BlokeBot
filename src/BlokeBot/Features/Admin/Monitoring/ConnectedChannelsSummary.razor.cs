@@ -47,9 +47,12 @@ namespace BlokeBot.Features.Admin.Monitoring;
 public partial class ConnectedChannelsSummary
 {
     private string _connectedChannelsText =>
-        _botStatus.Current.ConnectedChannels.Count == 0
-            ? "No channels connected."
-            : $"Connected: {string.Join(", ", _botStatus.Current.ConnectedChannels.Select(channel => $"#{channel}"))}";
+        _botStatus.Current.Match(
+            static _ => "No channels connected.",
+            static _ => "No channels connected.",
+            connected =>
+                $"Connected: {string.Join(", ", connected.Channels.Select(channel => $"#{channel}"))}"
+        );
 
     protected override void OnInitialized()
     {

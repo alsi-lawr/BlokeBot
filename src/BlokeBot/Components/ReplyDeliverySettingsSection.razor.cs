@@ -39,6 +39,13 @@ public partial class ReplyDeliverySettingsSection
             return;
         }
 
-        Delivery.SetWhisper(replyKey, args.Value is true || args.Value?.ToString() == "true");
+        if (args.Value is true || args.Value?.ToString() == "true")
+        {
+            Delivery.DeliverAsWhisper(replyKey);
+        }
+        else
+        {
+            Delivery.DeliverInChat(replyKey);
+        }
     }
 }

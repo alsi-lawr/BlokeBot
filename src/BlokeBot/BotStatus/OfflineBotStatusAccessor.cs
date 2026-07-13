@@ -8,5 +8,5 @@ internal sealed class OfflineBotStatusAccessor : IBotRuntimeStatusAccessor
         remove { }
     }
 
-    public BotRuntimeStatus Current { get; } = new(false, false, []);
+    public BotRuntimeStatus Current { get; } = new BotRuntimeStatus.Unauthorized();
 }

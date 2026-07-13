@@ -74,8 +74,9 @@ public sealed class EventSubChannelRecoveryTests
             _now
         );
         states["bad"].ToString().ShouldNotContain("oauth:secret");
-        harness.RuntimeStatus.Current.IsConnected.ShouldBeTrue();
-        harness.RuntimeStatus.Current.ConnectedChannels.ShouldBe(["good"]);
+        harness
+            .RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Connected>()
+            .Channels.ShouldBe(["good"]);
         operations.CompleteStopCount("bad").ShouldBe(0);
     }
 
@@ -163,8 +164,7 @@ public sealed class EventSubChannelRecoveryTests
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
             )
             .ShouldBeNull();
-        harness.RuntimeStatus.Current.IsAuthorized.ShouldBeTrue();
-        harness.RuntimeStatus.Current.IsConnected.ShouldBeFalse();
+        harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         harness.Session.ActiveChannels.ShouldBeEmpty();
         operations.CreateCount("channel").ShouldBe(1);
         operations.CompleteStopCount("channel").ShouldBe(0);
@@ -737,8 +737,9 @@ public sealed class EventSubChannelRecoveryTests
             _now
         );
         degraded.ToString().ShouldNotContain("terminal delete secret");
-        harness.RuntimeStatus.Current.IsConnected.ShouldBeTrue();
-        harness.RuntimeStatus.Current.ConnectedChannels.ShouldBe(["good"]);
+        harness
+            .RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Connected>()
+            .Channels.ShouldBe(["good"]);
         var pending = harness.PendingDeletions.PendingDeletions.ShouldHaveSingleItem();
         pending.Subscription.Channel.ShouldBe("bad");
         pending
@@ -767,7 +768,7 @@ public sealed class EventSubChannelRecoveryTests
         harness.Session.ActiveChannels.ShouldBeEmpty();
         harness.PendingDeletions.PendingDeletions.ShouldBeEmpty();
         harness.Status.Current.Channels.ShouldBeEmpty();
-        harness.RuntimeStatus.Current.IsConnected.ShouldBeFalse();
+        harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 
     [Test]
@@ -868,7 +869,7 @@ public sealed class EventSubChannelRecoveryTests
         sharedPendingDeletions.HasPendingReconciliation.ShouldBeFalse();
         replacement.Session.ActiveChannels.ShouldBeEmpty();
         sharedStatus.Current.Channels.ShouldBeEmpty();
-        sharedRuntimeStatus.Current.ConnectedChannels.ShouldBeEmpty();
+        sharedRuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
     }
 
     [Test]
@@ -916,7 +917,9 @@ public sealed class EventSubChannelRecoveryTests
             .Current.Channels.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelStatus.Healthy>();
         replacementState.Channel.ShouldBe("replacement");
-        sharedRuntimeStatus.Current.ConnectedChannels.ShouldBe(["replacement"]);
+        sharedRuntimeStatus
+            .Current.ShouldBeOfType<BotRuntimeStatus.Connected>()
+            .Channels.ShouldBe(["replacement"]);
         oldOperations.CreateCount("old").ShouldBe(1);
         old.Session.ActiveChannels.ShouldBe(["old"]);
         replacement.Session.ActiveChannels.ShouldBe(["replacement"]);

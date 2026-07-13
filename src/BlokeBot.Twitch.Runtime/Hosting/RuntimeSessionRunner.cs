@@ -50,7 +50,7 @@ internal static class RuntimeSessionRunner
         }
         catch (Exception exception)
         {
-            status.SetConnected(false, []);
+            status.MarkDisconnected();
             var attempt = exception is RuntimeSessionCleanupException cleanup
                 ? cleanup.Attempt
                 : currentAttempt;
@@ -155,7 +155,7 @@ internal static class RuntimeSessionRunner
         {
             if (exception is AccessTokenUnavailableException)
             {
-                status.SetAuthorized(false);
+                status.MarkUnauthorized();
             }
 
             var report = CreateUnhealthyReport(
@@ -186,7 +186,7 @@ internal static class RuntimeSessionRunner
             }
             catch
             {
-                status.SetConnected(false, []);
+                status.MarkDisconnected();
                 throw;
             }
         }
@@ -221,7 +221,7 @@ internal static class RuntimeSessionRunner
             }
             catch (Exception cleanupException)
             {
-                status.SetConnected(false, []);
+                status.MarkDisconnected();
                 var report = new RuntimeSessionHealthReport.Unhealthy
                 {
                     Runtime = runtime,
@@ -241,11 +241,11 @@ internal static class RuntimeSessionRunner
         {
             if (exception is AccessTokenUnavailableException)
             {
-                status.SetAuthorized(false);
+                status.MarkUnauthorized();
             }
 
             var failure = await IncludeCleanupFailureAsync(session, established.Attempt, exception);
-            status.SetConnected(false, []);
+            status.MarkDisconnected();
             var classification = classify(failure, stoppingToken);
             if (RuntimeSessionFailureClassifier.IsRetryable(classification))
             {

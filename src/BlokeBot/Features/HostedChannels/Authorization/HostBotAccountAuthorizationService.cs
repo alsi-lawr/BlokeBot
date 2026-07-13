@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -166,7 +167,37 @@ public sealed class HostBotAccountAuthorizationService(
         return settings?.OverrideEnabled == true;
     }
 
-    public async Task SetOverrideEnabledAsync(int hostId, bool enabled, CancellationToken ct)
+    public Task UseCustomBotAsync(int hostId, CancellationToken ct)
+    {
+        return SelectBotAccountAsync(hostId, BotAccountSelection.Custom, ct);
+    }
+
+    public Task UseMainBotAsync(int hostId, CancellationToken ct)
+    {
+        return SelectBotAccountAsync(hostId, BotAccountSelection.Main, ct);
+    }
+
+    public Task<WhisperResponseConfigurationOutcome> EnableWhisperResponsesAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        return ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Enabled, ct);
+    }
+
+    public Task<WhisperResponseConfigurationOutcome> DisableWhisperResponsesAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        return ConfigureWhisperResponsesAsync(hostId, WhisperResponseConfiguration.Disabled, ct);
+    }
+
+    private async Task SelectBotAccountAsync(
+        int hostId,
+        BotAccountSelection selection,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
@@ -181,7 +212,13 @@ public sealed class HostBotAccountAuthorizationService(
             return;
         }
 
-        if (settings.OverrideEnabled == enabled)
+        var overrideEnabled = selection switch
+        {
+            BotAccountSelection.Main => false,
+            BotAccountSelection.Custom => true,
+            _ => throw new UnreachableException("Unknown bot account selection."),
+        };
+        if (settings.OverrideEnabled == overrideEnabled)
         {
             return;
         }
@@ -190,8 +227,8 @@ public sealed class HostBotAccountAuthorizationService(
             host.BotRuntimeState
             is BotChannelRuntimeState.Starting
                 or BotChannelRuntimeState.Started;
-        settings.OverrideEnabled = enabled;
-        if (!enabled)
+        settings.OverrideEnabled = overrideEnabled;
+        if (selection is BotAccountSelection.Main)
         {
             settings.WhisperResponsesEnabled = false;
         }
@@ -203,7 +240,7 @@ public sealed class HostBotAccountAuthorizationService(
             host.BotRuntimeState = await CanStartWithSelectedBotAccountAsync(
                 db,
                 settings,
-                enabled,
+                selection,
                 ct
             )
                 ? BotChannelRuntimeState.Starting
@@ -215,9 +252,9 @@ public sealed class HostBotAccountAuthorizationService(
         await changes.NotifyChangedAsync(ct);
     }
 
-    public async Task<bool> SetWhisperResponsesEnabledAsync(
+    private async Task<WhisperResponseConfigurationOutcome> ConfigureWhisperResponsesAsync(
         int hostId,
-        bool enabled,
+        WhisperResponseConfiguration configuration,
         CancellationToken ct
     )
     {
@@ -225,24 +262,30 @@ public sealed class HostBotAccountAuthorizationService(
         var settings = await EnsureSettingsAsync(db, hostId, ct);
         if (settings is null)
         {
-            return false;
+            return new WhisperResponseConfigurationOutcome.HostNotFound();
         }
 
-        if (enabled && !settings.OverrideEnabled)
+        if (configuration is WhisperResponseConfiguration.Enabled && !settings.OverrideEnabled)
         {
-            return false;
+            return new WhisperResponseConfigurationOutcome.CustomBotRequired();
         }
 
+        var enabled = configuration switch
+        {
+            WhisperResponseConfiguration.Enabled => true,
+            WhisperResponseConfiguration.Disabled => false,
+            _ => throw new UnreachableException("Unknown whisper response configuration."),
+        };
         if (settings.WhisperResponsesEnabled == enabled)
         {
-            return true;
+            return new WhisperResponseConfigurationOutcome.Configured();
         }
 
         settings.WhisperResponsesEnabled = enabled;
         settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
-        return true;
+        return new WhisperResponseConfigurationOutcome.Configured();
     }
 
     public async Task<BotAccountAuthorizationResult> AuthorizeAsync(
@@ -475,12 +518,12 @@ public sealed class HostBotAccountAuthorizationService(
     private async Task<bool> CanStartWithSelectedBotAccountAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
-        bool overrideEnabled,
+        BotAccountSelection selection,
         CancellationToken ct
     )
     {
         var required = botSettings.Identity.Scopes;
-        if (!overrideEnabled)
+        if (selection is BotAccountSelection.Main)
         {
             var globalInspection = await globalTokenStatus
                 .GetUserAccessTokenStatus(required)
@@ -488,13 +531,18 @@ public sealed class HostBotAccountAuthorizationService(
             return globalInspection.Match(IsReady, _ => false);
         }
 
-        var customStatus = await GetStoredTokenStatusAsync(
-            db,
-            settings,
-            RequiredScopes(settings),
-            ct
-        );
-        return IsReady(customStatus);
+        if (selection is BotAccountSelection.Custom)
+        {
+            var customStatus = await GetStoredTokenStatusAsync(
+                db,
+                settings,
+                RequiredScopes(settings),
+                ct
+            );
+            return IsReady(customStatus);
+        }
+
+        throw new UnreachableException("Unknown bot account selection.");
     }
 
     private string[] RequiredScopes(HostBotAccountSettings? settings)
@@ -622,5 +670,17 @@ public sealed class HostBotAccountAuthorizationService(
     private static InvalidOperationException BotNotReady(string channelLogin)
     {
         return new($"The bot for #{channelLogin} is not ready yet.");
+    }
+
+    private enum BotAccountSelection
+    {
+        Main,
+        Custom,
+    }
+
+    private enum WhisperResponseConfiguration
+    {
+        Disabled,
+        Enabled,
     }
 }

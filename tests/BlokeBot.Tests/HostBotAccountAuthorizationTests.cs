@@ -72,7 +72,7 @@ public sealed class HostBotAccountAuthorizationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
 
         await Should.ThrowAsync<AccessTokenUnavailableException>(async () =>
             await service.GetBotAccountAsync("streamer", CancellationToken.None)
@@ -85,7 +85,7 @@ public sealed class HostBotAccountAuthorizationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
 
         var result = await service.AuthorizeAsync(
             hostId,
@@ -122,7 +122,7 @@ public sealed class HostBotAccountAuthorizationTests
         var customHostId = await SeedHostAsync(dbFactory, "custom-channel");
         await SeedHostAsync(dbFactory, "global-channel");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(customHostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(customHostId, CancellationToken.None);
         await AuthorizeCustomBotAsync(service, customHostId);
 
         var lookups = Enumerable
@@ -156,14 +156,10 @@ public sealed class HostBotAccountAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
 
-        var saved = await service.SetWhisperResponsesEnabledAsync(
-            hostId,
-            true,
-            CancellationToken.None
-        );
+        var outcome = await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        saved.ShouldBeFalse();
+        outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.CustomBotRequired>();
         (
             await db.HostBotAccountSettings.SingleOrDefaultAsync(
                 x => x.HostId == hostId,
@@ -173,15 +169,51 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
+    public async Task MissingHost_ConfiguringWhispers_ReturnsTypedMissingOutcome()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+
+        var enabling = await service.EnableWhisperResponsesAsync(42, CancellationToken.None);
+        var disabling = await service.DisableWhisperResponsesAsync(42, CancellationToken.None);
+
+        enabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
+        disabling.ShouldBeOfType<WhisperResponseConfigurationOutcome.HostNotFound>();
+    }
+
+    [Test]
+    public async Task WhispersEnabled_DisablingWhispers_PersistsPublicChatConfiguration()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+        (
+            await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
+        ).ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
+
+        var outcome = await service.DisableWhisperResponsesAsync(hostId, CancellationToken.None);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        outcome.ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
+        (
+            await db.HostBotAccountSettings.SingleAsync(
+                x => x.HostId == hostId,
+                CancellationToken.None
+            )
+        ).WhisperResponsesEnabled.ShouldBeFalse();
+    }
+
+    [Test]
     public async Task WhispersEnabled_AuthorizingCustomBot_RequiresWhisperScope()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
         (
-            await service.SetWhisperResponsesEnabledAsync(hostId, true, CancellationToken.None)
-        ).ShouldBeTrue();
+            await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
+        ).ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
 
         var missing = await service.AuthorizeAsync(
             hostId,
@@ -219,11 +251,11 @@ public sealed class HostBotAccountAuthorizationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
         await AuthorizeCustomBotAsync(service, hostId);
         await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
 
-        await service.SetOverrideEnabledAsync(hostId, false, CancellationToken.None);
+        await service.UseMainBotAsync(hostId, CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);
@@ -241,12 +273,12 @@ public sealed class HostBotAccountAuthorizationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
         await AuthorizeCustomBotAsync(service, hostId);
-        await service.SetOverrideEnabledAsync(hostId, false, CancellationToken.None);
+        await service.UseMainBotAsync(hostId, CancellationToken.None);
         await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
 
-        await service.SetOverrideEnabledAsync(hostId, true, CancellationToken.None);
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = await db.Hosts.FindAsync([hostId], CancellationToken.None);

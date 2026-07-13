@@ -57,7 +57,7 @@ internal sealed class EventSubConnectionSession(
             && connectionTarget.IsInitial
         )
         {
-            status.SetConnected(false, []);
+            status.MarkDisconnected();
             _log.LogWarning(
                 "No Twitch channels are configured for the bot runtime; waiting for hosted channels."
             );

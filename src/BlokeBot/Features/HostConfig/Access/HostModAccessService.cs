@@ -109,24 +109,43 @@ public sealed class HostModAccessService(
         }
     }
 
-    public async Task SetModsEnabledAsync(int hostId, bool enabled, CancellationToken ct)
+    public Task EnableModeratorAccessAsync(int hostId, CancellationToken ct)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await EnsureSettingsAsync(db, hostId, ct);
-        settings.ModsEnabled = enabled;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+        return UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = true, ct);
     }
 
-    public async Task SetAllowModsByDefaultAsync(
+    public Task DisableModeratorAccessAsync(int hostId, CancellationToken ct)
+    {
+        return UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = false, ct);
+    }
+
+    public Task AllowAllModeratorsAsync(int hostId, CancellationToken ct)
+    {
+        return UpdateSettingsAsync(
+            hostId,
+            static settings => settings.AllowModsByDefault = true,
+            ct
+        );
+    }
+
+    public Task RequireModeratorAllowlistAsync(int hostId, CancellationToken ct)
+    {
+        return UpdateSettingsAsync(
+            hostId,
+            static settings => settings.AllowModsByDefault = false,
+            ct
+        );
+    }
+
+    private async Task UpdateSettingsAsync(
         int hostId,
-        bool allowByDefault,
+        Action<HostModAccessSettings> update,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await EnsureSettingsAsync(db, hostId, ct);
-        settings.AllowModsByDefault = allowByDefault;
+        update(settings);
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
     }

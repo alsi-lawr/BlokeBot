@@ -200,7 +200,14 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
 
 app.MapAuthEndpoints();
-app.MapBotOAuthEndpoints(botRuntimeConfigured);
+if (botRuntimeConfigured)
+{
+    app.MapBotOAuthEndpoints();
+}
+else
+{
+    app.MapUnavailableBotOAuthEndpoint();
+}
 app.MapHostConfigEndpoints();
 
 app.Run();
