@@ -20,10 +20,9 @@ public static class TwitchBotBuilderServiceOverrideExtensions
         where TProvider : class, ITwitchBotAccountProvider
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.Replace(
-            ServiceDescriptor.Singleton<ITwitchBotAccountProvider>(serviceProvider =>
-                serviceProvider.GetRequiredService<TProvider>()
-            )
+        builder.Services.RemoveAll<ITwitchBotAccountProvider>();
+        builder.Services.AddSingleton<ITwitchBotAccountProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<TProvider>()
         );
         return builder;
     }
@@ -40,10 +39,9 @@ public static class TwitchBotBuilderServiceOverrideExtensions
         where TSender : class, ITwitchCommandResponseSender
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.Replace(
-            ServiceDescriptor.Singleton<ITwitchCommandResponseSender>(serviceProvider =>
-                serviceProvider.GetRequiredService<TSender>()
-            )
+        builder.Services.RemoveAll<ITwitchCommandResponseSender>();
+        builder.Services.AddSingleton<ITwitchCommandResponseSender>(serviceProvider =>
+            serviceProvider.GetRequiredService<TSender>()
         );
         return builder;
     }
@@ -60,10 +58,9 @@ public static class TwitchBotBuilderServiceOverrideExtensions
         where TNotifier : class, ITwitchBotChannelLifecycleNotifier
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.Replace(
-            ServiceDescriptor.Singleton<ITwitchBotChannelLifecycleNotifier>(serviceProvider =>
-                serviceProvider.GetRequiredService<TNotifier>()
-            )
+        builder.Services.RemoveAll<ITwitchBotChannelLifecycleNotifier>();
+        builder.Services.AddSingleton<ITwitchBotChannelLifecycleNotifier>(serviceProvider =>
+            serviceProvider.GetRequiredService<TNotifier>()
         );
         return builder;
     }
