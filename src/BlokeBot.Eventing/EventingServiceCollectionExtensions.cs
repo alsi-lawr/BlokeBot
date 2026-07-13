@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Eventing;
 
@@ -21,6 +20,10 @@ public static class EventingServiceCollectionExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(policy.Boundary.Value);
 
         services.TryAddSingleton<
+            IObserverFailureDiagnosticReporter,
+            ObserverFailureDiagnosticLogger
+        >();
+        services.TryAddSingleton<
             IObserverCorrelationIdProvider,
             ObserverCorrelationIdProvider
         >();
@@ -32,7 +35,7 @@ public static class EventingServiceCollectionExtensions
                         ObserverFailurePolicy<TBoundary, TDeadLetter>
                     >(),
                     serviceProvider.GetRequiredService<
-                        ILogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>
+                        IObserverFailureDiagnosticReporter
                     >(),
                     serviceProvider.GetRequiredService<IObserverCorrelationIdProvider>()
                 )

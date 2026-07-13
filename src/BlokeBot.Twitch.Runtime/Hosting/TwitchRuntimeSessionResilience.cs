@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
 
@@ -10,7 +9,7 @@ internal static class TwitchRuntimeSessionResilience
     internal static void ConfigureIrc(
         ResiliencePipelineBuilder builder,
         IrcSessionResiliencePolicy policy,
-        ILogger<TwitchRuntimeSessionHealthReport> log
+        ITwitchRuntimeSessionHealthReporter health
     )
     {
         Configure(
@@ -22,14 +21,14 @@ internal static class TwitchRuntimeSessionResilience
             policy.DelayBackoffType,
             policy.AttemptTimeout,
             TwitchIrcSessionFailureClassifier.Classify,
-            log
+            health
         );
     }
 
     internal static void ConfigureEventSub(
         ResiliencePipelineBuilder builder,
         EventSubSessionResiliencePolicy policy,
-        ILogger<TwitchRuntimeSessionHealthReport> log
+        ITwitchRuntimeSessionHealthReporter health
     )
     {
         Configure(
@@ -41,7 +40,7 @@ internal static class TwitchRuntimeSessionResilience
             policy.DelayBackoffType,
             policy.AttemptTimeout,
             TwitchEventSubSessionFailureClassifier.Classify,
-            log
+            health
         );
     }
 
@@ -58,7 +57,7 @@ internal static class TwitchRuntimeSessionResilience
             CancellationToken,
             TwitchRuntimeSessionFailureClassification
         > classify,
-        ILogger<TwitchRuntimeSessionHealthReport> log
+        ITwitchRuntimeSessionHealthReporter health
     )
     {
         if (attemptLimit > 1)
@@ -84,17 +83,18 @@ internal static class TwitchRuntimeSessionResilience
                             ?? throw new UnreachableException(
                                 "A session retry requires an exception outcome."
                             );
-                        var report = new TwitchRuntimeSessionHealthReport.RetryScheduled
-                        {
-                            Runtime = runtime,
-                            Classification = classify(
-                                exception,
-                                args.Context.CancellationToken
-                            ),
-                            Attempt = args.AttemptNumber + 1,
-                            Exception = exception,
-                        };
-                        report.Log(log);
+                        health.Report(
+                            new TwitchRuntimeSessionHealthReport.RetryScheduled
+                            {
+                                Runtime = runtime,
+                                Classification = classify(
+                                    exception,
+                                    args.Context.CancellationToken
+                                ),
+                                Attempt = args.AttemptNumber + 1,
+                                Exception = exception,
+                            }
+                        );
                         return ValueTask.CompletedTask;
                     },
                 }

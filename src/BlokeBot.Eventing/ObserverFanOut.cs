@@ -51,7 +51,7 @@ public sealed record ObserverDispatch<TEvent, TDeadLetter>
 
 public enum ObserverFailureHandlingStage
 {
-    Logging,
+    Reporter,
     DeadLetterSink,
 }
 
@@ -110,17 +110,17 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
     where TDeadLetter : IObserverDeadLetterPayload
 {
     private readonly ObserverFailurePolicy<TBoundary, TDeadLetter> _policy;
-    private readonly ILogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>> _log;
+    private readonly IObserverFailureDiagnosticReporter _reporter;
     private readonly IObserverCorrelationIdProvider _correlations;
 
     internal ObserverFanOut(
         ObserverFailurePolicy<TBoundary, TDeadLetter> policy,
-        ILogger<ObserverFanOut<TBoundary, TEvent, TDeadLetter>> log,
+        IObserverFailureDiagnosticReporter reporter,
         IObserverCorrelationIdProvider correlations
     )
     {
         ArgumentNullException.ThrowIfNull(policy);
-        ArgumentNullException.ThrowIfNull(log);
+        ArgumentNullException.ThrowIfNull(reporter);
         ArgumentNullException.ThrowIfNull(correlations);
         ArgumentException.ThrowIfNullOrWhiteSpace(policy.Boundary.Value);
         if (policy is ObserverFailurePolicy<TBoundary, TDeadLetter>.DeadLetter deadLetter)
@@ -129,7 +129,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         }
 
         _policy = policy;
-        _log = log;
+        _reporter = reporter;
         _correlations = correlations;
     }
 
@@ -344,15 +344,13 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         var handlingFailures = new List<ObserverFailureHandlingDetails>();
         try
         {
-            _log.LogWarning(
-                "Observer {Observer} failed for {Event} at {Boundary} attempt {Attempt}; classified {Classification} ({FailureType}), correlation {CorrelationId}.",
-                details.Summary.Observer,
-                details.Summary.Event,
-                details.Summary.Boundary,
-                details.Summary.Attempt,
-                details.Summary.Classification,
-                details.Summary.FailureType,
-                details.Summary.CorrelationId
+            await _reporter.ReportAsync(
+                new ObserverFailureDiagnosticReport
+                {
+                    Summary = details.Summary,
+                    Exception = details.Exception,
+                },
+                cancellationToken
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -364,7 +362,7 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
             handlingFailures.Add(
                 ObserverFailureHandlingDetails.Create(
                     details.Summary,
-                    ObserverFailureHandlingStage.Logging,
+                    ObserverFailureHandlingStage.Reporter,
                     exception
                 )
             );
@@ -401,6 +399,44 @@ public sealed class ObserverFanOut<TBoundary, TEvent, TDeadLetter>
         }
 
         escalationFailures.AddRange(handlingFailures);
+    }
+}
+
+internal sealed record ObserverFailureDiagnosticReport
+{
+    internal required ObserverFailureSummary Summary { get; init; }
+
+    internal required Exception Exception { get; init; }
+}
+
+internal interface IObserverFailureDiagnosticReporter
+{
+    ValueTask ReportAsync(
+        ObserverFailureDiagnosticReport report,
+        CancellationToken cancellationToken
+    );
+}
+
+internal sealed class ObserverFailureDiagnosticLogger(
+    ILogger<ObserverFailureDiagnosticLogger> log
+) : IObserverFailureDiagnosticReporter
+{
+    public ValueTask ReportAsync(
+        ObserverFailureDiagnosticReport report,
+        CancellationToken cancellationToken
+    )
+    {
+        log.LogWarning(
+            "Observer {Observer} failed for {Event} at {Boundary} attempt {Attempt}; classified {Classification} ({FailureType}), correlation {CorrelationId}.",
+            report.Summary.Observer,
+            report.Summary.Event,
+            report.Summary.Boundary,
+            report.Summary.Attempt,
+            report.Summary.Classification,
+            report.Summary.FailureType,
+            report.Summary.CorrelationId
+        );
+        return ValueTask.CompletedTask;
     }
 }
 

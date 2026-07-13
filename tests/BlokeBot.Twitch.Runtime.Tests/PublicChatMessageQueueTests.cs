@@ -285,7 +285,7 @@ public sealed class PublicChatMessageQueueTests
                 PublicChatQueueAlertDeadLetter
             >(
                 TwitchBotObserverBoundaries.PublicChatQueueAlerts,
-                new IOException("logging secret payload")
+                new IOException("reporter secret payload")
             ),
             logger
         );
@@ -308,7 +308,7 @@ public sealed class PublicChatMessageQueueTests
             entry.Exception.ShouldBeNull();
             entry.Message.ShouldContain("Continuing queued chat processing");
             entry.Message.ShouldNotContain("observer secret payload");
-            entry.Message.ShouldNotContain("logging secret payload");
+            entry.Message.ShouldNotContain("reporter secret payload");
             entry.Message.ShouldNotContain("second secret chat payload");
         }
         await StopAsync(stopping, worker);

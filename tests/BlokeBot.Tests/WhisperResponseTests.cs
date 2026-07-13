@@ -154,7 +154,7 @@ public sealed class WhisperResponseTests
         receipt.ShouldBe(new PrivateDeliveryReceipt());
         harness.Http.ValidationRequestCount.ShouldBe(1);
         harness.Http.WhisperRequestCount.ShouldBe(1);
-        harness.Logger.Entries.ShouldBeEmpty();
+        harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Chat.Messages.ShouldBeEmpty();
         (await harness.Quota.GetStatusAsync(
                 harness.HostId,
@@ -371,7 +371,7 @@ public sealed class WhisperResponseTests
         await action.ShouldThrowAsync<OperationCanceledException>();
         harness.Http.ValidationRequestCount.ShouldBe(0);
         harness.Http.WhisperRequestCount.ShouldBe(0);
-        harness.Logger.Entries.ShouldBeEmpty();
+        harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Chat.Messages.ShouldBeEmpty();
     }
 
@@ -391,7 +391,31 @@ public sealed class WhisperResponseTests
 
         await action.ShouldThrowAsync<OperationCanceledException>();
         harness.Http.WhisperRequestCount.ShouldBe(1);
-        harness.Logger.Entries.ShouldBeEmpty();
+        harness.FailureHandler.Failures.ShouldBeEmpty();
+        harness.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task HandlerFailure_HandlingPrivateFailure_EscalatesWithoutDeliveryOrRecursion()
+    {
+        var handlerFailure = new SensitiveWhisperException("telemetry infrastructure failed");
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.BadRequest,
+            handlerException: handlerFailure
+        );
+
+        var action = async () =>
+            await harness.Sender.SendAsync(
+                harness.Source(),
+                TwitchCommandResponse.Whisper("sensitive private response"),
+                CancellationToken.None
+            );
+
+        var escalation = await action.ShouldThrowAsync<PrivateDeliveryFailureHandlingException>();
+        escalation.InnerException.ShouldBeSameAs(handlerFailure);
+        escalation.DeliveryError.ShouldBeOfType<PrivateDeliveryError.Rejected>();
+        escalation.Context.HostChannel.ShouldBe("streamer");
+        harness.FailureHandler.Failures.Count.ShouldBe(1);
         harness.Chat.Messages.ShouldBeEmpty();
     }
 
@@ -407,7 +431,28 @@ public sealed class WhisperResponseTests
         );
 
         harness.Http.WhisperRequestCount.ShouldBe(1);
-        harness.Logger.Entries.ShouldBeEmpty();
+        harness.FailureHandler.Failures.ShouldBeEmpty();
+        harness.Chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task CallerCancellationDuringFailureHandling_PropagatesWithoutEscalation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        await using var harness = await WhisperHarness.CreateAsync(
+            HttpStatusCode.BadRequest,
+            cancelOnHandling: cancellation
+        );
+
+        var action = async () =>
+            await harness.Sender.SendAsync(
+                harness.Source(),
+                TwitchCommandResponse.Whisper("private response"),
+                cancellation.Token
+            );
+
+        await action.ShouldThrowAsync<OperationCanceledException>();
+        harness.FailureHandler.Failures.Count.ShouldBe(1);
         harness.Chat.Messages.ShouldBeEmpty();
     }
 
@@ -423,38 +468,36 @@ public sealed class WhisperResponseTests
         );
 
         harness.Chat.Messages.ShouldBe([new SentChatMessage("streamer", "public response")]);
-        harness.Logger.Entries.ShouldBeEmpty();
+        harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Http.ValidationRequestCount.ShouldBe(0);
         harness.Http.WhisperRequestCount.ShouldBe(0);
     }
 
     [Test]
-    public async Task PrivateFailure_Logging_RecordsOnlyStructuredRedactedContext()
+    public async Task PrivateFailureTelemetry_Handling_RecordsOnlyRedactedContext()
     {
-        await using var harness = await WhisperHarness.CreateAsync(
-            HttpStatusCode.BadRequest,
-            whisperBody: "sensitive provider response"
+        var logger = new RecordingLogger<PrivateDeliveryFailureTelemetryHandler>();
+        var handler = new PrivateDeliveryFailureTelemetryHandler(logger);
+        var error = new PrivateDeliveryError.Unexpected(
+            new SensitiveWhisperException("sensitive exception message")
         );
+        var context = new PrivateDeliveryFailureContext { HostChannel = "streamer" };
 
-        await harness.Sender.SendAsync(
-            harness.Source(),
-            TwitchCommandResponse.Whisper("sensitive private response"),
-            CancellationToken.None
-        );
+        await handler.HandleAsync(error, context, CancellationToken.None);
 
-        var entry = harness.Logger.Entries.ShouldHaveSingleItem();
+        var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Warning);
         entry.Exception.ShouldBeNull();
         entry.Message.ShouldContain("Private command response delivery");
         entry.Message.ShouldContain("streamer");
-        entry.Message.ShouldContain(nameof(PrivateDeliveryError.Rejected));
-        entry.Message.ShouldNotContain("sensitive provider response");
+        entry.Message.ShouldContain(nameof(PrivateDeliveryError.Unexpected));
+        entry.Message.ShouldNotContain("sensitive exception message");
         entry.Message.ShouldNotContain("access-token");
-        entry.Message.ShouldNotContain("sensitive private response");
+        entry.Message.ShouldNotContain("private response");
         entry.Message.ShouldNotContain("viewer");
         entry.Properties["HostChannel"].ShouldBe("streamer");
         entry.Properties["Classification"].ShouldBe(
-            nameof(PrivateDeliveryError.Rejected)
+            nameof(PrivateDeliveryError.Unexpected)
         );
     }
 
@@ -472,13 +515,15 @@ public sealed class WhisperResponseTests
         string message = "private response"
     )
     {
-        var result = await harness
-            .Sender.Deliver(source, message)
-            .ExecuteAsync(CancellationToken.None);
-        return result.Match(
-            _ => throw new InvalidOperationException("Expected private delivery failure."),
-            error => error
+        await harness.Sender.SendAsync(
+            source,
+            TwitchCommandResponse.Whisper(message),
+            CancellationToken.None
         );
+        harness.Chat.Messages.ShouldBeEmpty();
+        var failure = harness.FailureHandler.Failures.ShouldHaveSingleItem();
+        failure.Context.HostChannel.ShouldBe("streamer");
+        return failure.Error;
     }
 
     private static TwitchBotSettings BotOptions()
@@ -549,7 +594,7 @@ public sealed class WhisperResponseTests
             WhisperHttpClientFactory http,
             RecordingChatSender chat,
             HostWhisperQuotaService quota,
-            RecordingLogger<HostWhisperCommandResponseSender> logger,
+            RecordingPrivateDeliveryFailureHandler failureHandler,
             HostWhisperCommandResponseSender sender
         )
         {
@@ -558,7 +603,7 @@ public sealed class WhisperResponseTests
             Http = http;
             Chat = chat;
             Quota = quota;
-            Logger = logger;
+            FailureHandler = failureHandler;
             Sender = sender;
         }
 
@@ -572,7 +617,7 @@ public sealed class WhisperResponseTests
 
         internal HostWhisperQuotaService Quota { get; }
 
-        internal RecordingLogger<HostWhisperCommandResponseSender> Logger { get; }
+        internal RecordingPrivateDeliveryFailureHandler FailureHandler { get; }
 
         internal HostWhisperCommandResponseSender Sender { get; }
 
@@ -584,7 +629,9 @@ public sealed class WhisperResponseTests
             Exception? whisperException = null,
             bool validationAccepted = true,
             bool whisperResponsesEnabled = true,
-            CancellationTokenSource? cancelOnWhisper = null
+            CancellationTokenSource? cancelOnWhisper = null,
+            Exception? handlerException = null,
+            CancellationTokenSource? cancelOnHandling = null
         )
         {
             var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -617,7 +664,10 @@ public sealed class WhisperResponseTests
             );
             var chat = new RecordingChatSender();
             var quota = CreateQuota(dbFactory);
-            var logger = new RecordingLogger<HostWhisperCommandResponseSender>();
+            var failureHandler = new RecordingPrivateDeliveryFailureHandler(
+                handlerException,
+                cancelOnHandling
+            );
             var sender = new HostWhisperCommandResponseSender(
                 chat,
                 hostBotAccounts,
@@ -626,9 +676,9 @@ public sealed class WhisperResponseTests
                 new TwitchHelixChatClient(http, options.Identity, helixUsers),
                 dbFactory,
                 options.Identity,
-                logger
+                failureHandler
             );
-            return new(dbFactory, hostId, http, chat, quota, logger, sender);
+            return new(dbFactory, hostId, http, chat, quota, failureHandler, sender);
         }
 
         internal TwitchChatMessage Source(
@@ -657,6 +707,39 @@ public sealed class WhisperResponseTests
     }
 
     private sealed record SentChatMessage(string Channel, string Message);
+
+    private sealed record HandledPrivateDeliveryFailure(
+        PrivateDeliveryError Error,
+        PrivateDeliveryFailureContext Context
+    );
+
+    private sealed class RecordingPrivateDeliveryFailureHandler(
+        Exception? exception = null,
+        CancellationTokenSource? cancelOnHandling = null
+    )
+        : IPrivateDeliveryFailureHandler
+    {
+        internal List<HandledPrivateDeliveryFailure> Failures { get; } = [];
+
+        public ValueTask HandleAsync(
+            PrivateDeliveryError error,
+            PrivateDeliveryFailureContext context,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Failures.Add(new(error, context));
+            if (cancelOnHandling is not null)
+            {
+                cancelOnHandling.Cancel();
+                return ValueTask.FromCanceled(cancellationToken);
+            }
+
+            return exception is null
+                ? ValueTask.CompletedTask
+                : ValueTask.FromException(exception);
+        }
+    }
 
     private sealed class RecordingChatSender : ITwitchChatMessageSender
     {

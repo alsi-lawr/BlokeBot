@@ -3,7 +3,6 @@ using BlokeBot.Eventing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Registry;
@@ -144,6 +143,10 @@ public static class TwitchBotServiceCollectionExtensions
     {
         RegisterSettings(services, settings);
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.TryAddSingleton<
+            ITwitchRuntimeSessionHealthReporter,
+            TwitchRuntimeSessionHealthLogger
+        >();
         services.TryAddSingleton<ITwitchRuntimeIdleWait, TwitchRuntimeIdleWait>();
         RegisterPolicies(services, policies);
         RegisterAccountProvider(services, accountProvider);
@@ -181,6 +184,10 @@ public static class TwitchBotServiceCollectionExtensions
             serviceProvider.GetRequiredService<TwitchEventSubChannelStatusStore>()
         );
         services.TryAddSingleton<TwitchEventSubSubscriptionReconciliationStore>();
+        services.TryAddSingleton<
+            ITwitchEventSubChannelDiagnosticReporter,
+            TwitchEventSubChannelDiagnosticLogger
+        >();
         services.TryAddSingleton<
             ITwitchEventSubChannelOperations,
             TwitchEventSubChannelOperations
@@ -354,7 +361,7 @@ public static class TwitchBotServiceCollectionExtensions
                     builder,
                     policies.IrcSession,
                     context.ServiceProvider.GetRequiredService<
-                        ILogger<TwitchRuntimeSessionHealthReport>
+                        ITwitchRuntimeSessionHealthReporter
                     >()
                 );
             }
@@ -368,7 +375,7 @@ public static class TwitchBotServiceCollectionExtensions
                     builder,
                     policies.EventSubSession,
                     context.ServiceProvider.GetRequiredService<
-                        ILogger<TwitchRuntimeSessionHealthReport>
+                        ITwitchRuntimeSessionHealthReporter
                     >()
                 );
             }

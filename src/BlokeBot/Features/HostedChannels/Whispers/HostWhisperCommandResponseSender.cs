@@ -5,7 +5,6 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Features.HostedChannels.Whispers;
 
@@ -17,7 +16,7 @@ public sealed class HostWhisperCommandResponseSender(
     TwitchHelixChatClient helix,
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     TwitchBotIdentity identity,
-    ILogger<HostWhisperCommandResponseSender> log
+    IPrivateDeliveryFailureHandler failureHandler
 ) : ITwitchCommandResponseSender
 {
     public async ValueTask SendAsync(
@@ -242,35 +241,60 @@ public sealed class HostWhisperCommandResponseSender(
         return Error(new PrivateDeliveryError.RateLimited(statusCode));
     }
 
-    private ValueTask HandlePrivateDeliveryErrorAsync(
+    private async ValueTask HandlePrivateDeliveryErrorAsync(
         TwitchChatMessage sourceMessage,
         PrivateDeliveryError error,
         CancellationToken cancellationToken
     )
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var classification = error switch
+        var context = new PrivateDeliveryFailureContext
         {
-            PrivateDeliveryError.Disabled => nameof(PrivateDeliveryError.Disabled),
+            HostChannel = TwitchLogin.Normalize(sourceMessage.Channel),
+        };
+        var handling = error switch
+        {
+            PrivateDeliveryError.Disabled => HandleFailureAsync(error, context, cancellationToken),
             PrivateDeliveryError.SenderIdentityUnavailable =>
-                nameof(PrivateDeliveryError.SenderIdentityUnavailable),
+                HandleFailureAsync(error, context, cancellationToken),
             PrivateDeliveryError.RecipientUnavailable =>
-                nameof(PrivateDeliveryError.RecipientUnavailable),
-            PrivateDeliveryError.SelfRecipient => nameof(PrivateDeliveryError.SelfRecipient),
-            PrivateDeliveryError.QuotaExceeded => nameof(PrivateDeliveryError.QuotaExceeded),
-            PrivateDeliveryError.RateLimited => nameof(PrivateDeliveryError.RateLimited),
-            PrivateDeliveryError.Transient => nameof(PrivateDeliveryError.Transient),
-            PrivateDeliveryError.Rejected => nameof(PrivateDeliveryError.Rejected),
-            PrivateDeliveryError.Ambiguous => nameof(PrivateDeliveryError.Ambiguous),
-            PrivateDeliveryError.Unexpected => nameof(PrivateDeliveryError.Unexpected),
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.SelfRecipient =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.QuotaExceeded =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.RateLimited =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Transient =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Rejected =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Ambiguous =>
+                HandleFailureAsync(error, context, cancellationToken),
+            PrivateDeliveryError.Unexpected =>
+                HandleFailureAsync(error, context, cancellationToken),
             _ => throw new UnreachableException("Unknown private-delivery error."),
         };
-        log.LogWarning(
-            "Private command response delivery failed for host channel #{HostChannel} with classification {Classification}; no additional user-visible delivery was attempted.",
-            TwitchLogin.Normalize(sourceMessage.Channel),
-            classification
-        );
-        return ValueTask.CompletedTask;
+        await handling;
+    }
+
+    private async ValueTask HandleFailureAsync(
+        PrivateDeliveryError error,
+        PrivateDeliveryFailureContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            await failureHandler.HandleAsync(error, context, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new PrivateDeliveryFailureHandlingException(error, context, exception);
+        }
     }
 
     private Task SendPublicChatAsync(
