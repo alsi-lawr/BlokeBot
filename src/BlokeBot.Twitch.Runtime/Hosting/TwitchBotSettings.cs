@@ -68,7 +68,7 @@ public sealed record TwitchBotSettings
             throw new Microsoft.Extensions.Options.OptionsValidationException(
                 boundary,
                 typeof(TwitchBotOptions),
-                ["Twitch bot options contain an invalid numeric value."]
+                ["Twitch bot options contain an invalid value."]
             );
         }
 

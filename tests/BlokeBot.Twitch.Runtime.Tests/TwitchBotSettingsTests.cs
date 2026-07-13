@@ -1,4 +1,5 @@
 using BlokeBot.Twitch.Auth;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -6,6 +7,23 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class TwitchBotSettingsTests
 {
+    [Test]
+    public void UndefinedRuntime_MappingValidatedSettings_RejectsConfiguration()
+    {
+        var options = new TwitchBotOptions { Runtime = (TwitchBotRuntime)99 };
+
+        var exception = Should.Throw<OptionsValidationException>(() =>
+            TwitchBotSettings.FromValidatedOptions(
+                options,
+                "TwitchBot",
+                requireConfiguredIdentity: false
+            )
+        );
+
+        exception.OptionsName.ShouldBe("TwitchBot");
+        exception.Failures.ShouldContain("Twitch bot options contain an invalid value.");
+    }
+
     [Test]
     public void CompositeOptions_MappingSettings_IsolatesRuntimeSnapshot()
     {

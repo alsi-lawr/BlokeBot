@@ -64,7 +64,8 @@ public static class TwitchBotOptionsValidation
 {
     public static bool IsValid(TwitchBotOptions options)
     {
-        return options.ChatMessageSendIntervalSeconds >= 0
+        return Enum.IsDefined(options.Runtime)
+            && options.ChatMessageSendIntervalSeconds >= 0
             && options.DuplicateChatMessageCooldownSeconds >= 0
             && options.MaxChatMessageLength >= 0
             && options.PublicChatQueueAlerts.StuckAfterSeconds > 0;
