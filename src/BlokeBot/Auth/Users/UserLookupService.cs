@@ -40,7 +40,7 @@ internal sealed class UserLookupService(
             [normalized],
             cancellationToken
         );
-        return Option<TwitchHelixUser>.FromNullable(users.FirstOrDefault()).Map(ToIdentity);
+        return ToIdentity(users.FirstOrDefault());
     }
 
     public async Task<Option<UserIdentity>> GetCurrentUserAsync(
@@ -54,20 +54,14 @@ internal sealed class UserLookupService(
             cancellationToken
         );
 
-        return string.IsNullOrWhiteSpace(user?.Id) || string.IsNullOrWhiteSpace(user.Login)
-            ? Option<UserIdentity>.None
-            : Option<UserIdentity>.Some(ToIdentity(user));
+        return ToIdentity(user);
     }
 
-    private static UserIdentity ToIdentity(TwitchHelixUser user)
+    private static Option<UserIdentity> ToIdentity(TwitchHelixUser? user)
     {
-        return new UserIdentity
-        {
-            Id = user.Id,
-            Login = user.Login,
-            DisplayName = user.DisplayName,
-            ProfileImageUrl = user.ProfileImageUrl,
-        };
+        return user is null
+            ? Option<UserIdentity>.None
+            : UserIdentity.Create(user.Id, user.Login, user.DisplayName, user.ProfileImageUrl);
     }
 
     private WebAuthOptions CreateCurrentOptions()

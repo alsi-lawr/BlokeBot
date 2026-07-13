@@ -1,12 +1,34 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Auth.Users;
 
 internal sealed record UserIdentity
 {
-    public required string Id { get; init; }
+    private UserIdentity(string id, string login, string displayName, string profileImageUrl)
+    {
+        Id = id;
+        Login = login;
+        DisplayName = displayName;
+        ProfileImageUrl = profileImageUrl;
+    }
 
-    public required string Login { get; init; }
+    public string Id { get; }
 
-    public required string DisplayName { get; init; }
+    public string Login { get; }
 
-    public required string ProfileImageUrl { get; init; }
+    public string DisplayName { get; }
+
+    public string ProfileImageUrl { get; }
+
+    internal static Option<UserIdentity> Create(
+        string id,
+        string login,
+        string displayName,
+        string profileImageUrl
+    )
+    {
+        return string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(login)
+            ? Option<UserIdentity>.None
+            : Option<UserIdentity>.Some(new UserIdentity(id, login, displayName, profileImageUrl));
+    }
 }

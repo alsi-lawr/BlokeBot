@@ -41,14 +41,10 @@ internal sealed class WebAuthService(
             code,
             cancellationToken
         );
-        var twitchUser = await users.GetCurrentUserAsync(
-            currentOptions,
-            accessToken,
-            cancellationToken
-        );
+        var user = await users.GetCurrentUserAsync(currentOptions, accessToken, cancellationToken);
 
-        return await twitchUser.Match(
-            user => AuthenticateAsync(currentOptions, accessToken, user, cancellationToken),
+        return await user.Match(
+            identity => AuthenticateAsync(currentOptions, accessToken, identity, cancellationToken),
             () =>
                 Task.FromResult(
                     new AuthResult(false, null, "Twitch did not return the signed-in user.")
@@ -59,16 +55,16 @@ internal sealed class WebAuthService(
     private async Task<AuthResult> AuthenticateAsync(
         WebAuthOptions currentOptions,
         string accessToken,
-        UserIdentity twitchUser,
+        UserIdentity user,
         CancellationToken cancellationToken
     )
     {
-        var twitchUserId = twitchUser.Id;
-        var twitchLogin = twitchUser.Login;
+        var twitchUserId = user.Id;
+        var twitchLogin = user.Login;
         var userLogin = LoginName.Parse(twitchLogin).Value;
-        var displayName = string.IsNullOrWhiteSpace(twitchUser.DisplayName)
+        var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
             ? twitchLogin
-            : twitchUser.DisplayName;
+            : user.DisplayName;
         if (IsConfiguredBotAccount(userLogin))
         {
             return new AuthResult(
@@ -77,7 +73,7 @@ internal sealed class WebAuthService(
                     twitchUserId,
                     twitchLogin,
                     displayName,
-                    twitchUser.ProfileImageUrl,
+                    user.ProfileImageUrl,
                     [],
                     false
                 ),
@@ -112,7 +108,7 @@ internal sealed class WebAuthService(
                 twitchUserId,
                 twitchLogin,
                 displayName,
-                twitchUser.ProfileImageUrl,
+                user.ProfileImageUrl,
                 authorizedHosts.Choices,
                 authorizedHosts.CanCreateHost
             ),

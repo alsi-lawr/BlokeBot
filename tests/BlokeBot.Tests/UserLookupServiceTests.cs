@@ -35,15 +35,10 @@ public sealed class UserLookupServiceTests
             user => user,
             () => throw new InvalidOperationException("Expected a mapped Twitch user identity.")
         );
-        identity.ShouldBe(
-            new UserIdentity
-            {
-                Id = "user-id",
-                Login = "viewer",
-                DisplayName = "Viewer",
-                ProfileImageUrl = "https://cdn.example/viewer.png",
-            }
-        );
+        identity.Id.ShouldBe("user-id");
+        identity.Login.ShouldBe("viewer");
+        identity.DisplayName.ShouldBe("Viewer");
+        identity.ProfileImageUrl.ShouldBe("https://cdn.example/viewer.png");
     }
 
     [Test]
@@ -52,6 +47,34 @@ public sealed class UserLookupServiceTests
         var service = CreateService("""{"data":[]}""");
 
         var result = await service.FindByLoginAsync("missing", CancellationToken.None);
+
+        result.Match(_ => false, () => true).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task HelixUserFoundByLoginWithoutId_MappingBoundary_ReturnsNone()
+    {
+        var service = CreateService(
+            """
+            {"data":[{"login":"viewer","display_name":"Viewer","profile_image_url":""}]}
+            """
+        );
+
+        var result = await service.FindByLoginAsync("viewer", CancellationToken.None);
+
+        result.Match(_ => false, () => true).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task HelixUserFoundByLoginWithBlankLogin_MappingBoundary_ReturnsNone()
+    {
+        var service = CreateService(
+            """
+            {"data":[{"id":"user-id","login":" ","display_name":"Viewer","profile_image_url":""}]}
+            """
+        );
+
+        var result = await service.FindByLoginAsync("viewer", CancellationToken.None);
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -84,27 +107,48 @@ public sealed class UserLookupServiceTests
             user => user,
             () => throw new InvalidOperationException("Expected a mapped Twitch user identity.")
         );
-        identity.ShouldBe(
-            new UserIdentity
-            {
-                Id = "current-id",
-                Login = "current",
-                DisplayName = "Current User",
-                ProfileImageUrl = "https://cdn.example/current.png",
-            }
-        );
+        identity.Id.ShouldBe("current-id");
+        identity.Login.ShouldBe("current");
+        identity.DisplayName.ShouldBe("Current User");
+        identity.ProfileImageUrl.ShouldBe("https://cdn.example/current.png");
     }
 
     [Test]
-    public async Task CurrentHelixUserWithoutIdentityFields_MappingBoundary_ReturnsNone()
+    public async Task CurrentHelixUserWithoutId_MappingBoundary_ReturnsNone()
     {
         var service = CreateService(
             """
             {
               "data": [
                 {
-                  "id": "",
                   "login": "current",
+                  "display_name": "Current User",
+                  "profile_image_url": "https://cdn.example/current.png"
+                }
+              ]
+            }
+            """
+        );
+
+        var result = await service.GetCurrentUserAsync(
+            new WebAuthOptions { ClientId = "client-id" },
+            "access-token",
+            CancellationToken.None
+        );
+
+        result.Match(_ => false, () => true).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task CurrentHelixUserWithBlankLogin_MappingBoundary_ReturnsNone()
+    {
+        var service = CreateService(
+            """
+            {
+              "data": [
+                {
+                  "id": "current-id",
+                  "login": " ",
                   "display_name": "Current User",
                   "profile_image_url": "https://cdn.example/current.png"
                 }

@@ -97,11 +97,6 @@ internal sealed class AdminHostManagementService(
         CancellationToken ct
     )
     {
-        if (string.IsNullOrWhiteSpace(user.Login))
-        {
-            return new AdminHostOperationResult(false, "Twitch user not found.");
-        }
-
         var displayName = string.IsNullOrWhiteSpace(user.DisplayName)
             ? user.Login
             : user.DisplayName;
