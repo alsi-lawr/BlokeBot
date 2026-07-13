@@ -28,7 +28,18 @@ public static class EventingServiceCollectionExtensions
             ObserverCorrelationIdProvider
         >();
         services.AddSingleton(policy);
-        services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>();
+        services.AddSingleton<ObserverFanOut<TBoundary, TEvent, TDeadLetter>>(
+            serviceProvider =>
+                new ObserverFanOut<TBoundary, TEvent, TDeadLetter>(
+                    serviceProvider.GetRequiredService<
+                        ObserverFailurePolicy<TBoundary, TDeadLetter>
+                    >(),
+                    serviceProvider.GetRequiredService<
+                        IObserverFailureDiagnosticReporter
+                    >(),
+                    serviceProvider.GetRequiredService<IObserverCorrelationIdProvider>()
+                )
+        );
         return services;
     }
 
@@ -68,7 +79,18 @@ public static class EventingServiceCollectionExtensions
         services.AddSingleton(
             new EventBusEventIdentity<TKey> { Project = eventIdentity }
         );
-        services.AddSingleton<EventBus<TKey>>();
+        services.AddSingleton<EventBus<TKey>>(serviceProvider =>
+            new EventBus<TKey>(
+                serviceProvider.GetRequiredService<
+                    ObserverFanOut<
+                        EventBusObserverBoundary<TKey>,
+                        EventNotification<TKey>,
+                        EventBusDeadLetter
+                    >
+                >(),
+                serviceProvider.GetRequiredService<EventBusEventIdentity<TKey>>()
+            )
+        );
         return services;
     }
 }
