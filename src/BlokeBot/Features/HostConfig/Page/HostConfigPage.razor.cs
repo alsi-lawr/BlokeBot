@@ -510,11 +510,7 @@ public partial class HostConfigPage
         await LoadAsync();
 
         outcome
-            .Match<Action>(
-                _ => ShowSavedStatus,
-                _ => enabled ? ShowRejectedStatus : ShowSavedStatus,
-                _ => ShowRejectedStatus
-            )
+            .Match<Action>(_ => ShowSavedStatus, _ => ShowRejectedStatus, _ => ShowRejectedStatus)
             .Invoke();
 
         void ShowRejectedStatus()
