@@ -124,12 +124,6 @@ public sealed class GuessingRoundService(
                             )
                         )
                 );
-
-                var shouldContinue = payoutAttempt.Match(static _ => true, static _ => false);
-                if (!shouldContinue)
-                {
-                    break;
-                }
             }
         }
 

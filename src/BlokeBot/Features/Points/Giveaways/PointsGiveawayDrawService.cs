@@ -148,12 +148,6 @@ public sealed class PointsGiveawayDrawService(
                         )
                     )
             );
-
-            var shouldContinue = payoutAttempt.Match(static _ => true, static _ => false);
-            if (!shouldContinue)
-            {
-                break;
-            }
         }
 
         return await payoutAttempt.Match(CommitWinnersAsync, PayoutFailedAsync);
