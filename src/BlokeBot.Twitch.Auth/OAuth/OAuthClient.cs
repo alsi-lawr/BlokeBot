@@ -9,7 +9,8 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
                 identity.ClientId,
                 identity.RedirectUri,
                 identity.Scopes,
-                state
+                state,
+                AuthorizationVerificationPolicy.ForceAccountVerification
             )
         );
     }
@@ -43,9 +44,12 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
         );
     }
 
-    public async Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken)
+    public Task<TokenValidationOutcome> ValidateAsync(
+        string accessToken,
+        CancellationToken cancellationToken
+    )
     {
-        return await transport.ValidateTokenAsync(accessToken, cancellationToken) is not null;
+        return transport.ValidateTokenAsync(accessToken, cancellationToken);
     }
 
     private static TokenSet ToTokenSet(OAuthTokenResponse payload)

@@ -202,7 +202,7 @@ public sealed class BotAccountAuthorizationPolicyTests
 
     private static TokenValidation Validation(IEnumerable<string> scopes)
     {
-        return new("bot-id", "bot", scopes.ToHashSet(StringComparer.Ordinal));
+        return new("bot-id", "bot", OAuthScopeSet.Create(scopes));
     }
 
     private sealed class RecordingAccessTokenCache : IAccessTokenCache

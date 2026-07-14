@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -11,7 +12,7 @@ public sealed class BotIdentityTests
         string[] scopes = [" User:Bot ", "chat:read", "CHAT:READ"];
         var options = ValidOptions(scopes);
 
-        var identity = BotIdentity.FromValidatedOptions(options, "TwitchBot.Identity");
+        var identity = BotIdentity.FromConfiguredOptions(options, "TwitchBot.Identity");
         scopes[0] = "channel:manage:broadcast";
         options.Scopes = ["moderator:manage:announcements"];
 
@@ -41,9 +42,31 @@ public sealed class BotIdentityTests
     }
 
     [Test]
+    public void EmptyScopes_MappingPermissiveIdentity_PreservesExplicitEmptySet()
+    {
+        var identity = BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] });
+
+        identity.Scopes.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void BlankScopes_MappingConfiguredIdentity_RejectsInvalidSet()
+    {
+        var options = ValidOptions([" "]);
+
+        var exception = Should.Throw<OptionsValidationException>(() =>
+            BotIdentity.FromConfiguredOptions(options, "TwitchBot.Identity")
+        );
+
+        exception.Failures.ShouldContain(failure =>
+            failure.Contains(nameof(BotIdentityOptions.Scopes), StringComparison.Ordinal)
+        );
+    }
+
+    [Test]
     public void IdentitySnapshot_Formatting_RedactsClientCredentials()
     {
-        var identity = BotIdentity.FromValidatedOptions(
+        var identity = BotIdentity.FromConfiguredOptions(
             ValidOptions(["chat:read"]),
             "TwitchBot.Identity"
         );

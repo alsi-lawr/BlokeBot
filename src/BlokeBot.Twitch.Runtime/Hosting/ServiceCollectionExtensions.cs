@@ -37,11 +37,7 @@ public static class ServiceCollectionExtensions
         var boundary = configuration is IConfigurationSection configuredSection
             ? configuredSection.Path
             : "TwitchBot";
-        var settings = BotSettings.FromValidatedOptions(
-            options,
-            boundary,
-            requireConfiguredIdentity: true
-        );
+        var settings = BotSettings.FromConfiguredOptions(options, boundary);
         var policies = BotPolicies.BindRequired(configuration);
 
         return AddBotCore(services, settings, policies);
@@ -82,11 +78,7 @@ public static class ServiceCollectionExtensions
 
         var options = new BotOptions();
         configure(options);
-        var settings = BotSettings.FromValidatedOptions(
-            options,
-            "TwitchBot",
-            requireConfiguredIdentity: true
-        );
+        var settings = BotSettings.FromConfiguredOptions(options, "TwitchBot");
         var policies = BotPolicies.FromOptions(policyOptions);
 
         return AddBotCore(services, settings, policies);

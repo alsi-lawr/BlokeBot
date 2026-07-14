@@ -13,7 +13,7 @@ internal sealed class OAuthFlow(
         return oauth.BuildAuthorizeUri(state);
     }
 
-    public async Task<TokenSet> CompleteAuthorizationAsync(
+    public Task<OAuthFlowCompletionOutcome> CompleteAuthorizationAsync(
         string code,
         string state,
         CancellationToken cancellationToken
@@ -21,13 +21,24 @@ internal sealed class OAuthFlow(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
 
-        if (!states.Consume(state))
-        {
-            throw new InvalidOperationException("Invalid OAuth state.");
-        }
+        return states
+            .Consume(state)
+            .Match(
+                _ => CompleteConsumedAuthorizationAsync(code, cancellationToken),
+                static _ =>
+                    Task.FromResult<OAuthFlowCompletionOutcome>(
+                        new OAuthFlowCompletionOutcome.InvalidState()
+                    )
+            );
+    }
 
+    private async Task<OAuthFlowCompletionOutcome> CompleteConsumedAuthorizationAsync(
+        string code,
+        CancellationToken cancellationToken
+    )
+    {
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
         await tokens.SaveAsync(identity.TokenCachePath, tokenSet, cancellationToken);
-        return tokenSet;
+        return new OAuthFlowCompletionOutcome.Completed(tokenSet);
     }
 }

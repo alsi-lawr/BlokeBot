@@ -66,7 +66,10 @@ internal sealed class AccessTokenProvider(
         if (
             transaction.Current is { } current
             && current.ExpiresAtUtc > DateTimeOffset.UtcNow
-            && await oauth.ValidateAsync(current.AccessToken, cancellationToken)
+            && (await oauth.ValidateAsync(current.AccessToken, cancellationToken)).Match(
+                static _ => true,
+                static _ => false
+            )
         )
         {
             return current.AccessToken;

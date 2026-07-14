@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using BlokeBot.Auth.Sessions;
@@ -51,11 +52,31 @@ public sealed class BotOAuthEndpointIntegrationTests
         response.Headers.Location.ShouldBeNull();
     }
 
+    [Test]
+    public async Task ReplayedGlobalOAuthState_AuthenticatedBotAdminCompleting_ReturnsExpiredState()
+    {
+        var flow = new StubOAuthFlow(_authorizationUri)
+        {
+            CompletionOutcome = new OAuthFlowCompletionOutcome.InvalidState(),
+        };
+        await using var host = await EndpointHost.StartAsync(configured: true, flow);
+
+        using var response = await host.Client.GetAsync("/oauth/callback?code=code&state=replayed");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await response.Content.ReadFromJsonAsync<string>()).ShouldBe(
+            "This Twitch sign-in expired. Try again."
+        );
+    }
+
     private sealed class EndpointHost(WebApplication app, HttpClient client) : IAsyncDisposable
     {
         public HttpClient Client { get; } = client;
 
-        public static async Task<EndpointHost> StartAsync(bool configured)
+        public static async Task<EndpointHost> StartAsync(
+            bool configured,
+            StubOAuthFlow? flow = null
+        )
         {
             var builder = WebApplication.CreateBuilder();
             builder
@@ -76,7 +97,7 @@ public sealed class BotOAuthEndpointIntegrationTests
                 )
             );
             builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-            builder.Services.AddSingleton<IOAuthFlow>(new StubOAuthFlow(_authorizationUri));
+            builder.Services.AddSingleton<IOAuthFlow>(flow ?? new StubOAuthFlow(_authorizationUri));
             RegisterUnselectedEndpointServices(builder.Services);
 
             var app = builder.Build();
@@ -114,30 +135,39 @@ public sealed class BotOAuthEndpointIntegrationTests
 
         private static void RegisterUnselectedEndpointServices(IServiceCollection services)
         {
-            services.AddSingleton<HostBotAccountOAuthService>(static _ => null!);
-            services.AddSingleton<HostBotAccountAuthorizationService>(static _ => null!);
-            services.AddSingleton<HostedChannelChangeNotifier>(static _ => null!);
-            services.AddSingleton<ChannelBotOAuthService>(static _ => null!);
-            services.AddSingleton<ChannelBotAuthorizationService>(static _ => null!);
+            services.AddSingleton(Uninitialized<HostBotAccountOAuthService>());
+            services.AddSingleton(Uninitialized<HostBotAccountAuthorizationService>());
+            services.AddSingleton(Uninitialized<HostedChannelChangeNotifier>());
+            services.AddSingleton(Uninitialized<ChannelBotOAuthService>());
+            services.AddSingleton(Uninitialized<ChannelBotAuthorizationService>());
+        }
+
+        private static TService Uninitialized<TService>()
+            where TService : class
+        {
+            return (TService)RuntimeHelpers.GetUninitializedObject(typeof(TService));
         }
     }
 
     private sealed class StubOAuthFlow(Uri authorizationUri) : IOAuthFlow
     {
+        public OAuthFlowCompletionOutcome CompletionOutcome { get; init; } =
+            new OAuthFlowCompletionOutcome.Completed(
+                new TokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1))
+            );
+
         public Uri CreateAuthorizationUri()
         {
             return authorizationUri;
         }
 
-        public Task<TokenSet> CompleteAuthorizationAsync(
+        public Task<OAuthFlowCompletionOutcome> CompleteAuthorizationAsync(
             string code,
             string state,
             CancellationToken cancellationToken
         )
         {
-            return Task.FromResult(
-                new TokenSet("access", "refresh", DateTimeOffset.UtcNow.AddHours(1))
-            );
+            return Task.FromResult(CompletionOutcome);
         }
     }
 

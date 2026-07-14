@@ -2,7 +2,9 @@ namespace BlokeBot.Auth.OAuth;
 
 internal sealed class WebOAuthClient(OAuthTransport transport)
 {
-    private static readonly string[] _scopes = [Scopes.UserReadModeratedChannels];
+    private static readonly OAuthScopeSet _scopes = OAuthScopeSet.Create([
+        Scopes.UserReadModeratedChannels,
+    ]);
 
     public Uri CreateAuthorizationUri(HttpRequest request, WebAuthOptions options, string state)
     {
@@ -11,7 +13,8 @@ internal sealed class WebOAuthClient(OAuthTransport transport)
                 options.ClientId,
                 OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 _scopes,
-                state
+                state,
+                AuthorizationVerificationPolicy.ForceAccountVerification
             )
         );
     }

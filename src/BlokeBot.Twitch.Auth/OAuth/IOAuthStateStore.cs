@@ -15,6 +15,6 @@ public interface IOAuthStateStore
     /// Consumes a state value.
     /// </summary>
     /// <param name="state">The state value to consume.</param>
-    /// <returns><see langword="true" /> when the value was valid and unused.</returns>
-    bool Consume(string state);
+    /// <returns>The typed state-consumption outcome.</returns>
+    OAuthStateConsumptionOutcome Consume(string state);
 }

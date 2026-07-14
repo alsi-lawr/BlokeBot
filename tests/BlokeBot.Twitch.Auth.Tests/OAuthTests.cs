@@ -14,24 +14,32 @@ public sealed class OAuthTests
         var state = store.Issue();
 
         state.ShouldNotBeNullOrWhiteSpace();
-        store.Consume(state).ShouldBeTrue();
-        store.Consume(state).ShouldBeFalse();
-        store.Consume("missing").ShouldBeFalse();
+        store.Consume(state).ShouldBeOfType<OAuthStateConsumptionOutcome.Consumed>();
+        store.Consume(state).ShouldBeOfType<OAuthStateConsumptionOutcome.Rejected>();
+        store.Consume("missing").ShouldBeOfType<OAuthStateConsumptionOutcome.Rejected>();
     }
 
     [Test]
     public async Task InvalidOAuthState_CompletingFlow_RejectsAuthorization()
     {
+        var oauth = new FakeOAuthClient();
+        var store = new MemoryTokenStore();
         var flow = new OAuthFlow(
             IdentityWithPath("tokens.json"),
-            new FakeOAuthClient(),
+            oauth,
             new InMemoryOAuthStateStore(),
-            new MemoryTokenStore()
+            store
         );
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
-            flow.CompleteAuthorizationAsync("code", "bad-state", CancellationToken.None)
+        var outcome = await flow.CompleteAuthorizationAsync(
+            "code",
+            "bad-state",
+            CancellationToken.None
         );
+
+        outcome.ShouldBeOfType<OAuthFlowCompletionOutcome.InvalidState>();
+        oauth.ExchangeCalls.ShouldBe(0);
+        store.Saved.ShouldBeNull();
     }
 
     [Test]
@@ -46,7 +54,8 @@ public sealed class OAuthTests
         var flow = new OAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store);
         var state = flow.CreateAuthorizationUri().Query.Split("state=")[1];
 
-        var token = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
+        var outcome = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
+        var token = outcome.ShouldBeOfType<OAuthFlowCompletionOutcome.Completed>().Token;
 
         token.AccessToken.ShouldBe("access");
         store.Saved.ShouldBe(token);

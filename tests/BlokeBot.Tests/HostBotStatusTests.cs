@@ -357,7 +357,7 @@ public sealed class HostBotStatusTests
         var validation = new TokenValidation(
             validationUserId,
             validationLogin,
-            granted.ToHashSet(StringComparer.Ordinal)
+            OAuthScopeSet.Create(granted)
         );
         return new ActiveBotAccountTokenStatus
         {

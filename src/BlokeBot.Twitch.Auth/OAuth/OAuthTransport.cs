@@ -20,10 +20,13 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
             new Dictionary<string, string?>
             {
                 ["client_id"] = request.ClientId,
-                ["force_verify"] = request.ForceVerify ? "true" : null,
+                ["force_verify"] =
+                    request.Verification == AuthorizationVerificationPolicy.ForceAccountVerification
+                        ? "true"
+                        : null,
                 ["redirect_uri"] = request.RedirectUri,
                 ["response_type"] = "code",
-                ["scope"] = ScopeSet.Format(request.Scopes),
+                ["scope"] = request.Scopes.Serialize(),
                 ["state"] = request.State,
             }
         );
@@ -90,7 +93,7 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
             : refreshed;
     }
 
-    public async Task<TokenValidation?> ValidateTokenAsync(
+    public async Task<TokenValidationOutcome> ValidateTokenAsync(
         string accessToken,
         CancellationToken cancellationToken
     )
@@ -101,20 +104,39 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return null;
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                return new TokenValidationOutcome.NotValidated();
+            }
+
+            response.EnsureSuccessStatusCode();
         }
 
         var payload = await response.Content.ReadFromJsonAsync<TokenValidationPayload>(
             _jsonOptions,
             cancellationToken
         );
-        return payload is null
-            ? null
-            : new TokenValidation(
+        if (
+            payload is null
+            || string.IsNullOrWhiteSpace(payload.UserId)
+            || string.IsNullOrWhiteSpace(payload.Login)
+            || payload.Scopes is null
+            || payload.Scopes.Any(scope =>
+                string.IsNullOrWhiteSpace(scope)
+                || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
+            )
+        )
+        {
+            throw new JsonException("Twitch returned an invalid token validation payload.");
+        }
+
+        return new TokenValidationOutcome.Validated(
+            new TokenValidation(
                 payload.UserId,
                 Login.Normalize(payload.Login),
-                ScopeSet.NormalizeMany(payload.Scopes).ToHashSet(StringComparer.Ordinal)
-            );
+                OAuthScopeSet.Create(payload.Scopes)
+            )
+        );
     }
 
     private static OAuthTokenResponse ToTokenResponse(TokenPayload? payload)

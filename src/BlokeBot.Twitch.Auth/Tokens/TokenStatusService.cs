@@ -91,30 +91,11 @@ public sealed class TokenStatusService(
             var validation = await transport
                 .ValidateTokenAsync(accessToken, cancellationToken)
                 .ConfigureAwait(false);
-            if (validation is null)
-            {
-                return Success(new TokenStatus.Invalid(requiredScopes));
-            }
-
-            var grantedScopes = ImmutableArray.CreateRange(
-                ScopeSet.NormalizeMany(validation.Scopes)
+            return validation.Match(
+                validated =>
+                    StatusFromValidation(accessToken, validated.Validation, requiredScopes),
+                _ => Success(new TokenStatus.Invalid(requiredScopes))
             );
-            var missingScopes = ImmutableArray.CreateRange(
-                ScopeSet.Missing(grantedScopes, requiredScopes)
-            );
-            return missingScopes.IsEmpty
-                ? Success(
-                    new TokenStatus.Ready(accessToken, validation, requiredScopes, grantedScopes)
-                )
-                : Success(
-                    new TokenStatus.MissingScopes(
-                        accessToken,
-                        validation,
-                        requiredScopes,
-                        grantedScopes,
-                        missingScopes
-                    )
-                );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -188,6 +169,29 @@ public sealed class TokenStatusService(
                 requiredScopes
             )
         );
+    }
+
+    private static Result<TokenStatus, TokenStatusError> StatusFromValidation(
+        string accessToken,
+        TokenValidation validation,
+        ImmutableArray<string> requiredScopes
+    )
+    {
+        var grantedScopes = ImmutableArray.CreateRange(validation.Scopes);
+        var missingScopes = ImmutableArray.CreateRange(
+            ScopeSet.Missing(grantedScopes, requiredScopes)
+        );
+        return missingScopes.IsEmpty
+            ? Success(new TokenStatus.Ready(accessToken, validation, requiredScopes, grantedScopes))
+            : Success(
+                new TokenStatus.MissingScopes(
+                    accessToken,
+                    validation,
+                    requiredScopes,
+                    grantedScopes,
+                    missingScopes
+                )
+            );
     }
 
     private static Result<TokenStatus, TokenStatusError> ValidationError(

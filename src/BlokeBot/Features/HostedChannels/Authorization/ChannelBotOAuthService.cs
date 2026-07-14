@@ -7,36 +7,36 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
 {
     private const string _callbackPath = "/oauth/channel-bot/callback";
 
-    public Uri CreateAuthorizationUri(HttpRequest request, string state)
+    public OAuthAuthorizationStartOutcome CreateAuthorization(HttpRequest request, string state)
     {
-        var clientId = ClientId();
+        var clientId = AuthorizationClientId();
         if (string.IsNullOrWhiteSpace(clientId))
         {
-            throw new InvalidOperationException("TwitchBot client ID is missing.");
+            return new OAuthAuthorizationStartOutcome.ConfigurationUnavailable();
         }
 
-        var scopes = RequestedScopes();
-        return transport.CreateAuthorizationUri(
-            new AuthorizationUriRequest(
-                clientId,
-                OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
-                scopes,
-                state
+        return new OAuthAuthorizationStartOutcome.Ready(
+            transport.CreateAuthorizationUri(
+                new AuthorizationUriRequest(
+                    clientId,
+                    OAuthRequestUri.CreateCallbackUri(request, _callbackPath),
+                    RequestedScopes(),
+                    state,
+                    AuthorizationVerificationPolicy.ForceAccountVerification
+                )
             )
         );
     }
 
-    public async Task<ChannelBotAuthorizationGrant> CompleteAsync(
-        HttpRequest request,
-        string code,
-        CancellationToken ct
-    )
+    public async Task<
+        OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>
+    > CompleteAsync(HttpRequest request, string code, CancellationToken ct)
     {
-        var clientId = ClientId();
-        var clientSecret = ClientSecret();
+        var clientId = TokenExchangeClientId();
+        var clientSecret = TokenExchangeClientSecret();
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
         {
-            throw new InvalidOperationException("TwitchBot client credentials are missing.");
+            return new OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ConfigurationUnavailable();
         }
 
         var token = await transport.ExchangeCodeAsync(
@@ -48,34 +48,43 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
             ),
             ct
         );
-        var validation =
-            await transport.ValidateTokenAsync(token.AccessToken, ct)
-            ?? throw new InvalidOperationException(
-                "Twitch did not finish connecting this channel."
-            );
-        return new ChannelBotAuthorizationGrant(
-            validation.UserId,
-            LoginName.Parse(validation.Login),
-            validation.Scopes
+        return (await transport.ValidateTokenAsync(token.AccessToken, ct)).Match<
+            OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>
+        >(
+            validated => new OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.Completed(
+                new ChannelBotAuthorizationGrant(
+                    validated.Validation.UserId,
+                    LoginName.Parse(validated.Validation.Login),
+                    validated.Validation.Scopes
+                )
+            ),
+            static _ => new OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ProviderNotValidated()
         );
     }
 
-    public string[] RequestedScopes()
+    public OAuthScopeSet RequestedScopes()
     {
-        return
-            configuration.GetSection("TwitchBot:ChannelAuthorization:Scopes").Get<string[]>()
-                is { } scopes
-            ? ScopeSet.NormalizeMany(scopes)
+        var scopes = configuration
+            .GetSection("TwitchBot:ChannelAuthorization:Scopes")
+            .Get<string[]>()
+            is { } configuredScopes
+            ? configuredScopes
             : [];
+        return OAuthScopeSet.Create(scopes);
     }
 
-    private string? ClientId()
+    private string AuthorizationClientId()
     {
-        return configuration.GetSection("TwitchBot:Identity")["ClientId"];
+        return configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
     }
 
-    private string? ClientSecret()
+    private string TokenExchangeClientId()
     {
-        return configuration.GetSection("TwitchBot:Identity")["ClientSecret"];
+        return configuration.GetSection("TwitchBot:Identity")["ClientId"] ?? string.Empty;
+    }
+
+    private string TokenExchangeClientSecret()
+    {
+        return configuration.GetSection("TwitchBot:Identity")["ClientSecret"] ?? string.Empty;
     }
 }

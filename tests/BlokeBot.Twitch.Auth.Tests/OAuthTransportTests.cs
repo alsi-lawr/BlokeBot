@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Twitch.Auth;
 using Shouldly;
 using TUnit.Core;
@@ -12,13 +13,17 @@ public sealed class OAuthTransportTests
     public void DuplicateNoisyScopes_CreatingAuthorizationUri_NormalizesAndEncodesRequest()
     {
         var client = new OAuthTransport(new ScriptedHttpClientFactory());
+        string[] requestedScopes = [" channel:bot ", "BITS:READ", "bits:read"];
+        var scopes = OAuthScopeSet.Create(requestedScopes);
+        requestedScopes[0] = "user:write:chat";
 
         var uri = client.CreateAuthorizationUri(
             new AuthorizationUriRequest(
                 "client",
                 "https://localhost/callback",
-                [" channel:bot ", "BITS:READ", "bits:read"],
-                "state value"
+                scopes,
+                "state value",
+                AuthorizationVerificationPolicy.ForceAccountVerification
             )
         );
 
@@ -27,6 +32,35 @@ public sealed class OAuthTransportTests
         uri.AbsoluteUri.ShouldContain("scope=bits%3Aread%20channel%3Abot");
         uri.AbsoluteUri.ShouldContain("state=state%20value");
         uri.AbsoluteUri.ShouldContain("force_verify=true");
+    }
+
+    [Test]
+    public void EmptyExplicitScopes_CreatingAuthorizationUri_SerializesEmptyWithoutDefaults()
+    {
+        var client = new OAuthTransport(new ScriptedHttpClientFactory());
+
+        var uri = client.CreateAuthorizationUri(
+            new AuthorizationUriRequest(
+                "client",
+                "https://localhost/callback",
+                OAuthScopeSet.Empty,
+                "state",
+                AuthorizationVerificationPolicy.ReuseExistingAuthorization
+            )
+        );
+
+        uri.AbsoluteUri.ShouldContain("scope=&");
+        uri.AbsoluteUri.ShouldNotContain("force_verify");
+        uri.AbsoluteUri.ShouldContain("state=state");
+    }
+
+    [Test]
+    public void InvalidScopeValues_CreatingScopeSet_RejectsInvalidElements()
+    {
+        Should.Throw<ArgumentNullException>(() => OAuthScopeSet.Create(null!));
+        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([null!]));
+        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([" "]));
+        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create(["chat read"]));
     }
 
     [Test]
@@ -64,15 +98,58 @@ public sealed class OAuthTransportTests
             new AuthorizationCodeExchange("client", "secret", "https://localhost/callback", "code"),
             CancellationToken.None
         );
-        var validation = await client.ValidateTokenAsync(token.AccessToken, CancellationToken.None);
+        var validation = (
+            await client.ValidateTokenAsync(token.AccessToken, CancellationToken.None)
+        )
+            .ShouldBeOfType<TokenValidationOutcome.Validated>()
+            .Validation;
 
         token.AccessToken.ShouldBe("access");
         token.RefreshToken.ShouldBe("refresh");
         token.ExpiresIn.ShouldBe(3600);
-        validation.ShouldNotBeNull();
         validation.UserId.ShouldBe("123");
         validation.Login.ShouldBe("streamer");
         validation.Scopes.ShouldBe(["bits:read", "channel:bot"], ignoreOrder: true);
+    }
+
+    [Test]
+    public async Task InvalidToken_Validating_ReturnsTypedRejection()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        var client = new OAuthTransport(factory);
+
+        var outcome = await client.ValidateTokenAsync("invalid", CancellationToken.None);
+
+        outcome.ShouldBeOfType<TokenValidationOutcome.NotValidated>();
+    }
+
+    [Test]
+    public async Task ProviderFailure_Validating_RemainsExceptional()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
+        factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        var client = new OAuthTransport(factory);
+
+        await Should.ThrowAsync<HttpRequestException>(() =>
+            client.ValidateTokenAsync("limited", CancellationToken.None)
+        );
+        await Should.ThrowAsync<HttpRequestException>(() =>
+            client.ValidateTokenAsync("failed", CancellationToken.None)
+        );
+    }
+
+    [Test]
+    public async Task MalformedValidationPayload_Validating_RemainsExceptional()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => JsonResponse("{}"));
+        var client = new OAuthTransport(factory);
+
+        await Should.ThrowAsync<JsonException>(() =>
+            client.ValidateTokenAsync("malformed", CancellationToken.None)
+        );
     }
 
     private static string ReadContent(HttpRequestMessage request)

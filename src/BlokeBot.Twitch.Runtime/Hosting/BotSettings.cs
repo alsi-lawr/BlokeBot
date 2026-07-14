@@ -54,11 +54,7 @@ public sealed record BotSettings
     /// <summary>
     /// Validates and maps a mutable configuration transport into an immutable snapshot.
     /// </summary>
-    public static BotSettings FromValidatedOptions(
-        BotOptions options,
-        string boundary,
-        bool requireConfiguredIdentity
-    )
+    public static BotSettings FromConfiguredOptions(BotOptions options, string boundary)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
@@ -72,11 +68,7 @@ public sealed record BotSettings
             );
         }
 
-        var identity = requireConfiguredIdentity
-            ? BotIdentity.FromValidatedOptions(options.Identity, boundary)
-            : BotIdentity.FromOptions(options.Identity);
-
-        return Create(options, identity);
+        return Create(options, BotIdentity.FromConfiguredOptions(options.Identity, boundary));
     }
 
     private static BotSettings Create(BotOptions options, BotIdentity identity)

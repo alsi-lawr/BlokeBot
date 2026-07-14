@@ -26,12 +26,40 @@ public sealed class ChannelBotAuthorizationTests
             new OAuthTransport(httpClientFactory)
         );
 
-        var grant = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
+        var grant = (await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None))
+            .ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.Completed>()
+            .Grant;
 
         grant.UserId.ShouldBe("123");
         grant.Login.ShouldBe(LoginName.Parse("streamer"));
         grant.Scopes.ShouldBe(["bits:read", "channel:bot"], ignoreOrder: true);
         httpClientFactory.ValidatedToken.ShouldBe("grant-token");
+    }
+
+    [Test]
+    public async Task MissingCredentials_CompletingChannelAuthorization_ReturnsTypedUnavailable()
+    {
+        var service = new ChannelBotOAuthService(
+            new ConfigurationBuilder().Build(),
+            new OAuthTransport(new EmptyHttpClientFactory())
+        );
+
+        var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
+
+        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ConfigurationUnavailable>();
+    }
+
+    [Test]
+    public async Task ProviderRejectedToken_CompletingChannelAuthorization_ReturnsTypedRejection()
+    {
+        var service = new ChannelBotOAuthService(
+            ConfigurationWithScopes("channel:bot"),
+            new OAuthTransport(new RecordingOAuthHttpClientFactory(HttpStatusCode.Unauthorized))
+        );
+
+        var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
+
+        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<ChannelBotAuthorizationGrant>.ProviderNotValidated>();
     }
 
     [Test]
@@ -127,7 +155,7 @@ public sealed class ChannelBotAuthorizationTests
         params string[] scopes
     )
     {
-        return new(userId, LoginName.Parse(login), scopes.ToHashSet(StringComparer.Ordinal));
+        return new(userId, LoginName.Parse(login), OAuthScopeSet.Create(scopes));
     }
 
     private static ChannelBotAuthorizationService ChannelAuthorizationService(
@@ -230,9 +258,11 @@ public sealed class ChannelBotAuthorizationTests
         return await db.Hosts.SingleAsync(x => x.Id == hostId);
     }
 
-    private sealed class RecordingOAuthHttpClientFactory : IHttpClientFactory
+    private sealed class RecordingOAuthHttpClientFactory(
+        HttpStatusCode validationStatus = HttpStatusCode.OK
+    ) : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        private readonly Handler _handler = new(validationStatus);
 
         public string? ValidatedToken => _handler.ValidatedToken;
 
@@ -241,7 +271,7 @@ public sealed class ChannelBotAuthorizationTests
             return new(_handler, disposeHandler: false);
         }
 
-        private sealed class Handler : HttpMessageHandler
+        private sealed class Handler(HttpStatusCode validationStatus) : HttpMessageHandler
         {
             public string? ValidatedToken { get; private set; }
 
@@ -258,6 +288,11 @@ public sealed class ChannelBotAuthorizationTests
                 if (request.RequestUri?.AbsolutePath == "/oauth2/validate")
                 {
                     ValidatedToken = request.Headers.Authorization?.Parameter;
+                    if (validationStatus != HttpStatusCode.OK)
+                    {
+                        return Task.FromResult(new HttpResponseMessage(validationStatus));
+                    }
+
                     return Task.FromResult(
                         JsonResponse(
                             """

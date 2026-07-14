@@ -77,33 +77,18 @@ internal static class BotOAuthEndpoints
                         return Results.BadRequest("This Twitch sign-in expired. Try again.");
                     }
 
-                    try
-                    {
-                        await oauth.CompleteAuthorizationAsync(code, state, ct);
-                        await changes.NotifyChangedAsync(ct);
-                        return Results.Content(
-                            """
-                            <!doctype html>
-                            <html lang="en">
-                            <head>
-                                <meta charset="utf-8">
-                                <title>BlokeBot connection complete</title>
-                            </head>
-                            <body>
-                                <p>Bot account connected. You can close this window.</p>
-                                <script>
-                                    window.close();
-                                </script>
-                            </body>
-                            </html>
-                            """,
-                            "text/html"
-                        );
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
-                    }
+                    var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
+                    return await completion.Match<Task<IResult>>(
+                        async _ =>
+                        {
+                            await changes.NotifyChangedAsync(ct);
+                            return BotAccountConnectedResult();
+                        },
+                        static _ =>
+                            Task.FromResult<IResult>(
+                                Results.BadRequest("This Twitch sign-in expired. Try again.")
+                            )
+                    );
                 }
             )
             .RequireAuthorization();
@@ -132,22 +117,23 @@ internal static class BotOAuthEndpoints
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     DeleteChannelBotStateCookie(context);
-                    context.Response.Cookies.Append(
-                        "BlokeBot.ChannelBotState",
-                        state,
-                        ChannelBotStateCookieOptions(context.Request, TimeSpan.FromMinutes(10))
-                    );
-
-                    try
-                    {
-                        return Results.Redirect(
-                            oauth.CreateAuthorizationUri(context.Request, state).ToString()
+                    return oauth
+                        .CreateAuthorization(context.Request, state)
+                        .Match<IResult>(
+                            ready =>
+                            {
+                                context.Response.Cookies.Append(
+                                    "BlokeBot.ChannelBotState",
+                                    state,
+                                    ChannelBotStateCookieOptions(
+                                        context.Request,
+                                        TimeSpan.FromMinutes(10)
+                                    )
+                                );
+                                return Results.Redirect(ready.AuthorizationUri.ToString());
+                            },
+                            static _ => Results.BadRequest("TwitchBot client ID is missing.")
                         );
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        return Results.BadRequest(ex.Message);
-                    }
                 }
             )
             .RequireAuthorization("Operator");
@@ -204,20 +190,30 @@ internal static class BotOAuthEndpoints
 
                     try
                     {
-                        var grant = await oauth.CompleteAsync(context.Request, code, ct);
-                        var authorization = await channelBotAuthorization.AuthorizeAsync(
-                            selectedHost.Id,
-                            grant,
-                            ct
+                        var completion = await oauth.CompleteAsync(context.Request, code, ct);
+                        return await completion.Match<Task<IResult>>(
+                            async completed =>
+                            {
+                                var authorization = await channelBotAuthorization.AuthorizeAsync(
+                                    selectedHost.Id,
+                                    completed.Grant,
+                                    ct
+                                );
+                                return authorization.Succeeded
+                                    ? ChannelConnectedResult()
+                                    : Results.BadRequest(authorization.Message);
+                            },
+                            static _ =>
+                                Task.FromResult<IResult>(
+                                    Results.BadRequest("TwitchBot client credentials are missing.")
+                                ),
+                            static _ =>
+                                Task.FromResult<IResult>(
+                                    Results.BadRequest(
+                                        "Twitch did not finish connecting this channel."
+                                    )
+                                )
                         );
-                        if (!authorization.Succeeded)
-                        {
-                            return Results.BadRequest(authorization.Message);
-                        }
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        return Results.BadRequest(ex.Message);
                     }
                     catch (HttpRequestException)
                     {
@@ -227,25 +223,6 @@ internal static class BotOAuthEndpoints
                             title: "Channel connection failed"
                         );
                     }
-
-                    return Results.Content(
-                        """
-                        <!doctype html>
-                        <html lang="en">
-                        <head>
-                            <meta charset="utf-8">
-                            <title>BlokeBot connection complete</title>
-                        </head>
-                        <body>
-                            <p>Channel connected. You can close this window.</p>
-                            <script>
-                                window.close();
-                            </script>
-                        </body>
-                        </html>
-                        """,
-                        "text/html"
-                    );
                 }
             )
             .RequireAuthorization("Operator");
@@ -279,26 +256,30 @@ internal static class BotOAuthEndpoints
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                     DeleteHostBotStateCookie(context);
-                    context.Response.Cookies.Append(
-                        "BlokeBot.HostBotState",
-                        state,
-                        HostBotStateCookieOptions(context.Request, TimeSpan.FromMinutes(10))
+                    var requiredScopes = await hostBotAuthorization.GetRequiredScopesAsync(
+                        selectedHost.Id,
+                        ct
                     );
-
-                    try
-                    {
-                        var requiredScopes = await hostBotAuthorization.GetRequiredScopesAsync(
-                            selectedHost.Id,
-                            ct
+                    return oauth
+                        .CreateAuthorizationUriForScopes(
+                            state,
+                            OAuthScopeSet.Create(requiredScopes)
+                        )
+                        .Match<IResult>(
+                            ready =>
+                            {
+                                context.Response.Cookies.Append(
+                                    "BlokeBot.HostBotState",
+                                    state,
+                                    HostBotStateCookieOptions(
+                                        context.Request,
+                                        TimeSpan.FromMinutes(10)
+                                    )
+                                );
+                                return Results.Redirect(ready.AuthorizationUri.ToString());
+                            },
+                            static _ => Results.BadRequest("The bot account is not set up yet.")
                         );
-                        return Results.Redirect(
-                            oauth.CreateAuthorizationUri(state, requiredScopes).ToString()
-                        );
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        return Results.BadRequest(ex.Message);
-                    }
                 }
             )
             .RequireAuthorization("Operator");
@@ -353,20 +334,28 @@ internal static class BotOAuthEndpoints
 
         try
         {
-            var grant = await oauth.CompleteAsync(code, ct);
-            var authorization = await hostBotAuthorization.AuthorizeAsync(
-                selectedHost.Id,
-                grant,
-                ct
+            var completion = await oauth.CompleteAsync(code, ct);
+            return await completion.Match<Task<IResult>>(
+                async completed =>
+                {
+                    var authorization = await hostBotAuthorization.AuthorizeAsync(
+                        selectedHost.Id,
+                        completed.Grant,
+                        ct
+                    );
+                    return authorization.Succeeded
+                        ? BotAccountConnectedResult()
+                        : Results.BadRequest(authorization.Message);
+                },
+                static _ =>
+                    Task.FromResult<IResult>(
+                        Results.BadRequest("The bot account is not set up yet.")
+                    ),
+                static _ =>
+                    Task.FromResult<IResult>(
+                        Results.BadRequest("Twitch did not validate the bot account grant.")
+                    )
             );
-            if (!authorization.Succeeded)
-            {
-                return Results.BadRequest(authorization.Message);
-            }
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Results.BadRequest(ex.Message);
         }
         catch (HttpRequestException)
         {
@@ -376,7 +365,10 @@ internal static class BotOAuthEndpoints
                 title: "Custom bot connection failed"
             );
         }
+    }
 
+    private static IResult BotAccountConnectedResult()
+    {
         return Results.Content(
             """
             <!doctype html>
@@ -387,6 +379,28 @@ internal static class BotOAuthEndpoints
             </head>
             <body>
                 <p>Bot account connected. You can close this window.</p>
+                <script>
+                    window.close();
+                </script>
+            </body>
+            </html>
+            """,
+            "text/html"
+        );
+    }
+
+    private static IResult ChannelConnectedResult()
+    {
+        return Results.Content(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="utf-8">
+                <title>BlokeBot connection complete</title>
+            </head>
+            <body>
+                <p>Channel connected. You can close this window.</p>
                 <script>
                     window.close();
                 </script>

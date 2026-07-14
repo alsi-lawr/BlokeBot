@@ -8,5 +8,5 @@ public sealed record HostBotAccountAuthorizationGrant(
     LoginName Login,
     string DisplayName,
     string? ProfileImageUrl,
-    IReadOnlyList<string> Scopes
+    OAuthScopeSet Scopes
 );

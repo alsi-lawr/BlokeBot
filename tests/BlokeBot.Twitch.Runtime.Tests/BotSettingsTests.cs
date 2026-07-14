@@ -10,10 +10,22 @@ public sealed class BotSettingsTests
     [Test]
     public void UndefinedRuntime_MappingValidatedSettings_RejectsConfiguration()
     {
-        var options = new BotOptions { Runtime = (ChatRuntime)99 };
+        var options = new BotOptions
+        {
+            Runtime = (ChatRuntime)99,
+            Identity = new BotIdentityOptions
+            {
+                BotUsername = "bot",
+                ClientId = "client",
+                ClientSecret = "secret",
+                RedirectUri = "https://localhost/oauth/callback",
+                Scopes = ["chat:read"],
+                TokenCachePath = "tokens.json",
+            },
+        };
 
         var exception = Should.Throw<OptionsValidationException>(() =>
-            BotSettings.FromValidatedOptions(options, "TwitchBot", requireConfiguredIdentity: false)
+            BotSettings.FromConfiguredOptions(options, "TwitchBot")
         );
 
         exception.OptionsName.ShouldBe("TwitchBot");

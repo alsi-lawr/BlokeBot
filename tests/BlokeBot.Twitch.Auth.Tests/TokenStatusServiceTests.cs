@@ -71,6 +71,23 @@ public sealed class TokenStatusServiceTests
     }
 
     [Test]
+    public async Task ProviderRateLimit_InspectingStatus_ReturnsTransportError()
+    {
+        var service = Service(
+            new RecordingTokenProvider("saved-token"),
+            Transport(null, rejectionStatus: HttpStatusCode.TooManyRequests)
+        );
+
+        var result = await service
+            .GetUserAccessTokenStatus(["chat:read"])
+            .ExecuteAsync(CancellationToken.None);
+
+        var error = Error(result).ShouldBeOfType<TokenStatusError.ValidationUnavailable>();
+        error.Reason.ShouldBe(TokenStatusTransportFailureReason.RequestFailed);
+        error.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+    }
+
+    [Test]
     public async Task ValidTokenWithRequiredScopes_InspectingStatus_ReturnsReady()
     {
         var service = Service(
@@ -243,9 +260,13 @@ public sealed class TokenStatusServiceTests
         return new(provider, transport, logger ?? new RecordingLogger<TokenStatusService>());
     }
 
-    private static OAuthTransport Transport(string? validationJson, Exception? exception = null)
+    private static OAuthTransport Transport(
+        string? validationJson,
+        Exception? exception = null,
+        HttpStatusCode rejectionStatus = HttpStatusCode.Unauthorized
+    )
     {
-        return new(new StatusHttpClientFactory(validationJson, exception));
+        return new(new StatusHttpClientFactory(validationJson, exception, rejectionStatus));
     }
 
     private static TokenStatus Success(
@@ -314,16 +335,25 @@ public sealed class TokenStatusServiceTests
         }
     }
 
-    private sealed class StatusHttpClientFactory(string? validationJson, Exception? exception)
-        : IHttpClientFactory
+    private sealed class StatusHttpClientFactory(
+        string? validationJson,
+        Exception? exception,
+        HttpStatusCode rejectionStatus
+    ) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name)
         {
-            return new(new Handler(validationJson, exception), disposeHandler: false);
+            return new(
+                new Handler(validationJson, exception, rejectionStatus),
+                disposeHandler: false
+            );
         }
 
-        private sealed class Handler(string? validationJson, Exception? exception)
-            : HttpMessageHandler
+        private sealed class Handler(
+            string? validationJson,
+            Exception? exception,
+            HttpStatusCode rejectionStatus
+        ) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
@@ -337,7 +367,7 @@ public sealed class TokenStatusServiceTests
 
                 if (validationJson is null)
                 {
-                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+                    return Task.FromResult(new HttpResponseMessage(rejectionStatus));
                 }
 
                 return Task.FromResult(

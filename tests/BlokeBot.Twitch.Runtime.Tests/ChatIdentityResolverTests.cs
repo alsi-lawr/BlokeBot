@@ -292,7 +292,7 @@ public sealed class ChatIdentityResolverTests
             ClientId = "client-id",
             ClientSecret = "client-secret",
             RedirectUri = "https://localhost/callback",
-            Scopes = ImmutableArray.Create("chat:read"),
+            Scopes = OAuthScopeSet.Create(["chat:read"]),
             TokenCachePath = "tokens.json",
         };
     }

@@ -12,6 +12,8 @@ internal sealed class FakeOAuthClient : IOAuthClient
 
     public bool ValidateResult { get; init; }
 
+    public int ExchangeCalls { get; private set; }
+
     public int RefreshCalls { get; private set; }
 
     public Uri BuildAuthorizeUri(string state)
@@ -21,6 +23,7 @@ internal sealed class FakeOAuthClient : IOAuthClient
 
     public Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {
+        ExchangeCalls++;
         return Task.FromResult(ExchangeResult);
     }
 
@@ -30,8 +33,17 @@ internal sealed class FakeOAuthClient : IOAuthClient
         return Task.FromResult(RefreshResult);
     }
 
-    public Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken)
+    public Task<TokenValidationOutcome> ValidateAsync(
+        string accessToken,
+        CancellationToken cancellationToken
+    )
     {
-        return Task.FromResult(ValidateResult);
+        return Task.FromResult<TokenValidationOutcome>(
+            ValidateResult
+                ? new TokenValidationOutcome.Validated(
+                    new TokenValidation("bot-id", "bot", OAuthScopeSet.Empty)
+                )
+                : new TokenValidationOutcome.NotValidated()
+        );
     }
 }

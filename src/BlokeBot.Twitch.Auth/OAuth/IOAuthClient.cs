@@ -33,6 +33,9 @@ public interface IOAuthClient
     /// </summary>
     /// <param name="accessToken">The access token to validate.</param>
     /// <param name="cancellationToken">A token that cancels validation.</param>
-    /// <returns><see langword="true" /> when Twitch accepts the token.</returns>
-    Task<bool> ValidateAsync(string accessToken, CancellationToken cancellationToken);
+    /// <returns>The typed provider validation outcome.</returns>
+    Task<TokenValidationOutcome> ValidateAsync(
+        string accessToken,
+        CancellationToken cancellationToken
+    );
 }

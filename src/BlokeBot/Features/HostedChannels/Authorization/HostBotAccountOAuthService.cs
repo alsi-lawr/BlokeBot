@@ -8,28 +8,45 @@ public sealed class HostBotAccountOAuthService(
     HelixClient helix
 )
 {
-    public Uri CreateAuthorizationUri(string state, IEnumerable<string?>? scopes = null)
+    public OAuthAuthorizationStartOutcome CreateAuthorizationUriForDefaultScopes(string state)
     {
-        var identity = settings.Identity;
-        ValidateConfiguredIdentity(identity, requireSecret: false);
+        return CreateAuthorizationUriForScopes(state, RequestedScopes());
+    }
 
-        return transport.CreateAuthorizationUri(
-            new AuthorizationUriRequest(
-                identity.ClientId,
-                identity.RedirectUri,
-                scopes is null ? RequestedScopes() : ScopeSet.NormalizeMany(scopes),
-                state
+    public OAuthAuthorizationStartOutcome CreateAuthorizationUriForScopes(
+        string state,
+        OAuthScopeSet scopes
+    )
+    {
+        ArgumentNullException.ThrowIfNull(scopes);
+        var identity = settings.Identity;
+        if (!IsConfiguredForAuthorization(identity))
+        {
+            return new OAuthAuthorizationStartOutcome.ConfigurationUnavailable();
+        }
+
+        return new OAuthAuthorizationStartOutcome.Ready(
+            transport.CreateAuthorizationUri(
+                new AuthorizationUriRequest(
+                    identity.ClientId,
+                    identity.RedirectUri,
+                    scopes,
+                    state,
+                    AuthorizationVerificationPolicy.ForceAccountVerification
+                )
             )
         );
     }
 
-    public async Task<HostBotAccountAuthorizationGrant> CompleteAsync(
-        string code,
-        CancellationToken ct
-    )
+    public async Task<
+        OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>
+    > CompleteAsync(string code, CancellationToken ct)
     {
         var identity = settings.Identity;
-        ValidateConfiguredIdentity(identity, requireSecret: true);
+        if (!IsConfiguredForTokenExchange(identity))
+        {
+            return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ConfigurationUnavailable();
+        }
 
         var token = await transport.ExchangeCodeAsync(
             new AuthorizationCodeExchange(
@@ -40,44 +57,62 @@ public sealed class HostBotAccountOAuthService(
             ),
             ct
         );
-        var validation =
-            await transport.ValidateTokenAsync(token.AccessToken, ct)
-            ?? throw new InvalidOperationException(
-                "Twitch did not validate the bot account grant."
-            );
+        return await (await transport.ValidateTokenAsync(token.AccessToken, ct)).Match(
+            validated => CompleteValidatedAuthorizationAsync(token, validated.Validation, ct),
+            static _ =>
+                Task.FromResult<
+                    OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>
+                >(
+                    new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated()
+                )
+        );
+    }
+
+    public OAuthScopeSet RequestedScopes()
+    {
+        return settings.Identity.Scopes;
+    }
+
+    private async Task<
+        OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>
+    > CompleteValidatedAuthorizationAsync(
+        OAuthTokenResponse token,
+        TokenValidation validation,
+        CancellationToken ct
+    )
+    {
+        var identity = settings.Identity;
         var user = await helix.GetCurrentUserAsync(
             new HelixRequestContext(identity.ClientId, token.AccessToken),
             ct
         );
 
-        return new HostBotAccountAuthorizationGrant(
-            new TokenSet(
-                token.AccessToken,
-                token.RefreshToken,
-                DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
-            ),
-            validation.UserId,
-            LoginName.Parse(validation.Login),
-            string.IsNullOrWhiteSpace(user?.DisplayName) ? validation.Login : user.DisplayName,
-            string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl,
-            validation.Scopes.ToArray()
+        return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.Completed(
+            new HostBotAccountAuthorizationGrant(
+                new TokenSet(
+                    token.AccessToken,
+                    token.RefreshToken,
+                    DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
+                ),
+                validation.UserId,
+                LoginName.Parse(validation.Login),
+                string.IsNullOrWhiteSpace(user?.DisplayName) ? validation.Login : user.DisplayName,
+                string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl,
+                validation.Scopes
+            )
         );
     }
 
-    public string[] RequestedScopes()
+    private static bool IsConfiguredForAuthorization(BotIdentity identity)
     {
-        return ScopeSet.NormalizeMany(settings.Identity.Scopes);
+        return !string.IsNullOrWhiteSpace(identity.ClientId)
+            && !string.IsNullOrWhiteSpace(identity.RedirectUri);
     }
 
-    private static void ValidateConfiguredIdentity(BotIdentity identity, bool requireSecret)
+    private static bool IsConfiguredForTokenExchange(BotIdentity identity)
     {
-        if (
-            string.IsNullOrWhiteSpace(identity.ClientId)
-            || string.IsNullOrWhiteSpace(identity.RedirectUri)
-            || (requireSecret && string.IsNullOrWhiteSpace(identity.ClientSecret))
-        )
-        {
-            throw new InvalidOperationException("The bot account is not set up yet.");
-        }
+        return !string.IsNullOrWhiteSpace(identity.ClientId)
+            && !string.IsNullOrWhiteSpace(identity.ClientSecret)
+            && !string.IsNullOrWhiteSpace(identity.RedirectUri);
     }
 }

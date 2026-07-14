@@ -16,16 +16,18 @@ internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
         return state;
     }
 
-    public bool Consume(string state)
+    public OAuthStateConsumptionOutcome Consume(string state)
     {
         if (string.IsNullOrWhiteSpace(state))
         {
-            return false;
+            return new OAuthStateConsumptionOutcome.Rejected();
         }
 
         lock (_gate)
         {
-            return _states.Remove(state);
+            return _states.Remove(state)
+                ? new OAuthStateConsumptionOutcome.Consumed()
+                : new OAuthStateConsumptionOutcome.Rejected();
         }
     }
 }

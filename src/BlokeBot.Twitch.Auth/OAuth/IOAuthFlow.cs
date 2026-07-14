@@ -17,8 +17,8 @@ public interface IOAuthFlow
     /// <param name="code">The authorization code.</param>
     /// <param name="state">The returned state value.</param>
     /// <param name="cancellationToken">A token that cancels callback handling.</param>
-    /// <returns>The persisted token set.</returns>
-    Task<TokenSet> CompleteAuthorizationAsync(
+    /// <returns>The typed callback completion outcome.</returns>
+    Task<OAuthFlowCompletionOutcome> CompleteAuthorizationAsync(
         string code,
         string state,
         CancellationToken cancellationToken

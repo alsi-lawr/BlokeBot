@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Microsoft.Extensions.Options;
 
 namespace BlokeBot.Twitch.Auth;
@@ -21,7 +20,7 @@ public sealed record BotIdentity
     public required string RedirectUri { get; init; }
 
     /// <summary>Gets the normalized, immutable OAuth scope set.</summary>
-    public required ImmutableArray<string> Scopes { get; init; }
+    public required OAuthScopeSet Scopes { get; init; }
 
     /// <summary>Gets the token storage path.</summary>
     public required string TokenCachePath { get; init; }
@@ -39,7 +38,7 @@ public sealed record BotIdentity
             ClientId = (options.ClientId ?? string.Empty).Trim(),
             ClientSecret = options.ClientSecret ?? string.Empty,
             RedirectUri = (options.RedirectUri ?? string.Empty).Trim(),
-            Scopes = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(options.Scopes ?? [])),
+            Scopes = OAuthScopeSet.Create(options.Scopes ?? []),
             TokenCachePath = (options.TokenCachePath ?? string.Empty).Trim(),
         };
     }
@@ -47,7 +46,7 @@ public sealed record BotIdentity
     /// <summary>
     /// Validates and maps a configured runtime identity.
     /// </summary>
-    public static BotIdentity FromValidatedOptions(BotIdentityOptions options, string boundary)
+    public static BotIdentity FromConfiguredOptions(BotIdentityOptions options, string boundary)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(boundary);
         var validation = new BotIdentityOptionsValidator().Validate(boundary, options);
@@ -60,22 +59,28 @@ public sealed record BotIdentity
             );
         }
 
-        var identity = FromOptions(options);
-        if (identity.Scopes.IsEmpty)
+        if (
+            options.Scopes is null
+            || options.Scopes.Length == 0
+            || options.Scopes.Any(scope =>
+                string.IsNullOrWhiteSpace(scope)
+                || !OAuthScopeSet.IsValid(scope.Trim().ToLowerInvariant())
+            )
+        )
         {
             throw new OptionsValidationException(
                 boundary,
                 typeof(BotIdentityOptions),
-                [$"{nameof(BotIdentityOptions.Scopes)} must contain a non-blank scope."]
+                [$"{nameof(BotIdentityOptions.Scopes)} must contain only valid scopes."]
             );
         }
 
-        return identity;
+        return FromOptions(options);
     }
 
     /// <inheritdoc />
     public override string ToString()
     {
-        return $"TwitchBotIdentity {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Length} }}";
+        return $"TwitchBotIdentity {{ BotUsername = {BotUsername}, ClientId = [redacted], ClientSecret = [redacted], Scopes = {Scopes.Count} }}";
     }
 }

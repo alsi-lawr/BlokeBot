@@ -418,7 +418,7 @@ public sealed class HostBotAccountAuthorizationService(
         }
 
         var validation = await transport.ValidateTokenAsync(accessToken, ct);
-        if (validation is null)
+        if (validation.Match(static _ => false, static _ => true))
         {
             if (
                 !await RefreshTokenAsync(db, settings, ct)
@@ -430,12 +430,31 @@ public sealed class HostBotAccountAuthorizationService(
 
             accessToken = settings.AccessToken;
             validation = await transport.ValidateTokenAsync(accessToken, ct);
-            if (validation is null)
-            {
-                return new TokenStatus.Invalid(required);
-            }
         }
 
+        return await validation.Match(
+            validated =>
+                PersistValidatedStatusAsync(
+                    db,
+                    settings,
+                    accessToken,
+                    validated.Validation,
+                    required,
+                    ct
+                ),
+            _ => Task.FromResult<TokenStatus>(new TokenStatus.Invalid(required))
+        );
+    }
+
+    private static async Task<TokenStatus> PersistValidatedStatusAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        string accessToken,
+        TokenValidation validation,
+        ImmutableArray<string> required,
+        CancellationToken ct
+    )
+    {
         var granted = ScopeSet.NormalizeMany(validation.Scopes);
         var missing = ScopeSet.Missing(granted, required);
         settings.AuthorizedScopes = ScopeSet.Format(granted);
@@ -554,7 +573,7 @@ public sealed class HostBotAccountAuthorizationService(
         var scopes = hostBotOAuth.RequestedScopes();
         return settings?.WhisperResponsesEnabled == true
             ? ScopeSet.NormalizeMany(scopes.Append(Scopes.UserManageWhispers))
-            : scopes;
+            : scopes.ToArray();
     }
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(

@@ -33,9 +33,96 @@ public sealed class HostBotAccountAuthorizationTests
             new HelixClient(httpClientFactory)
         );
 
-        var uri = oauth.CreateAuthorizationUri("state");
+        var uri = oauth
+            .CreateAuthorizationUriForDefaultScopes("state")
+            .ShouldBeOfType<OAuthAuthorizationStartOutcome.Ready>()
+            .AuthorizationUri;
 
         uri.Query.ShouldContain("redirect_uri=https%3A%2F%2Flocalhost%3A7107%2Foauth%2Fcallback");
+    }
+
+    [Test]
+    public void ExplicitEmptyScopes_CreatingAuthorizationUri_DoesNotUseDefaultScopes()
+    {
+        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        var oauth = new HostBotAccountOAuthService(
+            BotSettings.FromOptions(
+                new BotOptions
+                {
+                    Identity = new BotIdentityOptions
+                    {
+                        ClientId = "client",
+                        RedirectUri = "https://localhost:7107/oauth/callback",
+                        Scopes = ["chat:read"],
+                    },
+                }
+            ),
+            new OAuthTransport(httpClientFactory),
+            new HelixClient(httpClientFactory)
+        );
+
+        var uri = oauth
+            .CreateAuthorizationUriForScopes("state", OAuthScopeSet.Empty)
+            .ShouldBeOfType<OAuthAuthorizationStartOutcome.Ready>()
+            .AuthorizationUri;
+
+        uri.Query.ShouldContain("scope=");
+        uri.Query.ShouldNotContain("chat%3Aread");
+    }
+
+    [Test]
+    public void MissingConfiguration_CreatingAuthorizationUri_ReturnsTypedUnavailable()
+    {
+        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        var oauth = new HostBotAccountOAuthService(
+            BotSettings.FromOptions(new BotOptions()),
+            new OAuthTransport(httpClientFactory),
+            new HelixClient(httpClientFactory)
+        );
+
+        var outcome = oauth.CreateAuthorizationUriForDefaultScopes("state");
+
+        outcome.ShouldBeOfType<OAuthAuthorizationStartOutcome.ConfigurationUnavailable>();
+    }
+
+    [Test]
+    public async Task MissingConfiguration_CompletingAuthorization_ReturnsTypedUnavailable()
+    {
+        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        var oauth = new HostBotAccountOAuthService(
+            BotSettings.FromOptions(new BotOptions()),
+            new OAuthTransport(httpClientFactory),
+            new HelixClient(httpClientFactory)
+        );
+
+        var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
+
+        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ConfigurationUnavailable>();
+    }
+
+    [Test]
+    public async Task ProviderRejectedToken_CompletingAuthorization_ReturnsTypedRejection()
+    {
+        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        var oauth = new HostBotAccountOAuthService(
+            BotSettings.FromOptions(
+                new BotOptions
+                {
+                    Identity = new BotIdentityOptions
+                    {
+                        ClientId = "client",
+                        ClientSecret = "secret",
+                        RedirectUri = "https://localhost:7107/oauth/callback",
+                    },
+                }
+            ),
+            new OAuthTransport(httpClientFactory),
+            new HelixClient(httpClientFactory)
+        );
+
+        var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
+
+        outcome.ShouldBeOfType<OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated>();
     }
 
     [Test]
@@ -99,7 +186,7 @@ public sealed class HostBotAccountAuthorizationTests
                 LoginName.Parse("custombot"),
                 "CustomBot",
                 "https://static-cdn.jtvnw.net/custombot.png",
-                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                OAuthScopeSet.Create(["chat:read", "chat:edit", Scopes.UserReadModeratedChannels])
             ),
             CancellationToken.None
         );
@@ -370,7 +457,7 @@ public sealed class HostBotAccountAuthorizationTests
             LoginName.Parse("custombot"),
             "CustomBot",
             "https://static-cdn.jtvnw.net/custombot.png",
-            scopes
+            OAuthScopeSet.Create(scopes)
         );
     }
 
@@ -414,6 +501,11 @@ public sealed class HostBotAccountAuthorizationTests
                 return Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
+                        "/oauth2/token" => JsonResponse(
+                            """
+                            {"access_token":"grant-token","refresh_token":"refresh","expires_in":3600}
+                            """
+                        ),
                         "/oauth2/validate" => ValidationResponse(request),
                         "/helix/users" => JsonResponse(
                             """
