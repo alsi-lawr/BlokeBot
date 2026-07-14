@@ -26,30 +26,46 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
-        var selectedProfileId =
-            round?.ProfileId
-            ?? profileId
-            ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId.Value, ct);
-        var profile = await GuessingProfileQueries.LoadProfileDetailsAsync(
-            db,
+        GuessingReplySettingsResolution resolution;
+        if (round is not null)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId.Value,
+                round.ProfileId,
+                ct
+            );
+        }
+        else if (profileId is { } requestedProfileId)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForProfileAsync(
+                db,
+                hostId.Value,
+                requestedProfileId,
+                ct
+            );
+        }
+        else
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForDefaultAsync(
+                db,
+                hostId.Value,
+                ct
+            );
+        }
+
+        var profile = await db.Profiles.LoadProfileWithOptionsAsync(
             hostId.Value,
-            selectedProfileId,
+            resolution.ProfileId,
             ct
         );
-        var delivery = await ReplyDeliverySettingWriter.LoadAsync(
-            db,
-            hostId.Value,
-            ReplyFeature.Guessing,
-            selectedProfileId,
-            ct
-        );
-        var settings = profile?.Settings ?? GuessingProfileQueries.DefaultReplySettings();
+        var settings = resolution.Settings;
         var template = string.IsNullOrWhiteSpace(settings.AvailableGuessesReply)
             ? GuessingDefaults.Replies().AvailableGuessesReply
             : settings.AvailableGuessesReply;
 
         return new CommandResponse(
-            delivery.TargetFor(GuessingReplyKeys.AvailableGuesses),
+            resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.AvailableGuesses),
             MessageTemplateFormatter.Format(
                 template,
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -83,13 +99,35 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             return NotConfiguredResponse();
         }
 
-        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
-            db,
-            hostId.Value,
-            (await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct))?.ProfileId,
-            profileId,
-            ct
-        );
+        var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
+        GuessingReplySettingsResolution resolution;
+        if (round is not null)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId.Value,
+                round.ProfileId,
+                ct
+            );
+        }
+        else if (profileId is { } requestedProfileId)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForProfileAsync(
+                db,
+                hostId.Value,
+                requestedProfileId,
+                ct
+            );
+        }
+        else
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForDefaultAsync(
+                db,
+                hostId.Value,
+                ct
+            );
+        }
+
         return new CommandResponse(
             resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.ModeratorOnly),
             resolution.Settings.ModeratorOnlyReply
@@ -120,13 +158,35 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             return NotConfiguredResponse();
         }
 
-        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
-            db,
-            hostId.Value,
-            (await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct))?.ProfileId,
-            profileId,
-            ct
-        );
+        var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
+        GuessingReplySettingsResolution resolution;
+        if (round is not null)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId.Value,
+                round.ProfileId,
+                ct
+            );
+        }
+        else if (profileId is { } requestedProfileId)
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForProfileAsync(
+                db,
+                hostId.Value,
+                requestedProfileId,
+                ct
+            );
+        }
+        else
+        {
+            resolution = await GuessingReplySettingsQueries.LoadForDefaultAsync(
+                db,
+                hostId.Value,
+                ct
+            );
+        }
+
         var template = kind switch
         {
             GuessCommandKind.Win => resolution.Settings.WinUsageReply,

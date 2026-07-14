@@ -25,8 +25,7 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
             votes = voteRows.ToImmutableArray();
         }
 
-        var profileId =
-            round?.ProfileId ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId, ct);
+        var profileId = round?.ProfileId ?? await db.Profiles.LoadDefaultProfileIdAsync(hostId, ct);
         var options = await db
             .GuessOptions.AsNoTracking()
             .Where(x => x.GuessRoundProfileId == profileId)

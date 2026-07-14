@@ -30,13 +30,14 @@ public sealed class GuessingVoteService(
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
-        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
-            db,
-            hostId.Value,
-            round?.ProfileId,
-            null,
-            ct
-        );
+        var resolution = round is null
+            ? await GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId.Value, ct)
+            : await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId.Value,
+                round.ProfileId,
+                ct
+            );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
         var normalizedName = GuessName.Parse(name).Value;

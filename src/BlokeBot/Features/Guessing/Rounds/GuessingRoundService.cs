@@ -27,13 +27,14 @@ public sealed class GuessingRoundService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var round = await GuessingRoundQueries.LoadTrackedUnresolvedAsync(db, hostId, ct);
-        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
-            db,
-            hostId,
-            round?.GuessRoundProfileId,
-            null,
-            ct
-        );
+        var resolution = round is null
+            ? await GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct)
+            : await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId,
+                round.GuessRoundProfileId,
+                ct
+            );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
         var normalizedName = GuessName.Parse(name).Value;
@@ -148,12 +149,7 @@ public sealed class GuessingRoundService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var profile = await GuessingProfileQueries.LoadProfileDetailsAsync(
-            db,
-            hostId,
-            profileId,
-            ct
-        );
+        var profile = await db.Profiles.LoadProfileWithOptionsAsync(hostId, profileId, ct);
         if (profile is null)
         {
             return new GuessingOperationResult(false, "Round type not found.");
@@ -211,13 +207,8 @@ public sealed class GuessingRoundService(
         }
 
         var profileId = string.IsNullOrWhiteSpace(profileName)
-            ? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId.Value, ct)
-            : await GuessingProfileQueries.LoadProfileIdByNameAsync(
-                db,
-                hostId.Value,
-                profileName,
-                ct
-            );
+            ? await db.Profiles.LoadDefaultProfileIdAsync(hostId.Value, ct)
+            : await db.Profiles.LoadProfileIdByNameAsync(hostId.Value, profileName, ct);
 
         if (profileId is null)
         {
@@ -233,13 +224,14 @@ public sealed class GuessingRoundService(
         var round = await GuessingRoundQueries.LoadTrackedOpenAsync(db, hostId, ct);
         var settingsRound =
             round ?? await GuessingRoundQueries.LoadTrackedUnresolvedAsync(db, hostId, ct);
-        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
-            db,
-            hostId,
-            settingsRound?.GuessRoundProfileId,
-            null,
-            ct
-        );
+        var resolution = settingsRound is null
+            ? await GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct)
+            : await GuessingReplySettingsQueries.LoadForRoundAsync(
+                db,
+                hostId,
+                settingsRound.GuessRoundProfileId,
+                ct
+            );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
 
