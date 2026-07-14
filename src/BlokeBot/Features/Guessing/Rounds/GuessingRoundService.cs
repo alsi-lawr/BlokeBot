@@ -19,7 +19,7 @@ public sealed class GuessingRoundService(
     PointsChangeNotifier pointsChanges
 )
 {
-    public async Task<GuessingOperationResult> DeclareWinnerAsync(
+    public async Task<GuessingWinnerDeclarationOutcome> DeclareWinnerAsync(
         int hostId,
         string name,
         CancellationToken ct
@@ -41,10 +41,12 @@ public sealed class GuessingRoundService(
 
         if (round is null)
         {
-            return new GuessingOperationResult(
-                false,
-                settings.NoOpenRoundReply,
-                delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
+            return Completed(
+                new GuessingOperationResult(
+                    false,
+                    settings.NoOpenRoundReply,
+                    delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
+                )
             );
         }
 
@@ -54,10 +56,12 @@ public sealed class GuessingRoundService(
         );
         if (!optionExists)
         {
-            return new GuessingOperationResult(
-                false,
-                Format(settings.InvalidGuessReply, normalizedName, string.Empty),
-                delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
+            return Completed(
+                new GuessingOperationResult(
+                    false,
+                    Format(settings.InvalidGuessReply, normalizedName, string.Empty),
+                    delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
+                )
             );
         }
 
@@ -86,7 +90,6 @@ public sealed class GuessingRoundService(
         round.Status = GuessRoundStatus.Completed;
         round.ClosedAtUtc ??= now;
         round.WinningName = normalizedName;
-        var awardedAnyPoints = false;
         if (!rewardAmount.IsZero)
         {
             foreach (var winner in winners)
@@ -94,14 +97,21 @@ public sealed class GuessingRoundService(
                 var result = await balances
                     .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
                     .ExecuteAsync(ct);
-                awardedAnyPoints = result.Match(_ => true, _ => awardedAnyPoints);
+                var failure = result.Match<PointBalanceMutationFailure?>(
+                    static _ => null,
+                    static failed => failed
+                );
+                if (failure is not null)
+                {
+                    return new GuessingWinnerDeclarationOutcome.PayoutFailed(failure);
+                }
             }
         }
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);
-        if (awardedAnyPoints)
+        if (!rewardAmount.IsZero && winners.Count > 0)
         {
             await pointsChanges.NotifyChangedAsync(ct);
         }
@@ -121,10 +131,10 @@ public sealed class GuessingRoundService(
                         : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
             }
         );
-        return new GuessingOperationResult(true, message);
+        return Completed(new GuessingOperationResult(true, message));
     }
 
-    public async Task<GuessingOperationResult> DeclareWinnerAsync(
+    public async Task<GuessingWinnerDeclarationOutcome> DeclareWinnerAsync(
         string hostLogin,
         string name,
         CancellationToken ct
@@ -132,7 +142,9 @@ public sealed class GuessingRoundService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
-        return hostId is null ? NotConfigured() : await DeclareWinnerAsync(hostId.Value, name, ct);
+        return hostId is null
+            ? Completed(NotConfigured())
+            : await DeclareWinnerAsync(hostId.Value, name, ct);
     }
 
     public async Task<GuessingOperationResult> StartRoundAsync(
@@ -288,5 +300,10 @@ public sealed class GuessingRoundService(
     private static GuessingOperationResult NotConfigured()
     {
         return new(false, "This channel is not set up.");
+    }
+
+    private static GuessingWinnerDeclarationOutcome Completed(GuessingOperationResult result)
+    {
+        return new GuessingWinnerDeclarationOutcome.Completed(result);
     }
 }

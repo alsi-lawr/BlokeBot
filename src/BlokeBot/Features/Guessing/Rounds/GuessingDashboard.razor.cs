@@ -166,8 +166,11 @@ public partial class GuessingDashboard
             return;
         }
 
-        await RunAsync(() =>
-            _rounds.DeclareWinnerAsync(HostId, _winnerName, CancellationToken.None)
+        await RunAsync(async () =>
+            (await _rounds.DeclareWinnerAsync(HostId, _winnerName, CancellationToken.None)).Match(
+                completed => completed.Result,
+                failed => new GuessingOperationResult(false, failed.Message, failed.Target)
+            )
         );
         _winnerName = string.Empty;
     }

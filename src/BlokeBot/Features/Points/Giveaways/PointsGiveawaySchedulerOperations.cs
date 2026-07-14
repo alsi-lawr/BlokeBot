@@ -146,6 +146,7 @@ internal sealed class PointsGiveawaySchedulerOperations(
             _ => ValueTask.FromResult(FormattedMessage(new ReplyDeliveryMap())),
             notActive => FormatWithDeliveryAsync(notActive.Settings.HostId),
             noEntrants => FormatWithDeliveryAsync(noEntrants.Settings.HostId),
+            payoutFailed => FormatWithDeliveryAsync(payoutFailed.Settings.HostId),
             winners => FormatWithDeliveryAsync(winners.Settings.HostId)
         );
 

@@ -945,6 +945,60 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
+    public async Task MultipleWinnersWithCappedBalance_DrawingRollsBackEntirePayout()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var giveawayId = await SeedGiveawayAsync(
+            dbFactory,
+            hostId,
+            DateTime.UtcNow,
+            DateTime.UtcNow.AddMinutes(5),
+            "first"
+        );
+        await SeedSettingsAsync(dbFactory, hostId);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            var giveaway = await seed.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
+            giveaway.WinnerCount = 2;
+            giveaway.Entrants.Add(
+                new PointsGiveawayEntrant { Login = "capped", JoinedAtUtc = DateTime.UtcNow }
+            );
+            seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "capped",
+                    Amount = PointAmount.MaximumValue.ToString(),
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await seed.SaveChangesAsync();
+        }
+        var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
+
+        var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
+
+        var failure = outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.PayoutFailed>();
+        failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        var reply = Failed(
+            new PointsGiveawayMessageFormatter().Reply(outcome, new ReplyDeliveryMap())
+        );
+        reply.Message.ShouldBe("Giveaway prizes could not be awarded.");
+        reply.Message.ShouldNotContain("Giveaway winners");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var persisted = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
+        persisted.Status.ShouldBe(PointsGiveawayStatus.Active);
+        persisted.CompletedAtUtc.ShouldBeNull();
+        (await db.PointsGiveawayWinners.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
+        (await db.PointLedgerEntries.CountAsync(x => x.GiveawayId == giveawayId)).ShouldBe(0);
+        var balances = await db.PointBalances.OrderBy(x => x.Login).ToListAsync();
+        balances
+            .Select(balance => (balance.Login, balance.Amount))
+            .ShouldBe([("capped", PointAmount.MaximumValue.ToString())]);
+    }
+
+    [Test]
     public async Task CompletedGiveaway_DrawingAgain_DoesNotPayTwice()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

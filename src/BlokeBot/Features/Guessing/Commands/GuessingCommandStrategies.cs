@@ -166,10 +166,15 @@ public sealed class WinGuessingCommandStrategy(
     {
         var result =
             context.Args.Count == 1
-                ? await rounds.DeclareWinnerAsync(
-                    context.Command.Message.Channel,
-                    context.Args[0],
-                    cancellationToken
+                ? (
+                    await rounds.DeclareWinnerAsync(
+                        context.Command.Message.Channel,
+                        context.Args[0],
+                        cancellationToken
+                    )
+                ).Match(
+                    completed => completed.Result,
+                    failed => new GuessingOperationResult(false, failed.Message, failed.Target)
                 )
                 : await UsageAsync(context, cancellationToken);
 

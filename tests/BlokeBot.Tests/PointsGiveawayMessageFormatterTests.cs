@@ -139,6 +139,20 @@ public sealed class PointsGiveawayMessageFormatterTests
             "Giveaway ended with no eligible entrants.",
             CommandResponseTarget.Chat
         );
+        AssertFailed(
+            _formatter.Reply(
+                new PointsGiveawayDrawOutcome.PayoutFailed(
+                    _settings,
+                    new PointBalanceMutationFailure.CapExceeded(
+                        PointAmount.ParseAbsolute("100"),
+                        PointAmount.ParseAbsolute("10")
+                    )
+                ),
+                delivery
+            ),
+            "Giveaway prizes could not be awarded.",
+            CommandResponseTarget.Chat
+        );
         AssertSucceeded(
             _formatter.Reply(
                 new PointsGiveawayDrawOutcome.Winners(

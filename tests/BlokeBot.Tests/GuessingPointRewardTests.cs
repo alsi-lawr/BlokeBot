@@ -47,7 +47,8 @@ public sealed class GuessingPointRewardTests
         var seed = await SeedRoundAsync(dbFactory, "25");
         var service = RoundService(dbFactory);
 
-        var result = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var result = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>().Result;
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var balances = await db
@@ -80,13 +81,60 @@ public sealed class GuessingPointRewardTests
         var seed = await SeedRoundAsync(dbFactory, "0");
         var service = RoundService(dbFactory);
 
-        var result = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var result = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>().Result;
 
         await using var db = await dbFactory.CreateDbContextAsync();
         result.Succeeded.ShouldBeTrue();
         result.Message.ShouldBe("blue wins. Correct guesses: one, three.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task WinnerAtPointCap_DeclaringWinnerRollsBackRoundAndAllRewards()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedRoundAsync(dbFactory, "25");
+        await using (var balances = await dbFactory.CreateDbContextAsync())
+        {
+            balances.PointBalances.AddRange(
+                new PointBalance
+                {
+                    HostId = seed.HostId,
+                    Login = "one",
+                    Amount = "5",
+                    UpdatedAtUtc = DateTime.UtcNow,
+                },
+                new PointBalance
+                {
+                    HostId = seed.HostId,
+                    Login = "three",
+                    Amount = PointAmount.MaximumValue.ToString(),
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await balances.SaveChangesAsync();
+        }
+        var service = RoundService(dbFactory);
+
+        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+
+        var failure = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.PayoutFailed>();
+        failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        failure.Message.ShouldBe("Winner rewards could not be awarded.");
+        failure.Message.ShouldNotContain("wins");
+        failure.Message.ShouldNotContain("Each winner gets");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var round = await db.Rounds.SingleAsync(x => x.Id == seed.RoundId);
+        round.Status.ShouldBe(GuessRoundStatus.Open);
+        round.ClosedAtUtc.ShouldBeNull();
+        round.WinningName.ShouldBeNull();
+        var persistedBalances = await db.PointBalances.OrderBy(x => x.Login).ToListAsync();
+        persistedBalances
+            .Select(balance => (balance.Login, balance.Amount))
+            .ShouldBe([("one", "5"), ("three", PointAmount.MaximumValue.ToString())]);
+        (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
     }
 
     private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory)

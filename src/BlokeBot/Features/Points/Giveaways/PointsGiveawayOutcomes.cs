@@ -210,6 +210,7 @@ public abstract record PointsGiveawayDrawOutcome
         Func<Missing, TResult> missing,
         Func<NotActive, TResult> notActive,
         Func<NoEntrants, TResult> noEntrants,
+        Func<PayoutFailed, TResult> payoutFailed,
         Func<Winners, TResult> winners
     );
 
@@ -219,6 +220,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<Missing, TResult> missing,
             Func<NotActive, TResult> notActive,
             Func<NoEntrants, TResult> noEntrants,
+            Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
         )
         {
@@ -232,6 +234,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<Missing, TResult> missing,
             Func<NotActive, TResult> notActive,
             Func<NoEntrants, TResult> noEntrants,
+            Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
         )
         {
@@ -245,10 +248,26 @@ public abstract record PointsGiveawayDrawOutcome
             Func<Missing, TResult> missing,
             Func<NotActive, TResult> notActive,
             Func<NoEntrants, TResult> noEntrants,
+            Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
         )
         {
             return noEntrants(this);
+        }
+    }
+
+    public sealed record PayoutFailed(PointsSettings Settings, PointBalanceMutationFailure Failure)
+        : PointsGiveawayDrawOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Missing, TResult> missing,
+            Func<NotActive, TResult> notActive,
+            Func<NoEntrants, TResult> noEntrants,
+            Func<PayoutFailed, TResult> payoutFailed,
+            Func<Winners, TResult> winners
+        )
+        {
+            return payoutFailed(this);
         }
     }
 
@@ -275,6 +294,7 @@ public abstract record PointsGiveawayDrawOutcome
             Func<Missing, TResult> missing,
             Func<NotActive, TResult> notActive,
             Func<NoEntrants, TResult> noEntrants,
+            Func<PayoutFailed, TResult> payoutFailed,
             Func<Winners, TResult> winners
         )
         {

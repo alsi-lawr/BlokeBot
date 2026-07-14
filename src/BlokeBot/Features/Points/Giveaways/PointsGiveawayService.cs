@@ -242,6 +242,7 @@ public sealed class PointsGiveawayService(
             static _ => Task.CompletedTask,
             static _ => Task.CompletedTask,
             _ => CompleteAsync(),
+            static _ => Task.CompletedTask,
             _ => CompleteAsync()
         );
         return result;

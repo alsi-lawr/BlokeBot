@@ -1,4 +1,5 @@
 using System.Reflection;
+using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Giveaways;
 using Shouldly;
@@ -40,8 +41,9 @@ public sealed class PointsOutcomeContractTests
         );
         AssertUnion(
             typeof(PointsGiveawayDrawOutcome),
-            ["Missing", "NoEntrants", "NotActive", "Winners"]
+            ["Missing", "NoEntrants", "NotActive", "PayoutFailed", "Winners"]
         );
+        AssertUnion(typeof(GuessingWinnerDeclarationOutcome), ["Completed", "PayoutFailed"]);
         AssertUnion(typeof(PointsGiveawayCancelOutcome), ["Cancelled", "NotActive"]);
     }
 

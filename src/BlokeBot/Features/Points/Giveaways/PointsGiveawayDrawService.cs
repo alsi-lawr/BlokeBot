@@ -111,6 +111,18 @@ public sealed class PointsGiveawayDrawService(
         foreach (var winner in winners)
         {
             var payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
+            var mutation = await balances
+                .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
+                .ExecuteAsync(ct);
+            var failure = mutation.Match<PointBalanceMutationFailure?>(
+                static _ => null,
+                static failed => failed
+            );
+            if (failure is not null)
+            {
+                return new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure);
+            }
+
             winnerPayouts.Add(new PointsGiveawayWinnerPayout(winner, payout));
             giveaway.Winners.Add(
                 new PointsGiveawayWinner
@@ -120,9 +132,6 @@ public sealed class PointsGiveawayDrawService(
                     Payout = payout.ToString(),
                 }
             );
-            _ = await balances
-                .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
-                .ExecuteAsync(ct);
         }
 
         await db.SaveChangesAsync(ct);

@@ -175,6 +175,7 @@ internal sealed class PointsGiveawayScheduler(
             static _ => Task.CompletedTask,
             static _ => Task.CompletedTask,
             _ => NotifyChangedAsync(schedule.GiveawayId, ct),
+            static _ => Task.CompletedTask,
             _ => NotifyChangedAsync(schedule.GiveawayId, ct)
         );
 

@@ -9,6 +9,7 @@ public sealed class PointsGiveawayMessageFormatter
 {
     private const string _streamLivenessUnavailableReply =
         "Stream status could not be checked right now.";
+    private const string _payoutFailedReply = "Giveaway prizes could not be awarded.";
 
     public PointOperationOutcome Reply(
         PointsGiveawayStartOutcome outcome,
@@ -107,6 +108,7 @@ public sealed class PointsGiveawayMessageFormatter
                 Succeeded(
                     FormatPlain(noEntrants.Settings.GiveawayNoEntrantsReply, noEntrants.Settings)
                 ),
+            _ => Failed(_payoutFailedReply, CommandResponseTarget.Chat),
             winners =>
                 Succeeded(
                     FormatWinners(

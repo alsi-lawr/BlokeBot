@@ -76,6 +76,61 @@ public sealed class PointBalanceIOTests
         thrown.ShouldBeSameAs(expected);
     }
 
+    [Test]
+    public async Task MaximumBalance_AddingPoints_ReturnsCapExceededWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            seed.PointBalances.Add(
+                new PointBalance
+                {
+                    HostId = hostId,
+                    Login = "viewer",
+                    Amount = PointAmount.MaximumValue.ToString(),
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await seed.SaveChangesAsync();
+        }
+
+        var result = await new PointBalanceService(dbFactory)
+            .Add(hostId, "viewer", PointAmount.ParseAbsolute("1"), "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match(
+                _ => throw new InvalidOperationException("Expected the point cap to reject add."),
+                failure => failure
+            )
+            .ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PointBalances.SingleAsync()).Amount.ShouldBe(PointAmount.MaximumValue.ToString());
+        (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task MissingBalance_Deleting_ReturnsUnknownUserWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+
+        var result = await new PointBalanceService(dbFactory)
+            .DeleteBalance(hostId, "missing", "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match(
+                _ => throw new InvalidOperationException("Expected an unknown-user failure."),
+                failure => failure
+            )
+            .ShouldBeOfType<PointBalanceMutationFailure.UnknownUser>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PointBalances.CountAsync()).ShouldBe(0);
+        (await db.PointLedgerEntries.CountAsync()).ShouldBe(0);
+    }
+
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
