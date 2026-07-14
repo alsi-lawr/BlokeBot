@@ -1,6 +1,7 @@
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -102,89 +103,58 @@ public sealed class BoundedDiscriminatorBehaviorTests
         var hostId = await SeedHostAsync(dbFactory);
         var service = new PointBalanceService(dbFactory);
 
-        (
-            await service.AddAsync(
-                hostId,
-                "alpha",
-                Amount(100),
-                "moderator",
-                "add",
-                CancellationToken.None
-            )
-        ).Success.ShouldBeTrue();
-        (
-            await service.RemoveAsync(
-                hostId,
-                "alpha",
-                Amount(10),
-                "moderator",
-                "remove",
-                CancellationToken.None
-            )
-        ).Success.ShouldBeTrue();
-        (
-            await service.AddAsync(
-                hostId,
-                "beta",
-                Amount(20),
-                "moderator",
-                "add",
-                CancellationToken.None
-            )
-        ).Success.ShouldBeTrue();
-        (
-            await service.TransferAsync(hostId, "alpha", "beta", Amount(5), CancellationToken.None)
-        ).Success.ShouldBeTrue();
-        (
-            await service.ApplyGambleAsync(hostId, "alpha", Amount(5), true, CancellationToken.None)
-        ).Success.ShouldBeTrue();
-        (
-            await service.ApplyGambleAsync(
-                hostId,
-                "alpha",
-                Amount(5),
-                false,
-                CancellationToken.None
-            )
-        ).Success.ShouldBeTrue();
+        AssertSuccess(
+            await service
+                .Add(hostId, "alpha", Amount(100), "moderator", "add")
+                .ExecuteAsync(CancellationToken.None)
+        );
+        AssertSuccess(
+            await service
+                .Remove(hostId, "alpha", Amount(10), "moderator", "remove")
+                .ExecuteAsync(CancellationToken.None)
+        );
+        AssertSuccess(
+            await service
+                .Add(hostId, "beta", Amount(20), "moderator", "add")
+                .ExecuteAsync(CancellationToken.None)
+        );
+        AssertSuccess(
+            await service
+                .Transfer(hostId, "alpha", "beta", Amount(5))
+                .ExecuteAsync(CancellationToken.None)
+        );
+        AssertSuccess(
+            await service
+                .ApplyGamble(hostId, "alpha", Amount(5), new PointGambleOutcome.Won())
+                .ExecuteAsync(CancellationToken.None)
+        );
+        AssertSuccess(
+            await service
+                .ApplyGamble(hostId, "alpha", Amount(5), new PointGambleOutcome.Lost())
+                .ExecuteAsync(CancellationToken.None)
+        );
 
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             var now = new DateTime(2026, 7, 13, 12, 0, 0, DateTimeKind.Utc);
-            (
-                await service.AwardGiveawayAsync(
-                    db,
-                    hostId,
-                    42,
-                    "beta",
-                    Amount(10),
-                    now,
-                    CancellationToken.None
-                )
-            ).Success.ShouldBeTrue();
-            (
-                await service.AwardGuessWinAsync(
-                    db,
-                    hostId,
-                    24,
-                    "alpha",
-                    Amount(10),
-                    now,
-                    CancellationToken.None
-                )
-            ).Success.ShouldBeTrue();
+            AssertSuccess(
+                await service
+                    .AwardGiveaway(db, hostId, 42, "beta", Amount(10), now)
+                    .ExecuteAsync(CancellationToken.None)
+            );
+            AssertSuccess(
+                await service
+                    .AwardGuessWin(db, hostId, 24, "alpha", Amount(10), now)
+                    .ExecuteAsync(CancellationToken.None)
+            );
             await db.SaveChangesAsync();
         }
 
-        (
-            await service.DeleteBalanceAsync(
-                hostId,
-                "beta",
-                "moderator",
-                "delete",
-                CancellationToken.None
-            )
-        ).Success.ShouldBeTrue();
+        AssertSuccess(
+            await service
+                .DeleteBalance(hostId, "beta", "moderator", "delete")
+                .ExecuteAsync(CancellationToken.None)
+        );
 
         await using var readDb = await dbFactory.CreateDbContextAsync();
         var kinds = await readDb
@@ -193,6 +163,13 @@ public sealed class BoundedDiscriminatorBehaviorTests
             .Distinct()
             .ToListAsync();
         kinds.Order().ShouldBe(Enum.GetValues<PointLedgerKind>());
+    }
+
+    private static void AssertSuccess(
+        Result<PointBalanceMutation, PointBalanceMutationFailure> result
+    )
+    {
+        result.Match(static _ => true, static _ => false).ShouldBeTrue();
     }
 
     private static ReplyDeliverySetting Setting(string key, ReplyDeliveryTarget target)

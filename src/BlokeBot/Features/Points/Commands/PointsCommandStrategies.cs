@@ -67,16 +67,17 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
 
     protected static async ValueTask ReplyAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
-        PointOperationResult result,
+        PointOperationOutcome outcome,
         CancellationToken cancellationToken
     )
     {
-        if (!string.IsNullOrWhiteSpace(result.Message))
+        var response = outcome.Match(
+            succeeded => new CommandResponse(succeeded.Target, succeeded.Message),
+            failed => new CommandResponse(failed.Target, failed.Message)
+        );
+        if (!string.IsNullOrWhiteSpace(response.Message))
         {
-            await context.Command.RespondAsync(
-                new CommandResponse(result.Target, result.Message),
-                cancellationToken
-            );
+            await context.Command.RespondAsync(response, cancellationToken);
         }
     }
 
@@ -109,35 +110,33 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         );
     }
 
-    protected static PointOperationResult Insufficient(
+    protected static PointOperationOutcome Insufficient(
         PointsSettings settings,
         ReplyDeliveryMap delivery
     )
     {
-        return PointOperationResult.Failure(
-            PointOperationFailureReason.InsufficientBalance,
+        return new PointOperationOutcome.Failed(
             Format(settings.InsufficientBalanceReply, settings),
-            target: delivery.TargetFor(PointsReplyKeys.InsufficientBalance)
+            delivery.TargetFor(PointsReplyKeys.InsufficientBalance)
         );
     }
 
-    protected static PointOperationResult Invalid(
+    protected static PointOperationOutcome Invalid(
         PointsSettings settings,
         ReplyDeliveryMap delivery
     )
     {
-        return PointOperationResult.Failure(
-            PointOperationFailureReason.InvalidAmount,
+        return new PointOperationOutcome.Failed(
             Format(settings.InvalidAmountReply, settings),
-            target: delivery.TargetFor(PointsReplyKeys.InvalidAmount)
+            delivery.TargetFor(PointsReplyKeys.InvalidAmount)
         );
     }
 
-    protected static PointOperationResult UnknownUser(string login)
+    protected static PointOperationOutcome UnknownUser(string login)
     {
-        return PointOperationResult.Failure(
-            PointOperationFailureReason.UnknownUser,
-            $"Twitch user @{login} was not found."
+        return new PointOperationOutcome.Failed(
+            $"Twitch user @{login} was not found.",
+            CommandResponseTarget.Chat
         );
     }
 }
@@ -159,7 +158,7 @@ public sealed class PointsBalanceCommandStrategy(
     )
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
-        PointOperationResult result;
+        PointOperationOutcome result;
         if (context.Args.Count > 1)
         {
             result = Invalid(resolution.Settings, resolution.ReplyDelivery);
@@ -169,10 +168,9 @@ public sealed class PointsBalanceCommandStrategy(
             && !ChatModeratorPolicy.IsModerator(context.Command.Message)
         )
         {
-            result = new PointOperationResult(
-                false,
+            result = new PointOperationOutcome.Failed(
                 Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings),
-                Target: resolution.ReplyDelivery.TargetFor(PointsReplyKeys.ModeratorOnly)
+                resolution.ReplyDelivery.TargetFor(PointsReplyKeys.ModeratorOnly)
             );
         }
         else
@@ -189,16 +187,14 @@ public sealed class PointsBalanceCommandStrategy(
                     : resolution.Settings.OtherBalanceReply;
             var replyKey =
                 context.Args.Count == 0 ? PointsReplyKeys.Balance : PointsReplyKeys.OtherBalance;
-            result = new PointOperationResult(
-                true,
+            result = new PointOperationOutcome.Succeeded(
                 Format(
                     template,
                     resolution.Settings,
                     user: balance.Login,
                     balance: balance.Balance.ToDisplayString()
                 ),
-                balance.Balance,
-                Target: resolution.ReplyDelivery.TargetFor(replyKey)
+                resolution.ReplyDelivery.TargetFor(replyKey)
             );
         }
 
@@ -224,7 +220,7 @@ public sealed class GivePointsCommandStrategy(
     )
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
-        PointOperationResult result;
+        PointOperationOutcome result;
         if (context.Args.Count != 2)
         {
             result = Invalid(resolution.Settings, resolution.ReplyDelivery);
@@ -243,7 +239,7 @@ public sealed class GivePointsCommandStrategy(
                     _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
                 );
 
-            async Task<PointOperationResult> TransferAsync(PointAmount amount)
+            async Task<PointOperationOutcome> TransferAsync(PointAmount amount)
             {
                 var target = LoginName.Parse(context.Args[0]).Value;
                 if (!await users.ExistsAsync(target, cancellationToken))
@@ -251,29 +247,29 @@ public sealed class GivePointsCommandStrategy(
                     return UnknownUser(target);
                 }
 
-                var transfer = await balances.TransferAsync(
-                    resolution.HostId,
-                    context.Command.Message.Login,
-                    target,
-                    amount,
-                    cancellationToken
+                var transfer = await balances
+                    .Transfer(resolution.HostId, context.Command.Message.Login, target, amount)
+                    .ExecuteAsync(cancellationToken);
+                return transfer.Match<PointOperationOutcome>(
+                    success => new PointOperationOutcome.Succeeded(
+                        Format(
+                            resolution.Settings.TransferReply,
+                            resolution.Settings,
+                            from: context.Command.Message.Login,
+                            to: target,
+                            amount: amount.ToDisplayString(),
+                            balance: success.Balance.ToDisplayString()
+                        ),
+                        resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Transfer)
+                    ),
+                    failure =>
+                        failure.Match<PointOperationOutcome>(
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery),
+                            _ => UnknownUser(target),
+                            _ => Insufficient(resolution.Settings, resolution.ReplyDelivery),
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery)
+                        )
                 );
-                return transfer.Success
-                        ? transfer with
-                        {
-                            Message = Format(
-                                resolution.Settings.TransferReply,
-                                resolution.Settings,
-                                from: context.Command.Message.Login,
-                                to: target,
-                                amount: amount.ToDisplayString(),
-                                balance: transfer.Balance?.ToDisplayString()
-                            ),
-                            Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Transfer),
-                        }
-                    : transfer.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
-                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -299,7 +295,7 @@ public sealed class AddPointsCommandStrategy(
     )
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
-        PointOperationResult result;
+        PointOperationOutcome result;
         if (context.Args.Count != 2)
         {
             result = Invalid(resolution.Settings, resolution.ReplyDelivery);
@@ -313,7 +309,7 @@ public sealed class AddPointsCommandStrategy(
                     _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
                 );
 
-            async Task<PointOperationResult> AddAsync(PointAmount amount)
+            async Task<PointOperationOutcome> AddAsync(PointAmount amount)
             {
                 var target = LoginName.Parse(context.Args[0]).Value;
                 if (!await users.ExistsAsync(target, cancellationToken))
@@ -321,27 +317,34 @@ public sealed class AddPointsCommandStrategy(
                     return UnknownUser(target);
                 }
 
-                var addition = await balances.AddAsync(
-                    resolution.HostId,
-                    target,
-                    amount,
-                    context.Command.Message.Login,
-                    "chat command",
-                    cancellationToken
-                );
-                return addition.Success
-                    ? addition with
-                    {
-                        Message = Format(
+                var addition = await balances
+                    .Add(
+                        resolution.HostId,
+                        target,
+                        amount,
+                        context.Command.Message.Login,
+                        "chat command"
+                    )
+                    .ExecuteAsync(cancellationToken);
+                return addition.Match<PointOperationOutcome>(
+                    success => new PointOperationOutcome.Succeeded(
+                        Format(
                             resolution.Settings.AddReply,
                             resolution.Settings,
                             user: target,
                             amount: amount.ToDisplayString(),
-                            balance: addition.Balance?.ToDisplayString()
+                            balance: success.Balance.ToDisplayString()
                         ),
-                        Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Add),
-                    }
-                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
+                        resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Add)
+                    ),
+                    failure =>
+                        failure.Match<PointOperationOutcome>(
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery),
+                            _ => UnknownUser(target),
+                            _ => Insufficient(resolution.Settings, resolution.ReplyDelivery),
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery)
+                        )
+                );
             }
         }
 
@@ -366,7 +369,7 @@ public sealed class RemovePointsCommandStrategy(
     )
     {
         var resolution = await LoadResolutionAsync(context, cancellationToken);
-        PointOperationResult result;
+        PointOperationOutcome result;
         if (context.Args.Count != 2)
         {
             result = Invalid(resolution.Settings, resolution.ReplyDelivery);
@@ -386,31 +389,36 @@ public sealed class RemovePointsCommandStrategy(
                     _ => Task.FromResult(Invalid(resolution.Settings, resolution.ReplyDelivery))
                 );
 
-            async Task<PointOperationResult> RemoveAsync(PointAmount amount)
+            async Task<PointOperationOutcome> RemoveAsync(PointAmount amount)
             {
-                var removal = await balances.RemoveAsync(
-                    resolution.HostId,
-                    target,
-                    amount,
-                    context.Command.Message.Login,
-                    "chat command",
-                    cancellationToken
+                var removal = await balances
+                    .Remove(
+                        resolution.HostId,
+                        target,
+                        amount,
+                        context.Command.Message.Login,
+                        "chat command"
+                    )
+                    .ExecuteAsync(cancellationToken);
+                return removal.Match<PointOperationOutcome>(
+                    success => new PointOperationOutcome.Succeeded(
+                        Format(
+                            resolution.Settings.RemoveReply,
+                            resolution.Settings,
+                            user: target,
+                            amount: amount.ToDisplayString(),
+                            balance: success.Balance.ToDisplayString()
+                        ),
+                        resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Remove)
+                    ),
+                    failure =>
+                        failure.Match<PointOperationOutcome>(
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery),
+                            _ => UnknownUser(target),
+                            _ => Insufficient(resolution.Settings, resolution.ReplyDelivery),
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery)
+                        )
                 );
-                return removal.Success
-                        ? removal with
-                        {
-                            Message = Format(
-                                resolution.Settings.RemoveReply,
-                                resolution.Settings,
-                                user: target,
-                                amount: amount.ToDisplayString(),
-                                balance: removal.Balance?.ToDisplayString()
-                            ),
-                            Target = resolution.ReplyDelivery.TargetFor(PointsReplyKeys.Remove),
-                        }
-                    : removal.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
-                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
             }
         }
 
@@ -467,7 +475,7 @@ public sealed class GambleCommandStrategy(
 
         async ValueTask GambleAsync(PointAmount stake)
         {
-            PointOperationResult result;
+            PointOperationOutcome result;
             if (source.Balance.Value < stake.Value)
             {
                 result = Insufficient(resolution.Settings, resolution.ReplyDelivery);
@@ -485,31 +493,45 @@ public sealed class GambleCommandStrategy(
                     return;
                 }
 
-                var won = random.NextDouble() * 100 < resolution.Settings.GamblingWinRatePercent;
-                result = await balances.ApplyGambleAsync(
-                    resolution.HostId,
-                    context.Command.Message.Login,
-                    stake,
-                    won,
-                    cancellationToken
-                );
-                result =
-                    result.Success
-                        ? result with
-                        {
-                            Message = Format(
-                                won
-                                    ? resolution.Settings.GamblingWinReply
-                                    : resolution.Settings.GamblingLoseReply,
-                                resolution.Settings,
-                                user: context.Command.Message.Login,
-                                amount: stake.ToDisplayString(),
-                                balance: result.Balance?.ToDisplayString()
+                PointGambleOutcome gamble =
+                    random.NextDouble() * 100 < resolution.Settings.GamblingWinRatePercent
+                        ? new PointGambleOutcome.Won()
+                        : new PointGambleOutcome.Lost();
+                var mutation = await balances
+                    .ApplyGamble(resolution.HostId, context.Command.Message.Login, stake, gamble)
+                    .ExecuteAsync(cancellationToken);
+                result = mutation.Match<PointOperationOutcome>(
+                    success =>
+                        gamble.Match<PointOperationOutcome>(
+                            _ => new PointOperationOutcome.Succeeded(
+                                Format(
+                                    resolution.Settings.GamblingWinReply,
+                                    resolution.Settings,
+                                    user: context.Command.Message.Login,
+                                    amount: stake.ToDisplayString(),
+                                    balance: success.Balance.ToDisplayString()
+                                ),
+                                CommandResponseTarget.Chat
                             ),
-                        }
-                    : result.FailureReason == PointOperationFailureReason.InsufficientBalance
-                        ? Insufficient(resolution.Settings, resolution.ReplyDelivery)
-                    : Invalid(resolution.Settings, resolution.ReplyDelivery);
+                            _ => new PointOperationOutcome.Succeeded(
+                                Format(
+                                    resolution.Settings.GamblingLoseReply,
+                                    resolution.Settings,
+                                    user: context.Command.Message.Login,
+                                    amount: stake.ToDisplayString(),
+                                    balance: success.Balance.ToDisplayString()
+                                ),
+                                CommandResponseTarget.Chat
+                            )
+                        ),
+                    failure =>
+                        failure.Match<PointOperationOutcome>(
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery),
+                            _ => UnknownUser(context.Command.Message.Login),
+                            _ => Insufficient(resolution.Settings, resolution.ReplyDelivery),
+                            _ => Invalid(resolution.Settings, resolution.ReplyDelivery)
+                        )
+                );
             }
 
             await ReplyAsync(context, result, cancellationToken);

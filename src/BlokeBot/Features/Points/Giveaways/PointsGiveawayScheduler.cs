@@ -171,10 +171,12 @@ internal sealed class PointsGiveawayScheduler(
             schedule.GiveawayId,
             ct
         );
-        if (drawOutcome.Success)
-        {
-            await NotifyChangedAsync(schedule.GiveawayId, ct);
-        }
+        await drawOutcome.Match(
+            static _ => Task.CompletedTask,
+            static _ => Task.CompletedTask,
+            _ => NotifyChangedAsync(schedule.GiveawayId, ct),
+            _ => NotifyChangedAsync(schedule.GiveawayId, ct)
+        );
 
         var drawMessage = await BuildDrawNotificationAsync(schedule, drawOutcome, ct);
         await SendAsync(schedule, drawMessage, PointsGiveawayNotificationKind.DrawResult, ct);

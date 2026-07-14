@@ -305,29 +305,25 @@ public sealed class CommandCatalogTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var balances = new PointBalanceService(dbFactory);
 
-        var insufficient = await balances.RemoveAsync(
-            hostId,
-            "viewer",
-            PointAmount.ParseAbsolute("10"),
-            "admin",
-            "test",
-            CancellationToken.None
-        );
-        var invalid = await balances.AddAsync(
-            hostId,
-            "viewer",
-            PointAmount.Zero,
-            "admin",
-            "test",
-            CancellationToken.None
-        );
+        var insufficient = await balances
+            .Remove(hostId, "viewer", PointAmount.ParseAbsolute("10"), "admin", "test")
+            .ExecuteAsync(CancellationToken.None);
+        var invalid = await balances
+            .Add(hostId, "viewer", PointAmount.Zero, "admin", "test")
+            .ExecuteAsync(CancellationToken.None);
 
-        insufficient.Success.ShouldBeFalse();
-        insufficient.FailureReason.ShouldBe(PointOperationFailureReason.InsufficientBalance);
-        insufficient.Message.ShouldBeEmpty();
-        invalid.Success.ShouldBeFalse();
-        invalid.FailureReason.ShouldBe(PointOperationFailureReason.InvalidAmount);
-        invalid.Message.ShouldBeEmpty();
+        insufficient
+            .Match<PointBalanceMutationFailure>(
+                _ => throw new InvalidOperationException("Expected insufficient balance."),
+                failure => failure
+            )
+            .ShouldBeOfType<PointBalanceMutationFailure.InsufficientBalance>();
+        invalid
+            .Match<PointBalanceMutationFailure>(
+                _ => throw new InvalidOperationException("Expected invalid amount."),
+                failure => failure
+            )
+            .ShouldBeOfType<PointBalanceMutationFailure.InvalidAmount>();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)

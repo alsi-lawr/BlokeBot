@@ -1,8 +1,17 @@
 using System.Numerics;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using PointMutationIO = BlokeBot.Functional.IO<
+    BlokeBot.Features.Points.Balances.PointBalanceMutation,
+    BlokeBot.Features.Points.Balances.PointBalanceMutationFailure
+>;
+using PointMutationResult = BlokeBot.Functional.Result<
+    BlokeBot.Features.Points.Balances.PointBalanceMutation,
+    BlokeBot.Features.Points.Balances.PointBalanceMutationFailure
+>;
 
 namespace BlokeBot.Features.Points.Balances;
 
@@ -75,7 +84,20 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
             .ToListAsync(ct);
     }
 
-    public async Task<PointOperationResult> AddAsync(
+    public PointMutationIO Add(
+        int hostId,
+        string targetLogin,
+        PointAmount amount,
+        string actorLogin,
+        string note
+    )
+    {
+        return PointMutationIO.Create(ct =>
+            AddAsync(hostId, targetLogin, amount, actorLogin, note, ct)
+        );
+    }
+
+    private async ValueTask<PointMutationResult> AddAsync(
         int hostId,
         string targetLogin,
         PointAmount amount,
@@ -86,7 +108,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     {
         if (amount.IsZero)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -96,7 +118,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var current = PointAmount.ParseAbsolute(target.Amount);
         if (current.Value + amount.Value > PointAmount.MaximumValue)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.CapExceeded);
+            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }
 
         var next = current.Add(amount);
@@ -117,10 +139,23 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return PointOperationResult.Successful(balance: next, amount: amount);
+        return Success(next, amount);
     }
 
-    public async Task<PointOperationResult> RemoveAsync(
+    public PointMutationIO Remove(
+        int hostId,
+        string targetLogin,
+        PointAmount amount,
+        string actorLogin,
+        string note
+    )
+    {
+        return PointMutationIO.Create(ct =>
+            RemoveAsync(hostId, targetLogin, amount, actorLogin, note, ct)
+        );
+    }
+
+    private async ValueTask<PointMutationResult> RemoveAsync(
         int hostId,
         string targetLogin,
         PointAmount amount,
@@ -131,7 +166,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     {
         if (amount.IsZero)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -141,11 +176,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var current = PointAmount.ParseAbsolute(target.Amount);
         if (current.Value < amount.Value)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InsufficientBalance,
-                balance: current,
-                amount: amount
-            );
+            return Failure(new PointBalanceMutationFailure.InsufficientBalance(current, amount));
         }
 
         var next = current.Subtract(amount);
@@ -166,10 +197,22 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return PointOperationResult.Successful(balance: next, amount: amount);
+        return Success(next, amount);
     }
 
-    public async Task<PointOperationResult> DeleteBalanceAsync(
+    public PointMutationIO DeleteBalance(
+        int hostId,
+        string targetLogin,
+        string actorLogin,
+        string note
+    )
+    {
+        return PointMutationIO.Create(ct =>
+            DeleteBalanceAsync(hostId, targetLogin, actorLogin, note, ct)
+        );
+    }
+
+    private async ValueTask<PointMutationResult> DeleteBalanceAsync(
         int hostId,
         string targetLogin,
         string actorLogin,
@@ -186,7 +229,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         if (row is null)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.UnknownUser);
+            return Failure(new PointBalanceMutationFailure.UnknownUser());
         }
 
         var current = PointAmount.ParseAbsolute(row.Amount);
@@ -207,10 +250,20 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return PointOperationResult.Successful(balance: PointAmount.Zero, amount: current);
+        return Success(PointAmount.Zero, current);
     }
 
-    public async Task<PointOperationResult> TransferAsync(
+    public PointMutationIO Transfer(
+        int hostId,
+        string fromLogin,
+        string toLogin,
+        PointAmount amount
+    )
+    {
+        return PointMutationIO.Create(ct => TransferAsync(hostId, fromLogin, toLogin, amount, ct));
+    }
+
+    private async ValueTask<PointMutationResult> TransferAsync(
         int hostId,
         string fromLogin,
         string toLogin,
@@ -220,14 +273,14 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     {
         if (amount.IsZero)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         var from = LoginName.Parse(fromLogin).Value;
         var to = LoginName.Parse(toLogin).Value;
         if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase))
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -239,20 +292,14 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var targetCurrent = PointAmount.ParseAbsolute(target.Amount);
         if (sourceCurrent.Value < amount.Value)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InsufficientBalance,
-                balance: sourceCurrent,
-                amount: amount
+            return Failure(
+                new PointBalanceMutationFailure.InsufficientBalance(sourceCurrent, amount)
             );
         }
 
         if (targetCurrent.Value + amount.Value > PointAmount.MaximumValue)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.CapExceeded,
-                balance: targetCurrent,
-                amount: amount
-            );
+            return Failure(new PointBalanceMutationFailure.CapExceeded(targetCurrent, amount));
         }
 
         var sourceNext = sourceCurrent.Subtract(amount);
@@ -289,20 +336,30 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         );
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return PointOperationResult.Successful(balance: sourceNext, amount: amount);
+        return Success(sourceNext, amount);
     }
 
-    public async Task<PointOperationResult> ApplyGambleAsync(
+    public PointMutationIO ApplyGamble(
         int hostId,
         string login,
         PointAmount stake,
-        bool won,
+        PointGambleOutcome outcome
+    )
+    {
+        return PointMutationIO.Create(ct => ApplyGambleAsync(hostId, login, stake, outcome, ct));
+    }
+
+    private async ValueTask<PointMutationResult> ApplyGambleAsync(
+        int hostId,
+        string login,
+        PointAmount stake,
+        PointGambleOutcome outcome,
         CancellationToken ct
     )
     {
         if (stake.IsZero)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -312,56 +369,72 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var current = PointAmount.ParseAbsolute(row.Amount);
         if (current.Value < stake.Value)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.InsufficientBalance,
-                balance: current,
-                amount: stake
-            );
+            return Failure(new PointBalanceMutationFailure.InsufficientBalance(current, stake));
         }
 
-        PointAmount next;
-        BigInteger delta;
-        if (won)
-        {
-            if (current.Value + stake.Value > PointAmount.MaximumValue)
-            {
-                return PointOperationResult.Failure(
-                    PointOperationFailureReason.CapExceeded,
-                    balance: current,
-                    amount: stake
-                );
-            }
-
-            next = current.Add(stake);
-            delta = stake.Value;
-        }
-        else
-        {
-            next = current.Subtract(stake);
-            delta = -stake.Value;
-        }
-
-        row.Amount = next.ToString();
-        row.UpdatedAtUtc = now;
-        AddLedger(
-            db,
-            hostId,
-            won ? PointLedgerKind.GambleWin : PointLedgerKind.GambleLoss,
-            row.Login,
-            delta,
-            next,
-            login,
-            null,
-            null,
-            string.Empty,
-            now
+        var prepared = outcome.Match(
+            _ =>
+                current.Value + stake.Value > PointAmount.MaximumValue
+                    ? Result<GambleMutation, PointBalanceMutationFailure>.Error(
+                        new PointBalanceMutationFailure.CapExceeded(current, stake)
+                    )
+                    : Result<GambleMutation, PointBalanceMutationFailure>.Success(
+                        new GambleMutation(
+                            current.Add(stake),
+                            stake.Value,
+                            PointLedgerKind.GambleWin
+                        )
+                    ),
+            _ =>
+                Result<GambleMutation, PointBalanceMutationFailure>.Success(
+                    new GambleMutation(
+                        current.Subtract(stake),
+                        -stake.Value,
+                        PointLedgerKind.GambleLoss
+                    )
+                )
         );
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        return PointOperationResult.Successful(balance: next, amount: stake);
+
+        return await prepared.Match(CommitAsync, failure => ValueTask.FromResult(Failure(failure)));
+
+        async ValueTask<PointMutationResult> CommitAsync(GambleMutation mutation)
+        {
+            row.Amount = mutation.Balance.ToString();
+            row.UpdatedAtUtc = now;
+            AddLedger(
+                db,
+                hostId,
+                mutation.LedgerKind,
+                row.Login,
+                mutation.Delta,
+                mutation.Balance,
+                login,
+                null,
+                null,
+                string.Empty,
+                now
+            );
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return Success(mutation.Balance, stake);
+        }
     }
 
-    public async Task<PointOperationResult> AwardGiveawayAsync(
+    public PointMutationIO AwardGiveaway(
+        BlokeBotDbContext db,
+        int hostId,
+        int giveawayId,
+        string login,
+        PointAmount amount,
+        DateTime now
+    )
+    {
+        return PointMutationIO.Create(ct =>
+            AwardGiveawayAsync(db, hostId, giveawayId, login, amount, now, ct)
+        );
+    }
+
+    private async ValueTask<PointMutationResult> AwardGiveawayAsync(
         BlokeBotDbContext db,
         int hostId,
         int giveawayId,
@@ -375,11 +448,7 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
         var current = PointAmount.ParseAbsolute(row.Amount);
         if (current.Value + amount.Value > PointAmount.MaximumValue)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.CapExceeded,
-                balance: current,
-                amount: amount
-            );
+            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }
 
         var next = current.Add(amount);
@@ -398,10 +467,24 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
             string.Empty,
             now
         );
-        return PointOperationResult.Successful(balance: next, amount: amount);
+        return Success(next, amount);
     }
 
-    public async Task<PointOperationResult> AwardGuessWinAsync(
+    public PointMutationIO AwardGuessWin(
+        BlokeBotDbContext db,
+        int hostId,
+        int roundId,
+        string login,
+        PointAmount amount,
+        DateTime now
+    )
+    {
+        return PointMutationIO.Create(ct =>
+            AwardGuessWinAsync(db, hostId, roundId, login, amount, now, ct)
+        );
+    }
+
+    private async ValueTask<PointMutationResult> AwardGuessWinAsync(
         BlokeBotDbContext db,
         int hostId,
         int roundId,
@@ -413,18 +496,14 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
     {
         if (amount.IsZero)
         {
-            return PointOperationResult.Failure(PointOperationFailureReason.InvalidAmount);
+            return Failure(new PointBalanceMutationFailure.InvalidAmount());
         }
 
         var row = await LoadBalanceForUpdateAsync(db, hostId, login, now, ct);
         var current = PointAmount.ParseAbsolute(row.Amount);
         if (current.Value + amount.Value > PointAmount.MaximumValue)
         {
-            return PointOperationResult.Failure(
-                PointOperationFailureReason.CapExceeded,
-                balance: current,
-                amount: amount
-            );
+            return Failure(new PointBalanceMutationFailure.CapExceeded(current, amount));
         }
 
         var next = current.Add(amount);
@@ -443,8 +522,24 @@ public sealed class PointBalanceService(IDbContextFactory<BlokeBotDbContext> dbF
             $"guess round {roundId}",
             now
         );
-        return PointOperationResult.Successful(balance: next, amount: amount);
+        return Success(next, amount);
     }
+
+    private static PointMutationResult Success(PointAmount balance, PointAmount amount)
+    {
+        return PointMutationResult.Success(new PointBalanceMutation(balance, amount));
+    }
+
+    private static PointMutationResult Failure(PointBalanceMutationFailure failure)
+    {
+        return PointMutationResult.Error(failure);
+    }
+
+    private sealed record GambleMutation(
+        PointAmount Balance,
+        BigInteger Delta,
+        PointLedgerKind LedgerKind
+    );
 
     private static void AddLedger(
         BlokeBotDbContext db,

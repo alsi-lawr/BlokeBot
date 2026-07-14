@@ -168,7 +168,7 @@ public partial class PointsDashboard
         );
     }
 
-    private async Task RunAsync(Func<Task<PointOperationResult>> operation)
+    private async Task RunAsync(Func<Task<PointOperationOutcome>> operation)
     {
         await LoadFeatureStateAsync();
         if (!_featureEnabled)
@@ -199,13 +199,21 @@ public partial class PointsDashboard
             );
     }
 
-    private void PublishResult(PointOperationResult result)
+    private void PublishResult(PointOperationOutcome outcome)
     {
-        if (string.IsNullOrWhiteSpace(result.Message))
-        {
-            return;
-        }
+        _ = outcome.Match(
+            succeeded => Publish(ToastKind.Success, succeeded.Message),
+            failed => Publish(ToastKind.Warning, failed.Message)
+        );
 
-        _toasts.Publish(result.Success ? ToastKind.Success : ToastKind.Warning, result.Message);
+        bool Publish(ToastKind kind, string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                _toasts.Publish(kind, message);
+            }
+
+            return true;
+        }
     }
 }

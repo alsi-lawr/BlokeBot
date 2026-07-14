@@ -347,7 +347,7 @@ public sealed class PointsGiveawaySchedulerTests
         operations.DrawOutcomes.Enqueue(Failure<PointsGiveawayDrawOutcome>());
         operations.DrawOutcomes.Enqueue(
             Result<PointsGiveawayDrawOutcome, PointsGiveawaySchedulerTransientFailure>.Success(
-                PointsGiveawayDrawOutcome.NoEntrants(new PointsSettings { HostId = 7 })
+                new PointsGiveawayDrawOutcome.NoEntrants(new PointsSettings { HostId = 7 })
             )
         );
         var logger = new RecordingLogger<PointsGiveawayScheduler>();
@@ -411,7 +411,9 @@ public sealed class PointsGiveawaySchedulerTests
     [Test]
     public void AmbiguousCommit_Classifying_IsTerminalRatherThanRetryable()
     {
-        var intendedDraw = PointsGiveawayDrawOutcome.NoEntrants(new PointsSettings { HostId = 7 });
+        var intendedDraw = new PointsGiveawayDrawOutcome.NoEntrants(
+            new PointsSettings { HostId = 7 }
+        );
         var draw = new PointsGiveawayDrawCommitAmbiguousException(
             42,
             intendedDraw,
@@ -461,7 +463,7 @@ public sealed class PointsGiveawaySchedulerTests
         commitCancellation.CommitAttempts.ShouldBe(1);
         commitCancellation.ObservedCancellationToken.CanBeCanceled.ShouldBeFalse();
         thrown.GiveawayId.ShouldBe(giveawayId);
-        thrown.IntendedOutcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.Winners);
+        thrown.IntendedOutcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
         thrown.InnerException.ShouldBeOfType<OperationCanceledException>();
         PointsGiveawaySchedulerFailureClassifier.IsTransient(thrown).ShouldBeFalse();
         PointsGiveawaySchedulerFailureClassifier
@@ -707,7 +709,7 @@ public sealed class PointsGiveawaySchedulerTests
 
         var result = await service.CancelAsync(hostId, CancellationToken.None);
 
-        result.Success.ShouldBeTrue();
+        _ = Successful(result);
         scheduler.Cancelled.ShouldContain(giveawayId);
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
@@ -725,7 +727,7 @@ public sealed class PointsGiveawaySchedulerTests
 
         var outcome = await service.CancelOutcomeAsync(hostId, CancellationToken.None);
 
-        outcome.Kind.ShouldBe(PointsGiveawayCancelOutcomeKind.Cancelled);
+        outcome.ShouldBeOfType<PointsGiveawayCancelOutcome.Cancelled>();
     }
 
     [Test]
@@ -744,7 +746,7 @@ public sealed class PointsGiveawaySchedulerTests
 
         var result = await service.EndAsync(hostId, "streamer", CancellationToken.None);
 
-        result.Success.ShouldBeTrue();
+        _ = Successful(result);
         scheduler.Cancelled.ShouldContain(giveawayId);
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
@@ -767,7 +769,7 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.AlreadyActive);
+        outcome.ShouldBeOfType<PointsGiveawayStartOutcome.AlreadyActive>();
     }
 
     [Test]
@@ -796,8 +798,9 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.Cooldown);
-        outcome.TimeLeft.ShouldNotBeNull();
+        outcome
+            .ShouldBeOfType<PointsGiveawayStartOutcome.Cooldown>()
+            .TimeLeft.ShouldBeGreaterThan(TimeSpan.Zero);
     }
 
     [Test]
@@ -814,8 +817,7 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamOffline);
-        outcome.StreamLivenessFailure.ShouldBeNull();
+        outcome.ShouldBeOfType<PointsGiveawayStartOutcome.StreamOffline>();
     }
 
     [Test]
@@ -837,18 +839,19 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable);
-        var unavailable = outcome.StreamLivenessFailure.ShouldNotBeNull();
-        unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.ProviderRequestFailed);
-        unavailable.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
-        unavailable.Cause.ShouldBeSameAs(expected);
-        unavailable.ToString().ShouldNotContain("provider secret");
+        var unavailable =
+            outcome.ShouldBeOfType<PointsGiveawayStartOutcome.StreamLivenessUnavailable>();
+        var failure = unavailable.Failure;
+        failure.Reason.ShouldBe(HostStreamLivenessUnavailableReason.ProviderRequestFailed);
+        failure.FailureType.ShouldBe(typeof(HttpRequestException).FullName);
+        failure.Cause.ShouldBeSameAs(expected);
+        failure.ToString().ShouldNotContain("provider secret");
         outcome.ToString().ShouldNotContain("provider secret");
         JsonSerializer.Serialize(outcome).ShouldNotContain("provider secret");
         var result = new PointsGiveawayMessageFormatter().Reply(outcome, new ReplyDeliveryMap());
-        result.Success.ShouldBeFalse();
-        result.Message.ShouldBe("Stream status could not be checked right now.");
-        result.Message.ShouldNotBe(outcome.Settings.StreamOfflineReply);
+        var failed = Failed(result);
+        failed.Message.ShouldBe("Stream status could not be checked right now.");
+        failed.Message.ShouldNotBe(unavailable.Settings.StreamOfflineReply);
     }
 
     [Test]
@@ -873,7 +876,7 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayJoinOutcomeKind.DuplicateJoin);
+        outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.DuplicateJoin>();
     }
 
     [Test]
@@ -897,7 +900,7 @@ public sealed class PointsGiveawaySchedulerTests
             CancellationToken.None
         );
 
-        outcome.Kind.ShouldBe(PointsGiveawayJoinOutcomeKind.NotEligible);
+        outcome.ShouldBeOfType<PointsGiveawayJoinOutcome.NotEligible>();
     }
 
     [Test]
@@ -916,7 +919,7 @@ public sealed class PointsGiveawaySchedulerTests
 
         var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
-        outcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.NoEntrants);
+        outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.NoEntrants>();
     }
 
     [Test]
@@ -936,9 +939,9 @@ public sealed class PointsGiveawaySchedulerTests
 
         var outcome = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
-        outcome.Kind.ShouldBe(PointsGiveawayDrawOutcomeKind.Winners);
-        outcome.Winners.Single().Login.ShouldBe("entrant");
-        outcome.Winners.Single().Payout.ShouldBe(PointAmount.ParseAbsolute("10"));
+        var winners = outcome.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>().Payouts;
+        winners.Single().Login.ShouldBe("entrant");
+        winners.Single().Payout.ShouldBe(PointAmount.ParseAbsolute("10"));
     }
 
     [Test]
@@ -959,8 +962,8 @@ public sealed class PointsGiveawaySchedulerTests
         var first = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
         var second = await service.DrawOutcomeAsync(giveawayId, CancellationToken.None);
 
-        first.Success.ShouldBeTrue();
-        second.Success.ShouldBeFalse();
+        first.ShouldBeOfType<PointsGiveawayDrawOutcome.Winners>();
+        second.ShouldBeOfType<PointsGiveawayDrawOutcome.NotActive>();
         await using var db = await dbFactory.CreateDbContextAsync();
         var giveaway = await db.PointsGiveaways.SingleAsync(x => x.Id == giveawayId);
         giveaway.Status.ShouldBe(PointsGiveawayStatus.Completed);
@@ -990,6 +993,22 @@ public sealed class PointsGiveawaySchedulerTests
             new PointsGiveawaySchedulerRecoveryPolicy { RetryDelay = TimeSpan.Zero },
             timeProvider,
             NullLogger<PointsGiveawayScheduler>.Instance
+        );
+    }
+
+    private static PointOperationOutcome.Succeeded Successful(PointOperationOutcome outcome)
+    {
+        return outcome.Match(
+            succeeded => succeeded,
+            _ => throw new InvalidOperationException("Expected a successful giveaway reply.")
+        );
+    }
+
+    private static PointOperationOutcome.Failed Failed(PointOperationOutcome outcome)
+    {
+        return outcome.Match(
+            _ => throw new InvalidOperationException("Expected a failed giveaway reply."),
+            failed => failed
         );
     }
 
@@ -1228,7 +1247,7 @@ public sealed class PointsGiveawaySchedulerTests
                     }
 
                     return ValueTask.FromResult(
-                        Next(DrawOutcomes, PointsGiveawayDrawOutcome.Missing())
+                        Next(DrawOutcomes, new PointsGiveawayDrawOutcome.Missing())
                     );
                 }
             );

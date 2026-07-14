@@ -121,10 +121,10 @@ internal sealed class PointsGiveawaySchedulerOperations(
         }
 
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveaway.HostId, ct);
-        var message = formatter.Format(
+        var message = formatter.FormatUpdate(
             settings.GiveawayUpdateReply,
             settings,
-            timeLeft: formatter.FormatTimeLeft(endsAtUtc - GetUtcNow())
+            endsAtUtc - GetUtcNow()
         );
         return Message(message);
     }
@@ -142,10 +142,24 @@ internal sealed class PointsGiveawaySchedulerOperations(
         CancellationToken ct
     )
     {
-        var delivery = outcome.Settings is { } settings
-            ? await LoadReplyDeliveryAsync(settings.HostId, ct)
-            : new ReplyDeliveryMap();
-        return Message(formatter.Reply(outcome, delivery).Message);
+        return await outcome.Match(
+            _ => ValueTask.FromResult(FormattedMessage(new ReplyDeliveryMap())),
+            notActive => FormatWithDeliveryAsync(notActive.Settings.HostId),
+            noEntrants => FormatWithDeliveryAsync(noEntrants.Settings.HostId),
+            winners => FormatWithDeliveryAsync(winners.Settings.HostId)
+        );
+
+        async ValueTask<Option<string>> FormatWithDeliveryAsync(int hostId)
+        {
+            return FormattedMessage(await LoadReplyDeliveryAsync(hostId, ct));
+        }
+
+        Option<string> FormattedMessage(ReplyDeliveryMap delivery)
+        {
+            return formatter
+                .Reply(outcome, delivery)
+                .Match(succeeded => Message(succeeded.Message), failed => Message(failed.Message));
+        }
     }
 
     private async ValueTask<PointsGiveawayExpirationOutcome> ExpireAsync(

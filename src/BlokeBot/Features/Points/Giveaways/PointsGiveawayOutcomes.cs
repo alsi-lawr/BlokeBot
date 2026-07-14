@@ -1,100 +1,316 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Giveaways;
 
-public enum PointsGiveawayStartOutcomeKind
+public abstract record PointsGiveawayStartOutcome
 {
-    Started,
-    AlreadyActive,
-    Cooldown,
-    StreamOffline,
-    StreamLivenessUnavailable,
-    FollowerEligibilityUnavailable,
+    private PointsGiveawayStartOutcome() { }
+
+    public abstract TResult Match<TResult>(
+        Func<Started, TResult> started,
+        Func<AlreadyActive, TResult> alreadyActive,
+        Func<Cooldown, TResult> cooldown,
+        Func<StreamOffline, TResult> streamOffline,
+        Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+        Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+    );
+
+    public sealed record Started(PointsSettings Settings) : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return started(this);
+        }
+    }
+
+    public sealed record AlreadyActive(PointsSettings Settings) : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return alreadyActive(this);
+        }
+    }
+
+    public sealed record Cooldown(PointsSettings Settings, TimeSpan TimeLeft)
+        : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return cooldown(this);
+        }
+    }
+
+    public sealed record StreamOffline(PointsSettings Settings) : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return streamOffline(this);
+        }
+    }
+
+    public sealed record StreamLivenessUnavailable(
+        PointsSettings Settings,
+        HostStreamLivenessOutcome.Unavailable Failure
+    ) : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return streamLivenessUnavailable(this);
+        }
+    }
+
+    public sealed record FollowerEligibilityUnavailable(PointsSettings Settings)
+        : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return followerEligibilityUnavailable(this);
+        }
+    }
 }
 
-public sealed record PointsGiveawayStartOutcome(
-    PointsGiveawayStartOutcomeKind Kind,
-    PointsSettings Settings,
-    TimeSpan? TimeLeft = null,
-    HostStreamLivenessOutcome.Unavailable? StreamLivenessFailure = null
-)
+public abstract record PointsGiveawayJoinOutcome
 {
-    public bool Success => Kind == PointsGiveawayStartOutcomeKind.Started;
-}
+    private PointsGiveawayJoinOutcome() { }
 
-public enum PointsGiveawayJoinOutcomeKind
-{
-    Joined,
-    NotActive,
-    DuplicateJoin,
-    FollowerEligibilityUnavailable,
-    NotEligible,
-}
+    public abstract TResult Match<TResult>(
+        Func<Joined, TResult> joined,
+        Func<NotActive, TResult> notActive,
+        Func<DuplicateJoin, TResult> duplicateJoin,
+        Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+        Func<NotEligible, TResult> notEligible
+    );
 
-public sealed record PointsGiveawayJoinOutcome(
-    PointsGiveawayJoinOutcomeKind Kind,
-    PointsSettings Settings,
-    string User
-)
-{
-    public bool Success => Kind == PointsGiveawayJoinOutcomeKind.Joined;
-}
+    public sealed record Joined(PointsSettings Settings, string User) : PointsGiveawayJoinOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Joined, TResult> joined,
+            Func<NotActive, TResult> notActive,
+            Func<DuplicateJoin, TResult> duplicateJoin,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+            Func<NotEligible, TResult> notEligible
+        )
+        {
+            return joined(this);
+        }
+    }
 
-public enum PointsGiveawayDrawOutcomeKind
-{
-    Missing,
-    NotActive,
-    NoEntrants,
-    Winners,
+    public sealed record NotActive(PointsSettings Settings, string User) : PointsGiveawayJoinOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Joined, TResult> joined,
+            Func<NotActive, TResult> notActive,
+            Func<DuplicateJoin, TResult> duplicateJoin,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+            Func<NotEligible, TResult> notEligible
+        )
+        {
+            return notActive(this);
+        }
+    }
+
+    public sealed record DuplicateJoin(PointsSettings Settings, string User)
+        : PointsGiveawayJoinOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Joined, TResult> joined,
+            Func<NotActive, TResult> notActive,
+            Func<DuplicateJoin, TResult> duplicateJoin,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+            Func<NotEligible, TResult> notEligible
+        )
+        {
+            return duplicateJoin(this);
+        }
+    }
+
+    public sealed record FollowerEligibilityUnavailable(PointsSettings Settings, string User)
+        : PointsGiveawayJoinOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Joined, TResult> joined,
+            Func<NotActive, TResult> notActive,
+            Func<DuplicateJoin, TResult> duplicateJoin,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+            Func<NotEligible, TResult> notEligible
+        )
+        {
+            return followerEligibilityUnavailable(this);
+        }
+    }
+
+    public sealed record NotEligible(PointsSettings Settings, string User)
+        : PointsGiveawayJoinOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Joined, TResult> joined,
+            Func<NotActive, TResult> notActive,
+            Func<DuplicateJoin, TResult> duplicateJoin,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable,
+            Func<NotEligible, TResult> notEligible
+        )
+        {
+            return notEligible(this);
+        }
+    }
 }
 
 public sealed record PointsGiveawayWinnerPayout(string Login, PointAmount Payout);
 
-public sealed record PointsGiveawayDrawOutcome(
-    PointsGiveawayDrawOutcomeKind Kind,
-    PointsSettings? Settings,
-    IReadOnlyList<PointsGiveawayWinnerPayout> Winners
-)
+public abstract record PointsGiveawayDrawOutcome
 {
-    public bool Success =>
-        Kind is PointsGiveawayDrawOutcomeKind.NoEntrants or PointsGiveawayDrawOutcomeKind.Winners;
+    private PointsGiveawayDrawOutcome() { }
 
-    public static PointsGiveawayDrawOutcome Missing()
+    public abstract TResult Match<TResult>(
+        Func<Missing, TResult> missing,
+        Func<NotActive, TResult> notActive,
+        Func<NoEntrants, TResult> noEntrants,
+        Func<Winners, TResult> winners
+    );
+
+    public sealed record Missing : PointsGiveawayDrawOutcome
     {
-        return new(PointsGiveawayDrawOutcomeKind.Missing, null, []);
+        public override TResult Match<TResult>(
+            Func<Missing, TResult> missing,
+            Func<NotActive, TResult> notActive,
+            Func<NoEntrants, TResult> noEntrants,
+            Func<Winners, TResult> winners
+        )
+        {
+            return missing(this);
+        }
     }
 
-    public static PointsGiveawayDrawOutcome NotActive(PointsSettings settings)
+    public sealed record NotActive(PointsSettings Settings) : PointsGiveawayDrawOutcome
     {
-        return new(PointsGiveawayDrawOutcomeKind.NotActive, settings, []);
+        public override TResult Match<TResult>(
+            Func<Missing, TResult> missing,
+            Func<NotActive, TResult> notActive,
+            Func<NoEntrants, TResult> noEntrants,
+            Func<Winners, TResult> winners
+        )
+        {
+            return notActive(this);
+        }
     }
 
-    public static PointsGiveawayDrawOutcome NoEntrants(PointsSettings settings)
+    public sealed record NoEntrants(PointsSettings Settings) : PointsGiveawayDrawOutcome
     {
-        return new(PointsGiveawayDrawOutcomeKind.NoEntrants, settings, []);
+        public override TResult Match<TResult>(
+            Func<Missing, TResult> missing,
+            Func<NotActive, TResult> notActive,
+            Func<NoEntrants, TResult> noEntrants,
+            Func<Winners, TResult> winners
+        )
+        {
+            return noEntrants(this);
+        }
     }
 
-    public static PointsGiveawayDrawOutcome WithWinners(
-        PointsSettings settings,
-        IReadOnlyList<PointsGiveawayWinnerPayout> winners
-    )
+    public sealed record Winners : PointsGiveawayDrawOutcome
     {
-        return new(PointsGiveawayDrawOutcomeKind.Winners, settings, winners);
+        public Winners(PointsSettings settings, IEnumerable<PointsGiveawayWinnerPayout> winners)
+        {
+            Settings = settings;
+            Payouts = winners.ToImmutableArray();
+            if (Payouts.IsEmpty)
+            {
+                throw new ArgumentException(
+                    "A winners outcome requires at least one winner.",
+                    nameof(winners)
+                );
+            }
+        }
+
+        public PointsSettings Settings { get; }
+
+        public ImmutableArray<PointsGiveawayWinnerPayout> Payouts { get; }
+
+        public override TResult Match<TResult>(
+            Func<Missing, TResult> missing,
+            Func<NotActive, TResult> notActive,
+            Func<NoEntrants, TResult> noEntrants,
+            Func<Winners, TResult> winners
+        )
+        {
+            return winners(this);
+        }
     }
 }
 
-public enum PointsGiveawayCancelOutcomeKind
+public abstract record PointsGiveawayCancelOutcome
 {
-    Cancelled,
-    NotActive,
-}
+    private PointsGiveawayCancelOutcome() { }
 
-public sealed record PointsGiveawayCancelOutcome(
-    PointsGiveawayCancelOutcomeKind Kind,
-    PointsSettings Settings
-)
-{
-    public bool Success => Kind == PointsGiveawayCancelOutcomeKind.Cancelled;
+    public abstract TResult Match<TResult>(
+        Func<Cancelled, TResult> cancelled,
+        Func<NotActive, TResult> notActive
+    );
+
+    public sealed record Cancelled(PointsSettings Settings) : PointsGiveawayCancelOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Cancelled, TResult> cancelled,
+            Func<NotActive, TResult> notActive
+        )
+        {
+            return cancelled(this);
+        }
+    }
+
+    public sealed record NotActive(PointsSettings Settings) : PointsGiveawayCancelOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Cancelled, TResult> cancelled,
+            Func<NotActive, TResult> notActive
+        )
+        {
+            return notActive(this);
+        }
+    }
 }

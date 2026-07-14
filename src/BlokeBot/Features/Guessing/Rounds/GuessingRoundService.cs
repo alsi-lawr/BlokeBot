@@ -91,16 +91,10 @@ public sealed class GuessingRoundService(
         {
             foreach (var winner in winners)
             {
-                var result = await balances.AwardGuessWinAsync(
-                    db,
-                    hostId,
-                    round.Id,
-                    winner,
-                    rewardAmount,
-                    now,
-                    ct
-                );
-                awardedAnyPoints = awardedAnyPoints || result.Success;
+                var result = await balances
+                    .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
+                    .ExecuteAsync(ct);
+                awardedAnyPoints = result.Match(_ => true, _ => awardedAnyPoints);
             }
         }
 

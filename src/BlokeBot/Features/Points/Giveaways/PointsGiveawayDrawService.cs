@@ -60,13 +60,13 @@ public sealed class PointsGiveawayDrawService(
             .SingleOrDefaultAsync(ct);
         if (giveawayHeader is null)
         {
-            return PointsGiveawayDrawOutcome.Missing();
+            return new PointsGiveawayDrawOutcome.Missing();
         }
 
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, giveawayHeader.HostId, ct);
         if (giveawayHeader.Status != PointsGiveawayStatus.Active)
         {
-            return PointsGiveawayDrawOutcome.NotActive(settings);
+            return new PointsGiveawayDrawOutcome.NotActive(settings);
         }
 
         var now = DateTime.UtcNow;
@@ -83,7 +83,7 @@ public sealed class PointsGiveawayDrawService(
             );
         if (claimed == 0)
         {
-            return PointsGiveawayDrawOutcome.NotActive(settings);
+            return new PointsGiveawayDrawOutcome.NotActive(settings);
         }
 
         var giveaway = await db
@@ -96,7 +96,7 @@ public sealed class PointsGiveawayDrawService(
             .ToList();
         if (entrants.Count == 0)
         {
-            var outcome = PointsGiveawayDrawOutcome.NoEntrants(settings);
+            var outcome = new PointsGiveawayDrawOutcome.NoEntrants(settings);
             await CommitAsync(tx, giveawayId, outcome, ct);
             onCommitted(outcome);
             return outcome;
@@ -120,19 +120,13 @@ public sealed class PointsGiveawayDrawService(
                     Payout = payout.ToString(),
                 }
             );
-            await balances.AwardGiveawayAsync(
-                db,
-                giveaway.HostId,
-                giveaway.Id,
-                winner,
-                payout,
-                now,
-                ct
-            );
+            _ = await balances
+                .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
+                .ExecuteAsync(ct);
         }
 
         await db.SaveChangesAsync(ct);
-        var completed = PointsGiveawayDrawOutcome.WithWinners(settings, winnerPayouts);
+        var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
         await CommitAsync(tx, giveawayId, completed, ct);
         onCommitted(completed);
         return completed;

@@ -24,12 +24,12 @@ public sealed class LoginPageTests
     [Test]
     public void ErrorPage_Rendering_EncodesErrorAndPreservesLoginMarkup()
     {
-        const string error = "<script>alert(1)</script>&";
+        const string ErrorMarkup = "<script>alert(1)</script>&";
 
-        var page = LoginPage.RenderError(error);
+        var page = LoginPage.RenderError(ErrorMarkup);
 
         page.ShouldContain("&lt;script&gt;alert(1)&lt;/script&gt;&amp;");
-        page.ShouldNotContain(error);
+        page.ShouldNotContain(ErrorMarkup);
         page.ShouldContain("border-rose-200");
         page.ShouldContain("href=\"/auth/login?start=true\"");
     }

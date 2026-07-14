@@ -130,9 +130,7 @@ public sealed class PointsTests
         );
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        result.Success.ShouldBeFalse();
-        result.FailureReason.ShouldBe(PointOperationFailureReason.UnknownUser);
-        result.Message.ShouldBe("Twitch user @missingviewer was not found.");
+        Failure(result).Message.ShouldBe("Twitch user @missingviewer was not found.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
 
@@ -158,7 +156,7 @@ public sealed class PointsTests
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var balance = await db.PointBalances.SingleAsync(CancellationToken.None);
-        result.Success.ShouldBeTrue();
+        _ = Success(result);
         balance.Login.ShouldBe("viewer");
         balance.Amount.ShouldBe("10");
     }
@@ -202,9 +200,7 @@ public sealed class PointsTests
         );
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        dashboardResult.Success.ShouldBeFalse();
-        dashboardResult.FailureReason.ShouldBe(PointOperationFailureReason.InvalidAmount);
-        dashboardResult.Message.ShouldBe("Invalid amount.");
+        Failure(dashboardResult).Message.ShouldBe("Invalid amount.");
         replies.ShouldBe(["That point amount is not valid."]);
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
@@ -217,20 +213,14 @@ public sealed class PointsTests
         var balances = new PointBalanceService(dbFactory);
         var amount = PointAmount.ParseAbsolute("123456789012");
 
-        var result = await balances.AddAsync(
-            hostId,
-            "viewer",
-            amount,
-            "streamer",
-            "test",
-            CancellationToken.None
-        );
+        var result = await balances
+            .Add(hostId, "viewer", amount, "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var balance = await db.PointBalances.SingleAsync(CancellationToken.None);
         var ledger = await db.PointLedgerEntries.SingleAsync(CancellationToken.None);
-        result.Success.ShouldBeTrue();
-        result.Balance.ShouldBe(amount);
+        Mutation(result).Balance.ShouldBe(amount);
         balance.Amount.ShouldBe("123456789012");
         ledger.BalanceAfter.ShouldBe("123456789012");
     }
@@ -247,14 +237,9 @@ public sealed class PointsTests
             new PointsChangeNotifier(TestEventBus.Create<AppEventKind>()),
             new FixedPointTargetUserLookup([])
         );
-        await balances.AddAsync(
-            hostId,
-            "viewer",
-            PointAmount.ParseAbsolute("25"),
-            "streamer",
-            "test",
-            CancellationToken.None
-        );
+        _ = await balances
+            .Add(hostId, "viewer", PointAmount.ParseAbsolute("25"), "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
 
         var result = await service.RemoveBalanceAsync(
             hostId,
@@ -267,8 +252,7 @@ public sealed class PointsTests
         var ledger = await db
             .PointLedgerEntries.OrderBy(x => x.Id)
             .ToListAsync(CancellationToken.None);
-        result.Success.ShouldBeTrue();
-        result.Message.ShouldBe("Point balance removed.");
+        Success(result).Message.ShouldBe("Point balance removed.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         ledger.Count.ShouldBe(2);
         ledger[^1].Kind.ShouldBe(PointLedgerKind.DeleteBalance);
@@ -299,9 +283,7 @@ public sealed class PointsTests
         );
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        result.Success.ShouldBeFalse();
-        result.FailureReason.ShouldBe(PointOperationFailureReason.UnknownUser);
-        result.Message.ShouldBe("No point balance found.");
+        Failure(result).Message.ShouldBe("No point balance found.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
     }
@@ -570,6 +552,32 @@ public sealed class PointsTests
         return result.Match(static amount => $"Amount:{amount}", static error => $"Error:{error}");
     }
 
+    private static PointOperationOutcome.Succeeded Success(PointOperationOutcome outcome)
+    {
+        return outcome.Match(
+            succeeded => succeeded,
+            _ => throw new InvalidOperationException("Expected a successful point operation.")
+        );
+    }
+
+    private static PointOperationOutcome.Failed Failure(PointOperationOutcome outcome)
+    {
+        return outcome.Match(
+            _ => throw new InvalidOperationException("Expected a failed point operation."),
+            failed => failed
+        );
+    }
+
+    private static PointBalanceMutation Mutation(
+        Result<PointBalanceMutation, PointBalanceMutationFailure> result
+    )
+    {
+        return result.Match(
+            mutation => mutation,
+            _ => throw new InvalidOperationException("Expected a successful balance mutation.")
+        );
+    }
+
     private static CommandStrategyContext<PointsCommandKind, AppCommandRouteState> CommandContext(
         int hostId,
         string login,
@@ -642,15 +650,10 @@ public sealed class PointsTests
         string amount
     )
     {
-        var result = await new PointBalanceService(dbFactory).AddAsync(
-            hostId,
-            login,
-            PointAmount.ParseAbsolute(amount),
-            "streamer",
-            "test",
-            CancellationToken.None
-        );
-        result.Success.ShouldBeTrue();
+        var result = await new PointBalanceService(dbFactory)
+            .Add(hostId, login, PointAmount.ParseAbsolute(amount), "streamer", "test")
+            .ExecuteAsync(CancellationToken.None);
+        _ = Mutation(result);
     }
 
     private static async Task SeedPointsSettingsAsync(

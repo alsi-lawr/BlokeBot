@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
@@ -11,209 +10,188 @@ public sealed class PointsGiveawayMessageFormatter
     private const string _streamLivenessUnavailableReply =
         "Stream status could not be checked right now.";
 
-    public PointOperationResult Reply(PointsGiveawayStartOutcome outcome, ReplyDeliveryMap delivery)
+    public PointOperationOutcome Reply(
+        PointsGiveawayStartOutcome outcome,
+        ReplyDeliveryMap delivery
+    )
     {
-        return outcome.Kind switch
-        {
-            PointsGiveawayStartOutcomeKind.Started => ChatReply(
-                true,
-                outcome.Settings.GiveawayStartedReply,
-                outcome.Settings
-            ),
-            PointsGiveawayStartOutcomeKind.AlreadyActive => Reply(
-                false,
-                outcome.Settings.GiveawayAlreadyActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayAlreadyActive
-            ),
-            PointsGiveawayStartOutcomeKind.Cooldown => Reply(
-                false,
-                outcome.Settings.GiveawayCooldownReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayCooldown,
-                timeLeft: outcome.TimeLeft
-            ),
-            PointsGiveawayStartOutcomeKind.StreamOffline => Reply(
-                false,
-                outcome.Settings.StreamOfflineReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.StreamOffline
-            ),
-            PointsGiveawayStartOutcomeKind.StreamLivenessUnavailable => new PointOperationResult(
-                false,
-                _streamLivenessUnavailableReply
-            ),
-            PointsGiveawayStartOutcomeKind.FollowerEligibilityUnavailable => Reply(
-                false,
-                outcome.Settings.FollowerEligibilityUnavailableReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.FollowerEligibilityUnavailable
-            ),
-            _ => throw new UnreachableException("Unknown giveaway start outcome."),
-        };
-    }
-
-    public PointOperationResult Reply(PointsGiveawayJoinOutcome outcome, ReplyDeliveryMap delivery)
-    {
-        return outcome.Kind switch
-        {
-            PointsGiveawayJoinOutcomeKind.Joined => Reply(
-                true,
-                outcome.Settings.GiveawayJoinedReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayJoined,
-                user: outcome.User
-            ),
-            PointsGiveawayJoinOutcomeKind.NotActive => Reply(
-                false,
-                outcome.Settings.GiveawayNotActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
-            PointsGiveawayJoinOutcomeKind.DuplicateJoin => Reply(
-                false,
-                outcome.Settings.GiveawayAlreadyJoinedReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayAlreadyJoined,
-                user: outcome.User
-            ),
-            PointsGiveawayJoinOutcomeKind.FollowerEligibilityUnavailable => Reply(
-                false,
-                outcome.Settings.FollowerEligibilityUnavailableReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.FollowerEligibilityUnavailable
-            ),
-            PointsGiveawayJoinOutcomeKind.NotEligible => Reply(
-                false,
-                outcome.Settings.NotEligibleReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.NotEligible,
-                user: outcome.User
-            ),
-            _ => Reply(
-                false,
-                outcome.Settings.GiveawayNotActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
-        };
-    }
-
-    public PointOperationResult Reply(PointsGiveawayDrawOutcome outcome, ReplyDeliveryMap delivery)
-    {
-        return outcome.Kind switch
-        {
-            PointsGiveawayDrawOutcomeKind.Missing => new PointOperationResult(false, string.Empty),
-            PointsGiveawayDrawOutcomeKind.NotActive when outcome.Settings is { } settings => Reply(
-                false,
-                settings.GiveawayNotActiveReply,
-                settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
-            PointsGiveawayDrawOutcomeKind.NoEntrants when outcome.Settings is { } settings =>
-                ChatReply(true, settings.GiveawayNoEntrantsReply, settings),
-            PointsGiveawayDrawOutcomeKind.Winners when outcome.Settings is { } settings =>
-                ChatReply(
-                    true,
-                    settings.GiveawayEndedReply,
-                    settings,
-                    winners: FormatWinners(outcome.Winners)
+        return outcome.Match<PointOperationOutcome>(
+            started =>
+                Succeeded(FormatPlain(started.Settings.GiveawayStartedReply, started.Settings)),
+            alreadyActive =>
+                Failed(
+                    FormatPlain(
+                        alreadyActive.Settings.GiveawayAlreadyActiveReply,
+                        alreadyActive.Settings
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayAlreadyActive)
                 ),
-            _ => new PointOperationResult(false, string.Empty),
-        };
+            cooldown =>
+                Failed(
+                    FormatTimeLeft(
+                        cooldown.Settings.GiveawayCooldownReply,
+                        cooldown.Settings,
+                        cooldown.TimeLeft
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayCooldown)
+                ),
+            streamOffline =>
+                Failed(
+                    FormatPlain(streamOffline.Settings.StreamOfflineReply, streamOffline.Settings),
+                    delivery.TargetFor(PointsReplyKeys.StreamOffline)
+                ),
+            _ => Failed(_streamLivenessUnavailableReply, CommandResponseTarget.Chat),
+            followerUnavailable =>
+                Failed(
+                    FormatPlain(
+                        followerUnavailable.Settings.FollowerEligibilityUnavailableReply,
+                        followerUnavailable.Settings
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.FollowerEligibilityUnavailable)
+                )
+        );
     }
 
-    public PointOperationResult Reply(
+    public PointOperationOutcome Reply(PointsGiveawayJoinOutcome outcome, ReplyDeliveryMap delivery)
+    {
+        return outcome.Match<PointOperationOutcome>(
+            joined =>
+                Succeeded(
+                    FormatUser(joined.Settings.GiveawayJoinedReply, joined.Settings, joined.User),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayJoined)
+                ),
+            notActive =>
+                Failed(
+                    FormatPlain(notActive.Settings.GiveawayNotActiveReply, notActive.Settings),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayNotActive)
+                ),
+            duplicate =>
+                Failed(
+                    FormatUser(
+                        duplicate.Settings.GiveawayAlreadyJoinedReply,
+                        duplicate.Settings,
+                        duplicate.User
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayAlreadyJoined)
+                ),
+            followerUnavailable =>
+                Failed(
+                    FormatPlain(
+                        followerUnavailable.Settings.FollowerEligibilityUnavailableReply,
+                        followerUnavailable.Settings
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.FollowerEligibilityUnavailable)
+                ),
+            notEligible =>
+                Failed(
+                    FormatUser(
+                        notEligible.Settings.NotEligibleReply,
+                        notEligible.Settings,
+                        notEligible.User
+                    ),
+                    delivery.TargetFor(PointsReplyKeys.NotEligible)
+                )
+        );
+    }
+
+    public PointOperationOutcome Reply(PointsGiveawayDrawOutcome outcome, ReplyDeliveryMap delivery)
+    {
+        return outcome.Match<PointOperationOutcome>(
+            _ => Failed(string.Empty, CommandResponseTarget.Chat),
+            notActive =>
+                Failed(
+                    FormatPlain(notActive.Settings.GiveawayNotActiveReply, notActive.Settings),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayNotActive)
+                ),
+            noEntrants =>
+                Succeeded(
+                    FormatPlain(noEntrants.Settings.GiveawayNoEntrantsReply, noEntrants.Settings)
+                ),
+            winners =>
+                Succeeded(
+                    FormatWinners(
+                        winners.Settings.GiveawayEndedReply,
+                        winners.Settings,
+                        winners.Payouts
+                    )
+                )
+        );
+    }
+
+    public PointOperationOutcome Reply(
         PointsGiveawayCancelOutcome outcome,
         ReplyDeliveryMap delivery
     )
     {
-        return outcome.Kind switch
-        {
-            PointsGiveawayCancelOutcomeKind.Cancelled => ChatReply(
-                true,
-                outcome.Settings.GiveawayCancelledReply,
-                outcome.Settings
-            ),
-            PointsGiveawayCancelOutcomeKind.NotActive => Reply(
-                false,
-                outcome.Settings.GiveawayNotActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
-            _ => Reply(
-                false,
-                outcome.Settings.GiveawayNotActiveReply,
-                outcome.Settings,
-                delivery,
-                PointsReplyKeys.GiveawayNotActive
-            ),
-        };
-    }
-
-    public PointOperationResult Reply(
-        bool success,
-        string template,
-        PointsSettings settings,
-        ReplyDeliveryMap delivery,
-        string replyKey,
-        string? user = null,
-        string? winners = null,
-        TimeSpan? timeLeft = null
-    )
-    {
-        return new(
-            success,
-            Format(
-                template,
-                settings,
-                user,
-                winners,
-                timeLeft is null ? null : FormatTimeLeft(timeLeft.Value)
-            ),
-            Target: delivery.TargetFor(replyKey)
+        return outcome.Match<PointOperationOutcome>(
+            cancelled =>
+                Succeeded(
+                    FormatPlain(cancelled.Settings.GiveawayCancelledReply, cancelled.Settings)
+                ),
+            notActive =>
+                Failed(
+                    FormatPlain(notActive.Settings.GiveawayNotActiveReply, notActive.Settings),
+                    delivery.TargetFor(PointsReplyKeys.GiveawayNotActive)
+                )
         );
     }
 
-    private PointOperationResult ChatReply(
-        bool success,
-        string template,
-        PointsSettings settings,
-        string? user = null,
-        string? winners = null,
-        TimeSpan? timeLeft = null
-    )
+    public string FormatUpdate(string template, PointsSettings settings, TimeSpan timeLeft)
     {
-        return new(
-            success,
-            Format(
-                template,
-                settings,
-                user,
-                winners,
-                timeLeft is null ? null : FormatTimeLeft(timeLeft.Value)
-            )
-        );
+        return FormatTimeLeft(template, settings, timeLeft);
     }
 
-    public string Format(
+    private static PointOperationOutcome Succeeded(
+        string message,
+        CommandResponseTarget target = CommandResponseTarget.Chat
+    )
+    {
+        return new PointOperationOutcome.Succeeded(message, target);
+    }
+
+    private static PointOperationOutcome Failed(string message, CommandResponseTarget target)
+    {
+        return new PointOperationOutcome.Failed(message, target);
+    }
+
+    private static string FormatPlain(string template, PointsSettings settings)
+    {
+        return Format(template, settings, string.Empty, string.Empty, string.Empty);
+    }
+
+    private static string FormatUser(string template, PointsSettings settings, string user)
+    {
+        return Format(template, settings, user, string.Empty, string.Empty);
+    }
+
+    private static string FormatWinners(
         string template,
         PointsSettings settings,
-        string? user = null,
-        string? winners = null,
-        string? timeLeft = null
+        IReadOnlyList<PointsGiveawayWinnerPayout> winners
+    )
+    {
+        var winnerText = string.Join(
+            ", ",
+            winners.Select(winner => $"{winner.Login} ({winner.Payout.ToDisplayString()})")
+        );
+        return Format(template, settings, string.Empty, winnerText, string.Empty);
+    }
+
+    private static string FormatTimeLeft(
+        string template,
+        PointsSettings settings,
+        TimeSpan timeLeft
+    )
+    {
+        return Format(template, settings, string.Empty, string.Empty, DescribeTimeLeft(timeLeft));
+    }
+
+    private static string Format(
+        string template,
+        PointsSettings settings,
+        string user,
+        string winners,
+        string timeLeft
     )
     {
         return MessageTemplateFormatter.Format(
@@ -221,21 +199,16 @@ public sealed class PointsGiveawayMessageFormatter
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["label"] = settings.PointLabel,
-                ["user"] = user ?? string.Empty,
-                ["winners"] = winners ?? string.Empty,
-                ["time_left"] = timeLeft ?? string.Empty,
+                ["user"] = user,
+                ["winners"] = winners,
+                ["time_left"] = timeLeft,
             }
         );
     }
 
-    public string FormatTimeLeft(TimeSpan timeLeft)
+    private static string DescribeTimeLeft(TimeSpan timeLeft)
     {
         var seconds = Math.Max(0, (int)Math.Round(timeLeft.TotalSeconds));
         return seconds == 1 ? "1 second" : $"{seconds} seconds";
-    }
-
-    private static string FormatWinners(IReadOnlyList<PointsGiveawayWinnerPayout> winners)
-    {
-        return string.Join(", ", winners.Select(x => $"{x.Login} ({x.Payout.ToDisplayString()})"));
     }
 }
