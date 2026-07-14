@@ -130,6 +130,23 @@ public sealed class TokenStatusServiceTests
     }
 
     [Test]
+    public async Task ValidTokenWithNoGrantedScopes_InspectingStatus_ReturnsMissingScopes()
+    {
+        var service = Service(
+            new RecordingTokenProvider("saved-token"),
+            Transport("""{"user_id":"123","login":"bot","scopes":[]}""")
+        );
+
+        var result = await service
+            .GetUserAccessTokenStatus(["chat:read"])
+            .ExecuteAsync(CancellationToken.None);
+
+        var status = Success(result).ShouldBeOfType<TokenStatus.MissingScopes>();
+        status.GrantedScopes.ShouldBeEmpty();
+        status.Missing.ShouldBe(["chat:read"]);
+    }
+
+    [Test]
     public async Task AcquisitionTransportFailure_InspectingStatus_ReturnsTypedError()
     {
         var service = Service(

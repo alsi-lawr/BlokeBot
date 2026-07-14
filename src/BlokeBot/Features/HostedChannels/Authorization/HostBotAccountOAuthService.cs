@@ -15,7 +15,7 @@ public sealed class HostBotAccountOAuthService(
 
     public OAuthAuthorizationStartOutcome CreateAuthorizationUriForScopes(
         string state,
-        OAuthScopeSet scopes
+        OAuthAuthorizationScopeSet scopes
     )
     {
         ArgumentNullException.ThrowIfNull(scopes);
@@ -68,7 +68,7 @@ public sealed class HostBotAccountOAuthService(
         );
     }
 
-    public OAuthScopeSet RequestedScopes()
+    public OAuthAuthorizationScopeSet RequestedScopes()
     {
         return settings.Identity.Scopes;
     }

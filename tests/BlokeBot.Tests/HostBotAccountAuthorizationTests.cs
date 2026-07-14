@@ -63,7 +63,10 @@ public sealed class HostBotAccountAuthorizationTests
         );
 
         var uri = oauth
-            .CreateAuthorizationUriForScopes("state", OAuthScopeSet.Create(["bits:read"]))
+            .CreateAuthorizationUriForScopes(
+                "state",
+                OAuthAuthorizationScopeSet.Create(["bits:read"])
+            )
             .ShouldBeOfType<OAuthAuthorizationStartOutcome.Ready>()
             .AuthorizationUri;
 

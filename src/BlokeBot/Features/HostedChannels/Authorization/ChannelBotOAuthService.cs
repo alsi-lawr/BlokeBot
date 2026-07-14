@@ -62,7 +62,7 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
         );
     }
 
-    public OAuthScopeSet RequestedScopes()
+    public OAuthAuthorizationScopeSet RequestedScopes()
     {
         var scopes = configuration
             .GetSection("TwitchBot:ChannelAuthorization:Scopes")
@@ -70,7 +70,7 @@ public sealed class ChannelBotOAuthService(IConfiguration configuration, OAuthTr
             is { } configuredScopes
             ? configuredScopes
             : [];
-        return OAuthScopeSet.Create(scopes);
+        return OAuthAuthorizationScopeSet.Create(scopes);
     }
 
     private string AuthorizationClientId()

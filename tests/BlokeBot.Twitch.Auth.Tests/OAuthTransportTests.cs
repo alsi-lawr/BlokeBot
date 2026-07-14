@@ -14,7 +14,7 @@ public sealed class OAuthTransportTests
     {
         var client = new OAuthTransport(new ScriptedHttpClientFactory());
         string[] requestedScopes = [" channel:bot ", "BITS:READ", "bits:read"];
-        var scopes = OAuthScopeSet.Create(requestedScopes);
+        var scopes = OAuthAuthorizationScopeSet.Create(requestedScopes);
         requestedScopes[0] = "user:write:chat";
 
         var uri = client.CreateAuthorizationUri(
@@ -43,7 +43,7 @@ public sealed class OAuthTransportTests
             new AuthorizationUriRequest(
                 "client",
                 "https://localhost/callback",
-                OAuthScopeSet.Create(["chat:read"]),
+                OAuthAuthorizationScopeSet.Create(["chat:read"]),
                 "state",
                 AuthorizationVerificationPolicy.ReuseExistingAuthorization
             )
@@ -55,13 +55,13 @@ public sealed class OAuthTransportTests
     }
 
     [Test]
-    public void InvalidScopeValues_CreatingScopeSet_RejectsInvalidElements()
+    public void InvalidAuthorizationScopeValues_CreatingScopeSet_RejectsInvalidElements()
     {
-        Should.Throw<ArgumentNullException>(() => OAuthScopeSet.Create(null!));
-        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([]));
-        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([null!]));
-        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([" "]));
-        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create(["chat read"]));
+        Should.Throw<ArgumentNullException>(() => OAuthAuthorizationScopeSet.Create(null!));
+        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([]));
+        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([null!]));
+        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create([" "]));
+        Should.Throw<ArgumentException>(() => OAuthAuthorizationScopeSet.Create(["chat read"]));
     }
 
     [Test]
@@ -123,6 +123,21 @@ public sealed class OAuthTransportTests
         var outcome = await client.ValidateTokenAsync("invalid", CancellationToken.None);
 
         outcome.ShouldBeOfType<TokenValidationOutcome.NotValidated>();
+    }
+
+    [Test]
+    public async Task NoGrantedScopes_Validating_ReturnsValidatedEmptyScopeSet()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => JsonResponse("""{"user_id":"123","login":"Streamer","scopes":[]}"""));
+        var client = new OAuthTransport(factory);
+
+        var validation = (await client.ValidateTokenAsync("access", CancellationToken.None))
+            .ShouldBeOfType<TokenValidationOutcome.Validated>()
+            .Validation;
+
+        validation.Scopes.ShouldBeEmpty();
+        validation.Scopes.ShouldBeSameAs(OAuthScopeSet.Empty);
     }
 
     [Test]

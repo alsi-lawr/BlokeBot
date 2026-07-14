@@ -12,6 +12,8 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
         _scopes = scopes;
     }
 
+    public static OAuthScopeSet Empty { get; } = new([]);
+
     public int Count => _scopes.Length;
 
     public int Length => _scopes.Length;
@@ -44,15 +46,9 @@ public sealed class OAuthScopeSet : IReadOnlyList<string>, IEquatable<OAuthScope
             normalized.Add(scope);
         }
 
-        if (normalized.Count == 0)
-        {
-            throw new ArgumentException(
-                "OAuth scopes must contain at least one value.",
-                nameof(scopes)
-            );
-        }
-
-        return new OAuthScopeSet(ImmutableArray.CreateRange(normalized));
+        return normalized.Count == 0
+            ? Empty
+            : new OAuthScopeSet(ImmutableArray.CreateRange(normalized));
     }
 
     public string Serialize()

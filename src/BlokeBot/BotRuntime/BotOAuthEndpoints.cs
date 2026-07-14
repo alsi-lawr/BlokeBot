@@ -263,7 +263,7 @@ internal static class BotOAuthEndpoints
                     return oauth
                         .CreateAuthorizationUriForScopes(
                             state,
-                            OAuthScopeSet.Create(requiredScopes)
+                            OAuthAuthorizationScopeSet.Create(requiredScopes)
                         )
                         .Match<IResult>(
                             ready =>

@@ -20,7 +20,7 @@ public sealed record BotIdentity
     public required string RedirectUri { get; init; }
 
     /// <summary>Gets the normalized, immutable OAuth scope set.</summary>
-    public required OAuthScopeSet Scopes { get; init; }
+    public required OAuthAuthorizationScopeSet Scopes { get; init; }
 
     /// <summary>Gets the token storage path.</summary>
     public required string TokenCachePath { get; init; }
@@ -38,7 +38,7 @@ public sealed record BotIdentity
             ClientId = (options.ClientId ?? string.Empty).Trim(),
             ClientSecret = options.ClientSecret ?? string.Empty,
             RedirectUri = (options.RedirectUri ?? string.Empty).Trim(),
-            Scopes = OAuthScopeSet.Create(options.Scopes ?? []),
+            Scopes = OAuthAuthorizationScopeSet.Create(options.Scopes ?? []),
             TokenCachePath = (options.TokenCachePath ?? string.Empty).Trim(),
         };
     }

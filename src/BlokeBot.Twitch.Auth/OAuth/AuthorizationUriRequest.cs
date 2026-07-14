@@ -3,7 +3,7 @@ namespace BlokeBot.Twitch.Auth;
 public sealed record AuthorizationUriRequest(
     string ClientId,
     string RedirectUri,
-    OAuthScopeSet Scopes,
+    OAuthAuthorizationScopeSet Scopes,
     string State,
     AuthorizationVerificationPolicy Verification
 );
