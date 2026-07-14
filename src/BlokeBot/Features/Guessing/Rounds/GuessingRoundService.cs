@@ -90,48 +90,49 @@ public sealed class GuessingRoundService(
         round.Status = GuessRoundStatus.Completed;
         round.ClosedAtUtc ??= now;
         round.WinningName = normalizedName;
-        if (!rewardAmount.IsZero)
+        return await AwardWinnerAsync(0);
+
+        async Task<GuessingWinnerDeclarationOutcome> AwardWinnerAsync(int index)
         {
-            foreach (var winner in winners)
+            if (!rewardAmount.IsZero && index < winners.Count)
             {
                 var result = await balances
-                    .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
+                    .AwardGuessWin(db, hostId, round.Id, winners[index], rewardAmount, now)
                     .ExecuteAsync(ct);
-                var failure = result.Match<PointBalanceMutationFailure?>(
-                    static _ => null,
-                    static failed => failed
+                return await result.Match(
+                    _ => AwardWinnerAsync(index + 1),
+                    failure =>
+                        Task.FromResult<GuessingWinnerDeclarationOutcome>(
+                            new GuessingWinnerDeclarationOutcome.PayoutFailed(failure)
+                        )
                 );
-                if (failure is not null)
-                {
-                    return new GuessingWinnerDeclarationOutcome.PayoutFailed(failure);
-                }
             }
-        }
 
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-        await changes.NotifyChangedAsync(ct);
-        if (!rewardAmount.IsZero && winners.Count > 0)
-        {
-            await pointsChanges.NotifyChangedAsync(ct);
-        }
-
-        var message = MessageTemplateFormatter.Format(
-            winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            await changes.NotifyChangedAsync(ct);
+            if (!rewardAmount.IsZero && winners.Count > 0)
             {
-                ["name"] = normalizedName,
-                ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
-                ["count"] = winners.Count.ToString(),
-                ["reward"] = rewardAmount.ToDisplayString(),
-                ["label"] = pointLabel,
-                ["reward_text"] =
-                    rewardAmount.IsZero || winners.Count == 0
-                        ? string.Empty
-                        : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
+                await pointsChanges.NotifyChangedAsync(ct);
             }
-        );
-        return Completed(new GuessingOperationResult(true, message));
+
+            var message = MessageTemplateFormatter.Format(
+                winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
+                new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["name"] = normalizedName,
+                    ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
+                    ["count"] = winners.Count.ToString(),
+                    ["reward"] = rewardAmount.ToDisplayString(),
+                    ["label"] = pointLabel,
+                    ["reward_text"] =
+                        rewardAmount.IsZero || winners.Count == 0
+                            ? string.Empty
+                            : $" Each winner gets {rewardAmount.ToDisplayString()} {pointLabel}.",
+                }
+            );
+            return Completed(new GuessingOperationResult(true, message));
+        }
     }
 
     public async Task<GuessingWinnerDeclarationOutcome> DeclareWinnerAsync(

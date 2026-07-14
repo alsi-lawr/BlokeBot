@@ -108,37 +108,46 @@ public sealed class PointsGiveawayDrawService(
             .Take(winnerCount)
             .ToArray();
         var winnerPayouts = new List<PointsGiveawayWinnerPayout>();
-        foreach (var winner in winners)
+        return await AwardWinnerAsync(0);
+
+        async Task<PointsGiveawayDrawOutcome> AwardWinnerAsync(int index)
         {
+            if (index == winners.Length)
+            {
+                await db.SaveChangesAsync(ct);
+                var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
+                await CommitAsync(tx, giveawayId, completed, ct);
+                onCommitted(completed);
+                return completed;
+            }
+
+            var winner = winners[index];
             var payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
             var mutation = await balances
                 .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
                 .ExecuteAsync(ct);
-            var failure = mutation.Match<PointBalanceMutationFailure?>(
-                static _ => null,
-                static failed => failed
+            return await mutation.Match(
+                ContinueAsync,
+                failure =>
+                    Task.FromResult<PointsGiveawayDrawOutcome>(
+                        new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure)
+                    )
             );
-            if (failure is not null)
+
+            async Task<PointsGiveawayDrawOutcome> ContinueAsync(PointBalanceMutation _)
             {
-                return new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure);
+                winnerPayouts.Add(new PointsGiveawayWinnerPayout(winner, payout));
+                giveaway.Winners.Add(
+                    new PointsGiveawayWinner
+                    {
+                        GiveawayId = giveaway.Id,
+                        Login = winner,
+                        Payout = payout.ToString(),
+                    }
+                );
+                return await AwardWinnerAsync(index + 1);
             }
-
-            winnerPayouts.Add(new PointsGiveawayWinnerPayout(winner, payout));
-            giveaway.Winners.Add(
-                new PointsGiveawayWinner
-                {
-                    GiveawayId = giveaway.Id,
-                    Login = winner,
-                    Payout = payout.ToString(),
-                }
-            );
         }
-
-        await db.SaveChangesAsync(ct);
-        var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
-        await CommitAsync(tx, giveawayId, completed, ct);
-        onCommitted(completed);
-        return completed;
     }
 
     private PointAmount RandomPayout(string minimum, string maximum)
