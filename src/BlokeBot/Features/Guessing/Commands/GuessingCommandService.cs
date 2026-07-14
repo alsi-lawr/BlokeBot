@@ -15,7 +15,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 {
     public async Task<CommandResponse> AvailableGuessesResponseAsync(
         string hostLogin,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
@@ -27,7 +27,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
-        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, aliasScope, ct);
+        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, route, ct);
 
         var profile = await db.Profiles.LoadProfileWithOptionsAsync(
             hostId.Value,
@@ -54,16 +54,16 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 
     public async Task<string> AvailableGuessesReplyAsync(
         string hostLogin,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
-        return (await AvailableGuessesResponseAsync(hostLogin, aliasScope, ct)).Message;
+        return (await AvailableGuessesResponseAsync(hostLogin, route, ct)).Message;
     }
 
     public async Task<CommandResponse> ModeratorOnlyResponseAsync(
         string hostLogin,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
@@ -75,7 +75,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
-        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, aliasScope, ct);
+        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, route, ct);
 
         return new CommandResponse(
             resolution.ReplyDelivery.TargetFor(GuessingReplyKeys.ModeratorOnly),
@@ -85,18 +85,18 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
 
     public async Task<string> ModeratorOnlyReplyAsync(
         string hostLogin,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
-        return (await ModeratorOnlyResponseAsync(hostLogin, aliasScope, ct)).Message;
+        return (await ModeratorOnlyResponseAsync(hostLogin, route, ct)).Message;
     }
 
     public async Task<CommandResponse> UsageResponseAsync(
         string hostLogin,
         GuessCommandKind kind,
         string command,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
@@ -108,7 +108,7 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         }
 
         var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
-        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, aliasScope, ct);
+        var resolution = await LoadReplySettingsAsync(db, hostId.Value, round, route, ct);
 
         var template = kind switch
         {
@@ -137,30 +137,30 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
         string hostLogin,
         GuessCommandKind kind,
         string command,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
-        return (await UsageResponseAsync(hostLogin, kind, command, aliasScope, ct)).Message;
+        return (await UsageResponseAsync(hostLogin, kind, command, route, ct)).Message;
     }
 
     private static Task<GuessingReplySettingsResolution> LoadReplySettingsAsync(
         BlokeBotDbContext db,
         int hostId,
         GuessRoundReference? round,
-        CommandAliasScope aliasScope,
+        AppCommandRouteState route,
         CancellationToken ct
     )
     {
         return round is not null
             ? GuessingReplySettingsQueries.LoadForRoundAsync(db, hostId, round.ProfileId, ct)
-            : aliasScope.Match(
+            : route.Match(
                 _ => GuessingReplySettingsQueries.LoadForDefaultAsync(db, hostId, ct),
-                profile =>
+                guessingProfile =>
                     GuessingReplySettingsQueries.LoadForProfileAsync(
                         db,
                         hostId,
-                        profile.ProfileId,
+                        guessingProfile.ProfileId,
                         ct
                     )
             );

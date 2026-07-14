@@ -187,7 +187,7 @@ public sealed class GuessingSharedHelperTests
 
         var response = await new GuessingCommandService(dbFactory).ModeratorOnlyResponseAsync(
             seed.HostLogin,
-            new CommandAliasScope.Profile(seed.DefaultProfileId),
+            new AppCommandRouteState.GuessingProfile(seed.HostId, seed.DefaultProfileId),
             CancellationToken.None
         );
 

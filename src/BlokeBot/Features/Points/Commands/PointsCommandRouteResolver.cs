@@ -40,7 +40,7 @@ public sealed class PointsCommandRouteResolver(
 
         return new CommandRoute<PointsCommandKind, AppCommandRouteState>(
             kind,
-            new AppCommandRouteState(resolution.HostId, new CommandAliasScope.Global())
+            new AppCommandRouteState.Host(resolution.HostId)
         );
     }
 }

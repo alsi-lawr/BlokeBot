@@ -38,9 +38,13 @@ public sealed class GuessingCommandRouteResolver(
             return null;
         }
 
-        return new CommandRoute<GuessCommandKind, AppCommandRouteState>(
-            kind,
-            new AppCommandRouteState(resolution.HostId, resolution.Scope)
+        var state = resolution.Scope.Match<AppCommandRouteState>(
+            _ => new AppCommandRouteState.Host(resolution.HostId),
+            profile => new AppCommandRouteState.GuessingProfile(
+                resolution.HostId,
+                profile.ProfileId
+            )
         );
+        return new CommandRoute<GuessCommandKind, AppCommandRouteState>(kind, state);
     }
 }

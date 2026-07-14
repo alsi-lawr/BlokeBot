@@ -594,7 +594,7 @@ public sealed class PointsTests
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
             kind,
-            new AppCommandRouteState(hostId, new CommandAliasScope.Global()),
+            new AppCommandRouteState.Host(hostId),
             command,
             args
         );
@@ -693,7 +693,7 @@ public sealed class PointsTests
 
         return new CommandStrategyContext<PointsCommandKind, AppCommandRouteState>(
             kind,
-            new AppCommandRouteState(hostId, new CommandAliasScope.Global()),
+            new AppCommandRouteState.Host(hostId),
             command,
             args
         );

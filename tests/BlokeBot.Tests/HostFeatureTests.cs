@@ -73,6 +73,7 @@ public sealed class HostFeatureTests
         disabledGuessing.ShouldBeNull();
         enabledPoints.ShouldNotBeNull();
         enabledPoints.Kind.ShouldBe(PointsCommandKind.Points);
+        enabledPoints.State.ShouldBe(new AppCommandRouteState.Host(hostId));
 
         await features.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
         await features.DisableAsync(hostId, HostFeatureFlags.Points, CancellationToken.None);
@@ -88,6 +89,7 @@ public sealed class HostFeatureTests
 
         enabledGuessing.ShouldNotBeNull();
         enabledGuessing.Kind.ShouldBe(GuessCommandKind.Start);
+        enabledGuessing.State.ShouldBe(new AppCommandRouteState.Host(hostId));
         disabledPoints.ShouldBeNull();
     }
 
@@ -137,9 +139,7 @@ public sealed class HostFeatureTests
         var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
         route.ShouldNotBeNull();
         route.Kind.ShouldBe(GuessCommandKind.Start);
-        route
-            .State.AliasScope.ShouldBeOfType<CommandAliasScope.Profile>()
-            .ProfileId.ShouldBe(profileId);
+        route.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, profileId));
     }
 
     private static ChatCommandContext CommandContext(string channel, string commandName)

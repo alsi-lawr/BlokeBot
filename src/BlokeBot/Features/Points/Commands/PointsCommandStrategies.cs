@@ -27,7 +27,7 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
     )
     {
         var resolution = await Commands.CreateResolutionAsync(
-            context.State.HostId,
+            HostId(context.State),
             Kind,
             cancellationToken
         );
@@ -54,7 +54,15 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         CancellationToken cancellationToken
     )
     {
-        return await Commands.CreateResolutionAsync(context.State.HostId, Kind, cancellationToken);
+        return await Commands.CreateResolutionAsync(HostId(context.State), Kind, cancellationToken);
+    }
+
+    private static int HostId(AppCommandRouteState state)
+    {
+        return state.Match(
+            static host => host.HostId,
+            static guessingProfile => guessingProfile.HostId
+        );
     }
 
     protected static async ValueTask ReplyAsync(

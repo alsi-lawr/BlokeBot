@@ -23,7 +23,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     {
         return await Commands.ModeratorOnlyResponseAsync(
             context.Command.Message.Channel,
-            context.State.AliasScope,
+            context.State,
             cancellationToken
         );
     }
@@ -66,7 +66,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
             context.Command.Message.Channel,
             Kind,
             context.Command.CommandName,
-            context.State.AliasScope,
+            context.State,
             cancellationToken
         );
         return new GuessingOperationResult(false, response.Message, response.Target);
@@ -92,17 +92,17 @@ public sealed class StartGuessingCommandStrategy(
         GuessingOperationResult result;
         if (context.Args.Count == 0)
         {
-            result = await context.State.AliasScope.Match(
+            result = await context.State.Match(
                 _ =>
                     rounds.StartRoundAsync(
                         context.Command.Message.Channel,
                         null,
                         cancellationToken
                     ),
-                profile =>
+                guessingProfile =>
                     rounds.StartRoundAsync(
-                        context.State.HostId,
-                        profile.ProfileId,
+                        guessingProfile.HostId,
+                        guessingProfile.ProfileId,
                         cancellationToken
                     )
             );
@@ -221,7 +221,7 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
     {
         var response = await Commands.AvailableGuessesResponseAsync(
             context.Command.Message.Channel,
-            context.State.AliasScope,
+            context.State,
             cancellationToken
         );
         if (!string.IsNullOrWhiteSpace(response.Message))

@@ -110,10 +110,7 @@ public sealed class GuessingAliasTests
             CommandContext(
                 seed.Host.Login,
                 "special",
-                new AppCommandRouteState(
-                    seed.Host.Id,
-                    new CommandAliasScope.Profile(seed.SpecialProfile.Id)
-                ),
+                new AppCommandRouteState.GuessingProfile(seed.Host.Id, seed.SpecialProfile.Id),
                 [],
                 replies
             ),
@@ -164,10 +161,7 @@ public sealed class GuessingAliasTests
             TypedCommandContext(
                 seed.Host.Login,
                 "special",
-                new AppCommandRouteState(
-                    seed.Host.Id,
-                    new CommandAliasScope.Profile(seed.SpecialProfile.Id)
-                ),
+                new AppCommandRouteState.GuessingProfile(seed.Host.Id, seed.SpecialProfile.Id),
                 [],
                 responses
             ),
@@ -208,10 +202,7 @@ public sealed class GuessingAliasTests
             TypedCommandContext(
                 seed.Host.Login,
                 "special",
-                new AppCommandRouteState(
-                    seed.Host.Id,
-                    new CommandAliasScope.Profile(seed.SpecialProfile.Id)
-                ),
+                new AppCommandRouteState.GuessingProfile(seed.Host.Id, seed.SpecialProfile.Id),
                 [],
                 responses
             ),
