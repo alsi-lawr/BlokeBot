@@ -1,10 +1,13 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class OAuthFlow(
     BotIdentity identity,
     IOAuthClient oauth,
     IOAuthStateStore states,
-    ITokenStore tokens
+    ITokenStore tokens,
+    IAccessTokenCache cache
 ) : IOAuthFlow
 {
     public Uri CreateAuthorizationUri()
@@ -38,7 +41,15 @@ internal sealed class OAuthFlow(
     )
     {
         var tokenSet = await oauth.ExchangeCodeAsync(code, cancellationToken);
-        await tokens.SaveAsync(identity.TokenCachePath, tokenSet, cancellationToken);
+        await cache.ExecuteSynchronizedAsync(
+            async (transaction, token) =>
+            {
+                await tokens.SaveAsync(identity.TokenCachePath, tokenSet, token);
+                transaction.SetLoaded(Option<TokenSet>.Some(tokenSet));
+                return true;
+            },
+            cancellationToken
+        );
         return new OAuthFlowCompletionOutcome.Completed(tokenSet);
     }
 }

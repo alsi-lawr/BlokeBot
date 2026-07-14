@@ -9,16 +9,28 @@ internal sealed class UserLookupService(
     HelixClient helix
 )
 {
-    public async Task<Option<UserIdentity>> FindByLoginAsync(
-        string login,
-        CancellationToken cancellationToken
-    )
+    public IO<Option<UserIdentity>, AccessTokenUnavailableReason> FindByLogin(string login)
     {
-        return await FindByLoginAsync(
-            CreateCurrentOptions(),
-            await tokens.GetAccessTokenAsync(cancellationToken),
-            login,
-            cancellationToken
+        return IO<Option<UserIdentity>, AccessTokenUnavailableReason>.Create(
+            async cancellationToken =>
+            {
+                var accessToken = await tokens.GetAccessToken().ExecuteAsync(cancellationToken);
+                return await accessToken.Match(
+                    async token =>
+                        Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Success(
+                            await FindByLoginAsync(
+                                CreateCurrentOptions(),
+                                token,
+                                login,
+                                cancellationToken
+                            )
+                        ),
+                    reason =>
+                        Task.FromResult(
+                            Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Error(reason)
+                        )
+                );
+            }
         );
     }
 

@@ -1,18 +1,25 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class AccessTokenProvider(
     BotIdentity identity,
     IAccessTokenCache cache,
     ITokenStore tokenStore,
-    IOAuthClient oauth
+    IOAuthClient oauth,
+    TimeProvider timeProvider
 ) : IAccessTokenProvider
 {
-    public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    public IO<string, AccessTokenUnavailableReason> GetAccessToken()
     {
-        return cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken);
+        return IO<string, AccessTokenUnavailableReason>.Create(async cancellationToken =>
+            await cache.ExecuteSynchronizedAsync(GetAccessTokenSynchronizedAsync, cancellationToken)
+        );
     }
 
-    private async Task<string> GetAccessTokenSynchronizedAsync(
+    private async Task<
+        Result<string, AccessTokenUnavailableReason>
+    > GetAccessTokenSynchronizedAsync(
         IAccessTokenCacheTransaction transaction,
         CancellationToken cancellationToken
     )
@@ -20,21 +27,20 @@ internal sealed class AccessTokenProvider(
         await LoadTokenIfNeededAsync(transaction, cancellationToken);
 
         var accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(accessToken))
-        {
-            return accessToken;
-        }
-
-        await LoadTokenAsync(transaction, cancellationToken);
-        accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(accessToken))
-        {
-            return accessToken;
-        }
-
-        throw new AccessTokenUnavailableException(
-            AccessTokenUnavailableReason.MissingRefreshToken,
-            AccessTokenUnavailableException.MissingRefreshTokenMessage
+        return await accessToken.Match(
+            token => Task.FromResult(Result<string, AccessTokenUnavailableReason>.Success(token)),
+            async () =>
+            {
+                await LoadTokenAsync(transaction, cancellationToken);
+                var reloaded = await TryGetAccessTokenAsync(transaction, cancellationToken);
+                return reloaded.Match(
+                    Result<string, AccessTokenUnavailableReason>.Success,
+                    static () =>
+                        Result<string, AccessTokenUnavailableReason>.Error(
+                            AccessTokenUnavailableReason.MissingRefreshToken
+                        )
+                );
+            }
         );
     }
 
@@ -58,41 +64,48 @@ internal sealed class AccessTokenProvider(
         }
     }
 
-    private async Task<string?> TryGetAccessTokenAsync(
+    private Task<Option<string>> TryGetAccessTokenAsync(
+        IAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
+    {
+        return transaction.Current.Match(
+            current => TryGetCurrentAccessTokenAsync(current, transaction, cancellationToken),
+            static () => Task.FromResult(Option<string>.None)
+        );
+    }
+
+    private async Task<Option<string>> TryGetCurrentAccessTokenAsync(
+        TokenSet current,
         IAccessTokenCacheTransaction transaction,
         CancellationToken cancellationToken
     )
     {
         if (
-            transaction.Current is { } current
-            && current.ExpiresAtUtc > DateTimeOffset.UtcNow
+            current.ExpiresAtUtc > timeProvider.GetUtcNow()
             && (await oauth.ValidateAsync(current.AccessToken, cancellationToken)).Match(
                 static _ => true,
                 static _ => false
             )
         )
         {
-            return current.AccessToken;
+            return Option<string>.Some(current.AccessToken);
         }
 
-        if (transaction.Current is { RefreshToken.Length: > 0 } refreshable)
+        if (string.IsNullOrWhiteSpace(current.RefreshToken))
         {
-            var refreshed = await oauth.RefreshAsync(refreshable.RefreshToken, cancellationToken);
-            var refreshedTokenSet = string.IsNullOrWhiteSpace(refreshed.RefreshToken)
-                ? refreshed with
-                {
-                    RefreshToken = refreshable.RefreshToken,
-                }
-                : refreshed;
-            await tokenStore.SaveAsync(
-                identity.TokenCachePath,
-                refreshedTokenSet,
-                cancellationToken
-            );
-            transaction.SetLoaded(refreshedTokenSet);
-            return refreshedTokenSet.AccessToken;
+            return Option<string>.None;
         }
 
-        return null;
+        var refreshed = await oauth.RefreshAsync(current.RefreshToken, cancellationToken);
+        var refreshedTokenSet = string.IsNullOrWhiteSpace(refreshed.RefreshToken)
+            ? refreshed with
+            {
+                RefreshToken = current.RefreshToken,
+            }
+            : refreshed;
+        await tokenStore.SaveAsync(identity.TokenCachePath, refreshedTokenSet, cancellationToken);
+        transaction.SetLoaded(Option<TokenSet>.Some(refreshedTokenSet));
+        return Option<string>.Some(refreshedTokenSet.AccessToken);
     }
 }

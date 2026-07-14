@@ -83,8 +83,7 @@ internal static class EventSubChannelFailureClassifier
             HttpRequestException => EventSubChannelFailureClassification.Terminal,
             SocketException or WebSocketException or IOException =>
                 EventSubChannelFailureClassification.Transient,
-            AccessTokenUnavailableException
-            or AuthenticationException
+            AuthenticationException
             or InvalidDataException
             or InvalidOperationException
             or JsonException => EventSubChannelFailureClassification.Terminal,
@@ -139,7 +138,8 @@ internal abstract record EventSubChannelFailureContext
         Func<ClassifiedException, TResult> classifiedException,
         Func<MissingChannel, TResult> missingChannel,
         Func<MissingBot, TResult> missingBot,
-        Func<StartupMessageRejected, TResult> startupMessageRejected
+        Func<StartupMessageRejected, TResult> startupMessageRejected,
+        Func<TokenUnavailable, TResult> tokenUnavailable
     );
 
     internal EventSubChannelFailure ToPublicFailure()
@@ -161,7 +161,8 @@ internal abstract record EventSubChannelFailureContext
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
-            Func<StartupMessageRejected, TResult> startupMessageRejected
+            Func<StartupMessageRejected, TResult> startupMessageRejected,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return classifiedException(this);
@@ -186,7 +187,8 @@ internal abstract record EventSubChannelFailureContext
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
-            Func<StartupMessageRejected, TResult> startupMessageRejected
+            Func<StartupMessageRejected, TResult> startupMessageRejected,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return missingChannel(this);
@@ -206,10 +208,33 @@ internal abstract record EventSubChannelFailureContext
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
-            Func<StartupMessageRejected, TResult> startupMessageRejected
+            Func<StartupMessageRejected, TResult> startupMessageRejected,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return missingBot(this);
+        }
+    }
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : EventSubChannelFailureContext
+    {
+        internal override EventSubChannelPhase Phase => EventSubChannelPhase.AccountResolution;
+
+        internal override EventSubChannelFailureClassification Classification =>
+            EventSubChannelFailureClassification.Terminal;
+
+        internal override string FailureType => Reason.ToString();
+
+        internal override TResult Match<TResult>(
+            Func<ClassifiedException, TResult> classifiedException,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<StartupMessageRejected, TResult> startupMessageRejected,
+            Func<TokenUnavailable, TResult> tokenUnavailable
+        )
+        {
+            return tokenUnavailable(this);
         }
     }
 
@@ -226,7 +251,8 @@ internal abstract record EventSubChannelFailureContext
             Func<ClassifiedException, TResult> classifiedException,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
-            Func<StartupMessageRejected, TResult> startupMessageRejected
+            Func<StartupMessageRejected, TResult> startupMessageRejected,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return startupMessageRejected(this);

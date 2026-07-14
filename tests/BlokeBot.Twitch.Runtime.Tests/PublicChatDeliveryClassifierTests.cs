@@ -51,10 +51,6 @@ public sealed class PublicChatDeliveryClassifierTests
         [
             new HttpRequestException("bad request", null, HttpStatusCode.BadRequest),
             new AppAccessTokenResponseException(),
-            new AccessTokenUnavailableException(
-                AccessTokenUnavailableReason.MissingRefreshToken,
-                "credential detail"
-            ),
             new InvalidOperationException("invalid identity response"),
         ];
 

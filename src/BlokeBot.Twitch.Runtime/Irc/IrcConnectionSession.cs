@@ -69,60 +69,79 @@ internal sealed class IrcConnectionSession(
             return new RuntimeSessionEstablishment.Idle();
         }
 
-        var accessToken = await tokens.GetAccessTokenAsync(cancellationToken);
-        status.MarkAuthorized();
+        var accessToken = await tokens.GetAccessToken().ExecuteAsync(cancellationToken);
+        return await accessToken.Match(
+            EstablishAuthorizedAsync,
+            reason =>
+                Task.FromResult<RuntimeSessionEstablishment>(
+                    new RuntimeSessionEstablishment.TokenUnavailable(reason)
+                )
+        );
 
-        var tcp = new TcpClient();
-        StreamReader? reader = null;
-        StreamWriter? writer = null;
-        try
+        async Task<RuntimeSessionEstablishment> EstablishAuthorizedAsync(string token)
         {
-            await tcp.ConnectAsync(_opts.Connection.Host, _opts.Connection.Port, cancellationToken);
-            var stream = await OpenStreamAsync(tcp, cancellationToken);
-            reader = new StreamReader(stream, Encoding.UTF8);
-            writer = new StreamWriter(stream, Encoding.UTF8) { NewLine = "\r\n", AutoFlush = true };
+            status.MarkAuthorized();
 
-            await writer.WriteLineAsync(
-                "CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership"
-            );
-            await writer.WriteLineAsync($"PASS oauth:{accessToken}");
-            await writer.WriteLineAsync($"NICK {_opts.Identity.BotUsername}");
-            var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var startedChannels = new List<string>();
-            foreach (var channel in channelLogins)
+            var tcp = new TcpClient();
+            StreamReader? reader = null;
+            StreamWriter? writer = null;
+            try
             {
-                await JoinChannelAsync(writer, channel, cancellationToken);
-                joinedChannels.Add(channel);
-                startedChannels.Add(channel);
+                await tcp.ConnectAsync(
+                    _opts.Connection.Host,
+                    _opts.Connection.Port,
+                    cancellationToken
+                );
+                var stream = await OpenStreamAsync(tcp, cancellationToken);
+                reader = new StreamReader(stream, Encoding.UTF8);
+                writer = new StreamWriter(stream, Encoding.UTF8)
+                {
+                    NewLine = "\r\n",
+                    AutoFlush = true,
+                };
+
+                await writer.WriteLineAsync(
+                    "CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership"
+                );
+                await writer.WriteLineAsync($"PASS oauth:{token}");
+                await writer.WriteLineAsync($"NICK {_opts.Identity.BotUsername}");
+                var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var startedChannels = new List<string>();
+                foreach (var channel in channelLogins)
+                {
+                    await JoinChannelAsync(writer, channel, cancellationToken);
+                    joinedChannels.Add(channel);
+                    startedChannels.Add(channel);
+                }
+                await AwaitAuthenticationAsync(reader, writer, cancellationToken);
+                status.MarkConnected(joinedChannels);
+                foreach (var channel in startedChannels)
+                {
+                    await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+                }
+
+                _log.LogInformation(
+                    "Twitch IRC authentication sent for {BotUsername}; joining {ChannelCount} channels.",
+                    _opts.Identity.BotUsername,
+                    channelLogins.Length
+                );
+
+                return new RuntimeSessionEstablishment.Established
+                {
+                    Session = new EstablishedSession(this, tcp, reader, writer, joinedChannels),
+                };
             }
-            await AwaitAuthenticationAsync(reader, writer, cancellationToken);
-            status.MarkConnected(joinedChannels);
-            foreach (var channel in startedChannels)
+            catch
             {
-                await lifecycleNotifier.ChannelStartedAsync(channel, cancellationToken);
+                if (writer is not null)
+                {
+                    await writer.DisposeAsync();
+                }
+
+                reader?.Dispose();
+                tcp.Dispose();
+                throw;
             }
-
-            _log.LogInformation(
-                "Twitch IRC authentication sent for {BotUsername}; joining {ChannelCount} channels.",
-                _opts.Identity.BotUsername,
-                channelLogins.Length
-            );
-
-            return new RuntimeSessionEstablishment.Established
-            {
-                Session = new EstablishedSession(this, tcp, reader, writer, joinedChannels),
-            };
-        }
-        catch
-        {
-            if (writer is not null)
-            {
-                await writer.DisposeAsync();
-            }
-
-            reader?.Dispose();
-            tcp.Dispose();
-            throw;
         }
     }
 

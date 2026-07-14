@@ -24,10 +24,8 @@ internal static class IrcSessionFailureClassifier
             SocketException => RuntimeSessionFailureClassification.Transient,
             InvalidDataException => RuntimeSessionFailureClassification.Terminal,
             IOException => RuntimeSessionFailureClassification.Transient,
-            AccessTokenUnavailableException
-            or AuthenticationException
-            or InvalidOperationException
-            or JsonException => RuntimeSessionFailureClassification.Terminal,
+            AuthenticationException or InvalidOperationException or JsonException =>
+                RuntimeSessionFailureClassification.Terminal,
             _ => RuntimeSessionFailureClassification.Unexpected,
         };
     }
@@ -57,10 +55,8 @@ internal static class EventSubSessionFailureClassifier
             SocketException or WebSocketException => RuntimeSessionFailureClassification.Transient,
             InvalidDataException => RuntimeSessionFailureClassification.Terminal,
             IOException => RuntimeSessionFailureClassification.Transient,
-            AccessTokenUnavailableException
-            or AuthenticationException
-            or InvalidOperationException
-            or JsonException => RuntimeSessionFailureClassification.Terminal,
+            AuthenticationException or InvalidOperationException or JsonException =>
+                RuntimeSessionFailureClassification.Terminal,
             _ => RuntimeSessionFailureClassification.Unexpected,
         };
     }

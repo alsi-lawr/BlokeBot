@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Twitch.Runtime;
 
 internal interface IEventSubChannelOperations
 {
-    ValueTask<BotAccount> ResolveAccountAsync(string channel, CancellationToken cancellationToken);
+    IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel);
 
     ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
@@ -50,6 +51,7 @@ internal abstract record EventSubChannelReconciliationOutcome
         Func<MissingChannel, TResult> missingChannel,
         Func<MissingBot, TResult> missingBot,
         Func<StartupMessageRejected, TResult> startupMessageRejected,
+        Func<TokenUnavailable, TResult> tokenUnavailable,
         Func<UnresolvedDeletion, TResult> unresolvedDeletion
     )
     {
@@ -59,6 +61,7 @@ internal abstract record EventSubChannelReconciliationOutcome
             MissingChannel outcome => missingChannel(outcome),
             MissingBot outcome => missingBot(outcome),
             StartupMessageRejected outcome => startupMessageRejected(outcome),
+            TokenUnavailable outcome => tokenUnavailable(outcome),
             UnresolvedDeletion outcome => unresolvedDeletion(outcome),
             _ => throw new UnreachableException("Unknown EventSub channel reconciliation outcome."),
         };
@@ -71,6 +74,9 @@ internal abstract record EventSubChannelReconciliationOutcome
     internal sealed record MissingBot : EventSubChannelReconciliationOutcome;
 
     internal sealed record StartupMessageRejected : EventSubChannelReconciliationOutcome;
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : EventSubChannelReconciliationOutcome;
 
     internal sealed record UnresolvedDeletion : EventSubChannelReconciliationOutcome
     {
@@ -124,12 +130,9 @@ internal sealed class EventSubChannelOperations(
     IBotChannelLifecycleNotifier lifecycle
 ) : IEventSubChannelOperations
 {
-    public ValueTask<BotAccount> ResolveAccountAsync(
-        string channel,
-        CancellationToken cancellationToken
-    )
+    public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel)
     {
-        return accounts.GetBotAccountAsync(channel, cancellationToken);
+        return accounts.GetBotAccount(channel);
     }
 
     public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
@@ -637,6 +640,7 @@ internal sealed class EventSubChannelSession(
             PublishOutcomeAsync,
             PublishOutcomeAsync,
             PublishOutcomeAsync,
+            PublishOutcomeAsync,
             HandleUnresolvedDeletionAsync
         );
         return;
@@ -835,122 +839,134 @@ internal sealed class EventSubChannelSession(
         }
 
         await CompletePendingStopAsync(channel, context, cancellationToken);
-        var account = await RunPhaseAsync(
-            context,
-            EventSubChannelPhase.AccountResolution,
-            token => operations.ResolveAccountAsync(channel, token),
-            cancellationToken
-        );
-        lock (_gate)
-        {
-            _authorizedChannels.Add(channel);
-        }
-
-        ActiveEventSubSubscription? active;
-        lock (_gate)
-        {
-            _subscriptions.TryGetValue(channel, out active);
-        }
-
-        if (
-            active is not null
-            && !active.BotLogin.Equals(account.Login, StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            var deletion = await ReconcileSubscriptionDeletionAsync(
-                active,
-                context,
-                cancellationToken
-            );
-            switch (deletion)
+        context.Phase = EventSubChannelPhase.AccountResolution;
+        var accountResolution = await operations
+            .ResolveAccount(channel)
+            .ExecuteAsync(cancellationToken);
+        return await accountResolution.Match<ValueTask<EventSubChannelReconciliationOutcome>>(
+            async account =>
             {
-                case EventSubChannelReconciliationOutcome.Completed:
-                    break;
-                case EventSubChannelReconciliationOutcome.UnresolvedDeletion:
-                    return deletion;
-                default:
-                    throw new UnreachableException(
-                        "EventSub subscription deletion produced a non-deletion reconciliation outcome."
+                lock (_gate)
+                {
+                    _authorizedChannels.Add(channel);
+                }
+
+                ActiveEventSubSubscription? active;
+                lock (_gate)
+                {
+                    _subscriptions.TryGetValue(channel, out active);
+                }
+
+                if (
+                    active is not null
+                    && !active.BotLogin.Equals(account.Login, StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    var deletion = await ReconcileSubscriptionDeletionAsync(
+                        active,
+                        context,
+                        cancellationToken
                     );
-            }
+                    switch (deletion)
+                    {
+                        case EventSubChannelReconciliationOutcome.Completed:
+                            break;
+                        case EventSubChannelReconciliationOutcome.UnresolvedDeletion:
+                            return deletion;
+                        default:
+                            throw new UnreachableException(
+                                "EventSub subscription deletion produced a non-deletion reconciliation outcome."
+                            );
+                    }
 
-            await CompletePendingStopAsync(channel, context, cancellationToken);
-            active = null;
-        }
-
-        if (active is null)
-        {
-            var setup = await RunPhaseAsync(
-                context,
-                EventSubChannelPhase.SubscriptionSetup,
-                token => operations.CreateSubscriptionAsync(channel, account, sessionId, token),
-                cancellationToken
-            );
-            switch (setup)
-            {
-                case EventSubSubscriptionSetupOutcome.Created created:
-                    active = created.Subscription;
-                    break;
-                case EventSubSubscriptionSetupOutcome.MissingChannel:
-                    return new EventSubChannelReconciliationOutcome.MissingChannel();
-                case EventSubSubscriptionSetupOutcome.MissingBot:
-                    return new EventSubChannelReconciliationOutcome.MissingBot();
-                default:
-                    throw new UnreachableException("Unknown EventSub subscription setup outcome.");
-            }
-
-            lock (_gate)
-            {
-                _subscriptions[channel] = active;
-            }
-        }
-
-        switch (active.Readiness)
-        {
-            case EventSubSubscriptionReadiness.PendingStartupDelivery:
-                var startupDelivery = await RunPhaseAsync(
-                    context,
-                    EventSubChannelPhase.SubscriptionSetup,
-                    token => operations.DeliverStartupMessageAsync(channel, token),
-                    cancellationToken
-                );
-                if (!startupDelivery.Match(static _ => true, static _ => false))
-                {
-                    return new EventSubChannelReconciliationOutcome.StartupMessageRejected();
+                    await CompletePendingStopAsync(channel, context, cancellationToken);
+                    active = null;
                 }
 
-                active = active with
+                if (active is null)
                 {
-                    Readiness = EventSubSubscriptionReadiness.PendingLifecycleStart,
-                };
-                lock (_gate)
-                {
-                    _subscriptions[channel] = active;
+                    var setup = await RunPhaseAsync(
+                        context,
+                        EventSubChannelPhase.SubscriptionSetup,
+                        token =>
+                            operations.CreateSubscriptionAsync(channel, account, sessionId, token),
+                        cancellationToken
+                    );
+                    switch (setup)
+                    {
+                        case EventSubSubscriptionSetupOutcome.Created created:
+                            active = created.Subscription;
+                            break;
+                        case EventSubSubscriptionSetupOutcome.MissingChannel:
+                            return new EventSubChannelReconciliationOutcome.MissingChannel();
+                        case EventSubSubscriptionSetupOutcome.MissingBot:
+                            return new EventSubChannelReconciliationOutcome.MissingBot();
+                        default:
+                            throw new UnreachableException(
+                                "Unknown EventSub subscription setup outcome."
+                            );
+                    }
+
+                    lock (_gate)
+                    {
+                        _subscriptions[channel] = active;
+                    }
                 }
 
-                goto case EventSubSubscriptionReadiness.PendingLifecycleStart;
-            case EventSubSubscriptionReadiness.PendingLifecycleStart:
-                await RunPhaseAsync(
-                    context,
-                    EventSubChannelPhase.SubscriptionSetup,
-                    token => operations.NotifyChannelStartedAsync(channel, token),
-                    cancellationToken
-                );
-                active = active with { Readiness = EventSubSubscriptionReadiness.Ready };
-                lock (_gate)
+                switch (active.Readiness)
                 {
-                    _subscriptions[channel] = active;
+                    case EventSubSubscriptionReadiness.PendingStartupDelivery:
+                        var startupDelivery = await RunPhaseAsync(
+                            context,
+                            EventSubChannelPhase.SubscriptionSetup,
+                            token => operations.DeliverStartupMessageAsync(channel, token),
+                            cancellationToken
+                        );
+                        if (!startupDelivery.Match(static _ => true, static _ => false))
+                        {
+                            return new EventSubChannelReconciliationOutcome.StartupMessageRejected();
+                        }
+
+                        active = active with
+                        {
+                            Readiness = EventSubSubscriptionReadiness.PendingLifecycleStart,
+                        };
+                        lock (_gate)
+                        {
+                            _subscriptions[channel] = active;
+                        }
+
+                        goto case EventSubSubscriptionReadiness.PendingLifecycleStart;
+                    case EventSubSubscriptionReadiness.PendingLifecycleStart:
+                        await RunPhaseAsync(
+                            context,
+                            EventSubChannelPhase.SubscriptionSetup,
+                            token => operations.NotifyChannelStartedAsync(channel, token),
+                            cancellationToken
+                        );
+                        active = active with { Readiness = EventSubSubscriptionReadiness.Ready };
+                        lock (_gate)
+                        {
+                            _subscriptions[channel] = active;
+                        }
+
+                        break;
+                    case EventSubSubscriptionReadiness.Ready:
+                        break;
+                    default:
+                        throw new UnreachableException(
+                            "Unknown EventSub subscription setup stage."
+                        );
                 }
 
-                break;
-            case EventSubSubscriptionReadiness.Ready:
-                break;
-            default:
-                throw new UnreachableException("Unknown EventSub subscription setup stage.");
-        }
-
-        context.Phase = EventSubChannelPhase.Reconciliation;
-        return new EventSubChannelReconciliationOutcome.Completed();
+                context.Phase = EventSubChannelPhase.Reconciliation;
+                return new EventSubChannelReconciliationOutcome.Completed();
+            },
+            reason =>
+                ValueTask.FromResult<EventSubChannelReconciliationOutcome>(
+                    new EventSubChannelReconciliationOutcome.TokenUnavailable(reason)
+                )
+        );
     }
 
     private async ValueTask<EventSubChannelReconciliationOutcome> EnsureAbsentAsync(
@@ -1179,6 +1195,15 @@ internal sealed class EventSubChannelSession(
                             attempt,
                             new EventSubChannelFailureContext.StartupMessageRejected(),
                             EventSubChannelNextAction.NoFurtherAction
+                        ),
+                unavailable =>
+                    () =>
+                        PublishDegraded(
+                            channel,
+                            trigger,
+                            attempt,
+                            new EventSubChannelFailureContext.TokenUnavailable(unavailable.Reason),
+                            EventSubChannelNextAction.RetryOnNextReconciliation
                         ),
                 unresolved =>
                     () =>

@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ITokenStore, JsonTokenStore>();
         services.TryAddSingleton<IOAuthStateStore, InMemoryOAuthStateStore>();
         services.TryAddSingleton<IOAuthClient, OAuthClient>();
+        services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IOAuthFlow, OAuthFlow>();
         services.TryAddSingleton<IAccessTokenCache, AccessTokenCache>();
         services.TryAddSingleton<IAccessTokenProvider, AccessTokenProvider>();

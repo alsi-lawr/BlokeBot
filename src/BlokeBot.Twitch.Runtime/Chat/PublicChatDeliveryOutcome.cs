@@ -134,6 +134,7 @@ internal abstract record PublicChatDeliveryOutcome
         Func<Sent, TResult> sent,
         Func<MissingChannel, TResult> missingChannel,
         Func<MissingBot, TResult> missingBot,
+        Func<TokenUnavailable, TResult> tokenUnavailable,
         Func<SafePreSendTransient, TResult> safePreSendTransient,
         Func<Rejection, TResult> rejection,
         Func<Ambiguous, TResult> ambiguous,
@@ -144,6 +145,7 @@ internal abstract record PublicChatDeliveryOutcome
         Action<Sent> sent,
         Action<MissingChannel> missingChannel,
         Action<MissingBot> missingBot,
+        Action<TokenUnavailable> tokenUnavailable,
         Action<SafePreSendTransient> safePreSendTransient,
         Action<Rejection> rejection,
         Action<Ambiguous> ambiguous,
@@ -156,6 +158,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -169,6 +172,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -185,6 +189,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -198,6 +203,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -214,6 +220,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -227,6 +234,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -234,6 +242,38 @@ internal abstract record PublicChatDeliveryOutcome
         )
         {
             missingBot(this);
+        }
+    }
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : PublicChatDeliveryOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Sent, TResult> sent,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Rejection, TResult> rejection,
+            Func<Ambiguous, TResult> ambiguous,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return tokenUnavailable(this);
+        }
+
+        internal override void Match(
+            Action<Sent> sent,
+            Action<MissingChannel> missingChannel,
+            Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
+            Action<SafePreSendTransient> safePreSendTransient,
+            Action<Rejection> rejection,
+            Action<Ambiguous> ambiguous,
+            Action<Unexpected> unexpected
+        )
+        {
+            tokenUnavailable(this);
         }
     }
 
@@ -245,6 +285,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -258,6 +299,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -276,6 +318,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -289,6 +332,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -307,6 +351,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -320,6 +365,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -340,6 +386,7 @@ internal abstract record PublicChatDeliveryOutcome
             Func<Sent, TResult> sent,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Rejection, TResult> rejection,
             Func<Ambiguous, TResult> ambiguous,
@@ -353,6 +400,7 @@ internal abstract record PublicChatDeliveryOutcome
             Action<Sent> sent,
             Action<MissingChannel> missingChannel,
             Action<MissingBot> missingBot,
+            Action<TokenUnavailable> tokenUnavailable,
             Action<SafePreSendTransient> safePreSendTransient,
             Action<Rejection> rejection,
             Action<Ambiguous> ambiguous,
@@ -393,6 +441,7 @@ internal abstract record PublicChatPreparationOutcome
         Func<Ready, TResult> ready,
         Func<MissingChannel, TResult> missingChannel,
         Func<MissingBot, TResult> missingBot,
+        Func<TokenUnavailable, TResult> tokenUnavailable,
         Func<SafePreSendTransient, TResult> safePreSendTransient,
         Func<Unexpected, TResult> unexpected
     );
@@ -405,6 +454,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<Ready, TResult> ready,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
@@ -419,6 +469,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<Ready, TResult> ready,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
@@ -433,11 +484,28 @@ internal abstract record PublicChatPreparationOutcome
             Func<Ready, TResult> ready,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
         {
             return missingBot(this);
+        }
+    }
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : PublicChatPreparationOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Ready, TResult> ready,
+            Func<MissingChannel, TResult> missingChannel,
+            Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
+            Func<SafePreSendTransient, TResult> safePreSendTransient,
+            Func<Unexpected, TResult> unexpected
+        )
+        {
+            return tokenUnavailable(this);
         }
     }
 
@@ -449,6 +517,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<Ready, TResult> ready,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )
@@ -467,6 +536,7 @@ internal abstract record PublicChatPreparationOutcome
             Func<Ready, TResult> ready,
             Func<MissingChannel, TResult> missingChannel,
             Func<MissingBot, TResult> missingBot,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<SafePreSendTransient, TResult> safePreSendTransient,
             Func<Unexpected, TResult> unexpected
         )

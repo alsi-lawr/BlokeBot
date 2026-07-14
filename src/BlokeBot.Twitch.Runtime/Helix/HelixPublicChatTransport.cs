@@ -31,25 +31,14 @@ internal sealed class HelixPublicChatTransport(
     {
         try
         {
-            var botAccount = await botAccounts.GetBotAccountAsync(
-                message.Channel,
-                cancellationToken
-            );
-            var resolution = await identities.ResolveAsync(
-                message.Channel,
-                botAccount.Login,
-                botAccount.AccessToken,
-                cancellationToken
-            );
-            return await resolution.Match(
-                resolved => PrepareResolvedAsync(message, resolved, cancellationToken),
-                static _ =>
+            var botAccount = await botAccounts
+                .GetBotAccount(message.Channel)
+                .ExecuteAsync(cancellationToken);
+            return await botAccount.Match<ValueTask<PublicChatPreparationOutcome>>(
+                account => PrepareForAccountAsync(message, account, cancellationToken),
+                reason =>
                     ValueTask.FromResult<PublicChatPreparationOutcome>(
-                        new PublicChatPreparationOutcome.MissingChannel()
-                    ),
-                static _ =>
-                    ValueTask.FromResult<PublicChatPreparationOutcome>(
-                        new PublicChatPreparationOutcome.MissingBot()
+                        new PublicChatPreparationOutcome.TokenUnavailable(reason)
                     )
             );
         }
@@ -60,6 +49,31 @@ internal sealed class HelixPublicChatTransport(
                 cancellationToken
             );
         }
+    }
+
+    private async ValueTask<PublicChatPreparationOutcome> PrepareForAccountAsync(
+        PublicChatClaimedMessage message,
+        BotAccount botAccount,
+        CancellationToken cancellationToken
+    )
+    {
+        var resolution = await identities.ResolveAsync(
+            message.Channel,
+            botAccount.Login,
+            botAccount.AccessToken,
+            cancellationToken
+        );
+        return await resolution.Match(
+            resolved => PrepareResolvedAsync(message, resolved, cancellationToken),
+            static _ =>
+                ValueTask.FromResult<PublicChatPreparationOutcome>(
+                    new PublicChatPreparationOutcome.MissingChannel()
+                ),
+            static _ =>
+                ValueTask.FromResult<PublicChatPreparationOutcome>(
+                    new PublicChatPreparationOutcome.MissingBot()
+                )
+        );
     }
 
     public async ValueTask<PublicChatTransportSendResult> SendAsync(

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -134,27 +135,27 @@ public sealed class HostBotAccountAuthorizationService(
         return ActiveStatus(settings.Login, settings.ProfileImageUrl, status);
     }
 
-    public async ValueTask<BotAccount> GetBotAccountAsync(
-        string channelLogin,
-        CancellationToken cancellationToken
-    )
+    public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
     {
-        var status = await GetActiveTokenStatusAsync(
-            channelLogin,
-            botSettings.Identity.Scopes,
-            cancellationToken
-        );
-        return status.Status.Match(
-            _ => throw BotNotReady(channelLogin),
-            unavailable =>
-                throw new AccessTokenUnavailableException(
-                    unavailable.Reason,
-                    AccessTokenUnavailableException.MissingRefreshTokenMessage
-                ),
-            _ => throw BotNotReady(channelLogin),
-            _ => throw BotNotReady(channelLogin),
-            ready => new BotAccount(Login.Normalize(ready.Validation.Login), ready.AccessToken)
-        );
+        return IO<BotAccount, AccessTokenUnavailableReason>.Create(async cancellationToken =>
+        {
+            var status = await GetActiveTokenStatusAsync(
+                channelLogin,
+                botSettings.Identity.Scopes,
+                cancellationToken
+            );
+            return status.Status.Match(
+                _ => throw BotNotReady(channelLogin),
+                unavailable =>
+                    Result<BotAccount, AccessTokenUnavailableReason>.Error(unavailable.Reason),
+                _ => throw BotNotReady(channelLogin),
+                _ => throw BotNotReady(channelLogin),
+                ready =>
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        new BotAccount(Login.Normalize(ready.Validation.Login), ready.AccessToken)
+                    )
+            );
+        });
     }
 
     public async Task<bool> CanAuthorizeAsync(int hostId, CancellationToken ct)

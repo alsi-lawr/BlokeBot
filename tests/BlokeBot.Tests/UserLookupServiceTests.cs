@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Users;
+using BlokeBot.Functional;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Shouldly;
@@ -29,7 +30,9 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.FindByLoginAsync("Viewer", CancellationToken.None);
+        var result = Success(
+            await service.FindByLogin("Viewer").ExecuteAsync(CancellationToken.None)
+        );
 
         var identity = result.Match(
             user => user,
@@ -46,7 +49,9 @@ public sealed class UserLookupServiceTests
     {
         var service = CreateService("""{"data":[]}""");
 
-        var result = await service.FindByLoginAsync("missing", CancellationToken.None);
+        var result = Success(
+            await service.FindByLogin("missing").ExecuteAsync(CancellationToken.None)
+        );
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -60,7 +65,9 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.FindByLoginAsync("viewer", CancellationToken.None);
+        var result = Success(
+            await service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None)
+        );
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -74,7 +81,9 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.FindByLoginAsync("viewer", CancellationToken.None);
+        var result = Success(
+            await service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None)
+        );
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -172,7 +181,7 @@ public sealed class UserLookupServiceTests
         var service = CreateService("""{"data":[]}""", HttpStatusCode.BadGateway);
 
         await Should.ThrowAsync<HttpRequestException>(() =>
-            service.FindByLoginAsync("viewer", CancellationToken.None)
+            service.FindByLogin("viewer").ExecuteAsync(CancellationToken.None).AsTask()
         );
     }
 
@@ -184,7 +193,7 @@ public sealed class UserLookupServiceTests
         var service = CreateService("""{"data":[]}""");
 
         await Should.ThrowAsync<OperationCanceledException>(() =>
-            service.FindByLoginAsync("viewer", cancellation.Token)
+            service.FindByLogin("viewer").ExecuteAsync(cancellation.Token).AsTask()
         );
     }
 
@@ -204,12 +213,30 @@ public sealed class UserLookupServiceTests
         );
     }
 
+    private static Option<UserIdentity> Success(
+        Result<Option<UserIdentity>, AccessTokenUnavailableReason> result
+    )
+    {
+        return result.Match(
+            users => users,
+            reason =>
+                throw new InvalidOperationException(
+                    $"Expected a user lookup result, received {reason}."
+                )
+        );
+    }
+
     private sealed class StaticAccessTokenProvider(string accessToken) : IAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(accessToken);
+            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Success(accessToken)
+                );
+            });
         }
     }
 

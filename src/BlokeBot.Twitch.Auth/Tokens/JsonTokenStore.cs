@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Twitch.Auth;
 
@@ -15,19 +16,18 @@ public sealed class JsonTokenStore : ITokenStore
     public JsonTokenStore() { }
 
     /// <inheritdoc />
-    public async Task<TokenSet?> LoadAsync(string path, CancellationToken cancellationToken)
+    public async Task<Option<TokenSet>> LoadAsync(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
         {
-            return null;
+            return Option<TokenSet>.None;
         }
 
         await using var stream = File.OpenRead(path);
-        return await JsonSerializer.DeserializeAsync<TokenSet>(
-            stream,
-            _jsonOpts,
-            cancellationToken
-        );
+        var tokenSet =
+            await JsonSerializer.DeserializeAsync<TokenSet>(stream, _jsonOpts, cancellationToken)
+            ?? throw new JsonException("The Twitch token file did not contain a token set.");
+        return Option<TokenSet>.Some(tokenSet);
     }
 
     /// <inheritdoc />
@@ -39,7 +39,29 @@ public sealed class JsonTokenStore : ITokenStore
             Directory.CreateDirectory(directory);
         }
 
-        await using var stream = File.Create(path);
-        await JsonSerializer.SerializeAsync(stream, tokenSet, _jsonOpts, cancellationToken);
+        var tempPath = Path.Combine(
+            directory ?? Directory.GetCurrentDirectory(),
+            $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp"
+        );
+        try
+        {
+            await using (
+                var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write)
+            )
+            {
+                await JsonSerializer.SerializeAsync(stream, tokenSet, _jsonOpts, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(tempPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 }

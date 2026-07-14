@@ -72,6 +72,7 @@ internal static class PublicChatDeliveryClassifier
                 ),
             static _ => new PublicChatDeliveryOutcome.MissingChannel(),
             static _ => new PublicChatDeliveryOutcome.MissingBot(),
+            unavailable => new PublicChatDeliveryOutcome.TokenUnavailable(unavailable.Reason),
             transient => new PublicChatDeliveryOutcome.SafePreSendTransient
             {
                 Diagnostic = transient.Diagnostic,

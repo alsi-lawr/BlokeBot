@@ -1356,6 +1356,13 @@ public sealed class PublicChatMessageQueueTests
                         recordedAt,
                         cancellationToken
                     ),
+                _ =>
+                    CompleteClaimedRedacted(
+                        message,
+                        RowStatus.Unexpected,
+                        recordedAt,
+                        cancellationToken
+                    ),
                 _ => RecordSafePreSendTransient(message, recordedAt, cancellationToken),
                 _ => CompleteSending(message, RowStatus.Rejected, recordedAt, cancellationToken),
                 _ => CompleteSending(message, RowStatus.Ambiguous, recordedAt, cancellationToken),

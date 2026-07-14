@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 /// <summary>
@@ -21,7 +23,7 @@ internal interface IAccessTokenCacheTransaction
 {
     bool IsLoaded { get; }
 
-    TokenSet? Current { get; }
+    Option<TokenSet> Current { get; }
 
-    void SetLoaded(TokenSet? current);
+    void SetLoaded(Option<TokenSet> current);
 }

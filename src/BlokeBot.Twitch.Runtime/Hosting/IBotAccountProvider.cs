@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Runtime;
 
 /// <summary>
@@ -9,12 +11,8 @@ public interface IBotAccountProvider
     /// Gets the bot account that should send messages for the channel login.
     /// </summary>
     /// <param name="channelLogin">The channel login, without a leading hash.</param>
-    /// <param name="cancellationToken">A token that cancels the account lookup.</param>
-    /// <returns>The active bot account for the channel.</returns>
-    ValueTask<BotAccount> GetBotAccountAsync(
-        string channelLogin,
-        CancellationToken cancellationToken
-    );
+    /// <returns>A deferred active bot-account lookup.</returns>
+    IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin);
 }
 
 public sealed record BotAccount(string Login, string AccessToken);

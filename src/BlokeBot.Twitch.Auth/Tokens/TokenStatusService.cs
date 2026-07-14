@@ -27,18 +27,17 @@ public sealed class TokenStatusService(
         CancellationToken cancellationToken
     )
     {
-        string accessToken;
+        Result<string, AccessTokenUnavailableReason> accessToken;
         try
         {
-            accessToken = await tokens.GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+            accessToken = await tokens
+                .GetAccessToken()
+                .ExecuteAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
-        }
-        catch (AccessTokenUnavailableException exception)
-        {
-            return Success(new TokenStatus.Unavailable(exception.Reason, requiredScopes));
         }
         catch (HttpRequestException exception)
         {
@@ -86,6 +85,23 @@ public sealed class TokenStatusService(
             throw;
         }
 
+        return await accessToken
+            .Match(
+                token => ValidateAsync(token, requiredScopes, cancellationToken),
+                reason =>
+                    ValueTask.FromResult(
+                        Success(new TokenStatus.Unavailable(reason, requiredScopes))
+                    )
+            )
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask<Result<TokenStatus, TokenStatusError>> ValidateAsync(
+        string accessToken,
+        ImmutableArray<string> requiredScopes,
+        CancellationToken cancellationToken
+    )
+    {
         try
         {
             var validation = await transport

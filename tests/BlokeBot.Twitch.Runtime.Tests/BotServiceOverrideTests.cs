@@ -1,4 +1,5 @@
 using BlokeBot.Commands;
+using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,8 @@ public sealed class BotServiceOverrideTests
 
         var account = await provider
             .GetRequiredService<IBotAccountProvider>()
-            .GetBotAccountAsync("streamer", CancellationToken.None);
+            .GetBotAccount("streamer")
+            .ExecuteAsync(CancellationToken.None);
         await provider
             .GetRequiredService<ICommandResponseSender>()
             .SendAsync(
@@ -35,7 +37,7 @@ public sealed class BotServiceOverrideTests
         await lifecycle.ChannelStartedAsync("streamer", CancellationToken.None);
         await lifecycle.ChannelStoppedAsync("streamer", CancellationToken.None);
 
-        account.ShouldBe(new BotAccount("mainbot", "default-token"));
+        Success(account).ShouldBe(new BotAccount("mainbot", "default-token"));
         tokens.CallCount.ShouldBe(1);
         var sent = chat.Messages.ShouldHaveSingleItem();
         sent.Channel.ShouldBe("streamer");
@@ -64,7 +66,8 @@ public sealed class BotServiceOverrideTests
 
         var account = await provider
             .GetRequiredService<IBotAccountProvider>()
-            .GetBotAccountAsync("streamer", CancellationToken.None);
+            .GetBotAccount("streamer")
+            .ExecuteAsync(CancellationToken.None);
         await provider
             .GetRequiredService<ICommandResponseSender>()
             .SendAsync(
@@ -76,7 +79,7 @@ public sealed class BotServiceOverrideTests
         await lifecycle.ChannelStartedAsync("streamer", CancellationToken.None);
         await lifecycle.ChannelStoppedAsync("streamer", CancellationToken.None);
 
-        account.ShouldBe(new BotAccount("feature-bot", "feature-token"));
+        Success(account).ShouldBe(new BotAccount("feature-bot", "feature-token"));
         accountProvider.Channels.ShouldBe(["streamer"]);
         responseSender.Responses.ShouldBe([
             new RecordedResponse("streamer", CommandResponseTarget.Whisper, "feature response"),
@@ -129,10 +132,9 @@ public sealed class BotServiceOverrideTests
         responseContract.ShouldBeSameAs(responseSender);
         lifecycleContract.ShouldBeSameAs(lifecycleNotifier);
 
-        var account = await accountContract.GetBotAccountAsync(
-            "configured-streamer",
-            CancellationToken.None
-        );
+        var account = await accountContract
+            .GetBotAccount("configured-streamer")
+            .ExecuteAsync(CancellationToken.None);
         await responseContract.SendAsync(
             SourceMessage(),
             CommandResponse.Whisper("last response"),
@@ -141,7 +143,7 @@ public sealed class BotServiceOverrideTests
         await lifecycleContract.ChannelStartedAsync("configured-streamer", CancellationToken.None);
         await lifecycleContract.ChannelStoppedAsync("configured-streamer", CancellationToken.None);
 
-        account.ShouldBe(new BotAccount("feature-bot", "feature-token"));
+        Success(account).ShouldBe(new BotAccount("feature-bot", "feature-token"));
         accountProvider.Channels.ShouldBe(["configured-streamer"]);
         responseSender.Responses.ShouldBe([
             new RecordedResponse("streamer", CommandResponseTarget.Whisper, "last response"),
@@ -270,15 +272,29 @@ public sealed class BotServiceOverrideTests
         return new("viewer", "streamer", "!command", "raw", new Dictionary<string, string>());
     }
 
+    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result)
+    {
+        return result.Match(
+            account => account,
+            reason =>
+                throw new InvalidOperationException($"Expected a bot account, received {reason}.")
+        );
+    }
+
     private sealed class RecordingAccessTokenProvider : IAccessTokenProvider
     {
         internal int CallCount { get; private set; }
 
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            CallCount++;
-            return Task.FromResult("default-token");
+            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                CallCount++;
+                return ValueTask.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Success("default-token")
+                );
+            });
         }
     }
 
@@ -305,26 +321,34 @@ public sealed class BotServiceOverrideTests
     {
         internal List<string> Channels { get; } = [];
 
-        public ValueTask<BotAccount> GetBotAccountAsync(
-            string channelLogin,
-            CancellationToken cancellationToken
-        )
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Channels.Add(channelLogin);
-            return ValueTask.FromResult(new BotAccount("feature-bot", "feature-token"));
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Channels.Add(channelLogin);
+                return ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        new BotAccount("feature-bot", "feature-token")
+                    )
+                );
+            });
         }
     }
 
     private sealed class FirstFeatureAccountProvider : IBotAccountProvider
     {
-        public ValueTask<BotAccount> GetBotAccountAsync(
-            string channelLogin,
-            CancellationToken cancellationToken
-        )
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(new BotAccount("first-bot", "first-token"));
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        new BotAccount("first-bot", "first-token")
+                    )
+                );
+            });
         }
     }
 

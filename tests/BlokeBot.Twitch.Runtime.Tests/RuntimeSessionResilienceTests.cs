@@ -102,20 +102,20 @@ public sealed class RuntimeSessionResilienceTests
     [Test]
     [Arguments(ChatRuntime.Irc)]
     [Arguments(ChatRuntime.EventSub)]
-    public async Task TerminalEstablishmentFailure_RunningPipeline_ReportsUnhealthyWithoutRetry(
+    public async Task TokenUnavailable_DuringEstablishment_ReturnsTypedOutcomeWithoutRetry(
         ChatRuntime runtime
     )
     {
         var harness = CreateHarness(runtime, attemptLimit: 3);
-        var failure = new AccessTokenUnavailableException(
-            AccessTokenUnavailableReason.MissingRefreshToken,
-            AccessTokenUnavailableException.MissingRefreshTokenMessage
-        );
         harness.Session.Enqueue(
             (_, _) =>
             {
                 harness.Status.MarkConnected(["stale"]);
-                return FailedEstablishmentAsync(failure);
+                return Task.FromResult<RuntimeSessionEstablishment>(
+                    new RuntimeSessionEstablishment.TokenUnavailable(
+                        AccessTokenUnavailableReason.MissingRefreshToken
+                    )
+                );
             }
         );
 
@@ -124,20 +124,11 @@ public sealed class RuntimeSessionResilienceTests
             CancellationToken.None
         );
 
-        var unhealthy = outcome.ShouldBeOfType<RuntimeSessionOutcome.Unhealthy>();
+        var unavailable = outcome.ShouldBeOfType<RuntimeSessionOutcome.TokenUnavailable>();
+        unavailable.Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
         harness.Session.CallCount.ShouldBe(1);
         harness.Status.Current.ShouldBeOfType<BotRuntimeStatus.Unauthorized>();
-        var report = harness
-            .Health.Reports.ShouldHaveSingleItem()
-            .ShouldBeOfType<RuntimeSessionHealthReport.Unhealthy>();
-        unhealthy.Report.ShouldBeSameAs(report);
-        AssertReport(
-            report,
-            runtime,
-            RuntimeSessionFailureClassification.Terminal,
-            attempt: 1,
-            failure
-        );
+        harness.Health.Reports.ShouldBeEmpty();
     }
 
     [Test]

@@ -31,6 +31,7 @@ internal static class RuntimeSessionRunner
                         HandleIdleAsync,
                         HandleEstablishedAsync,
                         static _ => ValueTask.FromResult(false),
+                        static _ => ValueTask.FromResult(false),
                         static _ => ValueTask.FromResult(false)
                     );
                     if (!shouldContinue)
@@ -132,7 +133,8 @@ internal static class RuntimeSessionRunner
             {
                 await establishment.Match(
                     static _ => ValueTask.CompletedTask,
-                    connected => connected.Session.DisposeAsync()
+                    connected => connected.Session.DisposeAsync(),
+                    static _ => ValueTask.CompletedTask
                 );
 
                 return new RuntimeSessionOutcome.Canceled();
@@ -144,8 +146,15 @@ internal static class RuntimeSessionRunner
                 {
                     Session = established.Session,
                     Attempt = attempt,
-                }
+                },
+                unavailable => TokenUnavailable(unavailable.Reason)
             );
+
+            RuntimeSessionOutcome TokenUnavailable(AccessTokenUnavailableReason reason)
+            {
+                status.MarkUnauthorized();
+                return new RuntimeSessionOutcome.TokenUnavailable(reason);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -153,11 +162,6 @@ internal static class RuntimeSessionRunner
         }
         catch (Exception exception)
         {
-            if (exception is AccessTokenUnavailableException)
-            {
-                status.MarkUnauthorized();
-            }
-
             var report = CreateUnhealthyReport(
                 runtime,
                 classify,
@@ -239,11 +243,6 @@ internal static class RuntimeSessionRunner
         }
         catch (Exception exception)
         {
-            if (exception is AccessTokenUnavailableException)
-            {
-                status.MarkUnauthorized();
-            }
-
             var failure = await IncludeCleanupFailureAsync(session, established.Attempt, exception);
             status.MarkDisconnected();
             var classification = classify(failure, stoppingToken);
@@ -435,14 +434,16 @@ internal abstract record RuntimeSessionEstablishment
 
     internal abstract TResult Match<TResult>(
         Func<Idle, TResult> idle,
-        Func<Established, TResult> established
+        Func<Established, TResult> established,
+        Func<TokenUnavailable, TResult> tokenUnavailable
     );
 
     internal sealed record Idle : RuntimeSessionEstablishment
     {
         internal override TResult Match<TResult>(
             Func<Idle, TResult> idle,
-            Func<Established, TResult> established
+            Func<Established, TResult> established,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return idle(this);
@@ -455,10 +456,24 @@ internal abstract record RuntimeSessionEstablishment
 
         internal override TResult Match<TResult>(
             Func<Idle, TResult> idle,
-            Func<Established, TResult> established
+            Func<Established, TResult> established,
+            Func<TokenUnavailable, TResult> tokenUnavailable
         )
         {
             return established(this);
+        }
+    }
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : RuntimeSessionEstablishment
+    {
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<TokenUnavailable, TResult> tokenUnavailable
+        )
+        {
+            return tokenUnavailable(this);
         }
     }
 }
@@ -481,6 +496,7 @@ internal abstract record RuntimeSessionOutcome
         Func<Idle, TResult> idle,
         Func<Established, TResult> established,
         Func<Canceled, TResult> canceled,
+        Func<TokenUnavailable, TResult> tokenUnavailable,
         Func<Unhealthy, TResult> unhealthy
     );
 
@@ -490,6 +506,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<Canceled, TResult> canceled,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
         )
         {
@@ -507,6 +524,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<Canceled, TResult> canceled,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
         )
         {
@@ -520,10 +538,26 @@ internal abstract record RuntimeSessionOutcome
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<Canceled, TResult> canceled,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
         )
         {
             return canceled(this);
+        }
+    }
+
+    internal sealed record TokenUnavailable(AccessTokenUnavailableReason Reason)
+        : RuntimeSessionOutcome
+    {
+        internal override TResult Match<TResult>(
+            Func<Idle, TResult> idle,
+            Func<Established, TResult> established,
+            Func<Canceled, TResult> canceled,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
+            Func<Unhealthy, TResult> unhealthy
+        )
+        {
+            return tokenUnavailable(this);
         }
     }
 
@@ -535,6 +569,7 @@ internal abstract record RuntimeSessionOutcome
             Func<Idle, TResult> idle,
             Func<Established, TResult> established,
             Func<Canceled, TResult> canceled,
+            Func<TokenUnavailable, TResult> tokenUnavailable,
             Func<Unhealthy, TResult> unhealthy
         )
         {

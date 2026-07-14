@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging;
 using Shouldly;
@@ -299,38 +300,53 @@ public sealed class TokenStatusServiceTests
     {
         public int CallCount { get; private set; }
 
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            CallCount++;
-            return Task.FromResult(accessToken);
+            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+            {
+                CallCount++;
+                return ValueTask.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Success(accessToken)
+                );
+            });
         }
     }
 
     private sealed class ThrowingTokenProvider(Exception exception) : IAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            return Task.FromException<string>(exception);
+            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromException<Result<string, AccessTokenUnavailableReason>>(exception)
+            );
         }
     }
 
     private sealed class CancellingTokenProvider(CancellationTokenSource cancellation)
         : IAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            cancellation.Cancel();
-            return Task.FromCanceled<string>(cancellationToken);
+            return IO<string, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromCanceled<Result<string, AccessTokenUnavailableReason>>(
+                    cancellationToken
+                );
+            });
         }
     }
 
     private sealed class UnavailableTokenProvider : IAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            throw new AccessTokenUnavailableException(
-                AccessTokenUnavailableReason.MissingRefreshToken,
-                AccessTokenUnavailableException.MissingRefreshTokenMessage
+            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Error(
+                        AccessTokenUnavailableReason.MissingRefreshToken
+                    )
+                )
             );
         }
     }

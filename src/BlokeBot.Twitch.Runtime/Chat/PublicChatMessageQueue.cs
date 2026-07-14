@@ -182,6 +182,12 @@ internal sealed class PublicChatMessageQueue(
                     PublicChatDeliveryClassifier.MapPreparationFailure(missingBot),
                     CancellationToken.None
                 ),
+            unavailable =>
+                RecordOutcomeAsync(
+                    message,
+                    PublicChatDeliveryClassifier.MapPreparationFailure(unavailable),
+                    CancellationToken.None
+                ),
             transient =>
                 RecordOutcomeAsync(
                     message,
@@ -344,6 +350,13 @@ internal sealed class PublicChatMessageQueue(
             static _ => { },
             _ => LogMissingIdentity(message, nameof(PublicChatDeliveryOutcome.MissingChannel)),
             _ => LogMissingIdentity(message, nameof(PublicChatDeliveryOutcome.MissingBot)),
+            unavailable =>
+                log.LogWarning(
+                    "Public chat outbox message {OutboxMessageId} in #{Channel} could not prepare because the bot access token is unavailable ({UnavailableReason}).",
+                    message.Id,
+                    message.Channel,
+                    unavailable.Reason
+                ),
             transient =>
                 LogFailure(LogLevel.Warning, message, "SafePreSendTransient", transient.Diagnostic),
             rejection =>

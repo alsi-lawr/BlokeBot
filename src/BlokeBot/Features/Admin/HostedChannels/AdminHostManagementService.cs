@@ -15,17 +15,10 @@ internal sealed class AdminHostManagementService(
 {
     public async Task<AdminHostOperationResult> CreateHostAsync(string login, CancellationToken ct)
     {
-        Option<UserIdentity> user;
+        Result<Option<UserIdentity>, AccessTokenUnavailableReason> user;
         try
         {
-            user = await users.FindByLoginAsync(login, ct);
-        }
-        catch (InvalidOperationException)
-        {
-            return new AdminHostOperationResult(
-                false,
-                "Connect the bot account before adding channels."
-            );
+            user = await users.FindByLogin(login).ExecuteAsync(ct);
         }
         catch (HttpRequestException)
         {
@@ -36,8 +29,21 @@ internal sealed class AdminHostManagementService(
         }
 
         return await user.Match(
-            identity => CreateHostAsync(identity, ct),
-            () => Task.FromResult(new AdminHostOperationResult(false, "Twitch user not found."))
+            found =>
+                found.Match(
+                    identity => CreateHostAsync(identity, ct),
+                    () =>
+                        Task.FromResult(
+                            new AdminHostOperationResult(false, "Twitch user not found.")
+                        )
+                ),
+            _ =>
+                Task.FromResult(
+                    new AdminHostOperationResult(
+                        false,
+                        "Connect the bot account before adding channels."
+                    )
+                )
         );
     }
 

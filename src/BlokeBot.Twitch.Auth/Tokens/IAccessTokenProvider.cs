@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 /// <summary>
@@ -8,7 +10,6 @@ public interface IAccessTokenProvider
     /// <summary>
     /// Gets a Twitch access token.
     /// </summary>
-    /// <param name="cancellationToken">A token that cancels token acquisition.</param>
-    /// <returns>A valid access token.</returns>
-    Task<string> GetAccessTokenAsync(CancellationToken cancellationToken);
+    /// <returns>A deferred operation yielding a valid token or an expected unavailable reason.</returns>
+    IO<string, AccessTokenUnavailableReason> GetAccessToken();
 }

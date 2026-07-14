@@ -1,14 +1,16 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTransaction
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private TokenSet? _current;
+    private Option<TokenSet> _current = Option<TokenSet>.None;
     private bool _loaded;
 
     bool IAccessTokenCacheTransaction.IsLoaded => _loaded;
 
-    TokenSet? IAccessTokenCacheTransaction.Current => _current;
+    Option<TokenSet> IAccessTokenCacheTransaction.Current => _current;
 
     async Task<TResult> IAccessTokenCache.ExecuteSynchronizedAsync<TResult>(
         Func<IAccessTokenCacheTransaction, CancellationToken, Task<TResult>> operation,
@@ -33,8 +35,8 @@ internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTra
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            _current = null;
-            _loaded = true;
+            _current = Option<TokenSet>.None;
+            _loaded = false;
         }
         finally
         {
@@ -42,7 +44,7 @@ internal sealed class AccessTokenCache : IAccessTokenCache, IAccessTokenCacheTra
         }
     }
 
-    void IAccessTokenCacheTransaction.SetLoaded(TokenSet? tokenSet)
+    void IAccessTokenCacheTransaction.SetLoaded(Option<TokenSet> tokenSet)
     {
         _current = tokenSet;
         _loaded = true;

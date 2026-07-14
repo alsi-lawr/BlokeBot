@@ -3,6 +3,7 @@ using System.Text;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -132,7 +133,9 @@ public sealed class HostBotAccountAuthorizationTests
         await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
 
-        var account = await service.GetBotAccountAsync("streamer", CancellationToken.None);
+        var account = Success(
+            await service.GetBotAccount("streamer").ExecuteAsync(CancellationToken.None)
+        );
 
         account.Login.ShouldBe("bot");
         account.AccessToken.ShouldBe("global-token");
@@ -161,9 +164,11 @@ public sealed class HostBotAccountAuthorizationTests
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(hostId, CancellationToken.None);
 
-        await Should.ThrowAsync<AccessTokenUnavailableException>(async () =>
-            await service.GetBotAccountAsync("streamer", CancellationToken.None)
+        var reason = Error(
+            await service.GetBotAccount("streamer").ExecuteAsync(CancellationToken.None)
         );
+
+        reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
     }
 
     [Test]
@@ -191,7 +196,9 @@ public sealed class HostBotAccountAuthorizationTests
             CancellationToken.None
         );
 
-        var account = await service.GetBotAccountAsync("streamer", CancellationToken.None);
+        var account = Success(
+            await service.GetBotAccount("streamer").ExecuteAsync(CancellationToken.None)
+        );
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
         result.Succeeded.ShouldBeTrue();
@@ -232,7 +239,10 @@ public sealed class HostBotAccountAuthorizationTests
 
         async Task<(string Channel, BotAccount Account)> ResolveAsync(string channel)
         {
-            return (channel, await service.GetBotAccountAsync(channel, CancellationToken.None));
+            return (
+                channel,
+                Success(await service.GetBotAccount(channel).ExecuteAsync(CancellationToken.None))
+            );
         }
     }
 
@@ -415,6 +425,27 @@ public sealed class HostBotAccountAuthorizationTests
         );
     }
 
+    private static BotAccount Success(Result<BotAccount, AccessTokenUnavailableReason> result)
+    {
+        return result.Match(
+            account => account,
+            reason =>
+                throw new InvalidOperationException(
+                    $"Expected an authorized bot account, received {reason}."
+                )
+        );
+    }
+
+    private static AccessTokenUnavailableReason Error(
+        Result<BotAccount, AccessTokenUnavailableReason> result
+    )
+    {
+        return result.Match(
+            _ => throw new InvalidOperationException("Expected token unavailability."),
+            reason => reason
+        );
+    }
+
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -476,9 +507,13 @@ public sealed class HostBotAccountAuthorizationTests
 
     private sealed class StaticTokenProvider(string accessToken) : IAccessTokenProvider
     {
-        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        public IO<string, AccessTokenUnavailableReason> GetAccessToken()
         {
-            return Task.FromResult(accessToken);
+            return IO<string, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Success(accessToken)
+                )
+            );
         }
     }
 

@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 /// <summary>
@@ -10,8 +12,8 @@ public interface ITokenStore
     /// </summary>
     /// <param name="path">The storage path.</param>
     /// <param name="cancellationToken">A token that cancels loading.</param>
-    /// <returns>The stored token set, or <see langword="null" /> when none exists.</returns>
-    Task<TokenSet?> LoadAsync(string path, CancellationToken cancellationToken);
+    /// <returns>The optional stored token set.</returns>
+    Task<Option<TokenSet>> LoadAsync(string path, CancellationToken cancellationToken);
 
     /// <summary>
     /// Saves a token set to a path.

@@ -217,6 +217,17 @@ internal sealed class EfPublicChatOutbox(
                     recordedAt,
                     cancellationToken
                 ),
+            unavailable =>
+                RecordUnexpectedAsync(
+                    message,
+                    new PublicChatFailureDiagnostic.Preparation
+                    {
+                        FailureType = new PublicChatFailureType(unavailable.Reason.ToString()),
+                        HttpStatus = new PublicChatHttpStatus.Unavailable(),
+                    },
+                    recordedAt,
+                    cancellationToken
+                ),
             transient =>
                 RecordSafePreSendTransientAsync(
                     message,

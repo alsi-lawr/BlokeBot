@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Threading.Channels;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
@@ -205,6 +206,42 @@ public sealed class EventSubChannelRecoveryTests
         operations.CreateCount("channel").ShouldBe(1);
         operations.StartupDeliveryCount("channel").ShouldBe(0);
         degraded.ToString().ShouldNotContain("channel-secret");
+    }
+
+    [Test]
+    public async Task Startup_TokenUnavailable_IsTypedTerminalWithoutAccountRetry()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueAccountUnavailable(
+            "channel",
+            AccessTokenUnavailableReason.MissingRefreshToken
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 3);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        var degraded = harness
+            .Status.Current.Channels.ShouldHaveSingleItem()
+            .ShouldBeOfType<EventSubChannelStatus.Degraded>();
+        AssertFailure(
+            degraded,
+            "channel",
+            EventSubChannelPhase.AccountResolution,
+            EventSubChannelFailureClassification.Terminal,
+            nameof(AccessTokenUnavailableReason.MissingRefreshToken),
+            attempt: 1,
+            EventSubChannelRecoveryTrigger.Startup,
+            EventSubChannelNextAction.RetryOnNextReconciliation,
+            _now
+        );
+        harness
+            .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
+            .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>()
+            .Failure.ShouldBeOfType<EventSubChannelFailureContext.TokenUnavailable>()
+            .Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
+        operations.AccountCount("channel").ShouldBe(1);
+        operations.CreateCount("channel").ShouldBe(0);
     }
 
     [Test]
@@ -1000,6 +1037,7 @@ public sealed class EventSubChannelRecoveryTests
                 "MissingBot",
                 "MissingChannel",
                 "StartupMessageRejected",
+                "TokenUnavailable",
                 "UnresolvedDeletion",
             ]);
         handledCases.OrderBy(type => type.Name).ShouldBe(directCases);
@@ -1063,17 +1101,6 @@ public sealed class EventSubChannelRecoveryTests
             EventSubChannelPhase.AccountResolution,
             CancellationToken.None
         );
-        var unavailableAccount = EventSubChannelFailureClassifier.Classify(
-            new EventSubChannelOperationException(
-                EventSubChannelPhase.AccountResolution,
-                new AccessTokenUnavailableException(
-                    AccessTokenUnavailableReason.MissingRefreshToken,
-                    AccessTokenUnavailableException.MissingRefreshTokenMessage
-                )
-            ),
-            EventSubChannelPhase.SubscriptionSetup,
-            CancellationToken.None
-        );
         var unexpected = EventSubChannelFailureClassifier.Classify(
             new ApplicationException("programmer defect"),
             EventSubChannelPhase.Reconciliation,
@@ -1089,8 +1116,6 @@ public sealed class EventSubChannelRecoveryTests
         cancellation.Classification.ShouldBe(EventSubChannelFailureClassification.Cancellation);
         transientSetup.Phase.ShouldBe(EventSubChannelPhase.SubscriptionSetup);
         transientSetup.Classification.ShouldBe(EventSubChannelFailureClassification.Transient);
-        unavailableAccount.Phase.ShouldBe(EventSubChannelPhase.AccountResolution);
-        unavailableAccount.Classification.ShouldBe(EventSubChannelFailureClassification.Terminal);
         unexpected.Classification.ShouldBe(EventSubChannelFailureClassification.Unexpected);
         deletionFailure.Phase.ShouldBe(EventSubChannelPhase.SubscriptionDeletion);
         deletionFailure.Classification.ShouldBe(EventSubChannelFailureClassification.Transient);
@@ -1262,8 +1287,13 @@ public sealed class EventSubChannelRecoveryTests
     {
         private readonly Dictionary<
             string,
-            Queue<Func<CancellationToken, ValueTask<BotAccount>>>
+            Queue<
+                Func<CancellationToken, ValueTask<Result<BotAccount, AccessTokenUnavailableReason>>>
+            >
         > _accountScripts = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> _accountCounts = new(
+            StringComparer.OrdinalIgnoreCase
+        );
         private readonly Dictionary<
             string,
             Queue<Func<CancellationToken, ValueTask<EventSubSubscriptionSetupOutcome>>>
@@ -1308,7 +1338,12 @@ public sealed class EventSubChannelRecoveryTests
             Func<CancellationToken, ValueTask<BotAccount>> operation
         )
         {
-            GetQueue(_accountScripts, channel).Enqueue(operation);
+            GetQueue(_accountScripts, channel)
+                .Enqueue(async cancellationToken =>
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        await operation(cancellationToken)
+                    )
+                );
         }
 
         internal void EnqueueAccountFailure(string channel, Exception exception)
@@ -1319,6 +1354,21 @@ public sealed class EventSubChannelRecoveryTests
         internal void EnqueueAccountResult(string channel, string botLogin)
         {
             EnqueueAccount(channel, _ => ValueTask.FromResult(new BotAccount(botLogin, "secret")));
+        }
+
+        internal void EnqueueAccountUnavailable(string channel, AccessTokenUnavailableReason reason)
+        {
+            GetQueue(_accountScripts, channel)
+                .Enqueue(_ =>
+                    ValueTask.FromResult(
+                        Result<BotAccount, AccessTokenUnavailableReason>.Error(reason)
+                    )
+                );
+        }
+
+        internal int AccountCount(string channel)
+        {
+            return _accountCounts.GetValueOrDefault(channel);
         }
 
         internal void EnqueueCreateFailure(string channel, Exception exception)
@@ -1392,14 +1442,19 @@ public sealed class EventSubChannelRecoveryTests
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
         }
 
-        public ValueTask<BotAccount> ResolveAccountAsync(
-            string channel,
-            CancellationToken cancellationToken
-        )
+        public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel)
         {
-            return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
-                ? scripts.Dequeue()(cancellationToken)
-                : ValueTask.FromResult(new BotAccount($"{channel}-bot", $"{channel}-secret"));
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                _accountCounts[channel] = AccountCount(channel) + 1;
+                return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
+                    ? scripts.Dequeue()(cancellationToken)
+                    : ValueTask.FromResult(
+                        Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                            new BotAccount($"{channel}-bot", $"{channel}-secret")
+                        )
+                    );
+            });
         }
 
         public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(

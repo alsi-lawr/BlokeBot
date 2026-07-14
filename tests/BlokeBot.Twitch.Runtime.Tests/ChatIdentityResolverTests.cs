@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
@@ -412,24 +413,27 @@ public sealed class ChatIdentityResolverTests
 
     private sealed class StaticAccountProvider(BotAccount account) : IBotAccountProvider
     {
-        public ValueTask<BotAccount> GetBotAccountAsync(
-            string channelLogin,
-            CancellationToken cancellationToken
-        )
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(account);
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(account)
+                );
+            });
         }
     }
 
     private sealed class UnusedAccountProvider : IBotAccountProvider
     {
-        public ValueTask<BotAccount> GetBotAccountAsync(
-            string channelLogin,
-            CancellationToken cancellationToken
-        )
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
         {
-            throw new InvalidOperationException("Account lookup was not expected.");
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromException<Result<BotAccount, AccessTokenUnavailableReason>>(
+                    new InvalidOperationException("Account lookup was not expected.")
+                )
+            );
         }
     }
 
