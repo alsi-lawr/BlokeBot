@@ -101,7 +101,7 @@ public sealed class PersistenceLifecycleProjectionTests
     private static void AssertUnionContract(Type unionType, string[] expectedCaseNames)
     {
         var directCases = unionType
-            .GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            .Assembly.GetTypes()
             .Where(type => type.BaseType == unionType)
             .OrderBy(type => type.Name)
             .ToArray();
