@@ -2,10 +2,11 @@ using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Components;
 
-public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposable
+public abstract class BackgroundLoadComponent<TValue, TLoadIdentity> : ComponentBase, IDisposable
+    where TLoadIdentity : class, IEquatable<TLoadIdentity>
 {
     private CancellationTokenSource? _activeLoad;
-    private object? _currentLoadKey;
+    private TLoadIdentity? _currentLoadIdentity;
     private bool _disposed;
     private long _version;
 
@@ -13,25 +14,25 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
     protected Exception? BackgroundError { get; private set; }
     protected bool IsBackgroundLoading { get; private set; }
 
-    protected abstract object? BackgroundLoadKey { get; }
+    protected abstract TLoadIdentity? BackgroundLoadIdentity { get; }
 
     protected abstract Task<TValue> LoadBackgroundValueAsync(CancellationToken ct);
 
     protected override void OnParametersSet()
     {
-        var key = BackgroundLoadKey;
-        if (key is null)
+        var identity = BackgroundLoadIdentity;
+        if (identity is null)
         {
             ClearBackgroundLoad();
             return;
         }
 
-        if (Equals(_currentLoadKey, key))
+        if (EqualityComparer<TLoadIdentity>.Default.Equals(_currentLoadIdentity, identity))
         {
             return;
         }
 
-        StartBackgroundLoad(key);
+        StartBackgroundLoad(identity);
     }
 
     public void Dispose()
@@ -40,13 +41,13 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
         _activeLoad?.Cancel();
     }
 
-    private void StartBackgroundLoad(object key)
+    private void StartBackgroundLoad(TLoadIdentity identity)
     {
         _activeLoad?.Cancel();
 
         var cts = new CancellationTokenSource();
         _activeLoad = cts;
-        _currentLoadKey = key;
+        _currentLoadIdentity = identity;
         BackgroundValue = default;
         BackgroundError = null;
         IsBackgroundLoading = true;
@@ -58,7 +59,7 @@ public abstract class BackgroundLoadComponent<TValue> : ComponentBase, IDisposab
     private void ClearBackgroundLoad()
     {
         _activeLoad?.Cancel();
-        _currentLoadKey = null;
+        _currentLoadIdentity = null;
         BackgroundValue = default;
         BackgroundError = null;
         IsBackgroundLoading = false;

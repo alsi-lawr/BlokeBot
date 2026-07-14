@@ -53,8 +53,8 @@ public partial class PointsEligibilitySelector
 
     private HostBotChannelStatus? _status => BackgroundValue;
 
-    protected override object? BackgroundLoadKey =>
-        string.IsNullOrWhiteSpace(HostLogin) ? null : HostLogin.Trim().ToLowerInvariant();
+    protected override PointsEligibilityLoadIdentity? BackgroundLoadIdentity =>
+        PointsEligibilityLoadIdentity.From(HostLogin);
 
     protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct)
     {
