@@ -1,5 +1,6 @@
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Gambling;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -107,46 +108,72 @@ public sealed class PointsGiveawayDrawService(
             .OrderBy(_ => random.Next(0, int.MaxValue))
             .Take(winnerCount)
             .ToArray();
-        var winnerPayouts = new List<PointsGiveawayWinnerPayout>();
-        return await AwardWinnerAsync(0);
-
-        async Task<PointsGiveawayDrawOutcome> AwardWinnerAsync(int index)
+        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure> payoutAttempt =
+            Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Success([]);
+        foreach (var winner in winners)
         {
-            if (index == winners.Length)
-            {
-                await db.SaveChangesAsync(ct);
-                var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
-                await CommitAsync(tx, giveawayId, completed, ct);
-                onCommitted(completed);
-                return completed;
-            }
-
-            var winner = winners[index];
-            var payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
-            var mutation = await balances
-                .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
-                .ExecuteAsync(ct);
-            return await mutation.Match(
-                ContinueAsync,
+            payoutAttempt = await payoutAttempt.Match(
+                async winnerPayouts =>
+                {
+                    var payout = RandomPayout(giveaway.MinimumPayout, giveaway.MaximumPayout);
+                    var result = await balances
+                        .AwardGiveaway(db, giveaway.HostId, giveaway.Id, winner, payout, now)
+                        .ExecuteAsync(ct);
+                    return result.Match(
+                        mutation =>
+                        {
+                            winnerPayouts.Add(
+                                new PointsGiveawayWinnerPayout(winner, mutation.Amount)
+                            );
+                            giveaway.Winners.Add(
+                                new PointsGiveawayWinner
+                                {
+                                    GiveawayId = giveaway.Id,
+                                    Login = winner,
+                                    Payout = mutation.Amount.ToString(),
+                                }
+                            );
+                            return Result<
+                                List<PointsGiveawayWinnerPayout>,
+                                PointBalanceMutationFailure
+                            >.Success(winnerPayouts);
+                        },
+                        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Error
+                    );
+                },
                 failure =>
-                    Task.FromResult<PointsGiveawayDrawOutcome>(
-                        new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure)
+                    Task.FromResult(
+                        Result<List<PointsGiveawayWinnerPayout>, PointBalanceMutationFailure>.Error(
+                            failure
+                        )
                     )
             );
 
-            async Task<PointsGiveawayDrawOutcome> ContinueAsync(PointBalanceMutation _)
+            var shouldContinue = payoutAttempt.Match(static _ => true, static _ => false);
+            if (!shouldContinue)
             {
-                winnerPayouts.Add(new PointsGiveawayWinnerPayout(winner, payout));
-                giveaway.Winners.Add(
-                    new PointsGiveawayWinner
-                    {
-                        GiveawayId = giveaway.Id,
-                        Login = winner,
-                        Payout = payout.ToString(),
-                    }
-                );
-                return await AwardWinnerAsync(index + 1);
+                break;
             }
+        }
+
+        return await payoutAttempt.Match(CommitWinnersAsync, PayoutFailedAsync);
+
+        async Task<PointsGiveawayDrawOutcome> CommitWinnersAsync(
+            List<PointsGiveawayWinnerPayout> winnerPayouts
+        )
+        {
+            await db.SaveChangesAsync(ct);
+            var completed = new PointsGiveawayDrawOutcome.Winners(settings, winnerPayouts);
+            await CommitAsync(tx, giveawayId, completed, ct);
+            onCommitted(completed);
+            return completed;
+        }
+
+        Task<PointsGiveawayDrawOutcome> PayoutFailedAsync(PointBalanceMutationFailure failure)
+        {
+            return Task.FromResult<PointsGiveawayDrawOutcome>(
+                new PointsGiveawayDrawOutcome.PayoutFailed(settings, failure)
+            );
         }
     }
 

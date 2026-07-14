@@ -5,6 +5,7 @@ using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -90,28 +91,58 @@ public sealed class GuessingRoundService(
         round.Status = GuessRoundStatus.Completed;
         round.ClosedAtUtc ??= now;
         round.WinningName = normalizedName;
-        return await AwardWinnerAsync(0);
-
-        async Task<GuessingWinnerDeclarationOutcome> AwardWinnerAsync(int index)
+        Result<List<PointBalanceMutation>, PointBalanceMutationFailure> payoutAttempt = Result<
+            List<PointBalanceMutation>,
+            PointBalanceMutationFailure
+        >.Success([]);
+        if (!rewardAmount.IsZero)
         {
-            if (!rewardAmount.IsZero && index < winners.Count)
+            foreach (var winner in winners)
             {
-                var result = await balances
-                    .AwardGuessWin(db, hostId, round.Id, winners[index], rewardAmount, now)
-                    .ExecuteAsync(ct);
-                return await result.Match(
-                    _ => AwardWinnerAsync(index + 1),
+                payoutAttempt = await payoutAttempt.Match(
+                    async mutations =>
+                    {
+                        var result = await balances
+                            .AwardGuessWin(db, hostId, round.Id, winner, rewardAmount, now)
+                            .ExecuteAsync(ct);
+                        return result.Match(
+                            mutation =>
+                            {
+                                mutations.Add(mutation);
+                                return Result<
+                                    List<PointBalanceMutation>,
+                                    PointBalanceMutationFailure
+                                >.Success(mutations);
+                            },
+                            Result<List<PointBalanceMutation>, PointBalanceMutationFailure>.Error
+                        );
+                    },
                     failure =>
-                        Task.FromResult<GuessingWinnerDeclarationOutcome>(
-                            new GuessingWinnerDeclarationOutcome.PayoutFailed(failure)
+                        Task.FromResult(
+                            Result<List<PointBalanceMutation>, PointBalanceMutationFailure>.Error(
+                                failure
+                            )
                         )
                 );
-            }
 
+                var shouldContinue = payoutAttempt.Match(static _ => true, static _ => false);
+                if (!shouldContinue)
+                {
+                    break;
+                }
+            }
+        }
+
+        return await payoutAttempt.Match(CommitAsync, PayoutFailedAsync);
+
+        async Task<GuessingWinnerDeclarationOutcome> CommitAsync(
+            List<PointBalanceMutation> mutations
+        )
+        {
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
             await changes.NotifyChangedAsync(ct);
-            if (!rewardAmount.IsZero && winners.Count > 0)
+            if (mutations.Count > 0)
             {
                 await pointsChanges.NotifyChangedAsync(ct);
             }
@@ -132,6 +163,15 @@ public sealed class GuessingRoundService(
                 }
             );
             return Completed(new GuessingOperationResult(true, message));
+        }
+
+        static Task<GuessingWinnerDeclarationOutcome> PayoutFailedAsync(
+            PointBalanceMutationFailure failure
+        )
+        {
+            return Task.FromResult<GuessingWinnerDeclarationOutcome>(
+                new GuessingWinnerDeclarationOutcome.PayoutFailed(failure)
+            );
         }
     }
 
