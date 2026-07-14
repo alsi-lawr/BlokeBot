@@ -18,12 +18,7 @@ internal sealed class UserLookupService(
                 return await accessToken.Match(
                     async token =>
                         Result<Option<UserIdentity>, AccessTokenUnavailableReason>.Success(
-                            await FindByLoginAsync(
-                                CreateCurrentOptions(),
-                                token,
-                                login,
-                                cancellationToken
-                            )
+                            await FindByLoginAsync(token, login, cancellationToken)
                         ),
                     reason =>
                         Task.FromResult(
@@ -35,7 +30,6 @@ internal sealed class UserLookupService(
     }
 
     private async Task<Option<UserIdentity>> FindByLoginAsync(
-        WebAuthOptions options,
         string accessToken,
         string login,
         CancellationToken cancellationToken
@@ -48,7 +42,7 @@ internal sealed class UserLookupService(
         }
 
         var users = await helix.GetUsersByLoginAsync(
-            new HelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(configuration.Identity.ClientId, accessToken),
             [normalized],
             cancellationToken
         );
@@ -56,13 +50,12 @@ internal sealed class UserLookupService(
     }
 
     public async Task<Option<UserIdentity>> GetCurrentUserAsync(
-        WebAuthOptions options,
         string accessToken,
         CancellationToken cancellationToken
     )
     {
         var user = await helix.GetCurrentUserAsync(
-            new HelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(configuration.Identity.ClientId, accessToken),
             cancellationToken
         );
 
@@ -74,10 +67,5 @@ internal sealed class UserLookupService(
         return user is null
             ? Option<UserIdentity>.None
             : UserIdentity.Create(user.Id, user.Login, user.DisplayName, user.ProfileImageUrl);
-    }
-
-    private WebAuthOptions CreateCurrentOptions()
-    {
-        return configuration.CurrentOptions;
     }
 }

@@ -1,6 +1,6 @@
 namespace BlokeBot.Auth.OAuth;
 
-internal sealed class WebOAuthClient(OAuthTransport transport)
+internal sealed class WebOAuthClient(WebAuthConfiguration configuration, OAuthTransport transport)
 {
     private static readonly OAuthAuthorizationScopeSet _scopes = OAuthAuthorizationScopeSet.Create([
         Scopes.UserReadModeratedChannels,
@@ -8,9 +8,10 @@ internal sealed class WebOAuthClient(OAuthTransport transport)
 
     public Uri CreateAuthorizationUri(HttpRequest request, WebAuthOptions options, string state)
     {
+        var identity = configuration.Identity;
         return transport.CreateAuthorizationUri(
             new AuthorizationUriRequest(
-                options.ClientId,
+                identity.ClientId,
                 OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 _scopes,
                 state,
@@ -26,10 +27,11 @@ internal sealed class WebOAuthClient(OAuthTransport transport)
         CancellationToken ct
     )
     {
+        var identity = configuration.Identity;
         var token = await transport.ExchangeCodeAsync(
             new AuthorizationCodeExchange(
-                options.ClientId,
-                options.ClientSecret,
+                identity.ClientId,
+                identity.ClientSecret,
                 OAuthRequestUri.CreateCallbackUri(request, options.CallbackPath),
                 code
             ),

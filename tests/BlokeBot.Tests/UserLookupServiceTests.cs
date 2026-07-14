@@ -3,7 +3,6 @@ using System.Text;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Users;
 using BlokeBot.Functional;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
@@ -106,11 +105,7 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.GetCurrentUserAsync(
-            new WebAuthOptions { ClientId = "client-id" },
-            "access-token",
-            CancellationToken.None
-        );
+        var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
         var identity = result.Match(
             user => user,
@@ -139,11 +134,7 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.GetCurrentUserAsync(
-            new WebAuthOptions { ClientId = "client-id" },
-            "access-token",
-            CancellationToken.None
-        );
+        var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -166,11 +157,7 @@ public sealed class UserLookupServiceTests
             """
         );
 
-        var result = await service.GetCurrentUserAsync(
-            new WebAuthOptions { ClientId = "client-id" },
-            "access-token",
-            CancellationToken.None
-        );
+        var result = await service.GetCurrentUserAsync("access-token", CancellationToken.None);
 
         result.Match(_ => false, () => true).ShouldBeTrue();
     }
@@ -203,8 +190,10 @@ public sealed class UserLookupServiceTests
     )
     {
         var configuration = new WebAuthConfiguration(
-            Options.Create(new WebAuthOptions { ClientId = "client-id" }),
-            new ConfigurationBuilder().Build()
+            Options.Create(new WebAuthOptions()),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+            )
         );
         return new UserLookupService(
             configuration,

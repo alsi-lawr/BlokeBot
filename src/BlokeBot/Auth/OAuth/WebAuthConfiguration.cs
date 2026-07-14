@@ -4,21 +4,20 @@ namespace BlokeBot.Auth.OAuth;
 
 internal sealed class WebAuthConfiguration(
     IOptions<WebAuthOptions> options,
-    IConfiguration configuration
+    BotSettings botSettings
 )
 {
+    public BotIdentity Identity => botSettings.Identity;
+
     public WebAuthOptions CurrentOptions
     {
         get
         {
             var configured = options.Value;
-            var identity = configuration.GetSection("TwitchBot:Identity");
 
             return new WebAuthOptions
             {
                 CallbackPath = First(configured.CallbackPath, "/auth/twitch/callback"),
-                ClientId = First(configured.ClientId, identity["ClientId"]),
-                ClientSecret = First(configured.ClientSecret, identity["ClientSecret"]),
                 CookieName = First(configured.CookieName, "BlokeBot.Auth"),
             };
         }
@@ -26,8 +25,8 @@ internal sealed class WebAuthConfiguration(
 
     public bool IsConfigured(WebAuthOptions currentOptions)
     {
-        return !string.IsNullOrWhiteSpace(currentOptions.ClientId)
-            && !string.IsNullOrWhiteSpace(currentOptions.ClientSecret)
+        return !string.IsNullOrWhiteSpace(Identity.ClientId)
+            && !string.IsNullOrWhiteSpace(Identity.ClientSecret)
             && !string.IsNullOrWhiteSpace(currentOptions.CallbackPath);
     }
 

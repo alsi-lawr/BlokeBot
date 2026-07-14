@@ -39,8 +39,6 @@ Run it with a named volume for durable application state:
 
 ```console
 docker run --rm --init --publish 8080:8080 --volume blokebot-data:/data \
-  --env TwitchWebAuth__ClientId='<dashboard-twitch-client-id>' \
-  --env TwitchWebAuth__ClientSecret='<dashboard-twitch-client-secret>' \
   --env TwitchBot__Identity__BotUsername='<bot-login-name>' \
   --env TwitchBot__Identity__ClientId='<bot-twitch-client-id>' \
   --env TwitchBot__Identity__ClientSecret='<bot-twitch-client-secret>' \
@@ -113,8 +111,6 @@ export ASPNETCORE_ENVIRONMENT=Production
 export ASPNETCORE_URLS=http://+:8080
 export BlokeBot__DatabasePath=/absolute/path/to/data/blokebot.db
 export TwitchBot__Identity__TokenCachePath=/absolute/path/to/data/twitch.tokens.json
-export TwitchWebAuth__ClientId='<dashboard-twitch-client-id>'
-export TwitchWebAuth__ClientSecret='<dashboard-twitch-client-secret>'
 export TwitchBot__Identity__BotUsername='<bot-login-name>'
 export TwitchBot__Identity__ClientId='<bot-twitch-client-id>'
 export TwitchBot__Identity__ClientSecret='<bot-twitch-client-secret>'
@@ -126,9 +122,11 @@ the bot OAuth token cache. Keep both in a durable, private directory; the persis
 creates the database directory when needed. Their source defaults are relative paths intended for
 local development.
 
-Dashboard OAuth and bot identity use distinct settings. When bot identity settings are absent, the
-dashboard can still start while the Twitch bot runtime remains offline. Do not commit client
-secrets, token caches, or SQLite files; use placeholders or externally managed configuration.
+Dashboard sign-in and bot OAuth share the Twitch application credentials under
+`TwitchBot__Identity`; `TwitchWebAuth` contains only web-specific callback and cookie settings. When
+bot identity settings are absent, the dashboard can still start while Twitch sign-in and the bot
+runtime remain offline. Do not commit client secrets, token caches, or SQLite files; use
+placeholders or externally managed configuration.
 
 ## Development checks
 

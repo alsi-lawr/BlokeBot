@@ -41,7 +41,7 @@ internal sealed class WebAuthService(
             code,
             cancellationToken
         );
-        var user = await users.GetCurrentUserAsync(currentOptions, accessToken, cancellationToken);
+        var user = await users.GetCurrentUserAsync(accessToken, cancellationToken);
 
         return await user.Match(
             identity => AuthenticateAsync(currentOptions, accessToken, identity, cancellationToken),
@@ -82,7 +82,6 @@ internal sealed class WebAuthService(
         }
 
         var authorizedHosts = await hosts.LoadAuthorizedHostsAsync(
-            currentOptions,
             accessToken,
             twitchUserId,
             userLogin,

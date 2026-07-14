@@ -2,10 +2,12 @@ using BlokeBot.Auth.OAuth;
 
 namespace BlokeBot.Auth.Moderation;
 
-internal sealed class ModeratedChannelLookupService(HelixClient helix)
+internal sealed class ModeratedChannelLookupService(
+    WebAuthConfiguration configuration,
+    HelixClient helix
+)
 {
     public async Task<IReadOnlyList<string>> LoadModeratedLoginsAsync(
-        WebAuthOptions options,
         string accessToken,
         string userId,
         string userLogin,
@@ -13,7 +15,7 @@ internal sealed class ModeratedChannelLookupService(HelixClient helix)
     )
     {
         var moderatedChannels = await helix.GetModeratedChannelsAsync(
-            new HelixRequestContext(options.ClientId, accessToken),
+            new HelixRequestContext(configuration.Identity.ClientId, accessToken),
             userId,
             ct
         );

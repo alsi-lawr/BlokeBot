@@ -11,6 +11,7 @@ using BlokeBot.Features.SiteAccess;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Extensions.Options;
 using Shouldly;
 using TUnit.Core;
 
@@ -36,6 +37,12 @@ public sealed class AuthorizedHostSelectionServiceTests
             "streamer",
             CancellationToken.None
         );
+        var webAuth = new WebAuthConfiguration(
+            Options.Create(new WebAuthOptions()),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
+            )
+        );
         var service = new AuthorizedHostSelectionService(
             dbFactory,
             new SiteAccessService(
@@ -45,6 +52,7 @@ public sealed class AuthorizedHostSelectionServiceTests
             ),
             modAccess,
             new ModeratedChannelLookupService(
+                webAuth,
                 new HelixClient(
                     new JsonHttpClientFactory(
                         """
@@ -63,7 +71,6 @@ public sealed class AuthorizedHostSelectionServiceTests
         );
 
         var result = await service.LoadAuthorizedHostsAsync(
-            new WebAuthOptions { ClientId = "client" },
             "token",
             "user-id",
             "streamer",

@@ -1,5 +1,4 @@
 using BlokeBot.Auth.Moderation;
-using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.SiteAccess;
@@ -16,7 +15,6 @@ internal sealed class AuthorizedHostSelectionService(
 )
 {
     public async Task<AuthorizedHostSet> LoadAuthorizedHostsAsync(
-        WebAuthOptions options,
         string accessToken,
         string userId,
         string userLogin,
@@ -34,7 +32,7 @@ internal sealed class AuthorizedHostSelectionService(
         }
 
         choices.AddRange(
-            await LoadModeratedHostChoicesAsync(db, options, accessToken, userId, userLogin, ct)
+            await LoadModeratedHostChoicesAsync(db, accessToken, userId, userLogin, ct)
         );
 
         return new AuthorizedHostSet(Sort(choices), canCreateHost);
@@ -65,7 +63,6 @@ internal sealed class AuthorizedHostSelectionService(
 
     private async Task<IReadOnlyList<BotHostChoice>> LoadModeratedHostChoicesAsync(
         BlokeBotDbContext db,
-        WebAuthOptions options,
         string accessToken,
         string userId,
         string userLogin,
@@ -73,7 +70,6 @@ internal sealed class AuthorizedHostSelectionService(
     )
     {
         var moderatedLogins = await moderatedChannels.LoadModeratedLoginsAsync(
-            options,
             accessToken,
             userId,
             userLogin,
