@@ -10,6 +10,44 @@ namespace BlokeBot.Tests;
 public sealed class PointsGiveawayProjectionTests
 {
     [Test]
+    public async Task ActiveGiveawayWithoutEntries_LoadingView_ProjectsEmptyImmutableCollections()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            Login = "streamer",
+            DisplayName = "Streamer",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        var started = new DateTime(2026, 7, 14, 10, 0, 0, DateTimeKind.Utc);
+        db.PointsGiveaways.Add(
+            new PointsGiveaway
+            {
+                HostId = host.Id,
+                Status = PointsGiveawayStatus.Active,
+                StartedAtUtc = started,
+                EndsAtUtc = started.AddMinutes(5),
+            }
+        );
+        await db.SaveChangesAsync();
+
+        var view = await PointsGiveawayQueries.LoadActiveViewAsync(
+            db,
+            host.Id,
+            CancellationToken.None
+        );
+
+        view.ShouldNotBeNull();
+        view!.Entrants.IsDefault.ShouldBeFalse();
+        view.Entrants.IsEmpty.ShouldBeTrue();
+        view.Winners.IsDefault.ShouldBeFalse();
+        view.Winners.IsEmpty.ShouldBeTrue();
+    }
+
+    [Test]
     public async Task ActiveGiveaway_LoadingView_ProjectsOrderedImmutableCollections()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

@@ -38,6 +38,46 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
+    public async Task LoadedAliasesAndOptions_MutatingBeforeSave_IsIsolatedThenPersistsOnSave()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        var service = ConfigurationService(dbFactory);
+        var editor = await service.LoadConfigurationAsync(
+            seed.Host.Id,
+            seed.SpecialProfile.Id,
+            CancellationToken.None
+        );
+        editor.Aliases.StartAliases = "updated";
+        var editedOption = editor.Profile.Options.Single();
+        editedOption.Name = "green";
+        editedOption.ReplyText = "Green";
+
+        var beforeSave = await service.LoadConfigurationAsync(
+            seed.Host.Id,
+            seed.SpecialProfile.Id,
+            CancellationToken.None
+        );
+
+        beforeSave.Aliases.StartAliases.ShouldBe("special");
+        var unchangedOption = beforeSave.Profile.Options.ShouldHaveSingleItem();
+        unchangedOption.Name.ShouldBe("blue");
+        unchangedOption.ReplyText.ShouldBe("Blue");
+
+        await service.SaveConfigurationAsync(seed.Host.Id, editor, CancellationToken.None);
+
+        var afterSave = await service.LoadConfigurationAsync(
+            seed.Host.Id,
+            seed.SpecialProfile.Id,
+            CancellationToken.None
+        );
+        afterSave.Aliases.StartAliases.ShouldBe("updated");
+        var savedOption = afterSave.Profile.Options.ShouldHaveSingleItem();
+        savedOption.Name.ShouldBe("green");
+        savedOption.ReplyText.ShouldBe("Green");
+    }
+
+    [Test]
     public async Task AliasUsedByAnotherProfile_SavingConfiguration_RejectsCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

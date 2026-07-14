@@ -121,6 +121,33 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
+    public async Task LoadedAliasesAndMessageVariants_MutatingBeforeSave_IsIsolatedThenPersistsOnSave()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory);
+        await service.SaveConfigurationAsync(
+            hostId,
+            ConfigurationWithCommands(("Command", "original")),
+            CancellationToken.None
+        );
+        var editor = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        editor.Commands.Single().Aliases = "updated";
+        editor.MessageEntries.Single().Variants.Single().Text = "Updated reply.";
+
+        var beforeSave = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+
+        beforeSave.Commands.Single().Aliases.ShouldBe("original");
+        beforeSave.MessageEntries.Single().Variants.Single().Text.ShouldBe("Reply text.");
+
+        await service.SaveConfigurationAsync(hostId, editor, CancellationToken.None);
+
+        var afterSave = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        afterSave.Commands.Single().Aliases.ShouldBe("updated");
+        afterSave.MessageEntries.Single().Variants.Single().Text.ShouldBe("Updated reply.");
+    }
+
+    [Test]
     public async Task BuiltInOrDuplicateDraftAlias_Saving_RejectsCollision()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

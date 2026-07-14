@@ -1,3 +1,4 @@
+using System.Reflection;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.Points.Giveaways;
@@ -10,6 +11,20 @@ namespace BlokeBot.Tests;
 
 public sealed class PersistenceLifecycleProjectionTests
 {
+    [Test]
+    public void LifecycleUnions_Inspecting_HaveDeclaredDirectCasesAndCompleteMatchHandlers()
+    {
+        AssertUnionContract(typeof(GuessRoundLifecycle), ["Closed", "Completed", "Open"]);
+        AssertUnionContract(
+            typeof(PointsGiveawayLifecycle),
+            ["Active", "Cancelled", "Completed", "Expired"]
+        );
+        AssertUnionContract(
+            typeof(HostedChannelRuntimeLifecycle),
+            ["Started", "Starting", "Stopped", "Stopping"]
+        );
+    }
+
     [Test]
     public void GuessRoundStates_MappingPersistence_ProduceClosedLifecycleCases()
     {
@@ -81,5 +96,58 @@ public sealed class PersistenceLifecycleProjectionTests
         Should.Throw<PersistenceDataIntegrityException>(() =>
             HostedChannelRuntimeLifecycle.FromPersistence(BotChannelRuntimeState.Started, null)
         );
+    }
+
+    private static void AssertUnionContract(Type unionType, string[] expectedCaseNames)
+    {
+        var directCases = unionType
+            .GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic)
+            .Where(type => type.BaseType == unionType)
+            .OrderBy(type => type.Name)
+            .ToArray();
+        var match = unionType
+            .GetMethods(
+                BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly
+            )
+            .Single(method => method.Name == "Match");
+        var resultType = match.GetGenericArguments().ShouldHaveSingleItem();
+        var constructor =
+            unionType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.NonPublic,
+                binder: null,
+                Type.EmptyTypes,
+                modifiers: null
+            ) ?? throw new InvalidOperationException("The private union constructor is missing.");
+        var handlers = match.GetParameters();
+
+        unionType.IsAbstract.ShouldBeTrue();
+        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
+        constructor.IsPrivate.ShouldBeTrue();
+        directCases.Select(type => type.Name).ShouldBe(expectedCaseNames);
+        directCases.ShouldAllBe(type => type.DeclaringType == unionType);
+        directCases.ShouldAllBe(type => type.IsSealed);
+        match.IsGenericMethodDefinition.ShouldBeTrue();
+        match.ReturnType.ShouldBe(resultType);
+        handlers.Length.ShouldBe(directCases.Length);
+        handlers.ShouldAllBe(parameter =>
+            parameter.ParameterType.IsGenericType
+            && parameter.ParameterType.GetGenericTypeDefinition() == typeof(Func<,>)
+            && parameter.ParameterType.GetGenericArguments()[1] == resultType
+        );
+        handlers
+            .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
+            .OrderBy(type => type.Name)
+            .ShouldBe(directCases);
+        unionType
+            .GetMethods(
+                BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly
+            )
+            .ShouldNotContain(method => method.Name == "Seal");
     }
 }
