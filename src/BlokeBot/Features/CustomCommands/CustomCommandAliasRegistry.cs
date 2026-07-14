@@ -1,4 +1,4 @@
-using BlokeBot.Commands;
+using System.Diagnostics;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,74 +6,55 @@ namespace BlokeBot.Features.CustomCommands;
 
 public sealed class CustomCommandAliasRegistry
 {
-    public async Task<string[]> ValidateAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        int? commandId,
-        string aliases,
-        CancellationToken ct
-    )
-    {
-        return await ValidateExcludingCommandsAsync(
-            db,
-            hostId,
-            commandId is { } id ? new HashSet<int> { id } : new HashSet<int>(),
-            aliases,
-            ct
-        );
-    }
-
-    public async Task<string[]> ValidateExcludingCommandsAsync(
+    public async Task<CustomCommandAliasConflict?> FindConflictAsync(
         BlokeBotDbContext db,
         int hostId,
         IReadOnlySet<int> excludedCommandIds,
-        string aliases,
+        IReadOnlyCollection<string> aliases,
         CancellationToken ct
     )
     {
-        var normalized = CommandAliasNormalizer.Split(aliases).ToArray();
-        if (normalized.Length == 0)
-        {
-            throw new InvalidOperationException("Enter at least one command word.");
-        }
-
-        var duplicate = normalized
-            .GroupBy(alias => alias, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Count() > 1)
-            ?.Key;
-        if (duplicate is not null)
-        {
-            throw new InvalidOperationException($"!{duplicate} is entered more than once.");
-        }
-
+        var aliasValues = aliases.ToArray();
         var builtInCollision = await db
             .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId && normalized.Contains(x.Alias))
-            .Select(x => x.Alias)
+            .Where(alias => alias.HostId == hostId && aliasValues.Contains(alias.Alias))
+            .Select(alias => alias.Alias)
             .FirstOrDefaultAsync(ct);
-        if (!string.IsNullOrWhiteSpace(builtInCollision))
+        if (builtInCollision is not null)
         {
-            throw new InvalidOperationException(
-                $"!{builtInCollision} is already used by another bot command."
-            );
+            return new CustomCommandAliasConflict.BuiltIn(builtInCollision);
         }
 
         var customCollision = await db
             .CustomCommandAliases.AsNoTracking()
-            .Where(x =>
-                x.HostId == hostId
-                && normalized.Contains(x.Alias)
-                && !excludedCommandIds.Contains(x.CustomCommandId)
+            .Where(alias =>
+                alias.HostId == hostId
+                && aliasValues.Contains(alias.Alias)
+                && !excludedCommandIds.Contains(alias.CustomCommandId)
             )
-            .Select(x => x.Alias)
+            .Select(alias => alias.Alias)
             .FirstOrDefaultAsync(ct);
-        if (!string.IsNullOrWhiteSpace(customCollision))
-        {
-            throw new InvalidOperationException(
-                $"!{customCollision} is already used by another custom command."
-            );
-        }
-
-        return normalized;
+        return customCollision is null
+            ? null
+            : new CustomCommandAliasConflict.Custom(customCollision);
     }
+}
+
+public abstract record CustomCommandAliasConflict
+{
+    private CustomCommandAliasConflict() { }
+
+    public TResult Match<TResult>(Func<BuiltIn, TResult> builtIn, Func<Custom, TResult> custom)
+    {
+        return this switch
+        {
+            BuiltIn value => builtIn(value),
+            Custom value => custom(value),
+            _ => throw new UnreachableException("Unknown custom command alias conflict."),
+        };
+    }
+
+    public sealed record BuiltIn(string Alias) : CustomCommandAliasConflict;
+
+    public sealed record Custom(string Alias) : CustomCommandAliasConflict;
 }

@@ -60,18 +60,39 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        try
-        {
-            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
-            _config = await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            _nextTemporaryId = -1;
-            _toasts.Success("Custom commands saved.");
-        }
-        catch (Exception ex)
-            when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
-        {
-            _toasts.Error(ex.Message);
-        }
+        await CustomCommandConfigurationValidator
+            .Validate(_config)
+            .Match(
+                SaveCommandAsync,
+                errors =>
+                {
+                    _toasts.Error(errors[0].Message);
+                    return Task.CompletedTask;
+                }
+            );
+    }
+
+    private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command)
+    {
+        var result = await _configuration
+            .SaveConfiguration(HostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            async _ =>
+            {
+                _config = await _configuration.LoadConfigurationAsync(
+                    HostId,
+                    CancellationToken.None
+                );
+                _nextTemporaryId = -1;
+                _toasts.Success("Custom commands saved.");
+            },
+            failure =>
+            {
+                _toasts.Error(failure.Message);
+                return Task.CompletedTask;
+            }
+        );
     }
 
     private void AddMessageEntry()

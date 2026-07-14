@@ -55,16 +55,27 @@ public sealed class CustomCommandFoundationTests
         var registry = new CustomCommandAliasRegistry();
         await using var verify = await dbFactory.CreateDbContextAsync();
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
-            registry.ValidateAsync(verify, hostId, null, "!POINTS", CancellationToken.None)
+        var builtIn = await registry.FindConflictAsync(
+            verify,
+            hostId,
+            new HashSet<int>(),
+            ["points"],
+            CancellationToken.None
         );
-        await Should.ThrowAsync<InvalidOperationException>(() =>
-            registry.ValidateAsync(verify, hostId, null, "hello", CancellationToken.None)
+        var custom = await registry.FindConflictAsync(
+            verify,
+            hostId,
+            new HashSet<int>(),
+            ["hello"],
+            CancellationToken.None
         );
+
+        builtIn.ShouldBe(new CustomCommandAliasConflict.BuiltIn("points"));
+        custom.ShouldBe(new CustomCommandAliasConflict.Custom("hello"));
     }
 
     [Test]
-    public async Task ValidThenInvalidTimeZone_SavingHostSettings_PersistsOnlyValidZone()
+    public async Task InvalidTimeZone_Validating_RemainsTypedAndDoesNotChangeHostSettings()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -73,10 +84,21 @@ public sealed class CustomCommandFoundationTests
             TestEventBus.Create<AppEventKind>()
         );
 
-        await service.SetTimeZoneIdAsync(hostId, "UTC", CancellationToken.None);
-        await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SetTimeZoneIdAsync(hostId, "Missing/Zone", CancellationToken.None)
-        );
+        var valid = CustomCommandConfigurationValidator
+            .Validate(new CustomCommandConfiguration { TimeZoneId = "UTC" })
+            .Match(
+                command => command,
+                _ => throw new InvalidOperationException("Expected valid time zone.")
+            );
+        await service.SetTimeZoneAsync(hostId, valid.TimeZone, CancellationToken.None);
+        var invalid = CustomCommandConfigurationValidator
+            .Validate(new CustomCommandConfiguration { TimeZoneId = "Missing/Zone" })
+            .Match(
+                _ => Array.Empty<CustomCommandConfigurationValidationError>(),
+                errors => errors.ToArray()
+            );
+
+        invalid.ShouldContain(error => error.Message.Contains("Time zone 'Missing/Zone'"));
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var timeZone = await db

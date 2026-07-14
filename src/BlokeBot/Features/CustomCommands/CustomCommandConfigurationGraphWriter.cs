@@ -9,10 +9,9 @@ public sealed class CustomCommandConfigurationGraphWriter(
     TimeProvider clock
 )
 {
-    public async Task WriteAsync(
+    public async Task<CustomCommandConfigurationSaveFailure?> WriteAsync(
         int hostId,
-        CustomCommandConfiguration config,
-        IReadOnlyDictionary<CustomCommandEditor, string[]> normalizedAliases,
+        CustomCommandConfigurationSaveCommand command,
         CancellationToken ct
     )
     {
@@ -35,19 +34,24 @@ public sealed class CustomCommandConfigurationGraphWriter(
             .Where(x => x.HostId == hostId)
             .ToListAsync(ct);
 
-        CustomCommandConfigurationValidator.ValidateExistingIds(
-            config,
+        var staleEntity = FindStaleEntity(
+            command,
             messageEntries,
             counters,
             commands,
             announcements
         );
-        await RemoveChangedVariantsAsync(db, config, commands, announcements, ct);
+        if (staleEntity is not null)
+        {
+            return staleEntity;
+        }
+
+        await RemoveChangedVariantsAsync(db, command, commands, announcements, ct);
 
         var messageEntityByEditorId = await StageMessageEntriesAsync(
             db,
             hostId,
-            config.MessageEntries,
+            command.MessageEntries,
             messageEntries,
             now,
             ct
@@ -55,7 +59,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         var counterEntityByEditorId = await StageCountersAsync(
             db,
             hostId,
-            config.Counters,
+            command.Counters,
             counters,
             now,
             ct
@@ -63,7 +67,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
         var commandEntityByEditor = await StageCommandsAsync(
             db,
             hostId,
-            config.Commands,
+            command.Commands,
             commands,
             messageEntityByEditorId,
             counterEntityByEditorId,
@@ -73,19 +77,19 @@ public sealed class CustomCommandConfigurationGraphWriter(
         var announcementEntityByEditor = await StageAnnouncementsAsync(
             db,
             hostId,
-            config.Announcements,
+            command.Announcements,
             announcements,
             messageEntityByEditorId,
             now,
             ct
         );
 
-        await DeleteRemovedDependentsAsync(db, config, commands, announcements, ct);
-        await DeleteRemovedPrincipalsAsync(db, config, messageEntries, counters, ct);
-        await ReplaceVariantsAsync(db, config.MessageEntries, messageEntityByEditorId, ct);
-        await ReplaceAliasesAsync(db, hostId, commandEntityByEditor, normalizedAliases, ct);
+        await DeleteRemovedDependentsAsync(db, command, commands, announcements, ct);
+        await DeleteRemovedPrincipalsAsync(db, command, messageEntries, counters, ct);
+        await ReplaceVariantsAsync(db, command.MessageEntries, messageEntityByEditorId, ct);
+        await ReplaceAliasesAsync(db, hostId, command.Commands, commandEntityByEditor, ct);
         ApplyFinalFields(
-            config,
+            command,
             messageEntityByEditorId,
             counterEntityByEditorId,
             commandEntityByEditor,
@@ -94,12 +98,13 @@ public sealed class CustomCommandConfigurationGraphWriter(
         );
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        return null;
     }
 
     private static async Task<Dictionary<int, CustomMessageLibraryEntry>> StageMessageEntriesAsync(
         BlokeBotDbContext db,
         int hostId,
-        IReadOnlyList<CustomMessageLibraryEntryEditor> editors,
+        IReadOnlyList<CustomMessageLibraryEntryValue> editors,
         IReadOnlyList<CustomMessageLibraryEntry> existing,
         DateTime now,
         CancellationToken ct
@@ -132,7 +137,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
     private static async Task<Dictionary<int, CustomCounter>> StageCountersAsync(
         BlokeBotDbContext db,
         int hostId,
-        IReadOnlyList<CustomCounterEditor> editors,
+        IReadOnlyList<CustomCounterValue> editors,
         IReadOnlyList<CustomCounter> existing,
         DateTime now,
         CancellationToken ct
@@ -161,10 +166,10 @@ public sealed class CustomCommandConfigurationGraphWriter(
         return result;
     }
 
-    private static async Task<Dictionary<CustomCommandEditor, CustomCommand>> StageCommandsAsync(
+    private static async Task<Dictionary<int, CustomCommand>> StageCommandsAsync(
         BlokeBotDbContext db,
         int hostId,
-        IReadOnlyList<CustomCommandEditor> editors,
+        IReadOnlyList<CustomCommandValue> editors,
         IReadOnlyList<CustomCommand> existing,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         IReadOnlyDictionary<int, CustomCounter> counters,
@@ -173,7 +178,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
     )
     {
         var existingById = existing.ToDictionary(x => x.Id);
-        var result = new Dictionary<CustomCommandEditor, CustomCommand>();
+        var result = new Dictionary<int, CustomCommand>();
         foreach (var editor in editors)
         {
             var command =
@@ -208,19 +213,17 @@ public sealed class CustomCommandConfigurationGraphWriter(
                 counters
             );
             command.UpdatedAtUtc = now;
-            result[editor] = command;
+            result[editor.Id] = command;
         }
 
         await db.SaveChangesAsync(ct);
         return result;
     }
 
-    private static async Task<
-        Dictionary<CustomAnnouncementEditor, CustomAnnouncement>
-    > StageAnnouncementsAsync(
+    private static async Task<Dictionary<int, CustomAnnouncement>> StageAnnouncementsAsync(
         BlokeBotDbContext db,
         int hostId,
-        IReadOnlyList<CustomAnnouncementEditor> editors,
+        IReadOnlyList<CustomAnnouncementValue> editors,
         IReadOnlyList<CustomAnnouncement> existing,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         DateTime now,
@@ -228,7 +231,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
     )
     {
         var existingById = existing.ToDictionary(x => x.Id);
-        var result = new Dictionary<CustomAnnouncementEditor, CustomAnnouncement>();
+        var result = new Dictionary<int, CustomAnnouncement>();
         foreach (var editor in editors)
         {
             var announcement =
@@ -263,7 +266,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                 editor
             );
             announcement.UpdatedAtUtc = now;
-            result[editor] = announcement;
+            result[editor.Id] = announcement;
         }
 
         await db.SaveChangesAsync(ct);
@@ -272,32 +275,37 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
     private static async Task RemoveChangedVariantsAsync(
         BlokeBotDbContext db,
-        CustomCommandConfiguration config,
+        CustomCommandConfigurationSaveCommand command,
         IReadOnlyList<CustomCommand> existingCommands,
         IReadOnlyList<CustomAnnouncement> existingAnnouncements,
         CancellationToken ct
     )
     {
-        var commandEditors = config.Commands.Where(x => x.Id > 0).ToDictionary(x => x.Id);
-        foreach (var command in existingCommands)
+        var configuredCommands = command.Commands.Where(x => x.Id > 0).ToDictionary(x => x.Id);
+        foreach (var storedCommand in existingCommands)
         {
             if (
-                commandEditors.TryGetValue(command.Id, out var editor)
-                && !CustomCommandConfigurationMapper.ActionMatches(command.Action, editor.Action)
+                configuredCommands.TryGetValue(storedCommand.Id, out var configured)
+                && !CustomCommandConfigurationMapper.ActionMatches(
+                    storedCommand.Action,
+                    configured.Action
+                )
             )
             {
-                db.CustomCommandActions.Remove(command.Action);
+                db.CustomCommandActions.Remove(storedCommand.Action);
             }
         }
 
-        var announcementEditors = config.Announcements.Where(x => x.Id > 0).ToDictionary(x => x.Id);
+        var configuredAnnouncements = command
+            .Announcements.Where(x => x.Id > 0)
+            .ToDictionary(x => x.Id);
         foreach (var announcement in existingAnnouncements)
         {
             if (
-                announcementEditors.TryGetValue(announcement.Id, out var editor)
+                configuredAnnouncements.TryGetValue(announcement.Id, out var configured)
                 && !CustomCommandConfigurationMapper.ScheduleMatches(
                     announcement.Schedule,
-                    editor.Schedule
+                    configured.Schedule
                 )
             )
             {
@@ -310,14 +318,17 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
     private static async Task DeleteRemovedDependentsAsync(
         BlokeBotDbContext db,
-        CustomCommandConfiguration config,
+        CustomCommandConfigurationSaveCommand command,
         IReadOnlyList<CustomCommand> existingCommands,
         IReadOnlyList<CustomAnnouncement> existingAnnouncements,
         CancellationToken ct
     )
     {
-        var retainedCommandIds = config.Commands.Where(x => x.Id > 0).Select(x => x.Id).ToHashSet();
-        var retainedAnnouncementIds = config
+        var retainedCommandIds = command
+            .Commands.Where(x => x.Id > 0)
+            .Select(x => x.Id)
+            .ToHashSet();
+        var retainedAnnouncementIds = command
             .Announcements.Where(x => x.Id > 0)
             .Select(x => x.Id)
             .ToHashSet();
@@ -337,17 +348,20 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
     private static async Task DeleteRemovedPrincipalsAsync(
         BlokeBotDbContext db,
-        CustomCommandConfiguration config,
+        CustomCommandConfigurationSaveCommand command,
         IReadOnlyList<CustomMessageLibraryEntry> existingMessageEntries,
         IReadOnlyList<CustomCounter> existingCounters,
         CancellationToken ct
     )
     {
-        var retainedMessageEntryIds = config
+        var retainedMessageEntryIds = command
             .MessageEntries.Where(x => x.Id > 0)
             .Select(x => x.Id)
             .ToHashSet();
-        var retainedCounterIds = config.Counters.Where(x => x.Id > 0).Select(x => x.Id).ToHashSet();
+        var retainedCounterIds = command
+            .Counters.Where(x => x.Id > 0)
+            .Select(x => x.Id)
+            .ToHashSet();
 
         db.CustomCounters.RemoveRange(
             existingCounters.Where(x => !retainedCounterIds.Contains(x.Id))
@@ -360,7 +374,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
     private static async Task ReplaceVariantsAsync(
         BlokeBotDbContext db,
-        IReadOnlyList<CustomMessageLibraryEntryEditor> editors,
+        IReadOnlyList<CustomMessageLibraryEntryValue> editors,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> entries,
         CancellationToken ct
     )
@@ -382,7 +396,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
                     {
                         CustomMessageLibraryEntryId = entry.Id,
                         SortOrder = i,
-                        Text = editor.Variants[i].Text.Trim(),
+                        Text = editor.Variants[i].Text,
                     }
                 );
             }
@@ -392,8 +406,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
     private static async Task ReplaceAliasesAsync(
         BlokeBotDbContext db,
         int hostId,
-        IReadOnlyDictionary<CustomCommandEditor, CustomCommand> commands,
-        IReadOnlyDictionary<CustomCommandEditor, string[]> normalizedAliases,
+        IReadOnlyList<CustomCommandValue> configuredCommands,
+        IReadOnlyDictionary<int, CustomCommand> commands,
         CancellationToken ct
     )
     {
@@ -403,15 +417,15 @@ public sealed class CustomCommandConfigurationGraphWriter(
         db.CustomCommandAliases.RemoveRange(existingAliases);
         await db.SaveChangesAsync(ct);
 
-        foreach (var pair in commands)
+        foreach (var configured in configuredCommands)
         {
-            foreach (var alias in normalizedAliases[pair.Key])
+            foreach (var alias in configured.Aliases)
             {
                 db.CustomCommandAliases.Add(
                     new CustomCommandAlias
                     {
                         HostId = hostId,
-                        CustomCommandId = pair.Value.Id,
+                        CustomCommandId = commands[configured.Id].Id,
                         Alias = alias,
                     }
                 );
@@ -420,56 +434,109 @@ public sealed class CustomCommandConfigurationGraphWriter(
     }
 
     private static void ApplyFinalFields(
-        CustomCommandConfiguration config,
+        CustomCommandConfigurationSaveCommand command,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         IReadOnlyDictionary<int, CustomCounter> counters,
-        IReadOnlyDictionary<CustomCommandEditor, CustomCommand> commands,
-        IReadOnlyDictionary<CustomAnnouncementEditor, CustomAnnouncement> announcements,
+        IReadOnlyDictionary<int, CustomCommand> commands,
+        IReadOnlyDictionary<int, CustomAnnouncement> announcements,
         DateTime now
     )
     {
-        foreach (var editor in config.MessageEntries)
+        foreach (var configured in command.MessageEntries)
         {
-            var entry = messageEntries[editor.Id];
-            entry.Name = CustomCommandConfigurationValidator.RequiredName(editor.Name, "Reply");
-            entry.SelectionMode = editor.SelectionMode;
-            entry.CurrentVariantIndex = ClampVariantIndex(
-                editor.CurrentVariantIndex,
-                editor.Variants.Count
-            );
+            var entry = messageEntries[configured.Id];
+            entry.Name = configured.Name;
+            entry.SelectionMode = configured.SelectionMode;
+            entry.CurrentVariantIndex = configured.CurrentVariantIndex;
             entry.UpdatedAtUtc = now;
         }
 
-        foreach (var editor in config.Counters)
+        foreach (var configured in command.Counters)
         {
-            var counter = counters[editor.Id];
-            counter.Name = CustomCommandConfigurationValidator.RequiredName(editor.Name, "Counter");
-            counter.Value = editor.Value;
+            var counter = counters[configured.Id];
+            counter.Name = configured.Name;
+            counter.Value = configured.Value;
             counter.UpdatedAtUtc = now;
         }
 
-        foreach (var pair in commands)
+        foreach (var configured in command.Commands)
         {
-            pair.Value.Name = CustomCommandConfigurationValidator.RequiredName(
-                pair.Key.Name,
-                "Custom command"
-            );
-            pair.Value.UpdatedAtUtc = now;
+            var stored = commands[configured.Id];
+            stored.Name = configured.Name;
+            stored.UpdatedAtUtc = now;
         }
 
-        foreach (var pair in announcements)
+        foreach (var configured in command.Announcements)
         {
-            pair.Value.Name = CustomCommandConfigurationValidator.RequiredName(
-                pair.Key.Name,
-                "Announcement"
-            );
-            pair.Value.UpdatedAtUtc = now;
+            var stored = announcements[configured.Id];
+            stored.Name = configured.Name;
+            stored.UpdatedAtUtc = now;
         }
     }
 
-    private static int ClampVariantIndex(int index, int variantCount)
+    private static CustomCommandConfigurationSaveFailure? FindStaleEntity(
+        CustomCommandConfigurationSaveCommand command,
+        IReadOnlyList<CustomMessageLibraryEntry> messageEntries,
+        IReadOnlyList<CustomCounter> counters,
+        IReadOnlyList<CustomCommand> commands,
+        IReadOnlyList<CustomAnnouncement> announcements
+    )
     {
-        return variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
+        if (
+            HasMissingPositiveId(
+                command.MessageEntries,
+                messageEntries,
+                configured => configured.Id,
+                stored => stored.Id
+            )
+        )
+        {
+            return new CustomCommandConfigurationSaveFailure.StaleEntity("saved reply");
+        }
+
+        if (
+            HasMissingPositiveId(
+                command.Counters,
+                counters,
+                configured => configured.Id,
+                stored => stored.Id
+            )
+        )
+        {
+            return new CustomCommandConfigurationSaveFailure.StaleEntity("counter");
+        }
+
+        if (
+            HasMissingPositiveId(
+                command.Commands,
+                commands,
+                configured => configured.Id,
+                stored => stored.Id
+            )
+        )
+        {
+            return new CustomCommandConfigurationSaveFailure.StaleEntity("command");
+        }
+
+        return HasMissingPositiveId(
+            command.Announcements,
+            announcements,
+            configured => configured.Id,
+            stored => stored.Id
+        )
+            ? new CustomCommandConfigurationSaveFailure.StaleEntity("announcement")
+            : null;
+    }
+
+    private static bool HasMissingPositiveId<TConfigured, TStored>(
+        IEnumerable<TConfigured> configured,
+        IEnumerable<TStored> stored,
+        Func<TConfigured, int> configuredId,
+        Func<TStored, int> storedId
+    )
+    {
+        var storedIds = stored.Select(storedId).ToHashSet();
+        return configured.Select(configuredId).Any(id => id > 0 && !storedIds.Contains(id));
     }
 
     private static string TemporaryName(string entityName, int editorId)

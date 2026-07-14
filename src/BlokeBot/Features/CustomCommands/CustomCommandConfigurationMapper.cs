@@ -105,48 +105,42 @@ internal static class CustomCommandConfigurationMapper
 
     public static CustomAnnouncementDeliveryPolicy CreateDeliveryPolicy(
         int hostId,
-        CustomAnnouncementEditor editor
+        CustomAnnouncementValue announcement
     )
     {
         return new RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy
         {
             HostId = hostId,
-            RetryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(editor.RetryDelaySeconds)),
-            OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-                TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
-            ),
+            RetryDelay = announcement.RetryDelay,
+            OccurrenceLifetime = announcement.OccurrenceLifetime,
         };
     }
 
     public static void ApplyDeliveryPolicy(
         CustomAnnouncementDeliveryPolicy policy,
-        CustomAnnouncementEditor editor
+        CustomAnnouncementValue announcement
     )
     {
         var retry = RequireRetryUntilExpiredThenSkip(policy);
-        retry.RetryDelay = new AnnouncementRetryDelay(
-            TimeSpan.FromSeconds(editor.RetryDelaySeconds)
-        );
-        retry.OccurrenceLifetime = new AnnouncementOccurrenceLifetime(
-            TimeSpan.FromSeconds(editor.OccurrenceLifetimeSeconds)
-        );
+        retry.RetryDelay = announcement.RetryDelay;
+        retry.OccurrenceLifetime = announcement.OccurrenceLifetime;
     }
 
     public static CustomCommandAction CreateAction(
         int hostId,
-        ICustomCommandActionEditor editor,
+        CustomCommandActionValue action,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         IReadOnlyDictionary<int, CustomCounter> counters
     )
     {
-        return editor switch
+        return action switch
         {
-            MessageCustomCommandActionEditor => new MessageCustomCommandAction
+            CustomCommandActionValue.Message message => new MessageCustomCommandAction
             {
                 HostId = hostId,
-                MessageLibraryEntryId = messageEntries[editor.MessageLibraryEntryId].Id,
+                MessageLibraryEntryId = messageEntries[message.MessageLibraryEntryId].Id,
             },
-            CounterCustomCommandActionEditor counter => new CounterCustomCommandAction
+            CustomCommandActionValue.Counter counter => new CounterCustomCommandAction
             {
                 HostId = hostId,
                 MessageLibraryEntryId = messageEntries[counter.MessageLibraryEntryId].Id,
@@ -158,35 +152,35 @@ internal static class CustomCommandConfigurationMapper
 
     public static void ApplyAction(
         CustomCommandAction action,
-        ICustomCommandActionEditor editor,
+        CustomCommandActionValue value,
         IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries,
         IReadOnlyDictionary<int, CustomCounter> counters
     )
     {
-        action.MessageLibraryEntryId = messageEntries[editor.MessageLibraryEntryId].Id;
+        action.MessageLibraryEntryId = messageEntries[value.MessageLibraryEntryId].Id;
         if (
             action is CounterCustomCommandAction counterAction
-            && editor is CounterCustomCommandActionEditor counterEditor
+            && value is CustomCommandActionValue.Counter counterValue
         )
         {
-            counterAction.CounterId = counters[counterEditor.CounterId].Id;
+            counterAction.CounterId = counters[counterValue.CounterId].Id;
         }
     }
 
     public static CustomAnnouncementSchedule CreateSchedule(
         int hostId,
-        ICustomAnnouncementScheduleEditor editor
+        CustomAnnouncementScheduleValue schedule
     )
     {
-        return editor switch
+        return schedule switch
         {
-            IntervalCustomAnnouncementScheduleEditor => new IntervalCustomAnnouncementSchedule
+            CustomAnnouncementScheduleValue.Interval => new IntervalCustomAnnouncementSchedule
             {
                 HostId = hostId,
             },
-            IntervalAfterChatCustomAnnouncementScheduleEditor =>
+            CustomAnnouncementScheduleValue.IntervalAfterChat =>
                 new IntervalAfterChatCustomAnnouncementSchedule { HostId = hostId },
-            WeeklyCustomAnnouncementScheduleEditor => new WeeklyCustomAnnouncementSchedule
+            CustomAnnouncementScheduleValue.Weekly => new WeeklyCustomAnnouncementSchedule
             {
                 HostId = hostId,
             },
@@ -196,30 +190,30 @@ internal static class CustomCommandConfigurationMapper
 
     public static void ApplySchedule(
         CustomAnnouncementSchedule schedule,
-        ICustomAnnouncementScheduleEditor editor
+        CustomAnnouncementScheduleValue value
     )
     {
-        switch (schedule, editor)
+        switch (schedule, value)
         {
             case (
                 IntervalCustomAnnouncementSchedule stored,
-                IntervalCustomAnnouncementScheduleEditor edited
+                CustomAnnouncementScheduleValue.Interval configured
             ):
-                stored.IntervalMinutes = edited.IntervalMinutes;
+                stored.IntervalMinutes = configured.IntervalMinutes;
                 return;
             case (
                 IntervalAfterChatCustomAnnouncementSchedule stored,
-                IntervalAfterChatCustomAnnouncementScheduleEditor edited
+                CustomAnnouncementScheduleValue.IntervalAfterChat configured
             ):
-                stored.IntervalMinutes = edited.IntervalMinutes;
-                stored.RequiredChatMessages = edited.RequiredChatMessages;
+                stored.IntervalMinutes = configured.IntervalMinutes;
+                stored.RequiredChatMessages = configured.RequiredChatMessages;
                 return;
             case (
                 WeeklyCustomAnnouncementSchedule stored,
-                WeeklyCustomAnnouncementScheduleEditor edited
+                CustomAnnouncementScheduleValue.Weekly configured
             ):
-                stored.Day = edited.Day;
-                stored.Time = edited.Time;
+                stored.Day = configured.Day;
+                stored.Time = configured.Time;
                 return;
             default:
                 throw new InvalidOperationException(
@@ -228,30 +222,30 @@ internal static class CustomCommandConfigurationMapper
         }
     }
 
-    public static bool ActionMatches(CustomCommandAction action, ICustomCommandActionEditor editor)
+    public static bool ActionMatches(CustomCommandAction action, CustomCommandActionValue value)
     {
-        return (action, editor)
+        return (action, value)
             is
-                (MessageCustomCommandAction, MessageCustomCommandActionEditor)
+                (MessageCustomCommandAction, CustomCommandActionValue.Message)
                 or
-                (CounterCustomCommandAction, CounterCustomCommandActionEditor);
+                (CounterCustomCommandAction, CustomCommandActionValue.Counter);
     }
 
     public static bool ScheduleMatches(
         CustomAnnouncementSchedule schedule,
-        ICustomAnnouncementScheduleEditor editor
+        CustomAnnouncementScheduleValue value
     )
     {
-        return (schedule, editor)
+        return (schedule, value)
             is
-                (IntervalCustomAnnouncementSchedule, IntervalCustomAnnouncementScheduleEditor)
+                (IntervalCustomAnnouncementSchedule, CustomAnnouncementScheduleValue.Interval)
                 or
                 (
                     IntervalAfterChatCustomAnnouncementSchedule,
-                    IntervalAfterChatCustomAnnouncementScheduleEditor
+                    CustomAnnouncementScheduleValue.IntervalAfterChat
                 )
                 or
-                (WeeklyCustomAnnouncementSchedule, WeeklyCustomAnnouncementScheduleEditor);
+                (WeeklyCustomAnnouncementSchedule, CustomAnnouncementScheduleValue.Weekly);
     }
 
     private static RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy RequireRetryUntilExpiredThenSkip(

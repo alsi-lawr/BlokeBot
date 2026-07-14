@@ -20,10 +20,12 @@ public sealed class HostCustomCommandSettingsService(
             ?? "UTC";
     }
 
-    public async Task SetTimeZoneIdAsync(int hostId, string timeZoneId, CancellationToken ct)
+    public async Task SetTimeZoneAsync(
+        int hostId,
+        CustomCommandTimeZone timeZone,
+        CancellationToken ct
+    )
     {
-        var normalized = NormalizeTimeZoneId(timeZoneId);
-
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host is null)
@@ -31,31 +33,13 @@ public sealed class HostCustomCommandSettingsService(
             return;
         }
 
-        if (host.TimeZoneId == normalized)
+        if (host.TimeZoneId == timeZone.Id)
         {
             return;
         }
 
-        host.TimeZoneId = normalized;
+        host.TimeZoneId = timeZone.Id;
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
-    }
-
-    public static string NormalizeTimeZoneId(string timeZoneId)
-    {
-        var normalized = string.IsNullOrWhiteSpace(timeZoneId) ? "UTC" : timeZoneId.Trim();
-        try
-        {
-            _ = TimeZoneInfo.FindSystemTimeZoneById(normalized);
-            return normalized;
-        }
-        catch (TimeZoneNotFoundException ex)
-        {
-            throw new InvalidOperationException($"Time zone '{normalized}' was not found.", ex);
-        }
-        catch (InvalidTimeZoneException ex)
-        {
-            throw new InvalidOperationException($"Time zone '{normalized}' is invalid.", ex);
-        }
     }
 }

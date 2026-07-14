@@ -1,4 +1,5 @@
 using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,8 +13,6 @@ public sealed class CustomCommandConfigurationService(
     EventBus<AppEventKind> events
 )
 {
-    private const int _aliasMaxLength = 64;
-
     public async Task<CustomCommandConfiguration> LoadConfigurationAsync(
         int hostId,
         CancellationToken ct
@@ -80,78 +79,76 @@ public sealed class CustomCommandConfigurationService(
         };
     }
 
-    public async Task SaveConfigurationAsync(
+    public IO<
+        CustomCommandConfigurationSaved,
+        CustomCommandConfigurationSaveFailure
+    > SaveConfiguration(int hostId, CustomCommandConfigurationSaveCommand command)
+    {
+        return IO<CustomCommandConfigurationSaved, CustomCommandConfigurationSaveFailure>.Create(
+            ct => ExecuteSaveAsync(hostId, command, ct)
+        );
+    }
+
+    private async ValueTask<
+        Result<CustomCommandConfigurationSaved, CustomCommandConfigurationSaveFailure>
+    > ExecuteSaveAsync(
         int hostId,
-        CustomCommandConfiguration config,
+        CustomCommandConfigurationSaveCommand command,
         CancellationToken ct
     )
     {
-        var normalizedTimeZone = HostCustomCommandSettingsService.NormalizeTimeZoneId(
-            config.TimeZoneId
-        );
-        CustomCommandConfigurationValidator.Validate(config);
-
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var managedCommandIds = (
             await db
                 .CustomCommands.AsNoTracking()
-                .Where(x => x.HostId == hostId)
-                .Select(x => x.Id)
+                .Where(stored => stored.HostId == hostId)
+                .Select(stored => stored.Id)
                 .ToArrayAsync(ct)
         ).ToHashSet();
-        var normalizedAliases = await NormalizeAliasesAsync(
-            db,
-            hostId,
-            managedCommandIds,
-            config.Commands,
-            ct
-        );
-
-        await graphWriter.WriteAsync(hostId, config, normalizedAliases, ct);
-        await hostSettings.SetTimeZoneIdAsync(hostId, normalizedTimeZone, ct);
-        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
-    }
-
-    private async Task<Dictionary<CustomCommandEditor, string[]>> NormalizeAliasesAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        IReadOnlySet<int> managedCommandIds,
-        IEnumerable<CustomCommandEditor> commands,
-        CancellationToken ct
-    )
-    {
-        var normalized = new Dictionary<CustomCommandEditor, string[]>();
-        foreach (var command in commands)
+        foreach (var configured in command.Commands)
         {
-            var aliases = await aliasRegistry.ValidateExcludingCommandsAsync(
+            var conflict = await aliasRegistry.FindConflictAsync(
                 db,
                 hostId,
                 managedCommandIds,
-                command.Aliases,
+                configured.Aliases,
                 ct
             );
-            if (aliases.Any(alias => alias.Length > _aliasMaxLength))
+            if (conflict is not null)
             {
-                throw new InvalidOperationException(
-                    $"Command words cannot exceed {_aliasMaxLength} characters."
-                );
+                return Result<
+                    CustomCommandConfigurationSaved,
+                    CustomCommandConfigurationSaveFailure
+                >.Error(AliasFailure(conflict));
             }
-
-            normalized[command] = aliases;
         }
 
-        var duplicate = normalized
-            .SelectMany(pair => pair.Value.Select(alias => new { Alias = alias, pair.Key }))
-            .GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Select(x => x.Key).Distinct().Count() > 1)
-            ?.Key;
-        if (duplicate is not null)
+        var graphFailure = await graphWriter.WriteAsync(hostId, command, ct);
+        if (graphFailure is not null)
         {
-            throw new InvalidOperationException(
-                $"!{duplicate} is already used by another custom command."
-            );
+            return Result<
+                CustomCommandConfigurationSaved,
+                CustomCommandConfigurationSaveFailure
+            >.Error(graphFailure);
         }
 
-        return normalized;
+        await hostSettings.SetTimeZoneAsync(hostId, command.TimeZone, ct);
+        await events.PublishAsync(AppEventKind.CustomCommandsChanged, ct);
+        return Result<
+            CustomCommandConfigurationSaved,
+            CustomCommandConfigurationSaveFailure
+        >.Success(new());
+    }
+
+    private static CustomCommandConfigurationSaveFailure AliasFailure(
+        CustomCommandAliasConflict conflict
+    )
+    {
+        return conflict.Match<CustomCommandConfigurationSaveFailure>(
+            builtIn => new CustomCommandConfigurationSaveFailure.BuiltInAliasCollision(
+                builtIn.Alias
+            ),
+            custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(custom.Alias)
+        );
     }
 }

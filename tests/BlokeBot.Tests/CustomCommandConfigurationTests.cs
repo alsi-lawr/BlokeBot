@@ -16,7 +16,8 @@ public sealed class CustomCommandConfigurationTests
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory);
 
-        await service.SaveConfigurationAsync(
+        await SaveValidAsync(
+            service,
             hostId,
             new CustomCommandConfiguration
             {
@@ -80,8 +81,7 @@ public sealed class CustomCommandConfigurationTests
                         },
                     },
                 ],
-            },
-            CancellationToken.None
+            }
         );
 
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
@@ -126,11 +126,7 @@ public sealed class CustomCommandConfigurationTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
         var service = CreateService(dbFactory);
-        await service.SaveConfigurationAsync(
-            hostId,
-            ConfigurationWithCommands(("Command", "original")),
-            CancellationToken.None
-        );
+        await SaveValidAsync(service, hostId, ConfigurationWithCommands(("Command", "original")));
         var editor = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         editor.Commands.Single().Aliases = "updated";
         editor.MessageEntries.Single().Variants.Single().Text = "Updated reply.";
@@ -140,11 +136,55 @@ public sealed class CustomCommandConfigurationTests
         beforeSave.Commands.Single().Aliases.ShouldBe("original");
         beforeSave.MessageEntries.Single().Variants.Single().Text.ShouldBe("Reply text.");
 
-        await service.SaveConfigurationAsync(hostId, editor, CancellationToken.None);
+        await SaveValidAsync(service, hostId, editor);
 
         var afterSave = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         afterSave.Commands.Single().Aliases.ShouldBe("updated");
         afterSave.MessageEntries.Single().Variants.Single().Text.ShouldBe("Updated reply.");
+    }
+
+    [Test]
+    public void MutableDraft_Validating_ProducesNormalizedCopyIsolatedCommand()
+    {
+        var draft = ConfigurationWithCommands((" Command ", "!SECOND, first"));
+        draft.MessageEntries.Single().Name = " Reply ";
+        draft.MessageEntries.Single().Variants.Single().Text = " Reply text. ";
+
+        var command = ValidCommand(draft);
+        draft.MessageEntries.Single().Name = "mutated";
+        draft.MessageEntries.Single().Variants.Single().Text = "mutated";
+        draft.Commands.Single().Name = "mutated";
+        draft.Commands.Single().Aliases = "mutated";
+        draft.MessageEntries.Clear();
+
+        command.MessageEntries.Single().Name.ShouldBe("Reply");
+        command.MessageEntries.Single().Variants.Single().Text.ShouldBe("Reply text.");
+        command.Commands.Single().Name.ShouldBe("Command");
+        command.Commands.Single().Aliases.ShouldBe(["first", "second"]);
+        (command.MessageEntries is List<CustomMessageLibraryEntryValue>).ShouldBeFalse();
+        (command.Commands is List<CustomCommandValue>).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task CancelledExecution_Saving_DoesNotStartPersistence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var service = CreateService(dbFactory);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            service
+                .SaveConfiguration(
+                    1,
+                    ValidCommand(ConfigurationWithCommands(("Command", "command")))
+                )
+                .ExecuteAsync(cancellation.Token)
+                .AsTask()
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCommands.CountAsync()).ShouldBe(0);
     }
 
     [Test]
@@ -167,23 +207,19 @@ public sealed class CustomCommandConfigurationTests
 
         var service = CreateService(dbFactory);
 
-        var builtInCollision = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(
-                hostId,
-                ConfigurationWithCommands(("Built in", "points")),
-                CancellationToken.None
-            )
+        var builtInCollision = await SaveFailureAsync(
+            service,
+            hostId,
+            ConfigurationWithCommands(("Built in", "points"))
         );
-        builtInCollision.Message.ShouldContain("another bot command");
+        builtInCollision
+            .ShouldBeOfType<CustomCommandConfigurationSaveFailure.BuiltInAliasCollision>()
+            .Alias.ShouldBe("points");
 
-        var draftCollision = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(
-                hostId,
-                ConfigurationWithCommands(("First", "hello"), ("Second", "!HELLO")),
-                CancellationToken.None
-            )
+        var draftCollision = ValidationErrors(
+            ConfigurationWithCommands(("First", "hello"), ("Second", "!HELLO"))
         );
-        draftCollision.Message.ShouldContain("another custom command");
+        draftCollision.ShouldContain(error => error.Message.Contains("another custom command"));
     }
 
     [Test]
@@ -204,7 +240,7 @@ public sealed class CustomCommandConfigurationTests
                 OccurrenceLifetimeSeconds = 30,
             }
         );
-        await service.SaveConfigurationAsync(hostId, draft, CancellationToken.None);
+        await SaveValidAsync(service, hostId, draft);
         var update = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         var command = update.Commands.Single();
         command.Aliases = "new-alias";
@@ -219,7 +255,7 @@ public sealed class CustomCommandConfigurationTests
         intervalAfterChat.IntervalMinutes = 20;
         intervalAfterChat.RequiredChatMessages = 4;
 
-        await service.SaveConfigurationAsync(hostId, update, CancellationToken.None);
+        await SaveValidAsync(service, hostId, update);
 
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         loaded.Commands.Single().Aliases.ShouldBe("new-alias");
@@ -241,7 +277,7 @@ public sealed class CustomCommandConfigurationTests
             .Schedule.ShouldBeOfType<WeeklyCustomAnnouncementScheduleEditor>();
         weekly.Day = DayOfWeek.Sunday;
         weekly.Time = new TimeOnly(9, 15);
-        await service.SaveConfigurationAsync(hostId, loaded, CancellationToken.None);
+        await SaveValidAsync(service, hostId, loaded);
 
         var final = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         final.Commands.Single().Action.ShouldBeOfType<MessageCustomCommandActionEditor>();
@@ -270,14 +306,14 @@ public sealed class CustomCommandConfigurationTests
                 OccurrenceLifetimeSeconds = 30,
             }
         );
-        await service.SaveConfigurationAsync(hostId, draft, CancellationToken.None);
+        await SaveValidAsync(service, hostId, draft);
         var update = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         update.Commands.Clear();
         update.Announcements.Clear();
         update.Counters.Clear();
         update.MessageEntries.Clear();
 
-        await service.SaveConfigurationAsync(hostId, update, CancellationToken.None);
+        await SaveValidAsync(service, hostId, update);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.CustomCommands.CountAsync()).ShouldBe(0);
@@ -297,26 +333,22 @@ public sealed class CustomCommandConfigurationTests
         var firstHostId = await SeedHostAsync(dbFactory, "first");
         var secondHostId = await SeedHostAsync(dbFactory, "second");
         var service = CreateService(dbFactory);
-        await service.SaveConfigurationAsync(
+        await SaveValidAsync(
+            service,
             firstHostId,
-            ConfigurationWithCommands(("Command", "command")),
-            CancellationToken.None
+            ConfigurationWithCommands(("Command", "command"))
         );
         var stored = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
 
         var missingId = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         missingId.Commands.Single().Id = 999_999;
-        var missingError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(firstHostId, missingId, CancellationToken.None)
-        );
-        missingError.Message.ShouldContain("no longer available");
+        var missingError = await SaveFailureAsync(service, firstHostId, missingId);
+        missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var invalidMessage = ConfigurationWithCommands(("Invalid", "invalid"));
         invalidMessage.Commands.Single().Action.MessageLibraryEntryId = -999;
-        var messageError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(firstHostId, invalidMessage, CancellationToken.None)
-        );
-        messageError.Message.ShouldContain("Choose a saved reply");
+        var messageErrors = ValidationErrors(invalidMessage);
+        messageErrors.ShouldContain(error => error.Message.Contains("Choose a saved reply"));
 
         var invalidCounter = ConfigurationWithCommands(("Counter", "counter"));
         invalidCounter.Commands.Single().Action = new CounterCustomCommandActionEditor
@@ -324,15 +356,11 @@ public sealed class CustomCommandConfigurationTests
             MessageLibraryEntryId = -1,
             CounterId = -999,
         };
-        var counterError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(firstHostId, invalidCounter, CancellationToken.None)
-        );
-        counterError.Message.ShouldContain("Choose a counter");
+        var counterErrors = ValidationErrors(invalidCounter);
+        counterErrors.ShouldContain(error => error.Message.Contains("Choose a counter"));
 
-        var hostBoundaryError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(secondHostId, stored, CancellationToken.None)
-        );
-        hostBoundaryError.Message.ShouldContain("no longer available");
+        var hostBoundaryError = await SaveFailureAsync(service, secondHostId, stored);
+        hostBoundaryError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var unchanged = await service.LoadConfigurationAsync(firstHostId, CancellationToken.None);
         unchanged.Commands.Single().Name.ShouldBe("Command");
@@ -340,18 +368,12 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
-    public async Task InvalidAnnouncementSchedule_Saving_RejectsVariant()
+    public void InvalidAnnouncementSchedule_Validating_ReturnsTypedErrors()
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = CreateService(dbFactory);
         var interval = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 0 }
         );
-        var intervalError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(hostId, interval, CancellationToken.None)
-        );
-        intervalError.Message.ShouldContain("at least 1");
+        ValidationErrors(interval).ShouldContain(error => error.Message.Contains("at least 1"));
 
         var afterChat = ConfigurationWithAnnouncement(
             new IntervalAfterChatCustomAnnouncementScheduleEditor
@@ -360,43 +382,33 @@ public sealed class CustomCommandConfigurationTests
                 RequiredChatMessages = 0,
             }
         );
-        var afterChatError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(hostId, afterChat, CancellationToken.None)
-        );
-        afterChatError.Message.ShouldContain("at least 1 chat message");
+        ValidationErrors(afterChat)
+            .ShouldContain(error => error.Message.Contains("at least 1 chat message"));
     }
 
     [Test]
-    public async Task InvalidAnnouncementDeliveryTiming_Saving_RejectsWithoutPersistence()
+    public async Task InvalidAnnouncementDeliveryTiming_Validating_DoesNotPersist()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = CreateService(dbFactory);
         var missing = ConfigurationWithAnnouncement(new IntervalCustomAnnouncementScheduleEditor());
         missing.Announcements.Single().RetryDelaySeconds = 0;
-        var missingError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(hostId, missing, CancellationToken.None)
-        );
-        missingError.Message.ShouldContain("retry delay must be positive");
+        ValidationErrors(missing)
+            .ShouldContain(error => error.Message.Contains("retry delay must be positive"));
 
         var excessive = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor()
         );
         excessive.Announcements.Single().OccurrenceLifetimeSeconds = 61;
-        var excessiveError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(hostId, excessive, CancellationToken.None)
-        );
-        excessiveError.Message.ShouldContain("no greater than 60");
+        ValidationErrors(excessive)
+            .ShouldContain(error => error.Message.Contains("no greater than 60"));
 
         var inconsistent = ConfigurationWithAnnouncement(
             new IntervalCustomAnnouncementScheduleEditor()
         );
         inconsistent.Announcements.Single().RetryDelaySeconds = 30;
         inconsistent.Announcements.Single().OccurrenceLifetimeSeconds = 30;
-        var inconsistentError = await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(hostId, inconsistent, CancellationToken.None)
-        );
-        inconsistentError.Message.ShouldContain("less than its occurrence lifetime");
+        ValidationErrors(inconsistent)
+            .ShouldContain(error => error.Message.Contains("less than its occurrence lifetime"));
 
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.CustomAnnouncements.CountAsync()).ShouldBe(0);
@@ -467,6 +479,60 @@ public sealed class CustomCommandConfigurationTests
             new CustomCommandConfigurationGraphWriter(dbFactory, TimeProvider.System),
             new HostCustomCommandSettingsService(dbFactory, events),
             events
+        );
+    }
+
+    private static CustomCommandConfigurationSaveCommand ValidCommand(
+        CustomCommandConfiguration draft
+    )
+    {
+        return CustomCommandConfigurationValidator
+            .Validate(draft)
+            .Match(
+                command => command,
+                errors =>
+                    throw new InvalidOperationException(
+                        string.Join(" ", errors.Select(error => error.Message))
+                    )
+            );
+    }
+
+    private static IReadOnlyList<CustomCommandConfigurationValidationError> ValidationErrors(
+        CustomCommandConfiguration draft
+    )
+    {
+        return CustomCommandConfigurationValidator
+            .Validate(draft)
+            .Match(_ => Array.Empty<CustomCommandConfigurationValidationError>(), errors => errors);
+    }
+
+    private static async Task SaveValidAsync(
+        CustomCommandConfigurationService service,
+        int hostId,
+        CustomCommandConfiguration draft
+    )
+    {
+        var result = await service
+            .SaveConfiguration(hostId, ValidCommand(draft))
+            .ExecuteAsync(CancellationToken.None);
+        result.Match(
+            static _ => true,
+            failure => throw new InvalidOperationException(failure.Message)
+        );
+    }
+
+    private static async Task<CustomCommandConfigurationSaveFailure> SaveFailureAsync(
+        CustomCommandConfigurationService service,
+        int hostId,
+        CustomCommandConfiguration draft
+    )
+    {
+        var result = await service
+            .SaveConfiguration(hostId, ValidCommand(draft))
+            .ExecuteAsync(CancellationToken.None);
+        return result.Match(
+            _ => throw new InvalidOperationException("Expected custom-command save failure."),
+            failure => failure
         );
     }
 
