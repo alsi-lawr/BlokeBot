@@ -60,16 +60,25 @@ internal static class LoginPage
         </script>
         """;
 
-    public static string Render(string? error = null)
+    public static string Render()
     {
-        var errorBlock = string.IsNullOrWhiteSpace(error)
-            ? string.Empty
-            : $"""
-                  <div class="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                      {WebUtility.HtmlEncode(error)}
-                  </div>
-                """;
+        return RenderPage(string.Empty);
+    }
 
+    public static string RenderError(string error)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(error);
+        return RenderPage(
+            $"""
+              <div class="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  {WebUtility.HtmlEncode(error)}
+              </div>
+            """
+        );
+    }
+
+    private static string RenderPage(string errorBlock)
+    {
         return $$"""
             <!DOCTYPE html>
             <html lang="en">

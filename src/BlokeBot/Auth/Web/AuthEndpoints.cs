@@ -18,7 +18,7 @@ internal static class AuthEndpoints
                     if (!auth.IsConfigured(currentOptions))
                     {
                         return Results.Content(
-                            LoginPage.Render("Twitch sign-in is not set up yet."),
+                            LoginPage.RenderError("Twitch sign-in is not set up yet."),
                             "text/html",
                             statusCode: StatusCodes.Status503ServiceUnavailable
                         );
@@ -89,7 +89,7 @@ internal static class AuthEndpoints
                     if (!string.IsNullOrWhiteSpace(error))
                     {
                         return Results.Content(
-                            LoginPage.Render(error),
+                            LoginPage.RenderError(error),
                             "text/html",
                             statusCode: StatusCodes.Status400BadRequest
                         );
@@ -137,11 +137,11 @@ internal static class AuthEndpoints
 
                     if (!result.IsAuthorized || result.User is null)
                     {
+                        var authenticationError = string.IsNullOrWhiteSpace(result.Error)
+                            ? "This Twitch account is not connected to a BlokeBot channel."
+                            : result.Error;
                         return Results.Content(
-                            LoginPage.Render(
-                                result.Error
-                                    ?? "This Twitch account is not connected to a BlokeBot channel."
-                            ),
+                            LoginPage.RenderError(authenticationError),
                             "text/html",
                             statusCode: StatusCodes.Status403Forbidden
                         );
