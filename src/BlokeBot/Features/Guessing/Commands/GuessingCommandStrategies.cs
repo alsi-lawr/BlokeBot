@@ -23,7 +23,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
     {
         return await Commands.ModeratorOnlyResponseAsync(
             context.Command.Message.Channel,
-            context.State.GuessRoundProfileId,
+            context.State.AliasScope,
             cancellationToken
         );
     }
@@ -66,7 +66,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
             context.Command.Message.Channel,
             Kind,
             context.Command.CommandName,
-            context.State.GuessRoundProfileId,
+            context.State.AliasScope,
             cancellationToken
         );
         return new GuessingOperationResult(false, response.Message, response.Target);
@@ -90,19 +90,28 @@ public sealed class StartGuessingCommandStrategy(
     )
     {
         GuessingOperationResult result;
-        if (context.Args.Count == 0 && context.State.GuessRoundProfileId is { } profileId)
+        if (context.Args.Count == 0)
         {
-            result = await rounds.StartRoundAsync(
-                context.State.HostId,
-                profileId,
-                cancellationToken
+            result = await context.State.AliasScope.Match(
+                _ =>
+                    rounds.StartRoundAsync(
+                        context.Command.Message.Channel,
+                        null,
+                        cancellationToken
+                    ),
+                profile =>
+                    rounds.StartRoundAsync(
+                        context.State.HostId,
+                        profile.ProfileId,
+                        cancellationToken
+                    )
             );
         }
-        else if (context.Args.Count <= 1)
+        else if (context.Args.Count == 1)
         {
             result = await rounds.StartRoundAsync(
                 context.Command.Message.Channel,
-                context.Args.Count == 0 ? null : context.Args[0],
+                context.Args[0],
                 cancellationToken
             );
         }
@@ -212,7 +221,7 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
     {
         var response = await Commands.AvailableGuessesResponseAsync(
             context.Command.Message.Channel,
-            context.State.GuessRoundProfileId,
+            context.State.AliasScope,
             cancellationToken
         );
         if (!string.IsNullOrWhiteSpace(response.Message))

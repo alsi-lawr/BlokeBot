@@ -273,7 +273,7 @@ public sealed class GuessingConfigurationService(
         return CommandAliasRegistry.JoinAliases(
             aliases,
             GuessingAppCommandKindMap.ToAppKind(kind),
-            profileId
+            new CommandAliasScope.Profile(profileId)
         );
     }
 
@@ -381,8 +381,8 @@ public sealed class GuessingConfigurationService(
                 new CommandAliasDraft(AppCommandKind.Guess, aliases.GuessAliases),
                 new CommandAliasDraft(AppCommandKind.Guesses, aliases.GuessesAliases),
             ],
-            ct,
-            profileId
+            new CommandAliasScope.Profile(profileId),
+            ct
         );
     }
 }

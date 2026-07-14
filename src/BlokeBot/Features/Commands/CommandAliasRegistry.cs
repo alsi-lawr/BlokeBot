@@ -12,10 +12,11 @@ public sealed class CommandAliasRegistry
         int hostId,
         IReadOnlySet<AppCommandKind> ownedKinds,
         IEnumerable<CommandAliasDraft> drafts,
-        CancellationToken ct,
-        int? guessRoundProfileId = null
+        CommandAliasScope scope,
+        CancellationToken ct
     )
     {
+        var guessRoundProfileId = CommandAliasScopePersistence.ToProfileId(scope);
         var draftArray = drafts.ToArray();
         var owned = ownedKinds.ToArray();
         var rows = draftArray
@@ -71,9 +72,10 @@ public sealed class CommandAliasRegistry
     public static string JoinAliases(
         IEnumerable<CommandAlias> aliases,
         AppCommandKind kind,
-        int? guessRoundProfileId = null
+        CommandAliasScope scope
     )
     {
+        var guessRoundProfileId = CommandAliasScopePersistence.ToProfileId(scope);
         return string.Join(
             ", ",
             aliases

@@ -37,7 +37,7 @@ public sealed class CommandCatalogTests
         known.ShouldNotBeNull();
         known.HostId.ShouldBe(hostId);
         known.Kind.ShouldBe(AppCommandKind.Points);
-        known.GuessRoundProfileId.ShouldBeNull();
+        known.Scope.ShouldBeOfType<CommandAliasScope.Global>();
         unknown.ShouldBeNull();
     }
 
@@ -77,7 +77,7 @@ public sealed class CommandCatalogTests
         var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
         resolution.ShouldNotBeNull();
         resolution.Kind.ShouldBe(AppCommandKind.Start);
-        resolution.GuessRoundProfileId.ShouldBe(profileId);
+        resolution.Scope.ShouldBeOfType<CommandAliasScope.Profile>().ProfileId.ShouldBe(profileId);
     }
 
     [Test]
@@ -97,6 +97,7 @@ public sealed class CommandCatalogTests
                     new CommandAliasDraft(AppCommandKind.Points, "points"),
                     new CommandAliasDraft(AppCommandKind.GivePoints, "POINTS"),
                 ],
+                new CommandAliasScope.Global(),
                 CancellationToken.None
             )
         );
@@ -125,6 +126,7 @@ public sealed class CommandCatalogTests
                 hostId,
                 new HashSet<AppCommandKind> { AppCommandKind.Points },
                 [new CommandAliasDraft(AppCommandKind.Points, "play")],
+                new CommandAliasScope.Global(),
                 CancellationToken.None
             )
         );
@@ -171,10 +173,55 @@ public sealed class CommandCatalogTests
                 hostId,
                 GuessingAppCommandKindMap.AppKinds,
                 [new CommandAliasDraft(AppCommandKind.Start, "play")],
-                CancellationToken.None,
-                specialProfile.Id
+                new CommandAliasScope.Profile(specialProfile.Id),
+                CancellationToken.None
             )
         );
+    }
+
+    [Test]
+    public async Task GlobalAndProfileScopes_ReplacingAliases_PersistTheirDistinctStorageKeys()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var profile = new GuessRoundProfile
+        {
+            HostId = hostId,
+            Name = "Score",
+            Slug = "score",
+            IsDefault = true,
+            ReplySettings = new BotReplySettings(),
+        };
+        db.Profiles.Add(profile);
+        await db.SaveChangesAsync();
+        var registry = new CommandAliasRegistry();
+
+        await registry.ReplaceAliasesAsync(
+            db,
+            hostId,
+            PointsAppCommandKindMap.AppKinds,
+            [new CommandAliasDraft(AppCommandKind.Points, "balance")],
+            new CommandAliasScope.Global(),
+            CancellationToken.None
+        );
+        await registry.ReplaceAliasesAsync(
+            db,
+            hostId,
+            GuessingAppCommandKindMap.AppKinds,
+            [new CommandAliasDraft(AppCommandKind.Start, "score")],
+            new CommandAliasScope.Profile(profile.Id),
+            CancellationToken.None
+        );
+        await db.SaveChangesAsync();
+
+        var aliases = await db
+            .CommandAliases.AsNoTracking()
+            .OrderBy(alias => alias.Alias)
+            .ToListAsync(CancellationToken.None);
+        aliases.Select(alias => alias.Alias).ShouldBe(["balance", "score"]);
+        aliases.Single(alias => alias.Alias == "balance").GuessRoundProfileId.ShouldBeNull();
+        aliases.Single(alias => alias.Alias == "score").GuessRoundProfileId.ShouldBe(profile.Id);
     }
 
     [Test]

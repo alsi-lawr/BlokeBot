@@ -137,7 +137,9 @@ public sealed class HostFeatureTests
         var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
         route.ShouldNotBeNull();
         route.Kind.ShouldBe(GuessCommandKind.Start);
-        route.State.GuessRoundProfileId.ShouldBe(profileId);
+        route
+            .State.AliasScope.ShouldBeOfType<CommandAliasScope.Profile>()
+            .ProfileId.ShouldBe(profileId);
     }
 
     private static ChatCommandContext CommandContext(string channel, string commandName)

@@ -38,7 +38,7 @@ public sealed class AppCommandAliasResolver(IDbContextFactory<BlokeBotDbContext>
             : new AppCommandAliasResolution(
                 hostId.Value,
                 resolution.Kind,
-                resolution.GuessRoundProfileId
+                CommandAliasScopePersistence.FromProfileId(resolution.GuessRoundProfileId)
             );
     }
 }
@@ -46,5 +46,5 @@ public sealed class AppCommandAliasResolver(IDbContextFactory<BlokeBotDbContext>
 public sealed record AppCommandAliasResolution(
     int HostId,
     AppCommandKind Kind,
-    int? GuessRoundProfileId
+    CommandAliasScope Scope
 );

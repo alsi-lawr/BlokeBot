@@ -146,7 +146,11 @@ public sealed class PointsConfigurationService(
 
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind)
     {
-        return CommandAliasRegistry.JoinAliases(aliases, PointsAppCommandKindMap.ToAppKind(kind));
+        return CommandAliasRegistry.JoinAliases(
+            aliases,
+            PointsAppCommandKindMap.ToAppKind(kind),
+            new CommandAliasScope.Global()
+        );
     }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
@@ -184,6 +188,7 @@ public sealed class PointsConfigurationService(
                 new CommandAliasDraft(AppCommandKind.EndGiveaway, aliases.EndGiveawayAliases),
                 new CommandAliasDraft(AppCommandKind.CancelGiveaway, aliases.CancelGiveawayAliases),
             ],
+            new CommandAliasScope.Global(),
             ct
         );
     }

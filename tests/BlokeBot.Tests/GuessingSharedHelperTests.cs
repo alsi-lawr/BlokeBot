@@ -1,3 +1,4 @@
+using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
@@ -186,7 +187,7 @@ public sealed class GuessingSharedHelperTests
 
         var response = await new GuessingCommandService(dbFactory).ModeratorOnlyResponseAsync(
             seed.HostLogin,
-            seed.DefaultProfileId,
+            new CommandAliasScope.Profile(seed.DefaultProfileId),
             CancellationToken.None
         );
 
