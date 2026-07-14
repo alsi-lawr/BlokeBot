@@ -44,4 +44,20 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+
+    /// <summary>
+    /// Registers the unavailable access-token capability for an unconfigured bot runtime.
+    /// </summary>
+    /// <param name="services">The service collection to configure.</param>
+    /// <returns>The same service collection.</returns>
+    public static IServiceCollection AddUnavailableAccessTokenProvider(
+        this IServiceCollection services
+    )
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<IAccessTokenProvider, UnavailableAccessTokenProvider>();
+
+        return services;
+    }
 }

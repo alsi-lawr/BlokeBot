@@ -175,6 +175,7 @@ if (botRuntimeConfigured)
 else
 {
     builder.Services.AddTwitchBotSettings(botSection);
+    builder.Services.AddUnavailableAccessTokenProvider();
     builder.Services.AddOfflineBotRuntimeStatus();
 }
 
