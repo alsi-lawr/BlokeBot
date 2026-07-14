@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using TUnit.Core;
 
@@ -9,6 +10,27 @@ namespace BlokeBot.Twitch.Auth.Tests;
 public sealed class OAuthTests
 {
     private static readonly DateTimeOffset _currentTime = new(2026, 7, 14, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public void AuthRegistration_Inspecting_SeparatesAccessTokenProviderAndCache()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAuth();
+
+        var cache = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IAccessTokenCache)
+        );
+        var provider = services.Single(descriptor =>
+            descriptor.ServiceType == typeof(IAccessTokenProvider)
+        );
+        cache.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        cache.ImplementationType.ShouldBe(typeof(AccessTokenCache));
+        provider.Lifetime.ShouldBe(ServiceLifetime.Singleton);
+        provider.ImplementationType.ShouldBe(typeof(AccessTokenProvider));
+        typeof(IAccessTokenProvider).IsAssignableFrom(typeof(AccessTokenCache)).ShouldBeFalse();
+        typeof(IAccessTokenCache).IsAssignableFrom(typeof(AccessTokenProvider)).ShouldBeFalse();
+    }
 
     [Test]
     public void IssuedOAuthState_ConsumingTwice_SucceedsOnlyOnce()
