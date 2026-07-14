@@ -24,44 +24,36 @@ internal sealed class AccessTokenProvider(
         CancellationToken cancellationToken
     )
     {
-        await LoadTokenIfNeededAsync(transaction, cancellationToken);
+        if (!transaction.IsLoaded)
+        {
+            return await LoadAndGetAccessTokenAsync(transaction, cancellationToken);
+        }
 
         var accessToken = await TryGetAccessTokenAsync(transaction, cancellationToken);
         return await accessToken.Match(
             token => Task.FromResult(Result<string, AccessTokenUnavailableReason>.Success(token)),
-            async () =>
-            {
-                await LoadTokenAsync(transaction, cancellationToken);
-                var reloaded = await TryGetAccessTokenAsync(transaction, cancellationToken);
-                return reloaded.Match(
-                    Result<string, AccessTokenUnavailableReason>.Success,
-                    static () =>
-                        Result<string, AccessTokenUnavailableReason>.Error(
-                            AccessTokenUnavailableReason.MissingRefreshToken
-                        )
-                );
-            }
+            () => LoadAndGetAccessTokenAsync(transaction, cancellationToken)
         );
     }
 
-    private async Task LoadTokenAsync(
+    private async Task<Result<string, AccessTokenUnavailableReason>> LoadAndGetAccessTokenAsync(
         IAccessTokenCacheTransaction transaction,
         CancellationToken cancellationToken
     )
     {
         var loadedToken = await tokenStore.LoadAsync(identity.TokenCachePath, cancellationToken);
-        transaction.SetLoaded(loadedToken);
-    }
-
-    private async Task LoadTokenIfNeededAsync(
-        IAccessTokenCacheTransaction transaction,
-        CancellationToken cancellationToken
-    )
-    {
-        if (!transaction.IsLoaded)
-        {
-            await LoadTokenAsync(transaction, cancellationToken);
-        }
+        return await loadedToken.Match(
+            current => GetLoadedAccessTokenAsync(current, transaction, cancellationToken),
+            () =>
+            {
+                transaction.SetLoaded(Option<TokenSet>.None);
+                return Task.FromResult(
+                    Result<string, AccessTokenUnavailableReason>.Error(
+                        AccessTokenUnavailableReason.MissingRefreshToken
+                    )
+                );
+            }
+        );
     }
 
     private Task<Option<string>> TryGetAccessTokenAsync(
@@ -89,6 +81,7 @@ internal sealed class AccessTokenProvider(
             )
         )
         {
+            transaction.SetLoaded(Option<TokenSet>.Some(current));
             return Option<string>.Some(current.AccessToken);
         }
 
@@ -107,5 +100,28 @@ internal sealed class AccessTokenProvider(
         await tokenStore.SaveAsync(identity.TokenCachePath, refreshedTokenSet, cancellationToken);
         transaction.SetLoaded(Option<TokenSet>.Some(refreshedTokenSet));
         return Option<string>.Some(refreshedTokenSet.AccessToken);
+    }
+
+    private async Task<Result<string, AccessTokenUnavailableReason>> GetLoadedAccessTokenAsync(
+        TokenSet current,
+        IAccessTokenCacheTransaction transaction,
+        CancellationToken cancellationToken
+    )
+    {
+        var accessToken = await TryGetCurrentAccessTokenAsync(
+            current,
+            transaction,
+            cancellationToken
+        );
+        return accessToken.Match(
+            Result<string, AccessTokenUnavailableReason>.Success,
+            () =>
+            {
+                transaction.SetLoaded(Option<TokenSet>.None);
+                return Result<string, AccessTokenUnavailableReason>.Error(
+                    AccessTokenUnavailableReason.MissingRefreshToken
+                );
+            }
+        );
     }
 }

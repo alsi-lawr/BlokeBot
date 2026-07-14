@@ -3,9 +3,11 @@ using System.Diagnostics;
 using BlokeBot.Features.PublicChat;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch.Auth;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Polly;
 using Shouldly;
 using TUnit.Core;
@@ -123,6 +125,75 @@ public sealed class PublicChatOutboxIntegrationTests
             CancellationToken.None
         );
         next.ShouldBeOfType<PublicChatClaimOutcome.Empty>();
+    }
+
+    [Test]
+    public async Task TokenUnavailable_PreparingMessage_PersistsTerminalRedactedOutcomeWithoutRetry()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTestTimeProvider(Utc(12, 0, 0));
+        var outbox = new CompletionObservingPublicChatOutbox(
+            new EfPublicChatOutbox(
+                dbFactory,
+                StandardRetryPolicy,
+                StandardLifetimePolicy,
+                StandardRetentionPolicy
+            )
+        );
+        var transport = new ScriptedPublicChatTransport(
+            (_, _) =>
+                ValueTask.FromResult<PublicChatPreparationOutcome>(
+                    new PublicChatPreparationOutcome.TokenUnavailable(
+                        AccessTokenUnavailableReason.MissingRefreshToken
+                    )
+                ),
+            (_, _) =>
+                ValueTask.FromException<PublicChatTransportSendResult>(
+                    new InvalidOperationException("A token-unavailable message must not be sent.")
+                )
+        );
+        var logger = new RecordingPublicChatLogger<PublicChatMessageQueue>();
+        var queue = CreateQueue(outbox, transport, clock, logger: logger);
+        _ = await queue.EnqueueAsync(
+            Command("streamer", "private message payload"),
+            CancellationToken.None
+        );
+        using var stopping = new CancellationTokenSource();
+        var worker = queue.RunAsync(stopping.Token);
+
+        _ = (await outbox.ReadClaimOutcomeAsync()).ShouldBeOfType<PublicChatClaimOutcome.Claimed>();
+        var outcome = (
+            await outbox.ReadOutcomeAsync()
+        ).ShouldBeOfType<PublicChatDeliveryOutcome.TokenUnavailable>();
+        var nextClaim = await outbox.ReadClaimOutcomeAsync();
+        await StopAsync(stopping, worker);
+
+        outcome.Reason.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
+        nextClaim.ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
+        transport.PrepareCount.ShouldBe(1);
+        transport.SendCount.ShouldBe(0);
+        var diagnostic = logger.Entries.ShouldHaveSingleItem();
+        diagnostic.Level.ShouldBe(LogLevel.Warning);
+        diagnostic.Exception.ShouldBeNull();
+        diagnostic
+            .Properties["UnavailableReason"]
+            .ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
+        diagnostic.Properties.ContainsKey("FailureType").ShouldBeFalse();
+        diagnostic.Message.ShouldNotContain("private message payload");
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var persisted = await db.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
+        persisted.Status.ShouldBe(PublicChatOutboxStatus.Unexpected);
+        persisted.Message.ShouldBeNull();
+        persisted.DeduplicationKey.ShouldBeNull();
+        persisted.AttemptCount.ShouldBe(0);
+        persisted.SafePreSendFailureCount.ShouldBe(0);
+        persisted.NextAttemptAtUtc.ShouldBeNull();
+        persisted.ClaimToken.ShouldBeNull();
+        persisted.CompletedAtUtc.ShouldNotBeNull();
+        persisted.FailurePhase.ShouldBe(PublicChatOutboxFailurePhase.Preparation);
+        persisted.FailureType.ShouldBe(nameof(AccessTokenUnavailableReason.MissingRefreshToken));
+        persisted.HttpStatusCode.ShouldBeNull();
+        (await db.PublicChatSendReceipts.CountAsync()).ShouldBe(0);
     }
 
     [Test]

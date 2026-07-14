@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 using BlokeBot.Eventing;
 using BlokeBot.Twitch.Runtime;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 
@@ -27,7 +28,8 @@ internal static class PublicChatIntegrationTestSupport
         IPublicChatTransport transport,
         TimeProvider timeProvider,
         BotOptions? options = null,
-        IEnumerable<IPublicChatQueueAlertObserver>? observers = null
+        IEnumerable<IPublicChatQueueAlertObserver>? observers = null,
+        ILogger<PublicChatMessageQueue>? logger = null
     )
     {
         return new(
@@ -44,7 +46,7 @@ internal static class PublicChatIntegrationTestSupport
             ),
             outbox,
             transport,
-            NullLogger<PublicChatMessageQueue>.Instance
+            logger ?? NullLogger<PublicChatMessageQueue>.Instance
         );
     }
 
@@ -96,6 +98,43 @@ internal static class PublicChatIntegrationTestSupport
         };
     }
 }
+
+internal sealed class RecordingPublicChatLogger<TCategory> : ILogger<TCategory>
+{
+    public List<PublicChatLogEntry> Entries { get; } = [];
+
+    public IDisposable? BeginScope<TState>(TState state)
+        where TState : notnull
+    {
+        return null;
+    }
+
+    public bool IsEnabled(LogLevel logLevel)
+    {
+        return true;
+    }
+
+    public void Log<TState>(
+        LogLevel logLevel,
+        EventId eventId,
+        TState state,
+        Exception? exception,
+        Func<TState, Exception?, string> formatter
+    )
+    {
+        var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+            ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
+            : new Dictionary<string, object?>();
+        Entries.Add(new(logLevel, formatter(state, exception), exception, properties));
+    }
+}
+
+internal sealed record PublicChatLogEntry(
+    LogLevel Level,
+    string Message,
+    Exception? Exception,
+    IReadOnlyDictionary<string, object?> Properties
+);
 
 internal sealed class RecordingPublicChatTransport : IPublicChatTransport
 {

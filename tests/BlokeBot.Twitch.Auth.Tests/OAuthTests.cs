@@ -230,6 +230,7 @@ public sealed class OAuthTests
             await provider.GetAccessToken().ExecuteAsync(CancellationToken.None)
         );
         unavailable.ShouldBe(AccessTokenUnavailableReason.MissingRefreshToken);
+        store.LoadCalls.ShouldBe(1);
 
         store.Loaded = new TokenSet("authorized", "refresh", _currentTime.AddHours(1));
 
@@ -238,7 +239,155 @@ public sealed class OAuthTests
         );
 
         accessToken.ShouldBe("authorized");
-        store.LoadCalls.ShouldBeGreaterThanOrEqualTo(2);
+        store.LoadCalls.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task ValidationFault_RequestingAgain_ReloadsWithoutPublishingFailedToken()
+    {
+        var failure = new IOException("validation failed");
+        var oauth = new FakeOAuthClient { ValidateException = failure };
+        var store = new MemoryTokenStore
+        {
+            Loaded = new TokenSet("failed", "refresh", _currentTime.AddHours(1)),
+        };
+        var provider = Provider(new AccessTokenCache(), store, oauth);
+
+        var thrown = await Should.ThrowAsync<IOException>(() =>
+            provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
+        );
+
+        thrown.ShouldBeSameAs(failure);
+        store.LoadCalls.ShouldBe(1);
+        store.SaveCalls.ShouldBe(0);
+        oauth.ValidateException = null;
+        oauth.ValidateResult = true;
+        store.Loaded = new TokenSet("replacement", "refresh", _currentTime.AddHours(1));
+
+        Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
+            .ShouldBe("replacement");
+        store.LoadCalls.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task RefreshFault_RequestingAgain_ReloadsWithoutPublishingFailedRefresh()
+    {
+        var failure = new HttpRequestException("refresh failed");
+        var oauth = new FakeOAuthClient { RefreshException = failure };
+        var store = new MemoryTokenStore
+        {
+            Loaded = new TokenSet("expired", "refresh", _currentTime.AddMinutes(-1)),
+        };
+        var provider = Provider(new AccessTokenCache(), store, oauth);
+
+        var thrown = await Should.ThrowAsync<HttpRequestException>(() =>
+            provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask()
+        );
+
+        thrown.ShouldBeSameAs(failure);
+        store.LoadCalls.ShouldBe(1);
+        store.SaveCalls.ShouldBe(0);
+        oauth.RefreshCalls.ShouldBe(1);
+        oauth.RefreshException = null;
+        oauth.ValidateResult = true;
+        store.Loaded = new TokenSet("replacement", "refresh", _currentTime.AddHours(1));
+
+        Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
+            .ShouldBe("replacement");
+        store.LoadCalls.ShouldBe(2);
+        store.SaveCalls.ShouldBe(0);
+        oauth.RefreshCalls.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task InvalidationQueuedBehindLoad_RequestingAgain_ForcesReload()
+    {
+        var loadStarted = Channel.CreateUnbounded<bool>();
+        var continueLoad = Channel.CreateUnbounded<bool>();
+        var oauth = new FakeOAuthClient { ValidateResult = true };
+        var store = new MemoryTokenStore
+        {
+            Loaded = new TokenSet("first", "refresh", _currentTime.AddHours(1)),
+            LoadStarted = loadStarted,
+            ContinueLoad = continueLoad,
+        };
+        var cache = new AccessTokenCache();
+        var provider = Provider(cache, store, oauth);
+
+        var loading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
+        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        var invalidation = cache.ClearAsync(CancellationToken.None);
+        await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
+        Success(await loading).ShouldBe("first");
+        await invalidation;
+        store.Loaded = new TokenSet("second", "refresh", _currentTime.AddHours(1));
+
+        var reloading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
+        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
+
+        Success(await reloading).ShouldBe("second");
+        store.LoadCalls.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task CancellationQueuedBehindLoad_PropagatesAndLaterRequestSucceeds()
+    {
+        var loadStarted = Channel.CreateUnbounded<bool>();
+        var continueLoad = Channel.CreateUnbounded<bool>();
+        var store = new MemoryTokenStore
+        {
+            Loaded = new TokenSet("cached", "refresh", _currentTime.AddHours(1)),
+            LoadStarted = loadStarted,
+            ContinueLoad = continueLoad,
+        };
+        var provider = Provider(
+            new AccessTokenCache(),
+            store,
+            new FakeOAuthClient { ValidateResult = true }
+        );
+        var loading = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
+        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        using var cancellation = new CancellationTokenSource();
+        var queued = provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask();
+
+        await cancellation.CancelAsync();
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() => queued);
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
+        Success(await loading).ShouldBe("cached");
+        Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
+            .ShouldBe("cached");
+        store.LoadCalls.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task CancellationDuringStoreLoad_PropagatesAndLaterRetrySucceeds()
+    {
+        var loadStarted = Channel.CreateUnbounded<bool>();
+        var continueLoad = Channel.CreateUnbounded<bool>();
+        var store = new MemoryTokenStore { LoadStarted = loadStarted, ContinueLoad = continueLoad };
+        var provider = Provider(
+            new AccessTokenCache(),
+            store,
+            new FakeOAuthClient { ValidateResult = true }
+        );
+        using var cancellation = new CancellationTokenSource();
+        var loading = provider.GetAccessToken().ExecuteAsync(cancellation.Token).AsTask();
+        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+
+        await cancellation.CancelAsync();
+        var thrown = await Should.ThrowAsync<OperationCanceledException>(() => loading);
+
+        thrown.CancellationToken.ShouldBe(cancellation.Token);
+        store.Loaded = new TokenSet("recovered", "refresh", _currentTime.AddHours(1));
+        var retry = provider.GetAccessToken().ExecuteAsync(CancellationToken.None).AsTask();
+        await loadStarted.Reader.ReadAsync(CancellationToken.None);
+        await continueLoad.Writer.WriteAsync(true, CancellationToken.None);
+
+        Success(await retry).ShouldBe("recovered");
+        store.LoadCalls.ShouldBe(2);
     }
 
     [Test]

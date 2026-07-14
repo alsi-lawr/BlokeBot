@@ -825,6 +825,7 @@ public sealed class RuntimeSessionResilienceTests
                 [
                     typeof(RuntimeSessionEstablishment.Idle),
                     typeof(RuntimeSessionEstablishment.Established),
+                    typeof(RuntimeSessionEstablishment.TokenUnavailable),
                 ]
             ),
             (
@@ -833,6 +834,7 @@ public sealed class RuntimeSessionResilienceTests
                     typeof(RuntimeSessionOutcome.Idle),
                     typeof(RuntimeSessionOutcome.Established),
                     typeof(RuntimeSessionOutcome.Canceled),
+                    typeof(RuntimeSessionOutcome.TokenUnavailable),
                     typeof(RuntimeSessionOutcome.Unhealthy),
                 ]
             ),

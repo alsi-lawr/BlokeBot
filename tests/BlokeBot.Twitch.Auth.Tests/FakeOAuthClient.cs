@@ -7,10 +7,14 @@ internal sealed class FakeOAuthClient : IOAuthClient
     public TokenSet ExchangeResult { get; init; } =
         new("exchanged", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
-    public TokenSet RefreshResult { get; init; } =
+    public TokenSet RefreshResult { get; set; } =
         new("refreshed", "refresh", DateTimeOffset.UtcNow.AddHours(1));
 
-    public bool ValidateResult { get; init; }
+    public bool ValidateResult { get; set; }
+
+    public Exception? RefreshException { get; set; }
+
+    public Exception? ValidateException { get; set; }
 
     public int ExchangeCalls { get; private set; }
 
@@ -30,6 +34,11 @@ internal sealed class FakeOAuthClient : IOAuthClient
     public Task<TokenSet> RefreshAsync(string refreshToken, CancellationToken cancellationToken)
     {
         RefreshCalls++;
+        if (RefreshException is not null)
+        {
+            return Task.FromException<TokenSet>(RefreshException);
+        }
+
         return Task.FromResult(RefreshResult);
     }
 
@@ -38,6 +47,11 @@ internal sealed class FakeOAuthClient : IOAuthClient
         CancellationToken cancellationToken
     )
     {
+        if (ValidateException is not null)
+        {
+            return Task.FromException<TokenValidationOutcome>(ValidateException);
+        }
+
         return Task.FromResult<TokenValidationOutcome>(
             ValidateResult
                 ? new TokenValidationOutcome.Validated(
