@@ -1,11 +1,11 @@
+using System.Data;
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.Guessing.Game;
-using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
-using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -14,116 +14,197 @@ namespace BlokeBot.Features.Guessing.Configuration;
 
 public sealed class GuessingConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    CommandAliasRegistry aliasRegistry,
     GuessingChangeNotifier changes
 )
 {
-    public async Task<GuessingOperationResult> CreateProfileAsync(
+    public IO<GuessingProfileCreated, GuessingProfileCreateFailure> CreateProfile(
         int hostId,
-        string name,
-        CancellationToken ct
+        GuessingProfileCreateCommand command
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var normalizedName = NormalizeDisplayName(name);
-        if (string.IsNullOrWhiteSpace(normalizedName))
-        {
-            return new GuessingOperationResult(false, "Round type name is required.");
-        }
-
-        var slug = GuessRoundProfileSlug.FromName(normalizedName);
-        if (await db.Profiles.AnyAsync(x => x.HostId == hostId && x.Slug == slug.Value, ct))
-        {
-            return new GuessingOperationResult(
-                false,
-                "A round type with that name already exists."
-            );
-        }
-
-        db.Profiles.Add(
-            new GuessRoundProfile
-            {
-                Name = normalizedName,
-                Slug = slug.Value,
-                HostId = hostId,
-                IsDefault = false,
-                ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
-            }
+        return IO<GuessingProfileCreated, GuessingProfileCreateFailure>.Create(ct =>
+            ExecuteCreateProfileAsync(hostId, command, ct)
         );
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
-        return new GuessingOperationResult(true, $"Created {normalizedName}.");
     }
 
-    public async Task<GuessingOperationResult> DeleteProfileAsync(
+    public IO<GuessingProfileDeleted, GuessingProfileDeleteFailure> DeleteProfile(
         int hostId,
-        int profileId,
+        GuessingProfileDeleteCommand command
+    )
+    {
+        return IO<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Create(ct =>
+            ExecuteDeleteProfileAsync(hostId, command, ct)
+        );
+    }
+
+    public IO<GuessingConfiguration, GuessingConfigurationLoadFailure> LoadConfiguration(
+        int hostId,
+        GuessingProfileSelection selection
+    )
+    {
+        return IO<GuessingConfiguration, GuessingConfigurationLoadFailure>.Create(ct =>
+            ExecuteLoadConfigurationAsync(hostId, selection, ct)
+        );
+    }
+
+    public IO<GuessingConfigurationSaved, GuessingConfigurationSaveFailure> SaveConfiguration(
+        int hostId,
+        GuessingConfigurationSaveCommand command
+    )
+    {
+        return IO<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Create(ct =>
+            ExecuteSaveConfigurationAsync(hostId, command, ct)
+        );
+    }
+
+    private async ValueTask<
+        Result<GuessingProfileCreated, GuessingProfileCreateFailure>
+    > ExecuteCreateProfileAsync(
+        int hostId,
+        GuessingProfileCreateCommand command,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var profile = await db.Profiles.SingleOrDefaultAsync(
-            x => x.Id == profileId && x.HostId == hostId,
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
             ct
         );
-        if (profile is null)
+        if (await db.Profiles.AnyAsync(x => x.HostId == hostId && x.Slug == command.Slug, ct))
         {
-            return new GuessingOperationResult(false, "Round type not found.");
-        }
-
-        if (await db.Profiles.CountAsync(x => x.HostId == hostId, ct) <= 1)
-        {
-            return new GuessingOperationResult(false, "Keep at least one round type.");
-        }
-
-        if (await db.Rounds.AnyAsync(x => x.GuessRoundProfileId == profileId, ct))
-        {
-            return new GuessingOperationResult(
-                false,
-                "Round types used by past rounds cannot be deleted."
+            return Result<GuessingProfileCreated, GuessingProfileCreateFailure>.Error(
+                new GuessingProfileCreateFailure.DuplicateName()
             );
         }
 
-        var wasDefault = profile.IsDefault;
-        var scopedDeliverySettings = await db
-            .ReplyDeliverySettings.Where(x => x.HostId == hostId && x.ScopeId == profileId)
-            .ToListAsync(ct);
-        var deliverySettings = scopedDeliverySettings.Where(x =>
-            x.Feature == ReplyFeature.Guessing
-        );
-        db.ReplyDeliverySettings.RemoveRange(deliverySettings);
-        db.Profiles.Remove(profile);
-        await db.SaveChangesAsync(ct);
-
-        if (wasDefault)
+        var profile = new GuessRoundProfile
         {
+            Name = command.Name,
+            Slug = command.Slug,
+            HostId = hostId,
+            IsDefault = !await db.Profiles.AnyAsync(x => x.HostId == hostId, ct),
+            ReplySettings = ReplySettingsMapper.ToEntity(GuessingDefaults.Replies()),
+        };
+        db.Profiles.Add(profile);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await changes.NotifyChangedAsync(ct);
+        return Result<GuessingProfileCreated, GuessingProfileCreateFailure>.Success(
+            new(profile.Id, $"Created {profile.Name}.")
+        );
+    }
+
+    private async ValueTask<
+        Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>
+    > ExecuteDeleteProfileAsync(
+        int hostId,
+        GuessingProfileDeleteCommand command,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
+            ct
+        );
+        var claimed = await db
+            .Profiles.Where(profile =>
+                profile.HostId == hostId
+                && profile.Id == command.ProfileId
+                && profile.Revision == command.ExpectedRevision
+            )
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters.SetProperty(
+                        profile => profile.Revision,
+                        profile => profile.Revision + 1
+                    ),
+                ct
+            );
+        if (claimed == 0)
+        {
+            var exists = await db.Profiles.AnyAsync(
+                profile => profile.HostId == hostId && profile.Id == command.ProfileId,
+                ct
+            );
+            return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Error(
+                exists
+                    ? new GuessingProfileDeleteFailure.ConcurrentEdit()
+                    : new GuessingProfileDeleteFailure.ProfileNotFound()
+            );
+        }
+
+        var profile = await db.Profiles.SingleAsync(
+            x => x.Id == command.ProfileId && x.HostId == hostId,
+            ct
+        );
+        if (await db.Profiles.CountAsync(x => x.HostId == hostId, ct) <= 1)
+        {
+            return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Error(
+                new GuessingProfileDeleteFailure.LastProfile()
+            );
+        }
+
+        if (await db.Rounds.AnyAsync(x => x.GuessRoundProfileId == profile.Id, ct))
+        {
+            return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Error(
+                new GuessingProfileDeleteFailure.UsedByPastRound()
+            );
+        }
+
+        if (profile.IsDefault)
+        {
+            profile.IsDefault = false;
+            await db.SaveChangesAsync(ct);
             var nextDefault = await db
-                .Profiles.Where(x => x.HostId == hostId)
+                .Profiles.Where(x => x.HostId == hostId && x.Id != profile.Id)
                 .OrderBy(x => x.Name)
                 .FirstAsync(ct);
             nextDefault.IsDefault = true;
-            await db.SaveChangesAsync(ct);
+            nextDefault.Revision++;
         }
 
+        var deliverySettings = await db
+            .ReplyDeliverySettings.Where(x =>
+                x.HostId == hostId && x.Feature == ReplyFeature.Guessing && x.ScopeId == profile.Id
+            )
+            .ToListAsync(ct);
+        db.ReplyDeliverySettings.RemoveRange(deliverySettings);
+        db.Profiles.Remove(profile);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);
-        return new GuessingOperationResult(true, $"Deleted {profile.Name}.");
+        return Result<GuessingProfileDeleted, GuessingProfileDeleteFailure>.Success(
+            new($"Deleted {profile.Name}.")
+        );
     }
 
-    public async Task<GuessingConfiguration> LoadConfigurationAsync(
+    private async ValueTask<
+        Result<GuessingConfiguration, GuessingConfigurationLoadFailure>
+    > ExecuteLoadConfigurationAsync(
         int hostId,
-        int? profileId,
+        GuessingProfileSelection selection,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-
         var profiles = await LoadProfileSummariesAsync(db, hostId, ct);
-        var selectedProfileId =
-            profileId is { } id && profiles.Any(x => x.Id == id)
-                ? id
-                : profiles.First(x => x.IsDefault).Id;
+        var selectedProfileId = selection switch
+        {
+            GuessingProfileSelection.Default => profiles.Single(profile => profile.IsDefault).Id,
+            GuessingProfileSelection.Selected selected
+                when profiles.Any(profile => profile.Id == selected.ProfileId) =>
+                selected.ProfileId,
+            GuessingProfileSelection.Selected => 0,
+            _ => throw new InvalidOperationException("Unknown guessing profile selection."),
+        };
+        if (selectedProfileId == 0)
+        {
+            return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Error(
+                new GuessingConfigurationLoadFailure.ProfileNotFound()
+            );
+        }
+
         var aliases = await db
             .CommandAliases.AsNoTracking()
             .Where(x => x.HostId == hostId && x.GuessRoundProfileId == selectedProfileId)
@@ -136,10 +217,8 @@ public sealed class GuessingConfigurationService(
             ct
         );
         var whisperResponsesEnabled = await WhisperResponsesEnabledAsync(db, hostId, ct);
-
-        return new GuessingConfiguration
-        {
-            Aliases = new CommandAliasEditor
+        var draft = new GuessingConfiguration(
+            new CommandAliasEditor
             {
                 StartAliases = JoinAliases(aliases, GuessCommandKind.Start, selectedProfileId),
                 StopAliases = JoinAliases(aliases, GuessCommandKind.Stop, selectedProfileId),
@@ -147,121 +226,213 @@ public sealed class GuessingConfigurationService(
                 GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
                 GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, selectedProfileId),
             },
-            ReplyDelivery = ReplyDeliveryEditor.From(replyDelivery),
-            WhisperResponsesEnabled = whisperResponsesEnabled,
-            Profiles = profiles,
-            Profile = await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct),
-        };
+            ReplyDeliveryEditor.From(replyDelivery),
+            whisperResponsesEnabled,
+            profiles,
+            await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct)
+        );
+        return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Success(draft);
     }
 
-    public async Task SaveConfigurationAsync(
+    private async ValueTask<
+        Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>
+    > ExecuteSaveConfigurationAsync(
         int hostId,
-        GuessingConfiguration config,
+        GuessingConfigurationSaveCommand command,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-        var profile = await db
-            .Profiles.Include(x => x.ReplySettings)
-            .Include(x => x.Options)
-            .SingleAsync(x => x.Id == config.Profile.Id && x.HostId == hostId, ct);
-
-        await SaveAliasesAsync(db, hostId, profile.Id, config.Aliases, ct);
-
-        var profileName = NormalizeDisplayName(config.Profile.Name);
-        if (string.IsNullOrWhiteSpace(profileName))
-        {
-            profileName = profile.Name;
-        }
-
-        var slug = GuessRoundProfileSlug.FromName(profileName);
-        var duplicate = await db.Profiles.AnyAsync(
-            x => x.HostId == hostId && x.Id != profile.Id && x.Slug == slug.Value,
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.Serializable,
             ct
         );
-        if (duplicate)
+        var claimed = await db
+            .Profiles.Where(profile =>
+                profile.HostId == hostId
+                && profile.Id == command.ProfileId
+                && profile.Revision == command.ExpectedRevision
+            )
+            .ExecuteUpdateAsync(
+                setters =>
+                    setters.SetProperty(
+                        profile => profile.Revision,
+                        profile => profile.Revision + 1
+                    ),
+                ct
+            );
+        if (claimed == 0)
         {
-            throw new InvalidOperationException("A round type with that name already exists.");
+            var exists = await db.Profiles.AnyAsync(
+                profile => profile.HostId == hostId && profile.Id == command.ProfileId,
+                ct
+            );
+            return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Error(
+                exists
+                    ? new GuessingConfigurationSaveFailure.ConcurrentEdit()
+                    : new GuessingConfigurationSaveFailure.ProfileNotFound()
+            );
         }
 
-        profile.Name = profileName;
-        profile.Slug = slug.Value;
-        profile.IsDefault = config.Profile.IsDefault;
-        profile.WinningGuessPointReward = PointAmount
-            .ParseAbsolute(config.Profile.WinningGuessPointReward)
-            .ToString();
-
-        if (profile.IsDefault)
-        {
-            await db
-                .Profiles.Where(x => x.HostId == hostId && x.Id != profile.Id)
-                .ExecuteUpdateAsync(x => x.SetProperty(p => p.IsDefault, false), ct);
-        }
-        else if (
-            !await db.Profiles.AnyAsync(
-                x => x.HostId == hostId && x.Id != profile.Id && x.IsDefault,
+        var slug = GuessRoundProfileSlug.FromName(command.ProfileName).Value;
+        if (
+            await db.Profiles.AnyAsync(
+                profile =>
+                    profile.HostId == hostId
+                    && profile.Id != command.ProfileId
+                    && profile.Slug == slug,
                 ct
             )
         )
         {
-            profile.IsDefault = true;
+            return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Error(
+                new GuessingConfigurationSaveFailure.DuplicateProfileName()
+            );
         }
 
+        var aliasFailure = await FindAliasFailureAsync(db, hostId, command, ct);
+        if (aliasFailure is not null)
+        {
+            return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Error(
+                aliasFailure
+            );
+        }
+
+        if (command.IsDefault)
+        {
+            await db
+                .Profiles.Where(profile =>
+                    profile.HostId == hostId && profile.Id != command.ProfileId && profile.IsDefault
+                )
+                .ExecuteUpdateAsync(
+                    setters =>
+                        setters
+                            .SetProperty(profile => profile.IsDefault, false)
+                            .SetProperty(
+                                profile => profile.Revision,
+                                profile => profile.Revision + 1
+                            ),
+                    ct
+                );
+        }
+
+        var profile = await db
+            .Profiles.Include(x => x.ReplySettings)
+            .Include(x => x.Options)
+            .SingleAsync(x => x.Id == command.ProfileId && x.HostId == hostId, ct);
+        profile.Name = command.ProfileName;
+        profile.Slug = slug;
+        profile.IsDefault = command.IsDefault || profile.IsDefault;
+        profile.WinningGuessPointReward = command.WinningGuessPointReward.ToString();
         profile.ReplySettings ??= ReplySettingsMapper.ToEntity(GuessingDefaults.Replies());
-        Apply(profile.ReplySettings, config.Profile.Replies);
+        Apply(profile.ReplySettings, command.Replies);
+        ReplaceAliases(db, hostId, command);
         await ReplyDeliverySettingWriter.ReplaceAsync(
             db,
             hostId,
             ReplyFeature.Guessing,
             profile.Id,
-            config.ReplyDelivery.ToMap().Only(GuessingReplyKeys.WhisperableKeys),
+            command.ReplyDelivery.Only(GuessingReplyKeys.WhisperableKeys),
             ct
         );
 
         db.GuessOptions.RemoveRange(profile.Options);
-        var answerReplyTarget = config.Profile.WhisperAnswerReplies
-            ? ReplyDeliveryTarget.Whisper
-            : ReplyDeliveryTarget.Chat;
-        foreach (
-            var option in config
-                .Profile.Options.Where(x => !string.IsNullOrWhiteSpace(x.Name))
-                .GroupBy(x => GuessName.Parse(x.Name).Value)
-                .Select(x => x.First())
-        )
+        for (var index = 0; index < command.Options.Count; index++)
         {
+            var option = command.Options[index];
             db.GuessOptions.Add(
                 new GuessOption
                 {
                     GuessRoundProfile = profile,
-                    Name = GuessName.Parse(option.Name).Value,
-                    ReplyText = string.IsNullOrWhiteSpace(option.ReplyText)
-                        ? option.Name.Trim()
-                        : option.ReplyText.Trim(),
-                    ReplyTarget = answerReplyTarget,
+                    Name = option.Name,
+                    ReplyText = option.ReplyText,
+                    ReplyTarget = option.ReplyTarget,
+                    SortOrder = index,
                 }
             );
         }
 
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);
+        return Result<GuessingConfigurationSaved, GuessingConfigurationSaveFailure>.Success(new());
     }
 
-    private static void Apply(BotReplySettings settings, ReplySettingsEditor editor)
+    private static async Task<GuessingConfigurationSaveFailure?> FindAliasFailureAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        GuessingConfigurationSaveCommand command,
+        CancellationToken ct
+    )
     {
-        settings.RoundStartedReply = editor.RoundStartedReply.Trim();
-        settings.RoundAlreadyOpenReply = editor.RoundAlreadyOpenReply.Trim();
-        settings.NoOpenRoundReply = editor.NoOpenRoundReply.Trim();
-        settings.GuessingStoppedReply = editor.GuessingStoppedReply.Trim();
-        settings.GuessingAlreadyStoppedReply = editor.GuessingAlreadyStoppedReply.Trim();
-        settings.GuessingClosedReply = editor.GuessingClosedReply.Trim();
-        settings.InvalidGuessReply = editor.InvalidGuessReply.Trim();
-        settings.GuessUsageReply = editor.GuessUsageReply.Trim();
-        settings.AvailableGuessesReply = editor.AvailableGuessesReply.Trim();
-        settings.WinUsageReply = editor.WinUsageReply.Trim();
-        settings.ModeratorOnlyReply = editor.ModeratorOnlyReply.Trim();
-        settings.WinnerReply = editor.WinnerReply.Trim();
-        settings.NoWinnersReply = editor.NoWinnersReply.Trim();
+        var requestedAliases = command
+            .Aliases.ToDrafts()
+            .SelectMany(draft => CommandAliasNormalizer.Split(draft.Aliases))
+            .ToArray();
+        var ownedKinds = GuessingAppCommandKindMap.AppKinds.ToArray();
+        var collision = await db
+            .CommandAliases.AsNoTracking()
+            .Where(alias => requestedAliases.Contains(alias.Alias))
+            .Where(alias =>
+                alias.HostId == hostId
+                && (
+                    !ownedKinds.Contains(alias.Kind)
+                    || alias.GuessRoundProfileId != command.ProfileId
+                )
+            )
+            .Select(alias => alias.Alias)
+            .FirstOrDefaultAsync(ct);
+        return collision is null
+            ? null
+            : new GuessingConfigurationSaveFailure.AliasAlreadyUsed(collision);
+    }
+
+    private static void ReplaceAliases(
+        BlokeBotDbContext db,
+        int hostId,
+        GuessingConfigurationSaveCommand command
+    )
+    {
+        var ownedKinds = GuessingAppCommandKindMap.AppKinds.ToArray();
+        db.CommandAliases.RemoveRange(
+            db.CommandAliases.Where(alias =>
+                alias.HostId == hostId
+                && ownedKinds.Contains(alias.Kind)
+                && alias.GuessRoundProfileId == command.ProfileId
+            )
+        );
+        db.CommandAliases.AddRange(
+            command
+                .Aliases.ToDrafts()
+                .SelectMany(draft =>
+                    CommandAliasNormalizer
+                        .Split(draft.Aliases)
+                        .Select(alias => new CommandAlias
+                        {
+                            HostId = hostId,
+                            GuessRoundProfileId = command.ProfileId,
+                            Kind = draft.Kind,
+                            Alias = alias,
+                        })
+                )
+        );
+    }
+
+    private static void Apply(BotReplySettings settings, GuessingReplySettings replies)
+    {
+        settings.RoundStartedReply = replies.RoundStartedReply;
+        settings.RoundAlreadyOpenReply = replies.RoundAlreadyOpenReply;
+        settings.NoOpenRoundReply = replies.NoOpenRoundReply;
+        settings.GuessingStoppedReply = replies.GuessingStoppedReply;
+        settings.GuessingAlreadyStoppedReply = replies.GuessingAlreadyStoppedReply;
+        settings.GuessingClosedReply = replies.GuessingClosedReply;
+        settings.InvalidGuessReply = replies.InvalidGuessReply;
+        settings.GuessUsageReply = replies.GuessUsageReply;
+        settings.AvailableGuessesReply = replies.AvailableGuessesReply;
+        settings.WinUsageReply = replies.WinUsageReply;
+        settings.ModeratorOnlyReply = replies.ModeratorOnlyReply;
+        settings.WinnerReply = replies.WinnerReply;
+        settings.NoWinnersReply = replies.NoWinnersReply;
     }
 
     private static string JoinAliases(
@@ -284,24 +455,22 @@ public sealed class GuessingConfigurationService(
         CancellationToken ct
     )
     {
-        var profile =
-            await db
-                .Profiles.AsNoTracking()
-                .Include(x => x.ReplySettings)
-                .Include(x => x.Options)
-                .SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct)
-            ?? throw new InvalidOperationException("Round type not found.");
-
+        var profile = await db
+            .Profiles.AsNoTracking()
+            .Include(x => x.ReplySettings)
+            .Include(x => x.Options)
+            .SingleAsync(x => x.Id == profileId && x.HostId == hostId, ct);
         var options = profile
-            .Options.OrderBy(x => x.Name)
-            .Select(x => new GuessOptionEditor
+            .Options.OrderBy(option => option.SortOrder)
+            .ThenBy(option => option.Name)
+            .Select(option => new GuessOptionEditor
             {
-                Name = x.Name,
-                ReplyText = x.ReplyText,
-                ReplyTarget = x.ReplyTarget,
+                Name = option.Name,
+                ReplyText = option.ReplyText,
+                ReplyTarget = option.ReplyTarget,
             })
             .ToList();
-        var whisperAnswerReplies = options.Any(IsWhisperTarget);
+        var whisperAnswerReplies = options.Any(option => option.ReplyTarget.IsWhisper());
         var answerReplyTarget = whisperAnswerReplies
             ? ReplyDeliveryTarget.Whisper
             : ReplyDeliveryTarget.Chat;
@@ -313,6 +482,7 @@ public sealed class GuessingConfigurationService(
         return new GuessRoundProfileEditor
         {
             Id = profile.Id,
+            Revision = profile.Revision,
             Name = profile.Name,
             IsDefault = profile.IsDefault,
             WhisperAnswerReplies = whisperAnswerReplies,
@@ -322,11 +492,6 @@ public sealed class GuessingConfigurationService(
             ),
             Options = options,
         };
-    }
-
-    private static bool IsWhisperTarget(GuessOptionEditor option)
-    {
-        return option.ReplyTarget.IsWhisper();
     }
 
     private static async Task<bool> WhisperResponsesEnabledAsync(
@@ -342,47 +507,19 @@ public sealed class GuessingConfigurationService(
             .SingleOrDefaultAsync(ct);
     }
 
-    private async Task<List<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
+    private static async Task<IReadOnlyList<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
     )
     {
-        return await db
+        var profiles = await db
             .Profiles.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.Name)
-            .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
-            .ToListAsync(ct);
-    }
-
-    private static string NormalizeDisplayName(string name)
-    {
-        return name.Trim();
-    }
-
-    private async Task SaveAliasesAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        int profileId,
-        CommandAliasEditor aliases,
-        CancellationToken ct
-    )
-    {
-        await aliasRegistry.ReplaceAliasesAsync(
-            db,
-            hostId,
-            GuessingAppCommandKindMap.AppKinds,
-            [
-                new CommandAliasDraft(AppCommandKind.Start, aliases.StartAliases),
-                new CommandAliasDraft(AppCommandKind.Stop, aliases.StopAliases),
-                new CommandAliasDraft(AppCommandKind.Win, aliases.WinAliases),
-                new CommandAliasDraft(AppCommandKind.Guess, aliases.GuessAliases),
-                new CommandAliasDraft(AppCommandKind.Guesses, aliases.GuessesAliases),
-            ],
-            new CommandAliasScope.Profile(profileId),
-            ct
-        );
+            .Select(x => new GuessRoundProfileSummary(x.Id, x.Revision, x.Name, x.IsDefault))
+            .ToArrayAsync(ct);
+        return Array.AsReadOnly(profiles);
     }
 }

@@ -947,6 +947,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             );
             b.HasKey(x => x.Id);
             b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.SortOrder).HasDefaultValue(0);
             b.Property(x => x.ReplyTarget)
                 .HasConversion(
                     target => ReplyDeliveryTargetPersistence.ToToken(target),
@@ -968,6 +969,7 @@ public sealed class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext> option
             b.HasAlternateKey(x => new { x.HostId, x.Id });
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.Slug).HasMaxLength(128);
+            b.Property(x => x.Revision).HasDefaultValue(0L);
             b.Property(x => x.WinningGuessPointReward).HasMaxLength(128).HasDefaultValue("0");
             b.HasIndex(x => new { x.HostId, x.Slug }).IsUnique();
             b.HasIndex(x => x.HostId).IsUnique().HasFilter("\"IsDefault\" = 1");

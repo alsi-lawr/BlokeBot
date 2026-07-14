@@ -53,7 +53,7 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.Name)
-            .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
+            .Select(x => new GuessRoundProfileSummary(x.Id, x.Revision, x.Name, x.IsDefault))
             .ToArrayAsync(ct);
         return profiles.ToImmutableArray();
     }

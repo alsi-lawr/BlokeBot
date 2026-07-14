@@ -43,7 +43,7 @@ namespace BlokeBot.Features.Guessing.Configuration;
 public partial class ProfileSettingsSection
 {
     [Parameter, EditorRequired]
-    public GuessingConfiguration Configuration { get; set; } = new();
+    public GuessingConfiguration Configuration { get; set; } = null!;
 
     [Parameter, EditorRequired]
     public EventCallback CreateProfile { get; set; }

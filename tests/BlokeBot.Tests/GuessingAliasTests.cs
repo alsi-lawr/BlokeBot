@@ -27,11 +27,7 @@ public sealed class GuessingAliasTests
         var seed = await SeedProfilesAsync(dbFactory);
         var service = ConfigurationService(dbFactory);
 
-        var config = await service.LoadConfigurationAsync(
-            seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
-        );
+        var config = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
 
         config.Aliases.StartAliases.ShouldBe("special");
         config.Aliases.GuessAliases.ShouldBeEmpty();
@@ -43,20 +39,25 @@ public sealed class GuessingAliasTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
         var service = ConfigurationService(dbFactory);
-        var editor = await service.LoadConfigurationAsync(
-            seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
-        );
+        var editor = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         editor.Aliases.StartAliases = "updated";
         var editedOption = editor.Profile.Options.Single();
         editedOption.Name = "green";
         editedOption.ReplyText = "Green";
+        editor.Profile.Options.Add(
+            new GuessOptionEditor
+            {
+                Name = "amber",
+                ReplyText = "Amber",
+                ReplyTarget = ReplyDeliveryTarget.Chat,
+            }
+        );
 
-        var beforeSave = await service.LoadConfigurationAsync(
+        var command = ValidCommand(editor);
+        var beforeSave = await LoadConfigurationAsync(
+            service,
             seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
+            seed.SpecialProfile.Id
         );
 
         beforeSave.Aliases.StartAliases.ShouldBe("special");
@@ -64,17 +65,16 @@ public sealed class GuessingAliasTests
         unchangedOption.Name.ShouldBe("blue");
         unchangedOption.ReplyText.ShouldBe("Blue");
 
-        await service.SaveConfigurationAsync(seed.Host.Id, editor, CancellationToken.None);
+        editor.Aliases.StartAliases = "later";
+        editedOption.Name = "later";
+        editedOption.ReplyText = "Later";
+        editor.Profile.Options.Clear();
+        await service.SaveConfiguration(seed.Host.Id, command).ExecuteAsync(CancellationToken.None);
 
-        var afterSave = await service.LoadConfigurationAsync(
-            seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
-        );
+        var afterSave = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         afterSave.Aliases.StartAliases.ShouldBe("updated");
-        var savedOption = afterSave.Profile.Options.ShouldHaveSingleItem();
-        savedOption.Name.ShouldBe("green");
-        savedOption.ReplyText.ShouldBe("Green");
+        afterSave.Profile.Options.Select(option => option.Name).ShouldBe(["green", "amber"]);
+        afterSave.Profile.Options.Select(option => option.ReplyText).ShouldBe(["Green", "Amber"]);
     }
 
     [Test]
@@ -83,16 +83,16 @@ public sealed class GuessingAliasTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
         var service = ConfigurationService(dbFactory);
-        var config = await service.LoadConfigurationAsync(
-            seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
-        );
+        var config = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         config.Aliases.StartAliases = "default";
 
-        await Should.ThrowAsync<InvalidOperationException>(() =>
-            service.SaveConfigurationAsync(seed.Host.Id, config, CancellationToken.None)
-        );
+        var result = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(config))
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+            .ShouldBeOfType<GuessingConfigurationSaveFailure.AliasAlreadyUsed>();
     }
 
     [Test]
@@ -220,11 +220,7 @@ public sealed class GuessingAliasTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seed = await SeedProfilesAsync(dbFactory);
         var service = ConfigurationService(dbFactory);
-        var config = await service.LoadConfigurationAsync(
-            seed.Host.Id,
-            seed.SpecialProfile.Id,
-            CancellationToken.None
-        );
+        var config = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
         config.Profile.WhisperAnswerReplies = true;
         config.Profile.Options.Add(
             new GuessOptionEditor
@@ -235,7 +231,9 @@ public sealed class GuessingAliasTests
             }
         );
 
-        await service.SaveConfigurationAsync(seed.Host.Id, config, CancellationToken.None);
+        await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(config))
+            .ExecuteAsync(CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var targets = await db
@@ -293,11 +291,35 @@ public sealed class GuessingAliasTests
         SqliteBlokeBotDbFactory dbFactory
     )
     {
-        return new(
-            dbFactory,
-            new CommandAliasRegistry(),
-            new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
+        return new(dbFactory, new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>()));
+    }
+
+    private static async Task<GuessingConfiguration> LoadConfigurationAsync(
+        GuessingConfigurationService service,
+        int hostId,
+        int profileId
+    )
+    {
+        var result = await service
+            .LoadConfiguration(hostId, new GuessingProfileSelection.Selected(profileId))
+            .ExecuteAsync(CancellationToken.None);
+        return result.Match(
+            configuration => configuration,
+            failure => throw new InvalidOperationException(failure.Message)
         );
+    }
+
+    private static GuessingConfigurationSaveCommand ValidCommand(GuessingConfiguration draft)
+    {
+        return GuessingConfigurationValidator
+            .Validate(draft)
+            .Match(
+                command => command,
+                errors =>
+                    throw new InvalidOperationException(
+                        string.Join(" ", errors.Select(error => error.Message))
+                    )
+            );
     }
 
     private static GuessingRoundService RoundService(SqliteBlokeBotDbFactory dbFactory)

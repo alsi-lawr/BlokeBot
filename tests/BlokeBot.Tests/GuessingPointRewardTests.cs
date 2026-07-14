@@ -23,17 +23,27 @@ public sealed class GuessingPointRewardTests
         var seed = await SeedRoundAsync(dbFactory, "0");
         var service = new GuessingConfigurationService(
             dbFactory,
-            new CommandAliasRegistry(),
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
-        var config = await service.LoadConfigurationAsync(
-            seed.HostId,
-            seed.ProfileId,
-            CancellationToken.None
+        var loaded = await service
+            .LoadConfiguration(seed.HostId, new GuessingProfileSelection.Selected(seed.ProfileId))
+            .ExecuteAsync(CancellationToken.None);
+        var config = loaded.Match(
+            configuration => configuration,
+            failure => throw new InvalidOperationException(failure.Message)
         );
         config.Profile.WinningGuessPointReward = "250";
+        var command = GuessingConfigurationValidator
+            .Validate(config)
+            .Match(
+                value => value,
+                errors =>
+                    throw new InvalidOperationException(
+                        string.Join(" ", errors.Select(error => error.Message))
+                    )
+            );
 
-        await service.SaveConfigurationAsync(seed.HostId, config, CancellationToken.None);
+        await service.SaveConfiguration(seed.HostId, command).ExecuteAsync(CancellationToken.None);
 
         await using var db = await dbFactory.CreateDbContextAsync();
         var profile = await db.Profiles.SingleAsync(x => x.Id == seed.ProfileId);

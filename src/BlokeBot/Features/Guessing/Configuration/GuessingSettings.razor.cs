@@ -85,9 +85,13 @@ public partial class GuessingSettings
                 HostFeatureFlags.Guessing,
                 CancellationToken.None
             );
-        _config = _featureEnabled
-            ? await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None)
-            : null;
+        if (!_featureEnabled)
+        {
+            _config = null;
+            return;
+        }
+
+        await LoadConfigurationAsync(new GuessingProfileSelection.Default());
     }
 
     private void AddOption()
@@ -114,30 +118,86 @@ public partial class GuessingSettings
 
     private async Task CreateProfileAsync()
     {
-        var result = await _configuration.CreateProfileAsync(
-            HostId,
-            _newProfileName,
-            CancellationToken.None
-        );
-        PublishResult(result);
-        _newProfileName = string.Empty;
-        _config = await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
+        await GuessingConfigurationValidator
+            .ValidateNewProfile(_newProfileName)
+            .Match(
+                CreateProfileAsync,
+                errors =>
+                {
+                    _toasts.Warning(ValidationMessage(errors));
+                    return Task.CompletedTask;
+                }
+            );
     }
 
-    private async Task DeleteProfileAsync()
+    private async Task CreateProfileAsync(GuessingProfileCreateCommand command)
+    {
+        var selectedId = _config?.Profile.Id;
+        var result = await _configuration
+            .CreateProfile(HostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            async created =>
+            {
+                _toasts.Success(created.Message);
+                _newProfileName = string.Empty;
+                await LoadConfigurationAsync(
+                    selectedId is { } id
+                        ? new GuessingProfileSelection.Selected(id)
+                        : new GuessingProfileSelection.Default()
+                );
+            },
+            failure =>
+            {
+                _toasts.Warning(failure.Message);
+                return Task.CompletedTask;
+            }
+        );
+    }
+
+    private Task DeleteProfileAsync()
     {
         if (_config is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        var result = await _configuration.DeleteProfileAsync(
-            HostId,
-            _config.Profile.Id,
-            CancellationToken.None
+        return GuessingConfigurationValidator
+            .ValidateDelete(_config)
+            .Match(
+                DeleteProfileAsync,
+                errors =>
+                {
+                    _toasts.Warning(ValidationMessage(errors));
+                    return Task.CompletedTask;
+                }
+            );
+    }
+
+    private async Task DeleteProfileAsync(GuessingProfileDeleteCommand command)
+    {
+        var result = await _configuration
+            .DeleteProfile(HostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            async deleted =>
+            {
+                _toasts.Success(deleted.Message);
+                await LoadConfigurationAsync(new GuessingProfileSelection.Default());
+            },
+            async failure =>
+            {
+                _toasts.Warning(failure.Message);
+                if (
+                    failure
+                    is GuessingProfileDeleteFailure.ProfileNotFound
+                        or GuessingProfileDeleteFailure.ConcurrentEdit
+                )
+                {
+                    await LoadConfigurationAsync(new GuessingProfileSelection.Default());
+                }
+            }
         );
-        PublishResult(result);
-        _config = await _configuration.LoadConfigurationAsync(HostId, null, CancellationToken.None);
     }
 
     private async Task SaveAsync()
@@ -147,21 +207,46 @@ public partial class GuessingSettings
             return;
         }
 
-        try
-        {
-            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
-            var selectedId = _config.Profile.Id;
-            _config = await _configuration.LoadConfigurationAsync(
-                HostId,
-                selectedId,
-                CancellationToken.None
+        await GuessingConfigurationValidator
+            .Validate(_config)
+            .Match(
+                SaveConfigurationAsync,
+                errors =>
+                {
+                    _toasts.Error(ValidationMessage(errors));
+                    return Task.CompletedTask;
+                }
             );
-            _toasts.Success("Guessing settings saved.");
-        }
-        catch (InvalidOperationException ex)
-        {
-            _toasts.Error(ex.Message);
-        }
+    }
+
+    private async Task SaveConfigurationAsync(GuessingConfigurationSaveCommand command)
+    {
+        var result = await _configuration
+            .SaveConfiguration(HostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            async _ =>
+            {
+                await LoadConfigurationAsync(
+                    new GuessingProfileSelection.Selected(command.ProfileId)
+                );
+                _toasts.Success("Guessing settings saved.");
+            },
+            async failure =>
+            {
+                _toasts.Error(failure.Message);
+                if (
+                    failure
+                    is GuessingConfigurationSaveFailure.ProfileNotFound
+                        or GuessingConfigurationSaveFailure.ConcurrentEdit
+                )
+                {
+                    await LoadConfigurationAsync(
+                        new GuessingProfileSelection.Selected(command.ProfileId)
+                    );
+                }
+            }
+        );
     }
 
     private async Task SelectProfileAsync(ChangeEventArgs args)
@@ -171,20 +256,41 @@ public partial class GuessingSettings
             return;
         }
 
-        _config = await _configuration.LoadConfigurationAsync(
-            HostId,
-            profileId,
-            CancellationToken.None
+        await LoadConfigurationAsync(new GuessingProfileSelection.Selected(profileId));
+    }
+
+    private async Task LoadConfigurationAsync(GuessingProfileSelection selection)
+    {
+        var result = await _configuration
+            .LoadConfiguration(HostId, selection)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            draft =>
+            {
+                _config = draft;
+                return Task.CompletedTask;
+            },
+            async failure =>
+            {
+                _toasts.Warning(failure.Message);
+                var fallback = await _configuration
+                    .LoadConfiguration(HostId, new GuessingProfileSelection.Default())
+                    .ExecuteAsync(CancellationToken.None);
+                fallback.Match(
+                    draft => _config = draft,
+                    _ =>
+                        throw new InvalidOperationException(
+                            "The default guessing profile could not be loaded."
+                        )
+                );
+            }
         );
     }
 
-    private void PublishResult(GuessingOperationResult result)
+    private static string ValidationMessage(
+        IReadOnlyList<GuessingConfigurationValidationError> errors
+    )
     {
-        if (string.IsNullOrWhiteSpace(result.Message))
-        {
-            return;
-        }
-
-        _toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
+        return string.Join(" ", errors.Select(error => error.Message));
     }
 }
