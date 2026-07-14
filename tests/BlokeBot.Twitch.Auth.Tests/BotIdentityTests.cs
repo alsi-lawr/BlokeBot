@@ -42,11 +42,11 @@ public sealed class BotIdentityTests
     }
 
     [Test]
-    public void EmptyScopes_MappingPermissiveIdentity_PreservesExplicitEmptySet()
+    public void EmptyScopes_MappingPermissiveIdentity_RejectsInvalidSet()
     {
-        var identity = BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] });
-
-        identity.Scopes.ShouldBeEmpty();
+        Should.Throw<ArgumentException>(() =>
+            BotIdentity.FromOptions(new BotIdentityOptions { Scopes = [] })
+        );
     }
 
     [Test]

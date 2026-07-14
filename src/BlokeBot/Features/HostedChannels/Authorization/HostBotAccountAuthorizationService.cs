@@ -503,11 +503,8 @@ public sealed class HostBotAccountAuthorizationService(
             await db.SaveChangesAsync(ct);
             return true;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
+            when (exception.StatusCode is System.Net.HttpStatusCode.BadRequest)
         {
             return false;
         }

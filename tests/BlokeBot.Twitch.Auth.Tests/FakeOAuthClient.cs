@@ -41,7 +41,7 @@ internal sealed class FakeOAuthClient : IOAuthClient
         return Task.FromResult<TokenValidationOutcome>(
             ValidateResult
                 ? new TokenValidationOutcome.Validated(
-                    new TokenValidation("bot-id", "bot", OAuthScopeSet.Empty)
+                    new TokenValidation("bot-id", "bot", OAuthScopeSet.Create(["chat:read"]))
                 )
                 : new TokenValidationOutcome.NotValidated()
         );

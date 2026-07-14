@@ -43,7 +43,7 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
-    public void ExplicitEmptyScopes_CreatingAuthorizationUri_DoesNotUseDefaultScopes()
+    public void ExplicitScope_CreatingAuthorizationUri_UsesOnlyExplicitSelection()
     {
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
@@ -63,11 +63,11 @@ public sealed class HostBotAccountAuthorizationTests
         );
 
         var uri = oauth
-            .CreateAuthorizationUriForScopes("state", OAuthScopeSet.Empty)
+            .CreateAuthorizationUriForScopes("state", OAuthScopeSet.Create(["bits:read"]))
             .ShouldBeOfType<OAuthAuthorizationStartOutcome.Ready>()
             .AuthorizationUri;
 
-        uri.Query.ShouldContain("scope=");
+        uri.Query.ShouldContain("scope=bits%3Aread");
         uri.Query.ShouldNotContain("chat%3Aread");
     }
 
@@ -207,6 +207,48 @@ public sealed class HostBotAccountAuthorizationTests
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
         status.AuthorizedLogin.ShouldBe("custombot");
         status.AuthorizedProfileImageUrl.ShouldBe("https://static-cdn.jtvnw.net/custombot.png");
+    }
+
+    [Test]
+    public async Task RefreshCredentialsRejected_LoadingStatus_ReturnsNotAuthorized()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            new HostBotAccountHttpClientFactory(HttpStatusCode.BadRequest)
+        );
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+        await AuthorizeExpiredCustomBotAsync(service, hostId);
+
+        var status = await service.GetStatusAsync(hostId, CancellationToken.None);
+
+        status.State.ShouldBe(BotAccountAuthorizationState.NotAuthorized);
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.TooManyRequests)]
+    [Arguments(HttpStatusCode.InternalServerError)]
+    public async Task RefreshProviderFailure_LoadingStatus_PropagatesTransportFailure(
+        HttpStatusCode statusCode
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            new HostBotAccountHttpClientFactory(statusCode)
+        );
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+        await AuthorizeExpiredCustomBotAsync(service, hostId);
+
+        var exception = await Should.ThrowAsync<HttpRequestException>(() =>
+            service.GetStatusAsync(hostId, CancellationToken.None)
+        );
+
+        exception.StatusCode.ShouldBe(statusCode);
     }
 
     [Test]
@@ -389,10 +431,11 @@ public sealed class HostBotAccountAuthorizationTests
 
     private static HostBotAccountAuthorizationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
-        IAccessTokenProvider? tokenProvider
+        IAccessTokenProvider? tokenProvider,
+        HostBotAccountHttpClientFactory? httpClientFactory = null
     )
     {
-        var httpClientFactory = new HostBotAccountHttpClientFactory();
+        httpClientFactory ??= new HostBotAccountHttpClientFactory();
         var options = BotSettings.FromOptions(
             new BotOptions
             {
@@ -477,13 +520,36 @@ public sealed class HostBotAccountAuthorizationTests
         result.Succeeded.ShouldBeTrue();
     }
 
+    private static async Task AuthorizeExpiredCustomBotAsync(
+        HostBotAccountAuthorizationService service,
+        int hostId
+    )
+    {
+        var result = await service.AuthorizeAsync(
+            hostId,
+            CreateCustomBotGrant(
+                "expired-token",
+                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
+                DateTimeOffset.UtcNow.AddMinutes(-1)
+            ),
+            CancellationToken.None
+        );
+
+        result.Succeeded.ShouldBeTrue();
+    }
+
     private static HostBotAccountAuthorizationGrant CreateCustomBotGrant(
         string accessToken,
-        IReadOnlyList<string> scopes
+        IReadOnlyList<string> scopes,
+        DateTimeOffset? expiresAtUtc = null
     )
     {
         return new(
-            new TokenSet(accessToken, "override-refresh", DateTimeOffset.UtcNow.AddHours(1)),
+            new TokenSet(
+                accessToken,
+                "override-refresh",
+                expiresAtUtc ?? DateTimeOffset.UtcNow.AddHours(1)
+            ),
             "custom-id",
             LoginName.Parse("custombot"),
             "CustomBot",
@@ -517,16 +583,17 @@ public sealed class HostBotAccountAuthorizationTests
         }
     }
 
-    private sealed class HostBotAccountHttpClientFactory : IHttpClientFactory
+    private sealed class HostBotAccountHttpClientFactory(HttpStatusCode? tokenStatusCode = null)
+        : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        private readonly Handler _handler = new(tokenStatusCode);
 
         public HttpClient CreateClient(string name)
         {
             return new(_handler, disposeHandler: false);
         }
 
-        private sealed class Handler : HttpMessageHandler
+        private sealed class Handler(HttpStatusCode? tokenStatusCode) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
@@ -536,11 +603,13 @@ public sealed class HostBotAccountAuthorizationTests
                 return Task.FromResult(
                     request.RequestUri?.AbsolutePath switch
                     {
-                        "/oauth2/token" => JsonResponse(
-                            """
-                            {"access_token":"grant-token","refresh_token":"refresh","expires_in":3600}
-                            """
-                        ),
+                        "/oauth2/token" => tokenStatusCode is { } statusCode
+                            ? new HttpResponseMessage(statusCode)
+                            : JsonResponse(
+                                """
+                                {"access_token":"grant-token","refresh_token":"refresh","expires_in":3600}
+                                """
+                            ),
                         "/oauth2/validate" => ValidationResponse(request),
                         "/helix/users" => JsonResponse(
                             """

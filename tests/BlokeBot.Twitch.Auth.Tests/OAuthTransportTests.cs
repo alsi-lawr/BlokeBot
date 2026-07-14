@@ -35,7 +35,7 @@ public sealed class OAuthTransportTests
     }
 
     [Test]
-    public void EmptyExplicitScopes_CreatingAuthorizationUri_SerializesEmptyWithoutDefaults()
+    public void SingleExplicitScope_CreatingAuthorizationUri_SerializesExactSelection()
     {
         var client = new OAuthTransport(new ScriptedHttpClientFactory());
 
@@ -43,13 +43,13 @@ public sealed class OAuthTransportTests
             new AuthorizationUriRequest(
                 "client",
                 "https://localhost/callback",
-                OAuthScopeSet.Empty,
+                OAuthScopeSet.Create(["chat:read"]),
                 "state",
                 AuthorizationVerificationPolicy.ReuseExistingAuthorization
             )
         );
 
-        uri.AbsoluteUri.ShouldContain("scope=&");
+        uri.AbsoluteUri.ShouldContain("scope=chat%3Aread");
         uri.AbsoluteUri.ShouldNotContain("force_verify");
         uri.AbsoluteUri.ShouldContain("state=state");
     }
@@ -58,6 +58,7 @@ public sealed class OAuthTransportTests
     public void InvalidScopeValues_CreatingScopeSet_RejectsInvalidElements()
     {
         Should.Throw<ArgumentNullException>(() => OAuthScopeSet.Create(null!));
+        Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([]));
         Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([null!]));
         Should.Throw<ArgumentException>(() => OAuthScopeSet.Create([" "]));
         Should.Throw<ArgumentException>(() => OAuthScopeSet.Create(["chat read"]));
