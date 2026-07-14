@@ -147,7 +147,7 @@ public sealed class GuessingConfigurationService(
                 GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
                 GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, selectedProfileId),
             },
-            ReplyDelivery = replyDelivery,
+            ReplyDelivery = ReplyDeliveryEditor.From(replyDelivery),
             WhisperResponsesEnabled = whisperResponsesEnabled,
             Profiles = profiles,
             Profile = await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct),
@@ -215,7 +215,7 @@ public sealed class GuessingConfigurationService(
             hostId,
             ReplyFeature.Guessing,
             profile.Id,
-            config.ReplyDelivery.Only(GuessingReplyKeys.WhisperableKeys),
+            config.ReplyDelivery.ToMap().Only(GuessingReplyKeys.WhisperableKeys),
             ct
         );
 

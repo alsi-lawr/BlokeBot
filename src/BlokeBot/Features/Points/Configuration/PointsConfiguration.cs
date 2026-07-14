@@ -9,7 +9,7 @@ public sealed class PointsConfiguration
     public string PointLabel { get; set; } = "points";
     public PointsCommandAliasEditor Aliases { get; set; } = new();
     public PointsReplySettingsEditor Replies { get; set; } = new();
-    public ReplyDeliveryMap ReplyDelivery { get; set; } = new();
+    public ReplyDeliveryEditor ReplyDelivery { get; set; } = new();
     public bool WhisperResponsesEnabled { get; set; }
     public int GamblingWinRatePercent { get; set; } = 50;
     public int GamblingCooldownSeconds { get; set; }

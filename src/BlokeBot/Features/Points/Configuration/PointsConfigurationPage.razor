@@ -75,7 +75,7 @@
                 <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="_config.GiveawayEligibility" />
                 <div class="space-y-2">
                     <label class="label" for="cooldown">Wait between giveaways (seconds)</label>
-                    <input id="cooldown" class="input" type="number" min="@PointsConfigurationService.MinimumGiveawayCooldownSeconds" @bind="_config.GiveawayCooldownSeconds" />
+                    <input id="cooldown" class="input" type="number" min="@PointsConfigurationValidator.MinimumGiveawayCooldownSeconds" @bind="_config.GiveawayCooldownSeconds" />
                 </div>
             </div>
         </CollapsibleSection>

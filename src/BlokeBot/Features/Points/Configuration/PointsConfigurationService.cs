@@ -1,10 +1,10 @@
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.Points;
-using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Commands;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -13,12 +13,9 @@ namespace BlokeBot.Features.Points.Configuration;
 
 public sealed class PointsConfigurationService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    CommandAliasRegistry aliasRegistry,
     PointsChangeNotifier changes
 )
 {
-    public const int MinimumGiveawayCooldownSeconds = 300;
-
     public async Task<PointsConfiguration> LoadConfigurationAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -54,7 +51,7 @@ public sealed class PointsConfigurationService(
                 CancelGiveawayAliases = JoinAliases(aliases, PointsCommandKind.CancelGiveaway),
             },
             Replies = PointsDefaults.Replies(settings),
-            ReplyDelivery = replyDelivery,
+            ReplyDelivery = ReplyDeliveryEditor.From(replyDelivery),
             WhisperResponsesEnabled = whisperResponsesEnabled,
             GamblingWinRatePercent = settings.GamblingWinRatePercent,
             GamblingCooldownSeconds = settings.GamblingCooldownSeconds,
@@ -67,15 +64,29 @@ public sealed class PointsConfigurationService(
         };
     }
 
-    public async Task SaveConfigurationAsync(
+    public IO<PointsConfigurationSaved, PointsConfigurationSaveFailure> SaveConfiguration(
         int hostId,
-        PointsConfiguration config,
-        CancellationToken ct
+        PointsConfigurationSaveCommand command
     )
     {
-        Validate(config);
+        return IO<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Create(ct =>
+            ExecuteSaveAsync(hostId, command, ct)
+        );
+    }
 
+    private async ValueTask<
+        Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>
+    > ExecuteSaveAsync(int hostId, PointsConfigurationSaveCommand command, CancellationToken ct)
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var aliasFailure = await ReplaceAliasesAsync(db, hostId, command.Aliases, ct);
+        if (aliasFailure is not null)
+        {
+            return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Error(
+                aliasFailure
+            );
+        }
+
         var settings = await db.PointsSettings.SingleOrDefaultAsync(x => x.HostId == hostId, ct);
         if (settings is null)
         {
@@ -83,65 +94,57 @@ public sealed class PointsConfigurationService(
             db.PointsSettings.Add(settings);
         }
 
-        Apply(settings, config);
+        Apply(settings, command);
         await ReplyDeliverySettingWriter.ReplaceAsync(
             db,
             hostId,
             ReplyFeature.Points,
             ReplyDeliverySettingWriter.HostScopeId,
-            config.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
+            command.ReplyDelivery.Only(PointsReplyKeys.WhisperableKeys),
             ct
         );
-        await SaveAliasesAsync(db, hostId, config.Aliases, ct);
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
+        return Result<PointsConfigurationSaved, PointsConfigurationSaveFailure>.Success(new());
     }
 
-    private static void Apply(PointsSettings settings, PointsConfiguration config)
+    private static void Apply(PointsSettings settings, PointsConfigurationSaveCommand command)
     {
-        settings.PointLabel = string.IsNullOrWhiteSpace(config.PointLabel)
-            ? "points"
-            : config.PointLabel.Trim();
-        settings.GamblingWinRatePercent = Math.Clamp(config.GamblingWinRatePercent, 0, 100);
-        settings.GamblingCooldownSeconds = Math.Max(0, config.GamblingCooldownSeconds);
-        settings.GiveawayDurationSeconds = Math.Max(1, config.GiveawayDurationSeconds);
-        settings.GiveawayMinimumPayout = PointAmount
-            .ParseAbsolute(config.GiveawayMinimumPayout)
-            .ToString();
-        settings.GiveawayMaximumPayout = PointAmount
-            .ParseAbsolute(config.GiveawayMaximumPayout)
-            .ToString();
-        settings.GiveawayWinnerCount = Math.Max(1, config.GiveawayWinnerCount);
-        settings.GiveawayEligibility = config.GiveawayEligibility;
-        settings.GiveawayCooldownSeconds = Math.Max(
-            MinimumGiveawayCooldownSeconds,
-            config.GiveawayCooldownSeconds
-        );
+        settings.PointLabel = command.PointLabel;
+        settings.GamblingWinRatePercent = command.GamblingWinRatePercent;
+        settings.GamblingCooldownSeconds = command.GamblingCooldownSeconds;
+        settings.GiveawayDurationSeconds = command.GiveawayDurationSeconds;
+        settings.GiveawayMinimumPayout = command.GiveawayMinimumPayout.ToString();
+        settings.GiveawayMaximumPayout = command.GiveawayMaximumPayout.ToString();
+        settings.GiveawayWinnerCount = command.GiveawayWinnerCount;
+        settings.GiveawayEligibility = command.GiveawayEligibility;
+        settings.GiveawayCooldownSeconds = command.GiveawayCooldownSeconds;
 
-        settings.BalanceReply = config.Replies.BalanceReply.Trim();
-        settings.OtherBalanceReply = config.Replies.OtherBalanceReply.Trim();
-        settings.TransferReply = config.Replies.TransferReply.Trim();
-        settings.AddReply = config.Replies.AddReply.Trim();
-        settings.RemoveReply = config.Replies.RemoveReply.Trim();
-        settings.InvalidAmountReply = config.Replies.InvalidAmountReply.Trim();
-        settings.InsufficientBalanceReply = config.Replies.InsufficientBalanceReply.Trim();
-        settings.ModeratorOnlyReply = config.Replies.ModeratorOnlyReply.Trim();
-        settings.GamblingWinReply = config.Replies.GamblingWinReply.Trim();
-        settings.GamblingLoseReply = config.Replies.GamblingLoseReply.Trim();
-        settings.GiveawayStartedReply = config.Replies.GiveawayStartedReply.Trim();
-        settings.GiveawayUpdateReply = config.Replies.GiveawayUpdateReply.Trim();
-        settings.GiveawayJoinedReply = config.Replies.GiveawayJoinedReply.Trim();
-        settings.GiveawayAlreadyJoinedReply = config.Replies.GiveawayAlreadyJoinedReply.Trim();
-        settings.GiveawayEndedReply = config.Replies.GiveawayEndedReply.Trim();
-        settings.GiveawayNoEntrantsReply = config.Replies.GiveawayNoEntrantsReply.Trim();
-        settings.GiveawayCancelledReply = config.Replies.GiveawayCancelledReply.Trim();
-        settings.GiveawayAlreadyActiveReply = config.Replies.GiveawayAlreadyActiveReply.Trim();
-        settings.GiveawayNotActiveReply = config.Replies.GiveawayNotActiveReply.Trim();
-        settings.GiveawayCooldownReply = config.Replies.GiveawayCooldownReply.Trim();
-        settings.StreamOfflineReply = config.Replies.StreamOfflineReply.Trim();
-        settings.NotEligibleReply = config.Replies.NotEligibleReply.Trim();
-        settings.FollowerEligibilityUnavailableReply =
-            config.Replies.FollowerEligibilityUnavailableReply.Trim();
+        settings.BalanceReply = command.Replies.BalanceReply;
+        settings.OtherBalanceReply = command.Replies.OtherBalanceReply;
+        settings.TransferReply = command.Replies.TransferReply;
+        settings.AddReply = command.Replies.AddReply;
+        settings.RemoveReply = command.Replies.RemoveReply;
+        settings.InvalidAmountReply = command.Replies.InvalidAmountReply;
+        settings.InsufficientBalanceReply = command.Replies.InsufficientBalanceReply;
+        settings.ModeratorOnlyReply = command.Replies.ModeratorOnlyReply;
+        settings.GamblingWinReply = command.Replies.GamblingWinReply;
+        settings.GamblingLoseReply = command.Replies.GamblingLoseReply;
+        settings.GiveawayStartedReply = command.Replies.GiveawayStartedReply;
+        settings.GiveawayUpdateReply = command.Replies.GiveawayUpdateReply;
+        settings.GiveawayJoinedReply = command.Replies.GiveawayJoinedReply;
+        settings.GiveawayAlreadyJoinedReply = command.Replies.GiveawayAlreadyJoinedReply;
+        settings.GiveawayEndedReply = command.Replies.GiveawayEndedReply;
+        settings.GiveawayNoEntrantsReply = command.Replies.GiveawayNoEntrantsReply;
+        settings.GiveawayCancelledReply = command.Replies.GiveawayCancelledReply;
+        settings.GiveawayAlreadyActiveReply = command.Replies.GiveawayAlreadyActiveReply;
+        settings.GiveawayNotActiveReply = command.Replies.GiveawayNotActiveReply;
+        settings.GiveawayCooldownReply = command.Replies.GiveawayCooldownReply;
+        settings.StreamOfflineReply = command.Replies.StreamOfflineReply;
+        settings.NotEligibleReply = command.Replies.NotEligibleReply;
+        settings.FollowerEligibilityUnavailableReply = command
+            .Replies
+            .FollowerEligibilityUnavailableReply;
     }
 
     private static string JoinAliases(List<CommandAlias> aliases, PointsCommandKind kind)
@@ -166,64 +169,52 @@ public sealed class PointsConfigurationService(
             .SingleOrDefaultAsync(ct);
     }
 
-    private async Task SaveAliasesAsync(
+    private static async Task<PointsConfigurationSaveFailure?> ReplaceAliasesAsync(
         BlokeBotDbContext db,
         int hostId,
-        PointsCommandAliasEditor aliases,
+        PointsCommandAliases aliases,
         CancellationToken ct
     )
     {
-        await aliasRegistry.ReplaceAliasesAsync(
-            db,
-            hostId,
-            PointsAppCommandKindMap.AppKinds,
-            [
-                new CommandAliasDraft(AppCommandKind.Points, aliases.PointsAliases),
-                new CommandAliasDraft(AppCommandKind.GivePoints, aliases.GivePointsAliases),
-                new CommandAliasDraft(AppCommandKind.AddPoints, aliases.AddPointsAliases),
-                new CommandAliasDraft(AppCommandKind.RemovePoints, aliases.RemovePointsAliases),
-                new CommandAliasDraft(AppCommandKind.Gamble, aliases.GambleAliases),
-                new CommandAliasDraft(AppCommandKind.Giveaway, aliases.GiveawayAliases),
-                new CommandAliasDraft(AppCommandKind.Join, aliases.JoinAliases),
-                new CommandAliasDraft(AppCommandKind.EndGiveaway, aliases.EndGiveawayAliases),
-                new CommandAliasDraft(AppCommandKind.CancelGiveaway, aliases.CancelGiveawayAliases),
-            ],
-            new CommandAliasScope.Global(),
-            ct
+        var drafts = aliases.ToDrafts();
+        var requestedAliases = drafts
+            .SelectMany(draft => CommandAliasNormalizer.Split(draft.Aliases))
+            .ToArray();
+        var ownedKinds = PointsAppCommandKindMap.AppKinds.ToArray();
+        var existingCollision = await db
+            .CommandAliases.AsNoTracking()
+            .Where(alias => requestedAliases.Contains(alias.Alias))
+            .Where(alias =>
+                alias.HostId == hostId
+                && (!ownedKinds.Contains(alias.Kind) || alias.GuessRoundProfileId != null)
+            )
+            .Select(alias => alias.Alias)
+            .FirstOrDefaultAsync(ct);
+        if (existingCollision is not null)
+        {
+            return new PointsConfigurationSaveFailure.AliasAlreadyUsed(existingCollision);
+        }
+
+        db.CommandAliases.RemoveRange(
+            db.CommandAliases.Where(alias =>
+                alias.HostId == hostId
+                && ownedKinds.Contains(alias.Kind)
+                && alias.GuessRoundProfileId == null
+            )
         );
-    }
-
-    private static void Validate(PointsConfiguration config)
-    {
-        var min = PointAmount.ParseAbsolute(config.GiveawayMinimumPayout);
-        var max = PointAmount.ParseAbsolute(config.GiveawayMaximumPayout);
-        if (min.Value > max.Value)
-        {
-            throw new InvalidOperationException(
-                "The smallest giveaway prize cannot be larger than the largest prize."
-            );
-        }
-
-        if (min.Value % 10 != 0 || max.Value % 10 != 0)
-        {
-            throw new InvalidOperationException("Giveaway prizes must be multiples of 10.");
-        }
-
-        if (config.GamblingWinRatePercent is < 0 or > 100)
-        {
-            throw new InvalidOperationException(
-                "The chance of winning must be between 0% and 100%."
-            );
-        }
-
-        if (config.GamblingCooldownSeconds < 0)
-        {
-            config.GamblingCooldownSeconds = 0;
-        }
-
-        if (config.GiveawayCooldownSeconds < MinimumGiveawayCooldownSeconds)
-        {
-            config.GiveawayCooldownSeconds = MinimumGiveawayCooldownSeconds;
-        }
+        db.CommandAliases.AddRange(
+            drafts.SelectMany(draft =>
+                CommandAliasNormalizer
+                    .Split(draft.Aliases)
+                    .Select(alias => new CommandAlias
+                    {
+                        HostId = hostId,
+                        GuessRoundProfileId = null,
+                        Kind = draft.Kind,
+                        Alias = alias,
+                    })
+            )
+        );
+        return null;
     }
 }

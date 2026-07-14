@@ -185,13 +185,7 @@ public sealed class PointsGiveawayMessageFormatterTests
 
     private static ReplyDeliveryMap WhisperDelivery(params string[] replyKeys)
     {
-        var delivery = new ReplyDeliveryMap();
-        foreach (var replyKey in replyKeys)
-        {
-            delivery.DeliverAsWhisper(replyKey);
-        }
-
-        return delivery;
+        return ReplyDeliveryMap.FromWhisperKeys(replyKeys);
     }
 
     private static void AssertSucceeded(

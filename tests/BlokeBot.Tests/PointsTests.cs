@@ -538,7 +538,14 @@ public sealed class PointsTests
 
         var config = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
         config.GamblingCooldownSeconds = 42;
-        await service.SaveConfigurationAsync(hostId, config, CancellationToken.None);
+        var command = ValidConfiguration(config);
+        var result = await service
+            .SaveConfiguration(hostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        result.Match(
+            static _ => true,
+            failure => throw new InvalidOperationException(failure.Message)
+        );
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
 
         loaded.GamblingCooldownSeconds.ShouldBe(42);
@@ -636,11 +643,20 @@ public sealed class PointsTests
     )
     {
         var events = TestEventBus.Create<AppEventKind>();
-        return new PointsConfigurationService(
-            dbFactory,
-            new CommandAliasRegistry(),
-            new PointsChangeNotifier(events)
-        );
+        return new PointsConfigurationService(dbFactory, new PointsChangeNotifier(events));
+    }
+
+    private static PointsConfigurationSaveCommand ValidConfiguration(PointsConfiguration draft)
+    {
+        return PointsConfigurationValidator
+            .Validate(draft)
+            .Match(
+                command => command,
+                errors =>
+                    throw new InvalidOperationException(
+                        string.Join(" ", errors.Select(error => error.Message))
+                    )
+            );
     }
 
     private static async Task AddBalanceAsync(

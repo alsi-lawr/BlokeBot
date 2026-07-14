@@ -104,16 +104,37 @@ public partial class PointsConfigurationPage
             return;
         }
 
-        try
-        {
-            await _configuration.SaveConfigurationAsync(HostId, _config, CancellationToken.None);
-            _config = await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None);
-            _toasts.Success("Points settings saved.");
-        }
-        catch (Exception ex)
-            when (ex is InvalidOperationException or FormatException or ArgumentOutOfRangeException)
-        {
-            _toasts.Error(ex.Message);
-        }
+        await PointsConfigurationValidator
+            .Validate(_config)
+            .Match(
+                SaveCommandAsync,
+                errors =>
+                {
+                    _toasts.Error(string.Join(" ", errors.Select(error => error.Message)));
+                    return Task.CompletedTask;
+                }
+            );
+    }
+
+    private async Task SaveCommandAsync(PointsConfigurationSaveCommand command)
+    {
+        var result = await _configuration
+            .SaveConfiguration(HostId, command)
+            .ExecuteAsync(CancellationToken.None);
+        await result.Match(
+            async _ =>
+            {
+                _config = await _configuration.LoadConfigurationAsync(
+                    HostId,
+                    CancellationToken.None
+                );
+                _toasts.Success("Points settings saved.");
+            },
+            failure =>
+            {
+                _toasts.Error(failure.Message);
+                return Task.CompletedTask;
+            }
+        );
     }
 }

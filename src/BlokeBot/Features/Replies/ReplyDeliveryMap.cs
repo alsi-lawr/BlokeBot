@@ -12,9 +12,17 @@ public sealed class ReplyDeliveryMap
     private ReplyDeliveryMap(IEnumerable<string> whisperKeys)
     {
         _whisperKeys = whisperKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        WhisperKeys = Array.AsReadOnly(
+            _whisperKeys.Order(StringComparer.OrdinalIgnoreCase).ToArray()
+        );
     }
 
-    public IReadOnlyCollection<string> WhisperKeys => _whisperKeys;
+    public IReadOnlyCollection<string> WhisperKeys { get; }
+
+    public static ReplyDeliveryMap FromWhisperKeys(IEnumerable<string> whisperKeys)
+    {
+        return new(whisperKeys);
+    }
 
     public static ReplyDeliveryMap FromSettings(IEnumerable<ReplyDeliverySetting> settings)
     {
@@ -35,15 +43,5 @@ public sealed class ReplyDeliveryMap
     public CommandResponseTarget TargetFor(string replyKey)
     {
         return IsWhisper(replyKey) ? CommandResponseTarget.Whisper : CommandResponseTarget.Chat;
-    }
-
-    public void DeliverAsWhisper(string replyKey)
-    {
-        _whisperKeys.Add(replyKey);
-    }
-
-    public void DeliverInChat(string replyKey)
-    {
-        _whisperKeys.Remove(replyKey);
     }
 }

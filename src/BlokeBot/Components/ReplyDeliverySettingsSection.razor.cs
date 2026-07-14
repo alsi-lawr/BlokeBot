@@ -15,7 +15,7 @@ public partial class ReplyDeliverySettingsSection
     public string Description { get; set; } = "Choose which replies are sent privately.";
 
     [Parameter, EditorRequired]
-    public ReplyDeliveryMap Delivery { get; set; } = new();
+    public ReplyDeliveryEditor Delivery { get; set; } = new();
 
     [Parameter, EditorRequired]
     public IReadOnlyList<ReplyDeliveryOption> Options { get; set; } = [];
