@@ -33,18 +33,23 @@ public sealed class BooleanControlContractTests
             )
             .Single(method => method.Name == "Match");
         var resultType = match.GetGenericArguments().ShouldHaveSingleItem();
-        var constructor =
-            unionType.GetConstructor(
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                binder: null,
-                Type.EmptyTypes,
-                modifiers: null
-            ) ?? throw new InvalidOperationException("The private union constructor is missing.");
+        var constructors = unionType.GetConstructors(
+            BindingFlags.Instance
+                | BindingFlags.Public
+                | BindingFlags.NonPublic
+                | BindingFlags.DeclaredOnly
+        );
+        var constructor = constructors.Single(candidate => candidate.GetParameters().Length == 0);
+        var recordCopyConstructor = constructors.Single(candidate =>
+            candidate.GetParameters() is [var parameter] && parameter.ParameterType == unionType
+        );
         var handlers = match.GetParameters();
 
         unionType.IsAbstract.ShouldBeTrue();
         unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
+        constructors.Length.ShouldBe(2);
         constructor.IsPrivate.ShouldBeTrue();
+        recordCopyConstructor.IsFamily.ShouldBeTrue();
         directCases.Select(type => type.Name).ShouldBe(expectedCaseNames);
         directCases.ShouldAllBe(type => type.DeclaringType == unionType);
         directCases.ShouldAllBe(type => type.IsSealed);
