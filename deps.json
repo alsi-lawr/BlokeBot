@@ -5,11 +5,6 @@
     "hash": "sha256-EXvojddPu+9JKgOG9NSQgUTfWq1RpOYw7adxDPKDJ6o="
   },
   {
-    "pname": "Microsoft.AspNetCore.App.Internal.Assets",
-    "version": "10.0.9",
-    "hash": "sha256-BMehKd/Zn8UcS4hj8RTfnABFQz9PonckxwyMVuOAYx0="
-  },
-  {
     "pname": "Microsoft.Build.Framework",
     "version": "18.0.2",
     "hash": "sha256-fO31KAdDs2J0RUYD1ov9UB3ucsbALan7K0YdWW+yg7A="

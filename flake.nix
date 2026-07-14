@@ -10,7 +10,10 @@
       package = pkgs.buildDotnetModule {
         pname = "BlokeBot";
         version = "0.0.0";
-        src = ./.;
+        src = pkgs.lib.cleanSourceWith {
+          src = ./.;
+          filter = path: type: baseNameOf path != "dotnet-tools.json";
+        };
 
         projectFile = "src/BlokeBot/BlokeBot.csproj";
         nugetDeps = ./deps.json;
@@ -18,15 +21,16 @@
         dotnet-runtime = pkgs.dotnet-runtime_10;
         executables = [ "BlokeBot" ];
 
+        npmRoot = "src/BlokeBot";
         npmDeps = pkgs.fetchNpmDeps {
-          src = ./src/BlokeBot;
+          src = ./.;
+          npmRoot = "src/BlokeBot";
           hash = "sha256-LqmXiyTdzKlsubgaD93Zlb9aOoKSQd+7zHcpMcHpbXg=";
         };
         nativeBuildInputs = [ pkgs.nodejs_22 pkgs.npmHooks.npmConfigHook ];
 
         preBuild = ''
           pushd src/BlokeBot
-          npm ci --offline
           npm run css:build
           popd
         '';
