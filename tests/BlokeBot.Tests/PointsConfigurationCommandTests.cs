@@ -342,6 +342,7 @@ public sealed class PointsConfigurationCommandTests
         command.Replies.FollowerEligibilityUnavailableReply.ShouldBe(
             "Follower eligibility unavailable reply."
         );
+        command.WhisperResponsesEnabled.ShouldBeTrue();
         command.GamblingWinRatePercent.ShouldBe(63);
         command.GamblingCooldownSeconds.ShouldBe(0);
         command.GiveawayDurationSeconds.ShouldBe(1);
@@ -402,6 +403,7 @@ public sealed class PointsConfigurationCommandTests
         loaded.Replies.FollowerEligibilityUnavailableReply.ShouldBe(
             command.Replies.FollowerEligibilityUnavailableReply
         );
+        loaded.WhisperResponsesEnabled.ShouldBe(command.WhisperResponsesEnabled);
         loaded.GamblingWinRatePercent.ShouldBe(command.GamblingWinRatePercent);
         loaded.GamblingCooldownSeconds.ShouldBe(command.GamblingCooldownSeconds);
         loaded.GiveawayDurationSeconds.ShouldBe(command.GiveawayDurationSeconds);
