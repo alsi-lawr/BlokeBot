@@ -82,7 +82,12 @@ public partial class PointsConfigurationPage
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync()
+    {
+        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+    }
+
+    private async Task LoadCoreAsync()
     {
         await LoadPageContextAsync();
         _featureEnabled =
@@ -97,7 +102,12 @@ public partial class PointsConfigurationPage
             : null;
     }
 
-    private async Task SaveAsync()
+    private Task SaveAsync()
+    {
+        return ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
+    }
+
+    private async Task SaveCoreAsync()
     {
         if (_config is null || HostId == 0)
         {

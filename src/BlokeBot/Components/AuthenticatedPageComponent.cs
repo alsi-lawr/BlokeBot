@@ -16,6 +16,9 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     [Inject]
     protected BlokeBotPageContextAccessor PageContexts { get; set; } = default!;
 
+    [Inject]
+    protected UiFaultTelemetry UiFaults { get; set; } = default!;
+
     protected BlokeBotPageContext PageContext { get; private set; } = BlokeBotPageContext.Anonymous;
 
     protected BotHostChoice? Host { get; private set; }
@@ -39,6 +42,40 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     {
         _subscriptions.Add(subscription);
         return subscription;
+    }
+
+    protected async Task ObserveUiOperationAsync(string operation, Func<Task> execute)
+    {
+        try
+        {
+            await execute();
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(operation, exception);
+            throw;
+        }
+    }
+
+    protected async Task<T> ObserveUiOperationAsync<T>(string operation, Func<Task<T>> execute)
+    {
+        try
+        {
+            return await execute();
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(operation, exception);
+            throw;
+        }
+    }
+
+    protected void ReportUiFault(string operation, Exception exception)
+    {
+        UiFaults.Report(
+            exception,
+            new UiFaultContext(GetType().Name, operation, HostId == 0 ? null : HostId, null)
+        );
     }
 
     public void Dispose()

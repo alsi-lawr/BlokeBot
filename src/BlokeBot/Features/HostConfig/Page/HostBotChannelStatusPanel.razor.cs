@@ -28,6 +28,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -53,9 +54,13 @@ public partial class HostBotChannelStatusPanel
     protected override HostBotChannelStatusPanelLoadIdentity? BackgroundLoadIdentity =>
         HostBotChannelStatusPanelLoadIdentity.From(HostLogin, ReloadKey);
 
-    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct)
+    protected override async Task<
+        Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>
+    > LoadBackgroundValueAsync(CancellationToken ct)
     {
-        return _hostBotStatus.GetStatusAsync(HostLogin, ct);
+        return HostBotChannelStatusLoadFailure.FromReadiness(
+            await _hostBotStatus.GetReadinessAsync(HostLogin, ct)
+        );
     }
 
     private string _moderatorStatusBadgeClass =>
@@ -89,7 +94,7 @@ public partial class HostBotChannelStatusPanel
 
     private string _moderatorStatusMessage =>
         IsBackgroundLoading ? "Checking whether the bot is a channel mod."
-        : BackgroundError is not null ? "BlokeBot could not check whether the bot is a mod."
+        : BackgroundError is { } error ? error.ModeratorStatusMessage
         : _status?.ModeratorStatusMessage ?? "BlokeBot has not checked the bot account yet.";
 
     private string _followerReadStatusBadgeClass =>
@@ -113,7 +118,7 @@ public partial class HostBotChannelStatusPanel
 
     private string _followerReadStatusMessage =>
         IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
-        : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
+        : BackgroundError is { } error ? error.FollowerReadStatusMessage
         : _status?.FollowerReadStatusMessage
             ?? "BlokeBot has not checked follower-only giveaways yet.";
 }

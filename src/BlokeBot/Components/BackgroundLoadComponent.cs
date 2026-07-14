@@ -1,8 +1,12 @@
+using BlokeBot.Functional;
 using Microsoft.AspNetCore.Components;
 
 namespace BlokeBot.Components;
 
-public abstract class BackgroundLoadComponent<TValue, TLoadIdentity> : ComponentBase, IDisposable
+public abstract class BackgroundLoadComponent<TValue, TExpectedError, TLoadIdentity>
+    : ComponentBase,
+        IDisposable
+    where TExpectedError : class
     where TLoadIdentity : class, IEquatable<TLoadIdentity>
 {
     private CancellationTokenSource? _activeLoad;
@@ -10,13 +14,18 @@ public abstract class BackgroundLoadComponent<TValue, TLoadIdentity> : Component
     private bool _disposed;
     private long _version;
 
+    [Inject]
+    private UiFaultTelemetry _uiFaults { get; set; } = default!;
+
+    protected TExpectedError? BackgroundError { get; private set; }
     protected TValue? BackgroundValue { get; private set; }
-    protected Exception? BackgroundError { get; private set; }
     protected bool IsBackgroundLoading { get; private set; }
 
     protected abstract TLoadIdentity? BackgroundLoadIdentity { get; }
 
-    protected abstract Task<TValue> LoadBackgroundValueAsync(CancellationToken ct);
+    protected abstract Task<Result<TValue, TExpectedError>> LoadBackgroundValueAsync(
+        CancellationToken ct
+    );
 
     protected override void OnParametersSet()
     {
@@ -53,7 +62,7 @@ public abstract class BackgroundLoadComponent<TValue, TLoadIdentity> : Component
         IsBackgroundLoading = true;
         var loadVersion = unchecked(++_version);
 
-        _ = RunBackgroundLoadAsync(loadVersion, cts);
+        _ = RunBackgroundLoadAsync(loadVersion, identity, cts);
     }
 
     private void ClearBackgroundLoad()
@@ -69,38 +78,55 @@ public abstract class BackgroundLoadComponent<TValue, TLoadIdentity> : Component
         }
     }
 
-    private async Task RunBackgroundLoadAsync(long loadVersion, CancellationTokenSource cts)
+    private async Task RunBackgroundLoadAsync(
+        long loadVersion,
+        TLoadIdentity identity,
+        CancellationTokenSource cts
+    )
     {
         try
         {
-            var value = await Task.Run(() => LoadBackgroundValueAsync(cts.Token), cts.Token)
+            var result = await Task.Run(() => LoadBackgroundValueAsync(cts.Token), cts.Token)
                 .ConfigureAwait(false);
             await ApplyBackgroundLoadAsync(
                     loadVersion,
                     cts,
                     () =>
-                    {
-                        BackgroundValue = value;
-                        BackgroundError = null;
-                        IsBackgroundLoading = false;
-                    }
+                        result.Match(
+                            value =>
+                            {
+                                BackgroundValue = value;
+                                BackgroundError = null;
+                                IsBackgroundLoading = false;
+                                return true;
+                            },
+                            error =>
+                            {
+                                BackgroundValue = default;
+                                BackgroundError = error;
+                                IsBackgroundLoading = false;
+                                return false;
+                            }
+                        )
                 )
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            await ApplyBackgroundLoadAsync(
-                    loadVersion,
-                    cts,
-                    () =>
-                    {
-                        BackgroundValue = default;
-                        BackgroundError = ex;
-                        IsBackgroundLoading = false;
-                    }
+            _uiFaults.Report(
+                exception,
+                new UiFaultContext(
+                    GetType().Name,
+                    nameof(LoadBackgroundValueAsync),
+                    null,
+                    identity.GetType().Name
                 )
-                .ConfigureAwait(false);
+            );
+            if (!_disposed && !cts.IsCancellationRequested && loadVersion == _version)
+            {
+                await DispatchExceptionAsync(exception).ConfigureAwait(false);
+            }
         }
         finally
         {

@@ -75,7 +75,12 @@ public partial class GuessingSettings
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync()
+    {
+        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+    }
+
+    private async Task LoadCoreAsync()
     {
         await LoadPageContextAsync();
         _featureEnabled =
@@ -116,7 +121,12 @@ public partial class GuessingSettings
         _config?.Profile.Options.Remove(option);
     }
 
-    private async Task CreateProfileAsync()
+    private Task CreateProfileAsync()
+    {
+        return ObserveUiOperationAsync(nameof(CreateProfileAsync), CreateProfileCoreAsync);
+    }
+
+    private async Task CreateProfileCoreAsync()
     {
         await GuessingConfigurationValidator
             .ValidateNewProfile(_newProfileName)
@@ -156,6 +166,11 @@ public partial class GuessingSettings
     }
 
     private Task DeleteProfileAsync()
+    {
+        return ObserveUiOperationAsync(nameof(DeleteProfileAsync), DeleteProfileCoreAsync);
+    }
+
+    private Task DeleteProfileCoreAsync()
     {
         if (_config is null)
         {
@@ -200,7 +215,12 @@ public partial class GuessingSettings
         );
     }
 
-    private async Task SaveAsync()
+    private Task SaveAsync()
+    {
+        return ObserveUiOperationAsync(nameof(SaveAsync), SaveCoreAsync);
+    }
+
+    private async Task SaveCoreAsync()
     {
         if (_config is null)
         {
@@ -249,7 +269,15 @@ public partial class GuessingSettings
         );
     }
 
-    private async Task SelectProfileAsync(ChangeEventArgs args)
+    private Task SelectProfileAsync(ChangeEventArgs args)
+    {
+        return ObserveUiOperationAsync(
+            nameof(SelectProfileAsync),
+            () => SelectProfileCoreAsync(args)
+        );
+    }
+
+    private async Task SelectProfileCoreAsync(ChangeEventArgs args)
     {
         if (!int.TryParse(args.Value?.ToString(), out var profileId))
         {
@@ -277,11 +305,17 @@ public partial class GuessingSettings
                     .LoadConfiguration(HostId, new GuessingProfileSelection.Default())
                     .ExecuteAsync(CancellationToken.None);
                 fallback.Match(
-                    draft => _config = draft,
-                    _ =>
-                        throw new InvalidOperationException(
-                            "The default guessing profile could not be loaded."
-                        )
+                    draft =>
+                    {
+                        _config = draft;
+                        return true;
+                    },
+                    fallbackFailure =>
+                    {
+                        _config = null;
+                        _toasts.Error(fallbackFailure.Message);
+                        return false;
+                    }
                 );
             }
         );

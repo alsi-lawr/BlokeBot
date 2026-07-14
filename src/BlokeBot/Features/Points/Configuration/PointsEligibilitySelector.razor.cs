@@ -28,6 +28,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -56,9 +57,13 @@ public partial class PointsEligibilitySelector
     protected override PointsEligibilityLoadIdentity? BackgroundLoadIdentity =>
         PointsEligibilityLoadIdentity.From(HostLogin);
 
-    protected override Task<HostBotChannelStatus> LoadBackgroundValueAsync(CancellationToken ct)
+    protected override async Task<
+        Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>
+    > LoadBackgroundValueAsync(CancellationToken ct)
     {
-        return _hostBotStatus.GetStatusAsync(HostLogin, ct);
+        return HostBotChannelStatusLoadFailure.FromReadiness(
+            await _hostBotStatus.GetReadinessAsync(HostLogin, ct)
+        );
     }
 
     private bool _followerEligibilityAvailable =>
@@ -67,7 +72,7 @@ public partial class PointsEligibilitySelector
     private string _followerEligibilityTitle =>
         IsBackgroundLoading ? "Checking whether follower-only giveaways can work."
         : _followerEligibilityAvailable ? "Followers can enter."
-        : BackgroundError is not null ? "BlokeBot could not check follower-only giveaways."
+        : BackgroundError is { } error ? error.FollowerReadStatusMessage
         : _status?.ModeratorStatusMessage
             ?? "Follower-only giveaways are not ready for this channel.";
 

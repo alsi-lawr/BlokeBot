@@ -291,7 +291,12 @@ public partial class HostConfigPage
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private Task LoadAsync()
+    {
+        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+    }
+
+    private async Task LoadCoreAsync()
     {
         var pageContext = await LoadPageContextAsync();
         var session = pageContext.Session;
@@ -425,26 +430,28 @@ public partial class HostConfigPage
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch
+        catch (Exception exception)
         {
-            if (version != _allowModsByDefaultSaveVersion)
+            ReportUiFault(nameof(PersistAllowModsByDefaultAsync), exception);
+
+            if (version == _allowModsByDefaultSaveVersion)
             {
-                return;
+                await InvokeAsync(() =>
+                {
+                    if (_state is not null)
+                    {
+                        _state = _state with { ModAccess = previousAccess };
+                    }
+
+                    _toasts.Error(
+                        "Who can help could not be saved. Your previous setting has been restored.",
+                        "Mod help not saved"
+                    );
+                    StateHasChanged();
+                });
             }
 
-            await InvokeAsync(() =>
-            {
-                if (_state is not null)
-                {
-                    _state = _state with { ModAccess = previousAccess };
-                }
-
-                _toasts.Error(
-                    "Who can help could not be saved. Your previous setting has been restored.",
-                    "Mod help not saved"
-                );
-                StateHasChanged();
-            });
+            await DispatchExceptionAsync(exception);
         }
         finally
         {

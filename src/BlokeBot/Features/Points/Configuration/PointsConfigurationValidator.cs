@@ -69,6 +69,7 @@ public static class PointsConfigurationValidator
                 aliases,
                 SnapshotReplies(draft.Replies),
                 draft.ReplyDelivery.ToMap(),
+                draft.WhisperResponsesEnabled,
                 draft.GamblingWinRatePercent,
                 Math.Max(0, draft.GamblingCooldownSeconds),
                 Math.Max(1, draft.GiveawayDurationSeconds),

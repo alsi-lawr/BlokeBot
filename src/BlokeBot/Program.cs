@@ -48,6 +48,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<UiFaultTelemetry>();
 
 builder
     .Services.AddOptions<BlokeBotOptions>()
