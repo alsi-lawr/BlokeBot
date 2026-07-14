@@ -45,7 +45,6 @@ public sealed class HostConfigService(
                 false,
                 false,
                 null,
-                null,
                 new HostBotAccountOverrideState(
                     false,
                     DisabledBotOverrideStatus(),
@@ -83,7 +82,6 @@ public sealed class HostConfigService(
             true,
             host.ChannelBotAuthorizedAtUtc is not null,
             status,
-            host.BotRuntimeStateChangedAtUtc,
             new HostBotAccountOverrideState(
                 botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
                 botOverrideStatus,

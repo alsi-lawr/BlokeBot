@@ -75,22 +75,20 @@ public partial class GuessingDashboard
     private string _roundStartedText =>
         _state?.CurrentRound is null
             ? "Start a round when you're ready"
-            : _state.CurrentRound.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
+            : _state.CurrentRound.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
 
     private string _roundStatusText =>
         _state?.CurrentRound is null
             ? "No round running"
-            : $"{_state.CurrentRound.ProfileName}: {RoundStatusLabel(_state.CurrentRound.Status)}";
+            : $"{_state.CurrentRound.ProfileName}: {RoundStatusLabel(_state.CurrentRound.Lifecycle)}";
 
-    private static string RoundStatusLabel(GuessRoundStatus status)
+    private static string RoundStatusLabel(GuessRoundLifecycle lifecycle)
     {
-        return status switch
-        {
-            GuessRoundStatus.Open => "Accepting guesses",
-            GuessRoundStatus.Closed => "Waiting for a winner",
-            GuessRoundStatus.Completed => "Finished",
-            _ => "Not running",
-        };
+        return lifecycle.Match(
+            static _ => "Accepting guesses",
+            static _ => "Waiting for a winner",
+            static _ => "Finished"
+        );
     }
 
     private string _segmentedControlClass =>
@@ -320,7 +318,7 @@ public partial class GuessingDashboard
 
     private static string FormatEndedAt(GuessRoundHistoryEntry round)
     {
-        return round.ClosedAtUtc?.ToLocalTime().ToString("MMM d, HH:mm") ?? "Not recorded";
+        return round.Lifecycle.ClosedAtUtc.ToLocalTime().ToString("MMM d, HH:mm");
     }
 
     private Task StopGuessingAsync()

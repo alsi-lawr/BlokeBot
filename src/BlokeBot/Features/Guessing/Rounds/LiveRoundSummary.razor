@@ -6,7 +6,7 @@
     </div>
     <div class="live-round-summary__metric">
         <p class="live-round-summary__label">Votes</p>
-        <p class="live-round-summary__value">@State.Votes.Count</p>
+        <p class="live-round-summary__value">@State.Votes.Length</p>
         <p class="live-round-summary__detail">Unique players</p>
     </div>
     <div class="live-round-summary__metric">
@@ -16,7 +16,7 @@
     </div>
     <div class="live-round-summary__metric">
         <p class="live-round-summary__label">Winner</p>
-        <p class="live-round-summary__value">@(State.CurrentRound?.WinningName ?? "None")</p>
+        <p class="live-round-summary__value">@_winnerName</p>
         <p class="live-round-summary__detail">Chosen here or in chat</p>
     </div>
 </div>

@@ -1,4 +1,4 @@
-using BlokeBot.Persistence.Models;
+using BlokeBot.Features.HostedChannels.Runtime;
 
 namespace BlokeBot.Features.Admin.HostedChannels;
 
@@ -8,5 +8,5 @@ public sealed record HostedChannelAdminView(
     string DisplayName,
     string? ProfileImageUrl,
     bool IsChannelBotAuthorized,
-    BotChannelRuntimeState RuntimeState
+    HostedChannelRuntimeLifecycle Lifecycle
 );

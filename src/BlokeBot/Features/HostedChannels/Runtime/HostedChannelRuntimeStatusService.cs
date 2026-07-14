@@ -17,30 +17,37 @@ public sealed class HostedChannelRuntimeStatusService(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hosts = await db
             .Hosts.AsNoTracking()
-            .Where(host =>
-                host.ChannelBotAuthorizedAtUtc != null
-                && (
-                    host.BotRuntimeState == BotChannelRuntimeState.Starting
-                    || host.BotRuntimeState == BotChannelRuntimeState.Started
-                )
-            )
+            .Where(host => host.ChannelBotAuthorizedAtUtc != null)
             .OrderBy(host => host.Login)
             .Select(host => new
             {
                 host.Login,
                 host.ChannelBotAuthorizedAtUtc,
                 host.ChannelBotAuthorizedScopes,
+                host.BotRuntimeState,
+                host.BotRuntimeStateChangedAtUtc,
             })
             .ToArrayAsync(ct);
 
         return hosts
+            .Select(host => new
+            {
+                Host = host,
+                Lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+                    host.BotRuntimeState,
+                    host.BotRuntimeStateChangedAtUtc
+                ),
+            })
             .Where(host =>
-                channelBotAuthorization.IsCurrent(
-                    host.ChannelBotAuthorizedAtUtc,
-                    host.ChannelBotAuthorizedScopes
+                host.Lifecycle
+                    is HostedChannelRuntimeLifecycle.Starting
+                        or HostedChannelRuntimeLifecycle.Started
+                && channelBotAuthorization.IsCurrent(
+                    host.Host.ChannelBotAuthorizedAtUtc,
+                    host.Host.ChannelBotAuthorizedScopes
                 )
             )
-            .Select(host => host.Login)
+            .Select(host => host.Host.Login)
             .ToArray();
     }
 
@@ -62,7 +69,10 @@ public sealed class HostedChannelRuntimeStatusService(
                 host.ChannelBotAuthorizedScopes
             ),
             await botStatus.GetStatusAsync(host.Login, ct),
-            host.BotRuntimeState
+            HostedChannelRuntimeLifecycle.FromPersistence(
+                host.BotRuntimeState,
+                host.BotRuntimeStateChangedAtUtc
+            )
         );
     }
 
@@ -83,7 +93,10 @@ public sealed class HostedChannelRuntimeStatusService(
                 host.ChannelBotAuthorizedAtUtc,
                 host.ChannelBotAuthorizedScopes
             ),
-            host.BotRuntimeState
+            HostedChannelRuntimeLifecycle.FromPersistence(
+                host.BotRuntimeState,
+                host.BotRuntimeStateChangedAtUtc
+            )
         );
     }
 
@@ -100,6 +113,7 @@ public sealed class HostedChannelRuntimeStatusService(
                 x.ChannelBotAuthorizedAtUtc,
                 x.ChannelBotAuthorizedScopes,
                 x.BotRuntimeState,
+                x.BotRuntimeStateChangedAtUtc,
                 x.Login
             ))
             .SingleOrDefaultAsync(ct);
@@ -109,6 +123,7 @@ public sealed class HostedChannelRuntimeStatusService(
         DateTime? ChannelBotAuthorizedAtUtc,
         string? ChannelBotAuthorizedScopes,
         BotChannelRuntimeState BotRuntimeState,
+        DateTime? BotRuntimeStateChangedAtUtc,
         string Login
     );
 }

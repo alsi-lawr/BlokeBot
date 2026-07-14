@@ -81,7 +81,7 @@ public sealed class GuessingHistoryTests
 
         var entry = entries.Single();
         entry.ProfileName.ShouldBe("Score");
-        entry.WinningName.ShouldBe("blue");
+        entry.Lifecycle.WinningName.ShouldBe("blue");
         entry.GuessCount.ShouldBe(2);
         entry.CorrectGuessCount.ShouldBe(1);
     }

@@ -50,20 +50,15 @@ public sealed class GuessingSharedHelperTests
         db.Profiles.Add(activeProfile);
         await db.SaveChangesAsync();
 
-        var round = new GuessRound
-        {
-            HostId = host.Id,
-            GuessRoundProfileId = activeProfile.Id,
-            Status = GuessRoundStatus.Closed,
-            StartedAtUtc = DateTime.UtcNow,
-        };
-
-        var settings = await GuessingProfileQueries.ReplySettingsForRoundOrDefaultAsync(
-            db,
-            host.Id,
-            round,
-            CancellationToken.None
-        );
+        var settings = (
+            await GuessingProfileQueries.ResolveReplySettingsAsync(
+                db,
+                host.Id,
+                activeProfile.Id,
+                null,
+                CancellationToken.None
+            )
+        ).Settings;
 
         settings.NoOpenRoundReply.ShouldBe("special");
     }

@@ -29,15 +29,14 @@ public sealed class GuessingVoteService(
             return NotConfigured();
         }
 
-        var round = await GuessingRoundQueries.Unresolved(db, hostId.Value).FirstOrDefaultAsync(ct);
-        var resolution =
-            await GuessingProfileQueries.ReplySettingsResolutionForRoundOrProfileOrDefaultAsync(
-                db,
-                hostId.Value,
-                round,
-                null,
-                ct
-            );
+        var round = await GuessingRoundQueries.LoadUnresolvedAsync(db, hostId.Value, ct);
+        var resolution = await GuessingProfileQueries.ResolveReplySettingsAsync(
+            db,
+            hostId.Value,
+            round?.ProfileId,
+            null,
+            ct
+        );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
         var normalizedName = GuessName.Parse(name).Value;
@@ -51,7 +50,7 @@ public sealed class GuessingVoteService(
             );
         }
 
-        if (round.Status != GuessRoundStatus.Open)
+        if (!round.Lifecycle.Match(static _ => true, static _ => false, static _ => false))
         {
             return new GuessingOperationResult(
                 false,
@@ -63,7 +62,7 @@ public sealed class GuessingVoteService(
         var option = await db
             .GuessOptions.AsNoTracking()
             .FirstOrDefaultAsync(
-                x => x.GuessRoundProfileId == round.GuessRoundProfileId && x.Name == normalizedName,
+                x => x.GuessRoundProfileId == round.ProfileId && x.Name == normalizedName,
                 ct
             );
 
@@ -98,7 +97,7 @@ public sealed class GuessingVoteService(
 
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
-        var answerReplyTarget = await AnswerReplyTargetAsync(db, round.GuessRoundProfileId, ct);
+        var answerReplyTarget = await AnswerReplyTargetAsync(db, round.ProfileId, ct);
         return new GuessingOperationResult(
             true,
             Format(option.ReplyText, normalizedName, login),

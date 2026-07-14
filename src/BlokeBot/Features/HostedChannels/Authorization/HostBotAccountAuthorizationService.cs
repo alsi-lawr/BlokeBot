@@ -223,10 +223,14 @@ public sealed class HostBotAccountAuthorizationService(
             return;
         }
 
+        var runtimeLifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+            host.BotRuntimeState,
+            host.BotRuntimeStateChangedAtUtc
+        );
         var restartRuntime =
-            host.BotRuntimeState
-            is BotChannelRuntimeState.Starting
-                or BotChannelRuntimeState.Started;
+            runtimeLifecycle
+            is HostedChannelRuntimeLifecycle.Starting
+                or HostedChannelRuntimeLifecycle.Started;
         settings.OverrideEnabled = overrideEnabled;
         if (selection is BotAccountSelection.Main)
         {

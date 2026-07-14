@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
 using BlokeBot.Persistence;
@@ -76,20 +77,60 @@ internal static class PointsGiveawayQueries
             .FirstOrDefaultAsync(ct);
     }
 
-    public static PointsGiveawayView ToView(PointsGiveaway giveaway)
+    public static async Task<PointsGiveawayView?> LoadActiveViewAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
     {
+        var giveaway = await db
+            .PointsGiveaways.AsNoTracking()
+            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
+            .OrderByDescending(x => x.StartedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.Status,
+                x.StartedAtUtc,
+                x.EndsAtUtc,
+                x.CompletedAtUtc,
+            })
+            .FirstOrDefaultAsync(ct);
+        if (giveaway is null)
+        {
+            return null;
+        }
+
+        var entrants = await db
+            .PointsGiveawayEntrants.AsNoTracking()
+            .Where(x => x.GiveawayId == giveaway.Id)
+            .OrderBy(x => x.JoinedAtUtc)
+            .ThenBy(x => x.Id)
+            .Select(x => x.Login)
+            .ToArrayAsync(ct);
+        var winners = await db
+            .PointsGiveawayWinners.AsNoTracking()
+            .Where(x => x.GiveawayId == giveaway.Id)
+            .OrderBy(x => x.Id)
+            .Select(x => new { x.Login, x.Payout })
+            .ToArrayAsync(ct);
+
         return new(
             giveaway.Id,
-            giveaway.Status,
+            PointsGiveawayLifecycle.FromPersistence(
+                giveaway.Status,
+                giveaway.StartedAtUtc,
+                giveaway.CompletedAtUtc
+            ),
             giveaway.StartedAtUtc,
             giveaway.EndsAtUtc,
-            giveaway.Entrants.OrderBy(x => x.JoinedAtUtc).Select(x => x.Login).ToArray(),
-            giveaway
-                .Winners.Select(x => new PointsGiveawayWinnerView(
+            entrants.ToImmutableArray(),
+            winners
+                .Select(x => new PointsGiveawayWinnerView(
                     x.Login,
                     PointAmount.ParseAbsolute(x.Payout)
                 ))
-                .ToArray()
+                .ToImmutableArray()
         );
     }
 }

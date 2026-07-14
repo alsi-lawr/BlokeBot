@@ -47,7 +47,14 @@ public partial class HostedChannelRow
 
     [Parameter, EditorRequired]
     public HostedChannelAdminView Host { get; set; } =
-        new(0, string.Empty, string.Empty, null, false, BotChannelRuntimeState.Stopped);
+        new(
+            0,
+            string.Empty,
+            string.Empty,
+            null,
+            false,
+            new HostedChannelRuntimeLifecycle.Stopped(null)
+        );
 
     [Parameter]
     public bool CanEditHost { get; set; } = true;
@@ -73,35 +80,39 @@ public partial class HostedChannelRow
     {
         get
         {
-            var color = Host.RuntimeState switch
-            {
-                BotChannelRuntimeState.Starting => "bg-orange-50 text-orange-700 ring-orange-200",
-                BotChannelRuntimeState.Started => "bg-emerald-50 text-emerald-700 ring-emerald-200",
-                BotChannelRuntimeState.Stopping => "bg-purple-50 text-purple-700 ring-purple-200",
-                _ => "bg-slate-100 text-slate-600 ring-slate-200",
-            };
+            var color = Host.Lifecycle.Match(
+                static _ => "bg-slate-100 text-slate-600 ring-slate-200",
+                static _ => "bg-orange-50 text-orange-700 ring-orange-200",
+                static _ => "bg-emerald-50 text-emerald-700 ring-emerald-200",
+                static _ => "bg-purple-50 text-purple-700 ring-purple-200"
+            );
 
             return $"inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold ring-1 {color}";
         }
     }
 
     private string _botStartedDotClass =>
-        Host.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting => "h-1.5 w-1.5 rounded-full bg-orange-500",
-            BotChannelRuntimeState.Started => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            BotChannelRuntimeState.Stopping => "h-1.5 w-1.5 rounded-full bg-purple-500",
-            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
-        };
+        Host.Lifecycle.Match(
+            static _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+            static _ => "h-1.5 w-1.5 rounded-full bg-orange-500",
+            static _ => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            static _ => "h-1.5 w-1.5 rounded-full bg-purple-500"
+        );
 
     private string _botStartedText =>
-        Host.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting => "bot starting",
-            BotChannelRuntimeState.Started => "bot running",
-            BotChannelRuntimeState.Stopping => "bot stopping",
-            _ => "bot offline",
-        };
+        Host.Lifecycle.Match(
+            static _ => "bot offline",
+            static _ => "bot starting",
+            static _ => "bot running",
+            static _ => "bot stopping"
+        );
+
+    private bool _isStopping => Host.Lifecycle is HostedChannelRuntimeLifecycle.Stopping;
+
+    private bool _canStop =>
+        Host.Lifecycle
+            is HostedChannelRuntimeLifecycle.Starting
+                or HostedChannelRuntimeLifecycle.Started;
 
     private static string Initials(string value)
     {

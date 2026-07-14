@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -7,29 +8,53 @@ namespace BlokeBot.Features.Guessing.History;
 
 public sealed class GuessingHistoryService(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
-    public async Task<IReadOnlyList<GuessRoundHistoryEntry>> LoadRecentCompletedRoundsAsync(
+    public async Task<ImmutableArray<GuessRoundHistoryEntry>> LoadRecentCompletedRoundsAsync(
         int hostId,
         int count,
         CancellationToken ct
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
+        var rounds = await db
             .Rounds.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Status == GuessRoundStatus.Completed)
             .OrderByDescending(x => x.ClosedAtUtc ?? x.StartedAtUtc)
             .ThenByDescending(x => x.Id)
             .Take(Math.Clamp(count, 1, 100))
-            .Select(x => new GuessRoundHistoryEntry(
+            .Select(x => new
+            {
                 x.Id,
-                x.GuessRoundProfile == null ? string.Empty : x.GuessRoundProfile.Name,
+                ProfileName = x.GuessRoundProfile == null ? string.Empty : x.GuessRoundProfile.Name,
+                x.Status,
                 x.StartedAtUtc,
                 x.ClosedAtUtc,
                 x.WinningName,
-                x.Votes.Count,
-                x.WinningName == null ? 0 : x.Votes.Count(vote => vote.GuessName == x.WinningName)
-            ))
+                GuessCount = x.Votes.Count,
+                CorrectGuessCount = x.WinningName == null
+                    ? 0
+                    : x.Votes.Count(vote => vote.GuessName == x.WinningName),
+            })
             .ToListAsync(ct);
+        return rounds
+            .Select(round => new GuessRoundHistoryEntry(
+                round.Id,
+                round.ProfileName,
+                GuessRoundLifecycle
+                    .FromPersistence(
+                        round.Status,
+                        round.StartedAtUtc,
+                        round.ClosedAtUtc,
+                        round.WinningName
+                    )
+                    .Match(
+                        _ => throw new PersistenceDataIntegrityException(typeof(GuessRound)),
+                        _ => throw new PersistenceDataIntegrityException(typeof(GuessRound)),
+                        static completed => completed
+                    ),
+                round.GuessCount,
+                round.CorrectGuessCount
+            ))
+            .ToImmutableArray();
     }
 
     public async Task<GuessLeaderboardPage> LoadLeaderboardAsync(

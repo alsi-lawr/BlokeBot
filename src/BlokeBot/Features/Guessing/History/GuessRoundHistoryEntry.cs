@@ -1,11 +1,11 @@
+using BlokeBot.Features.Guessing.Rounds;
+
 namespace BlokeBot.Features.Guessing.History;
 
 public sealed record GuessRoundHistoryEntry(
     int Id,
     string ProfileName,
-    DateTime StartedAtUtc,
-    DateTime? ClosedAtUtc,
-    string? WinningName,
+    GuessRoundLifecycle.Completed Lifecycle,
     int GuessCount,
     int CorrectGuessCount
 );

@@ -21,14 +21,7 @@ public sealed class PointsGiveawayService(
     public async Task<PointsGiveawayView?> GetActiveGiveawayAsync(int hostId, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
-            .PointsGiveaways.AsNoTracking()
-            .Include(x => x.Entrants)
-            .Include(x => x.Winners)
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
-            .OrderByDescending(x => x.StartedAtUtc)
-            .Select(x => PointsGiveawayQueries.ToView(x))
-            .FirstOrDefaultAsync(ct);
+        return await PointsGiveawayQueries.LoadActiveViewAsync(db, hostId, ct);
     }
 
     public async Task<PointOperationResult> StartAsync(

@@ -123,10 +123,10 @@
                                 {
                                     <tr @key="round.Id" class="motion-list__item">
                                         <td class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
-                                        <td class="px-5 py-3 text-slate-700">@(round.WinningName ?? "None")</td>
+                                        <td class="px-5 py-3 text-slate-700">@round.Lifecycle.WinningName</td>
                                         <td class="px-5 py-3 text-slate-700">@round.GuessCount</td>
                                         <td class="px-5 py-3 text-slate-700">@round.CorrectGuessCount</td>
-                                        <td class="px-5 py-3 text-muted-foreground">@round.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                        <td class="px-5 py-3 text-muted-foreground">@round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
                                         <td class="px-5 py-3 text-muted-foreground">@FormatEndedAt(round)</td>
                                     </tr>
                                 }

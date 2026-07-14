@@ -1,15 +1,15 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.Points.Balances;
-using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Giveaways;
 
 public sealed record PointsGiveawayView(
     int Id,
-    PointsGiveawayStatus Status,
+    PointsGiveawayLifecycle Lifecycle,
     DateTime StartedAtUtc,
     DateTime EndsAtUtc,
-    IReadOnlyList<string> Entrants,
-    IReadOnlyList<PointsGiveawayWinnerView> Winners
+    ImmutableArray<string> Entrants,
+    ImmutableArray<PointsGiveawayWinnerView> Winners
 );
 
 public sealed record PointsGiveawayWinnerView(string Login, PointAmount Payout);

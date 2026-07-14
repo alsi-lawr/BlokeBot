@@ -65,14 +65,13 @@ public partial class SelectedChannelBotStatus
                 { IsChannelBotAuthorized: false } => "border-amber-200 bg-amber-50 text-amber-700",
                 { ChannelBotAuthorizationScopesCurrent: false } =>
                     "border-amber-200 bg-amber-50 text-amber-700",
-                { RuntimeState: BotChannelRuntimeState.Starting } =>
-                    "border-orange-200 bg-orange-50 text-orange-700",
-                { RuntimeState: BotChannelRuntimeState.Stopping } =>
-                    "border-purple-200 bg-purple-50 text-purple-700",
-                { RuntimeState: BotChannelRuntimeState.Started } =>
-                    "border-emerald-200 bg-emerald-50 text-emerald-700",
-                { IsChannelBotAuthorized: true } => "app-blue-status",
-                _ => "border-slate-200 bg-slate-100 text-slate-600",
+                { } status => status.Lifecycle.Match(
+                    static _ => "app-blue-status",
+                    static _ => "border-orange-200 bg-orange-50 text-orange-700",
+                    static _ => "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    static _ => "border-purple-200 bg-purple-50 text-purple-700"
+                ),
+                null => "border-slate-200 bg-slate-100 text-slate-600",
             };
 
             return $"flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-bold shadow-sm sm:w-auto sm:justify-start {color}";
@@ -87,11 +86,13 @@ public partial class SelectedChannelBotStatus
             {
                 { IsChannelBotAuthorized: false } => "bg-amber-500",
                 { ChannelBotAuthorizationScopesCurrent: false } => "bg-amber-500",
-                { RuntimeState: BotChannelRuntimeState.Starting } => "bg-orange-500",
-                { RuntimeState: BotChannelRuntimeState.Stopping } => "bg-purple-500",
-                { RuntimeState: BotChannelRuntimeState.Started } => "bg-emerald-500",
-                { IsChannelBotAuthorized: true } => "app-blue-dot",
-                _ => "bg-slate-400",
+                { } status => status.Lifecycle.Match(
+                    static _ => "app-blue-dot",
+                    static _ => "bg-orange-500",
+                    static _ => "bg-emerald-500",
+                    static _ => "bg-purple-500"
+                ),
+                null => "bg-slate-400",
             };
 
             return $"h-1.5 w-1.5 rounded-full {color}";
@@ -99,16 +100,19 @@ public partial class SelectedChannelBotStatus
     }
 
     private string _selectedBotStatusText =>
-        _selectedHostStatus switch
-        {
-            { RuntimeState: BotChannelRuntimeState.Starting } => "bot starting",
-            { RuntimeState: BotChannelRuntimeState.Stopping } => "bot stopping",
-            { RuntimeState: BotChannelRuntimeState.Started } => "bot running",
-            { IsChannelBotAuthorized: true, ChannelBotAuthorizationScopesCurrent: false } =>
-                "reconnect chat",
-            { IsChannelBotAuthorized: true } => "chat connected",
-            _ => "chat not connected",
-        };
+        _selectedHostStatus is { } status
+            ? status.Lifecycle.Match(
+                _ =>
+                    status.IsChannelBotAuthorized
+                        ? status.ChannelBotAuthorizationScopesCurrent
+                            ? "chat connected"
+                            : "reconnect chat"
+                        : "chat not connected",
+                static _ => "bot starting",
+                static _ => "bot running",
+                static _ => "bot stopping"
+            )
+            : "chat not connected";
 
     protected override void OnInitialized()
     {

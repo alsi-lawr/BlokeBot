@@ -2,7 +2,6 @@ using BlokeBot.Auth.Users;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Functional;
 using BlokeBot.Hosts;
-using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Admin.HostedChannels;
 
@@ -68,11 +67,11 @@ internal sealed class AdminHostManagementService(
     )
     {
         var host = hosts.FirstOrDefault(x => x.Id == hostId);
-        var state = host?.RuntimeState;
+        var lifecycle = host?.Lifecycle;
         return new AdminHostOperationResult(
             true,
-            RuntimeStatusMessage(state),
-            IsRuntimeTransitionPending(state) ? hostId : null
+            RuntimeStatusMessage(lifecycle),
+            IsRuntimeTransitionPending(lifecycle) ? hostId : null
         );
     }
 
@@ -84,11 +83,11 @@ internal sealed class AdminHostManagementService(
     {
         var result = await operation(hostId, ct);
         var hosts = await hostedChannels.LoadHostedChannelsAsync(ct);
-        var currentState = hosts.FirstOrDefault(host => host.Id == hostId)?.RuntimeState;
+        var currentLifecycle = hosts.FirstOrDefault(host => host.Id == hostId)?.Lifecycle;
         return new AdminHostOperationResult(
             result.Succeeded,
-            result.Succeeded ? RuntimeStatusMessage(currentState) : result.Message,
-            result.Succeeded && IsRuntimeTransitionPending(currentState) ? hostId : null
+            result.Succeeded ? RuntimeStatusMessage(currentLifecycle) : result.Message,
+            result.Succeeded && IsRuntimeTransitionPending(currentLifecycle) ? hostId : null
         );
     }
 
@@ -110,20 +109,24 @@ internal sealed class AdminHostManagementService(
         return new AdminHostOperationResult(true, $"Added a channel for {displayName}.");
     }
 
-    private static string RuntimeStatusMessage(BotChannelRuntimeState? state)
+    private static string RuntimeStatusMessage(HostedChannelRuntimeLifecycle? lifecycle)
     {
-        return state switch
-        {
-            BotChannelRuntimeState.Starting => "Bot starting.",
-            BotChannelRuntimeState.Started => "Bot running.",
-            BotChannelRuntimeState.Stopping => "Bot stopping.",
-            _ => "Bot offline.",
-        };
+        return lifecycle?.Match(
+                static _ => "Bot offline.",
+                static _ => "Bot starting.",
+                static _ => "Bot running.",
+                static _ => "Bot stopping."
+            ) ?? "Bot offline.";
     }
 
-    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? state)
+    private static bool IsRuntimeTransitionPending(HostedChannelRuntimeLifecycle? lifecycle)
     {
-        return state is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+        return lifecycle?.Match(
+                static _ => false,
+                static _ => true,
+                static _ => false,
+                static _ => true
+            ) ?? false;
     }
 }
 

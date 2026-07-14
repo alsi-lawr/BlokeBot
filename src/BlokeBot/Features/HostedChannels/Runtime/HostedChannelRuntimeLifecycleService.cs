@@ -20,7 +20,16 @@ public sealed class HostedChannelRuntimeLifecycleService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
-        if (host?.BotRuntimeState is not BotChannelRuntimeState.Starting)
+        if (host is null)
+        {
+            return;
+        }
+
+        var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+            host.BotRuntimeState,
+            host.BotRuntimeStateChangedAtUtc
+        );
+        if (lifecycle is not HostedChannelRuntimeLifecycle.Starting)
         {
             return;
         }
@@ -41,7 +50,16 @@ public sealed class HostedChannelRuntimeLifecycleService(
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Login == normalized.Value, ct);
-        if (host is null || host.BotRuntimeState is BotChannelRuntimeState.Stopped)
+        if (host is null)
+        {
+            return;
+        }
+
+        var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+            host.BotRuntimeState,
+            host.BotRuntimeStateChangedAtUtc
+        );
+        if (lifecycle is HostedChannelRuntimeLifecycle.Stopped)
         {
             return;
         }

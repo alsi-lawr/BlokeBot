@@ -48,7 +48,7 @@ public sealed class HostedChannelRuntimeStatusTests
         summary.ShouldNotBeNull();
         summary!.IsChannelBotAuthorized.ShouldBeTrue();
         summary.ChannelBotAuthorizationScopesCurrent.ShouldBeTrue();
-        summary.RuntimeState.ShouldBe(BotChannelRuntimeState.Started);
+        summary.Lifecycle.ShouldBeOfType<HostedChannelRuntimeLifecycle.Started>();
         httpClientFactory.RequestCount.ShouldBe(0);
     }
 
@@ -93,6 +93,7 @@ public sealed class HostedChannelRuntimeStatusTests
             ChannelBotAuthorizedAtUtc = DateTime.UtcNow,
             ChannelBotAuthorizedScopes = "channel:bot",
             BotRuntimeState = BotChannelRuntimeState.Started,
+            BotRuntimeStateChangedAtUtc = DateTime.UtcNow,
             CreatedAtUtc = DateTime.UtcNow,
         };
         db.Hosts.Add(host);

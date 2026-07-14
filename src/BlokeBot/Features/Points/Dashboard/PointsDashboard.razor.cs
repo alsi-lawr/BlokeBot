@@ -61,7 +61,7 @@ public partial class PointsDashboard
     private string _giveawaySummary =>
         _state?.ActiveGiveaway is null
             ? "No giveaway running."
-            : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Count} people joined.";
+            : $"Runs until {_state.ActiveGiveaway.EndsAtUtc.ToLocalTime():HH:mm}. {_state.ActiveGiveaway.Entrants.Length} people joined.";
 
     internal static string LedgerChangeLabel(PointLedgerKind kind)
     {

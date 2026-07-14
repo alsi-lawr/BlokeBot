@@ -1,43 +1,58 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
+using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.CustomCommands;
 
-public sealed class CustomMessageSelector(TimeProvider clock)
+public sealed record CustomMessageSelectionSnapshot
 {
-    public string? SelectMessage(CustomMessageLibraryEntry? entry)
-    {
-        if (entry is null)
-        {
-            return null;
-        }
-
-        var variants = entry.Variants.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).ToArray();
-        if (variants.Length == 0)
-        {
-            return null;
-        }
-
-        return entry.SelectionMode switch
-        {
-            CustomMessageSelectionMode.First => variants[0].Text,
-            CustomMessageSelectionMode.Random => variants[
-                RandomNumberGenerator.GetInt32(variants.Length)
-            ].Text,
-            CustomMessageSelectionMode.Sequential => SelectSequentialMessage(entry, variants),
-            _ => variants[0].Text,
-        };
-    }
-
-    private string SelectSequentialMessage(
-        CustomMessageLibraryEntry entry,
-        CustomMessageVariant[] variants
+    internal CustomMessageSelectionSnapshot(
+        CustomMessageSelectionMode selectionMode,
+        int currentVariantIndex,
+        IEnumerable<string> variants
     )
     {
-        var index = entry.CurrentVariantIndex < 0 ? 0 : entry.CurrentVariantIndex;
-        var selectedIndex = index % variants.Length;
-        entry.CurrentVariantIndex = (selectedIndex + 1) % variants.Length;
-        entry.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
-        return variants[selectedIndex].Text;
+        SelectionMode = selectionMode;
+        CurrentVariantIndex = currentVariantIndex;
+        Variants = variants.ToImmutableArray();
+    }
+
+    public CustomMessageSelectionMode SelectionMode { get; }
+
+    public int CurrentVariantIndex { get; }
+
+    public ImmutableArray<string> Variants { get; }
+}
+
+public sealed record CustomMessageSelectionResult(string Text, int NextVariantIndex);
+
+public sealed class CustomMessageSelector
+{
+    public Option<CustomMessageSelectionResult> Select(CustomMessageSelectionSnapshot snapshot)
+    {
+        if (snapshot.Variants.IsEmpty)
+        {
+            return Option<CustomMessageSelectionResult>.None;
+        }
+
+        var currentIndex = Math.Max(0, snapshot.CurrentVariantIndex) % snapshot.Variants.Length;
+        var selectedIndex = snapshot.SelectionMode switch
+        {
+            CustomMessageSelectionMode.First => 0,
+            CustomMessageSelectionMode.Random => RandomNumberGenerator.GetInt32(
+                snapshot.Variants.Length
+            ),
+            CustomMessageSelectionMode.Sequential => currentIndex,
+            _ => throw new PersistenceDataIntegrityException(typeof(CustomMessageSelectionMode)),
+        };
+        var nextIndex =
+            snapshot.SelectionMode is CustomMessageSelectionMode.Sequential
+                ? (selectedIndex + 1) % snapshot.Variants.Length
+                : currentIndex;
+        return Option<CustomMessageSelectionResult>.Some(
+            new CustomMessageSelectionResult(snapshot.Variants[selectedIndex], nextIndex)
+        );
     }
 }

@@ -27,11 +27,11 @@
         </div>
     </div>
     <div class="flex flex-wrap gap-2">
-        @if (Host.RuntimeState is BotChannelRuntimeState.Stopping)
+        @if (_isStopping)
         {
             <button class="btn-secondary disabled:cursor-not-allowed disabled:opacity-50" disabled>Stop bot</button>
         }
-        else if (Host.RuntimeState is BotChannelRuntimeState.Started or BotChannelRuntimeState.Starting)
+        else if (_canStop)
         {
             <button class="btn-secondary" @onclick="() => StopBot(Host.Id)">Stop bot</button>
         }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Persistence;
@@ -11,23 +12,21 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var round = await GuessingRoundQueries
-            .Unresolved(db, hostId)
-            .Include(x => x.GuessRoundProfile)
-            .AsNoTracking()
-            .FirstOrDefaultAsync(ct);
-        var votes = round is null
-            ? []
-            : await db
+        var round = await GuessingRoundQueries.LoadDashboardRoundAsync(db, hostId, ct);
+        var votes = ImmutableArray<GuessVoteView>.Empty;
+        if (round is not null)
+        {
+            var voteRows = await db
                 .Votes.AsNoTracking()
                 .Where(x => x.GuessRoundId == round.Id)
                 .OrderByDescending(x => x.GuessedAtUtc)
                 .Select(x => new GuessVoteView(x.Login, x.GuessName, x.GuessedAtUtc))
-                .ToListAsync(ct);
+                .ToArrayAsync(ct);
+            votes = voteRows.ToImmutableArray();
+        }
 
         var profileId =
-            round?.GuessRoundProfileId
-            ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId, ct);
+            round?.ProfileId ?? await GuessingProfileQueries.DefaultProfileIdAsync(db, hostId, ct);
         var options = await db
             .GuessOptions.AsNoTracking()
             .Where(x => x.GuessRoundProfileId == profileId)
@@ -37,35 +36,26 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
 
         return new GuessingDashboardState
         {
-            CurrentRound = round is null
-                ? null
-                : new GuessRoundView(
-                    round.Id,
-                    round.GuessRoundProfileId,
-                    round.GuessRoundProfile?.Name ?? string.Empty,
-                    round.Status,
-                    round.StartedAtUtc,
-                    round.ClosedAtUtc,
-                    round.WinningName
-                ),
+            CurrentRound = round,
             Votes = votes,
             Options = options,
             Profiles = await LoadProfileSummariesAsync(db, hostId, ct),
         };
     }
 
-    private static async Task<List<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
+    private static async Task<ImmutableArray<GuessRoundProfileSummary>> LoadProfileSummariesAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
     )
     {
-        return await db
+        var profiles = await db
             .Profiles.AsNoTracking()
             .Where(x => x.HostId == hostId)
             .OrderByDescending(x => x.IsDefault)
             .ThenBy(x => x.Name)
             .Select(x => new GuessRoundProfileSummary(x.Id, x.Name, x.IsDefault))
-            .ToListAsync(ct);
+            .ToArrayAsync(ct);
+        return profiles.ToImmutableArray();
     }
 }

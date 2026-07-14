@@ -89,7 +89,7 @@ public sealed class CustomCommandExecutionService(
             }
         }
 
-        var selectedMessage = messageSelector.SelectMessage(command.Action.MessageLibraryEntry);
+        var selectedMessage = SelectMessage(command.Action.MessageLibraryEntry);
         if (selectedMessage is null)
         {
             return true;
@@ -110,6 +110,35 @@ public sealed class CustomCommandExecutionService(
             Math.Max(0, options.Value.CustomCommands.MinimumCooldownSeconds)
         );
         return TimeSpan.FromSeconds(seconds);
+    }
+
+    private string? SelectMessage(CustomMessageLibraryEntry? entry)
+    {
+        if (entry is null)
+        {
+            return null;
+        }
+
+        var snapshot = new CustomMessageSelectionSnapshot(
+            entry.SelectionMode,
+            entry.CurrentVariantIndex,
+            entry.Variants.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Select(x => x.Text)
+        );
+        return messageSelector
+            .Select(snapshot)
+            .Match<string?>(
+                selected =>
+                {
+                    if (entry.SelectionMode is CustomMessageSelectionMode.Sequential)
+                    {
+                        entry.CurrentVariantIndex = selected.NextVariantIndex;
+                        entry.UpdatedAtUtc = clock.GetUtcNow().UtcDateTime;
+                    }
+
+                    return selected.Text;
+                },
+                static () => null
+            );
     }
 
     private long? IncrementCounter(CounterCustomCommandAction action)

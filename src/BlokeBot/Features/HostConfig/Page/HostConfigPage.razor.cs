@@ -54,22 +54,24 @@ public partial class HostConfigPage
     private string _newWhitelistLogin = string.Empty;
     private int _allowModsByDefaultSaveVersion;
     private bool _blockedByMode;
-    private BotChannelRuntimeState? _pendingRuntimeState;
+    private PendingRuntimeTransition? _pendingRuntimeTransition;
     private IReadOnlyList<AccessListEntryProfile> _blacklistEntries = [];
     private HostConfigState? _state;
     private IReadOnlyList<AccessListEntryProfile> _whitelistEntries = [];
+
+    private HostedChannelRuntimeLifecycle? _runtimeLifecycle => _state?.RuntimeStatus?.Lifecycle;
 
     private bool _canStart =>
         _state?.RuntimeStatus is not null
         && _state.IsChannelBotAuthorized
         && _state.RuntimeStatus.ChannelBotAuthorizationScopesCurrent
         && _botAccountCanStart
-        && _state.RuntimeStatus.RuntimeState is BotChannelRuntimeState.Stopped;
+        && _state.RuntimeStatus.Lifecycle is HostedChannelRuntimeLifecycle.Stopped;
 
     private bool _canStop =>
-        _state?.RuntimeStatus?.RuntimeState
-            is BotChannelRuntimeState.Started
-                or BotChannelRuntimeState.Starting;
+        _runtimeLifecycle
+            is HostedChannelRuntimeLifecycle.Started
+                or HostedChannelRuntimeLifecycle.Starting;
 
     private string _authorizationBadgeClass =>
         _state?.IsChannelBotAuthorized == true
@@ -91,44 +93,41 @@ public partial class HostConfigPage
         : "not connected";
 
     private string _runtimeBadgeClass =>
-        _state?.RuntimeStatus?.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-orange-50 px-2.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200",
-            BotChannelRuntimeState.Started =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
-            BotChannelRuntimeState.Stopping =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-purple-50 px-2.5 text-xs font-bold text-purple-700 ring-1 ring-purple-200",
-            _ =>
+        _runtimeLifecycle?.Match(
+            static _ =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
-        };
+            static _ =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-orange-50 px-2.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200",
+            static _ =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
+            static _ =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-purple-50 px-2.5 text-xs font-bold text-purple-700 ring-1 ring-purple-200"
+        )
+        ?? "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200";
 
     private string _runtimeDotClass =>
-        _state?.RuntimeStatus?.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting => "h-1.5 w-1.5 rounded-full bg-orange-500",
-            BotChannelRuntimeState.Started => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            BotChannelRuntimeState.Stopping => "h-1.5 w-1.5 rounded-full bg-purple-500",
-            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
-        };
+        _runtimeLifecycle?.Match(
+            static _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+            static _ => "h-1.5 w-1.5 rounded-full bg-orange-500",
+            static _ => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            static _ => "h-1.5 w-1.5 rounded-full bg-purple-500"
+        ) ?? "h-1.5 w-1.5 rounded-full bg-slate-400";
 
     private string _runtimeText =>
-        _state?.RuntimeStatus?.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting => "starting",
-            BotChannelRuntimeState.Started => "online",
-            BotChannelRuntimeState.Stopping => "stopping",
-            _ => "offline",
-        };
+        _runtimeLifecycle?.Match(
+            static _ => "offline",
+            static _ => "starting",
+            static _ => "online",
+            static _ => "stopping"
+        ) ?? "offline";
 
     private string _runtimeStatusMessage =>
-        _state?.RuntimeStatus?.RuntimeState switch
-        {
-            BotChannelRuntimeState.Starting => "The bot is starting.",
-            BotChannelRuntimeState.Started => "The bot is in chat.",
-            BotChannelRuntimeState.Stopping => "The bot is leaving chat.",
-            _ => "The bot is offline.",
-        };
+        _runtimeLifecycle?.Match(
+            static _ => "The bot is offline.",
+            static _ => "The bot is starting.",
+            static _ => "The bot is in chat.",
+            static _ => "The bot is leaving chat."
+        ) ?? "The bot is offline.";
 
     private string _startRuntimeTooltip =>
         _canStart ? "Start the bot for this channel." : _startRuntimeDisabledTooltip;
@@ -142,12 +141,12 @@ public partial class HostConfigPage
         : _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true
             ? "Reconnect the channel before starting the bot."
         : !_botAccountCanStart ? "Connect the custom bot account before starting the bot."
-        : _state.RuntimeStatus?.RuntimeState is not BotChannelRuntimeState.Stopped
+        : _state.RuntimeStatus?.Lifecycle is not HostedChannelRuntimeLifecycle.Stopped
             ? "Wait for the bot to stop before starting it again."
         : "The bot cannot be started right now.";
 
     private string _stopRuntimeDisabledTooltip =>
-        _state?.RuntimeStatus?.RuntimeState is BotChannelRuntimeState.Stopping
+        _runtimeLifecycle is HostedChannelRuntimeLifecycle.Stopping
             ? "The bot is already stopping."
             : "The bot is not running right now.";
 
@@ -330,22 +329,22 @@ public partial class HostConfigPage
 
     private async Task ReloadForEventAsync()
     {
-        var previousPendingRuntimeState = _pendingRuntimeState;
+        var previousPendingRuntimeTransition = _pendingRuntimeTransition;
         await LoadAsync();
 
-        if (previousPendingRuntimeState is null)
+        if (previousPendingRuntimeTransition is null)
         {
             return;
         }
 
-        var currentRuntimeState = _state?.RuntimeStatus?.RuntimeState;
-        if (currentRuntimeState == previousPendingRuntimeState)
+        var currentRuntimeTransition = PendingTransition(_runtimeLifecycle);
+        if (currentRuntimeTransition == previousPendingRuntimeTransition)
         {
             return;
         }
 
         TrackPendingRuntimeTransition();
-        if (currentRuntimeState is not null)
+        if (_runtimeLifecycle is not null)
         {
             _toasts.Status(_runtimeStatusMessage);
         }
@@ -476,9 +475,9 @@ public partial class HostConfigPage
     private async Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
     {
         var runtimeWasActive =
-            _state?.RuntimeStatus?.RuntimeState
-            is BotChannelRuntimeState.Starting
-                or BotChannelRuntimeState.Started;
+            _runtimeLifecycle
+            is HostedChannelRuntimeLifecycle.Starting
+                or HostedChannelRuntimeLifecycle.Started;
         if (enabled)
         {
             await _hostBotAccounts.UseCustomBotAsync(hostId, CancellationToken.None);
@@ -633,13 +632,19 @@ public partial class HostConfigPage
 
     private void TrackPendingRuntimeTransition()
     {
-        var runtimeState = _state?.RuntimeStatus?.RuntimeState;
-        _pendingRuntimeState = IsRuntimeTransitionPending(runtimeState) ? runtimeState : null;
+        _pendingRuntimeTransition = PendingTransition(_runtimeLifecycle);
     }
 
-    private static bool IsRuntimeTransitionPending(BotChannelRuntimeState? runtimeState)
+    private static PendingRuntimeTransition? PendingTransition(
+        HostedChannelRuntimeLifecycle? lifecycle
+    )
     {
-        return runtimeState is BotChannelRuntimeState.Starting or BotChannelRuntimeState.Stopping;
+        return lifecycle?.Match<PendingRuntimeTransition?>(
+            static _ => null,
+            static _ => PendingRuntimeTransition.Starting,
+            static _ => null,
+            static _ => PendingRuntimeTransition.Stopping
+        );
     }
 
     protected override void Dispose(bool disposing)
@@ -651,5 +656,11 @@ public partial class HostConfigPage
         }
 
         base.Dispose(disposing);
+    }
+
+    private enum PendingRuntimeTransition
+    {
+        Starting,
+        Stopping,
     }
 }

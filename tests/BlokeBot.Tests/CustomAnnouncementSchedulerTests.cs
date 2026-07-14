@@ -797,7 +797,7 @@ public sealed class CustomAnnouncementSchedulerTests
             dbFactory,
             sender,
             new TimeProviderCustomAnnouncementTickScheduler(clock),
-            new CustomMessageSelector(clock),
+            new CustomMessageSelector(),
             Options.Create(
                 new BlokeBotOptions
                 {

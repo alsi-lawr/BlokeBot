@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Announcements;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
@@ -23,7 +24,7 @@ internal sealed class CustomAnnouncementScheduler(
     {
         var now = scheduler.GetUtcNow();
         await using var candidateDb = await dbFactory.CreateDbContextAsync(cancellationToken);
-        var candidates = await (
+        var candidateRows = await (
             from announcement in candidateDb.CustomAnnouncements.AsNoTracking()
             join host in candidateDb.Hosts.AsNoTracking() on announcement.HostId equals host.Id
             where
@@ -32,13 +33,30 @@ internal sealed class CustomAnnouncementScheduler(
                 && (host.EnabledFeatures & HostFeatureFlags.CustomCommands)
                     == HostFeatureFlags.CustomCommands
             orderby announcement.Id
-            select new AnnouncementCandidate(
-                announcement.Id,
-                host.Login,
+            select new
+            {
+                AnnouncementId = announcement.Id,
+                HostLogin = host.Login,
                 host.TimeZoneId,
-                host.BotRuntimeStateChangedAtUtc
-            )
+                host.BotRuntimeState,
+                host.BotRuntimeStateChangedAtUtc,
+            }
         ).ToListAsync(cancellationToken);
+        var candidates = candidateRows
+            .Select(row => new AnnouncementCandidate(
+                row.AnnouncementId,
+                row.HostLogin,
+                row.TimeZoneId,
+                HostedChannelRuntimeLifecycle
+                    .FromPersistence(row.BotRuntimeState, row.BotRuntimeStateChangedAtUtc)
+                    .Match(
+                        _ => throw new PersistenceDataIntegrityException(typeof(BotHost)),
+                        _ => throw new PersistenceDataIntegrityException(typeof(BotHost)),
+                        static started => started,
+                        _ => throw new PersistenceDataIntegrityException(typeof(BotHost))
+                    )
+            ))
+            .ToArray();
 
         foreach (var candidate in candidates)
         {
@@ -200,8 +218,9 @@ internal sealed class CustomAnnouncementScheduler(
 
         var message = announcement.OccurrenceStatus switch
         {
-            AnnouncementOccurrenceStatus.Pending => messageSelector.SelectMessage(
-                announcement.MessageLibraryEntry
+            AnnouncementOccurrenceStatus.Pending => SelectMessage(
+                announcement.MessageLibraryEntry,
+                now
             ),
             AnnouncementOccurrenceStatus.RetryScheduled => announcement.OccurrenceMessage
                 ?? throw new UnreachableException(
@@ -381,10 +400,7 @@ internal sealed class CustomAnnouncementScheduler(
             return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
 
-        if (
-            candidate.BotRuntimeStateChangedAtUtc is { } changedAtUtc
-            && changedAtUtc > dueAt.UtcDateTime
-        )
+        if (candidate.Runtime.ChangedAtUtc > dueAt.UtcDateTime)
         {
             return new AnnouncementScheduleEvaluation.Evaluated(new AnnouncementDueResult.NotDue());
         }
@@ -529,6 +545,35 @@ internal sealed class CustomAnnouncementScheduler(
         return new(DateTime.SpecifyKind(value, DateTimeKind.Utc), TimeSpan.Zero);
     }
 
+    private string? SelectMessage(CustomMessageLibraryEntry? entry, DateTimeOffset selectedAt)
+    {
+        if (entry is null)
+        {
+            return null;
+        }
+
+        var snapshot = new CustomMessageSelectionSnapshot(
+            entry.SelectionMode,
+            entry.CurrentVariantIndex,
+            entry.Variants.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Select(x => x.Text)
+        );
+        return messageSelector
+            .Select(snapshot)
+            .Match<string?>(
+                selected =>
+                {
+                    if (entry.SelectionMode is CustomMessageSelectionMode.Sequential)
+                    {
+                        entry.CurrentVariantIndex = selected.NextVariantIndex;
+                        entry.UpdatedAtUtc = selectedAt.UtcDateTime;
+                    }
+
+                    return selected.Text;
+                },
+                static () => null
+            );
+    }
+
     private static DateTimeOffset Min(DateTimeOffset left, DateTimeOffset right)
     {
         return left <= right ? left : right;
@@ -538,7 +583,7 @@ internal sealed class CustomAnnouncementScheduler(
         int AnnouncementId,
         string HostLogin,
         string? TimeZoneId,
-        DateTime? BotRuntimeStateChangedAtUtc
+        HostedChannelRuntimeLifecycle.Started Runtime
     );
 
     private abstract record AnnouncementScheduleEvaluation

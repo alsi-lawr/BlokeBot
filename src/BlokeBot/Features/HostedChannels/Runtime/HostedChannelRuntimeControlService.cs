@@ -29,6 +29,11 @@ public sealed class HostedChannelRuntimeControlService(
             return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
         }
 
+        _ = HostedChannelRuntimeLifecycle.FromPersistence(
+            host.BotRuntimeState,
+            host.BotRuntimeStateChangedAtUtc
+        );
+
         if (
             !channelBotAuthorization.IsCurrent(
                 host.ChannelBotAuthorizedAtUtc,
@@ -74,17 +79,22 @@ public sealed class HostedChannelRuntimeControlService(
             return HostedChannelRuntimeControlResult.Failure("Channel setup was not found.");
         }
 
+        var lifecycle = HostedChannelRuntimeLifecycle.FromPersistence(
+            host.BotRuntimeState,
+            host.BotRuntimeStateChangedAtUtc
+        );
+
         if (CooldownMessage(host) is { } cooldown)
         {
             return cooldown;
         }
 
-        host.BotRuntimeState = host.BotRuntimeState switch
-        {
-            BotChannelRuntimeState.Started => BotChannelRuntimeState.Stopping,
-            BotChannelRuntimeState.Stopping => BotChannelRuntimeState.Stopping,
-            _ => BotChannelRuntimeState.Stopped,
-        };
+        host.BotRuntimeState = lifecycle.Match(
+            static _ => BotChannelRuntimeState.Stopped,
+            static _ => BotChannelRuntimeState.Stopped,
+            static _ => BotChannelRuntimeState.Stopping,
+            static _ => BotChannelRuntimeState.Stopping
+        );
         host.BotRuntimeStateChangedAtUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);

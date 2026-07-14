@@ -1,4 +1,5 @@
 using BlokeBot.Auth.Sessions;
+using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -12,18 +13,33 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
+        var hosts = await db
             .Hosts.AsNoTracking()
             .OrderBy(x => x.DisplayName)
+            .Select(x => new
+            {
+                x.Id,
+                x.Login,
+                x.DisplayName,
+                x.ProfileImageUrl,
+                IsChannelBotAuthorized = x.ChannelBotAuthorizedAtUtc != null,
+                x.BotRuntimeState,
+                x.BotRuntimeStateChangedAtUtc,
+            })
+            .ToArrayAsync(ct);
+        return hosts
             .Select(x => new HostedChannelAdminView(
                 x.Id,
                 x.Login,
                 x.DisplayName,
                 x.ProfileImageUrl,
-                x.ChannelBotAuthorizedAtUtc != null,
-                x.BotRuntimeState
+                x.IsChannelBotAuthorized,
+                HostedChannelRuntimeLifecycle.FromPersistence(
+                    x.BotRuntimeState,
+                    x.BotRuntimeStateChangedAtUtc
+                )
             ))
-            .ToListAsync(ct);
+            .ToArray();
     }
 
     public async Task<IReadOnlySet<int>> LoadHostedChannelIdsAsync(CancellationToken ct)

@@ -15,7 +15,6 @@ public sealed record HostConfigState(
     bool IsHostCreated,
     bool IsChannelBotAuthorized,
     HostedChannelRuntimeSummary? RuntimeStatus,
-    DateTime? LastRuntimeChangeAtUtc,
     HostBotAccountOverrideState BotOverride,
     IReadOnlyList<HostFeatureCardState> Features,
     HostModAccessState ModAccess
