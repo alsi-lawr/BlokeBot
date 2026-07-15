@@ -33,11 +33,12 @@ public sealed class UiFaultRoutingTests
     }
 
     [Test]
-    public void UnexpectedFault_Reporting_EmitsStructuredComponentOperationAndContext()
+    public void UnexpectedFault_Reporting_EmitsSafeContextWithoutExceptionDetails()
     {
         var logger = new RecordingLogger<UiFaultTelemetry>();
         var telemetry = new UiFaultTelemetry(logger);
-        var exception = new InvalidOperationException("unexpected");
+        const string SensitiveMessage = "secret-token-from-sensitive-failure";
+        var exception = new InvalidOperationException(SensitiveMessage);
 
         telemetry.Report(
             exception,
@@ -46,10 +47,15 @@ public sealed class UiFaultRoutingTests
 
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Error);
-        entry.Exception.ShouldBeSameAs(exception);
+        entry.Exception.ShouldBeNull();
         entry.Properties["UiComponent"].ShouldBe("PointsConfigurationPage");
         entry.Properties["UiOperation"].ShouldBe("SaveAsync");
         entry.Properties["HostId"].ShouldBe(42);
+        entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
+        entry.Message.ShouldNotContain(SensitiveMessage);
+        entry.Properties.Values.ShouldAllBe(value =>
+            value == null || !value.ToString()!.Contains(SensitiveMessage, StringComparison.Ordinal)
+        );
     }
 
     [Test]
@@ -110,7 +116,7 @@ public sealed class UiFaultRoutingTests
             boundary.Instance.CapturedException.ShouldBeSameAs(exception)
         );
         var entry = logger.Entries.ShouldHaveSingleItem();
-        entry.Exception.ShouldBeSameAs(exception);
+        entry.Exception.ShouldBeNull();
         entry.Properties["UiComponent"].ShouldBe(nameof(TestBackgroundComponent));
         entry.Properties["UiOperation"].ShouldBe("LoadBackgroundValueAsync");
         entry.Properties["LoadIdentityType"].ShouldBe(nameof(TestLoadIdentity));
@@ -240,13 +246,14 @@ public sealed class UiFaultRoutingTests
             var properties = state is IEnumerable<KeyValuePair<string, object?>> values
                 ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
                 : new Dictionary<string, object?>();
-            Entries.Add(new(logLevel, exception, properties));
+            Entries.Add(new(logLevel, exception, formatter(state, exception), properties));
         }
     }
 
     private sealed record LogEntry(
         LogLevel Level,
         Exception? Exception,
+        string Message,
         IReadOnlyDictionary<string, object?> Properties
     );
 }

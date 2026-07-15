@@ -15,12 +15,12 @@ public sealed class UiFaultTelemetry(ILogger<UiFaultTelemetry> log)
     {
         log.LogError(
             _unexpectedUiFault,
-            exception,
-            "Unexpected UI fault in {UiComponent} during {UiOperation} for host {HostId} with load identity {LoadIdentityType}",
+            "Unexpected UI fault in {UiComponent} during {UiOperation} for host {HostId} with load identity {LoadIdentityType}; failure type {FailureType}",
             context.Component,
             context.Operation,
             context.HostId,
-            context.LoadIdentityType
+            context.LoadIdentityType,
+            exception.GetType().FullName ?? exception.GetType().Name
         );
     }
 }

@@ -275,7 +275,15 @@ public partial class HostConfigPage
         await LoadAsync();
     }
 
-    private async Task AddAccessAsync(int hostId, AccessListEntryKind kind)
+    private Task AddAccessAsync(int hostId, AccessListEntryKind kind)
+    {
+        return ObserveUiOperationAsync(
+            nameof(AddAccessAsync),
+            () => AddAccessCoreAsync(hostId, kind)
+        );
+    }
+
+    private async Task AddAccessCoreAsync(int hostId, AccessListEntryKind kind)
     {
         var login = kind == AccessListEntryKind.Whitelist ? _newWhitelistLogin : _newBlacklistLogin;
         await _modAccess.AddEntryAsync(hostId, kind, login, CancellationToken.None);
@@ -288,7 +296,7 @@ public partial class HostConfigPage
             _newBlacklistLogin = string.Empty;
         }
 
-        await LoadAsync();
+        await LoadCoreAsync();
     }
 
     private Task LoadAsync()
@@ -360,13 +368,29 @@ public partial class HostConfigPage
         }
     }
 
-    private async Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
+    private Task RemoveAccessAsync(int hostId, AccessListEntryKind kind, string login)
     {
-        await _modAccess.RemoveEntryAsync(hostId, kind, login, CancellationToken.None);
-        await LoadAsync();
+        return ObserveUiOperationAsync(
+            nameof(RemoveAccessAsync),
+            () => RemoveAccessCoreAsync(hostId, kind, login)
+        );
     }
 
-    private async Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
+    private async Task RemoveAccessCoreAsync(int hostId, AccessListEntryKind kind, string login)
+    {
+        await _modAccess.RemoveEntryAsync(hostId, kind, login, CancellationToken.None);
+        await LoadCoreAsync();
+    }
+
+    private Task SetModsEnabledAsync(int hostId, ChangeEventArgs args)
+    {
+        return ObserveUiOperationAsync(
+            nameof(SetModsEnabledAsync),
+            () => SetModsEnabledCoreAsync(hostId, args)
+        );
+    }
+
+    private async Task SetModsEnabledCoreAsync(int hostId, ChangeEventArgs args)
     {
         if (args.Value is true)
         {
@@ -377,7 +401,7 @@ public partial class HostConfigPage
             await _modAccess.DisableModeratorAccessAsync(hostId, CancellationToken.None);
         }
 
-        await LoadAsync();
+        await LoadCoreAsync();
     }
 
     private void SetAllowModsByDefault(int hostId, bool allowByDefault)
@@ -482,7 +506,19 @@ public partial class HostConfigPage
         });
     }
 
-    private async Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
+    private Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
+    {
+        return ObserveUiOperationAsync(
+            nameof(SetFeatureEnabledAsync),
+            () => SetFeatureEnabledCoreAsync(hostId, feature, enabled)
+        );
+    }
+
+    private async Task SetFeatureEnabledCoreAsync(
+        int hostId,
+        HostFeatureFlags feature,
+        bool enabled
+    )
     {
         if (enabled)
         {
@@ -493,11 +529,19 @@ public partial class HostConfigPage
             await _features.DisableAsync(hostId, feature, CancellationToken.None);
         }
 
-        await LoadAsync();
+        await LoadCoreAsync();
         ToastFeatureChange(feature, enabled);
     }
 
-    private async Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
+    private Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
+    {
+        return ObserveUiOperationAsync(
+            nameof(SetBotOverrideEnabledAsync),
+            () => SetBotOverrideEnabledCoreAsync(hostId, enabled)
+        );
+    }
+
+    private async Task SetBotOverrideEnabledCoreAsync(int hostId, bool enabled)
     {
         var runtimeWasActive =
             _runtimeLifecycle
@@ -512,7 +556,7 @@ public partial class HostConfigPage
             await _hostBotAccounts.UseMainBotAsync(hostId, CancellationToken.None);
         }
 
-        await LoadAsync();
+        await LoadCoreAsync();
         if (runtimeWasActive)
         {
             TrackPendingRuntimeTransition();
@@ -527,12 +571,20 @@ public partial class HostConfigPage
         );
     }
 
-    private async Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
+    private Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
+    {
+        return ObserveUiOperationAsync(
+            nameof(SetWhisperResponsesEnabledAsync),
+            () => SetWhisperResponsesEnabledCoreAsync(hostId, enabled)
+        );
+    }
+
+    private async Task SetWhisperResponsesEnabledCoreAsync(int hostId, bool enabled)
     {
         var outcome = enabled
             ? await _hostBotAccounts.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
             : await _hostBotAccounts.DisableWhisperResponsesAsync(hostId, CancellationToken.None);
-        await LoadAsync();
+        await LoadCoreAsync();
 
         outcome
             .Match<Action>(_ => ShowSavedStatus, _ => ShowRejectedStatus, _ => ShowRejectedStatus)
@@ -603,17 +655,33 @@ public partial class HostConfigPage
         };
     }
 
-    private async Task ClearChannelAuthorizationAsync(int hostId)
+    private Task ClearChannelAuthorizationAsync(int hostId)
+    {
+        return ObserveUiOperationAsync(
+            nameof(ClearChannelAuthorizationAsync),
+            () => ClearChannelAuthorizationCoreAsync(hostId)
+        );
+    }
+
+    private async Task ClearChannelAuthorizationCoreAsync(int hostId)
     {
         await _channelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
-        await LoadAsync();
+        await LoadCoreAsync();
         _toasts.Status("The channel has been disconnected from Twitch chat.");
     }
 
-    private async Task ClearBotOverrideAuthorizationAsync(int hostId)
+    private Task ClearBotOverrideAuthorizationAsync(int hostId)
+    {
+        return ObserveUiOperationAsync(
+            nameof(ClearBotOverrideAuthorizationAsync),
+            () => ClearBotOverrideAuthorizationCoreAsync(hostId)
+        );
+    }
+
+    private async Task ClearBotOverrideAuthorizationCoreAsync(int hostId)
     {
         await _hostBotAccounts.ClearAsync(hostId, CancellationToken.None);
-        await LoadAsync();
+        await LoadCoreAsync();
         _toasts.Status(
             "The custom bot account has been disconnected.",
             "Custom bot disconnected",
@@ -621,10 +689,15 @@ public partial class HostConfigPage
         );
     }
 
-    private async Task StartAsync(int hostId)
+    private Task StartAsync(int hostId)
+    {
+        return ObserveUiOperationAsync(nameof(StartAsync), () => StartCoreAsync(hostId));
+    }
+
+    private async Task StartCoreAsync(int hostId)
     {
         var result = await _runtime.StartAsync(hostId, CancellationToken.None);
-        await LoadAsync();
+        await LoadCoreAsync();
         if (result.Succeeded)
         {
             TrackPendingRuntimeTransition();
@@ -636,10 +709,15 @@ public partial class HostConfigPage
         );
     }
 
-    private async Task StopAsync(int hostId)
+    private Task StopAsync(int hostId)
+    {
+        return ObserveUiOperationAsync(nameof(StopAsync), () => StopCoreAsync(hostId));
+    }
+
+    private async Task StopCoreAsync(int hostId)
     {
         var result = await _runtime.StopAsync(hostId, CancellationToken.None);
-        await LoadAsync();
+        await LoadCoreAsync();
         if (result.Succeeded)
         {
             TrackPendingRuntimeTransition();
