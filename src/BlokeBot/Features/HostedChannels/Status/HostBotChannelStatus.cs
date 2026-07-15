@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed record HostBotChannelStatus
@@ -31,24 +29,20 @@ public sealed record HostBotChannelStatus
 
     public static HostBotChannelStatus FromReadiness(HostBotReadinessOutcome outcome)
     {
-        return outcome switch
-        {
-            HostBotReadinessOutcome.NotConfigured => NotConfigured(),
-            HostBotReadinessOutcome.TokenUnavailable => NeedsAuthorization(),
-            HostBotReadinessOutcome.InvalidToken => NeedsAuthorization(),
-            HostBotReadinessOutcome.NeedsAuthorization => NeedsAuthorization(),
-            HostBotReadinessOutcome.BotAccountMismatch => NeedsAuthorization(),
-            HostBotReadinessOutcome.MissingModeratorCheckScope missing =>
-                MissingModeratorCheckPermission(missing.Capabilities),
-            HostBotReadinessOutcome.MissingModeratorCheckPermission missing =>
-                MissingModeratorCheckPermission(missing.Capabilities),
-            HostBotReadinessOutcome.IdentityLookupFailed => Unknown(),
-            HostBotReadinessOutcome.Unknown => Unknown(),
-            HostBotReadinessOutcome.NotModerator => NotModerator(),
-            HostBotReadinessOutcome.MissingFollowerReadScope => MissingFollowerReadPermission(),
-            HostBotReadinessOutcome.Ready => Ready(),
-            _ => throw new UnreachableException(),
-        };
+        return outcome.Match(
+            _ => NotConfigured(),
+            _ => NeedsAuthorization(),
+            _ => NeedsAuthorization(),
+            _ => NeedsAuthorization(),
+            _ => Unknown(),
+            missing => MissingModeratorCheckPermission(missing.Capabilities),
+            missing => MissingModeratorCheckPermission(missing.Capabilities),
+            _ => Unknown(),
+            _ => NeedsAuthorization(),
+            _ => NotModerator(),
+            _ => MissingFollowerReadPermission(),
+            _ => Ready()
+        );
     }
 
     private static HostBotChannelStatus NotConfigured()

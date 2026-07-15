@@ -145,22 +145,13 @@ public sealed class HostBotStatusService(
             channelId,
             ct
         );
-        return moderatorCheck switch
-        {
-            ModeratedChannelStatus.IsModerator when capabilities.FollowerReadGranted =>
-                new HostBotReadinessOutcome.Ready(),
-            ModeratedChannelStatus.IsModerator =>
-                new HostBotReadinessOutcome.MissingFollowerReadScope(capabilities),
-            ModeratedChannelStatus.NotModerator => new HostBotReadinessOutcome.NotModerator(
-                capabilities
-            ),
-            ModeratedChannelStatus.NeedsAuthorization =>
-                new HostBotReadinessOutcome.NeedsAuthorization(capabilities),
-            ModeratedChannelStatus.MissingPermission =>
-                new HostBotReadinessOutcome.MissingModeratorCheckPermission(capabilities),
-            ModeratedChannelStatus.Unknown => new HostBotReadinessOutcome.Unknown(capabilities),
-            _ => throw new UnreachableException(),
-        };
+        return moderatorCheck.Match<HostBotReadinessOutcome>(
+            _ => new HostBotReadinessOutcome.Unknown(capabilities),
+            _ => new HostBotReadinessOutcome.NeedsAuthorization(capabilities),
+            _ => new HostBotReadinessOutcome.MissingModeratorCheckPermission(capabilities),
+            _ => ChannelAuthorityReadyOutcome(capabilities),
+            _ => new HostBotReadinessOutcome.NotModerator(capabilities)
+        );
     }
 
     private static HostBotReadinessOutcome ChannelAuthorityReadyOutcome(
@@ -281,19 +272,18 @@ public sealed class HostBotStatusService(
             return new FollowerCheckOutcome.NotEligible();
         }
 
-        return await helix.GetFollowerStatusAsync(
+        var followerStatus = await helix.GetFollowerStatusAsync(
             HelixContext(token.AccessToken),
             channelId,
             viewerId,
             token.Validation.UserId,
             ct
-        ) switch
-        {
-            FollowerStatus.Follows => new FollowerCheckOutcome.Eligible(),
-            FollowerStatus.DoesNotFollow => new FollowerCheckOutcome.NotEligible(),
-            FollowerStatus.Unavailable => new FollowerCheckOutcome.Unavailable(),
-            _ => throw new UnreachableException(),
-        };
+        );
+        return followerStatus.Match<FollowerCheckOutcome>(
+            _ => new FollowerCheckOutcome.Eligible(),
+            _ => new FollowerCheckOutcome.NotEligible(),
+            _ => new FollowerCheckOutcome.Unavailable()
+        );
     }
 
     private HostBotReadinessCapabilities ConfiguredCapabilities()

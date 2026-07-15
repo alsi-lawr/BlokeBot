@@ -1,8 +1,29 @@
+using System.Diagnostics;
+
 namespace BlokeBot.Twitch;
 
 public abstract record ModeratedChannelStatus
 {
     private ModeratedChannelStatus() { }
+
+    public TResult Match<TResult>(
+        Func<Unknown, TResult> unknown,
+        Func<NeedsAuthorization, TResult> needsAuthorization,
+        Func<MissingPermission, TResult> missingPermission,
+        Func<IsModerator, TResult> isModerator,
+        Func<NotModerator, TResult> notModerator
+    )
+    {
+        return this switch
+        {
+            Unknown value => unknown(value),
+            NeedsAuthorization value => needsAuthorization(value),
+            MissingPermission value => missingPermission(value),
+            IsModerator value => isModerator(value),
+            NotModerator value => notModerator(value),
+            _ => throw new UnreachableException("Unknown moderated channel status."),
+        };
+    }
 
     public sealed record Unknown : ModeratedChannelStatus;
 

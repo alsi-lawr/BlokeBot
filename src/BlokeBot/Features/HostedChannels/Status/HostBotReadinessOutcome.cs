@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace BlokeBot.Features.HostedChannels.Status;
 
 public sealed record HostBotReadinessCapabilities(
@@ -10,6 +12,39 @@ public sealed record HostBotReadinessCapabilities(
 public abstract record HostBotReadinessOutcome
 {
     private HostBotReadinessOutcome() { }
+
+    public TResult Match<TResult>(
+        Func<NotConfigured, TResult> notConfigured,
+        Func<TokenUnavailable, TResult> tokenUnavailable,
+        Func<InvalidToken, TResult> invalidToken,
+        Func<NeedsAuthorization, TResult> needsAuthorization,
+        Func<Unknown, TResult> unknown,
+        Func<MissingModeratorCheckScope, TResult> missingModeratorCheckScope,
+        Func<MissingModeratorCheckPermission, TResult> missingModeratorCheckPermission,
+        Func<IdentityLookupFailed, TResult> identityLookupFailed,
+        Func<BotAccountMismatch, TResult> botAccountMismatch,
+        Func<NotModerator, TResult> notModerator,
+        Func<MissingFollowerReadScope, TResult> missingFollowerReadScope,
+        Func<Ready, TResult> ready
+    )
+    {
+        return this switch
+        {
+            NotConfigured value => notConfigured(value),
+            TokenUnavailable value => tokenUnavailable(value),
+            InvalidToken value => invalidToken(value),
+            NeedsAuthorization value => needsAuthorization(value),
+            Unknown value => unknown(value),
+            MissingModeratorCheckScope value => missingModeratorCheckScope(value),
+            MissingModeratorCheckPermission value => missingModeratorCheckPermission(value),
+            IdentityLookupFailed value => identityLookupFailed(value),
+            BotAccountMismatch value => botAccountMismatch(value),
+            NotModerator value => notModerator(value),
+            MissingFollowerReadScope value => missingFollowerReadScope(value),
+            Ready value => ready(value),
+            _ => throw new UnreachableException("Unknown host bot readiness outcome."),
+        };
+    }
 
     public sealed record NotConfigured : HostBotReadinessOutcome;
 
