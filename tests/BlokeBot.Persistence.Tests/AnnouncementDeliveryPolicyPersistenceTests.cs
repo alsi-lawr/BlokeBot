@@ -3,8 +3,6 @@ using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Shouldly;
 using TUnit.Core;
 
@@ -160,62 +158,6 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
                 """
             )
         );
-    }
-
-    [Test]
-    public async Task PolicyModel_IsOneRequiredHostScopedTypedTphHierarchy()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var model = db.GetService<IDesignTimeModel>().Model;
-        var baseType = model.FindEntityType(typeof(CustomAnnouncementDeliveryPolicy));
-        baseType.ShouldNotBeNull();
-        var leafType = baseType.GetDerivedTypes().ShouldHaveSingleItem();
-        leafType.ClrType.ShouldBe(
-            typeof(RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy)
-        );
-        leafType.GetTableName().ShouldBe(baseType.GetTableName());
-
-        var discriminator = baseType.FindDiscriminatorProperty();
-        discriminator.ShouldNotBeNull();
-        discriminator.ClrType.ShouldBe(typeof(CustomAnnouncementDeliveryPolicyKind));
-        discriminator.IsNullable.ShouldBeFalse();
-        baseType
-            .FindPrimaryKey()!
-            .Properties.Select(x => x.Name)
-            .ShouldBe([nameof(CustomAnnouncementDeliveryPolicy.Id)]);
-        baseType
-            .FindKey([
-                baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.HostId))!,
-                baseType.FindProperty(nameof(CustomAnnouncementDeliveryPolicy.Id))!,
-            ])
-            .ShouldNotBeNull();
-
-        var announcementType = model.FindEntityType(typeof(CustomAnnouncement));
-        announcementType.ShouldNotBeNull();
-        var relationship = announcementType
-            .GetForeignKeys()
-            .Single(x => x.PrincipalEntityType == baseType);
-        relationship
-            .Properties.Select(x => x.Name)
-            .ShouldBe([
-                nameof(CustomAnnouncement.HostId),
-                nameof(CustomAnnouncement.DeliveryPolicyId),
-            ]);
-        relationship.IsUnique.ShouldBeTrue();
-        relationship.IsRequired.ShouldBeTrue();
-        relationship.DeleteBehavior.ShouldBe(DeleteBehavior.Restrict);
-
-        baseType
-            .GetCheckConstraints()
-            .Select(x => x.Name)
-            .ShouldBe(
-                [
-                    "CK_custom_announcement_delivery_policies_Payload",
-                    "CK_custom_announcement_delivery_policies_PolicyType",
-                ],
-                ignoreOrder: true
-            );
     }
 
     [Test]

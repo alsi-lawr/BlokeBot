@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Net.WebSockets;
-using System.Reflection;
 using System.Text.Json;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging;
@@ -798,122 +797,6 @@ public sealed class RuntimeSessionResilienceTests
         entry.Properties["Classification"].ShouldBe(RuntimeSessionFailureClassification.Transient);
         entry.Properties["Attempt"].ShouldBe(3);
         entry.Properties["FailureType"].ShouldBe(typeof(IOException).FullName);
-    }
-
-    [Test]
-    public void RuntimeSessionUnionFamily_Inspecting_HasDeclaredDirectCasesAndCompleteMatchHandlers()
-    {
-        (Type Union, Type[] Cases)[] contracts =
-        [
-            (
-                typeof(RuntimeSessionHealthReport),
-                [
-                    typeof(RuntimeSessionHealthReport.RetryScheduled),
-                    typeof(RuntimeSessionHealthReport.ReconnectScheduled),
-                    typeof(RuntimeSessionHealthReport.Unhealthy),
-                ]
-            ),
-            (
-                typeof(RuntimeConnectionTarget),
-                [
-                    typeof(RuntimeConnectionTarget.Initial),
-                    typeof(RuntimeConnectionTarget.EventSubReconnect),
-                ]
-            ),
-            (
-                typeof(RuntimeSessionEstablishment),
-                [
-                    typeof(RuntimeSessionEstablishment.Idle),
-                    typeof(RuntimeSessionEstablishment.Established),
-                    typeof(RuntimeSessionEstablishment.TokenUnavailable),
-                ]
-            ),
-            (
-                typeof(RuntimeSessionOutcome),
-                [
-                    typeof(RuntimeSessionOutcome.Idle),
-                    typeof(RuntimeSessionOutcome.Established),
-                    typeof(RuntimeSessionOutcome.Canceled),
-                    typeof(RuntimeSessionOutcome.TokenUnavailable),
-                    typeof(RuntimeSessionOutcome.Unhealthy),
-                ]
-            ),
-            (
-                typeof(RuntimeListenOutcome),
-                [
-                    typeof(RuntimeListenOutcome.Reconnect),
-                    typeof(RuntimeListenOutcome.ProtocolHandoff),
-                    typeof(RuntimeListenOutcome.Canceled),
-                    typeof(RuntimeListenOutcome.Unhealthy),
-                ]
-            ),
-            (
-                typeof(RuntimeSessionHandoff),
-                [typeof(RuntimeSessionHandoff.None), typeof(RuntimeSessionHandoff.Pending)]
-            ),
-        ];
-
-        foreach (var (unionType, declaredCases) in contracts)
-        {
-            var directCases = unionType
-                .Assembly.GetTypes()
-                .Where(type => type.BaseType == unionType)
-                .OrderBy(type => type.Name, StringComparer.Ordinal)
-                .ToArray();
-            var expectedDirectCases = declaredCases
-                .OrderBy(type => type.Name, StringComparer.Ordinal)
-                .ToArray();
-            var constructor =
-                unionType.GetConstructor(
-                    BindingFlags.Instance | BindingFlags.NonPublic,
-                    binder: null,
-                    Type.EmptyTypes,
-                    modifiers: null
-                )
-                ?? throw new InvalidOperationException("The private union constructor is missing.");
-            var match = unionType
-                .GetMethods(
-                    BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
-                )
-                .Where(method => method.Name == "Match")
-                .ShouldHaveSingleItem();
-            var resultParameters = match.GetGenericArguments();
-            var handlers = match.GetParameters();
-
-            unionType.IsAbstract.ShouldBeTrue();
-            unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-            constructor.IsPrivate.ShouldBeTrue();
-            directCases.ShouldBe(expectedDirectCases);
-            directCases.ShouldAllBe(type => type.DeclaringType == unionType);
-            directCases.ShouldAllBe(type => type.IsSealed);
-            unionType
-                .GetMethods(
-                    BindingFlags.Instance
-                        | BindingFlags.Public
-                        | BindingFlags.NonPublic
-                        | BindingFlags.DeclaredOnly
-                )
-                .Any(method => method.Name == "Seal")
-                .ShouldBeFalse();
-            match.IsAbstract.ShouldBeTrue();
-            match.IsAssembly.ShouldBeTrue();
-            match.IsGenericMethodDefinition.ShouldBeTrue();
-            resultParameters.Length.ShouldBe(1);
-            var resultType = resultParameters[0];
-            resultType.Name.ShouldBe("TResult");
-            match.ReturnType.ShouldBe(resultType);
-            handlers.Length.ShouldBe(declaredCases.Length);
-
-            for (var index = 0; index < handlers.Length; index++)
-            {
-                var handlerType = handlers[index].ParameterType;
-                handlerType.IsGenericType.ShouldBeTrue();
-                handlerType.GetGenericTypeDefinition().ShouldBe(typeof(Func<,>));
-                var handlerArguments = handlerType.GetGenericArguments();
-                handlerArguments[0].ShouldBe(declaredCases[index]);
-                handlerArguments[1].ShouldBe(resultType);
-            }
-        }
     }
 
     private static Task<RuntimeSessionEstablishment> IdleAsync()

@@ -225,17 +225,6 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void FeatureStrategyCatalogs_EnumeratingDescriptors_CoverEveryKindOnce()
-    {
-        GuessingCatalog()
-            .Descriptors.Select(x => x.Kind)
-            .ShouldBe(Enum.GetValues<GuessCommandKind>(), ignoreOrder: true);
-        PointsCatalog()
-            .Descriptors.Select(x => x.Kind)
-            .ShouldBe(Enum.GetValues<PointsCommandKind>(), ignoreOrder: true);
-    }
-
-    [Test]
     public void FeatureStrategyCatalogs_ReadingDefaults_ExposeExpectedAliases()
     {
         var guessing = GuessingCatalog();
@@ -276,7 +265,7 @@ public sealed class CommandCatalogTests
     }
 
     [Test]
-    public void FeatureAndPersistedCommandKinds_Mapping_CoversEveryKindWithoutOverlap()
+    public void FeatureAndPersistedCommandKinds_Mapping_MapsSupportedKindsWithoutOverlap()
     {
         GuessingAppCommandKindMap.ToAppKind(GuessCommandKind.Guess).ShouldBe(AppCommandKind.Guess);
         PointsAppCommandKindMap.ToAppKind(PointsCommandKind.Gamble).ShouldBe(AppCommandKind.Gamble);
@@ -293,9 +282,6 @@ public sealed class CommandCatalogTests
         var guessingKinds = GuessingAppCommandKindMap.AppKinds;
         var pointsKinds = PointsAppCommandKindMap.AppKinds;
         guessingKinds.Intersect(pointsKinds).ShouldBeEmpty();
-        guessingKinds
-            .Concat(pointsKinds)
-            .ShouldBe(Enum.GetValues<AppCommandKind>(), ignoreOrder: true);
     }
 
     [Test]

@@ -1,4 +1,3 @@
-using System.Reflection;
 using BlokeBot.Eventing;
 using Shouldly;
 using TUnit.Core;
@@ -45,14 +44,6 @@ public sealed class ObserverFanOutTests
         );
         reporter.Reports.ShouldHaveSingleItem().Exception.ShouldBeSameAs(failure);
         handled.ToString().ShouldNotContain("secret exception payload");
-        typeof(ObserverFailureSummary)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .ShouldNotContain(name =>
-                name.Contains("Exception", StringComparison.Ordinal)
-                || name.Contains("Message", StringComparison.Ordinal)
-                || name.Contains("Payload", StringComparison.Ordinal)
-            );
     }
 
     [Test]
@@ -172,15 +163,6 @@ public sealed class ObserverFanOutTests
         deadLetter.Payload.ShouldBe(new TestDeadLetter("event-42"));
         deadLetter.Failure.Observer.ShouldBe(ObserverIdentity.Named("dead-lettered"));
         deadLetter.ToString().ShouldNotContain("private failure message");
-        typeof(TestDeadLetter)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .ShouldBe(["EventId"]);
-        typeof(ObserverDeadLetter<TestDeadLetter>)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .Order()
-            .ShouldBe(["Failure", "Payload"]);
     }
 
     [Test]

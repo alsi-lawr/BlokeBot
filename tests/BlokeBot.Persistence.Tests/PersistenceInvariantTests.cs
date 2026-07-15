@@ -306,42 +306,69 @@ public sealed class PersistenceInvariantTests
     [Test]
     public void PersistedEnums_FormattingAndParsing_UseExactRoundTrippableTokens()
     {
-        AssertTokens<AccessListEntryKind>(["blacklist", "whitelist"]);
+        AssertTokens<AccessListEntryKind>([
+            (AccessListEntryKind.Blacklist, "blacklist"),
+            (AccessListEntryKind.Whitelist, "whitelist"),
+        ]);
         AssertTokens<AnnouncementOccurrenceStatus>([
-            "Accepted",
-            "Attempting",
-            "None",
-            "Pending",
-            "RetryScheduled",
-            "SkippedExpired",
-            "TerminalAmbiguous",
-            "TerminalInvalidTimeZone",
-            "TerminalMissingMessage",
-            "TerminalRejected",
-            "TerminalUnexpected",
+            (AnnouncementOccurrenceStatus.Accepted, "Accepted"),
+            (AnnouncementOccurrenceStatus.Attempting, "Attempting"),
+            (AnnouncementOccurrenceStatus.None, "None"),
+            (AnnouncementOccurrenceStatus.Pending, "Pending"),
+            (AnnouncementOccurrenceStatus.RetryScheduled, "RetryScheduled"),
+            (AnnouncementOccurrenceStatus.SkippedExpired, "SkippedExpired"),
+            (AnnouncementOccurrenceStatus.TerminalAmbiguous, "TerminalAmbiguous"),
+            (AnnouncementOccurrenceStatus.TerminalInvalidTimeZone, "TerminalInvalidTimeZone"),
+            (AnnouncementOccurrenceStatus.TerminalMissingMessage, "TerminalMissingMessage"),
+            (AnnouncementOccurrenceStatus.TerminalRejected, "TerminalRejected"),
+            (AnnouncementOccurrenceStatus.TerminalUnexpected, "TerminalUnexpected"),
         ]);
         AssertTokens<AppCommandKind>([
-            "AddPoints",
-            "CancelGiveaway",
-            "EndGiveaway",
-            "Gamble",
-            "Giveaway",
-            "GivePoints",
-            "Guess",
-            "Guesses",
-            "Join",
-            "Points",
-            "RemovePoints",
-            "Start",
-            "Stop",
-            "Win",
+            (AppCommandKind.AddPoints, "AddPoints"),
+            (AppCommandKind.CancelGiveaway, "CancelGiveaway"),
+            (AppCommandKind.EndGiveaway, "EndGiveaway"),
+            (AppCommandKind.Gamble, "Gamble"),
+            (AppCommandKind.Giveaway, "Giveaway"),
+            (AppCommandKind.GivePoints, "GivePoints"),
+            (AppCommandKind.Guess, "Guess"),
+            (AppCommandKind.Guesses, "Guesses"),
+            (AppCommandKind.Join, "Join"),
+            (AppCommandKind.Points, "Points"),
+            (AppCommandKind.RemovePoints, "RemovePoints"),
+            (AppCommandKind.Start, "Start"),
+            (AppCommandKind.Stop, "Stop"),
+            (AppCommandKind.Win, "Win"),
         ]);
-        AssertTokens<CustomCommandCooldownScope>(["Global", "User"]);
-        AssertTokens<CustomMessageSelectionMode>(["First", "Random", "Sequential"]);
-        AssertTokens<DurableAlertSeverity>(["Critical", "Info", "Warning"]);
-        AssertTokens<GuessRoundStatus>(["Closed", "Completed", "Open"]);
-        AssertTokens<PointsEligibilityMode>(["everyone", "followers", "subscribers"]);
-        AssertTokens<PointsGiveawayStatus>(["Active", "Cancelled", "Completed", "Expired"]);
+        AssertTokens<CustomCommandCooldownScope>([
+            (CustomCommandCooldownScope.Global, "Global"),
+            (CustomCommandCooldownScope.User, "User"),
+        ]);
+        AssertTokens<CustomMessageSelectionMode>([
+            (CustomMessageSelectionMode.First, "First"),
+            (CustomMessageSelectionMode.Random, "Random"),
+            (CustomMessageSelectionMode.Sequential, "Sequential"),
+        ]);
+        AssertTokens<DurableAlertSeverity>([
+            (DurableAlertSeverity.Critical, "Critical"),
+            (DurableAlertSeverity.Info, "Info"),
+            (DurableAlertSeverity.Warning, "Warning"),
+        ]);
+        AssertTokens<GuessRoundStatus>([
+            (GuessRoundStatus.Closed, "Closed"),
+            (GuessRoundStatus.Completed, "Completed"),
+            (GuessRoundStatus.Open, "Open"),
+        ]);
+        AssertTokens<PointsEligibilityMode>([
+            (PointsEligibilityMode.Everyone, "everyone"),
+            (PointsEligibilityMode.Followers, "followers"),
+            (PointsEligibilityMode.Subscribers, "subscribers"),
+        ]);
+        AssertTokens<PointsGiveawayStatus>([
+            (PointsGiveawayStatus.Active, "Active"),
+            (PointsGiveawayStatus.Cancelled, "Cancelled"),
+            (PointsGiveawayStatus.Completed, "Completed"),
+            (PointsGiveawayStatus.Expired, "Expired"),
+        ]);
     }
 
     private static PointsGiveaway Giveaway(int hostId, PointsGiveawayStatus status)
@@ -429,13 +456,13 @@ public sealed class PersistenceInvariantTests
         };
     }
 
-    private static void AssertTokens<TEnum>(IReadOnlyList<string> expected)
+    private static void AssertTokens<TEnum>(IReadOnlyList<(TEnum Value, string Token)> cases)
         where TEnum : struct, Enum
     {
-        PersistedEnumTokens<TEnum>.Values.ShouldBe(expected);
-        foreach (var value in Enum.GetValues<TEnum>())
+        PersistedEnumTokens<TEnum>.Values.ShouldBe(cases.Select(item => item.Token));
+        foreach (var (value, token) in cases)
         {
-            var token = PersistedEnumTokens<TEnum>.Format(value);
+            PersistedEnumTokens<TEnum>.Format(value).ShouldBe(token);
             PersistedEnumTokens<TEnum>.Parse(token).ShouldBe(value);
         }
     }

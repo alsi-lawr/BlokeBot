@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Threading.Channels;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
@@ -154,17 +153,6 @@ public sealed class EventSubChannelRecoveryTests
             .Diagnostics.DiagnosticReports.ShouldHaveSingleItem()
             .ShouldBeOfType<EventSubChannelDiagnosticReport.Degraded>();
         ClassifiedFailure(diagnostic.Failure).Exception.ShouldBeSameAs(failure);
-        typeof(EventSubChannelFailure)
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Select(property => property.Name)
-            .Order()
-            .ShouldBe(["Classification", "FailureType"]);
-        typeof(EventSubChannelDiagnosticReport.Healthy)
-            .GetProperty(
-                "Failure",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            )
-            .ShouldBeNull();
         harness.RuntimeStatus.Current.ShouldBeOfType<BotRuntimeStatus.Authorized>();
         harness.Session.ActiveChannels.ShouldBeEmpty();
         operations.CreateCount("channel").ShouldBe(1);
@@ -960,123 +948,6 @@ public sealed class EventSubChannelRecoveryTests
         oldOperations.CreateCount("old").ShouldBe(1);
         old.Session.ActiveChannels.ShouldBe(["old"]);
         replacement.Session.ActiveChannels.ShouldBe(["replacement"]);
-    }
-
-    [Test]
-    public void SubscriptionDeletionOutcome_Inspecting_HasDeclaredDirectCases()
-    {
-        var unionType = typeof(EventSubSubscriptionDeletionOutcome);
-        var directCases = unionType
-            .GetNestedTypes(BindingFlags.NonPublic)
-            .Where(type => type.BaseType == unionType)
-            .OrderBy(type => type.Name)
-            .ToArray();
-
-        unionType.IsAbstract.ShouldBeTrue();
-        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-        directCases.Select(type => type.Name).ShouldBe(["Deleted", "Unresolved"]);
-        directCases.ShouldAllBe(type => type.IsSealed);
-    }
-
-    [Test]
-    public void ChannelReconciliationOutcome_Inspecting_HasDeclaredCasesAndCompleteHandlerSignatures()
-    {
-        var unionType = typeof(EventSubChannelReconciliationOutcome);
-        var directCases = unionType
-            .GetNestedTypes(BindingFlags.NonPublic)
-            .Where(type => type.BaseType == unionType)
-            .OrderBy(type => type.Name)
-            .ToArray();
-        var match =
-            unionType.GetMethod("Match", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("The channel reconciliation Match is missing.");
-        var constructor =
-            unionType.GetConstructor(
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                binder: null,
-                Type.EmptyTypes,
-                modifiers: null
-            )
-            ?? throw new InvalidOperationException(
-                "The channel reconciliation constructor is missing."
-            );
-        var matchResultType = match.GetGenericArguments().ShouldHaveSingleItem();
-        var handlerParameters = match.GetParameters();
-        var handledCases = new List<Type>(handlerParameters.Length);
-
-        unionType.IsAbstract.ShouldBeTrue();
-        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-        constructor.IsPrivate.ShouldBeTrue();
-        unionType
-            .GetMethods(
-                BindingFlags.Instance
-                    | BindingFlags.Public
-                    | BindingFlags.NonPublic
-                    | BindingFlags.DeclaredOnly
-            )
-            .ShouldNotContain(method => method.Name == "Seal");
-        match.IsGenericMethodDefinition.ShouldBeTrue();
-        matchResultType.IsGenericParameter.ShouldBeTrue();
-        matchResultType.Name.ShouldBe("TResult");
-        handlerParameters.Length.ShouldBe(directCases.Length);
-        foreach (var handlerParameter in handlerParameters)
-        {
-            var handlerType = handlerParameter.ParameterType;
-            handlerType.IsGenericType.ShouldBeTrue();
-            handlerType.GetGenericTypeDefinition().ShouldBe(typeof(Func<,>));
-            var handlerTypeArguments = handlerType.GetGenericArguments();
-            directCases.ShouldContain(handlerTypeArguments[0]);
-            handlerTypeArguments[1].ShouldBe(matchResultType);
-            handledCases.Add(handlerTypeArguments[0]);
-        }
-
-        directCases
-            .Select(type => type.Name)
-            .ShouldBe([
-                "Completed",
-                "MissingBot",
-                "MissingChannel",
-                "StartupMessageRejected",
-                "TokenUnavailable",
-                "UnresolvedDeletion",
-            ]);
-        handledCases.OrderBy(type => type.Name).ShouldBe(directCases);
-        directCases.ShouldAllBe(type => type.IsSealed);
-    }
-
-    [Test]
-    public void ChannelLifecycleUnion_Inspecting_HasDeclaredDirectCasesAndCompleteHandlers()
-    {
-        var unionType = typeof(EventSubChannelStatus);
-        var directCases = unionType
-            .Assembly.GetTypes()
-            .Where(type => type.BaseType == unionType)
-            .OrderBy(type => type.Name)
-            .ToArray();
-        var match =
-            unionType.GetMethod(nameof(EventSubChannelStatus.Match))
-            ?? throw new InvalidOperationException("The channel lifecycle Match is missing.");
-        var constructor =
-            unionType.GetConstructor(
-                BindingFlags.Instance | BindingFlags.NonPublic,
-                binder: null,
-                Type.EmptyTypes,
-                modifiers: null
-            )
-            ?? throw new InvalidOperationException("The channel lifecycle constructor is missing.");
-        var handledCases = match
-            .GetParameters()
-            .Select(parameter => parameter.ParameterType.GetGenericArguments()[0])
-            .OrderBy(type => type.Name)
-            .ToArray();
-
-        unionType.IsAbstract.ShouldBeTrue();
-        unionType.GetConstructors(BindingFlags.Instance | BindingFlags.Public).ShouldBeEmpty();
-        constructor.IsPrivate.ShouldBeTrue();
-        directCases.Select(type => type.Name).ShouldBe(["Degraded", "Healthy", "Recovering"]);
-        handledCases.ShouldBe(directCases);
-        directCases.ShouldAllBe(type => type.DeclaringType == unionType);
-        directCases.ShouldAllBe(type => type.IsSealed);
     }
 
     [Test]

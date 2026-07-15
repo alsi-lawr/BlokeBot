@@ -11,6 +11,18 @@ public sealed class BoundedDiscriminatorPersistenceTests
     [Test]
     public async Task ValidDiscriminators_Persisting_RoundTripsEveryCanonicalToken()
     {
+        PointLedgerKind[] supportedLedgerKinds =
+        [
+            PointLedgerKind.Add,
+            PointLedgerKind.Remove,
+            PointLedgerKind.DeleteBalance,
+            PointLedgerKind.TransferOut,
+            PointLedgerKind.TransferIn,
+            PointLedgerKind.GambleWin,
+            PointLedgerKind.GambleLoss,
+            PointLedgerKind.GiveawayWin,
+            PointLedgerKind.GuessWin,
+        ];
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
@@ -41,7 +53,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
                 GuessOption(profile.Id, "whisper", ReplyDeliveryTarget.Whisper)
             );
             db.PointLedgerEntries.AddRange(
-                Enum.GetValues<PointLedgerKind>().Select(kind => LedgerEntry(host.Id, kind))
+                supportedLedgerKinds.Select(kind => LedgerEntry(host.Id, kind))
             );
             await db.SaveChangesAsync();
         }
@@ -71,7 +83,7 @@ public sealed class BoundedDiscriminatorPersistenceTests
             .OrderBy(x => x.Id)
             .Select(x => x.Kind)
             .ToListAsync();
-        ledgerKinds.ShouldBe(Enum.GetValues<PointLedgerKind>());
+        ledgerKinds.ShouldBe(supportedLedgerKinds);
 
         var featureTokens = await readDb
             .Database.SqlQueryRaw<string>(

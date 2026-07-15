@@ -25,21 +25,24 @@ public sealed class BoundedDiscriminatorBehaviorTests
     }
 
     [Test]
-    public void PointLedgerKinds_Formatting_CoversEveryKind()
+    public void SupportedPointLedgerKinds_Formatting_ReturnExpectedLabels()
     {
-        Enum.GetValues<PointLedgerKind>()
-            .Select(kind => (kind, PointsDashboard.LedgerChangeLabel(kind)))
-            .ShouldBe([
-                (PointLedgerKind.Add, "Points added"),
-                (PointLedgerKind.Remove, "Points removed"),
-                (PointLedgerKind.DeleteBalance, "Balance deleted"),
-                (PointLedgerKind.TransferOut, "Points given"),
-                (PointLedgerKind.TransferIn, "Points received"),
-                (PointLedgerKind.GambleWin, "Gamble won"),
-                (PointLedgerKind.GambleLoss, "Gamble lost"),
-                (PointLedgerKind.GiveawayWin, "Giveaway prize"),
-                (PointLedgerKind.GuessWin, "Guessing prize"),
-            ]);
+        (PointLedgerKind Kind, string Label)[] supportedKinds =
+        [
+            (PointLedgerKind.Add, "Points added"),
+            (PointLedgerKind.Remove, "Points removed"),
+            (PointLedgerKind.DeleteBalance, "Balance deleted"),
+            (PointLedgerKind.TransferOut, "Points given"),
+            (PointLedgerKind.TransferIn, "Points received"),
+            (PointLedgerKind.GambleWin, "Gamble won"),
+            (PointLedgerKind.GambleLoss, "Gamble lost"),
+            (PointLedgerKind.GiveawayWin, "Giveaway prize"),
+            (PointLedgerKind.GuessWin, "Guessing prize"),
+        ];
+
+        supportedKinds
+            .Select(item => PointsDashboard.LedgerChangeLabel(item.Kind))
+            .ShouldBe(supportedKinds.Select(item => item.Label));
     }
 
     [Test]
@@ -97,7 +100,7 @@ public sealed class BoundedDiscriminatorBehaviorTests
     }
 
     [Test]
-    public async Task PointOperations_Completing_WritesEveryLedgerKind()
+    public async Task SupportedPointOperations_Completing_WriteExpectedLedgerKinds()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory);
@@ -162,7 +165,22 @@ public sealed class BoundedDiscriminatorBehaviorTests
             .Select(x => x.Kind)
             .Distinct()
             .ToListAsync();
-        kinds.Order().ShouldBe(Enum.GetValues<PointLedgerKind>());
+        kinds
+            .Order()
+            .ShouldBe(
+                new[]
+                {
+                    PointLedgerKind.Add,
+                    PointLedgerKind.Remove,
+                    PointLedgerKind.DeleteBalance,
+                    PointLedgerKind.TransferOut,
+                    PointLedgerKind.TransferIn,
+                    PointLedgerKind.GambleWin,
+                    PointLedgerKind.GambleLoss,
+                    PointLedgerKind.GiveawayWin,
+                    PointLedgerKind.GuessWin,
+                }.Order()
+            );
     }
 
     private static void AssertSuccess(

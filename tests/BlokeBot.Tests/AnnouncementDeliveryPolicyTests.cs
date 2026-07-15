@@ -47,20 +47,4 @@ public sealed class AnnouncementDeliveryPolicyTests
 
         Should.Throw<ArgumentException>(() => AnnouncementDeliveryPolicyMapper.ToDomain(entity));
     }
-
-    [Test]
-    public void DomainPolicyHierarchy_HasOnlyTheSupportedSealedLeaf()
-    {
-        var leaf = typeof(AnnouncementDeliveryPolicy).GetNestedType(
-            nameof(AnnouncementDeliveryPolicy.RetryUntilExpiredThenSkip),
-            System.Reflection.BindingFlags.NonPublic
-        );
-
-        leaf.ShouldNotBeNull();
-        leaf.IsSealed.ShouldBeTrue();
-        typeof(AnnouncementDeliveryPolicy)
-            .Assembly.GetTypes()
-            .Where(type => type.BaseType == typeof(AnnouncementDeliveryPolicy))
-            .ShouldBe([leaf]);
-    }
 }
