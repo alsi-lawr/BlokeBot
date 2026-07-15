@@ -51,7 +51,12 @@ public partial class SelectedChannelBotStatus
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
 
-    private BotHostSelection? _selection => Session.HostSelection;
+    private BotHostSelection? _selection =>
+        Session.State.Match<BotHostSelection?>(
+            _ => null,
+            selected => selected.Selection,
+            _ => null
+        );
 
     private bool _selectedHostBotAuthorized =>
         _selectedHostStatus?.IsChannelBotAuthorized == true

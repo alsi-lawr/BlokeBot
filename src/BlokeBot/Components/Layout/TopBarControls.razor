@@ -7,7 +7,11 @@
         @{
             var pageContext = _pageContext.FromPrincipal(authState.User);
             var session = pageContext.Session;
-            var selection = pageContext.HostSelection;
+            var selection = session.State.Match<BotHostSelection?>(
+                _ => null,
+                selected => selected.Selection,
+                _ => null
+            );
             var showHostSelector = ShowsHostSelector(session);
         }
         <div class="@ControlsGridClass(selection, session.IsAdminEditing, pageContext.IsBotAccount, showHostSelector, _showAlertIndicator)">

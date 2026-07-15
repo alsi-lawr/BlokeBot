@@ -6,7 +6,7 @@ namespace BlokeBot.Commands;
 public interface ICommandRouteResolver<TKind, TState>
     where TKind : notnull
 {
-    ValueTask<CommandRoute<TKind, TState>?> ResolveAsync(
+    ValueTask<CommandRouteResolution<TKind, TState>> ResolveAsync(
         ChatCommandContext context,
         CancellationToken cancellationToken
     );

@@ -9,10 +9,9 @@ public sealed class GuessingCommandRouteResolver(
     HostFeatureService features
 ) : ICommandRouteResolver<GuessCommandKind, AppCommandRouteState>
 {
-    public async ValueTask<CommandRoute<GuessCommandKind, AppCommandRouteState>?> ResolveAsync(
-        ChatCommandContext context,
-        CancellationToken cancellationToken
-    )
+    public async ValueTask<
+        CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
+    > ResolveAsync(ChatCommandContext context, CancellationToken cancellationToken)
     {
         var resolution = await aliases.ResolveAsync(
             context.Message.Channel,
@@ -21,7 +20,7 @@ public sealed class GuessingCommandRouteResolver(
         );
         if (resolution is null)
         {
-            return null;
+            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
         }
 
         var kind = GuessingAppCommandKindMap
@@ -29,7 +28,7 @@ public sealed class GuessingCommandRouteResolver(
             .Match<GuessCommandKind?>(value => value, () => null);
         if (kind is not { } mappedKind)
         {
-            return null;
+            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
         }
 
         if (
@@ -40,7 +39,7 @@ public sealed class GuessingCommandRouteResolver(
             )
         )
         {
-            return null;
+            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
         }
 
         var state = resolution.Scope.Match<AppCommandRouteState>(
@@ -50,6 +49,8 @@ public sealed class GuessingCommandRouteResolver(
                 profile.ProfileId
             )
         );
-        return new CommandRoute<GuessCommandKind, AppCommandRouteState>(mappedKind, state);
+        return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Resolved(
+            new CommandRoute<GuessCommandKind, AppCommandRouteState>(mappedKind, state)
+        );
     }
 }

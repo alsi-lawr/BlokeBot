@@ -16,7 +16,7 @@ public sealed class CustomCommandExecutionService(
     TimeProvider clock
 )
 {
-    public async ValueTask<bool> TryExecuteAsync(
+    public async ValueTask<CommandHandlingOutcome> ExecuteAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken ct
@@ -26,7 +26,7 @@ public sealed class CustomCommandExecutionService(
         var alias = CommandAliasNormalizer.Normalize(context.CommandName);
         if (hostLogin.Length == 0 || alias.Length == 0)
         {
-            return false;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -37,7 +37,7 @@ public sealed class CustomCommandExecutionService(
             .SingleOrDefaultAsync(ct);
         if (host is null || !HasCustomCommands(host.EnabledFeatures))
         {
-            return false;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         var commandId = await db
@@ -47,7 +47,7 @@ public sealed class CustomCommandExecutionService(
             .FirstOrDefaultAsync(ct);
         if (commandId is null)
         {
-            return false;
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -58,12 +58,12 @@ public sealed class CustomCommandExecutionService(
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
         {
-            return true;
+            return new CommandHandlingOutcome.Handled();
         }
 
         if (command.ModeratorOnly && !ChatModeratorPolicy.IsModerator(context.Message))
         {
-            return true;
+            return new CommandHandlingOutcome.Handled();
         }
 
         if (
@@ -75,7 +75,7 @@ public sealed class CustomCommandExecutionService(
             )
         )
         {
-            return true;
+            return new CommandHandlingOutcome.Handled();
         }
 
         long? count = null;
@@ -85,14 +85,14 @@ public sealed class CustomCommandExecutionService(
             count = IncrementCounter(counterAction);
             if (count is null)
             {
-                return true;
+                return new CommandHandlingOutcome.Handled();
             }
         }
 
         var selectedMessage = SelectMessage(command.Action.MessageLibraryEntry);
         if (selectedMessage is null)
         {
-            return true;
+            return new CommandHandlingOutcome.Handled();
         }
 
         await db.SaveChangesAsync(ct);
@@ -100,7 +100,7 @@ public sealed class CustomCommandExecutionService(
 
         var reply = templates.Render(selectedMessage, context, args, count);
         await context.ReplyAsync(reply, ct);
-        return true;
+        return new CommandHandlingOutcome.Handled();
     }
 
     private TimeSpan Cooldown(CustomCommand command)

@@ -37,11 +37,11 @@ public static class IrcProtocol
     /// </summary>
     /// <param name="line">The raw IRC line.</param>
     /// <returns>The typed private message parse result.</returns>
-    public static IrcPrivMsgParseResult ParsePrivMsg(string line)
+    public static IrcPrivMsgParseOutcome ParsePrivMsg(string line)
     {
         if (!line.Contains(" PRIVMSG ", StringComparison.Ordinal))
         {
-            return Failure(IrcPrivMsgParseStatus.NotPrivMsg, line);
+            return new IrcPrivMsgParseOutcome.NotPrivMsg();
         }
 
         var rest = line;
@@ -51,7 +51,7 @@ public static class IrcProtocol
             var tagEnd = rest.IndexOf(' ');
             if (tagEnd <= 1)
             {
-                return Failure(IrcPrivMsgParseStatus.MissingTagTerminator, line);
+                return new IrcPrivMsgParseOutcome.MissingTagTerminator();
             }
 
             tags = ParseTags(rest[1..tagEnd]);
@@ -60,20 +60,20 @@ public static class IrcProtocol
 
         if (!rest.StartsWith(':'))
         {
-            return Failure(IrcPrivMsgParseStatus.MissingPrefix, line);
+            return new IrcPrivMsgParseOutcome.MissingPrefix();
         }
 
         var prefixEnd = rest.IndexOf(' ');
         if (prefixEnd <= 1)
         {
-            return Failure(IrcPrivMsgParseStatus.MalformedPrefix, line);
+            return new IrcPrivMsgParseOutcome.MalformedPrefix();
         }
 
         var prefix = rest[1..prefixEnd];
         var bang = prefix.IndexOf('!');
         if (bang <= 0)
         {
-            return Failure(IrcPrivMsgParseStatus.MissingUserLogin, line);
+            return new IrcPrivMsgParseOutcome.MissingUserLogin();
         }
 
         var login = prefix[..bang];
@@ -81,28 +81,20 @@ public static class IrcProtocol
         const string Marker = "PRIVMSG #";
         if (!commandRest.StartsWith(Marker, StringComparison.Ordinal))
         {
-            return Failure(IrcPrivMsgParseStatus.MalformedCommand, line);
+            return new IrcPrivMsgParseOutcome.MalformedCommand();
         }
 
         var channelEnd = commandRest.IndexOf(" :", StringComparison.Ordinal);
         if (channelEnd <= Marker.Length)
         {
-            return Failure(IrcPrivMsgParseStatus.MissingChannelOrText, line);
+            return new IrcPrivMsgParseOutcome.MissingChannelOrText();
         }
 
         var channel = commandRest[Marker.Length..channelEnd];
         var text = commandRest[(channelEnd + 2)..];
         var message = new ChatMessage(login, channel, text, line, tags);
 
-        return new IrcPrivMsgParseResult(IrcPrivMsgParseStatus.Parsed, message);
-    }
-
-    private static IrcPrivMsgParseResult Failure(IrcPrivMsgParseStatus status, string line)
-    {
-        return new(
-            status,
-            new ChatMessage(string.Empty, string.Empty, string.Empty, line, _emptyTags)
-        );
+        return new IrcPrivMsgParseOutcome.Parsed(message);
     }
 
     private static IReadOnlyDictionary<string, string> ParseTags(string rawTags)

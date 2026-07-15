@@ -251,17 +251,29 @@ public sealed class CommandCatalogTests
         var points = PointsCatalog();
 
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Start)
-            .RequiresModerator.ShouldBeTrue();
+            .Find(GuessCommandKind.Start)!
+            .Access.ShouldBeOfType<CommandStrategyAccess<
+                GuessCommandKind,
+                AppCommandRouteState
+            >.ModeratorOnly>();
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.AddPoints)
-            .RequiresModerator.ShouldBeTrue();
+            .Find(PointsCommandKind.AddPoints)!
+            .Access.ShouldBeOfType<CommandStrategyAccess<
+                PointsCommandKind,
+                AppCommandRouteState
+            >.ModeratorOnly>();
         points
-            .Descriptors.Single(x => x.Kind == PointsCommandKind.Points)
-            .RequiresModerator.ShouldBeFalse();
+            .Find(PointsCommandKind.Points)!
+            .Access.ShouldBeOfType<CommandStrategyAccess<
+                PointsCommandKind,
+                AppCommandRouteState
+            >.Everyone>();
         guessing
-            .Descriptors.Single(x => x.Kind == GuessCommandKind.Guess)
-            .RequiresModerator.ShouldBeFalse();
+            .Find(GuessCommandKind.Guess)!
+            .Access.ShouldBeOfType<CommandStrategyAccess<
+                GuessCommandKind,
+                AppCommandRouteState
+            >.Everyone>();
     }
 
     [Test]

@@ -395,20 +395,29 @@ internal sealed class IrcConnectionSession(
 
                 owner.LogServerLine(line);
 
-                var parseResult = IrcProtocol.ParsePrivMsg(line);
-                if (!parseResult.Success)
+                await IrcProtocol
+                    .ParsePrivMsg(line)
+                    .Match(
+                        parsed => DispatchAsync(parsed.Message),
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask,
+                        _ => ValueTask.CompletedTask
+                    );
+
+                async ValueTask DispatchAsync(ChatMessage message)
                 {
-                    continue;
+                    owner._log.LogDebug(
+                        "Received Twitch chat message from {Login} in #{Channel}.",
+                        message.Login,
+                        message.Channel
+                    );
+
+                    await owner.DispatchChatMessageAsync(message, cancellationToken);
                 }
-
-                var message = parseResult.Message;
-                owner._log.LogDebug(
-                    "Received Twitch chat message from {Login} in #{Channel}.",
-                    message.Login,
-                    message.Channel
-                );
-
-                await owner.DispatchChatMessageAsync(message, cancellationToken);
             }
         }
 

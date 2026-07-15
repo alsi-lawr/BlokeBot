@@ -67,12 +67,9 @@ public sealed class SiteAccessService(
 
         return accessList.Allows(
             normalized,
-            new AccessListPolicy(
-                Enabled: true,
-                WhitelistMode: settings.WhitelistEnabled
-                    ? AccessListWhitelistMode.Required
-                    : AccessListWhitelistMode.Disabled
-            )
+            settings.WhitelistEnabled
+                ? new AccessListPolicy.WhitelistRequired()
+                : new AccessListPolicy.BlacklistByDefault()
         );
     }
 

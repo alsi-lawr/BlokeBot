@@ -9,10 +9,9 @@ public sealed class PointsCommandRouteResolver(
     HostFeatureService features
 ) : ICommandRouteResolver<PointsCommandKind, AppCommandRouteState>
 {
-    public async ValueTask<CommandRoute<PointsCommandKind, AppCommandRouteState>?> ResolveAsync(
-        ChatCommandContext context,
-        CancellationToken cancellationToken
-    )
+    public async ValueTask<
+        CommandRouteResolution<PointsCommandKind, AppCommandRouteState>
+    > ResolveAsync(ChatCommandContext context, CancellationToken cancellationToken)
     {
         var resolution = await aliases.ResolveAsync(
             context.Message.Channel,
@@ -21,7 +20,7 @@ public sealed class PointsCommandRouteResolver(
         );
         if (resolution is null)
         {
-            return null;
+            return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved();
         }
 
         var kind = PointsAppCommandKindMap
@@ -29,7 +28,7 @@ public sealed class PointsCommandRouteResolver(
             .Match<PointsCommandKind?>(value => value, () => null);
         if (kind is not { } mappedKind)
         {
-            return null;
+            return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved();
         }
 
         if (
@@ -40,12 +39,14 @@ public sealed class PointsCommandRouteResolver(
             )
         )
         {
-            return null;
+            return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Unresolved();
         }
 
-        return new CommandRoute<PointsCommandKind, AppCommandRouteState>(
-            mappedKind,
-            new AppCommandRouteState.Host(resolution.HostId)
+        return new CommandRouteResolution<PointsCommandKind, AppCommandRouteState>.Resolved(
+            new CommandRoute<PointsCommandKind, AppCommandRouteState>(
+                mappedKind,
+                new AppCommandRouteState.Host(resolution.HostId)
+            )
         );
     }
 }

@@ -84,13 +84,15 @@ public partial class TopBarControls : IDisposable
     private async Task LoadAlertCountAsync()
     {
         var pageContext = await _pageContext.FromAsync(_authenticationState);
+        var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
         _activeAlertCount =
-            pageContext.SelectedHost is null || pageContext.IsBotAccount
+            selectedHost is null || pageContext.IsBotAccount
                 ? 0
-                : await _alerts.CountActiveAsync(
-                    pageContext.SelectedHost.Id,
-                    CancellationToken.None
-                );
+                : await _alerts.CountActiveAsync(selectedHost.Id, CancellationToken.None);
     }
 
     private void OpenAlerts()

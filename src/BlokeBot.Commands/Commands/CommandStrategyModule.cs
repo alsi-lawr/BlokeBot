@@ -14,19 +14,19 @@ public sealed class CommandStrategyModule<TKind, TState>(
         commands.MapDynamic(RouteAsync);
     }
 
-    private async ValueTask<bool> RouteAsync(
+    private async ValueTask<CommandHandlingOutcome> RouteAsync(
         ChatCommandContext context,
         IReadOnlyList<string> args,
         CancellationToken cancellationToken
     )
     {
-        var route = await resolver.ResolveAsync(context, cancellationToken);
-        if (route is null)
-        {
-            return false;
-        }
-
-        var result = await dispatcher.DispatchAsync(route, context, args, cancellationToken);
-        return result.Status == CommandStrategyDispatchStatus.Handled;
+        var resolution = await resolver.ResolveAsync(context, cancellationToken);
+        return await resolution.Match(
+            _ =>
+                ValueTask.FromResult<CommandHandlingOutcome>(
+                    new CommandHandlingOutcome.Unhandled()
+                ),
+            resolved => dispatcher.DispatchAsync(resolved.Route, context, args, cancellationToken)
+        );
     }
 }

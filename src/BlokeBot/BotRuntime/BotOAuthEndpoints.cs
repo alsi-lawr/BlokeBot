@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Hosts;
 
 namespace BlokeBot.BotRuntime;
 
@@ -110,7 +111,11 @@ internal static class BotOAuthEndpoints
                         return Results.Forbid();
                     }
 
-                    var selectedHost = session.HostSelection?.Current;
+                    var selectedHost = session.State.Match<BotHostChoice?>(
+                        _ => null,
+                        selected => selected.Selection.Current,
+                        _ => null
+                    );
                     if (selectedHost is not null)
                     {
                         await channelBotAuthorization.ClearIfScopesStaleAsync(selectedHost.Id, ct);
@@ -183,7 +188,11 @@ internal static class BotOAuthEndpoints
                         return Results.BadRequest("This Twitch connection expired. Try again.");
                     }
 
-                    var selectedHost = session.HostSelection?.Current;
+                    var selectedHost = session.State.Match<BotHostChoice?>(
+                        _ => null,
+                        selected => selected.Selection.Current,
+                        _ => null
+                    );
                     if (selectedHost is null)
                     {
                         return Results.BadRequest("Choose your channel before connecting it.");
@@ -243,7 +252,11 @@ internal static class BotOAuthEndpoints
                         return Results.Forbid();
                     }
 
-                    var selectedHost = session.HostSelection?.Current;
+                    var selectedHost = session.State.Match<BotHostChoice?>(
+                        _ => null,
+                        selected => selected.Selection.Current,
+                        _ => null
+                    );
                     if (selectedHost is null)
                     {
                         return Results.BadRequest("Choose your channel before connecting it.");
@@ -326,7 +339,11 @@ internal static class BotOAuthEndpoints
             return Results.BadRequest("This Twitch connection expired. Try again.");
         }
 
-        var selectedHost = session.HostSelection?.Current;
+        var selectedHost = session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
         if (selectedHost is null)
         {
             return Results.BadRequest("Choose your channel before connecting it.");

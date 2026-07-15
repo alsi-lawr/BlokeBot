@@ -46,7 +46,12 @@ public partial class AccountMenu
     [Parameter, EditorRequired]
     public AuthenticatedSession Session { get; set; } = AuthenticatedSession.Anonymous;
 
-    private BotHostSelection? _selection => Session.HostSelection;
+    private BotHostSelection? _selection =>
+        Session.State.Match<BotHostSelection?>(
+            _ => null,
+            selected => selected.Selection,
+            _ => null
+        );
 
     private string _currentPath => "/" + _navigation.ToBaseRelativePath(_navigation.Uri);
 

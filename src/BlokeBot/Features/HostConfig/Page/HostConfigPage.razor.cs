@@ -309,7 +309,11 @@ public partial class HostConfigPage
     {
         var pageContext = await LoadPageContextAsync();
         var session = pageContext.Session;
-        var selection = pageContext.HostSelection;
+        var selection = session.State.Match<BotHostSelection?>(
+            _ => null,
+            selected => selected.Selection,
+            _ => null
+        );
         if (pageContext.IsBotAccount)
         {
             _blockedByMode = true;

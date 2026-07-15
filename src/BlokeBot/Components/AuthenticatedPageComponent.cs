@@ -32,7 +32,11 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
     protected async Task<BlokeBotPageContext> LoadPageContextAsync()
     {
         PageContext = await PageContexts.FromAsync(AuthenticationState);
-        Host = PageContext.SelectedHost;
+        Host = PageContext.Session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
         ActorLogin = PageContext.ActorLogin;
         return PageContext;
     }

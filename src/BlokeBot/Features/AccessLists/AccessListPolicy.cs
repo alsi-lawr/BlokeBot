@@ -6,13 +6,31 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Features.AccessLists;
 
-internal enum AccessListWhitelistMode
+internal abstract record AccessListPolicy
 {
-    Disabled,
-    Required,
-}
+    private AccessListPolicy() { }
 
-internal sealed record AccessListPolicy(bool Enabled, AccessListWhitelistMode WhitelistMode);
+    internal TResult Match<TResult>(
+        Func<Disabled, TResult> disabled,
+        Func<BlacklistByDefault, TResult> blacklistByDefault,
+        Func<WhitelistRequired, TResult> whitelistRequired
+    )
+    {
+        return this switch
+        {
+            Disabled value => disabled(value),
+            BlacklistByDefault value => blacklistByDefault(value),
+            WhitelistRequired value => whitelistRequired(value),
+            _ => throw new UnreachableException("Unknown access-list policy."),
+        };
+    }
+
+    internal sealed record Disabled : AccessListPolicy;
+
+    internal sealed record BlacklistByDefault : AccessListPolicy;
+
+    internal sealed record WhitelistRequired : AccessListPolicy;
+}
 
 internal sealed record AccessListEntryValue(AccessListEntryKind Kind, string Login);
 
@@ -20,25 +38,11 @@ internal sealed record AccessListSnapshot(string[] Whitelist, string[] Blacklist
 {
     public bool Allows(string normalizedLogin, AccessListPolicy policy)
     {
-        if (!policy.Enabled)
-        {
-            return false;
-        }
-
-        return policy.WhitelistMode switch
-        {
-            AccessListWhitelistMode.Disabled => !Blacklist.Contains(
-                normalizedLogin,
-                StringComparer.OrdinalIgnoreCase
-            ),
-            AccessListWhitelistMode.Required => Whitelist.Contains(
-                normalizedLogin,
-                StringComparer.OrdinalIgnoreCase
-            ),
-            _ => throw new UnreachableException(
-                $"Unknown access-list whitelist mode: {policy.WhitelistMode}."
-            ),
-        };
+        return policy.Match(
+            _ => false,
+            _ => !Blacklist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase),
+            _ => Whitelist.Contains(normalizedLogin, StringComparer.OrdinalIgnoreCase)
+        );
     }
 
     public static AccessListSnapshot From(IEnumerable<AccessListEntryValue> entries)

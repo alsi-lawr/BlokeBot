@@ -5,10 +5,10 @@ namespace BlokeBot.Hosts;
 
 internal sealed class BotHostSelectionAccessor(IHttpContextAccessor httpContextAccessor)
 {
-    public BotHostSelection? Current => FromPrincipal(httpContextAccessor.HttpContext?.User);
+    public AuthSessionState Current => FromPrincipal(httpContextAccessor.HttpContext?.User);
 
-    public static BotHostSelection? FromPrincipal(ClaimsPrincipal? user)
+    public static AuthSessionState FromPrincipal(ClaimsPrincipal? user)
     {
-        return AuthenticatedSession.FromPrincipal(user).HostSelection;
+        return AuthenticatedSession.FromPrincipal(user).State;
     }
 }

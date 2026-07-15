@@ -50,10 +50,16 @@ public sealed class CommandStrategyDispatcherTests
         var services = new ServiceCollection();
         services.AddSingleton(resolver);
         services.AddSingleton<ICommandStrategy<TestKind, string>>(
-            new TestStrategy(TestKind.Public, requiresModerator: false)
+            new TestStrategy(
+                TestKind.Public,
+                new CommandStrategyAccess<TestKind, string>.Everyone()
+            )
         );
         services.AddSingleton<ICommandStrategy<TestKind, string>>(
-            new TestStrategy(TestKind.Moderator, requiresModerator: true)
+            new TestStrategy(
+                TestKind.Moderator,
+                new CommandStrategyAccess<TestKind, string>.ModeratorOnly(ModeratorResponse)
+            )
         );
         services.AddSingleton<CommandStrategyCatalog<TestKind, string>>();
         services.AddSingleton<CommandStrategyDispatcher<TestKind, string>>();
@@ -64,33 +70,27 @@ public sealed class CommandStrategyDispatcherTests
     private sealed class TestResolver(TestKind kind, string state)
         : ICommandRouteResolver<TestKind, string>
     {
-        public ValueTask<CommandRoute<TestKind, string>?> ResolveAsync(
+        public ValueTask<CommandRouteResolution<TestKind, string>> ResolveAsync(
             ChatCommandContext context,
             CancellationToken cancellationToken
         )
         {
-            return ValueTask.FromResult<CommandRoute<TestKind, string>?>(
-                new CommandRoute<TestKind, string>(kind, state)
+            return ValueTask.FromResult<CommandRouteResolution<TestKind, string>>(
+                new CommandRouteResolution<TestKind, string>.Resolved(
+                    new CommandRoute<TestKind, string>(kind, state)
+                )
             );
         }
     }
 
-    private sealed class TestStrategy(TestKind kind, bool requiresModerator)
+    private sealed class TestStrategy(TestKind kind, CommandStrategyAccess<TestKind, string> access)
         : ICommandStrategy<TestKind, string>
     {
         public TestKind Kind { get; } = kind;
 
         public IReadOnlyList<string> DefaultAliases { get; } = [kind.ToString().ToLowerInvariant()];
 
-        public bool RequiresModerator { get; } = requiresModerator;
-
-        public ValueTask<string> ModeratorOnlyReplyAsync(
-            CommandStrategyContext<TestKind, string> context,
-            CancellationToken cancellationToken
-        )
-        {
-            return ValueTask.FromResult("mods only");
-        }
+        public CommandStrategyAccess<TestKind, string> Access { get; } = access;
 
         public async ValueTask ExecuteAsync(
             CommandStrategyContext<TestKind, string> context,
@@ -102,6 +102,14 @@ public sealed class CommandStrategyDispatcherTests
                 cancellationToken
             );
         }
+    }
+
+    private static ValueTask<CommandResponse> ModeratorResponse(
+        CommandStrategyContext<TestKind, string> context,
+        CancellationToken cancellationToken
+    )
+    {
+        return ValueTask.FromResult(CommandResponse.Chat("mods only"));
     }
 
     private static ChatMessage Message(string login, string text)

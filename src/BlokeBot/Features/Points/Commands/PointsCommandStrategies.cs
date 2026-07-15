@@ -19,9 +19,9 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
 
     public abstract IReadOnlyList<string> DefaultAliases { get; }
 
-    public abstract bool RequiresModerator { get; }
+    public abstract CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access { get; }
 
-    public async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
+    public async ValueTask<CommandResponse> ModeratorOnlyResponseAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -33,15 +33,6 @@ public abstract class PointsCommandStrategy(PointsCommandService commands)
         );
         var message = Format(resolution.Settings.ModeratorOnlyReply, resolution.Settings);
         return Response(message, resolution.ReplyDelivery.TargetFor(PointsReplyKeys.ModeratorOnly));
-    }
-
-    public async ValueTask<string> ModeratorOnlyReplyAsync(
-        CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
-        CancellationToken cancellationToken
-    )
-    {
-        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message
-            ?? string.Empty;
     }
 
     public abstract ValueTask ExecuteAsync(
@@ -150,7 +141,8 @@ public sealed class PointsBalanceCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["points"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -212,7 +204,8 @@ public sealed class GivePointsCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["givepoints"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -287,7 +280,10 @@ public sealed class AddPointsCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["addpoints"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -361,7 +357,10 @@ public sealed class RemovePointsCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["removepoints"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -438,7 +437,8 @@ public sealed class GambleCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["gamble"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -557,7 +557,10 @@ public sealed class StartGiveawayCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["giveaway"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -587,7 +590,8 @@ public sealed class JoinGiveawayCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["join"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -618,7 +622,10 @@ public sealed class EndGiveawayCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["endgiveaway"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,
@@ -647,7 +654,10 @@ public sealed class CancelGiveawayCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["cancelgiveaway"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<PointsCommandKind, AppCommandRouteState> context,

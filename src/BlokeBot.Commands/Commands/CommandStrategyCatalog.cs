@@ -30,8 +30,7 @@ public sealed class CommandStrategyCatalog<TKind, TState>
         Descriptors = strategyArray
             .Select(strategy => new CommandStrategyDescriptor<TKind>(
                 strategy.Kind,
-                CommandAliasNormalizer.NormalizeMany(strategy.DefaultAliases),
-                strategy.RequiresModerator
+                CommandAliasNormalizer.NormalizeMany(strategy.DefaultAliases)
             ))
             .ToArray();
         _strategies = strategyArray.ToDictionary(x => x.Kind);
@@ -47,7 +46,6 @@ public sealed class CommandStrategyCatalog<TKind, TState>
 
 public sealed record CommandStrategyDescriptor<TKind>(
     TKind Kind,
-    IReadOnlyList<string> DefaultAliases,
-    bool RequiresModerator
+    IReadOnlyList<string> DefaultAliases
 )
     where TKind : notnull;

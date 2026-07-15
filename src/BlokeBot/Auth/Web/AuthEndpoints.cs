@@ -15,6 +15,10 @@ internal static class AuthEndpoints
                 "/auth/login",
                 (HttpContext context, WebAuthService auth, bool? start, string? returnUrl) =>
                 {
+                    var action =
+                        start == true
+                            ? (LoginAction)new LoginAction.StartOAuth()
+                            : new LoginAction.ShowLoginPage();
                     var currentOptions = auth.CurrentOptions;
                     if (!auth.IsConfigured(currentOptions))
                     {
@@ -25,29 +29,17 @@ internal static class AuthEndpoints
                         );
                     }
 
-                    if (start != true)
-                    {
-                        return Results.Content(LoginPage.Render(), "text/html");
-                    }
-
-                    var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                    context.Response.Cookies.Append(
-                        "BlokeBot.AuthState",
-                        state,
-                        new CookieOptions
-                        {
-                            HttpOnly = true,
-                            IsEssential = true,
-                            MaxAge = TimeSpan.FromMinutes(10),
-                            SameSite = SameSiteMode.Lax,
-                            Secure = context.Request.IsHttps,
-                        }
+                    return action.Match<IResult>(
+                        _ => Results.Content(LoginPage.Render(), "text/html"),
+                        _ => StartLogin()
                     );
-                    if (LocalReturnUrl.IsSafe(returnUrl))
+
+                    IResult StartLogin()
                     {
+                        var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
                         context.Response.Cookies.Append(
-                            "BlokeBot.AuthReturnUrl",
-                            returnUrl!,
+                            "BlokeBot.AuthState",
+                            state,
                             new CookieOptions
                             {
                                 HttpOnly = true,
@@ -57,15 +49,30 @@ internal static class AuthEndpoints
                                 Secure = context.Request.IsHttps,
                             }
                         );
-                    }
-                    else
-                    {
-                        context.Response.Cookies.Delete("BlokeBot.AuthReturnUrl");
-                    }
+                        if (LocalReturnUrl.IsSafe(returnUrl))
+                        {
+                            context.Response.Cookies.Append(
+                                "BlokeBot.AuthReturnUrl",
+                                returnUrl!,
+                                new CookieOptions
+                                {
+                                    HttpOnly = true,
+                                    IsEssential = true,
+                                    MaxAge = TimeSpan.FromMinutes(10),
+                                    SameSite = SameSiteMode.Lax,
+                                    Secure = context.Request.IsHttps,
+                                }
+                            );
+                        }
+                        else
+                        {
+                            context.Response.Cookies.Delete("BlokeBot.AuthReturnUrl");
+                        }
 
-                    return Results.Redirect(
-                        auth.CreateAuthorizationUri(context.Request, state).ToString()
-                    );
+                        return Results.Redirect(
+                            auth.CreateAuthorizationUri(context.Request, state).ToString()
+                        );
+                    }
                 }
             )
             .AllowAnonymous();
@@ -149,7 +156,11 @@ internal static class AuthEndpoints
             await session.SignInAsync(
                 context,
                 authorized.User,
-                currentSession.HostSelection?.Current.Id
+                currentSession.State.Match<int?>(
+                    _ => null,
+                    selected => selected.Selection.Current.Id,
+                    _ => null
+                )
             );
             return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
         }
@@ -380,5 +391,27 @@ internal static class AuthEndpoints
                 }
             )
             .AllowAnonymous();
+    }
+
+    private abstract record LoginAction
+    {
+        private LoginAction() { }
+
+        internal TResult Match<TResult>(
+            Func<ShowLoginPage, TResult> showLoginPage,
+            Func<StartOAuth, TResult> startOAuth
+        )
+        {
+            return this switch
+            {
+                ShowLoginPage value => showLoginPage(value),
+                StartOAuth value => startOAuth(value),
+                _ => throw new UnreachableException("Unknown login action."),
+            };
+        }
+
+        internal sealed record ShowLoginPage : LoginAction;
+
+        internal sealed record StartOAuth : LoginAction;
     }
 }

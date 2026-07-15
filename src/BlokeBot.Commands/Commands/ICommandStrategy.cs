@@ -10,21 +10,7 @@ public interface ICommandStrategy<TKind, TState>
 
     IReadOnlyList<string> DefaultAliases { get; }
 
-    bool RequiresModerator { get; }
-
-    ValueTask<string> ModeratorOnlyReplyAsync(
-        CommandStrategyContext<TKind, TState> context,
-        CancellationToken cancellationToken
-    );
-
-    async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
-        CommandStrategyContext<TKind, TState> context,
-        CancellationToken cancellationToken
-    )
-    {
-        var reply = await ModeratorOnlyReplyAsync(context, cancellationToken);
-        return string.IsNullOrWhiteSpace(reply) ? null : CommandResponse.Chat(reply);
-    }
+    CommandStrategyAccess<TKind, TState> Access { get; }
 
     ValueTask ExecuteAsync(
         CommandStrategyContext<TKind, TState> context,

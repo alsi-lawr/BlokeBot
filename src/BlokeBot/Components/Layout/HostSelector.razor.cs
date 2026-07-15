@@ -50,7 +50,12 @@ public partial class HostSelector
     private IReadOnlyList<BotHostChoice> _visibleHosts = [];
     private int? _selectedHostId;
     private string? _loadedVisibleHostsKey;
-    private BotHostSelection? _selection => Session.HostSelection;
+    private BotHostSelection? _selection =>
+        Session.State.Match<BotHostSelection?>(
+            _ => null,
+            selected => selected.Selection,
+            _ => null
+        );
 
     private string _refreshIconClass =>
         "h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]";

@@ -36,7 +36,7 @@ public sealed class AuthSessionTests
         session.IsBotAdmin.ShouldBeTrue();
         session.HasCapability(AuthSessionCapability.BotAdmin).ShouldBeTrue();
         session.HasCapability(AuthSessionCapability.Operator).ShouldBeFalse();
-        session.HostSelection.ShouldBeNull();
+        session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
     }
 
     [Test]
@@ -57,8 +57,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.HostSelectionState.ShouldBe(AuthSessionHostSelectionState.Invalid);
-        session.HostSelection.ShouldBeNull();
+        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
         session.HasCapability(AuthSessionCapability.Operator).ShouldBeFalse();
         session.HasCapability(AuthSessionCapability.HostSelected).ShouldBeFalse();
     }
@@ -70,7 +69,7 @@ public sealed class AuthSessionTests
             TestPrincipals.BlokeBotUser(login: "streamer", roleClaim: "owner")
         );
 
-        session.ClaimsValid.ShouldBeFalse();
+        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
         session.Role.ShouldBeNull();
     }
 
@@ -85,8 +84,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.ClaimsValid.ShouldBeFalse();
-        session.HostSelection.ShouldBeNull();
+        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
     }
 
     [Test]
@@ -104,8 +102,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.HostSelectionState.ShouldBe(AuthSessionHostSelectionState.Invalid);
-        session.HostSelection.ShouldBeNull();
+        session.State.ShouldBeOfType<AuthSessionState.Invalid>();
     }
 
     [Test]
@@ -159,8 +156,7 @@ public sealed class AuthSessionTests
             )
         );
 
-        session.HostSelectionState.ShouldBe(AuthSessionHostSelectionState.None);
-        session.HostSelection.ShouldBeNull();
+        session.State.ShouldBeOfType<AuthSessionState.NoSelection>();
         session.AvailableHosts.Single().ShouldBe(alternateHost);
         session.CanOpenHostConfig(new HashSet<int> { alternateHost.Id }).ShouldBeTrue();
         session.CanUseBotFunctions(new HashSet<int> { alternateHost.Id }).ShouldBeFalse();

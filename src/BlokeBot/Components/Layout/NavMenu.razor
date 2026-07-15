@@ -23,7 +23,11 @@
                 @{
                     var navContext = _pageContext.FromPrincipal(navAuth.User);
                     var session = navContext.Session;
-                    var selection = navContext.HostSelection;
+                    var selection = session.State.Match<BotHostSelection?>(
+                        _ => null,
+                        selected => selected.Selection,
+                        _ => null
+                    );
                     var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);

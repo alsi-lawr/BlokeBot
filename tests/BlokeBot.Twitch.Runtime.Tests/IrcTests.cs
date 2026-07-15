@@ -14,9 +14,7 @@ public sealed class IrcTests
 
         var result = IrcProtocol.ParsePrivMsg(line);
 
-        result.Success.ShouldBeTrue();
-        result.Status.ShouldBe(IrcPrivMsgParseStatus.Parsed);
-        var message = result.Message;
+        var message = result.ShouldBeOfType<IrcPrivMsgParseOutcome.Parsed>().Message;
         message.Login.ShouldBe("alice");
         message.Channel.ShouldBe("channel");
         message.Text.ShouldBe("!deaths 5");
@@ -30,9 +28,7 @@ public sealed class IrcTests
     {
         var result = IrcProtocol.ParsePrivMsg("NOTICE #channel :hello");
 
-        result.Success.ShouldBeFalse();
-        result.Status.ShouldBe(IrcPrivMsgParseStatus.NotPrivMsg);
-        result.Message.RawLine.ShouldBe("NOTICE #channel :hello");
+        result.ShouldBeOfType<IrcPrivMsgParseOutcome.NotPrivMsg>();
     }
 
     [Test]
@@ -40,13 +36,13 @@ public sealed class IrcTests
     {
         IrcProtocol
             .ParsePrivMsg(":missing-prefix PRIVMSG #channel :hello")
-            .Status.ShouldBe(IrcPrivMsgParseStatus.MissingUserLogin);
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingUserLogin>();
         IrcProtocol
             .ParsePrivMsg(":a!b@c PRIVMSG channel hello")
-            .Status.ShouldBe(IrcPrivMsgParseStatus.MalformedCommand);
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MalformedCommand>();
         IrcProtocol
             .ParsePrivMsg("@ :a!b@c PRIVMSG #channel :hello")
-            .Status.ShouldBe(IrcPrivMsgParseStatus.MissingTagTerminator);
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingTagTerminator>();
     }
 
     [Test]

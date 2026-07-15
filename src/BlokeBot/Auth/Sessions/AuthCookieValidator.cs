@@ -36,16 +36,13 @@ internal sealed class AuthCookieValidator(
             return;
         }
 
-        if (
-            !session.ClaimsValid
-            || session.HostSelectionState == AuthSessionHostSelectionState.Invalid
-        )
-        {
-            await RejectAsync(context);
-            return;
-        }
+        await session.State.Match(
+            _ => ValidateNoSelectionAsync(),
+            selected => ValidateSelectionAsync(selected.Selection.Current),
+            _ => RejectAsync(context)
+        );
 
-        if (session.HostSelection is null)
+        async Task ValidateNoSelectionAsync()
         {
             if (
                 isBotAdmin
@@ -59,60 +56,61 @@ internal sealed class AuthCookieValidator(
             }
 
             await RejectAsync(context);
-            return;
         }
 
-        var currentHost = session.HostSelection.Current;
-        await using var db = await dbFactory.CreateDbContextAsync(
-            context.HttpContext.RequestAborted
-        );
-        var persistedHost = await db
-            .Hosts.AsNoTracking()
-            .Where(host => host.Id == currentHost.Id)
-            .Select(host => new { host.Login })
-            .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
-        if (persistedHost is null)
+        async Task ValidateSelectionAsync(BotHostChoice currentHost)
         {
-            await RejectAsync(context);
-            return;
-        }
-
-        if (
-            session.CurrentHostRoleIs(AuthRole.Streamer)
-            && !string.Equals(
-                persistedHost.Login,
-                session.Login,
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-        {
-            await RejectAsync(context);
-            return;
-        }
-
-        if (session.CurrentHostRoleIs(AuthRole.Admin) && !isBotAdmin)
-        {
-            await RejectAsync(context);
-            return;
-        }
-
-        if (!session.CurrentHostRoleIs(AuthRole.Moderator))
-        {
-            return;
-        }
-
-        if (
-            await modAccess.CanModeratorAccessAsync(
-                currentHost.Id,
-                session.Login,
+            await using var db = await dbFactory.CreateDbContextAsync(
                 context.HttpContext.RequestAborted
-            )
-        )
-        {
-            return;
-        }
+            );
+            var persistedHost = await db
+                .Hosts.AsNoTracking()
+                .Where(host => host.Id == currentHost.Id)
+                .Select(host => new { host.Login })
+                .SingleOrDefaultAsync(context.HttpContext.RequestAborted);
+            if (persistedHost is null)
+            {
+                await RejectAsync(context);
+                return;
+            }
 
-        await RejectAsync(context);
+            if (
+                session.CurrentHostRoleIs(AuthRole.Streamer)
+                && !string.Equals(
+                    persistedHost.Login,
+                    session.Login,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                await RejectAsync(context);
+                return;
+            }
+
+            if (session.CurrentHostRoleIs(AuthRole.Admin) && !isBotAdmin)
+            {
+                await RejectAsync(context);
+                return;
+            }
+
+            if (!session.CurrentHostRoleIs(AuthRole.Moderator))
+            {
+                return;
+            }
+
+            if (
+                await modAccess.CanModeratorAccessAsync(
+                    currentHost.Id,
+                    session.Login,
+                    context.HttpContext.RequestAborted
+                )
+            )
+            {
+                return;
+            }
+
+            await RejectAsync(context);
+        }
     }
 
     private static async Task RejectAsync(CookieValidatePrincipalContext context)

@@ -71,12 +71,9 @@ public sealed class HostModAccessService(
         );
         return accessList.Allows(
             normalized,
-            new AccessListPolicy(
-                settings.ModsEnabled,
-                settings.AllowModsByDefault
-                    ? AccessListWhitelistMode.Disabled
-                    : AccessListWhitelistMode.Required
-            )
+            !settings.ModsEnabled ? new AccessListPolicy.Disabled()
+                : settings.AllowModsByDefault ? new AccessListPolicy.BlacklistByDefault()
+                : new AccessListPolicy.WhitelistRequired()
         );
     }
 

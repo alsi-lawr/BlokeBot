@@ -16,9 +16,9 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
 
     public abstract IReadOnlyList<string> DefaultAliases { get; }
 
-    public abstract bool RequiresModerator { get; }
+    public abstract CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access { get; }
 
-    public async ValueTask<CommandResponse?> ModeratorOnlyResponseAsync(
+    public async ValueTask<CommandResponse> ModeratorOnlyResponseAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -28,15 +28,6 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
             context.State,
             cancellationToken
         );
-    }
-
-    public async ValueTask<string> ModeratorOnlyReplyAsync(
-        CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
-        CancellationToken cancellationToken
-    )
-    {
-        return (await ModeratorOnlyResponseAsync(context, cancellationToken))?.Message
-            ?? string.Empty;
     }
 
     public abstract ValueTask ExecuteAsync(
@@ -93,7 +84,10 @@ public sealed class StartGuessingCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["startguessing"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<GuessCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -135,7 +129,10 @@ public sealed class StopGuessingCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["stopguessing"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<GuessCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -162,7 +159,10 @@ public sealed class WinGuessingCommandStrategy(
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["win"];
 
-    public override bool RequiresModerator => true;
+    public override CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<GuessCommandKind, AppCommandRouteState>.ModeratorOnly(
+            ModeratorOnlyResponseAsync
+        );
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -193,7 +193,8 @@ public sealed class GuessCommandStrategy(GuessingCommandService commands, Guessi
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["guess"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<GuessCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
@@ -223,7 +224,8 @@ public sealed class AvailableGuessesCommandStrategy(GuessingCommandService comma
 
     public override IReadOnlyList<string> DefaultAliases { get; } = ["guesses"];
 
-    public override bool RequiresModerator => false;
+    public override CommandStrategyAccess<GuessCommandKind, AppCommandRouteState> Access =>
+        new CommandStrategyAccess<GuessCommandKind, AppCommandRouteState>.Everyone();
 
     public override async ValueTask ExecuteAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,

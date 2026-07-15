@@ -16,8 +16,8 @@ public delegate ValueTask ChatCommandHandler(
 /// <summary>
 /// Handles a command route that is resolved dynamically at dispatch time.
 /// </summary>
-/// <returns><see langword="true" /> when the dynamic route was handled.</returns>
-public delegate ValueTask<bool> DynamicChatCommandHandler(
+/// <returns>The typed command handling outcome.</returns>
+public delegate ValueTask<CommandHandlingOutcome> DynamicChatCommandHandler(
     ChatCommandContext context,
     IReadOnlyList<string> args,
     CancellationToken cancellationToken

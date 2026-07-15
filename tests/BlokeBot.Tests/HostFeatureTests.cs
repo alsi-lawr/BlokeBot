@@ -71,10 +71,18 @@ public sealed class HostFeatureTests
             CancellationToken.None
         );
 
-        disabledGuessing.ShouldBeNull();
-        enabledPoints.ShouldNotBeNull();
-        enabledPoints.Kind.ShouldBe(PointsCommandKind.Points);
-        enabledPoints.State.ShouldBe(new AppCommandRouteState.Host(hostId));
+        disabledGuessing.ShouldBeOfType<CommandRouteResolution<
+            GuessCommandKind,
+            AppCommandRouteState
+        >.Unresolved>();
+        var pointsRoute = enabledPoints
+            .ShouldBeOfType<CommandRouteResolution<
+                PointsCommandKind,
+                AppCommandRouteState
+            >.Resolved>()
+            .Route;
+        pointsRoute.Kind.ShouldBe(PointsCommandKind.Points);
+        pointsRoute.State.ShouldBe(new AppCommandRouteState.Host(hostId));
 
         await features.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
         await features.DisableAsync(hostId, HostFeatureFlags.Points, CancellationToken.None);
@@ -88,10 +96,18 @@ public sealed class HostFeatureTests
             CancellationToken.None
         );
 
-        enabledGuessing.ShouldNotBeNull();
-        enabledGuessing.Kind.ShouldBe(GuessCommandKind.Start);
-        enabledGuessing.State.ShouldBe(new AppCommandRouteState.Host(hostId));
-        disabledPoints.ShouldBeNull();
+        var guessingRoute = enabledGuessing
+            .ShouldBeOfType<CommandRouteResolution<
+                GuessCommandKind,
+                AppCommandRouteState
+            >.Resolved>()
+            .Route;
+        guessingRoute.Kind.ShouldBe(GuessCommandKind.Start);
+        guessingRoute.State.ShouldBe(new AppCommandRouteState.Host(hostId));
+        disabledPoints.ShouldBeOfType<CommandRouteResolution<
+            PointsCommandKind,
+            AppCommandRouteState
+        >.Unresolved>();
     }
 
     [Test]
@@ -138,9 +154,14 @@ public sealed class HostFeatureTests
 
         await using var verify = await dbFactory.CreateDbContextAsync();
         var profileId = await verify.Profiles.Select(x => x.Id).SingleAsync(CancellationToken.None);
-        route.ShouldNotBeNull();
-        route.Kind.ShouldBe(GuessCommandKind.Start);
-        route.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, profileId));
+        var resolved = route
+            .ShouldBeOfType<CommandRouteResolution<
+                GuessCommandKind,
+                AppCommandRouteState
+            >.Resolved>()
+            .Route;
+        resolved.Kind.ShouldBe(GuessCommandKind.Start);
+        resolved.State.ShouldBe(new AppCommandRouteState.GuessingProfile(hostId, profileId));
     }
 
     private static ChatCommandContext CommandContext(string channel, string commandName)

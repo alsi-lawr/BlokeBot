@@ -14,9 +14,11 @@
             @{
                 var selectedChannel = AuthenticatedSession
                     .FromPrincipal(homeAuth.User)
-                    .HostSelection
-                    ?.Current
-                    .Login;
+                    .State.Match<string?>(
+                        _ => null,
+                        selected => selected.Selection.Current.Login,
+                        _ => null
+                    );
             }
             <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
         </Authorized>

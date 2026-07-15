@@ -8,7 +8,7 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
 )
     where TKind : struct, Enum
 {
-    public async ValueTask<CommandStrategyDispatchResult<TKind>> DispatchAsync(
+    public async ValueTask<CommandHandlingOutcome> DispatchAsync(
         CommandRoute<TKind, TState> route,
         ChatCommandContext command,
         IReadOnlyList<string> args,
@@ -18,7 +18,7 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
         var strategy = catalog.Find(route.Kind);
         if (strategy is null)
         {
-            return CommandStrategyDispatchResult<TKind>.Unknown();
+            return new CommandHandlingOutcome.Unhandled();
         }
 
         var context = new CommandStrategyContext<TKind, TState>(
@@ -27,41 +27,31 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
             command,
             args
         );
-        if (strategy.RequiresModerator && !ChatModeratorPolicy.IsModerator(command.Message))
+        return await strategy.Access.Match(
+            _ => ExecuteAsync(),
+            moderatorOnly =>
+                ChatModeratorPolicy.IsModerator(command.Message)
+                    ? ExecuteAsync()
+                    : RejectModeratorOnlyAsync(moderatorOnly)
+        );
+
+        async ValueTask<CommandHandlingOutcome> ExecuteAsync()
         {
-            var response = await strategy.ModeratorOnlyResponseAsync(context, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(response?.Message))
+            await strategy.ExecuteAsync(context, cancellationToken);
+            return new CommandHandlingOutcome.Handled();
+        }
+
+        async ValueTask<CommandHandlingOutcome> RejectModeratorOnlyAsync(
+            CommandStrategyAccess<TKind, TState>.ModeratorOnly moderatorOnly
+        )
+        {
+            var response = await moderatorOnly.Response(context, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(response.Message))
             {
                 await command.RespondAsync(response, cancellationToken);
             }
 
-            return CommandStrategyDispatchResult<TKind>.Handled(route.Kind);
+            return new CommandHandlingOutcome.Handled();
         }
-
-        await strategy.ExecuteAsync(context, cancellationToken);
-        return CommandStrategyDispatchResult<TKind>.Handled(route.Kind);
-    }
-}
-
-public enum CommandStrategyDispatchStatus
-{
-    Unknown,
-    Handled,
-}
-
-public sealed record CommandStrategyDispatchResult<TKind>(
-    CommandStrategyDispatchStatus Status,
-    TKind? Kind
-)
-    where TKind : struct, Enum
-{
-    public static CommandStrategyDispatchResult<TKind> Unknown()
-    {
-        return new(CommandStrategyDispatchStatus.Unknown, null);
-    }
-
-    public static CommandStrategyDispatchResult<TKind> Handled(TKind kind)
-    {
-        return new(CommandStrategyDispatchStatus.Handled, kind);
     }
 }
