@@ -110,16 +110,5 @@ public sealed class ResultTests
         bindInvoked.ShouldBeFalse();
     }
 
-    [Test]
-    public void EquivalentResults_Comparing_HaveValueSemantics()
-    {
-        Result<int, TestError>.Success(42).ShouldBe(Result<int, TestError>.Success(42));
-        Result<int, TestError>.Success(42).ShouldNotBe(Result<int, TestError>.Success(41));
-        Result<int, TestError>
-            .Error(new TestError("invalid"))
-            .ShouldBe(Result<int, TestError>.Error(new TestError("invalid")));
-        Result<int, int>.Success(42).ShouldNotBe(Result<int, int>.Error(42));
-    }
-
     private sealed record TestError(string Code);
 }

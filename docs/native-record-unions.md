@@ -18,5 +18,3 @@ At the repository's C# 14 language level, use all of these parts together:
 3. An abstract `Match` method with one typed handler per declared case. Each case dispatches only to its own handler.
 
 C# 14 does not consider a type-pattern switch over an abstract record hierarchy exhaustive. Handle the union through `Match` instead. Do not add a wildcard, default handler, or fallback exception: those paths let a new case compile without updating consumers. When adding a case, extend `Match`; the resulting compiler errors identify every case implementation and call site that must become exhaustive.
-
-The compiling convention example is [`NativeUnionExample.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionExample.cs), and [`NativeUnionTests.cs`](../tests/BlokeBot.Functional.Tests/NativeUnionTests.cs) verifies case behavior, invariants, and value semantics.

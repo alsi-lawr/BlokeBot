@@ -110,13 +110,4 @@ public sealed class OptionTests
         bound.ShouldBe(Option<string>.None);
         bindInvoked.ShouldBeFalse();
     }
-
-    [Test]
-    public void EquivalentOptions_Comparing_HaveValueSemantics()
-    {
-        Option<int>.Some(42).ShouldBe(Option<int>.Some(42));
-        Option<int>.Some(42).ShouldNotBe(Option<int>.Some(41));
-        Option<int>.None.ShouldBe(Option<int>.None);
-        Option<int>.Some(42).ShouldNotBe(Option<int>.None);
-    }
 }

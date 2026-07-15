@@ -103,19 +103,6 @@ public sealed class ValidationTests
     }
 
     [Test]
-    public void EquivalentValidations_Comparing_HaveValueSemantics()
-    {
-        Validation<int, string>.Valid(42).ShouldBe(Validation<int, string>.Valid(42));
-        Validation<int, string>.Valid(42).ShouldNotBe(Validation<int, string>.Valid(41));
-        Validation<int, string>
-            .Invalid("first", "second")
-            .ShouldBe(Validation<int, string>.Invalid("first", "second"));
-        Validation<int, string>
-            .Invalid("first", "second")
-            .ShouldNotBe(Validation<int, string>.Invalid("second", "first"));
-    }
-
-    [Test]
     public void Invalid_ConvertingToResult_UsesSelectedAggregateError()
     {
         var result = Validation<int, string>

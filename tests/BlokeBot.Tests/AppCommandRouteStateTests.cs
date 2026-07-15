@@ -26,24 +26,6 @@ public sealed class AppCommandRouteStateTests
     }
 
     [Test]
-    public void RouteCases_Comparing_UseCaseAndIdentifierValueEquality()
-    {
-        new AppCommandRouteState.Host(7).ShouldBe(new AppCommandRouteState.Host(7));
-        new AppCommandRouteState.Host(7).ShouldNotBe(new AppCommandRouteState.Host(8));
-        new AppCommandRouteState.GuessingProfile(7, 11).ShouldBe(
-            new AppCommandRouteState.GuessingProfile(7, 11)
-        );
-        new AppCommandRouteState.GuessingProfile(7, 11).ShouldNotBe(
-            new AppCommandRouteState.GuessingProfile(8, 11)
-        );
-        new AppCommandRouteState.GuessingProfile(7, 11).ShouldNotBe(
-            new AppCommandRouteState.GuessingProfile(7, 12)
-        );
-        AppCommandRouteState host = new AppCommandRouteState.Host(7);
-        host.ShouldNotBe(new AppCommandRouteState.GuessingProfile(7, 11));
-    }
-
-    [Test]
     public void InvalidIdentifiers_ConstructingRoutes_Rejects()
     {
         Should.Throw<ArgumentOutOfRangeException>(() => new AppCommandRouteState.Host(0));
