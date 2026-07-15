@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/blokebot-banner.svg" alt="BlokeBot — Own your channel tools" width="100%" />
+<img src="assets/blokebot-banner.svg" alt="BlokeBot - Own your channel tools" width="100%" />
 
 [![Status: pre-release](https://img.shields.io/badge/status-pre--release-F59E0B?style=flat-square)](https://github.com/alsi-lawr/BlokeBot/wiki)
 [![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
@@ -9,20 +9,20 @@
 
 **A self-hosted Twitch bot and dashboard for running channel tools on your own terms.**
 
-[Documentation](https://github.com/alsi-lawr/BlokeBot/wiki) ·
-[Install](https://github.com/alsi-lawr/BlokeBot/wiki/Installation) ·
+[Documentation](https://github.com/alsi-lawr/BlokeBot/wiki) |
+[Install](https://github.com/alsi-lawr/BlokeBot/wiki/Installation) |
 [Configure](https://github.com/alsi-lawr/BlokeBot/wiki/Configuration)
 
 </div>
 
 ## Inside BlokeBot
 
-- **Hosted channels** — one dashboard for channel access, bot authorisation, and runtime status.
-- **Commands** — built-in and custom commands, aliases, cooldowns, and announcements.
-- **Guessing games** — profiles, rounds, rewards, history, and leaderboards.
-- **Points** — balances, gambling, scheduled giveaways, and public leaderboards.
-- **Resilient chat** — EventSub and IRC operation with durable public-message delivery.
-- **Private by default** — self-hosted SQLite state and credentials under your control.
+- **Hosted channels** - one dashboard for channel access, bot authorisation, and runtime status.
+- **Commands** - built-in and custom commands, aliases, cooldowns, and announcements.
+- **Guessing games** - profiles, rounds, rewards, history, and leaderboards.
+- **Points** - balances, gambling, scheduled giveaways, and public leaderboards.
+- **Resilient chat** - EventSub and IRC operation with durable public-message delivery.
+- **Private by default** - self-hosted SQLite state and credentials under your control.
 
 ## Quick start
 
