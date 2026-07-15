@@ -184,7 +184,14 @@ public partial class AdminPage
     {
         if (!string.IsNullOrWhiteSpace(result.Message))
         {
-            _toasts.Publish(result.Succeeded ? ToastKind.Status : ToastKind.Error, result.Message);
+            if (result.Succeeded)
+            {
+                _toasts.Publish(new ToastRequest<StatusToastStrategy>(result.Message));
+            }
+            else
+            {
+                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
+            }
         }
 
         _pendingRuntimeHostId = result.PendingRuntimeHostId;

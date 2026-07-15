@@ -202,18 +202,24 @@ public partial class PointsDashboard
     private void PublishResult(PointOperationOutcome outcome)
     {
         _ = outcome.Match(
-            succeeded => Publish(ToastKind.Success, succeeded.Message),
-            failed => Publish(ToastKind.Warning, failed.Message)
-        );
-
-        bool Publish(ToastKind kind, string message)
-        {
-            if (!string.IsNullOrWhiteSpace(message))
+            succeeded =>
             {
-                _toasts.Publish(kind, message);
-            }
+                if (!string.IsNullOrWhiteSpace(succeeded.Message))
+                {
+                    _toasts.Publish(new ToastRequest<SuccessToastStrategy>(succeeded.Message));
+                }
 
-            return true;
-        }
+                return true;
+            },
+            failed =>
+            {
+                if (!string.IsNullOrWhiteSpace(failed.Message))
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(failed.Message));
+                }
+
+                return true;
+            }
+        );
     }
 }

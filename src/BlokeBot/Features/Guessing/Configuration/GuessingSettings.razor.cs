@@ -134,7 +134,9 @@ public partial class GuessingSettings
                 CreateProfileAsync,
                 errors =>
                 {
-                    _toasts.Warning(ValidationMessage(errors));
+                    _toasts.Publish(
+                        new ToastRequest<WarningToastStrategy>(ValidationMessage(errors))
+                    );
                     return Task.CompletedTask;
                 }
             );
@@ -149,7 +151,7 @@ public partial class GuessingSettings
         await result.Match(
             async created =>
             {
-                _toasts.Success(created.Message);
+                _toasts.Publish(new ToastRequest<SuccessToastStrategy>(created.Message));
                 _newProfileName = string.Empty;
                 await LoadConfigurationAsync(
                     selectedId is { } id
@@ -159,7 +161,7 @@ public partial class GuessingSettings
             },
             failure =>
             {
-                _toasts.Warning(failure.Message);
+                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
                 return Task.CompletedTask;
             }
         );
@@ -183,7 +185,9 @@ public partial class GuessingSettings
                 DeleteProfileAsync,
                 errors =>
                 {
-                    _toasts.Warning(ValidationMessage(errors));
+                    _toasts.Publish(
+                        new ToastRequest<WarningToastStrategy>(ValidationMessage(errors))
+                    );
                     return Task.CompletedTask;
                 }
             );
@@ -197,12 +201,12 @@ public partial class GuessingSettings
         await result.Match(
             async deleted =>
             {
-                _toasts.Success(deleted.Message);
+                _toasts.Publish(new ToastRequest<SuccessToastStrategy>(deleted.Message));
                 await LoadConfigurationAsync(new GuessingProfileSelection.Default());
             },
             async failure =>
             {
-                _toasts.Warning(failure.Message);
+                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
                 if (
                     failure
                     is GuessingProfileDeleteFailure.ProfileNotFound
@@ -233,7 +237,9 @@ public partial class GuessingSettings
                 SaveConfigurationAsync,
                 errors =>
                 {
-                    _toasts.Error(ValidationMessage(errors));
+                    _toasts.Publish(
+                        new ToastRequest<ErrorToastStrategy>(ValidationMessage(errors))
+                    );
                     return Task.CompletedTask;
                 }
             );
@@ -250,11 +256,11 @@ public partial class GuessingSettings
                 await LoadConfigurationAsync(
                     new GuessingProfileSelection.Selected(command.ProfileId)
                 );
-                _toasts.Success("Guessing settings saved.");
+                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Guessing settings saved."));
             },
             async failure =>
             {
-                _toasts.Error(failure.Message);
+                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                 if (
                     failure
                     is GuessingConfigurationSaveFailure.ProfileNotFound
@@ -300,7 +306,7 @@ public partial class GuessingSettings
             },
             async failure =>
             {
-                _toasts.Warning(failure.Message);
+                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
                 var fallback = await _configuration
                     .LoadConfiguration(HostId, new GuessingProfileSelection.Default())
                     .ExecuteAsync(CancellationToken.None);
@@ -313,7 +319,9 @@ public partial class GuessingSettings
                     fallbackFailure =>
                     {
                         _config = null;
-                        _toasts.Error(fallbackFailure.Message);
+                        _toasts.Publish(
+                            new ToastRequest<ErrorToastStrategy>(fallbackFailure.Message)
+                        );
                         return false;
                     }
                 );

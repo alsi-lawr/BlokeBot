@@ -19,47 +19,20 @@ public sealed class ToastService
         }
     }
 
-    public ToastNotification Error(string message, string? title = null, ToastTone? tone = null)
+    public ToastNotification Publish<TStrategy>(ToastRequest<TStrategy> request)
+        where TStrategy : IToastStrategy
     {
-        return Publish(ToastKind.Error, message, title, tone);
-    }
-
-    public ToastNotification Status(string message, string? title = null, ToastTone? tone = null)
-    {
-        return Publish(ToastKind.Status, message, title, tone);
-    }
-
-    public ToastNotification Success(string message, string? title = null, ToastTone? tone = null)
-    {
-        return Publish(ToastKind.Success, message, title, tone);
-    }
-
-    public ToastNotification Warning(string message, string? title = null, ToastTone? tone = null)
-    {
-        return Publish(ToastKind.Warning, message, title, tone);
-    }
-
-    public ToastNotification Publish(
-        ToastKind kind,
-        string message,
-        string? title = null,
-        ToastTone? tone = null
-    )
-    {
-        var trimmed = message.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-        {
-            throw new ArgumentException("Toast message is required.", nameof(message));
-        }
+        ArgumentNullException.ThrowIfNull(request);
+        var dismissal = TStrategy.Dismissal;
 
         var toast = new ToastNotification(
             Guid.NewGuid(),
-            kind,
-            tone ?? DefaultTone(kind),
-            trimmed,
-            string.IsNullOrWhiteSpace(title) ? DefaultTitle(kind) : title.Trim(),
+            TStrategy.Kind,
+            TStrategy.Tone,
+            request.Message,
+            request.Title,
             DateTimeOffset.UtcNow,
-            DefaultAutoDismiss(kind)
+            dismissal.AutoDismissAfter
         );
 
         lock (_gate)
@@ -94,40 +67,5 @@ public sealed class ToastService
     private void NotifyChanged()
     {
         Changed?.Invoke();
-    }
-
-    private static ToastTone DefaultTone(ToastKind kind)
-    {
-        return kind switch
-        {
-            ToastKind.Success => ToastTone.Positive,
-            ToastKind.Warning => ToastTone.Caution,
-            ToastKind.Error => ToastTone.Critical,
-            _ => ToastTone.Neutral,
-        };
-    }
-
-    private static TimeSpan? DefaultAutoDismiss(ToastKind kind)
-    {
-        return kind switch
-        {
-            ToastKind.Status => TimeSpan.FromSeconds(4),
-            ToastKind.Success => TimeSpan.FromSeconds(4),
-            ToastKind.Warning => null,
-            ToastKind.Error => null,
-            _ => null,
-        };
-    }
-
-    private static string DefaultTitle(ToastKind kind)
-    {
-        return kind switch
-        {
-            ToastKind.Status => "Status",
-            ToastKind.Success => "Done",
-            ToastKind.Warning => "Needs attention",
-            ToastKind.Error => "Something went wrong",
-            _ => "Notification",
-        };
     }
 }

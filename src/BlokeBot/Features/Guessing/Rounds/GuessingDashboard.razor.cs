@@ -162,7 +162,11 @@ public partial class GuessingDashboard
     {
         if (string.IsNullOrWhiteSpace(_winnerName))
         {
-            _toasts.Warning("Choose one of the saved winner names first.");
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>(
+                    "Choose one of the saved winner names first."
+                )
+            );
             return;
         }
 
@@ -364,8 +368,9 @@ public partial class GuessingDashboard
                     _ =>
                         () =>
                             _toasts.Publish(
-                                ToastKind.Warning,
-                                "The action completed, but its chat message could not be queued."
+                                new ToastRequest<WarningToastStrategy>(
+                                    "The action completed, but its chat message could not be queued."
+                                )
                             )
                 )
                 .Invoke();
@@ -394,6 +399,13 @@ public partial class GuessingDashboard
             return;
         }
 
-        _toasts.Publish(result.Succeeded ? ToastKind.Success : ToastKind.Warning, result.Message);
+        if (result.Succeeded)
+        {
+            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(result.Message));
+        }
+        else
+        {
+            _toasts.Publish(new ToastRequest<WarningToastStrategy>(result.Message));
+        }
     }
 }

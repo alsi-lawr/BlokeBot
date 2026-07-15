@@ -7,67 +7,57 @@ namespace BlokeBot.Tests;
 public sealed class ToastServiceTests
 {
     [Test]
-    public void StatusAndSuccessToasts_Publishing_AutoDismissWithExpectedTone()
-    {
-        var service = new ToastService();
-
-        var status = service.Status("Saved.");
-        var success = service.Success("Created.");
-
-        status.Tone.ShouldBe(ToastTone.Neutral);
-        success.Tone.ShouldBe(ToastTone.Positive);
-        status.AutoDismissAfter.ShouldNotBeNull();
-        success.AutoDismissAfter.ShouldNotBeNull();
-        status.RequiresManualDismiss.ShouldBeFalse();
-        success.RequiresManualDismiss.ShouldBeFalse();
-    }
-
-    [Test]
-    public void WarningAndErrorToasts_Publishing_RequireManualDismissWithExpectedTone()
-    {
-        var service = new ToastService();
-
-        var warning = service.Warning("Review this.");
-        var error = service.Error("Could not save.");
-
-        warning.Tone.ShouldBe(ToastTone.Caution);
-        error.Tone.ShouldBe(ToastTone.Critical);
-        warning.AutoDismissAfter.ShouldBeNull();
-        error.AutoDismissAfter.ShouldBeNull();
-        warning.RequiresManualDismiss.ShouldBeTrue();
-        error.RequiresManualDismiss.ShouldBeTrue();
-    }
-
-    [Test]
-    public void PublishedToast_Dismissing_UpdatesCollectionAndRaisesChanges()
+    public void AutomaticToast_PublishingAndDismissing_UsesCustomContentAndNotifiesChanges()
     {
         var service = new ToastService();
         var changeCount = 0;
         service.Changed += () => changeCount++;
 
-        var toast = service.Publish(ToastKind.Status, "  Bot started.  ");
+        var toast = service.Publish(
+            ToastRequest<PositiveStatusToastStrategy>.WithTitle(
+                "  Bot started.  ",
+                "  Custom bot on  "
+            )
+        );
 
+        toast.Kind.ShouldBe(ToastKind.Status);
+        toast.Tone.ShouldBe(ToastTone.Positive);
         toast.Message.ShouldBe("Bot started.");
-        service.Current.ShouldHaveSingleItem().ShouldBe(toast);
+        toast.Title.ShouldBe("Custom bot on");
+        toast.AutoDismissAfter.ShouldBe(TimeSpan.FromSeconds(4));
+        toast.RequiresManualDismiss.ShouldBeFalse();
+        service.Current.ShouldHaveSingleItem().ShouldBeSameAs(toast);
         changeCount.ShouldBe(1);
 
         service.Dismiss(toast.Id).ShouldBeTrue();
 
         service.Current.ShouldBeEmpty();
         changeCount.ShouldBe(2);
+        service.Dismiss(toast.Id).ShouldBeFalse();
+        changeCount.ShouldBe(2);
     }
 
     [Test]
-    public void StatusToastWithToneOverride_Publishing_PreservesStatusBehaviorAndUsesTone()
+    public void ManualToast_Publishing_UsesDefaultTitleAndRequiresDismissal()
     {
         var service = new ToastService();
 
-        var toast = service.Status("Points is now disabled.", "Points disabled", ToastTone.Caution);
+        var toast = service.Publish(new ToastRequest<ErrorToastStrategy>("Could not save."));
 
-        toast.Kind.ShouldBe(ToastKind.Status);
-        toast.Tone.ShouldBe(ToastTone.Caution);
-        toast.Title.ShouldBe("Points disabled");
-        toast.AutoDismissAfter.ShouldNotBeNull();
-        toast.RequiresManualDismiss.ShouldBeFalse();
+        toast.Kind.ShouldBe(ToastKind.Error);
+        toast.Tone.ShouldBe(ToastTone.Critical);
+        toast.Message.ShouldBe("Could not save.");
+        toast.Title.ShouldBe("Something went wrong");
+        toast.AutoDismissAfter.ShouldBeNull();
+        toast.RequiresManualDismiss.ShouldBeTrue();
+    }
+
+    [Test]
+    public void RequiredContent_ConstructingRequest_RejectsBlankMessageAndTitle()
+    {
+        Should.Throw<ArgumentException>(() => new ToastRequest<StatusToastStrategy>("  "));
+        Should.Throw<ArgumentException>(() =>
+            ToastRequest<StatusToastStrategy>.WithTitle("Saved.", "  ")
+        );
     }
 }

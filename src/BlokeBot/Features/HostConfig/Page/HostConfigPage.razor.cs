@@ -364,7 +364,7 @@ public partial class HostConfigPage
         TrackPendingRuntimeTransition();
         if (_runtimeLifecycle is not null)
         {
-            _toasts.Status(_runtimeStatusMessage);
+            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
     }
 
@@ -421,7 +421,12 @@ public partial class HostConfigPage
                 },
                 errors =>
                 {
-                    _toasts.Error(errors[0].Message, "Mod help not saved");
+                    _toasts.Publish(
+                        ToastRequest<ErrorToastStrategy>.WithTitle(
+                            errors[0].Message,
+                            "Mod help not saved"
+                        )
+                    );
                     return false;
                 }
             );
@@ -494,7 +499,9 @@ public partial class HostConfigPage
                 _state = _state with { ModAccess = submission.PreviousAccess };
             }
 
-            _toasts.Error(failure.Message, "Mod help not saved");
+            _toasts.Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(failure.Message, "Mod help not saved")
+            );
             StateHasChanged();
         });
     }
@@ -555,13 +562,24 @@ public partial class HostConfigPage
             TrackPendingRuntimeTransition();
         }
 
-        _toasts.Status(
-            enabled
-                ? "Custom bot is turned on for this channel. Connect the account before starting the bot."
-                : "Custom bot is turned off. This channel will use the main bot account.",
-            enabled ? "Custom bot on" : "Custom bot off",
-            enabled ? ToastTone.Positive : ToastTone.Caution
-        );
+        if (enabled)
+        {
+            _toasts.Publish(
+                ToastRequest<PositiveStatusToastStrategy>.WithTitle(
+                    "Custom bot is turned on for this channel. Connect the account before starting the bot.",
+                    "Custom bot on"
+                )
+            );
+        }
+        else
+        {
+            _toasts.Publish(
+                ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                    "Custom bot is turned off. This channel will use the main bot account.",
+                    "Custom bot off"
+                )
+            );
+        }
     }
 
     private Task SetWhisperResponsesEnabledAsync(int hostId, bool enabled)
@@ -585,21 +603,34 @@ public partial class HostConfigPage
 
         void ShowRejectedStatus()
         {
-            _toasts.Error(
-                "Turn on custom bot before enabling whisper responses.",
-                "Whisper responses not saved"
+            _toasts.Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(
+                    "Turn on custom bot before enabling whisper responses.",
+                    "Whisper responses not saved"
+                )
             );
         }
 
         void ShowSavedStatus()
         {
-            _toasts.Status(
-                enabled
-                    ? "Command replies will use custom-bot whispers when available."
-                    : "Command replies will use public chat.",
-                enabled ? "Whisper responses on" : "Whisper responses off",
-                enabled ? ToastTone.Positive : ToastTone.Caution
-            );
+            if (enabled)
+            {
+                _toasts.Publish(
+                    ToastRequest<PositiveStatusToastStrategy>.WithTitle(
+                        "Command replies will use custom-bot whispers when available.",
+                        "Whisper responses on"
+                    )
+                );
+            }
+            else
+            {
+                _toasts.Publish(
+                    ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                        "Command replies will use public chat.",
+                        "Whisper responses off"
+                    )
+                );
+            }
         }
     }
 
@@ -630,11 +661,16 @@ public partial class HostConfigPage
             ? "Its chat commands and pages are available again."
             : "Its chat commands and pages are unavailable until you enable it again.";
 
-        _toasts.Status(
-            $"{featureName} is now {stateText} for {channelName}. {impactText}",
-            $"{featureName} {stateText}",
-            enabled ? ToastTone.Positive : ToastTone.Caution
-        );
+        var message = $"{featureName} is now {stateText} for {channelName}. {impactText}";
+        var title = $"{featureName} {stateText}";
+        if (enabled)
+        {
+            _toasts.Publish(ToastRequest<PositiveStatusToastStrategy>.WithTitle(message, title));
+        }
+        else
+        {
+            _toasts.Publish(ToastRequest<CautionStatusToastStrategy>.WithTitle(message, title));
+        }
     }
 
     private static string FeatureName(HostFeatureFlags feature)
@@ -660,7 +696,11 @@ public partial class HostConfigPage
     {
         await _channelBotAuthorization.ClearAsync(hostId, CancellationToken.None);
         await LoadCoreAsync();
-        _toasts.Status("The channel has been disconnected from Twitch chat.");
+        _toasts.Publish(
+            new ToastRequest<StatusToastStrategy>(
+                "The channel has been disconnected from Twitch chat."
+            )
+        );
     }
 
     private Task ClearBotOverrideAuthorizationAsync(int hostId)
@@ -675,10 +715,11 @@ public partial class HostConfigPage
     {
         await _hostBotAccounts.ClearAsync(hostId, CancellationToken.None);
         await LoadCoreAsync();
-        _toasts.Status(
-            "The custom bot account has been disconnected.",
-            "Custom bot disconnected",
-            ToastTone.Caution
+        _toasts.Publish(
+            ToastRequest<CautionStatusToastStrategy>.WithTitle(
+                "The custom bot account has been disconnected.",
+                "Custom bot disconnected"
+            )
         );
     }
 
@@ -696,10 +737,14 @@ public partial class HostConfigPage
             TrackPendingRuntimeTransition();
         }
 
-        _toasts.Publish(
-            result.Succeeded ? ToastKind.Status : ToastKind.Error,
-            result.Succeeded ? _runtimeStatusMessage : result.Message
-        );
+        if (result.Succeeded)
+        {
+            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+        }
+        else
+        {
+            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
+        }
     }
 
     private Task StopAsync(int hostId)
@@ -716,10 +761,14 @@ public partial class HostConfigPage
             TrackPendingRuntimeTransition();
         }
 
-        _toasts.Publish(
-            result.Succeeded ? ToastKind.Status : ToastKind.Error,
-            result.Succeeded ? _runtimeStatusMessage : result.Message
-        );
+        if (result.Succeeded)
+        {
+            _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+        }
+        else
+        {
+            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
+        }
     }
 
     private void TrackPendingRuntimeTransition()

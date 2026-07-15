@@ -120,7 +120,11 @@ public partial class PointsConfigurationPage
                 SaveCommandAsync,
                 errors =>
                 {
-                    _toasts.Error(string.Join(" ", errors.Select(error => error.Message)));
+                    _toasts.Publish(
+                        new ToastRequest<ErrorToastStrategy>(
+                            string.Join(" ", errors.Select(error => error.Message))
+                        )
+                    );
                     return Task.CompletedTask;
                 }
             );
@@ -138,11 +142,11 @@ public partial class PointsConfigurationPage
                     HostId,
                     CancellationToken.None
                 );
-                _toasts.Success("Points settings saved.");
+                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Points settings saved."));
             },
             failure =>
             {
-                _toasts.Error(failure.Message);
+                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                 return Task.CompletedTask;
             }
         );

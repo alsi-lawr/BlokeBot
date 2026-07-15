@@ -1,6 +1,7 @@
 using BlokeBot.Components;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels;
+using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 
@@ -76,7 +77,7 @@ public partial class CustomCommandSettingsPage
                 SaveCommandAsync,
                 errors =>
                 {
-                    _toasts.Error(errors[0].Message);
+                    _toasts.Publish(new ToastRequest<ErrorToastStrategy>(errors[0].Message));
                     return Task.CompletedTask;
                 }
             );
@@ -95,11 +96,11 @@ public partial class CustomCommandSettingsPage
                     CancellationToken.None
                 );
                 _nextTemporaryId = -1;
-                _toasts.Success("Custom commands saved.");
+                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Custom commands saved."));
             },
             failure =>
             {
-                _toasts.Error(failure.Message);
+                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
                 return Task.CompletedTask;
             }
         );
@@ -141,8 +142,10 @@ public partial class CustomCommandSettingsPage
             || _config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
-            _toasts.Warning(
-                "This reply is used by a command or announcement. Change that first, then delete it."
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>(
+                    "This reply is used by a command or announcement. Change that first, then delete it."
+                )
             );
             return;
         }
@@ -168,7 +171,9 @@ public partial class CustomCommandSettingsPage
     {
         if (entry.Variants.Count <= 1)
         {
-            _toasts.Warning("A reply needs at least one message.");
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>("A reply needs at least one message.")
+            );
             return;
         }
 
@@ -243,8 +248,10 @@ public partial class CustomCommandSettingsPage
             )
         )
         {
-            _toasts.Warning(
-                "This counter is used by a command. Change that command first, then delete it."
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>(
+                    "This counter is used by a command. Change that command first, then delete it."
+                )
             );
             return;
         }
