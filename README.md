@@ -85,20 +85,65 @@ ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_URLS=http://127.0.0.1:8080 \
   dotnet run --project src/BlokeBot/BlokeBot.csproj
 ```
 
-### Nix (Linux x86_64)
+### Nix (Linux x86_64 and ARM64)
 
-The locked flake exposes the default package and application for `x86_64-linux`:
+The locked flake exposes an installable package, runnable application, development shell, and NixOS
+module for `x86_64-linux` and `aarch64-linux`:
 
 ```console
 nix build .#
 ./result/bin/BlokeBot
 
 nix run .#
+nix profile install .#blokebot
+nix develop
 ```
 
-The Nix wrapper deliberately does not set credentials or mutable-state locations. Supply the same
-ASP.NET Core environment variables described below and choose writable database and token-cache
-paths before running it.
+The package wrapper locates its immutable application configuration automatically. It deliberately
+does not set credentials or mutable-state locations when run directly; supply the same ASP.NET Core
+environment variables described below and choose writable database and token-cache paths.
+
+For a declarative NixOS installation, add this flake as an input and import its module:
+
+```nix
+{
+  inputs.blokebot.url = "github:alsi-lawr/BlokeBot";
+
+  outputs =
+    { blokebot, nixpkgs, ... }:
+    {
+      nixosConfigurations.my-host = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux"; # Or "aarch64-linux" for ARM64.
+        modules = [
+          blokebot.nixosModules.default
+          {
+            services.blokebot = {
+              enable = true;
+              listenAddress = "0.0.0.0";
+              openFirewall = true;
+              environment = {
+                TwitchBot__Identity__BotUsername = "my-bot";
+                TwitchBot__Identity__ClientId = "public-client-id";
+                TwitchBot__Identity__RedirectUri = "https://bot.example.com/oauth/callback";
+              };
+              environmentFile = "/run/secrets/blokebot.env";
+            };
+          }
+        ];
+      };
+    };
+}
+```
+
+Put secrets in the systemd environment file rather than in the Nix configuration:
+
+```shell
+TwitchBot__Identity__ClientSecret=private-client-secret
+```
+
+The module runs BlokeBot as a dedicated system user, stores its SQLite database and OAuth token
+cache under `/var/lib/blokebot`, and listens on `127.0.0.1:8080` unless configured otherwise. It
+leaves the firewall closed by default.
 
 ## Configuration and state
 
