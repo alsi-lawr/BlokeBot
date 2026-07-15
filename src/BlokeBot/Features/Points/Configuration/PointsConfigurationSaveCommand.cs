@@ -67,7 +67,6 @@ public sealed record PointsConfigurationSaveCommand
         PointsCommandAliases aliases,
         PointsReplySettings replies,
         ReplyDeliveryMap replyDelivery,
-        bool whisperResponsesEnabled,
         int gamblingWinRatePercent,
         int gamblingCooldownSeconds,
         int giveawayDurationSeconds,
@@ -82,7 +81,6 @@ public sealed record PointsConfigurationSaveCommand
         Aliases = aliases;
         Replies = replies;
         ReplyDelivery = replyDelivery;
-        WhisperResponsesEnabled = whisperResponsesEnabled;
         GamblingWinRatePercent = gamblingWinRatePercent;
         GamblingCooldownSeconds = gamblingCooldownSeconds;
         GiveawayDurationSeconds = giveawayDurationSeconds;
@@ -100,8 +98,6 @@ public sealed record PointsConfigurationSaveCommand
     public PointsReplySettings Replies { get; }
 
     public ReplyDeliveryMap ReplyDelivery { get; }
-
-    public bool WhisperResponsesEnabled { get; }
 
     public int GamblingWinRatePercent { get; }
 
