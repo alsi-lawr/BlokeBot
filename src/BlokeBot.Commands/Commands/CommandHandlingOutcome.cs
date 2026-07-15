@@ -1,25 +1,33 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Commands;
 
 public abstract record CommandHandlingOutcome
 {
     private CommandHandlingOutcome() { }
 
-    public TResult Match<TResult>(
+    public abstract TResult Match<TResult>(
         Func<Unhandled, TResult> unhandled,
         Func<Handled, TResult> handled
-    )
+    );
+
+    public sealed record Unhandled : CommandHandlingOutcome
     {
-        return this switch
+        public override TResult Match<TResult>(
+            Func<Unhandled, TResult> unhandled,
+            Func<Handled, TResult> handled
+        )
         {
-            Unhandled value => unhandled(value),
-            Handled value => handled(value),
-            _ => throw new UnreachableException("Unknown command handling outcome."),
-        };
+            return unhandled(this);
+        }
     }
 
-    public sealed record Unhandled : CommandHandlingOutcome;
-
-    public sealed record Handled : CommandHandlingOutcome;
+    public sealed record Handled : CommandHandlingOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Unhandled, TResult> unhandled,
+            Func<Handled, TResult> handled
+        )
+        {
+            return handled(this);
+        }
+    }
 }

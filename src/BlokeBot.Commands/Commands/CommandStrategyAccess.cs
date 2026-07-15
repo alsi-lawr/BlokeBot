@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Commands;
 
 public delegate ValueTask<CommandResponse> ModeratorOnlyResponse<TKind, TState>(
@@ -13,21 +11,31 @@ public abstract record CommandStrategyAccess<TKind, TState>
 {
     private CommandStrategyAccess() { }
 
-    public TResult Match<TResult>(
+    public abstract TResult Match<TResult>(
         Func<Everyone, TResult> everyone,
         Func<ModeratorOnly, TResult> moderatorOnly
-    )
+    );
+
+    public sealed record Everyone : CommandStrategyAccess<TKind, TState>
     {
-        return this switch
+        public override TResult Match<TResult>(
+            Func<Everyone, TResult> everyone,
+            Func<ModeratorOnly, TResult> moderatorOnly
+        )
         {
-            Everyone value => everyone(value),
-            ModeratorOnly value => moderatorOnly(value),
-            _ => throw new UnreachableException("Unknown command strategy access."),
-        };
+            return everyone(this);
+        }
     }
 
-    public sealed record Everyone : CommandStrategyAccess<TKind, TState>;
-
     public sealed record ModeratorOnly(ModeratorOnlyResponse<TKind, TState> Response)
-        : CommandStrategyAccess<TKind, TState>;
+        : CommandStrategyAccess<TKind, TState>
+    {
+        public override TResult Match<TResult>(
+            Func<Everyone, TResult> everyone,
+            Func<ModeratorOnly, TResult> moderatorOnly
+        )
+        {
+            return moderatorOnly(this);
+        }
+    }
 }

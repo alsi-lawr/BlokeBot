@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Claims;
 using BlokeBot.Functional;
 using BlokeBot.Hosts;
@@ -277,18 +276,31 @@ public sealed record AuthenticatedSession
 
     private abstract record DecodedHostClaims(BotHostChoice[] Hosts)
     {
-        internal TResult Match<TResult>(Func<Valid, TResult> valid, Func<Invalid, TResult> invalid)
+        internal abstract TResult Match<TResult>(
+            Func<Valid, TResult> valid,
+            Func<Invalid, TResult> invalid
+        );
+
+        internal sealed record Valid(BotHostChoice[] Hosts) : DecodedHostClaims(Hosts)
         {
-            return this switch
+            internal override TResult Match<TResult>(
+                Func<Valid, TResult> valid,
+                Func<Invalid, TResult> invalid
+            )
             {
-                Valid value => valid(value),
-                Invalid value => invalid(value),
-                _ => throw new UnreachableException("Unknown decoded host claims."),
-            };
+                return valid(this);
+            }
         }
 
-        internal sealed record Valid(BotHostChoice[] Hosts) : DecodedHostClaims(Hosts);
-
-        internal sealed record Invalid(BotHostChoice[] Hosts) : DecodedHostClaims(Hosts);
+        internal sealed record Invalid(BotHostChoice[] Hosts) : DecodedHostClaims(Hosts)
+        {
+            internal override TResult Match<TResult>(
+                Func<Valid, TResult> valid,
+                Func<Invalid, TResult> invalid
+            )
+            {
+                return invalid(this);
+            }
+        }
     }
 }

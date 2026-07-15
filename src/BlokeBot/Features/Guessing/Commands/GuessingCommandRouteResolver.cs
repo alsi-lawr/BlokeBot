@@ -23,34 +23,47 @@ public sealed class GuessingCommandRouteResolver(
             return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
         }
 
-        var kind = GuessingAppCommandKindMap
+        return await GuessingAppCommandKindMap
             .FromAppKind(resolution.Kind)
-            .Match<GuessCommandKind?>(value => value, () => null);
-        if (kind is not { } mappedKind)
+            .Match(ResolveKindAsync, Unresolved);
+
+        async ValueTask<
+            CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
+        > ResolveKindAsync(GuessCommandKind kind)
         {
-            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
+            if (
+                !await features.IsEnabledAsync(
+                    resolution.HostId,
+                    HostFeatureFlags.Guessing,
+                    cancellationToken
+                )
+            )
+            {
+                return new CommandRouteResolution<
+                    GuessCommandKind,
+                    AppCommandRouteState
+                >.Unresolved();
+            }
+
+            var state = resolution.Scope.Match<AppCommandRouteState>(
+                _ => new AppCommandRouteState.Host(resolution.HostId),
+                profile => new AppCommandRouteState.GuessingProfile(
+                    resolution.HostId,
+                    profile.ProfileId
+                )
+            );
+            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Resolved(
+                new CommandRoute<GuessCommandKind, AppCommandRouteState>(kind, state)
+            );
         }
 
-        if (
-            !await features.IsEnabledAsync(
-                resolution.HostId,
-                HostFeatureFlags.Guessing,
-                cancellationToken
-            )
-        )
+        static ValueTask<
+            CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
+        > Unresolved()
         {
-            return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved();
+            return ValueTask.FromResult<
+                CommandRouteResolution<GuessCommandKind, AppCommandRouteState>
+            >(new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Unresolved());
         }
-
-        var state = resolution.Scope.Match<AppCommandRouteState>(
-            _ => new AppCommandRouteState.Host(resolution.HostId),
-            profile => new AppCommandRouteState.GuessingProfile(
-                resolution.HostId,
-                profile.ProfileId
-            )
-        );
-        return new CommandRouteResolution<GuessCommandKind, AppCommandRouteState>.Resolved(
-            new CommandRoute<GuessCommandKind, AppCommandRouteState>(mappedKind, state)
-        );
     }
 }

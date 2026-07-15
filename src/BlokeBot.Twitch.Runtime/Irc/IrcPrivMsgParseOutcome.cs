@@ -1,12 +1,10 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Twitch.Runtime;
 
 public abstract record IrcPrivMsgParseOutcome
 {
     private IrcPrivMsgParseOutcome() { }
 
-    public TResult Match<TResult>(
+    public abstract TResult Match<TResult>(
         Func<Parsed, TResult> parsed,
         Func<NotPrivMsg, TResult> notPrivMsg,
         Func<MissingTagTerminator, TResult> missingTagTerminator,
@@ -15,35 +13,141 @@ public abstract record IrcPrivMsgParseOutcome
         Func<MissingUserLogin, TResult> missingUserLogin,
         Func<MalformedCommand, TResult> malformedCommand,
         Func<MissingChannelOrText, TResult> missingChannelOrText
-    )
+    );
+
+    public sealed record Parsed(ChatMessage Message) : IrcPrivMsgParseOutcome
     {
-        return this switch
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
         {
-            Parsed value => parsed(value),
-            NotPrivMsg value => notPrivMsg(value),
-            MissingTagTerminator value => missingTagTerminator(value),
-            MissingPrefix value => missingPrefix(value),
-            MalformedPrefix value => malformedPrefix(value),
-            MissingUserLogin value => missingUserLogin(value),
-            MalformedCommand value => malformedCommand(value),
-            MissingChannelOrText value => missingChannelOrText(value),
-            _ => throw new UnreachableException("Unknown IRC private-message parse outcome."),
-        };
+            return parsed(this);
+        }
     }
 
-    public sealed record Parsed(ChatMessage Message) : IrcPrivMsgParseOutcome;
+    public sealed record NotPrivMsg : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return notPrivMsg(this);
+        }
+    }
 
-    public sealed record NotPrivMsg : IrcPrivMsgParseOutcome;
+    public sealed record MissingTagTerminator : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return missingTagTerminator(this);
+        }
+    }
 
-    public sealed record MissingTagTerminator : IrcPrivMsgParseOutcome;
+    public sealed record MissingPrefix : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return missingPrefix(this);
+        }
+    }
 
-    public sealed record MissingPrefix : IrcPrivMsgParseOutcome;
+    public sealed record MalformedPrefix : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return malformedPrefix(this);
+        }
+    }
 
-    public sealed record MalformedPrefix : IrcPrivMsgParseOutcome;
+    public sealed record MissingUserLogin : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return missingUserLogin(this);
+        }
+    }
 
-    public sealed record MissingUserLogin : IrcPrivMsgParseOutcome;
+    public sealed record MalformedCommand : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return malformedCommand(this);
+        }
+    }
 
-    public sealed record MalformedCommand : IrcPrivMsgParseOutcome;
-
-    public sealed record MissingChannelOrText : IrcPrivMsgParseOutcome;
+    public sealed record MissingChannelOrText : IrcPrivMsgParseOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Parsed, TResult> parsed,
+            Func<NotPrivMsg, TResult> notPrivMsg,
+            Func<MissingTagTerminator, TResult> missingTagTerminator,
+            Func<MissingPrefix, TResult> missingPrefix,
+            Func<MalformedPrefix, TResult> malformedPrefix,
+            Func<MissingUserLogin, TResult> missingUserLogin,
+            Func<MalformedCommand, TResult> malformedCommand,
+            Func<MissingChannelOrText, TResult> missingChannelOrText
+        )
+        {
+            return missingChannelOrText(this);
+        }
+    }
 }

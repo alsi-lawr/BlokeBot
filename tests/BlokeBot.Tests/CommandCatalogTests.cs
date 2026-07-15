@@ -251,26 +251,30 @@ public sealed class CommandCatalogTests
         var points = PointsCatalog();
 
         guessing
-            .Find(GuessCommandKind.Start)!
-            .Access.ShouldBeOfType<CommandStrategyAccess<
+            .Find(GuessCommandKind.Start)
+            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
         points
-            .Find(PointsCommandKind.AddPoints)!
-            .Access.ShouldBeOfType<CommandStrategyAccess<
+            .Find(PointsCommandKind.AddPoints)
+            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.ModeratorOnly>();
         points
-            .Find(PointsCommandKind.Points)!
-            .Access.ShouldBeOfType<CommandStrategyAccess<
+            .Find(PointsCommandKind.Points)
+            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .ShouldBeOfType<CommandStrategyAccess<
                 PointsCommandKind,
                 AppCommandRouteState
             >.Everyone>();
         guessing
-            .Find(GuessCommandKind.Guess)!
-            .Access.ShouldBeOfType<CommandStrategyAccess<
+            .Find(GuessCommandKind.Guess)
+            .Match(_ => throw new InvalidOperationException(), found => found.Strategy.Access)
+            .ShouldBeOfType<CommandStrategyAccess<
                 GuessCommandKind,
                 AppCommandRouteState
             >.Everyone>();
@@ -284,20 +288,20 @@ public sealed class CommandCatalogTests
 
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match<GuessCommandKind?>(kind => kind, () => null)
+            .Match(kind => kind, () => throw new InvalidOperationException())
             .ShouldBe(GuessCommandKind.Win);
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match<PointsCommandKind?>(kind => kind, () => null)
+            .Match(kind => kind, () => throw new InvalidOperationException())
             .ShouldBe(PointsCommandKind.Giveaway);
         GuessingAppCommandKindMap
             .FromAppKind(AppCommandKind.Giveaway)
-            .Match<GuessCommandKind?>(kind => kind, () => null)
-            .ShouldBeNull();
+            .Match(_ => false, () => true)
+            .ShouldBeTrue();
         PointsAppCommandKindMap
             .FromAppKind(AppCommandKind.Win)
-            .Match<PointsCommandKind?>(kind => kind, () => null)
-            .ShouldBeNull();
+            .Match(_ => false, () => true)
+            .ShouldBeTrue();
 
         var guessingKinds = GuessingAppCommandKindMap.AppKinds;
         var pointsKinds = PointsAppCommandKindMap.AppKinds;

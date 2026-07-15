@@ -1,5 +1,3 @@
-using System.Diagnostics;
-
 namespace BlokeBot.Commands;
 
 public abstract record CommandRouteResolution<TKind, TState>
@@ -7,21 +5,31 @@ public abstract record CommandRouteResolution<TKind, TState>
 {
     private CommandRouteResolution() { }
 
-    public TResult Match<TResult>(
+    public abstract TResult Match<TResult>(
         Func<Unresolved, TResult> unresolved,
         Func<Resolved, TResult> resolved
-    )
+    );
+
+    public sealed record Unresolved : CommandRouteResolution<TKind, TState>
     {
-        return this switch
+        public override TResult Match<TResult>(
+            Func<Unresolved, TResult> unresolved,
+            Func<Resolved, TResult> resolved
+        )
         {
-            Unresolved value => unresolved(value),
-            Resolved value => resolved(value),
-            _ => throw new UnreachableException("Unknown command route resolution."),
-        };
+            return unresolved(this);
+        }
     }
 
-    public sealed record Unresolved : CommandRouteResolution<TKind, TState>;
-
     public sealed record Resolved(CommandRoute<TKind, TState> Route)
-        : CommandRouteResolution<TKind, TState>;
+        : CommandRouteResolution<TKind, TState>
+    {
+        public override TResult Match<TResult>(
+            Func<Unresolved, TResult> unresolved,
+            Func<Resolved, TResult> resolved
+        )
+        {
+            return resolved(this);
+        }
+    }
 }

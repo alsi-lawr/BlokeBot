@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
@@ -10,26 +9,47 @@ internal abstract record AccessListPolicy
 {
     private AccessListPolicy() { }
 
-    internal TResult Match<TResult>(
+    internal abstract TResult Match<TResult>(
         Func<Disabled, TResult> disabled,
         Func<BlacklistByDefault, TResult> blacklistByDefault,
         Func<WhitelistRequired, TResult> whitelistRequired
-    )
+    );
+
+    internal sealed record Disabled : AccessListPolicy
     {
-        return this switch
+        internal override TResult Match<TResult>(
+            Func<Disabled, TResult> disabled,
+            Func<BlacklistByDefault, TResult> blacklistByDefault,
+            Func<WhitelistRequired, TResult> whitelistRequired
+        )
         {
-            Disabled value => disabled(value),
-            BlacklistByDefault value => blacklistByDefault(value),
-            WhitelistRequired value => whitelistRequired(value),
-            _ => throw new UnreachableException("Unknown access-list policy."),
-        };
+            return disabled(this);
+        }
     }
 
-    internal sealed record Disabled : AccessListPolicy;
+    internal sealed record BlacklistByDefault : AccessListPolicy
+    {
+        internal override TResult Match<TResult>(
+            Func<Disabled, TResult> disabled,
+            Func<BlacklistByDefault, TResult> blacklistByDefault,
+            Func<WhitelistRequired, TResult> whitelistRequired
+        )
+        {
+            return blacklistByDefault(this);
+        }
+    }
 
-    internal sealed record BlacklistByDefault : AccessListPolicy;
-
-    internal sealed record WhitelistRequired : AccessListPolicy;
+    internal sealed record WhitelistRequired : AccessListPolicy
+    {
+        internal override TResult Match<TResult>(
+            Func<Disabled, TResult> disabled,
+            Func<BlacklistByDefault, TResult> blacklistByDefault,
+            Func<WhitelistRequired, TResult> whitelistRequired
+        )
+        {
+            return whitelistRequired(this);
+        }
+    }
 }
 
 internal sealed record AccessListEntryValue(AccessListEntryKind Kind, string Login);

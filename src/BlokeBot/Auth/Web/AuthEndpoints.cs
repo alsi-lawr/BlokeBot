@@ -397,21 +397,31 @@ internal static class AuthEndpoints
     {
         private LoginAction() { }
 
-        internal TResult Match<TResult>(
+        internal abstract TResult Match<TResult>(
             Func<ShowLoginPage, TResult> showLoginPage,
             Func<StartOAuth, TResult> startOAuth
-        )
+        );
+
+        internal sealed record ShowLoginPage : LoginAction
         {
-            return this switch
+            internal override TResult Match<TResult>(
+                Func<ShowLoginPage, TResult> showLoginPage,
+                Func<StartOAuth, TResult> startOAuth
+            )
             {
-                ShowLoginPage value => showLoginPage(value),
-                StartOAuth value => startOAuth(value),
-                _ => throw new UnreachableException("Unknown login action."),
-            };
+                return showLoginPage(this);
+            }
         }
 
-        internal sealed record ShowLoginPage : LoginAction;
-
-        internal sealed record StartOAuth : LoginAction;
+        internal sealed record StartOAuth : LoginAction
+        {
+            internal override TResult Match<TResult>(
+                Func<ShowLoginPage, TResult> showLoginPage,
+                Func<StartOAuth, TResult> startOAuth
+            )
+            {
+                return startOAuth(this);
+            }
+        }
     }
 }

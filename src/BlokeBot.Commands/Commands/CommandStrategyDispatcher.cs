@@ -15,43 +15,52 @@ public sealed class CommandStrategyDispatcher<TKind, TState>(
         CancellationToken cancellationToken
     )
     {
-        var strategy = catalog.Find(route.Kind);
-        if (strategy is null)
-        {
-            return new CommandHandlingOutcome.Unhandled();
-        }
-
         var context = new CommandStrategyContext<TKind, TState>(
             route.Kind,
             route.State,
             command,
             args
         );
-        return await strategy.Access.Match(
-            _ => ExecuteAsync(),
-            moderatorOnly =>
-                ChatModeratorPolicy.IsModerator(command.Message)
-                    ? ExecuteAsync()
-                    : RejectModeratorOnlyAsync(moderatorOnly)
-        );
+        return await catalog
+            .Find(route.Kind)
+            .Match(
+                _ =>
+                    ValueTask.FromResult<CommandHandlingOutcome>(
+                        new CommandHandlingOutcome.Unhandled()
+                    ),
+                found => DispatchAsync(found.Strategy)
+            );
 
-        async ValueTask<CommandHandlingOutcome> ExecuteAsync()
-        {
-            await strategy.ExecuteAsync(context, cancellationToken);
-            return new CommandHandlingOutcome.Handled();
-        }
-
-        async ValueTask<CommandHandlingOutcome> RejectModeratorOnlyAsync(
-            CommandStrategyAccess<TKind, TState>.ModeratorOnly moderatorOnly
+        async ValueTask<CommandHandlingOutcome> DispatchAsync(
+            ICommandStrategy<TKind, TState> strategy
         )
         {
-            var response = await moderatorOnly.Response(context, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(response.Message))
+            return await strategy.Access.Match(
+                _ => ExecuteAsync(),
+                moderatorOnly =>
+                    ChatModeratorPolicy.IsModerator(command.Message)
+                        ? ExecuteAsync()
+                        : RejectModeratorOnlyAsync(moderatorOnly)
+            );
+
+            async ValueTask<CommandHandlingOutcome> ExecuteAsync()
             {
-                await command.RespondAsync(response, cancellationToken);
+                await strategy.ExecuteAsync(context, cancellationToken);
+                return new CommandHandlingOutcome.Handled();
             }
 
-            return new CommandHandlingOutcome.Handled();
+            async ValueTask<CommandHandlingOutcome> RejectModeratorOnlyAsync(
+                CommandStrategyAccess<TKind, TState>.ModeratorOnly moderatorOnly
+            )
+            {
+                var response = await moderatorOnly.Response(context, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(response.Message))
+                {
+                    await command.RespondAsync(response, cancellationToken);
+                }
+
+                return new CommandHandlingOutcome.Handled();
+            }
         }
     }
 }

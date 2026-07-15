@@ -43,6 +43,15 @@ public sealed class IrcTests
         IrcProtocol
             .ParsePrivMsg("@ :a!b@c PRIVMSG #channel :hello")
             .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingTagTerminator>();
+        IrcProtocol
+            .ParsePrivMsg("a!b@c PRIVMSG #channel :hello")
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingPrefix>();
+        IrcProtocol
+            .ParsePrivMsg(": PRIVMSG #channel :hello")
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MalformedPrefix>();
+        IrcProtocol
+            .ParsePrivMsg(":a!b@c PRIVMSG #channel")
+            .ShouldBeOfType<IrcPrivMsgParseOutcome.MissingChannelOrText>();
     }
 
     [Test]
