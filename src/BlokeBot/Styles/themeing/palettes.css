@@ -1,6 +1,6 @@
 html {
     color-scheme: light;
-    --app-topbar-sticky-offset: 6.875rem;
+    --app-topbar-sticky-offset: 12.25rem;
     --app-background: #f8fafc;
     --app-surface: rgb(255 255 255 / 0.92);
     --app-surface-solid: rgb(255 255 255);
@@ -51,7 +51,13 @@ html {
     --app-shadow-surface: 0 18px 60px -34px rgb(15 23 42 / 0.5);
 }
 
-@media (min-width: 64rem) {
+@media (min-width: 40rem) {
+    html {
+        --app-topbar-sticky-offset: 6.875rem;
+    }
+}
+
+@media (min-width: 96rem) {
     html {
         --app-topbar-sticky-offset: 4rem;
     }

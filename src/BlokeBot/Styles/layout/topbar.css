@@ -60,10 +60,19 @@
         min-width: 0;
     }
 
+    .topbar-alert-button {
+        grid-area: alert;
+    }
+
+    .selected-channel-bot-status {
+        grid-area: status;
+    }
+
     .host-selector {
         align-items: center;
         display: grid;
         gap: 0.5rem;
+        grid-area: selector;
         grid-template-columns: minmax(0, 1fr) 2.25rem;
         min-width: 0;
         width: 100%;
@@ -82,7 +91,58 @@
     }
 
     .account-menu {
+        grid-area: account;
         width: 100%;
+    }
+
+    .topbar-controls--account-only {
+        grid-template-areas: "account";
+    }
+
+    .topbar-controls--account-only.topbar-controls--with-alert {
+        grid-template-areas: "alert account";
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .topbar-controls--selector-account {
+        grid-template-areas:
+            "selector"
+            "account";
+    }
+
+    .topbar-controls--selector-account.topbar-controls--with-alert {
+        grid-template-areas:
+            "alert selector"
+            "account account";
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .topbar-controls--status-account {
+        grid-template-areas:
+            "status"
+            "account";
+    }
+
+    .topbar-controls--status-account.topbar-controls--with-alert {
+        grid-template-areas:
+            "alert status"
+            "account account";
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .topbar-controls--status-selector-account {
+        grid-template-areas:
+            "status"
+            "selector"
+            "account";
+    }
+
+    .topbar-controls--status-selector-account.topbar-controls--with-alert {
+        grid-template-areas:
+            "alert status"
+            "selector selector"
+            "account account";
+        grid-template-columns: auto minmax(0, 1fr);
     }
 
     .account-menu__summary {
@@ -107,7 +167,56 @@
         }
     }
 
-    @media (min-width: 64rem) {
+    @media (min-width: 40rem) {
+        .topbar-controls {
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .topbar-controls--account-only {
+            grid-template-areas: "account";
+            grid-template-columns: 19rem;
+            justify-content: end;
+        }
+
+        .topbar-controls--account-only.topbar-controls--with-alert {
+            grid-template-areas: "alert account";
+            grid-template-columns: auto 19rem;
+        }
+
+        .topbar-controls--selector-account {
+            grid-template-areas: "selector account";
+            grid-template-columns: minmax(0, 1fr) 19rem;
+        }
+
+        .topbar-controls--selector-account.topbar-controls--with-alert {
+            grid-template-areas: "alert selector account";
+            grid-template-columns: auto minmax(0, 1fr) 19rem;
+        }
+
+        .topbar-controls--status-account {
+            grid-template-areas: "status account";
+            grid-template-columns: auto 19rem;
+            justify-content: end;
+        }
+
+        .topbar-controls--status-account.topbar-controls--with-alert {
+            grid-template-areas: "alert status account";
+            grid-template-columns: auto auto 19rem;
+        }
+
+        .topbar-controls--status-selector-account {
+            grid-template-areas: "status selector account";
+            grid-template-columns: auto minmax(0, 1fr) 19rem;
+        }
+
+        .topbar-controls--status-selector-account.topbar-controls--with-alert {
+            grid-template-areas: "alert status selector account";
+            grid-template-columns: auto auto minmax(0, 1fr) 19rem;
+        }
+    }
+
+    @media (min-width: 96rem) {
         .app-topbar__inner {
             gap: 0.75rem;
             grid-template-areas: "identity controls utility";
@@ -123,41 +232,39 @@
         }
 
         .topbar-controls {
-            align-items: center;
-            gap: 0.75rem;
             width: auto;
         }
 
         .topbar-controls--account-only {
-            grid-template-columns: minmax(14rem, 18rem);
+            grid-template-columns: 19rem;
         }
 
         .topbar-controls--account-only.topbar-controls--with-alert {
-            grid-template-columns: auto minmax(14rem, 18rem);
+            grid-template-columns: auto 19rem;
         }
 
         .topbar-controls--selector-account {
-            grid-template-columns: auto minmax(14rem, 18rem);
+            grid-template-columns: auto 19rem;
         }
 
         .topbar-controls--selector-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto minmax(14rem, 18rem);
+            grid-template-columns: auto auto 19rem;
         }
 
         .topbar-controls--status-account {
-            grid-template-columns: auto minmax(14rem, 18rem);
+            grid-template-columns: auto 19rem;
         }
 
         .topbar-controls--status-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto minmax(14rem, 18rem);
+            grid-template-columns: auto auto 19rem;
         }
 
         .topbar-controls--status-selector-account {
-            grid-template-columns: auto auto minmax(14rem, 18rem);
+            grid-template-columns: auto auto 19rem;
         }
 
         .topbar-controls--status-selector-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto auto minmax(14rem, 18rem);
+            grid-template-columns: auto auto auto 19rem;
         }
 
         .host-selector {

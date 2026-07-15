@@ -8,6 +8,12 @@
         {
             <img class="h-7 w-7 rounded-full border border-slate-200 object-cover" src="@imageUrl" alt="" />
         }
+        else
+        {
+            <span class="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200" aria-hidden="true">
+                @AccountInitial()
+            </span>
+        }
         <span class="truncate text-sm font-semibold text-slate-900">@IdentityText()</span>
         <span class="@RoleBadgeClass(_role)">@_role</span>
         <svg class="h-5 w-5 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">

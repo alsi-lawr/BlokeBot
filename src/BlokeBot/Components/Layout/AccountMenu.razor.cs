@@ -79,6 +79,12 @@ public partial class AccountMenu
         return Session.DisplayText;
     }
 
+    private string AccountInitial()
+    {
+        var identity = IdentityText();
+        return string.IsNullOrWhiteSpace(identity) ? "?" : identity[..1].ToUpperInvariant();
+    }
+
     private static string RoleBadgeClass(string role)
     {
         var color = role.ToLowerInvariant() switch
