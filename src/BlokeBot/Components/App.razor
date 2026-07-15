@@ -1,3 +1,5 @@
+@inject IWebHostEnvironment Environment
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -5,6 +7,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @if (Environment.EnvironmentName == "Simulation")
+    {
+        <script>
+            try {
+                const requestedTheme = new URLSearchParams(window.location.search).get("simulationTheme");
+                const simulationTheme = requestedTheme === "dark" ? "dark" : "light";
+                window.localStorage.setItem("blokebot.theme", simulationTheme);
+            } catch {
+            }
+        </script>
+    }
     <script>
         (() => {
             const storageKey = "blokebot.theme";

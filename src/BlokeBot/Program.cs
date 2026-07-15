@@ -39,6 +39,7 @@ using BlokeBot.Features.Toasts;
 using BlokeBot.Hosting;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
+using BlokeBot.Simulation;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -180,6 +181,13 @@ else
     builder.Services.AddOfflineBotRuntimeStatus();
 }
 
+var simulationEnabled = builder.Environment.IsEnvironment(SimulationMode.EnvironmentName);
+if (simulationEnabled)
+{
+    builder.WebHost.UseStaticWebAssets();
+    builder.Services.AddBlokeBotSimulation();
+}
+
 var app = builder.Build();
 
 await app
@@ -202,6 +210,10 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
 
 app.MapAuthEndpoints();
+if (simulationEnabled)
+{
+    app.MapSimulationEndpoints();
+}
 if (botRuntimeConfigured)
 {
     app.MapBotOAuthEndpoints();
