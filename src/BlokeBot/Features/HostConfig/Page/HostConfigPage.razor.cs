@@ -456,7 +456,7 @@ public partial class HostConfigPage
                     .SaveModeratorAccess(submission.Command)
                     .ExecuteAsync(cancellationToken);
                 await result.Match(
-                    _ => ApplyAllowModsByDefaultSuccessAsync(submission),
+                    _ => Task.CompletedTask,
                     failure => ApplyAllowModsByDefaultFailureAsync(submission, failure)
                 );
             }
@@ -477,25 +477,18 @@ public partial class HostConfigPage
         }
     }
 
-    private Task ApplyAllowModsByDefaultSuccessAsync(HostModAccessSaveSubmission submission)
-    {
-        return _allowModsByDefaultSaves.IsCurrent(submission)
-            ? InvokeAsync(LoadCoreAsync)
-            : Task.CompletedTask;
-    }
-
     private Task ApplyAllowModsByDefaultFailureAsync(
         HostModAccessSaveSubmission submission,
         HostModAccessSaveFailure failure
     )
     {
-        if (!_allowModsByDefaultSaves.IsCurrent(submission))
-        {
-            return Task.CompletedTask;
-        }
-
         return InvokeAsync(() =>
         {
+            if (!_allowModsByDefaultSaves.IsCurrent(submission))
+            {
+                return;
+            }
+
             if (_state is not null)
             {
                 _state = _state with { ModAccess = submission.PreviousAccess };

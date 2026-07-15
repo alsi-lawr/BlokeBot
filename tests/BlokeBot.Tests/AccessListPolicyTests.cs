@@ -377,6 +377,11 @@ public sealed class AccessListPolicyTests
             .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
             .ShouldBe(new HostModAccessSaveFailure.RuntimeNotificationFailed(1, 0));
         notificationCount.ShouldBe(2);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            (await db.HostModAccessSettings.AnyAsync(x => x.HostId == hostId)).ShouldBeFalse();
+        }
+
         (await service.LoadAsync(hostId, CancellationToken.None)).AllowModsByDefault.ShouldBeTrue();
     }
 

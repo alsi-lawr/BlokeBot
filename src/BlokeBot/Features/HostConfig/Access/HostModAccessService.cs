@@ -146,6 +146,7 @@ public sealed class HostModAccessService(
             x => x.HostId == command.HostId,
             ct
         );
+        var settingsExisted = settings is not null;
         if (settings is null)
         {
             settings = new HostModAccessSettings
@@ -170,7 +171,15 @@ public sealed class HostModAccessService(
         }
 
         var failedNotification = (ObserverFanOutOutcome.CompletedWithFailures)notification;
-        settings.AllowModsByDefault = previousAllowModsByDefault;
+        if (settingsExisted)
+        {
+            settings.AllowModsByDefault = previousAllowModsByDefault;
+        }
+        else
+        {
+            db.HostModAccessSettings.Remove(settings);
+        }
+
         await db.SaveChangesAsync(CancellationToken.None);
         var rollbackNotification = await changes.NotifyChangedAsync(CancellationToken.None);
         var failedRollbackObserverCount = rollbackNotification switch
