@@ -66,8 +66,7 @@ formatting.
 - Include only tests that protect meaningful product behavior.
 - State what you verified and identify any remaining risk in the pull request.
 
-## Licence status
+## Licence
 
-No licence is currently declared for this repository. Public visibility does not grant permission
-to use, modify, or redistribute the project, and a contribution does not establish a project-wide
-licence. Licence selection remains a maintainer decision.
+BlokeBot is distributed under the [MIT License](LICENSE). Only submit work that you have the right
+to contribute. Contributions accepted into the repository are distributed under the same terms.

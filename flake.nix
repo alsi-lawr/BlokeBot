@@ -55,6 +55,7 @@
 
           meta = {
             description = "Self-hosted Twitch bot and Blazor admin dashboard";
+            license = pkgs.lib.licenses.mit;
             mainProgram = "BlokeBot";
           };
         };
