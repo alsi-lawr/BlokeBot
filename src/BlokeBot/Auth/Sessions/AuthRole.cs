@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Auth.Sessions;
 
 public enum AuthRole
@@ -22,24 +24,22 @@ internal static class AuthRoleCodec
         };
     }
 
-    public static bool TryDecode(string? value, out AuthRole role)
+    public static Result<AuthRole, AuthRoleDecodeFailure> Decode(string? value)
     {
-        role = default;
         if (string.IsNullOrWhiteSpace(value))
         {
-            return false;
+            return Result<AuthRole, AuthRoleDecodeFailure>.Error(new AuthRoleDecodeFailure());
         }
 
-        var normalized = value.Trim().ToLowerInvariant();
-        role = normalized switch
+        return value.Trim().ToLowerInvariant() switch
         {
-            "admin" => AuthRole.Admin,
-            "bot" => AuthRole.Bot,
-            "moderator" => AuthRole.Moderator,
-            "streamer" => AuthRole.Streamer,
-            _ => default,
+            "admin" => Result<AuthRole, AuthRoleDecodeFailure>.Success(AuthRole.Admin),
+            "bot" => Result<AuthRole, AuthRoleDecodeFailure>.Success(AuthRole.Bot),
+            "moderator" => Result<AuthRole, AuthRoleDecodeFailure>.Success(AuthRole.Moderator),
+            "streamer" => Result<AuthRole, AuthRoleDecodeFailure>.Success(AuthRole.Streamer),
+            _ => Result<AuthRole, AuthRoleDecodeFailure>.Error(new AuthRoleDecodeFailure()),
         };
-
-        return normalized is "admin" or "bot" or "moderator" or "streamer";
     }
 }
+
+internal readonly record struct AuthRoleDecodeFailure;

@@ -18,9 +18,9 @@ public sealed class OAuthTests
         var state = store.Issue();
 
         state.ShouldNotBeNullOrWhiteSpace();
-        store.Consume(state).ShouldBeOfType<OAuthStateConsumptionOutcome.Consumed>();
-        store.Consume(state).ShouldBeOfType<OAuthStateConsumptionOutcome.Rejected>();
-        store.Consume("missing").ShouldBeOfType<OAuthStateConsumptionOutcome.Rejected>();
+        store.Consume(state).Match(_ => true, _ => false).ShouldBeTrue();
+        store.Consume(state).Match(_ => true, _ => false).ShouldBeFalse();
+        store.Consume("missing").Match(_ => true, _ => false).ShouldBeFalse();
     }
 
     [Test]

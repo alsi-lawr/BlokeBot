@@ -20,7 +20,10 @@ public sealed class HostModAccessService(
         CancellationToken ct
     )
     {
-        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        var normalized = AccessListStore
+            .NormalizeLogin(login)
+            .Match<string?>(value => value, _ => null);
+        if (normalized is null)
         {
             return;
         }
@@ -52,7 +55,10 @@ public sealed class HostModAccessService(
 
     public async Task<bool> CanModeratorAccessAsync(int hostId, string login, CancellationToken ct)
     {
-        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        var normalized = AccessListStore
+            .NormalizeLogin(login)
+            .Match<string?>(value => value, _ => null);
+        if (normalized is null)
         {
             return false;
         }

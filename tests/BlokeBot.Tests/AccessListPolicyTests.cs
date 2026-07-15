@@ -21,6 +21,7 @@ public sealed class AccessListPolicyTests
 
         (await service.CanCreateHostAsync("Viewer", CancellationToken.None)).ShouldBeTrue();
 
+        await service.AddEntryAsync(AccessListEntryKind.Blacklist, " ", CancellationToken.None);
         await service.AddEntryAsync(
             AccessListEntryKind.Blacklist,
             " Viewer ",

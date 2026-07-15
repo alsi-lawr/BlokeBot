@@ -19,10 +19,15 @@ public sealed class PointsCommandRouteResolver(
             context.CommandName,
             cancellationToken
         );
-        if (
-            resolution is null
-            || !PointsAppCommandKindMap.TryFromAppKind(resolution.Kind, out var kind)
-        )
+        if (resolution is null)
+        {
+            return null;
+        }
+
+        var kind = PointsAppCommandKindMap
+            .FromAppKind(resolution.Kind)
+            .Match<PointsCommandKind?>(value => value, () => null);
+        if (kind is not { } mappedKind)
         {
             return null;
         }
@@ -39,7 +44,7 @@ public sealed class PointsCommandRouteResolver(
         }
 
         return new CommandRoute<PointsCommandKind, AppCommandRouteState>(
-            kind,
+            mappedKind,
             new AppCommandRouteState.Host(resolution.HostId)
         );
     }

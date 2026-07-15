@@ -1,4 +1,10 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
+
+public readonly record struct OAuthStateConsumed;
+
+public readonly record struct OAuthStateRejected;
 
 /// <summary>
 /// Issues and consumes OAuth state values.
@@ -15,6 +21,6 @@ public interface IOAuthStateStore
     /// Consumes a state value.
     /// </summary>
     /// <param name="state">The state value to consume.</param>
-    /// <returns>The typed state-consumption outcome.</returns>
-    OAuthStateConsumptionOutcome Consume(string state);
+    /// <returns>The typed state-consumption result.</returns>
+    Result<OAuthStateConsumed, OAuthStateRejected> Consume(string state);
 }

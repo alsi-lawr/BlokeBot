@@ -33,19 +33,25 @@ internal static class BotHostClaimCodec
                 || payload.Id <= 0
                 || string.IsNullOrWhiteSpace(payload.Login)
                 || string.IsNullOrWhiteSpace(payload.DisplayName)
-                || !AuthRoleCodec.TryDecode(payload.Role, out var role)
             )
             {
                 return null;
             }
 
-            return new BotHostChoice(
-                payload.Id,
-                payload.Login,
-                payload.DisplayName,
-                role,
-                string.IsNullOrWhiteSpace(payload.ProfileImageUrl) ? null : payload.ProfileImageUrl
-            );
+            return AuthRoleCodec
+                .Decode(payload.Role)
+                .Match<BotHostChoice?>(
+                    role => new BotHostChoice(
+                        payload.Id,
+                        payload.Login,
+                        payload.DisplayName,
+                        role,
+                        string.IsNullOrWhiteSpace(payload.ProfileImageUrl)
+                            ? null
+                            : payload.ProfileImageUrl
+                    ),
+                    _ => null
+                );
         }
         catch (JsonException)
         {

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -100,7 +101,8 @@ internal static class AccessListStore
     )
         where TEntry : class, IAccessListEntry
     {
-        if (!TryNormalizeLogin(login, out var normalized))
+        var normalized = NormalizeLogin(login).Match<string?>(value => value, _ => null);
+        if (normalized is null)
         {
             return 0;
         }
@@ -110,10 +112,15 @@ internal static class AccessListStore
             .ExecuteDeleteAsync(ct);
     }
 
-    public static bool TryNormalizeLogin(string login, out string normalized)
+    public static Result<string, AccessListLoginNormalizationFailure> NormalizeLogin(string login)
     {
         var parsed = LoginName.Parse(login);
-        normalized = parsed.Value;
-        return !parsed.IsEmpty;
+        return parsed.IsEmpty
+            ? Result<string, AccessListLoginNormalizationFailure>.Error(
+                new AccessListLoginNormalizationFailure()
+            )
+            : Result<string, AccessListLoginNormalizationFailure>.Success(parsed.Value);
     }
 }
+
+internal readonly record struct AccessListLoginNormalizationFailure;

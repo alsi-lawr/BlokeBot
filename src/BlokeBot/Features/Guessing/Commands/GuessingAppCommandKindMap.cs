@@ -1,3 +1,4 @@
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Guessing.Commands;
@@ -27,17 +28,16 @@ public static class GuessingAppCommandKindMap
         };
     }
 
-    public static bool TryFromAppKind(AppCommandKind appKind, out GuessCommandKind kind)
+    public static Option<GuessCommandKind> FromAppKind(AppCommandKind appKind)
     {
-        kind = appKind switch
+        return appKind switch
         {
-            AppCommandKind.Start => GuessCommandKind.Start,
-            AppCommandKind.Stop => GuessCommandKind.Stop,
-            AppCommandKind.Win => GuessCommandKind.Win,
-            AppCommandKind.Guess => GuessCommandKind.Guess,
-            AppCommandKind.Guesses => GuessCommandKind.Guesses,
-            _ => default,
+            AppCommandKind.Start => Option<GuessCommandKind>.Some(GuessCommandKind.Start),
+            AppCommandKind.Stop => Option<GuessCommandKind>.Some(GuessCommandKind.Stop),
+            AppCommandKind.Win => Option<GuessCommandKind>.Some(GuessCommandKind.Win),
+            AppCommandKind.Guess => Option<GuessCommandKind>.Some(GuessCommandKind.Guess),
+            AppCommandKind.Guesses => Option<GuessCommandKind>.Some(GuessCommandKind.Guesses),
+            _ => Option<GuessCommandKind>.None,
         };
-        return AppKinds.Contains(appKind);
     }
 }

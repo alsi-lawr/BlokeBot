@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Twitch.Auth;
 
 internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
@@ -16,18 +18,18 @@ internal sealed class InMemoryOAuthStateStore : IOAuthStateStore
         return state;
     }
 
-    public OAuthStateConsumptionOutcome Consume(string state)
+    public Result<OAuthStateConsumed, OAuthStateRejected> Consume(string state)
     {
         if (string.IsNullOrWhiteSpace(state))
         {
-            return new OAuthStateConsumptionOutcome.Rejected();
+            return Result<OAuthStateConsumed, OAuthStateRejected>.Error(new OAuthStateRejected());
         }
 
         lock (_gate)
         {
             return _states.Remove(state)
-                ? new OAuthStateConsumptionOutcome.Consumed()
-                : new OAuthStateConsumptionOutcome.Rejected();
+                ? Result<OAuthStateConsumed, OAuthStateRejected>.Success(new OAuthStateConsumed())
+                : Result<OAuthStateConsumed, OAuthStateRejected>.Error(new OAuthStateRejected());
         }
     }
 }

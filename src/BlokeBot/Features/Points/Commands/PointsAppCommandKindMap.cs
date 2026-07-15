@@ -1,3 +1,4 @@
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Commands;
@@ -35,21 +36,28 @@ public static class PointsAppCommandKindMap
         };
     }
 
-    public static bool TryFromAppKind(AppCommandKind appKind, out PointsCommandKind kind)
+    public static Option<PointsCommandKind> FromAppKind(AppCommandKind appKind)
     {
-        kind = appKind switch
+        return appKind switch
         {
-            AppCommandKind.Points => PointsCommandKind.Points,
-            AppCommandKind.GivePoints => PointsCommandKind.GivePoints,
-            AppCommandKind.AddPoints => PointsCommandKind.AddPoints,
-            AppCommandKind.RemovePoints => PointsCommandKind.RemovePoints,
-            AppCommandKind.Gamble => PointsCommandKind.Gamble,
-            AppCommandKind.Giveaway => PointsCommandKind.Giveaway,
-            AppCommandKind.Join => PointsCommandKind.Join,
-            AppCommandKind.EndGiveaway => PointsCommandKind.EndGiveaway,
-            AppCommandKind.CancelGiveaway => PointsCommandKind.CancelGiveaway,
-            _ => default,
+            AppCommandKind.Points => Option<PointsCommandKind>.Some(PointsCommandKind.Points),
+            AppCommandKind.GivePoints => Option<PointsCommandKind>.Some(
+                PointsCommandKind.GivePoints
+            ),
+            AppCommandKind.AddPoints => Option<PointsCommandKind>.Some(PointsCommandKind.AddPoints),
+            AppCommandKind.RemovePoints => Option<PointsCommandKind>.Some(
+                PointsCommandKind.RemovePoints
+            ),
+            AppCommandKind.Gamble => Option<PointsCommandKind>.Some(PointsCommandKind.Gamble),
+            AppCommandKind.Giveaway => Option<PointsCommandKind>.Some(PointsCommandKind.Giveaway),
+            AppCommandKind.Join => Option<PointsCommandKind>.Some(PointsCommandKind.Join),
+            AppCommandKind.EndGiveaway => Option<PointsCommandKind>.Some(
+                PointsCommandKind.EndGiveaway
+            ),
+            AppCommandKind.CancelGiveaway => Option<PointsCommandKind>.Some(
+                PointsCommandKind.CancelGiveaway
+            ),
+            _ => Option<PointsCommandKind>.None,
         };
-        return AppKinds.Contains(appKind);
     }
 }

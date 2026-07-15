@@ -185,7 +185,8 @@ public sealed record AuthenticatedSession
             return null;
         }
 
-        if (AuthRoleCodec.TryDecode(value, out var role))
+        var role = AuthRoleCodec.Decode(value).Match<AuthRole?>(decoded => decoded, _ => null);
+        if (role is not null)
         {
             return role;
         }

@@ -19,10 +19,15 @@ public sealed class GuessingCommandRouteResolver(
             context.CommandName,
             cancellationToken
         );
-        if (
-            resolution is null
-            || !GuessingAppCommandKindMap.TryFromAppKind(resolution.Kind, out var kind)
-        )
+        if (resolution is null)
+        {
+            return null;
+        }
+
+        var kind = GuessingAppCommandKindMap
+            .FromAppKind(resolution.Kind)
+            .Match<GuessCommandKind?>(value => value, () => null);
+        if (kind is not { } mappedKind)
         {
             return null;
         }
@@ -45,6 +50,6 @@ public sealed class GuessingCommandRouteResolver(
                 profile.ProfileId
             )
         );
-        return new CommandRoute<GuessCommandKind, AppCommandRouteState>(kind, state);
+        return new CommandRoute<GuessCommandKind, AppCommandRouteState>(mappedKind, state);
     }
 }

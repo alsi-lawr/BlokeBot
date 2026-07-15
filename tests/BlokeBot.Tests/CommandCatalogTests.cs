@@ -271,13 +271,21 @@ public sealed class CommandCatalogTests
         PointsAppCommandKindMap.ToAppKind(PointsCommandKind.Gamble).ShouldBe(AppCommandKind.Gamble);
 
         GuessingAppCommandKindMap
-            .TryFromAppKind(AppCommandKind.Win, out var guessingKind)
-            .ShouldBeTrue();
-        guessingKind.ShouldBe(GuessCommandKind.Win);
+            .FromAppKind(AppCommandKind.Win)
+            .Match<GuessCommandKind?>(kind => kind, () => null)
+            .ShouldBe(GuessCommandKind.Win);
         PointsAppCommandKindMap
-            .TryFromAppKind(AppCommandKind.Giveaway, out var pointsKind)
-            .ShouldBeTrue();
-        pointsKind.ShouldBe(PointsCommandKind.Giveaway);
+            .FromAppKind(AppCommandKind.Giveaway)
+            .Match<PointsCommandKind?>(kind => kind, () => null)
+            .ShouldBe(PointsCommandKind.Giveaway);
+        GuessingAppCommandKindMap
+            .FromAppKind(AppCommandKind.Giveaway)
+            .Match<GuessCommandKind?>(kind => kind, () => null)
+            .ShouldBeNull();
+        PointsAppCommandKindMap
+            .FromAppKind(AppCommandKind.Win)
+            .Match<PointsCommandKind?>(kind => kind, () => null)
+            .ShouldBeNull();
 
         var guessingKinds = GuessingAppCommandKindMap.AppKinds;
         var pointsKinds = PointsAppCommandKindMap.AppKinds;

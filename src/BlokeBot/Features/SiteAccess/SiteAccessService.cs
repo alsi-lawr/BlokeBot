@@ -14,7 +14,10 @@ public sealed class SiteAccessService(
 {
     public async Task AddEntryAsync(AccessListEntryKind kind, string login, CancellationToken ct)
     {
-        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        var normalized = AccessListStore
+            .NormalizeLogin(login)
+            .Match<string?>(value => value, _ => null);
+        if (normalized is null)
         {
             return;
         }
@@ -50,7 +53,10 @@ public sealed class SiteAccessService(
             return true;
         }
 
-        if (!AccessListStore.TryNormalizeLogin(login, out var normalized))
+        var normalized = AccessListStore
+            .NormalizeLogin(login)
+            .Match<string?>(value => value, _ => null);
+        if (normalized is null)
         {
             return false;
         }
