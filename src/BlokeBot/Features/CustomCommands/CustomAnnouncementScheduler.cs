@@ -124,15 +124,13 @@ internal sealed class CustomAnnouncementScheduler(
         }
 
         var policy = AnnouncementDeliveryPolicyMapper.ToDomain(announcement.DeliveryPolicy);
-        await policy.Match(retry =>
-            ProcessRetryUntilExpiredThenSkipAsync(
-                db,
-                announcement,
-                candidate,
-                retry,
-                now,
-                cancellationToken
-            )
+        await ProcessRetryUntilExpiredThenSkipAsync(
+            db,
+            announcement,
+            candidate,
+            policy,
+            now,
+            cancellationToken
         );
     }
 
@@ -140,7 +138,7 @@ internal sealed class CustomAnnouncementScheduler(
         BlokeBotDbContext db,
         CustomAnnouncement announcement,
         AnnouncementCandidate candidate,
-        AnnouncementDeliveryPolicy.RetryUntilExpiredThenSkip policy,
+        AnnouncementDeliveryPolicy policy,
         DateTimeOffset now,
         CancellationToken cancellationToken
     )

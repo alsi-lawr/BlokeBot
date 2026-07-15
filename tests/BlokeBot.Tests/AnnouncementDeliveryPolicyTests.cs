@@ -9,7 +9,7 @@ namespace BlokeBot.Tests;
 public sealed class AnnouncementDeliveryPolicyTests
 {
     [Test]
-    public void RetryUntilExpiredThenSkipEntity_Mapping_ReturnsImmutableClosedPolicy()
+    public void EntityMapping_ReturnsValidatedPolicyWithTiming()
     {
         var retryDelay = new AnnouncementRetryDelay(TimeSpan.FromSeconds(2));
         var occurrenceLifetime = new AnnouncementOccurrenceLifetime(TimeSpan.FromSeconds(30));
@@ -21,9 +21,8 @@ public sealed class AnnouncementDeliveryPolicyTests
 
         var mapped = AnnouncementDeliveryPolicyMapper.ToDomain(entity);
 
-        var timing = mapped.Match(policy => (policy.RetryDelay, policy.OccurrenceLifetime));
-        timing.RetryDelay.ShouldBe(retryDelay);
-        timing.OccurrenceLifetime.ShouldBe(occurrenceLifetime);
+        mapped.RetryDelay.ShouldBe(retryDelay);
+        mapped.OccurrenceLifetime.ShouldBe(occurrenceLifetime);
     }
 
     [Test]

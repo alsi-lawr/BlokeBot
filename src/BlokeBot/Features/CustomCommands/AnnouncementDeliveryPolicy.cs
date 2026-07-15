@@ -4,47 +4,31 @@ using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.CustomCommands;
 
-internal abstract record AnnouncementDeliveryPolicy
+internal sealed record AnnouncementDeliveryPolicy
 {
-    private protected AnnouncementDeliveryPolicy() { }
-
-    internal TResult Match<TResult>(
-        Func<RetryUntilExpiredThenSkip, TResult> retryUntilExpiredThenSkip
+    internal AnnouncementDeliveryPolicy(
+        AnnouncementRetryDelay retryDelay,
+        AnnouncementOccurrenceLifetime occurrenceLifetime
     )
     {
-        return this switch
+        ArgumentNullException.ThrowIfNull(retryDelay);
+        ArgumentNullException.ThrowIfNull(occurrenceLifetime);
+
+        if (retryDelay.Value >= occurrenceLifetime.Value)
         {
-            RetryUntilExpiredThenSkip policy => retryUntilExpiredThenSkip(policy),
-            _ => throw new UnreachableException("Unknown announcement delivery policy."),
-        };
-    }
-
-    internal sealed record RetryUntilExpiredThenSkip : AnnouncementDeliveryPolicy
-    {
-        internal RetryUntilExpiredThenSkip(
-            AnnouncementRetryDelay retryDelay,
-            AnnouncementOccurrenceLifetime occurrenceLifetime
-        )
-        {
-            ArgumentNullException.ThrowIfNull(retryDelay);
-            ArgumentNullException.ThrowIfNull(occurrenceLifetime);
-
-            if (retryDelay.Value >= occurrenceLifetime.Value)
-            {
-                throw new ArgumentException(
-                    "Retry delay must be less than the occurrence lifetime.",
-                    nameof(retryDelay)
-                );
-            }
-
-            RetryDelay = retryDelay;
-            OccurrenceLifetime = occurrenceLifetime;
+            throw new ArgumentException(
+                "Retry delay must be less than the occurrence lifetime.",
+                nameof(retryDelay)
+            );
         }
 
-        internal AnnouncementRetryDelay RetryDelay { get; }
-
-        internal AnnouncementOccurrenceLifetime OccurrenceLifetime { get; }
+        RetryDelay = retryDelay;
+        OccurrenceLifetime = occurrenceLifetime;
     }
+
+    internal AnnouncementRetryDelay RetryDelay { get; }
+
+    internal AnnouncementOccurrenceLifetime OccurrenceLifetime { get; }
 }
 
 internal static class AnnouncementDeliveryPolicyMapper
@@ -54,10 +38,7 @@ internal static class AnnouncementDeliveryPolicyMapper
         return policy switch
         {
             RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy retry =>
-                new AnnouncementDeliveryPolicy.RetryUntilExpiredThenSkip(
-                    retry.RetryDelay,
-                    retry.OccurrenceLifetime
-                ),
+                new AnnouncementDeliveryPolicy(retry.RetryDelay, retry.OccurrenceLifetime),
             null => throw new InvalidOperationException(
                 "A custom announcement delivery policy is required."
             ),
