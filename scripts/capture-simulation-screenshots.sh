@@ -2,28 +2,33 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-scratch_root="$(realpath -m "$repo_root/.agent-workspace")"
-requested_workspace="${1:-$scratch_root/simulation-screenshots}"
-if [[ "$requested_workspace" != /* ]]; then
-  requested_workspace="$repo_root/$requested_workspace"
+requested_target="${1:-$repo_root/assets/simulation}"
+if [[ "$requested_target" != /* ]]; then
+  requested_target="$repo_root/$requested_target"
 fi
-workspace="$(realpath -m "$requested_workspace")"
+target="$(realpath -m "$requested_target")"
+target_marker="$target/.blokebot-simulation-output"
 
-if [[ "$workspace" == "$scratch_root" || "$workspace" != "$scratch_root/"* ]]; then
-  printf 'Simulation output must be a child of %s\n' "$scratch_root" >&2
+if [[ -e "$target" && ! -d "$target" ]]; then
+  printf 'Simulation output target is not a directory: %s\n' "$target" >&2
+  exit 2
+fi
+if [[ -d "$target" && ! -f "$target_marker" ]] \
+  && [[ -n "$(find "$target" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+  printf 'Simulation output target is not empty or owned by this workflow: %s\n' "$target" >&2
   exit 2
 fi
 
 browser="${BLOKEBOT_SIMULATION_BROWSER:-chromium}"
 port="${BLOKEBOT_SIMULATION_PORT:-43217}"
 base_url="http://127.0.0.1:$port"
-runtime="$workspace/runtime"
-raw="$workspace/raw"
-output="$workspace/output"
-animation_frames="$workspace/animation-frames"
-animations="$workspace/animations"
-server_log="$workspace/blokebot.log"
-browser_log="$workspace/chromium.log"
+runtime="$target/runtime"
+raw="$target/raw"
+output="$target/output"
+animation_frames="$target/animation-frames"
+animations="$target/animations"
+server_log="$target/blokebot.log"
+browser_log="$target/chromium.log"
 browser_profile="$runtime/chromium-profile"
 frame_template="$repo_root/scripts/simulation-frame.html"
 animation_script="$repo_root/scripts/capture-simulation-animations.mjs"
@@ -70,6 +75,8 @@ cleanup_on_exit() {
 }
 trap cleanup_on_exit EXIT
 
+mkdir -p "$target"
+touch "$target_marker"
 rm -rf -- "$runtime" "$raw" "$output" "$animation_frames" "$animations"
 mkdir -p "$runtime/home" "$browser_profile" "$raw" "$output" "$animation_frames" "$animations"
 : >"$server_log"
@@ -140,9 +147,9 @@ chromium_flags=(
   --virtual-time-budget=3000 \
   --dump-dom \
   "$base_url/simulation/login" \
-  >"$workspace/login.html" 2>>"$browser_log"
+  >"$target/login.html" 2>>"$browser_log"
 
-if ! grep -q "Sample Channel" "$workspace/login.html"; then
+if ! grep -q "Sample Channel" "$target/login.html"; then
   cat "$server_log" >&2
   printf 'Simulation sign-in did not reach the seeded channel.\n' >&2
   exit 1
