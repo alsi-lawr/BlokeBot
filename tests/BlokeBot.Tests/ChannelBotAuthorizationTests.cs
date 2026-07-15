@@ -4,6 +4,7 @@ using BlokeBot;
 using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http;
@@ -69,13 +70,11 @@ public sealed class ChannelBotAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
         var service = ChannelAuthorizationService(dbFactory, "channel:bot");
 
-        var result = await service.AuthorizeAsync(
-            hostId,
-            Grant("999", "other", "channel:bot"),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(hostId, Grant("999", "other", "channel:bot"))
+            .RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeFalse();
+        result.ShouldBeOfType<ChannelBotAuthorizationOutcome.GrantMismatch>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.ChannelBotAuthorizedAtUtc.ShouldBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBeNull();
@@ -88,14 +87,13 @@ public sealed class ChannelBotAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
         var service = ChannelAuthorizationService(dbFactory, "channel:bot", "bits:read");
 
-        var result = await service.AuthorizeAsync(
-            hostId,
-            Grant("123", "streamer", "channel:bot"),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(hostId, Grant("123", "streamer", "channel:bot"))
+            .RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeFalse();
-        result.MissingScopes.ShouldBe(["bits:read"]);
+        result
+            .ShouldBeOfType<ChannelBotAuthorizationOutcome.MissingScopes>()
+            .Scopes.ShouldBe(["bits:read"]);
         var host = await LoadHostAsync(dbFactory, hostId);
         host.ChannelBotAuthorizedAtUtc.ShouldBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBeNull();
@@ -108,13 +106,11 @@ public sealed class ChannelBotAuthorizationTests
         var hostId = await SeedHostAsync(dbFactory, "123", "streamer");
         var service = ChannelAuthorizationService(dbFactory, "channel:bot");
 
-        var result = await service.AuthorizeAsync(
-            hostId,
-            Grant("123", "STREAMER", "channel:bot", "bits:read"),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(hostId, Grant("123", "STREAMER", "channel:bot", "bits:read"))
+            .RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<ChannelBotAuthorizationOutcome.Authorized>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.ChannelBotAuthorizedAtUtc.ShouldNotBeNull();
         host.ChannelBotAuthorizedScopes.ShouldBe("bits:read channel:bot");
@@ -142,9 +138,9 @@ public sealed class ChannelBotAuthorizationTests
             Options.Create(new BlokeBotOptions { BotStateChangeCooldownSeconds = 0 })
         );
 
-        var result = await runtime.StartAsync(hostId, CancellationToken.None);
+        var result = await runtime.Start(hostId).RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeFalse();
+        result.ShouldBeOfType<HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired>();
         var host = await LoadHostAsync(dbFactory, hostId);
         host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
     }

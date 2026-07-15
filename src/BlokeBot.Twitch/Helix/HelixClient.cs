@@ -112,17 +112,17 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                return ModeratedChannelStatus.NeedsAuthorization;
+                return new ModeratedChannelStatus.NeedsAuthorization();
             }
 
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
-                return ModeratedChannelStatus.MissingPermission;
+                return new ModeratedChannelStatus.MissingPermission();
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                return ModeratedChannelStatus.Unknown;
+                return new ModeratedChannelStatus.Unknown();
             }
 
             var payload = await response.Content.ReadFromJsonAsync<ModeratedChannelsResponse>(
@@ -135,13 +135,13 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 ) == true
             )
             {
-                return ModeratedChannelStatus.IsModerator;
+                return new ModeratedChannelStatus.IsModerator();
             }
 
             cursor = payload?.Pagination.Cursor;
         } while (!string.IsNullOrWhiteSpace(cursor));
 
-        return ModeratedChannelStatus.NotModerator;
+        return new ModeratedChannelStatus.NotModerator();
     }
 
     public async Task<bool> IsStreamLiveAsync(
@@ -188,7 +188,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
         {
-            return FollowerStatus.Unavailable;
+            return new FollowerStatus.Unavailable();
         }
 
         response.EnsureSuccessStatusCode();
@@ -196,7 +196,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.Length > 0 ? FollowerStatus.Follows : FollowerStatus.DoesNotFollow;
+        return payload?.Data.Length > 0
+            ? new FollowerStatus.Follows()
+            : new FollowerStatus.DoesNotFollow();
     }
 
     private static string ModeratedChannelsUri(string userId, string? cursor)

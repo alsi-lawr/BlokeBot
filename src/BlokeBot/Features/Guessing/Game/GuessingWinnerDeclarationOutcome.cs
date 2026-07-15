@@ -11,7 +11,7 @@ public abstract record GuessingWinnerDeclarationOutcome
         Func<PayoutFailed, TResult> payoutFailed
     );
 
-    public sealed record Completed(GuessingOperationResult Result)
+    public sealed record Completed(GuessingOperationOutcome Result)
         : GuessingWinnerDeclarationOutcome
     {
         public override TResult Match<TResult>(

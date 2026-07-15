@@ -2,6 +2,7 @@ using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -18,10 +19,17 @@ public sealed class PointsGiveawayService(
     PointsChangeNotifier changes
 )
 {
-    public async Task<PointsGiveawayView?> GetActiveGiveawayAsync(int hostId, CancellationToken ct)
+    public IO<Option<PointsGiveawayView>, Never> GetActiveGiveaway(int hostId)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await PointsGiveawayQueries.LoadActiveViewAsync(db, hostId, ct);
+        return IO<Option<PointsGiveawayView>, Never>.Create(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            return Result<Option<PointsGiveawayView>, Never>.Success(
+                Option<PointsGiveawayView>.FromNullable(
+                    await PointsGiveawayQueries.LoadActiveViewAsync(db, hostId, ct)
+                )
+            );
+        });
     }
 
     public async Task<PointOperationOutcome> StartAsync(
@@ -51,11 +59,12 @@ public sealed class PointsGiveawayService(
 
         var now = DateTime.UtcNow;
         var cooldownStart = now.AddSeconds(-settings.GiveawayCooldownSeconds);
-        var lastStarted = await PointsGiveawayQueries.FindLastStartedAfterAsync(
-            db,
-            hostId,
-            cooldownStart,
-            ct
+        var lastStartedResult = await PointsGiveawayQueries
+            .FindLastStartedAfter(db, hostId, cooldownStart)
+            .ExecuteAsync(ct);
+        var lastStarted = lastStartedResult.Match(
+            option => option.Match<DateTime?>(value => value, () => null),
+            _ => throw new UnreachableException()
         );
         if (lastStarted is not null)
         {
@@ -63,7 +72,9 @@ public sealed class PointsGiveawayService(
             return new PointsGiveawayStartOutcome.Cooldown(settings, readyAt - now);
         }
 
-        switch (await eligibility.GetStreamLivenessAsync(hostLogin, ct))
+        var livenessResult = await eligibility.GetStreamLiveness(hostLogin).ExecuteAsync(ct);
+        var liveness = livenessResult.Match(value => value, _ => throw new UnreachableException());
+        switch (liveness)
         {
             case HostStreamLivenessOutcome.Live:
                 break;
@@ -148,14 +159,14 @@ public sealed class PointsGiveawayService(
             return new PointsGiveawayJoinOutcome.DuplicateJoin(settings, normalized);
         }
 
-        var joinEligibility = await eligibility.CheckJoinEligibilityAsync(
-            settings,
-            hostLogin,
-            normalized,
-            tags,
-            ct
+        var joinEligibilityResult = await eligibility
+            .CheckJoinEligibility(settings, hostLogin, normalized, tags)
+            .ExecuteAsync(ct);
+        var joinEligibility = joinEligibilityResult.Match(
+            value => value,
+            _ => throw new UnreachableException()
         );
-        if (joinEligibility == FollowerCheckResult.Unavailable)
+        if (joinEligibility is FollowerCheckOutcome.Unavailable)
         {
             return new PointsGiveawayJoinOutcome.FollowerEligibilityUnavailable(
                 settings,
@@ -163,7 +174,7 @@ public sealed class PointsGiveawayService(
             );
         }
 
-        if (joinEligibility == FollowerCheckResult.NotEligible)
+        if (joinEligibility is FollowerCheckOutcome.NotEligible)
         {
             return new PointsGiveawayJoinOutcome.NotEligible(settings, normalized);
         }
@@ -231,7 +242,13 @@ public sealed class PointsGiveawayService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await PointsGiveawayQueries.LoadSettingsAsync(db, hostId, ct);
-        var giveawayId = await PointsGiveawayQueries.FindActiveGiveawayIdAsync(db, hostId, ct);
+        var giveawayIdResult = await PointsGiveawayQueries
+            .FindActiveGiveawayId(db, hostId)
+            .ExecuteAsync(ct);
+        var giveawayId = giveawayIdResult.Match(
+            option => option.Match<int?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
         if (giveawayId is null)
         {
             return new PointsGiveawayDrawOutcome.NotActive(settings);

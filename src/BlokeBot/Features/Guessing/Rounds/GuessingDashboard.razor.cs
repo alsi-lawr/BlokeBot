@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -31,6 +32,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
@@ -170,11 +172,18 @@ public partial class GuessingDashboard
             return;
         }
 
-        await RunAsync(async () =>
-            (await _rounds.DeclareWinnerAsync(HostId, _winnerName, CancellationToken.None)).Match(
-                completed => completed.Result,
-                failed => new GuessingOperationResult(false, failed.Message, failed.Target)
-            )
+        await RunAsync(() =>
+            _rounds
+                .DeclareWinner(HostId, _winnerName)
+                .Map(outcome =>
+                    outcome.Match(
+                        completed => completed.Result,
+                        failed => new GuessingOperationOutcome.Rejected(
+                            failed.Message,
+                            failed.Target
+                        )
+                    )
+                )
         );
         _winnerName = string.Empty;
     }
@@ -304,9 +313,7 @@ public partial class GuessingDashboard
 
     private Task StartRoundAsync()
     {
-        return RunAsync(() =>
-            _rounds.StartRoundAsync(HostId, _selectedProfileId, CancellationToken.None)
-        );
+        return RunAsync(() => _rounds.StartRound(HostId, _selectedProfileId));
     }
 
     private static DateTime? StartOfLocalDateUtc(DateTime? value)
@@ -330,7 +337,7 @@ public partial class GuessingDashboard
 
     private Task StopGuessingAsync()
     {
-        return RunAsync(() => _rounds.StopGuessingAsync(HostId, CancellationToken.None));
+        return RunAsync(() => _rounds.StopGuessing(HostId));
     }
 
     private string TabClass(DashboardTab tab)
@@ -340,7 +347,7 @@ public partial class GuessingDashboard
             : "segmented-motion__tab";
     }
 
-    private async Task RunAsync(Func<Task<GuessingOperationResult>> operation)
+    private async Task RunAsync(Func<IO<GuessingOperationOutcome, Never>> operation)
     {
         if (HostId == 0)
         {
@@ -353,8 +360,9 @@ public partial class GuessingDashboard
             return;
         }
 
-        var result = await operation();
-        if (result.Succeeded)
+        var execution = await operation().ExecuteAsync(CancellationToken.None);
+        var result = execution.Match(value => value, _ => throw new UnreachableException());
+        if (result is GuessingOperationOutcome.Succeeded)
         {
             var outcome = await _chat.SendAsync(
                 Host!.Login,
@@ -392,14 +400,14 @@ public partial class GuessingDashboard
         }
     }
 
-    private void PublishResult(GuessingOperationResult result)
+    private void PublishResult(GuessingOperationOutcome result)
     {
         if (string.IsNullOrWhiteSpace(result.Message))
         {
             return;
         }
 
-        if (result.Succeeded)
+        if (result is GuessingOperationOutcome.Succeeded)
         {
             _toasts.Publish(new ToastRequest<SuccessToastStrategy>(result.Message));
         }

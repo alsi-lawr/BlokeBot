@@ -4,6 +4,7 @@ using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -20,7 +21,10 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
+        var hostId = (await ResolveHostIdAsync(db, hostLogin, ct)).Match<int?>(
+            value => value,
+            () => null
+        );
         if (hostId is null)
         {
             return NotConfiguredResponse();
@@ -68,7 +72,10 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
+        var hostId = (await ResolveHostIdAsync(db, hostLogin, ct)).Match<int?>(
+            value => value,
+            () => null
+        );
         if (hostId is null)
         {
             return NotConfiguredResponse();
@@ -101,7 +108,10 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
+        var hostId = (await ResolveHostIdAsync(db, hostLogin, ct)).Match<int?>(
+            value => value,
+            () => null
+        );
         if (hostId is null)
         {
             return NotConfiguredResponse();
@@ -166,19 +176,23 @@ public sealed class GuessingCommandService(IDbContextFactory<BlokeBotDbContext> 
             );
     }
 
-    private static GuessingOperationResult NotConfigured()
-    {
-        return new(false, "This channel is not set up.");
-    }
-
     private static CommandResponse NotConfiguredResponse()
     {
-        return CommandResponse.Chat(NotConfigured().Message);
+        return CommandResponse.Chat("This channel is not set up.");
     }
 
     private static string FormatOptions(IEnumerable<string> options)
     {
         var values = options.Order(StringComparer.OrdinalIgnoreCase).ToArray();
         return values.Length == 0 ? "none" : string.Join(", ", values);
+    }
+
+    private static ValueTask<Option<int>> ResolveHostIdAsync(
+        BlokeBotDbContext db,
+        string hostLogin,
+        CancellationToken ct
+    )
+    {
+        return BotHostQueries.FindHostId(db, hostLogin).RunAsync(ct);
     }
 }

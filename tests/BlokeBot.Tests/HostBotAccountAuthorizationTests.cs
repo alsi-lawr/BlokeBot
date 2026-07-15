@@ -182,29 +182,34 @@ public sealed class HostBotAccountAuthorizationTests
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(hostId, CancellationToken.None);
 
-        var result = await service.AuthorizeAsync(
-            hostId,
-            new HostBotAccountAuthorizationGrant(
-                new TokenSet(
-                    "override-token",
-                    "override-refresh",
-                    DateTimeOffset.UtcNow.AddHours(1)
-                ),
-                "custom-id",
-                LoginName.Parse("custombot"),
-                "CustomBot",
-                "https://static-cdn.jtvnw.net/custombot.png",
-                OAuthScopeSet.Create(["chat:read", "chat:edit", Scopes.UserReadModeratedChannels])
-            ),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(
+                hostId,
+                new HostBotAccountAuthorizationGrant(
+                    new TokenSet(
+                        "override-token",
+                        "override-refresh",
+                        DateTimeOffset.UtcNow.AddHours(1)
+                    ),
+                    "custom-id",
+                    LoginName.Parse("custombot"),
+                    "CustomBot",
+                    "https://static-cdn.jtvnw.net/custombot.png",
+                    OAuthScopeSet.Create([
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                    ])
+                )
+            )
+            .RunAsync(CancellationToken.None);
 
         var account = Success(
             await service.GetBotAccount("streamer").ExecuteAsync(CancellationToken.None)
         );
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
         account.Login.ShouldBe("custombot");
         account.AccessToken.ShouldBe("override-token");
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
@@ -357,32 +362,35 @@ public sealed class HostBotAccountAuthorizationTests
             await service.EnableWhisperResponsesAsync(hostId, CancellationToken.None)
         ).ShouldBeOfType<WhisperResponseConfigurationOutcome.Configured>();
 
-        var missing = await service.AuthorizeAsync(
-            hostId,
-            CreateCustomBotGrant(
-                "override-token",
-                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
-            ),
-            CancellationToken.None
-        );
-        var authorized = await service.AuthorizeAsync(
-            hostId,
-            CreateCustomBotGrant(
-                "override-whisper-token",
-                [
-                    "chat:read",
-                    "chat:edit",
-                    Scopes.UserReadModeratedChannels,
-                    Scopes.UserManageWhispers,
-                ]
-            ),
-            CancellationToken.None
-        );
+        var missing = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "override-token",
+                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                )
+            )
+            .RunAsync(CancellationToken.None);
+        var authorized = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "override-whisper-token",
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserManageWhispers,
+                    ]
+                )
+            )
+            .RunAsync(CancellationToken.None);
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
-        missing.Succeeded.ShouldBeFalse();
-        missing.MissingScopes.ShouldContain(Scopes.UserManageWhispers);
-        authorized.Succeeded.ShouldBeTrue();
+        missing
+            .ShouldBeOfType<HostBotAccountAuthorizationOutcome.MissingScopes>()
+            .Scopes.ShouldContain(Scopes.UserManageWhispers);
+        authorized.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
         status.RequiredScopes.ShouldContain(Scopes.UserManageWhispers);
     }
@@ -511,16 +519,17 @@ public sealed class HostBotAccountAuthorizationTests
         int hostId
     )
     {
-        var result = await service.AuthorizeAsync(
-            hostId,
-            CreateCustomBotGrant(
-                "override-token",
-                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
-            ),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "override-token",
+                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                )
+            )
+            .RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
     }
 
     private static async Task AuthorizeExpiredCustomBotAsync(
@@ -528,17 +537,18 @@ public sealed class HostBotAccountAuthorizationTests
         int hostId
     )
     {
-        var result = await service.AuthorizeAsync(
-            hostId,
-            CreateCustomBotGrant(
-                "expired-token",
-                ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
-                DateTimeOffset.UtcNow.AddMinutes(-1)
-            ),
-            CancellationToken.None
-        );
+        var result = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "expired-token",
+                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
+                    DateTimeOffset.UtcNow.AddMinutes(-1)
+                )
+            )
+            .RunAsync(CancellationToken.None);
 
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
     }
 
     private static HostBotAccountAuthorizationGrant CreateCustomBotGrant(

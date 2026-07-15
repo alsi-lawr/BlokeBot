@@ -1,8 +1,12 @@
 namespace BlokeBot.Twitch;
 
-public enum FollowerStatus
+public abstract record FollowerStatus
 {
-    Follows,
-    DoesNotFollow,
-    Unavailable,
+    private FollowerStatus() { }
+
+    public sealed record Follows : FollowerStatus;
+
+    public sealed record DoesNotFollow : FollowerStatus;
+
+    public sealed record Unavailable : FollowerStatus;
 }

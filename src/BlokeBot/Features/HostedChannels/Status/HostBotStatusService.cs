@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Features.HostedChannels.Status;
 
@@ -10,46 +12,50 @@ public sealed class HostBotStatusService(
     BotSettings settings
 )
 {
-    public async Task<HostBotChannelStatus> GetStatusAsync(
-        string channelLogin,
-        CancellationToken ct
-    )
+    public IO<HostBotChannelStatus, Never> GetStatus(string channelLogin)
     {
-        return HostBotChannelStatus.FromReadiness(await GetReadinessAsync(channelLogin, ct));
+        return GetReadiness(channelLogin).Map(HostBotChannelStatus.FromReadiness);
     }
 
-    public async Task<HostBotReadinessOutcome> GetReadinessAsync(
+    public IO<HostBotReadinessOutcome, Never> GetReadiness(string channelLogin)
+    {
+        return IO<HostBotReadinessOutcome, Never>.Create(async ct =>
+            Result<HostBotReadinessOutcome, Never>.Success(
+                await EvaluateReadinessCoreAsync(channelLogin, ct)
+            )
+        );
+    }
+
+    private async Task<HostBotReadinessOutcome> EvaluateReadinessCoreAsync(
         string channelLogin,
         CancellationToken ct
     )
     {
-        var configuredFlags = ConfiguredFlags();
-        if (!HasAll(configuredFlags, HostBotChannelStatusFlags.ModeratorCheckConfigured))
+        var configured = ConfiguredCapabilities();
+        if (!configured.ModeratorCheckConfigured)
         {
-            return HostBotReadinessOutcome.NotConfigured();
+            return new HostBotReadinessOutcome.NotConfigured();
         }
 
         try
         {
-            return await EvaluateReadinessAsync(channelLogin, configuredFlags, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
+            return await EvaluateReadinessAsync(channelLogin, configured, ct);
         }
         catch (HttpRequestException)
         {
-            return HostBotReadinessOutcome.Unknown(configuredFlags);
+            ct.ThrowIfCancellationRequested();
+            return new HostBotReadinessOutcome.Unknown(configured);
         }
         catch (JsonException)
         {
-            return HostBotReadinessOutcome.Unknown(configuredFlags);
+            ct.ThrowIfCancellationRequested();
+            return new HostBotReadinessOutcome.Unknown(configured);
         }
     }
 
     private async Task<HostBotReadinessOutcome> EvaluateReadinessAsync(
         string channelLogin,
-        HostBotChannelStatusFlags configuredFlags,
+        HostBotReadinessCapabilities configured,
         CancellationToken ct
     )
     {
@@ -59,9 +65,18 @@ public sealed class HostBotStatusService(
             ct
         );
         return await tokenStatus.Status.Match(
-            _ => Task.FromResult(HostBotReadinessOutcome.Unknown(configuredFlags)),
-            _ => Task.FromResult(HostBotReadinessOutcome.TokenUnavailable(configuredFlags)),
-            _ => Task.FromResult(HostBotReadinessOutcome.InvalidToken(configuredFlags)),
+            _ =>
+                Task.FromResult<HostBotReadinessOutcome>(
+                    new HostBotReadinessOutcome.Unknown(configured)
+                ),
+            _ =>
+                Task.FromResult<HostBotReadinessOutcome>(
+                    new HostBotReadinessOutcome.TokenUnavailable(configured)
+                ),
+            _ =>
+                Task.FromResult<HostBotReadinessOutcome>(
+                    new HostBotReadinessOutcome.InvalidToken(configured)
+                ),
             missingScopes =>
                 EvaluateAuthorizedReadinessAsync(
                     channelLogin,
@@ -69,7 +84,7 @@ public sealed class HostBotStatusService(
                     missingScopes.AccessToken,
                     missingScopes.Validation,
                     missingScopes.GrantedScopes,
-                    configuredFlags,
+                    configured,
                     ct
                 ),
             ready =>
@@ -79,7 +94,7 @@ public sealed class HostBotStatusService(
                     ready.AccessToken,
                     ready.Validation,
                     ready.GrantedScopes,
-                    configuredFlags,
+                    configured,
                     ct
                 )
         );
@@ -91,14 +106,14 @@ public sealed class HostBotStatusService(
         string accessToken,
         TokenValidation validation,
         IReadOnlyList<string> grantedScopes,
-        HostBotChannelStatusFlags configuredFlags,
+        HostBotReadinessCapabilities configured,
         CancellationToken ct
     )
     {
-        var flags = GrantedFlags(configuredFlags, grantedScopes);
-        if (!HasAll(flags, HostBotChannelStatusFlags.ModeratorCheckGranted))
+        var capabilities = GrantedCapabilities(configured, grantedScopes);
+        if (!capabilities.ModeratorCheckGranted)
         {
-            return HostBotReadinessOutcome.MissingModeratorCheckScope(flags);
+            return new HostBotReadinessOutcome.MissingModeratorCheckScope(capabilities);
         }
 
         if (
@@ -110,18 +125,18 @@ public sealed class HostBotStatusService(
             )
         )
         {
-            return HostBotReadinessOutcome.BotAccountMismatch(flags);
+            return new HostBotReadinessOutcome.BotAccountMismatch(capabilities);
         }
 
         var identities = await LookupUsersAsync(accessToken, [Login.Normalize(channelLogin)], ct);
         if (!identities.TryGetValue(Login.Normalize(channelLogin), out var channelId))
         {
-            return HostBotReadinessOutcome.IdentityLookupFailed(flags);
+            return new HostBotReadinessOutcome.IdentityLookupFailed(capabilities);
         }
 
         if (string.Equals(validation.UserId, channelId, StringComparison.Ordinal))
         {
-            return ChannelAuthorityReadyOutcome(flags);
+            return ChannelAuthorityReadyOutcome(capabilities);
         }
 
         var moderatorCheck = await helix.GetModeratedChannelStatusAsync(
@@ -132,39 +147,41 @@ public sealed class HostBotStatusService(
         );
         return moderatorCheck switch
         {
-            ModeratedChannelStatus.IsModerator
-                when HasAll(
-                    flags,
-                    HostBotChannelStatusFlags.FollowerReadConfigured
-                        | HostBotChannelStatusFlags.FollowerReadGranted
-                ) => HostBotReadinessOutcome.Ready(),
-            ModeratedChannelStatus.IsModerator => HostBotReadinessOutcome.MissingFollowerReadScope(
-                flags
+            ModeratedChannelStatus.IsModerator when capabilities.FollowerReadGranted =>
+                new HostBotReadinessOutcome.Ready(),
+            ModeratedChannelStatus.IsModerator =>
+                new HostBotReadinessOutcome.MissingFollowerReadScope(capabilities),
+            ModeratedChannelStatus.NotModerator => new HostBotReadinessOutcome.NotModerator(
+                capabilities
             ),
-            ModeratedChannelStatus.NotModerator => HostBotReadinessOutcome.NotModerator(flags),
-            ModeratedChannelStatus.NeedsAuthorization => HostBotReadinessOutcome.NeedsAuthorization(
-                flags
-            ),
+            ModeratedChannelStatus.NeedsAuthorization =>
+                new HostBotReadinessOutcome.NeedsAuthorization(capabilities),
             ModeratedChannelStatus.MissingPermission =>
-                HostBotReadinessOutcome.MissingModeratorCheckPermission(flags),
-            _ => HostBotReadinessOutcome.Unknown(flags),
+                new HostBotReadinessOutcome.MissingModeratorCheckPermission(capabilities),
+            ModeratedChannelStatus.Unknown => new HostBotReadinessOutcome.Unknown(capabilities),
+            _ => throw new UnreachableException(),
         };
     }
 
     private static HostBotReadinessOutcome ChannelAuthorityReadyOutcome(
-        HostBotChannelStatusFlags flags
+        HostBotReadinessCapabilities capabilities
     )
     {
-        return HasAll(
-            flags,
-            HostBotChannelStatusFlags.FollowerReadConfigured
-                | HostBotChannelStatusFlags.FollowerReadGranted
-        )
-            ? HostBotReadinessOutcome.Ready()
-            : HostBotReadinessOutcome.MissingFollowerReadScope(flags);
+        return capabilities.FollowerReadGranted
+            ? new HostBotReadinessOutcome.Ready()
+            : new HostBotReadinessOutcome.MissingFollowerReadScope(capabilities);
     }
 
-    public async Task<HostStreamLivenessOutcome> GetStreamLivenessAsync(
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
+    {
+        return IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
+            Result<HostStreamLivenessOutcome, Never>.Success(
+                await EvaluateStreamLivenessAsync(channelLogin, ct)
+            )
+        );
+    }
+
+    private async Task<HostStreamLivenessOutcome> EvaluateStreamLivenessAsync(
         string channelLogin,
         CancellationToken ct
     )
@@ -219,28 +236,40 @@ public sealed class HostBotStatusService(
         {
             return Unavailable(HostStreamLivenessUnavailableReason.ProviderTimedOut, exception);
         }
-        catch (OperationCanceledException exception)
-        {
-            return Unavailable(HostStreamLivenessUnavailableReason.ProviderTimedOut, exception);
-        }
     }
 
-    public async Task<FollowerCheckResult> IsFollowerAsync(
+    public IO<FollowerCheckOutcome, Never> CheckFollower(string channelLogin, string viewerLogin)
+    {
+        return IO<FollowerCheckOutcome, Never>.Create(async ct =>
+            Result<FollowerCheckOutcome, Never>.Success(
+                await CheckFollowerAsync(channelLogin, viewerLogin, ct)
+            )
+        );
+    }
+
+    private async Task<FollowerCheckOutcome> CheckFollowerAsync(
         string channelLogin,
         string viewerLogin,
         CancellationToken ct
     )
     {
-        var status = await GetStatusAsync(channelLogin, ct);
-        if (status.ModeratorState != HostBotModeratorState.IsModerator)
+        var statusResult = await GetStatus(channelLogin).ExecuteAsync(ct);
+        var status = statusResult.Match(value => value, _ => throw new UnreachableException());
+        if (!status.IsModerator)
         {
-            return FollowerCheckResult.Unavailable;
+            return new FollowerCheckOutcome.Unavailable();
         }
 
-        var tokenStatus = await GetValidatedUserAccessTokenAsync(channelLogin, ct);
-        var token = tokenStatus.AccessToken;
+        var token = (
+            await GetValidatedUserAccessTokenAsync(channelLogin, ct)
+        ).Match<ValidatedUserAccessToken?>(value => value, () => null);
+        if (token is null)
+        {
+            return new FollowerCheckOutcome.Unavailable();
+        }
+
         var identities = await LookupUsersAsync(
-            token,
+            token.AccessToken,
             [Login.Normalize(channelLogin), Login.Normalize(viewerLogin)],
             ct
         );
@@ -249,74 +278,49 @@ public sealed class HostBotStatusService(
             || !identities.TryGetValue(Login.Normalize(viewerLogin), out var viewerId)
         )
         {
-            return FollowerCheckResult.NotEligible;
+            return new FollowerCheckOutcome.NotEligible();
         }
 
         return await helix.GetFollowerStatusAsync(
-            HelixContext(token),
+            HelixContext(token.AccessToken),
             channelId,
             viewerId,
-            tokenStatus.Validation.UserId,
+            token.Validation.UserId,
             ct
         ) switch
         {
-            FollowerStatus.Follows => FollowerCheckResult.Eligible,
-            FollowerStatus.DoesNotFollow => FollowerCheckResult.NotEligible,
-            _ => FollowerCheckResult.Unavailable,
+            FollowerStatus.Follows => new FollowerCheckOutcome.Eligible(),
+            FollowerStatus.DoesNotFollow => new FollowerCheckOutcome.NotEligible(),
+            FollowerStatus.Unavailable => new FollowerCheckOutcome.Unavailable(),
+            _ => throw new UnreachableException(),
         };
     }
 
-    private HostBotChannelStatusFlags ConfiguredFlags()
+    private HostBotReadinessCapabilities ConfiguredCapabilities()
     {
-        return settings
-            .Identity.Scopes.Select(ScopeSet.Normalize)
-            .Aggregate(
-                HostBotChannelStatusFlags.None,
-                (flags, scope) =>
-                    flags
-                    | (
-                        scope switch
-                        {
-                            Scopes.UserReadModeratedChannels =>
-                                HostBotChannelStatusFlags.ModeratorCheckConfigured,
-                            Scopes.ModeratorReadFollowers =>
-                                HostBotChannelStatusFlags.FollowerReadConfigured,
-                            _ => HostBotChannelStatusFlags.None,
-                        }
-                    )
-            );
+        var scopes = settings.Identity.Scopes.Select(ScopeSet.Normalize).ToHashSet();
+        return new(
+            scopes.Contains(Scopes.UserReadModeratedChannels),
+            false,
+            scopes.Contains(Scopes.ModeratorReadFollowers),
+            false
+        );
     }
 
-    private static HostBotChannelStatusFlags GrantedFlags(
-        HostBotChannelStatusFlags configuredFlags,
+    private static HostBotReadinessCapabilities GrantedCapabilities(
+        HostBotReadinessCapabilities configured,
         IReadOnlyList<string> grantedScopes
     )
     {
-        return grantedScopes
-            .Select(ScopeSet.Normalize)
-            .Aggregate(
-                configuredFlags | HostBotChannelStatusFlags.BotAccountAuthorized,
-                (flags, scope) =>
-                    flags
-                    | (
-                        scope switch
-                        {
-                            Scopes.UserReadModeratedChannels =>
-                                HostBotChannelStatusFlags.ModeratorCheckGranted,
-                            Scopes.ModeratorReadFollowers =>
-                                HostBotChannelStatusFlags.FollowerReadGranted,
-                            _ => HostBotChannelStatusFlags.None,
-                        }
-                    )
-            );
+        var scopes = grantedScopes.Select(ScopeSet.Normalize).ToHashSet();
+        return configured with
+        {
+            ModeratorCheckGranted = scopes.Contains(Scopes.UserReadModeratedChannels),
+            FollowerReadGranted = scopes.Contains(Scopes.ModeratorReadFollowers),
+        };
     }
 
-    private static bool HasAll(HostBotChannelStatusFlags flags, HostBotChannelStatusFlags required)
-    {
-        return (flags & required) == required;
-    }
-
-    private async Task<ValidatedUserAccessToken> GetValidatedUserAccessTokenAsync(
+    private async Task<Option<ValidatedUserAccessToken>> GetValidatedUserAccessTokenAsync(
         string channelLogin,
         CancellationToken ct
     )
@@ -327,19 +331,14 @@ public sealed class HostBotStatusService(
             ct
         );
         return status.Status.Match(
-            _ => throw BotRunnerNotConnected(),
-            _ => throw BotRunnerNotConnected(),
-            _ => throw BotRunnerNotConnected(),
-            missingScopes => new ValidatedUserAccessToken
-            {
-                AccessToken = missingScopes.AccessToken,
-                Validation = missingScopes.Validation,
-            },
-            ready => new ValidatedUserAccessToken
-            {
-                AccessToken = ready.AccessToken,
-                Validation = ready.Validation,
-            }
+            _ => Option<ValidatedUserAccessToken>.None,
+            _ => Option<ValidatedUserAccessToken>.None,
+            _ => Option<ValidatedUserAccessToken>.None,
+            missingScopes =>
+                Option<ValidatedUserAccessToken>.Some(
+                    new(missingScopes.AccessToken, missingScopes.Validation)
+                ),
+            ready => Option<ValidatedUserAccessToken>.Some(new(ready.AccessToken, ready.Validation))
         );
     }
 
@@ -370,15 +369,5 @@ public sealed class HostBotStatusService(
         return new(reason, cause);
     }
 
-    private static InvalidOperationException BotRunnerNotConnected()
-    {
-        return new("The Twitch bot runner is not connected.");
-    }
-
-    private sealed record ValidatedUserAccessToken
-    {
-        internal required string AccessToken { get; init; }
-
-        internal required TokenValidation Validation { get; init; }
-    }
+    private sealed record ValidatedUserAccessToken(string AccessToken, TokenValidation Validation);
 }

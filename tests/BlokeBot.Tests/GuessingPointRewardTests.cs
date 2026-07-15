@@ -7,6 +7,7 @@ using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -57,7 +58,9 @@ public sealed class GuessingPointRewardTests
         var seed = await SeedRoundAsync(dbFactory, "25");
         var service = RoundService(dbFactory);
 
-        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var outcome = await service
+            .DeclareWinner(seed.HostId, "blue")
+            .RunAsync(CancellationToken.None);
         var result = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>().Result;
 
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -69,7 +72,7 @@ public sealed class GuessingPointRewardTests
             .ToListAsync(CancellationToken.None);
         var round = await db.Rounds.SingleAsync(x => x.Id == seed.RoundId);
 
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Message.ShouldBe(
             "blue wins. Correct guesses: one, three. Each winner gets 25 beans."
         );
@@ -91,11 +94,13 @@ public sealed class GuessingPointRewardTests
         var seed = await SeedRoundAsync(dbFactory, "0");
         var service = RoundService(dbFactory);
 
-        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var outcome = await service
+            .DeclareWinner(seed.HostId, "blue")
+            .RunAsync(CancellationToken.None);
         var result = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.Completed>().Result;
 
         await using var db = await dbFactory.CreateDbContextAsync();
-        result.Succeeded.ShouldBeTrue();
+        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Message.ShouldBe("blue wins. Correct guesses: one, three.");
         (await db.PointBalances.CountAsync(CancellationToken.None)).ShouldBe(0);
         (await db.PointLedgerEntries.CountAsync(CancellationToken.None)).ShouldBe(0);
@@ -128,7 +133,9 @@ public sealed class GuessingPointRewardTests
         }
         var service = RoundService(dbFactory);
 
-        var outcome = await service.DeclareWinnerAsync(seed.HostId, "blue", CancellationToken.None);
+        var outcome = await service
+            .DeclareWinner(seed.HostId, "blue")
+            .RunAsync(CancellationToken.None);
 
         var failure = outcome.ShouldBeOfType<GuessingWinnerDeclarationOutcome.PayoutFailed>();
         failure.Failure.ShouldBeOfType<PointBalanceMutationFailure.CapExceeded>();

@@ -5,6 +5,7 @@ using System.Text.Json;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Giveaways;
+using BlokeBot.Functional;
 using Microsoft.Extensions.Logging;
 using Shouldly;
 using TUnit.Core;
@@ -18,9 +19,9 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(UnavailableTokenStatus());
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.TokenUnavailable);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.TokenUnavailable>();
     }
 
     [Test]
@@ -28,9 +29,9 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(InvalidTokenStatus());
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.InvalidToken);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.InvalidToken>();
     }
 
     [Test]
@@ -38,9 +39,9 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(UnknownTokenStatus());
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.Unknown);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.Unknown>();
     }
 
     [Test]
@@ -48,9 +49,9 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(AuthorizedTokenStatus([Scopes.ModeratorReadFollowers]));
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.MissingModeratorCheckScope);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingModeratorCheckScope>();
     }
 
     [Test]
@@ -59,9 +60,9 @@ public sealed class HostBotStatusTests
         var httpClientFactory = new HostBotStatusHttpClientFactory { BotIsModerator = false };
         var service = CreateService(AuthorizedTokenStatus(RequiredScopes()), httpClientFactory);
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.NotModerator);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.NotModerator>();
     }
 
     [Test]
@@ -69,9 +70,9 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(AuthorizedTokenStatus([Scopes.UserReadModeratedChannels]));
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.MissingFollowerReadScope);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.MissingFollowerReadScope>();
     }
 
     [Test]
@@ -79,10 +80,10 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(AuthorizedTokenStatus(RequiredScopes()));
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
-        var status = await service.GetStatusAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
+        var status = await service.GetStatus("streamer").RunAsync(CancellationToken.None);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
         status.CanReadFollowers.ShouldBeTrue();
     }
 
@@ -101,9 +102,9 @@ public sealed class HostBotStatusTests
             httpClientFactory
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
         httpClientFactory.LastModerationUserId.ShouldBe("custom-id");
     }
 
@@ -122,10 +123,10 @@ public sealed class HostBotStatusTests
             httpClientFactory
         );
 
-        var outcome = await service.GetReadinessAsync("streamer", CancellationToken.None);
-        var status = await service.GetStatusAsync("streamer", CancellationToken.None);
+        var outcome = await ReadinessAsync(service);
+        var status = await service.GetStatus("streamer").RunAsync(CancellationToken.None);
 
-        outcome.Kind.ShouldBe(HostBotReadinessKind.Ready);
+        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
         status.CanReadFollowers.ShouldBeTrue();
         httpClientFactory.LastModerationUserId.ShouldBeNull();
     }
@@ -135,7 +136,7 @@ public sealed class HostBotStatusTests
     {
         var service = CreateService(UnavailableTokenStatus());
 
-        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
         var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
         unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.AppAccessTokenUnavailable);
@@ -157,7 +158,7 @@ public sealed class HostBotStatusTests
             settings
         );
 
-        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
         outcome.ShouldBeOfType<HostStreamLivenessOutcome.Live>();
         httpClientFactory.TokenRequestCount.ShouldBe(1);
@@ -172,7 +173,7 @@ public sealed class HostBotStatusTests
         var httpClientFactory = new HostBotStatusHttpClientFactory();
         var service = CreateStreamService(httpClientFactory);
 
-        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
         outcome.ShouldBeOfType<HostStreamLivenessOutcome.Offline>();
     }
@@ -184,7 +185,7 @@ public sealed class HostBotStatusTests
         var httpClientFactory = new HostBotStatusHttpClientFactory { StreamFailure = expected };
         var service = CreateStreamService(httpClientFactory);
 
-        var outcome = await service.GetStreamLivenessAsync("streamer", CancellationToken.None);
+        var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
         var unavailable = outcome.ShouldBeOfType<HostStreamLivenessOutcome.Unavailable>();
         unavailable.Reason.ShouldBe(HostStreamLivenessUnavailableReason.ProviderRequestFailed);
@@ -207,7 +208,7 @@ public sealed class HostBotStatusTests
         );
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(() =>
-            service.GetStreamLivenessAsync("streamer", cancellation.Token)
+            service.GetStreamLiveness("streamer").RunAsync(cancellation.Token).AsTask()
         );
 
         thrown.CancellationToken.ShouldBe(cancellation.Token);
@@ -227,7 +228,7 @@ public sealed class HostBotStatusTests
         );
 
         var thrown = await Should.ThrowAsync<PointsGiveawayStreamLivenessException>(() =>
-            policy.GetStreamLivenessAsync("streamer", CancellationToken.None)
+            policy.GetStreamLiveness("streamer").RunAsync(CancellationToken.None).AsTask()
         );
 
         thrown.HostLogin.ShouldBe("streamer");
@@ -251,6 +252,11 @@ public sealed class HostBotStatusTests
             new HelixClient(http),
             Settings()
         );
+    }
+
+    private static ValueTask<HostBotReadinessOutcome> ReadinessAsync(HostBotStatusService service)
+    {
+        return service.GetReadiness("streamer").RunAsync(CancellationToken.None);
     }
 
     private static HostBotStatusService CreateStreamService(

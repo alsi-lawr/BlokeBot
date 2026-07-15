@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -48,33 +49,40 @@ internal static class PointsGiveawayQueries
         );
     }
 
-    public static async Task<int?> FindActiveGiveawayIdAsync(
-        BlokeBotDbContext db,
-        int hostId,
-        CancellationToken ct
-    )
+    public static IO<Option<int>, Never> FindActiveGiveawayId(BlokeBotDbContext db, int hostId)
     {
-        return await db
-            .PointsGiveaways.AsNoTracking()
-            .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
-            .OrderByDescending(x => x.StartedAtUtc)
-            .Select(x => (int?)x.Id)
-            .FirstOrDefaultAsync(ct);
+        return IO<Option<int>, Never>.Create(async ct =>
+        {
+            var giveawayId = await db
+                .PointsGiveaways.AsNoTracking()
+                .Where(x => x.HostId == hostId && x.Status == PointsGiveawayStatus.Active)
+                .OrderByDescending(x => x.StartedAtUtc)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync(ct);
+            return Result<Option<int>, Never>.Success(
+                giveawayId.HasValue ? Option<int>.Some(giveawayId.Value) : Option<int>.None
+            );
+        });
     }
 
-    public static async Task<DateTime?> FindLastStartedAfterAsync(
+    public static IO<Option<DateTime>, Never> FindLastStartedAfter(
         BlokeBotDbContext db,
         int hostId,
-        DateTime startedAfterUtc,
-        CancellationToken ct
+        DateTime startedAfterUtc
     )
     {
-        return await db
-            .PointsGiveaways.AsNoTracking()
-            .Where(x => x.HostId == hostId && x.StartedAtUtc > startedAfterUtc)
-            .OrderByDescending(x => x.StartedAtUtc)
-            .Select(x => (DateTime?)x.StartedAtUtc)
-            .FirstOrDefaultAsync(ct);
+        return IO<Option<DateTime>, Never>.Create(async ct =>
+        {
+            var startedAt = await db
+                .PointsGiveaways.AsNoTracking()
+                .Where(x => x.HostId == hostId && x.StartedAtUtc > startedAfterUtc)
+                .OrderByDescending(x => x.StartedAtUtc)
+                .Select(x => (DateTime?)x.StartedAtUtc)
+                .FirstOrDefaultAsync(ct);
+            return Result<Option<DateTime>, Never>.Success(
+                startedAt.HasValue ? Option<DateTime>.Some(startedAt.Value) : Option<DateTime>.None
+            );
+        });
     }
 
     public static async Task<PointsGiveawayView?> LoadActiveViewAsync(

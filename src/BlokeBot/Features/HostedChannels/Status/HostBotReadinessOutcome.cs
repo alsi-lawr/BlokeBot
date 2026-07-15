@@ -1,94 +1,47 @@
 namespace BlokeBot.Features.HostedChannels.Status;
 
-public enum HostBotReadinessKind
+public sealed record HostBotReadinessCapabilities(
+    bool ModeratorCheckConfigured,
+    bool ModeratorCheckGranted,
+    bool FollowerReadConfigured,
+    bool FollowerReadGranted
+);
+
+public abstract record HostBotReadinessOutcome
 {
-    NotConfigured,
-    TokenUnavailable,
-    InvalidToken,
-    NeedsAuthorization,
-    Unknown,
-    MissingModeratorCheckScope,
-    MissingModeratorCheckPermission,
-    IdentityLookupFailed,
-    BotAccountMismatch,
-    NotModerator,
-    MissingFollowerReadScope,
-    Ready,
-}
+    private HostBotReadinessOutcome() { }
 
-public sealed record HostBotReadinessOutcome(
-    HostBotReadinessKind Kind,
-    HostBotChannelStatusFlags Flags
-)
-{
-    public static HostBotReadinessOutcome NotConfigured()
-    {
-        return new(HostBotReadinessKind.NotConfigured, HostBotChannelStatusFlags.None);
-    }
+    public sealed record NotConfigured : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome TokenUnavailable(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.TokenUnavailable, flags);
-    }
+    public sealed record TokenUnavailable(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome InvalidToken(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.InvalidToken, flags);
-    }
+    public sealed record InvalidToken(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome NeedsAuthorization(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.NeedsAuthorization, flags);
-    }
+    public sealed record NeedsAuthorization(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome Unknown(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.Unknown, flags);
-    }
+    public sealed record Unknown(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome MissingModeratorCheckScope(
-        HostBotChannelStatusFlags flags
-    )
-    {
-        return new(HostBotReadinessKind.MissingModeratorCheckScope, flags);
-    }
+    public sealed record MissingModeratorCheckScope(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome MissingModeratorCheckPermission(
-        HostBotChannelStatusFlags flags
-    )
-    {
-        return new(HostBotReadinessKind.MissingModeratorCheckPermission, flags);
-    }
+    public sealed record MissingModeratorCheckPermission(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome IdentityLookupFailed(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.IdentityLookupFailed, flags);
-    }
+    public sealed record IdentityLookupFailed(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome BotAccountMismatch(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.BotAccountMismatch, flags);
-    }
+    public sealed record BotAccountMismatch(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome NotModerator(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.NotModerator, flags);
-    }
+    public sealed record NotModerator(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome MissingFollowerReadScope(HostBotChannelStatusFlags flags)
-    {
-        return new(HostBotReadinessKind.MissingFollowerReadScope, flags);
-    }
+    public sealed record MissingFollowerReadScope(HostBotReadinessCapabilities Capabilities)
+        : HostBotReadinessOutcome;
 
-    public static HostBotReadinessOutcome Ready()
-    {
-        return new(
-            HostBotReadinessKind.Ready,
-            HostBotChannelStatusFlags.BotAccountAuthorized
-                | HostBotChannelStatusFlags.ModeratorCheckConfigured
-                | HostBotChannelStatusFlags.ModeratorCheckGranted
-                | HostBotChannelStatusFlags.FollowerReadConfigured
-                | HostBotChannelStatusFlags.FollowerReadGranted
-        );
-    }
+    public sealed record Ready : HostBotReadinessOutcome;
 }

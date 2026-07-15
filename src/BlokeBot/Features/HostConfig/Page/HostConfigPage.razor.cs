@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -317,7 +318,11 @@ public partial class HostConfigPage
             return;
         }
 
-        _state = await _hostConfig.LoadAsync(session, CancellationToken.None);
+        var result = await _hostConfig.Load(session).ExecuteAsync(CancellationToken.None);
+        _state = result.Match(
+            option => option.Match<HostConfigState?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
 
         _blockedByMode =
             selection is not null
@@ -730,20 +735,17 @@ public partial class HostConfigPage
 
     private async Task StartCoreAsync(int hostId)
     {
-        var result = await _runtime.StartAsync(hostId, CancellationToken.None);
+        var result = await _runtime.Start(hostId).ExecuteAsync(CancellationToken.None);
+        var outcome = result.Match(value => value, _ => throw new UnreachableException());
         await LoadCoreAsync();
-        if (result.Succeeded)
+        if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {
             TrackPendingRuntimeTransition();
-        }
-
-        if (result.Succeeded)
-        {
             _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
         else
         {
-            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
+            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome)));
         }
     }
 
@@ -754,21 +756,33 @@ public partial class HostConfigPage
 
     private async Task StopCoreAsync(int hostId)
     {
-        var result = await _runtime.StopAsync(hostId, CancellationToken.None);
+        var result = await _runtime.Stop(hostId).ExecuteAsync(CancellationToken.None);
+        var outcome = result.Match(value => value, _ => throw new UnreachableException());
         await LoadCoreAsync();
-        if (result.Succeeded)
+        if (outcome is HostedChannelRuntimeControlOutcome.Accepted)
         {
             TrackPendingRuntimeTransition();
-        }
-
-        if (result.Succeeded)
-        {
             _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
         }
         else
         {
-            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
+            _toasts.Publish(new ToastRequest<ErrorToastStrategy>(RuntimeControlMessage(outcome)));
         }
+    }
+
+    private static string RuntimeControlMessage(HostedChannelRuntimeControlOutcome outcome)
+    {
+        return outcome switch
+        {
+            HostedChannelRuntimeControlOutcome.HostNotFound => "Channel setup was not found.",
+            HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired =>
+                "Connect the bot to Twitch chat before starting it.",
+            HostedChannelRuntimeControlOutcome.CustomBotNotReady =>
+                "Connect the custom bot account before starting it, or turn custom bot off.",
+            HostedChannelRuntimeControlOutcome.Cooldown cooldown =>
+                $"Wait until {cooldown.NextAllowedAtUtc.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",
+            _ => throw new UnreachableException(),
+        };
     }
 
     private void TrackPendingRuntimeTransition()

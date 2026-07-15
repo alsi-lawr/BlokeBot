@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Auth.Users;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Functional;
@@ -13,91 +14,102 @@ internal sealed class AdminHostManagementService(
     HostedChannelDirectoryService hostedChannels
 )
 {
-    public async Task<AdminHostOperationResult> CreateHostAsync(string login, CancellationToken ct)
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> CreateHost(string login)
     {
-        Result<Option<UserIdentity>, AccessTokenUnavailableReason> user;
-        try
+        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
         {
-            user = await users.FindByLogin(login).ExecuteAsync(ct);
-        }
-        catch (HttpRequestException)
-        {
-            return new AdminHostOperationResult(
-                false,
-                "Twitch could not look up that user. Try again."
+            Result<Option<UserIdentity>, AccessTokenUnavailableReason> user;
+            try
+            {
+                user = await users.FindByLogin(login).ExecuteAsync(ct);
+            }
+            catch (HttpRequestException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new AdminHostOperationError.LookupUnavailable(exception));
+            }
+
+            return await user.Match(
+                found =>
+                    found.Match(
+                        identity => CreateHostAsync(identity, ct),
+                        () =>
+                            Task.FromResult(
+                                Success(
+                                    new AdminHostOperationOutcome.Rejected("Twitch user not found.")
+                                )
+                            )
+                    ),
+                reason =>
+                    Task.FromResult(Error(new AdminHostOperationError.BotTokenUnavailable(reason)))
             );
-        }
+        });
+    }
 
-        return await user.Match(
-            found =>
-                found.Match(
-                    identity => CreateHostAsync(identity, ct),
-                    () =>
-                        Task.FromResult(
-                            new AdminHostOperationResult(false, "Twitch user not found.")
-                        )
-                ),
-            _ =>
-                Task.FromResult(
-                    new AdminHostOperationResult(
-                        false,
-                        "Connect the bot account before adding channels."
-                    )
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> RemoveHost(int hostId)
+    {
+        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
+        {
+            await runtime.Stop(hostId).ExecuteAsync(ct);
+            var removed = await hostRemoval.RemoveAsync(hostId, ct);
+            return Success(
+                new AdminHostOperationOutcome.Completed(
+                    removed ? "Channel removed." : "Channel was already removed."
                 )
-        );
+            );
+        });
     }
 
-    public async Task<AdminHostOperationResult> RemoveHostAsync(int hostId, CancellationToken ct)
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> StartBot(int hostId)
     {
-        await runtime.StopAsync(hostId, ct);
-        var removed = await hostRemoval.RemoveAsync(hostId, ct);
-        return new AdminHostOperationResult(
-            true,
-            removed ? "Channel removed." : "Channel was already removed."
-        );
+        return ApplyRuntimeOperation(hostId, runtime.Start(hostId));
     }
 
-    public async Task<AdminHostOperationResult> StartBotAsync(int hostId, CancellationToken ct)
+    public IO<AdminHostOperationOutcome, AdminHostOperationError> StopBot(int hostId)
     {
-        return await ApplyRuntimeOperationAsync(hostId, runtime.StartAsync, ct);
+        return ApplyRuntimeOperation(hostId, runtime.Stop(hostId));
     }
 
-    public async Task<AdminHostOperationResult> StopBotAsync(int hostId, CancellationToken ct)
-    {
-        return await ApplyRuntimeOperationAsync(hostId, runtime.StopAsync, ct);
-    }
-
-    public AdminHostOperationResult RefreshPendingRuntime(
+    public AdminHostOperationOutcome RefreshPendingRuntime(
         int hostId,
         IReadOnlyList<HostedChannelAdminView> hosts
     )
     {
-        var host = hosts.FirstOrDefault(x => x.Id == hostId);
-        var lifecycle = host?.Lifecycle;
-        return new AdminHostOperationResult(
-            true,
-            RuntimeStatusMessage(lifecycle),
-            IsRuntimeTransitionPending(lifecycle) ? hostId : null
-        );
+        var lifecycle = hosts.FirstOrDefault(x => x.Id == hostId)?.Lifecycle;
+        var message = RuntimeStatusMessage(lifecycle);
+        return IsRuntimeTransitionPending(lifecycle)
+            ? new AdminHostOperationOutcome.PendingRuntime(message, hostId)
+            : new AdminHostOperationOutcome.Completed(message);
     }
 
-    private async Task<AdminHostOperationResult> ApplyRuntimeOperationAsync(
+    private IO<AdminHostOperationOutcome, AdminHostOperationError> ApplyRuntimeOperation(
         int hostId,
-        Func<int, CancellationToken, Task<HostedChannelRuntimeControlResult>> operation,
-        CancellationToken ct
+        IO<HostedChannelRuntimeControlOutcome, Never> operation
     )
     {
-        var result = await operation(hostId, ct);
-        var hosts = await hostedChannels.LoadHostedChannelsAsync(ct);
-        var currentLifecycle = hosts.FirstOrDefault(host => host.Id == hostId)?.Lifecycle;
-        return new AdminHostOperationResult(
-            result.Succeeded,
-            result.Succeeded ? RuntimeStatusMessage(currentLifecycle) : result.Message,
-            result.Succeeded && IsRuntimeTransitionPending(currentLifecycle) ? hostId : null
-        );
+        return IO<AdminHostOperationOutcome, AdminHostOperationError>.Create(async ct =>
+        {
+            var result = await operation.ExecuteAsync(ct);
+            var outcome = result.Match(value => value, _ => throw new UnreachableException());
+            if (outcome is not HostedChannelRuntimeControlOutcome.Accepted)
+            {
+                return Success(
+                    new AdminHostOperationOutcome.Rejected(RuntimeFailureMessage(outcome))
+                );
+            }
+
+            var hosts = await hostedChannels.LoadHostedChannelsAsync(ct);
+            var lifecycle = hosts.FirstOrDefault(host => host.Id == hostId)?.Lifecycle;
+            var message = RuntimeStatusMessage(lifecycle);
+            return Success(
+                IsRuntimeTransitionPending(lifecycle)
+                    ? new AdminHostOperationOutcome.PendingRuntime(message, hostId)
+                    : new AdminHostOperationOutcome.Completed(message)
+            );
+        });
     }
 
-    private async Task<AdminHostOperationResult> CreateHostAsync(
+    private async Task<Result<AdminHostOperationOutcome, AdminHostOperationError>> CreateHostAsync(
         UserIdentity user,
         CancellationToken ct
     )
@@ -112,7 +124,24 @@ internal sealed class AdminHostManagementService(
             user.ProfileImageUrl,
             ct
         );
-        return new AdminHostOperationResult(true, $"Added a channel for {displayName}.");
+        return Success(
+            new AdminHostOperationOutcome.Completed($"Added a channel for {displayName}.")
+        );
+    }
+
+    private static string RuntimeFailureMessage(HostedChannelRuntimeControlOutcome outcome)
+    {
+        return outcome switch
+        {
+            HostedChannelRuntimeControlOutcome.HostNotFound => "Channel setup was not found.",
+            HostedChannelRuntimeControlOutcome.ChannelAuthorizationRequired =>
+                "Connect the bot to Twitch chat before starting it.",
+            HostedChannelRuntimeControlOutcome.CustomBotNotReady =>
+                "Connect the custom bot account before starting it, or turn custom bot off.",
+            HostedChannelRuntimeControlOutcome.Cooldown cooldown =>
+                $"Wait until {cooldown.NextAllowedAtUtc.ToLocalTime():HH:mm:ss} before starting or stopping the bot again.",
+            _ => throw new UnreachableException(),
+        };
     }
 
     private static string RuntimeStatusMessage(HostedChannelRuntimeLifecycle? lifecycle)
@@ -134,10 +163,39 @@ internal sealed class AdminHostManagementService(
                 static _ => true
             ) ?? false;
     }
+
+    private static Result<AdminHostOperationOutcome, AdminHostOperationError> Success(
+        AdminHostOperationOutcome outcome
+    )
+    {
+        return Result<AdminHostOperationOutcome, AdminHostOperationError>.Success(outcome);
+    }
+
+    private static Result<AdminHostOperationOutcome, AdminHostOperationError> Error(
+        AdminHostOperationError error
+    )
+    {
+        return Result<AdminHostOperationOutcome, AdminHostOperationError>.Error(error);
+    }
 }
 
-public sealed record AdminHostOperationResult(
-    bool Succeeded,
-    string Message,
-    int? PendingRuntimeHostId = null
-);
+public abstract record AdminHostOperationOutcome
+{
+    private AdminHostOperationOutcome() { }
+
+    public sealed record Completed(string Message) : AdminHostOperationOutcome;
+
+    public sealed record PendingRuntime(string Message, int HostId) : AdminHostOperationOutcome;
+
+    public sealed record Rejected(string Message) : AdminHostOperationOutcome;
+}
+
+public abstract record AdminHostOperationError
+{
+    private AdminHostOperationError() { }
+
+    public sealed record LookupUnavailable(HttpRequestException Cause) : AdminHostOperationError;
+
+    public sealed record BotTokenUnavailable(AccessTokenUnavailableReason Reason)
+        : AdminHostOperationError;
+}

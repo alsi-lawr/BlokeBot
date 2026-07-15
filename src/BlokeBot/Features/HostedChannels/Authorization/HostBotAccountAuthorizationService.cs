@@ -293,51 +293,48 @@ public sealed class HostBotAccountAuthorizationService(
         return new WhisperResponseConfigurationOutcome.Configured();
     }
 
-    public async Task<BotAccountAuthorizationResult> AuthorizeAsync(
+    public IO<HostBotAccountAuthorizationOutcome, Never> Authorize(
         int hostId,
-        HostBotAccountAuthorizationGrant grant,
-        CancellationToken ct
+        HostBotAccountAuthorizationGrant grant
     )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await EnsureSettingsAsync(db, hostId, ct);
-        if (settings is null)
+        return IO<HostBotAccountAuthorizationOutcome, Never>.Create(async ct =>
         {
-            return BotAccountAuthorizationResult.Failure("Channel was not found.");
-        }
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var settings = await EnsureSettingsAsync(db, hostId, ct);
+            if (settings is null)
+            {
+                return Success(new HostBotAccountAuthorizationOutcome.HostNotFound());
+            }
 
-        if (!settings.OverrideEnabled)
-        {
-            return BotAccountAuthorizationResult.Failure(
-                "Turn on custom bot before connecting it."
-            );
-        }
+            if (!settings.OverrideEnabled)
+            {
+                return Success(new HostBotAccountAuthorizationOutcome.OverrideDisabled());
+            }
 
-        var missingScopes = ScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
-        if (missingScopes.Length > 0)
-        {
-            return BotAccountAuthorizationResult.Failure(
-                "The bot account needs more Twitch access.",
-                missingScopes
-            );
-        }
+            var missingScopes = ScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
+            if (missingScopes.Length > 0)
+            {
+                return Success(new HostBotAccountAuthorizationOutcome.MissingScopes(missingScopes));
+            }
 
-        settings.AccessToken = grant.Token.AccessToken;
-        settings.AuthorizedAtUtc = DateTime.UtcNow;
-        settings.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
-        settings.DisplayName = grant.DisplayName.Trim();
-        settings.ExpiresAtUtc = grant.Token.ExpiresAtUtc;
-        settings.Login = grant.Login.Value;
-        settings.ProfileImageUrl = string.IsNullOrWhiteSpace(grant.ProfileImageUrl)
-            ? null
-            : grant.ProfileImageUrl.Trim();
-        settings.RefreshToken = grant.Token.RefreshToken;
-        settings.TwitchUserId = grant.UserId;
-        settings.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await changes.NotifyChangedAsync(ct);
+            settings.AccessToken = grant.Token.AccessToken;
+            settings.AuthorizedAtUtc = DateTime.UtcNow;
+            settings.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
+            settings.DisplayName = grant.DisplayName.Trim();
+            settings.ExpiresAtUtc = grant.Token.ExpiresAtUtc;
+            settings.Login = grant.Login.Value;
+            settings.ProfileImageUrl = string.IsNullOrWhiteSpace(grant.ProfileImageUrl)
+                ? null
+                : grant.ProfileImageUrl.Trim();
+            settings.RefreshToken = grant.Token.RefreshToken;
+            settings.TwitchUserId = grant.UserId;
+            settings.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            await changes.NotifyChangedAsync(ct);
 
-        return BotAccountAuthorizationResult.Success("The bot account is ready.");
+            return Success(new HostBotAccountAuthorizationOutcome.Authorized());
+        });
     }
 
     public async Task ClearAsync(int hostId, CancellationToken ct)
@@ -381,6 +378,13 @@ public sealed class HostBotAccountAuthorizationService(
         settings = new HostBotAccountSettings { HostId = hostId, UpdatedAtUtc = DateTime.UtcNow };
         db.HostBotAccountSettings.Add(settings);
         return settings;
+    }
+
+    private static Result<HostBotAccountAuthorizationOutcome, Never> Success(
+        HostBotAccountAuthorizationOutcome outcome
+    )
+    {
+        return Result<HostBotAccountAuthorizationOutcome, Never>.Success(outcome);
     }
 
     private async Task<TokenStatus> GetStoredTokenStatusAsync(
@@ -704,4 +708,18 @@ public sealed class HostBotAccountAuthorizationService(
         Disabled,
         Enabled,
     }
+}
+
+public abstract record HostBotAccountAuthorizationOutcome
+{
+    private HostBotAccountAuthorizationOutcome() { }
+
+    public sealed record Authorized : HostBotAccountAuthorizationOutcome;
+
+    public sealed record HostNotFound : HostBotAccountAuthorizationOutcome;
+
+    public sealed record OverrideDisabled : HostBotAccountAuthorizationOutcome;
+
+    public sealed record MissingScopes(IReadOnlyList<string> Scopes)
+        : HostBotAccountAuthorizationOutcome;
 }

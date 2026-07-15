@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -58,37 +59,39 @@ public partial class HostBotChannelStatusPanel
         Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>
     > LoadBackgroundValueAsync(CancellationToken ct)
     {
-        return HostBotChannelStatusLoadFailure.FromReadiness(
-            await _hostBotStatus.GetReadinessAsync(HostLogin, ct)
+        var result = await _hostBotStatus.GetReadiness(HostLogin).ExecuteAsync(ct);
+        return result.Match(
+            HostBotChannelStatusLoadFailure.FromReadiness,
+            _ => throw new UnreachableException()
         );
     }
 
     private string _moderatorStatusBadgeClass =>
-        _status?.ModeratorState switch
+        _status switch
         {
-            HostBotModeratorState.IsModerator =>
+            { IsModerator: true } =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
-            HostBotModeratorState.NotModerator =>
+            { ModeratorCheckCompleted: true } =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
             _ =>
                 "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
         };
 
     private string _moderatorStatusDotClass =>
-        _status?.ModeratorState switch
+        _status switch
         {
-            HostBotModeratorState.IsModerator => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            HostBotModeratorState.NotModerator => "h-1.5 w-1.5 rounded-full bg-amber-500",
+            { IsModerator: true } => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            { ModeratorCheckCompleted: true } => "h-1.5 w-1.5 rounded-full bg-amber-500",
             _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
         };
 
     private string _moderatorStatusText =>
         IsBackgroundLoading
             ? "checking"
-            : _status?.ModeratorState switch
+            : _status switch
             {
-                HostBotModeratorState.IsModerator => "yes",
-                HostBotModeratorState.NotModerator => "no",
+                { IsModerator: true } => "yes",
+                { ModeratorCheckCompleted: true } => "no",
                 _ => "unknown",
             };
 
@@ -100,20 +103,20 @@ public partial class HostBotChannelStatusPanel
     private string _followerReadStatusBadgeClass =>
         _status?.CanReadFollowers == true
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-        : _status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
+        : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
             ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200"
         : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
 
     private string _followerReadStatusDotClass =>
         _status?.CanReadFollowers == true ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-        : _status?.ModeratorState == HostBotModeratorState.Unknown || IsBackgroundLoading
+        : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
             ? "h-1.5 w-1.5 rounded-full bg-slate-400"
         : "h-1.5 w-1.5 rounded-full bg-amber-500";
 
     private string _followerReadStatusText =>
         IsBackgroundLoading ? "checking"
         : _status?.CanReadFollowers == true ? "ready"
-        : _status?.ModeratorState == HostBotModeratorState.Unknown ? "unknown"
+        : _status?.ModeratorCheckCompleted != true ? "unknown"
         : "not ready";
 
     private string _followerReadStatusMessage =>

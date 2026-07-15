@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -61,13 +62,14 @@ public partial class PointsEligibilitySelector
         Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>
     > LoadBackgroundValueAsync(CancellationToken ct)
     {
-        return HostBotChannelStatusLoadFailure.FromReadiness(
-            await _hostBotStatus.GetReadinessAsync(HostLogin, ct)
+        var result = await _hostBotStatus.GetReadiness(HostLogin).ExecuteAsync(ct);
+        return result.Match(
+            HostBotChannelStatusLoadFailure.FromReadiness,
+            _ => throw new UnreachableException()
         );
     }
 
-    private bool _followerEligibilityAvailable =>
-        _status?.ModeratorState == HostBotModeratorState.IsModerator;
+    private bool _followerEligibilityAvailable => _status?.IsModerator == true;
 
     private string _followerEligibilityTitle =>
         IsBackgroundLoading ? "Checking whether follower-only giveaways can work."

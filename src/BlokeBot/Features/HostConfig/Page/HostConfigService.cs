@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.HostedChannels;
@@ -5,6 +6,7 @@ using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Whispers;
 using BlokeBot.Features.SiteAccess;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +22,14 @@ public sealed class HostConfigService(
     SiteAccessService siteAccess
 )
 {
-    public async Task<HostConfigState?> LoadAsync(
+    public IO<Option<HostConfigState>, Never> Load(AuthenticatedSession session)
+    {
+        return IO<Option<HostConfigState>, Never>.Create(async ct =>
+            Result<Option<HostConfigState>, Never>.Success(await LoadStateAsync(session, ct))
+        );
+    }
+
+    private async Task<Option<HostConfigState>> LoadStateAsync(
         AuthenticatedSession session,
         CancellationToken ct
     )
@@ -28,7 +37,7 @@ public sealed class HostConfigService(
         var login = session.Login;
         if (string.IsNullOrWhiteSpace(login))
         {
-            return null;
+            return Option<HostConfigState>.None;
         }
 
         var canCreateHost = await siteAccess.CanCreateHostAsync(login, ct);
@@ -36,27 +45,33 @@ public sealed class HostConfigService(
         var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Login == login, ct);
         if (host is null)
         {
-            return new HostConfigState(
-                null,
-                login,
-                string.IsNullOrWhiteSpace(session.DisplayName) ? login : session.DisplayName,
-                session.ProfileImageUrl,
-                canCreateHost,
-                false,
-                false,
-                null,
-                new HostBotAccountOverrideState(
+            return Option<HostConfigState>.Some(
+                new HostConfigState(
+                    null,
+                    login,
+                    string.IsNullOrWhiteSpace(session.DisplayName) ? login : session.DisplayName,
+                    session.ProfileImageUrl,
+                    canCreateHost,
                     false,
-                    DisabledBotOverrideStatus(),
                     false,
-                    new WhisperQuotaStatus(0, WhisperQuotaService.UniqueRecipientLimit, false)
-                ),
-                [],
-                new HostModAccessState(true, true, [], [])
+                    null,
+                    new HostBotAccountOverrideState(
+                        false,
+                        DisabledBotOverrideStatus(),
+                        false,
+                        new WhisperQuotaStatus(0, WhisperQuotaService.UniqueRecipientLimit, false)
+                    ),
+                    [],
+                    new HostModAccessState(true, true, [], [])
+                )
             );
         }
 
-        var status = await runtimeStatus.LoadHostRuntimeSummaryAsync(host.Id, ct);
+        var statusResult = await runtimeStatus.LoadHostRuntimeSummary(host.Id).ExecuteAsync(ct);
+        var status = statusResult.Match(
+            option => option.Match<HostedChannelRuntimeSummary?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
         var botOverrideStatus = await botAccounts.GetStatusAsync(host.Id, ct);
         var botOverrideSettings = await db
             .HostBotAccountSettings.AsNoTracking()
@@ -73,24 +88,26 @@ public sealed class HostConfigService(
             botOverrideSettings?.TwitchUserId,
             ct
         );
-        return new HostConfigState(
-            host.Id,
-            host.Login,
-            host.DisplayName,
-            host.ProfileImageUrl,
-            canCreateHost,
-            true,
-            host.ChannelBotAuthorizedAtUtc is not null,
-            status,
-            new HostBotAccountOverrideState(
-                botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
-                botOverrideStatus,
-                botOverrideSettings?.OverrideEnabled == true
-                    && botOverrideSettings.WhisperResponsesEnabled,
-                whisperQuotaStatus
-            ),
-            HostFeatureCatalog.Cards(host.EnabledFeatures),
-            await modAccess.LoadAsync(host.Id, ct)
+        return Option<HostConfigState>.Some(
+            new HostConfigState(
+                host.Id,
+                host.Login,
+                host.DisplayName,
+                host.ProfileImageUrl,
+                canCreateHost,
+                true,
+                host.ChannelBotAuthorizedAtUtc is not null,
+                status,
+                new HostBotAccountOverrideState(
+                    botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
+                    botOverrideStatus,
+                    botOverrideSettings?.OverrideEnabled == true
+                        && botOverrideSettings.WhisperResponsesEnabled,
+                    whisperQuotaStatus
+                ),
+                HostFeatureCatalog.Cards(host.EnabledFeatures),
+                await modAccess.LoadAsync(host.Id, ct)
+            )
         );
     }
 

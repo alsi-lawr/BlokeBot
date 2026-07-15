@@ -1,7 +1,9 @@
+using System.Text.Json;
 using BlokeBot.Auth.OAuth;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Auth.Users;
 using BlokeBot.Features.Admin.Authorization;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Identity;
 
@@ -23,37 +25,64 @@ internal sealed class WebAuthService(
         return oauth.CreateAuthorizationUri(request, CurrentOptions, state);
     }
 
-    public async Task<AuthResult> AuthenticateAsync(
+    public IO<WebAuthenticationOutcome, WebAuthenticationError> Authenticate(
         HttpRequest request,
-        string code,
-        CancellationToken cancellationToken
+        string code
     )
     {
-        var currentOptions = CurrentOptions;
-        if (!IsConfigured(currentOptions))
+        return IO<WebAuthenticationOutcome, WebAuthenticationError>.Create(async ct =>
         {
-            return new AuthResult(false, null, "Twitch sign-in is not set up yet.");
-        }
+            var currentOptions = CurrentOptions;
+            if (!IsConfigured(currentOptions))
+            {
+                return Success(new WebAuthenticationOutcome.NotConfigured());
+            }
 
-        var accessToken = await oauth.ExchangeCodeAsync(
-            request,
-            currentOptions,
-            code,
-            cancellationToken
-        );
-        var user = await users.GetCurrentUserAsync(accessToken, cancellationToken);
+            string accessToken;
+            try
+            {
+                accessToken = await oauth.ExchangeCodeAsync(request, currentOptions, code, ct);
+            }
+            catch (HttpRequestException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new WebAuthenticationError.TransportFailure(exception));
+            }
+            catch (JsonException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+            }
+            catch (InvalidOperationException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+            }
 
-        return await user.Match(
-            identity => AuthenticateAsync(currentOptions, accessToken, identity, cancellationToken),
-            () =>
-                Task.FromResult(
-                    new AuthResult(false, null, "Twitch did not return the signed-in user.")
-                )
-        );
+            try
+            {
+                var user = await users.GetCurrentUserAsync(accessToken, ct);
+                return await user.Match(
+                    identity => AuthorizeIdentityAsync(accessToken, identity, ct),
+                    () => Task.FromResult(Success(new WebAuthenticationOutcome.UserNotValidated()))
+                );
+            }
+            catch (HttpRequestException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new WebAuthenticationError.TransportFailure(exception));
+            }
+            catch (JsonException exception)
+            {
+                ct.ThrowIfCancellationRequested();
+                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+            }
+        });
     }
 
-    private async Task<AuthResult> AuthenticateAsync(
-        WebAuthOptions currentOptions,
+    private async Task<
+        Result<WebAuthenticationOutcome, WebAuthenticationError>
+    > AuthorizeIdentityAsync(
         string accessToken,
         UserIdentity user,
         CancellationToken cancellationToken
@@ -67,17 +96,17 @@ internal sealed class WebAuthService(
             : user.DisplayName;
         if (IsConfiguredBotAccount(userLogin))
         {
-            return new AuthResult(
-                true,
-                new AuthenticatedUser(
-                    twitchUserId,
-                    twitchLogin,
-                    displayName,
-                    user.ProfileImageUrl,
-                    [],
-                    false
-                ),
-                null
+            return Success(
+                new WebAuthenticationOutcome.Authorized(
+                    new AuthenticatedUser(
+                        twitchUserId,
+                        twitchLogin,
+                        displayName,
+                        user.ProfileImageUrl,
+                        [],
+                        false
+                    )
+                )
             );
         }
 
@@ -94,24 +123,24 @@ internal sealed class WebAuthService(
             && !admins.IsAdmin(userLogin)
         )
         {
-            return new AuthResult(
-                false,
-                null,
-                "This Twitch account cannot create or manage a BlokeBot channel yet."
+            return Success(
+                new WebAuthenticationOutcome.NotAuthorized(
+                    "This Twitch account cannot create or manage a BlokeBot channel yet."
+                )
             );
         }
 
-        return new AuthResult(
-            true,
-            new AuthenticatedUser(
-                twitchUserId,
-                twitchLogin,
-                displayName,
-                user.ProfileImageUrl,
-                authorizedHosts.Choices,
-                authorizedHosts.CanCreateHost
-            ),
-            null
+        return Success(
+            new WebAuthenticationOutcome.Authorized(
+                new AuthenticatedUser(
+                    twitchUserId,
+                    twitchLogin,
+                    displayName,
+                    user.ProfileImageUrl,
+                    authorizedHosts.Choices,
+                    authorizedHosts.CanCreateHost
+                )
+            )
         );
     }
 
@@ -129,4 +158,40 @@ internal sealed class WebAuthService(
                 StringComparison.Ordinal
             );
     }
+
+    private static Result<WebAuthenticationOutcome, WebAuthenticationError> Success(
+        WebAuthenticationOutcome outcome
+    )
+    {
+        return Result<WebAuthenticationOutcome, WebAuthenticationError>.Success(outcome);
+    }
+
+    private static Result<WebAuthenticationOutcome, WebAuthenticationError> Error(
+        WebAuthenticationError error
+    )
+    {
+        return Result<WebAuthenticationOutcome, WebAuthenticationError>.Error(error);
+    }
+}
+
+internal abstract record WebAuthenticationOutcome
+{
+    private WebAuthenticationOutcome() { }
+
+    internal sealed record Authorized(AuthenticatedUser User) : WebAuthenticationOutcome;
+
+    internal sealed record NotConfigured : WebAuthenticationOutcome;
+
+    internal sealed record UserNotValidated : WebAuthenticationOutcome;
+
+    internal sealed record NotAuthorized(string Message) : WebAuthenticationOutcome;
+}
+
+internal abstract record WebAuthenticationError
+{
+    private WebAuthenticationError() { }
+
+    internal sealed record TransportFailure(HttpRequestException Cause) : WebAuthenticationError;
+
+    internal sealed record InvalidProviderPayload(Exception Cause) : WebAuthenticationError;
 }

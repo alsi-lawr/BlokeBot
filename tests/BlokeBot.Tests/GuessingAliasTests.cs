@@ -11,6 +11,7 @@ using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -276,13 +277,11 @@ public sealed class GuessingAliasTests
             new GuessingChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
-        var result = await service.RecordGuessAsync(
-            seed.Host.Login,
-            "viewer",
-            "blue",
-            CancellationToken.None
-        );
+        var result = await service
+            .RecordGuess(seed.Host.Login, "viewer", "blue")
+            .RunAsync(CancellationToken.None);
 
+        result.ShouldBeOfType<GuessingOperationOutcome.Succeeded>();
         result.Target.ShouldBe(CommandResponseTarget.Whisper);
         result.Message.ShouldBe("Blue");
     }

@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -49,18 +51,26 @@ public sealed class HostedChannelDirectoryService(IDbContextFactory<BlokeBotDbCo
         return ids.ToHashSet();
     }
 
-    public async Task<BotHostChoice?> LoadHostChoiceAsync(
-        int hostId,
-        AuthRole role,
-        CancellationToken ct
-    )
+    public IO<Option<BotHostChoice>, Never> LoadHostChoice(int hostId, AuthRole role)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Id == hostId)
-            .Select(x => new BotHostChoice(x.Id, x.Login, x.DisplayName, role, x.ProfileImageUrl))
-            .SingleOrDefaultAsync(ct);
+        return IO<Option<BotHostChoice>, Never>.Create(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var host = await db
+                .Hosts.AsNoTracking()
+                .Where(x => x.Id == hostId)
+                .Select(x => new BotHostChoice(
+                    x.Id,
+                    x.Login,
+                    x.DisplayName,
+                    role,
+                    x.ProfileImageUrl
+                ))
+                .SingleOrDefaultAsync(ct);
+            return Result<Option<BotHostChoice>, Never>.Success(
+                Option<BotHostChoice>.FromNullable(host)
+            );
+        });
     }
 
     public async Task<IReadOnlyList<BotHostChoice>> LoadExistingHostChoicesAsync(

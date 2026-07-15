@@ -40,7 +40,9 @@ public partial class AlertsPage
             return;
         }
 
-        await _alerts.AcknowledgeAsync(HostId, alert.Id, ActorLogin, CancellationToken.None);
+        await _alerts
+            .Acknowledge(HostId, alert.Id, ActorLogin)
+            .ExecuteAsync(CancellationToken.None);
         await LoadAsync();
     }
 

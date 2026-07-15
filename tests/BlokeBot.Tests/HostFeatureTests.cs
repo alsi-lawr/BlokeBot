@@ -4,6 +4,7 @@ using BlokeBot.Features.Guessing.Commands;
 using BlokeBot.Features.HostedChannels;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.Points.Commands;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -31,18 +32,18 @@ public sealed class HostFeatureTests
         );
         var service = new HostFeatureService(dbFactory, new HostedChannelChangeNotifier(events));
 
-        (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(HostFeatureFlags.All);
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
 
         await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
-        (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(
             HostFeatureFlags.Points | HostFeatureFlags.CustomCommands
         );
         publishCount.ShouldBe(1);
 
         await service.EnableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
-        (await service.LoadAsync(hostId, CancellationToken.None)).ShouldBe(HostFeatureFlags.All);
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         publishCount.ShouldBe(2);
     }
 
@@ -183,5 +184,14 @@ public sealed class HostFeatureTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
+    }
+
+    private static async Task<HostFeatureFlags?> LoadFeaturesAsync(
+        HostFeatureService service,
+        int hostId
+    )
+    {
+        var features = await service.Load(hostId).RunAsync(CancellationToken.None);
+        return features.Match<HostFeatureFlags?>(value => value, () => null);
     }
 }

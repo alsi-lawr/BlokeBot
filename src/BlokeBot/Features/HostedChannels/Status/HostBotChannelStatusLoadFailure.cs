@@ -12,9 +12,9 @@ public sealed record HostBotChannelStatusLoadFailure(
     )
     {
         return
-            readiness.Kind
-                is HostBotReadinessKind.Unknown
-                    or HostBotReadinessKind.IdentityLookupFailed
+            readiness
+                is HostBotReadinessOutcome.Unknown
+                    or HostBotReadinessOutcome.IdentityLookupFailed
             ? Result<HostBotChannelStatus, HostBotChannelStatusLoadFailure>.Error(
                 new(
                     "BlokeBot could not check whether the bot is a mod.",

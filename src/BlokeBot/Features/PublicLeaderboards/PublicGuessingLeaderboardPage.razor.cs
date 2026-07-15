@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Features.Guessing.History;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
@@ -28,7 +29,11 @@ public partial class PublicGuessingLeaderboardPage
     {
         _loaded = false;
         _leaderboard = null;
-        _host = await _hosts.FindAsync(Channel, CancellationToken.None);
+        var host = await _hosts.Find(Channel).ExecuteAsync(CancellationToken.None);
+        _host = host.Match(
+            option => option.Match<PublicLeaderboardHost?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
 
         if (_featureEnabled)
         {

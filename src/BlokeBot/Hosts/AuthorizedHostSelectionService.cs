@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using BlokeBot.Auth.Moderation;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostConfig.Access;
 using BlokeBot.Features.SiteAccess;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,11 +27,19 @@ internal sealed class AuthorizedHostSelectionService(
         var canCreateHost = await siteAccess.CanCreateHostAsync(userLogin, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-        var selfHost = await LoadSelfHostChoiceAsync(db, userLogin, ct);
-        if (selfHost is not null)
-        {
-            choices.Add(selfHost);
-        }
+        var selfHost = await LoadSelfHostChoice(db, userLogin).ExecuteAsync(ct);
+        selfHost.Match(
+            host =>
+                host.Match(
+                    value =>
+                    {
+                        choices.Add(value);
+                        return true;
+                    },
+                    () => false
+                ),
+            _ => throw new UnreachableException()
+        );
 
         choices.AddRange(
             await LoadModeratedHostChoicesAsync(db, accessToken, userId, userLogin, ct)
@@ -38,27 +48,30 @@ internal sealed class AuthorizedHostSelectionService(
         return new AuthorizedHostSet(Sort(choices), canCreateHost);
     }
 
-    private static async Task<BotHostChoice?> LoadSelfHostChoiceAsync(
+    private static IO<Option<BotHostChoice>, Never> LoadSelfHostChoice(
         BlokeBotDbContext db,
-        string userLogin,
-        CancellationToken ct
+        string userLogin
     )
     {
-        var selfHost = await db
-            .Hosts.AsNoTracking()
-            .SingleOrDefaultAsync(x => x.Login == userLogin, ct);
-        if (selfHost is null)
+        return IO<Option<BotHostChoice>, Never>.Create(async ct =>
         {
-            return null;
-        }
-
-        return new BotHostChoice(
-            selfHost.Id,
-            selfHost.Login,
-            selfHost.DisplayName,
-            AuthRole.Streamer,
-            selfHost.ProfileImageUrl
-        );
+            var selfHost = await db
+                .Hosts.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Login == userLogin, ct);
+            return Result<Option<BotHostChoice>, Never>.Success(
+                Option<BotHostChoice>.FromNullable(
+                    selfHost is null
+                        ? null
+                        : new BotHostChoice(
+                            selfHost.Id,
+                            selfHost.Login,
+                            selfHost.DisplayName,
+                            AuthRole.Streamer,
+                            selfHost.ProfileImageUrl
+                        )
+                )
+            );
+        });
     }
 
     private async Task<IReadOnlyList<BotHostChoice>> LoadModeratedHostChoicesAsync(

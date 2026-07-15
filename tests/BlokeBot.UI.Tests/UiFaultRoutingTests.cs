@@ -18,7 +18,7 @@ public sealed class UiFaultRoutingTests
     public void UnavailableReadiness_Mapping_ReturnsTypedExpectedLoadFailure()
     {
         var result = HostBotChannelStatusLoadFailure.FromReadiness(
-            HostBotReadinessOutcome.Unknown(HostBotChannelStatusFlags.ModeratorCheckConfigured)
+            new HostBotReadinessOutcome.Unknown(new(true, false, false, false))
         );
 
         var failure = result.Match<HostBotChannelStatusLoadFailure?>(_ => null, error => error);

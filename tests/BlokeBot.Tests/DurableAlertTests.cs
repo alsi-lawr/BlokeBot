@@ -1,6 +1,7 @@
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
+using BlokeBot.Functional;
 using BlokeBot.Hosting;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
@@ -22,27 +23,31 @@ public sealed class DurableAlertTests
         var clock = new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero));
         var alerts = new DurableAlertService(dbFactory, clock, TestEventBus.Create<AppEventKind>());
 
-        await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Warning,
-            "queue",
-            "active",
-            "Queue delayed",
-            "Outbound messages are delayed.",
-            "/alerts",
-            CancellationToken.None
-        );
-        var acknowledged = await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Info,
-            "setup",
-            "history",
-            "Setup notice",
-            "Setup changed.",
-            null,
-            CancellationToken.None
-        );
-        await alerts.AcknowledgeAsync(hostId, acknowledged.Id, "moderator", CancellationToken.None);
+        await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "queue",
+                "active",
+                "Queue delayed",
+                "Outbound messages are delayed.",
+                "/alerts"
+            )
+            .RunAsync(CancellationToken.None);
+        var acknowledged = await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Info,
+                "setup",
+                "history",
+                "Setup notice",
+                "Setup changed.",
+                null
+            )
+            .RunAsync(CancellationToken.None);
+        await alerts
+            .Acknowledge(hostId, acknowledged.Alert.Id, "moderator")
+            .RunAsync(CancellationToken.None);
 
         var state = await alerts.LoadStateAsync(hostId, CancellationToken.None);
 

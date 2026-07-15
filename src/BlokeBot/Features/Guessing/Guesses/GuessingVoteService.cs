@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Profiles;
 using BlokeBot.Features.Guessing.Replies;
 using BlokeBot.Features.Guessing.Rounds;
 using BlokeBot.Features.Replies;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -15,7 +17,20 @@ public sealed class GuessingVoteService(
     GuessingChangeNotifier changes
 )
 {
-    public async Task<GuessingOperationResult> RecordGuessAsync(
+    public IO<GuessingOperationOutcome, Never> RecordGuess(
+        string hostLogin,
+        string login,
+        string name
+    )
+    {
+        return IO<GuessingOperationOutcome, Never>.Create(async ct =>
+            Result<GuessingOperationOutcome, Never>.Success(
+                await PersistGuessAsync(hostLogin, login, name, ct)
+            )
+        );
+    }
+
+    private async Task<GuessingOperationOutcome> PersistGuessAsync(
         string hostLogin,
         string login,
         string name,
@@ -23,7 +38,11 @@ public sealed class GuessingVoteService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var hostId = await BotHostQueries.FindHostIdAsync(db, hostLogin, ct);
+        var hostIdResult = await BotHostQueries.FindHostId(db, hostLogin).ExecuteAsync(ct);
+        var hostId = hostIdResult.Match(
+            option => option.Match<int?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
         if (hostId is null)
         {
             return NotConfigured();
@@ -44,8 +63,7 @@ public sealed class GuessingVoteService(
 
         if (round is null)
         {
-            return new GuessingOperationResult(
-                false,
+            return new GuessingOperationOutcome.Rejected(
                 settings.NoOpenRoundReply,
                 delivery.TargetFor(GuessingReplyKeys.NoOpenRound)
             );
@@ -53,8 +71,7 @@ public sealed class GuessingVoteService(
 
         if (!round.Lifecycle.Match(static _ => true, static _ => false, static _ => false))
         {
-            return new GuessingOperationResult(
-                false,
+            return new GuessingOperationOutcome.Rejected(
                 settings.GuessingClosedReply,
                 delivery.TargetFor(GuessingReplyKeys.GuessingClosed)
             );
@@ -69,8 +86,7 @@ public sealed class GuessingVoteService(
 
         if (option is null)
         {
-            return new GuessingOperationResult(
-                false,
+            return new GuessingOperationOutcome.Rejected(
                 Format(settings.InvalidGuessReply, normalizedName, login),
                 delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
             );
@@ -83,7 +99,7 @@ public sealed class GuessingVoteService(
 
         if (vote is not null)
         {
-            return new GuessingOperationResult(false, string.Empty);
+            return new GuessingOperationOutcome.Rejected(string.Empty);
         }
 
         db.Votes.Add(
@@ -99,8 +115,7 @@ public sealed class GuessingVoteService(
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
         var answerReplyTarget = await AnswerReplyTargetAsync(db, round.ProfileId, ct);
-        return new GuessingOperationResult(
-            true,
+        return new GuessingOperationOutcome.Succeeded(
             Format(option.ReplyText, normalizedName, login),
             answerReplyTarget
         );
@@ -135,8 +150,8 @@ public sealed class GuessingVoteService(
         );
     }
 
-    private static GuessingOperationResult NotConfigured()
+    private static GuessingOperationOutcome NotConfigured()
     {
-        return new(false, "This channel is not set up.");
+        return new GuessingOperationOutcome.Rejected("This channel is not set up.");
     }
 }

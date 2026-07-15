@@ -98,7 +98,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBe(FollowerStatus.Follows);
+        status.ShouldBeOfType<FollowerStatus.Follows>();
     }
 
     [Test]
@@ -115,7 +115,7 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        status.ShouldBe(FollowerStatus.DoesNotFollow);
+        status.ShouldBeOfType<FollowerStatus.DoesNotFollow>();
     }
 
     [Test]

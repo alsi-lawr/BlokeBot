@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -32,6 +33,7 @@ using BlokeBot.Features.Points.Dashboard;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
+using BlokeBot.Functional;
 using BlokeBot.Hosts;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
@@ -100,7 +102,7 @@ public partial class AdminPage
     private async Task CreateHostAsync()
     {
         await ApplyHostOperationAsync(
-            await _hostManagement.CreateHostAsync(_newHostLogin, CancellationToken.None),
+            await _hostManagement.CreateHost(_newHostLogin).ExecuteAsync(CancellationToken.None),
             clearNewHostLogin: true
         );
         await LoadAsync();
@@ -109,7 +111,7 @@ public partial class AdminPage
     private async Task RemoveHostAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await _hostManagement.RemoveHostAsync(hostId, CancellationToken.None)
+            await _hostManagement.RemoveHost(hostId).ExecuteAsync(CancellationToken.None)
         );
         await LoadAsync();
     }
@@ -117,7 +119,7 @@ public partial class AdminPage
     private async Task StartBotAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await _hostManagement.StartBotAsync(hostId, CancellationToken.None)
+            await _hostManagement.StartBot(hostId).ExecuteAsync(CancellationToken.None)
         );
         await LoadAsync();
     }
@@ -125,7 +127,7 @@ public partial class AdminPage
     private async Task StopBotAsync(int hostId)
     {
         await ApplyHostOperationAsync(
-            await _hostManagement.StopBotAsync(hostId, CancellationToken.None)
+            await _hostManagement.StopBot(hostId).ExecuteAsync(CancellationToken.None)
         );
         await LoadAsync();
     }
@@ -167,12 +169,23 @@ public partial class AdminPage
     }
 
     private Task ApplyHostOperationAsync(
-        AdminHostOperationResult result,
+        Result<AdminHostOperationOutcome, AdminHostOperationError> result,
         bool clearNewHostLogin = false
     )
     {
-        ApplyHostOperation(result);
-        if (clearNewHostLogin && result.Succeeded)
+        var succeeded = result.Match(
+            outcome =>
+            {
+                ApplyHostOperation(outcome);
+                return outcome is not AdminHostOperationOutcome.Rejected;
+            },
+            error =>
+            {
+                ApplyHostOperation(error);
+                return false;
+            }
+        );
+        if (clearNewHostLogin && succeeded)
         {
             _newHostLogin = string.Empty;
         }
@@ -180,21 +193,39 @@ public partial class AdminPage
         return Task.CompletedTask;
     }
 
-    private void ApplyHostOperation(AdminHostOperationResult result)
+    private void ApplyHostOperation(AdminHostOperationOutcome outcome)
     {
-        if (!string.IsNullOrWhiteSpace(result.Message))
+        switch (outcome)
         {
-            if (result.Succeeded)
-            {
-                _toasts.Publish(new ToastRequest<StatusToastStrategy>(result.Message));
-            }
-            else
-            {
-                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(result.Message));
-            }
+            case AdminHostOperationOutcome.Completed completed:
+                _toasts.Publish(new ToastRequest<StatusToastStrategy>(completed.Message));
+                _pendingRuntimeHostId = null;
+                break;
+            case AdminHostOperationOutcome.PendingRuntime pending:
+                _toasts.Publish(new ToastRequest<StatusToastStrategy>(pending.Message));
+                _pendingRuntimeHostId = pending.HostId;
+                break;
+            case AdminHostOperationOutcome.Rejected rejected:
+                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(rejected.Message));
+                _pendingRuntimeHostId = null;
+                break;
+            default:
+                throw new UnreachableException();
         }
+    }
 
-        _pendingRuntimeHostId = result.PendingRuntimeHostId;
+    private void ApplyHostOperation(AdminHostOperationError error)
+    {
+        var message = error switch
+        {
+            AdminHostOperationError.LookupUnavailable =>
+                "Twitch could not look up that user. Try again.",
+            AdminHostOperationError.BotTokenUnavailable =>
+                "Connect the bot account before adding channels.",
+            _ => throw new UnreachableException(),
+        };
+        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(message));
+        _pendingRuntimeHostId = null;
     }
 
     private async Task RemoveBlacklistAsync(string login)

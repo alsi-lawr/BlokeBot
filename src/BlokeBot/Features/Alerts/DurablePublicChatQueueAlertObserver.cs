@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
@@ -27,7 +29,11 @@ internal sealed class DurablePublicChatQueueAlertObserver(
             return;
         }
 
-        var host = await ResolveHostAsync(channel, cancellationToken);
+        var hostResult = await ResolveHost(channel).ExecuteAsync(cancellationToken);
+        var host = hostResult.Match(
+            option => option.Match<QueueAlertHost?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
         if (host is null)
         {
             log.LogInformation(
@@ -37,26 +43,33 @@ internal sealed class DurablePublicChatQueueAlertObserver(
             return;
         }
 
-        await alerts.CreateOrGetActiveAsync(
-            host.Id,
-            DurableAlertSeverity.Warning,
-            _source,
-            SourceKey(channel, backlog.OldestPendingAt),
-            "Chat messages are delayed",
-            Message(host.Login, backlog),
-            _linkPath,
-            cancellationToken
-        );
+        await alerts
+            .Create(
+                host.Id,
+                DurableAlertSeverity.Warning,
+                _source,
+                SourceKey(channel, backlog.OldestPendingAt),
+                "Chat messages are delayed",
+                Message(host.Login, backlog),
+                _linkPath
+            )
+            .ExecuteAsync(cancellationToken);
     }
 
-    private async Task<QueueAlertHost?> ResolveHostAsync(string channel, CancellationToken ct)
+    private IO<Option<QueueAlertHost>, Never> ResolveHost(string channel)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Login == channel)
-            .Select(x => new QueueAlertHost(x.Id, x.Login))
-            .SingleOrDefaultAsync(ct);
+        return IO<Option<QueueAlertHost>, Never>.Create(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var host = await db
+                .Hosts.AsNoTracking()
+                .Where(x => x.Login == channel)
+                .Select(x => new QueueAlertHost(x.Id, x.Login))
+                .SingleOrDefaultAsync(ct);
+            return Result<Option<QueueAlertHost>, Never>.Success(
+                Option<QueueAlertHost>.FromNullable(host)
+            );
+        });
     }
 
     private static string Message(string hostLogin, PublicChatQueueBacklog backlog)

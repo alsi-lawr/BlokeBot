@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -154,9 +155,12 @@ public partial class SelectedChannelBotStatus
         }
 
         _loadedStatusHostId = _selection.Current.Id;
-        _selectedHostStatus = await _hostedChannels.LoadHostRuntimeSummaryAsync(
-            _selection.Current.Id,
-            CancellationToken.None
+        var result = await _hostedChannels
+            .LoadHostRuntimeSummary(_selection.Current.Id)
+            .ExecuteAsync(CancellationToken.None);
+        _selectedHostStatus = result.Match(
+            option => option.Match<HostedChannelRuntimeSummary?>(value => value, () => null),
+            _ => throw new UnreachableException()
         );
     }
 

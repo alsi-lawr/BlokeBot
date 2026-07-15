@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.Guessing.Game;
 using BlokeBot.Features.Guessing.Guesses;
 using BlokeBot.Features.Guessing.Rounds;
+using BlokeBot.Functional;
 
 namespace BlokeBot.Features.Guessing.Commands;
 
@@ -44,7 +46,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
 
     protected async ValueTask ReplyAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
-        GuessingOperationResult result,
+        GuessingOperationOutcome result,
         CancellationToken cancellationToken
     )
     {
@@ -57,7 +59,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
         }
     }
 
-    protected async Task<GuessingOperationResult> UsageAsync(
+    protected async Task<GuessingOperationOutcome> UsageAsync(
         CommandStrategyContext<GuessCommandKind, AppCommandRouteState> context,
         CancellationToken cancellationToken
     )
@@ -69,7 +71,16 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
             context.State,
             cancellationToken
         );
-        return new GuessingOperationResult(false, response.Message, response.Target);
+        return new GuessingOperationOutcome.Rejected(response.Message, response.Target);
+    }
+
+    protected static async Task<TValue> ExecuteAsync<TValue>(
+        IO<TValue, Never> operation,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await operation.ExecuteAsync(cancellationToken);
+        return result.Match(value => value, _ => throw new UnreachableException());
     }
 }
 
@@ -89,29 +100,20 @@ public sealed class StartGuessingCommandStrategy(
         CancellationToken cancellationToken
     )
     {
-        GuessingOperationResult result;
+        GuessingOperationOutcome result;
         if (context.Args.Count == 0)
         {
-            result = await context.State.Match(
-                _ =>
-                    rounds.StartRoundAsync(
-                        context.Command.Message.Channel,
-                        null,
-                        cancellationToken
-                    ),
+            var operation = context.State.Match(
+                _ => rounds.StartRound(context.Command.Message.Channel, null),
                 guessingProfile =>
-                    rounds.StartRoundAsync(
-                        guessingProfile.HostId,
-                        guessingProfile.ProfileId,
-                        cancellationToken
-                    )
+                    rounds.StartRound(guessingProfile.HostId, guessingProfile.ProfileId)
             );
+            result = await ExecuteAsync(operation, cancellationToken);
         }
         else if (context.Args.Count == 1)
         {
-            result = await rounds.StartRoundAsync(
-                context.Command.Message.Channel,
-                context.Args[0],
+            result = await ExecuteAsync(
+                rounds.StartRound(context.Command.Message.Channel, context.Args[0]),
                 cancellationToken
             );
         }
@@ -142,7 +144,10 @@ public sealed class StopGuessingCommandStrategy(
     {
         await ReplyAsync(
             context,
-            await rounds.StopGuessingAsync(context.Command.Message.Channel, cancellationToken),
+            await ExecuteAsync(
+                rounds.StopGuessing(context.Command.Message.Channel),
+                cancellationToken
+            ),
             cancellationToken
         );
     }
@@ -167,14 +172,13 @@ public sealed class WinGuessingCommandStrategy(
         var result =
             context.Args.Count == 1
                 ? (
-                    await rounds.DeclareWinnerAsync(
-                        context.Command.Message.Channel,
-                        context.Args[0],
+                    await ExecuteAsync(
+                        rounds.DeclareWinner(context.Command.Message.Channel, context.Args[0]),
                         cancellationToken
                     )
                 ).Match(
                     completed => completed.Result,
-                    failed => new GuessingOperationResult(false, failed.Message, failed.Target)
+                    failed => new GuessingOperationOutcome.Rejected(failed.Message, failed.Target)
                 )
                 : await UsageAsync(context, cancellationToken);
 
@@ -198,10 +202,12 @@ public sealed class GuessCommandStrategy(GuessingCommandService commands, Guessi
     {
         var result =
             context.Args.Count == 1
-                ? await votes.RecordGuessAsync(
-                    context.Command.Message.Channel,
-                    context.Command.Message.Login,
-                    context.Args[0],
+                ? await ExecuteAsync(
+                    votes.RecordGuess(
+                        context.Command.Message.Channel,
+                        context.Command.Message.Login,
+                        context.Args[0]
+                    ),
                     cancellationToken
                 )
                 : await UsageAsync(context, cancellationToken);

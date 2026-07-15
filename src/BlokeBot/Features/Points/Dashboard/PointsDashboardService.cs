@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Features.Points.Balances;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Identity;
@@ -13,10 +14,15 @@ public sealed class PointsDashboardService(
 {
     public async Task<PointsDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
+        var giveawayResult = await giveaways.GetActiveGiveaway(hostId).ExecuteAsync(ct);
+        var giveaway = giveawayResult.Match(
+            option => option.Match<PointsGiveawayView?>(value => value, () => null),
+            _ => throw new UnreachableException()
+        );
         return new(
             await balances.GetLeaderboardAsync(hostId, 25, ct),
             await balances.GetRecentLedgerAsync(hostId, 25, ct),
-            await giveaways.GetActiveGiveawayAsync(hostId, ct)
+            giveaway
         );
     }
 

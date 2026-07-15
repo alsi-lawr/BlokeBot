@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -23,14 +25,22 @@ public sealed class HostFeatureService(
         return hosts.ToDictionary(x => x.Id, x => x.EnabledFeatures);
     }
 
-    public async Task<HostFeatureFlags?> LoadAsync(int hostId, CancellationToken ct)
+    public IO<Option<HostFeatureFlags>, Never> Load(int hostId)
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Id == hostId)
-            .Select(x => (HostFeatureFlags?)x.EnabledFeatures)
-            .SingleOrDefaultAsync(ct);
+        return IO<Option<HostFeatureFlags>, Never>.Create(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var features = await db
+                .Hosts.AsNoTracking()
+                .Where(x => x.Id == hostId)
+                .Select(x => (HostFeatureFlags?)x.EnabledFeatures)
+                .SingleOrDefaultAsync(ct);
+            return Result<Option<HostFeatureFlags>, Never>.Success(
+                features.HasValue
+                    ? Option<HostFeatureFlags>.Some(features.Value)
+                    : Option<HostFeatureFlags>.None
+            );
+        });
     }
 
     public async Task<bool> IsEnabledAsync(
@@ -39,8 +49,11 @@ public sealed class HostFeatureService(
         CancellationToken ct
     )
     {
-        var features = await LoadAsync(hostId, ct);
-        return features?.Contains(feature) == true;
+        var result = await Load(hostId).ExecuteAsync(ct);
+        return result.Match(
+            features => features.Match(value => value.Contains(feature), () => false),
+            _ => throw new UnreachableException()
+        );
     }
 
     public Task EnableAsync(int hostId, HostFeatureFlags feature, CancellationToken ct)

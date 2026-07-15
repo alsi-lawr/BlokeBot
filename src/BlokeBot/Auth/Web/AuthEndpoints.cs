@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.Admin.HostedChannels;
@@ -109,59 +110,67 @@ internal static class AuthEndpoints
                         return Results.BadRequest("This Twitch sign-in expired. Try again.");
                     }
 
-                    AuthResult result;
-                    try
-                    {
-                        result = await auth.AuthenticateAsync(
-                            context.Request,
-                            code,
-                            cancellationToken
-                        );
-                    }
-                    catch (HttpRequestException)
-                    {
-                        return Results.Problem(
-                            "Twitch could not finish sign-in.",
-                            statusCode: StatusCodes.Status502BadGateway,
-                            title: "Twitch sign-in failed"
-                        );
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        return Results.Problem(
-                            ex.Message,
-                            statusCode: StatusCodes.Status502BadGateway,
-                            title: "Twitch sign-in failed"
-                        );
-                    }
-
-                    if (!result.IsAuthorized || result.User is null)
-                    {
-                        var authenticationError = string.IsNullOrWhiteSpace(result.Error)
-                            ? "This Twitch account is not connected to a BlokeBot channel."
-                            : result.Error;
-                        return Results.Content(
-                            LoginPage.RenderError(authenticationError),
-                            "text/html",
-                            statusCode: StatusCodes.Status403Forbidden
-                        );
-                    }
-
-                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
-                    await session.SignInAsync(
-                        context,
-                        result.User,
-                        currentSession.HostSelection?.Current.Id
+                    var result = await auth.Authenticate(context.Request, code)
+                        .ExecuteAsync(cancellationToken);
+                    return await result.Match(
+                        outcome =>
+                            CompleteAuthenticationAsync(outcome, context, session, returnUrl),
+                        error => Task.FromResult(MapAuthenticationError(error))
                     );
-                    if (session.IsConfiguredBotAccount(result.User.Login))
-                    {
-                        return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
-                    }
-
-                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
                 }
             )
             .AllowAnonymous();
+
+        static async Task<IResult> CompleteAuthenticationAsync(
+            WebAuthenticationOutcome outcome,
+            HttpContext context,
+            AuthSessionService session,
+            string? returnUrl
+        )
+        {
+            if (outcome is not WebAuthenticationOutcome.Authorized authorized)
+            {
+                var message = outcome switch
+                {
+                    WebAuthenticationOutcome.NotConfigured => "Twitch sign-in is not set up yet.",
+                    WebAuthenticationOutcome.UserNotValidated =>
+                        "Twitch did not return the signed-in user.",
+                    WebAuthenticationOutcome.NotAuthorized denied => denied.Message,
+                    _ => throw new UnreachableException(),
+                };
+                return Results.Content(
+                    LoginPage.RenderError(message),
+                    "text/html",
+                    statusCode: StatusCodes.Status403Forbidden
+                );
+            }
+
+            var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+            await session.SignInAsync(
+                context,
+                authorized.User,
+                currentSession.HostSelection?.Current.Id
+            );
+            return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
+        }
+
+        static IResult MapAuthenticationError(WebAuthenticationError error)
+        {
+            return error switch
+            {
+                WebAuthenticationError.TransportFailure => Results.Problem(
+                    "Twitch could not finish sign-in.",
+                    statusCode: StatusCodes.Status502BadGateway,
+                    title: "Twitch sign-in failed"
+                ),
+                WebAuthenticationError.InvalidProviderPayload invalid => Results.Problem(
+                    invalid.Cause.Message,
+                    statusCode: StatusCodes.Status502BadGateway,
+                    title: "Twitch sign-in failed"
+                ),
+                _ => throw new UnreachableException(),
+            };
+        }
 
         app.MapGet(
                 "/auth/select-host",
@@ -278,10 +287,12 @@ internal static class AuthEndpoints
                         return Results.Forbid();
                     }
 
-                    var selected = await hostedChannels.LoadHostChoiceAsync(
-                        hostId,
-                        AuthRole.Admin,
-                        context.RequestAborted
+                    var selectedResult = await hostedChannels
+                        .LoadHostChoice(hostId, AuthRole.Admin)
+                        .ExecuteAsync(context.RequestAborted);
+                    var selected = selectedResult.Match(
+                        choice => choice.Match<BotHostChoice?>(value => value, () => null),
+                        _ => throw new UnreachableException()
                     );
                     if (selected is null)
                     {

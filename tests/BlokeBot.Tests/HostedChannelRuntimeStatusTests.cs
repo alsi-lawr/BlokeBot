@@ -4,6 +4,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Configuration;
 using Shouldly;
@@ -43,7 +44,9 @@ public sealed class HostedChannelRuntimeStatusTests
             )
         );
 
-        var summary = await service.LoadHostRuntimeSummaryAsync(hostId, CancellationToken.None);
+        var summary = (
+            await service.LoadHostRuntimeSummary(hostId).RunAsync(CancellationToken.None)
+        ).Match<HostedChannelRuntimeSummary?>(value => value, () => null);
 
         summary.ShouldNotBeNull();
         summary!.IsChannelBotAuthorized.ShouldBeTrue();

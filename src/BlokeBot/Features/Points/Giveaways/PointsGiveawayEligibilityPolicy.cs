@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Status;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Microsoft.Extensions.Logging;
 
@@ -9,28 +11,32 @@ public sealed class PointsGiveawayEligibilityPolicy(
     ILogger<PointsGiveawayEligibilityPolicy> log
 )
 {
-    public async Task<HostStreamLivenessOutcome> GetStreamLivenessAsync(
-        string hostLogin,
-        CancellationToken ct
-    )
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string hostLogin)
     {
-        try
+        return IO<HostStreamLivenessOutcome, Never>.Create(async ct =>
         {
-            return await botStatus.GetStreamLivenessAsync(hostLogin, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            log.LogCritical(
-                "Points giveaway stream-liveness evaluation failed unexpectedly for host {HostLogin} with {FailureType}; the operation will be escalated.",
-                hostLogin,
-                exception.GetType().FullName
-            );
-            throw new PointsGiveawayStreamLivenessException(hostLogin, exception);
-        }
+            try
+            {
+                var result = await botStatus.GetStreamLiveness(hostLogin).ExecuteAsync(ct);
+                return result.Match(
+                    Result<HostStreamLivenessOutcome, Never>.Success,
+                    _ => throw new UnreachableException()
+                );
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                log.LogCritical(
+                    "Points giveaway stream-liveness evaluation failed unexpectedly for host {HostLogin} with {FailureType}; the operation will be escalated.",
+                    hostLogin,
+                    exception.GetType().FullName
+                );
+                throw new PointsGiveawayStreamLivenessException(hostLogin, exception);
+            }
+        });
     }
 
     public async Task<bool> IsFollowerEligibilityAvailableAsync(
@@ -44,30 +50,34 @@ public sealed class PointsGiveawayEligibilityPolicy(
             return true;
         }
 
-        var status = await botStatus.GetStatusAsync(hostLogin, ct);
-        return status.ModeratorState == HostBotModeratorState.IsModerator;
+        var result = await botStatus.GetStatus(hostLogin).ExecuteAsync(ct);
+        return result.Match(status => status.IsModerator, _ => throw new UnreachableException());
     }
 
-    public async Task<FollowerCheckResult> CheckJoinEligibilityAsync(
+    public IO<FollowerCheckOutcome, Never> CheckJoinEligibility(
         PointsSettings settings,
         string hostLogin,
         string login,
-        IReadOnlyDictionary<string, string> tags,
-        CancellationToken ct
+        IReadOnlyDictionary<string, string> tags
     )
     {
         return settings.GiveawayEligibility switch
         {
-            PointsEligibilityMode.Subscribers => HasSubscriberBadge(tags)
-                ? FollowerCheckResult.Eligible
-                : FollowerCheckResult.NotEligible,
-            PointsEligibilityMode.Followers => await botStatus.IsFollowerAsync(
-                hostLogin,
-                login,
-                ct
+            PointsEligibilityMode.Subscribers => Immediate(
+                HasSubscriberBadge(tags)
+                    ? new FollowerCheckOutcome.Eligible()
+                    : new FollowerCheckOutcome.NotEligible()
             ),
-            _ => FollowerCheckResult.Eligible,
+            PointsEligibilityMode.Followers => botStatus.CheckFollower(hostLogin, login),
+            _ => Immediate(new FollowerCheckOutcome.Eligible()),
         };
+    }
+
+    private static IO<FollowerCheckOutcome, Never> Immediate(FollowerCheckOutcome outcome)
+    {
+        return IO<FollowerCheckOutcome, Never>.Create(_ =>
+            ValueTask.FromResult(Result<FollowerCheckOutcome, Never>.Success(outcome))
+        );
     }
 
     private static bool HasSubscriberBadge(IReadOnlyDictionary<string, string> tags)

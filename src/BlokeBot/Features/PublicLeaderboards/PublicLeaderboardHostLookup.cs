@@ -1,3 +1,4 @@
+using BlokeBot.Functional;
 using BlokeBot.Identity;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -6,19 +7,36 @@ namespace BlokeBot.Features.PublicLeaderboards;
 
 public sealed class PublicLeaderboardHostLookup(IDbContextFactory<BlokeBotDbContext> dbFactory)
 {
-    public async Task<PublicLeaderboardHost?> FindAsync(string channel, CancellationToken ct)
+    public IO<Option<PublicLeaderboardHost>, Never> Find(string channel)
     {
         var login = LoginName.Parse(channel).Value;
         if (string.IsNullOrWhiteSpace(login))
         {
-            return null;
+            return IO<Option<PublicLeaderboardHost>, Never>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<Option<PublicLeaderboardHost>, Never>.Success(
+                        Option<PublicLeaderboardHost>.None
+                    )
+                )
+            );
         }
 
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        return await db
-            .Hosts.AsNoTracking()
-            .Where(x => x.Login == login)
-            .Select(x => new PublicLeaderboardHost(x.Id, x.Login, x.DisplayName, x.EnabledFeatures))
-            .SingleOrDefaultAsync(ct);
+        return IO<Option<PublicLeaderboardHost>, Never>.Create(async ct =>
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var host = await db
+                .Hosts.AsNoTracking()
+                .Where(x => x.Login == login)
+                .Select(x => new PublicLeaderboardHost(
+                    x.Id,
+                    x.Login,
+                    x.DisplayName,
+                    x.EnabledFeatures
+                ))
+                .SingleOrDefaultAsync(ct);
+            return Result<Option<PublicLeaderboardHost>, Never>.Success(
+                Option<PublicLeaderboardHost>.FromNullable(host)
+            );
+        });
     }
 }

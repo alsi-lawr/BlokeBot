@@ -1,6 +1,7 @@
 using BlokeBot.Components.Layout;
 using BlokeBot.Eventing;
 using BlokeBot.Features.Alerts;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
@@ -21,16 +22,17 @@ public sealed class AlertUiTests
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Warning,
-            "test",
-            "top-bar",
-            "Queue delayed",
-            "Outbound messages are delayed.",
-            "/alerts",
-            CancellationToken.None
-        );
+        await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "test",
+                "top-bar",
+                "Queue delayed",
+                "Outbound messages are delayed.",
+                "/alerts"
+            )
+            .RunAsync(CancellationToken.None);
         context.ComponentFactories.AddStub<SelectedChannelBotStatus>();
         context.ComponentFactories.AddStub<HostSelector>();
         context.ComponentFactories.AddStub<AccountMenu>();
@@ -63,16 +65,17 @@ public sealed class AlertUiTests
         var hostId = await SeedHostAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var alerts = context.Services.GetRequiredService<DurableAlertService>();
-        await alerts.CreateAsync(
-            hostId,
-            DurableAlertSeverity.Warning,
-            "test",
-            "acknowledge",
-            "Queue delayed",
-            "Outbound messages are delayed.",
-            null,
-            CancellationToken.None
-        );
+        await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "test",
+                "acknowledge",
+                "Queue delayed",
+                "Outbound messages are delayed.",
+                null
+            )
+            .RunAsync(CancellationToken.None);
 
         var cut = context.Render<AlertsPage>();
         cut.Find("button[aria-label='Mark Queue delayed as handled']").Click();

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Security.Cryptography;
 using BlokeBot.Auth.Sessions;
@@ -194,14 +195,13 @@ internal static class BotOAuthEndpoints
                         return await completion.Match<Task<IResult>>(
                             async completed =>
                             {
-                                var authorization = await channelBotAuthorization.AuthorizeAsync(
-                                    selectedHost.Id,
-                                    completed.Grant,
-                                    ct
+                                var authorization = await channelBotAuthorization
+                                    .Authorize(selectedHost.Id, completed.Grant)
+                                    .ExecuteAsync(ct);
+                                return authorization.Match(
+                                    MapChannelAuthorization,
+                                    _ => throw new UnreachableException()
                                 );
-                                return authorization.Succeeded
-                                    ? ChannelConnectedResult()
-                                    : Results.BadRequest(authorization.Message);
                             },
                             static _ =>
                                 Task.FromResult<IResult>(
@@ -338,14 +338,13 @@ internal static class BotOAuthEndpoints
             return await completion.Match<Task<IResult>>(
                 async completed =>
                 {
-                    var authorization = await hostBotAuthorization.AuthorizeAsync(
-                        selectedHost.Id,
-                        completed.Grant,
-                        ct
+                    var authorization = await hostBotAuthorization
+                        .Authorize(selectedHost.Id, completed.Grant)
+                        .ExecuteAsync(ct);
+                    return authorization.Match(
+                        MapHostBotAuthorization,
+                        _ => throw new UnreachableException()
                     );
-                    return authorization.Succeeded
-                        ? BotAccountConnectedResult()
-                        : Results.BadRequest(authorization.Message);
                 },
                 static _ =>
                     Task.FromResult<IResult>(
@@ -365,6 +364,42 @@ internal static class BotOAuthEndpoints
                 title: "Custom bot connection failed"
             );
         }
+    }
+
+    private static IResult MapChannelAuthorization(ChannelBotAuthorizationOutcome outcome)
+    {
+        return outcome switch
+        {
+            ChannelBotAuthorizationOutcome.Authorized => ChannelConnectedResult(),
+            ChannelBotAuthorizationOutcome.HostNotFound => Results.BadRequest(
+                "Channel setup was not found."
+            ),
+            ChannelBotAuthorizationOutcome.GrantMismatch => Results.BadRequest(
+                "That Twitch sign-in belongs to a different channel."
+            ),
+            ChannelBotAuthorizationOutcome.MissingScopes => Results.BadRequest(
+                "The bot still needs more Twitch access for this channel."
+            ),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    private static IResult MapHostBotAuthorization(HostBotAccountAuthorizationOutcome outcome)
+    {
+        return outcome switch
+        {
+            HostBotAccountAuthorizationOutcome.Authorized => BotAccountConnectedResult(),
+            HostBotAccountAuthorizationOutcome.HostNotFound => Results.BadRequest(
+                "Channel was not found."
+            ),
+            HostBotAccountAuthorizationOutcome.OverrideDisabled => Results.BadRequest(
+                "Turn on custom bot before connecting it."
+            ),
+            HostBotAccountAuthorizationOutcome.MissingScopes => Results.BadRequest(
+                "The bot account needs more Twitch access."
+            ),
+            _ => throw new UnreachableException(),
+        };
     }
 
     private static IResult BotAccountConnectedResult()

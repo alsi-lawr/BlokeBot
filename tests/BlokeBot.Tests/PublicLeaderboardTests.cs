@@ -1,4 +1,5 @@
 using BlokeBot.Features.PublicLeaderboards;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Shouldly;
 using TUnit.Core;
@@ -26,7 +27,9 @@ public sealed class PublicLeaderboardTests
         }
         var lookup = new PublicLeaderboardHostLookup(dbFactory);
 
-        var host = await lookup.FindAsync("@Streamer", CancellationToken.None);
+        var host = (
+            await lookup.Find("@Streamer").RunAsync(CancellationToken.None)
+        ).Match<PublicLeaderboardHost?>(value => value, () => null);
 
         host.ShouldNotBeNull();
         host.Login.ShouldBe("streamer");
@@ -40,7 +43,9 @@ public sealed class PublicLeaderboardTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var lookup = new PublicLeaderboardHostLookup(dbFactory);
 
-        var host = await lookup.FindAsync("missing", CancellationToken.None);
+        var host = (
+            await lookup.Find("missing").RunAsync(CancellationToken.None)
+        ).Match<PublicLeaderboardHost?>(value => value, () => null);
 
         host.ShouldBeNull();
     }
