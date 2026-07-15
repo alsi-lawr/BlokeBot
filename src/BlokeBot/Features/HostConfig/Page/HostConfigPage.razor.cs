@@ -49,10 +49,10 @@ public partial class HostConfigPage
 {
     private static readonly TimeSpan _accessModeSaveDebounce = TimeSpan.FromMilliseconds(180);
 
-    private CancellationTokenSource? _allowModsByDefaultSaveCts;
+    private readonly SemaphoreSlim _allowModsByDefaultSaveGate = new(1, 1);
+    private readonly HostModAccessSaveSequence _allowModsByDefaultSaves = new();
     private string _newBlacklistLogin = string.Empty;
     private string _newWhitelistLogin = string.Empty;
-    private int _allowModsByDefaultSaveVersion;
     private bool _blockedByMode;
     private PendingRuntimeTransition? _pendingRuntimeTransition;
     private IReadOnlyList<AccessListEntryProfile> _blacklistEntries = [];
@@ -334,6 +334,11 @@ public partial class HostConfigPage
 
     private async Task ReloadForEventAsync()
     {
+        if (_allowModsByDefaultSaves.HasPendingSubmission)
+        {
+            return;
+        }
+
         var previousPendingRuntimeTransition = _pendingRuntimeTransition;
         await LoadAsync();
 
@@ -382,86 +387,99 @@ public partial class HostConfigPage
             return;
         }
 
+        HostModAccessSaveValidator
+            .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowByDefault))
+            .Match(
+                command =>
+                {
+                    BeginAllowModsByDefaultSave(command, allowByDefault);
+                    return true;
+                },
+                errors =>
+                {
+                    _toasts.Error(errors[0].Message, "Mod help not saved");
+                    return false;
+                }
+            );
+    }
+
+    private void BeginAllowModsByDefaultSave(HostModAccessSaveCommand command, bool allowByDefault)
+    {
+        if (_state is null)
+        {
+            return;
+        }
+
         var previousAccess = _state.ModAccess;
-        var version = ++_allowModsByDefaultSaveVersion;
+        var submission = _allowModsByDefaultSaves.Begin(command, previousAccess);
         _state = _state with
         {
             ModAccess = previousAccess with { AllowModsByDefault = allowByDefault },
         };
-
-        _allowModsByDefaultSaveCts?.Cancel();
-        var saveCts = new CancellationTokenSource();
-        _allowModsByDefaultSaveCts = saveCts;
-
-        _ = PersistAllowModsByDefaultAsync(
-            hostId,
-            allowByDefault,
-            previousAccess,
-            version,
-            saveCts
-        );
+        _ = PersistAllowModsByDefaultAsync(submission);
     }
 
-    private async Task PersistAllowModsByDefaultAsync(
-        int hostId,
-        bool allowByDefault,
-        HostModAccessState previousAccess,
-        int version,
-        CancellationTokenSource saveCts
-    )
+    private async Task PersistAllowModsByDefaultAsync(HostModAccessSaveSubmission submission)
     {
-        var cancellationToken = saveCts.Token;
+        var cancellationToken = submission.CancellationToken;
         try
         {
-            await Task.Delay(_accessModeSaveDebounce, cancellationToken);
-            if (allowByDefault)
+            await Task.Delay(_accessModeSaveDebounce, _timeProvider, cancellationToken);
+            await _allowModsByDefaultSaveGate.WaitAsync(cancellationToken);
+            try
             {
-                await _modAccess.AllowAllModeratorsAsync(hostId, cancellationToken);
+                var result = await _modAccess
+                    .SaveModeratorAccess(submission.Command)
+                    .ExecuteAsync(cancellationToken);
+                await result.Match(
+                    _ => ApplyAllowModsByDefaultSuccessAsync(submission),
+                    failure => ApplyAllowModsByDefaultFailureAsync(submission, failure)
+                );
             }
-            else
+            finally
             {
-                await _modAccess.RequireModeratorAllowlistAsync(hostId, cancellationToken);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            if (version == _allowModsByDefaultSaveVersion)
-            {
-                await InvokeAsync(LoadAsync);
+                _allowModsByDefaultSaveGate.Release();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
             ReportUiFault(nameof(PersistAllowModsByDefaultAsync), exception);
-
-            if (version == _allowModsByDefaultSaveVersion)
-            {
-                await InvokeAsync(() =>
-                {
-                    if (_state is not null)
-                    {
-                        _state = _state with { ModAccess = previousAccess };
-                    }
-
-                    _toasts.Error(
-                        "Who can help could not be saved. Your previous setting has been restored.",
-                        "Mod help not saved"
-                    );
-                    StateHasChanged();
-                });
-            }
-
             await DispatchExceptionAsync(exception);
         }
         finally
         {
-            if (ReferenceEquals(_allowModsByDefaultSaveCts, saveCts))
+            _allowModsByDefaultSaves.Complete(submission);
+        }
+    }
+
+    private Task ApplyAllowModsByDefaultSuccessAsync(HostModAccessSaveSubmission submission)
+    {
+        return _allowModsByDefaultSaves.IsCurrent(submission)
+            ? InvokeAsync(LoadCoreAsync)
+            : Task.CompletedTask;
+    }
+
+    private Task ApplyAllowModsByDefaultFailureAsync(
+        HostModAccessSaveSubmission submission,
+        HostModAccessSaveFailure failure
+    )
+    {
+        if (!_allowModsByDefaultSaves.IsCurrent(submission))
+        {
+            return Task.CompletedTask;
+        }
+
+        return InvokeAsync(() =>
+        {
+            if (_state is not null)
             {
-                _allowModsByDefaultSaveCts = null;
+                _state = _state with { ModAccess = submission.PreviousAccess };
             }
 
-            saveCts.Dispose();
-        }
+            _toasts.Error(failure.Message, "Mod help not saved");
+            StateHasChanged();
+        });
     }
 
     private async Task SetFeatureEnabledAsync(int hostId, HostFeatureFlags feature, bool enabled)
@@ -654,8 +672,7 @@ public partial class HostConfigPage
     {
         if (disposing)
         {
-            _allowModsByDefaultSaveCts?.Cancel();
-            _allowModsByDefaultSaveCts = null;
+            _allowModsByDefaultSaves.Dispose();
         }
 
         base.Dispose(disposing);

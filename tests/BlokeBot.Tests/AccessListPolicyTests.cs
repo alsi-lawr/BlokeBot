@@ -137,7 +137,7 @@ public sealed class AccessListPolicyTests
             new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
         );
 
-        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
+        await SaveModeratorAccessAsync(service, hostId, allowModsByDefault: false);
         await service.AddEntryAsync(
             hostId,
             AccessListEntryKind.Whitelist,
@@ -193,7 +193,7 @@ public sealed class AccessListPolicyTests
         state.Whitelist.ShouldBe(["moderator"]);
         state.Blacklist.ShouldBe(["moderator"]);
 
-        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
+        await SaveModeratorAccessAsync(service, hostId, allowModsByDefault: false);
 
         (
             await service.CanModeratorAccessAsync(hostId, "moderator", CancellationToken.None)
@@ -206,7 +206,7 @@ public sealed class AccessListPolicyTests
         state.Whitelist.ShouldBe(["moderator"]);
         state.Blacklist.ShouldBe(["moderator"]);
 
-        await service.AllowAllModeratorsAsync(hostId, CancellationToken.None);
+        await SaveModeratorAccessAsync(service, hostId, allowModsByDefault: true);
 
         (
             await service.CanModeratorAccessAsync(hostId, "othermod", CancellationToken.None)
@@ -292,9 +292,109 @@ public sealed class AccessListPolicyTests
             CancellationToken.None
         );
         await service.DisableModeratorAccessAsync(hostId, CancellationToken.None);
-        await service.RequireModeratorAllowlistAsync(hostId, CancellationToken.None);
+        await SaveModeratorAccessAsync(service, hostId, allowModsByDefault: false);
 
         eventCount.ShouldBe(4);
+    }
+
+    [Test]
+    public async Task MissingHost_SavingModeratorAccess_ReturnsTypedFailureWithoutSettings()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
+        );
+        var command = ValidSaveCommand(42, allowModsByDefault: false);
+
+        var result = await service
+            .SaveModeratorAccess(command)
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
+            .ShouldBeOfType<HostModAccessSaveFailure.HostNotFound>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.HostModAccessSettings.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ValidCommand_SavingModeratorAccess_PersistsAndReportsNotification()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var events = TestEventBus.Create<AppEventKind>();
+        events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            ObserverIdentity.Named("Test.HostConfig.Success"),
+            (_, _) => ValueTask.CompletedTask
+        );
+        var service = new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(events));
+        var command = ValidSaveCommand(hostId, allowModsByDefault: false);
+
+        var result = await service
+            .SaveModeratorAccess(command)
+            .ExecuteAsync(CancellationToken.None);
+
+        var saved = result.Match(
+            success => success,
+            failure => throw new InvalidOperationException(failure.Message)
+        );
+        saved.HostId.ShouldBe(hostId);
+        saved.Mode.ShouldBeOfType<HostModeratorAccessMode.AllowlistOnly>();
+        saved.NotifiedObserverCount.ShouldBe(1);
+        (
+            await service.LoadAsync(hostId, CancellationToken.None)
+        ).AllowModsByDefault.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task RuntimeNotificationFailure_SavingModeratorAccess_RestoresPersistence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var events = TestEventBus.Create<AppEventKind>();
+        var notificationCount = 0;
+        events.Subscribe(
+            AppEventKind.HostedChannelsChanged,
+            ObserverIdentity.Named("Test.HostConfig.Runtime"),
+            (_, _) =>
+            {
+                notificationCount++;
+                return notificationCount == 1
+                    ? ValueTask.FromException(new InvalidOperationException("runtime unavailable"))
+                    : ValueTask.CompletedTask;
+            }
+        );
+        var service = new HostModAccessService(dbFactory, new HostedChannelChangeNotifier(events));
+        var command = ValidSaveCommand(hostId, allowModsByDefault: false);
+
+        var result = await service
+            .SaveModeratorAccess(command)
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
+            .ShouldBe(new HostModAccessSaveFailure.RuntimeNotificationFailed(1, 0));
+        notificationCount.ShouldBe(2);
+        (await service.LoadAsync(hostId, CancellationToken.None)).AllowModsByDefault.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task PreCancelledExecution_SavingModeratorAccess_PropagatesCancellation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var service = new HostModAccessService(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
+        );
+        var command = ValidSaveCommand(1, allowModsByDefault: false);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            service.SaveModeratorAccess(command).ExecuteAsync(cancellation.Token).AsTask()
+        );
     }
 
     private static SiteAccessService CreateSiteAccessService(
@@ -310,6 +410,28 @@ public sealed class AccessListPolicyTests
             ),
             new SiteAccessChangeNotifier(events)
         );
+    }
+
+    private static async Task SaveModeratorAccessAsync(
+        HostModAccessService service,
+        int hostId,
+        bool allowModsByDefault
+    )
+    {
+        var result = await service
+            .SaveModeratorAccess(ValidSaveCommand(hostId, allowModsByDefault))
+            .ExecuteAsync(CancellationToken.None);
+        result.Match(_ => true, failure => throw new InvalidOperationException(failure.Message));
+    }
+
+    private static HostModAccessSaveCommand ValidSaveCommand(int hostId, bool allowModsByDefault)
+    {
+        return HostModAccessSaveValidator
+            .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowModsByDefault))
+            .Match(
+                command => command,
+                errors => throw new InvalidOperationException(errors[0].Message)
+            );
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory, string login)

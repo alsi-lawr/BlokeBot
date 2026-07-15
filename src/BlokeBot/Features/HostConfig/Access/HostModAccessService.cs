@@ -1,5 +1,7 @@
+using BlokeBot.Eventing;
 using BlokeBot.Features.AccessLists;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -119,21 +121,69 @@ public sealed class HostModAccessService(
         return UpdateSettingsAsync(hostId, static settings => settings.ModsEnabled = false, ct);
     }
 
-    public Task AllowAllModeratorsAsync(int hostId, CancellationToken ct)
+    public IO<HostModAccessSaved, HostModAccessSaveFailure> SaveModeratorAccess(
+        HostModAccessSaveCommand command
+    )
     {
-        return UpdateSettingsAsync(
-            hostId,
-            static settings => settings.AllowModsByDefault = true,
-            ct
+        return IO<HostModAccessSaved, HostModAccessSaveFailure>.Create(ct =>
+            ExecuteSaveModeratorAccessAsync(command, ct)
         );
     }
 
-    public Task RequireModeratorAllowlistAsync(int hostId, CancellationToken ct)
+    private async ValueTask<
+        Result<HostModAccessSaved, HostModAccessSaveFailure>
+    > ExecuteSaveModeratorAccessAsync(HostModAccessSaveCommand command, CancellationToken ct)
     {
-        return UpdateSettingsAsync(
-            hostId,
-            static settings => settings.AllowModsByDefault = false,
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        if (!await db.Hosts.AnyAsync(host => host.Id == command.HostId, ct))
+        {
+            return Result<HostModAccessSaved, HostModAccessSaveFailure>.Error(
+                new HostModAccessSaveFailure.HostNotFound()
+            );
+        }
+
+        var settings = await db.HostModAccessSettings.SingleOrDefaultAsync(
+            x => x.HostId == command.HostId,
             ct
+        );
+        if (settings is null)
+        {
+            settings = new HostModAccessSettings
+            {
+                HostId = command.HostId,
+                ModsEnabled = true,
+                AllowModsByDefault = true,
+            };
+            db.HostModAccessSettings.Add(settings);
+        }
+
+        var previousAllowModsByDefault = settings.AllowModsByDefault;
+        settings.AllowModsByDefault = command.Mode.AllowModsByDefault;
+        await db.SaveChangesAsync(ct);
+
+        var notification = await changes.NotifyChangedAsync(CancellationToken.None);
+        if (notification is ObserverFanOutOutcome.AllSucceeded notified)
+        {
+            return Result<HostModAccessSaved, HostModAccessSaveFailure>.Success(
+                new(command.HostId, command.Mode, notified.ObserverCount)
+            );
+        }
+
+        var failedNotification = (ObserverFanOutOutcome.CompletedWithFailures)notification;
+        settings.AllowModsByDefault = previousAllowModsByDefault;
+        await db.SaveChangesAsync(CancellationToken.None);
+        var rollbackNotification = await changes.NotifyChangedAsync(CancellationToken.None);
+        var failedRollbackObserverCount = rollbackNotification switch
+        {
+            ObserverFanOutOutcome.AllSucceeded => 0,
+            ObserverFanOutOutcome.CompletedWithFailures failed => failed.Failures.Count,
+            _ => throw new InvalidOperationException("Unknown observer fan-out outcome."),
+        };
+        return Result<HostModAccessSaved, HostModAccessSaveFailure>.Error(
+            new HostModAccessSaveFailure.RuntimeNotificationFailed(
+                failedNotification.Failures.Count,
+                failedRollbackObserverCount
+            )
         );
     }
 
