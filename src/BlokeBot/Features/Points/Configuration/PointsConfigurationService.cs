@@ -192,7 +192,7 @@ public sealed class PointsConfigurationService(
             .FirstOrDefaultAsync(ct);
         if (existingCollision is not null)
         {
-            return new PointsConfigurationSaveFailure.AliasAlreadyUsed(existingCollision);
+            return new PointsConfigurationSaveFailure(existingCollision);
         }
 
         db.CommandAliases.RemoveRange(

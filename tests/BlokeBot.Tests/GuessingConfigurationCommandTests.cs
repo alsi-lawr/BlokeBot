@@ -139,9 +139,13 @@ public sealed class GuessingConfigurationCommandTests
             .LoadConfiguration(seed.HostId, new GuessingProfileSelection.Selected(int.MaxValue))
             .ExecuteAsync(CancellationToken.None);
 
-        result
-            .Match<GuessingConfigurationLoadFailure?>(_ => null, failure => failure)
-            .ShouldBeOfType<GuessingConfigurationLoadFailure.ProfileNotFound>();
+        var failure = result.Match<GuessingConfigurationLoadFailure?>(_ => null, error => error);
+
+        failure.ShouldNotBeNull();
+        failure.ShouldBe(new GuessingConfigurationLoadFailure());
+        failure.Message.ShouldBe(
+            "That round type is no longer available. Reloaded the current settings."
+        );
     }
 
     private static GuessingConfigurationService ConfigurationService(

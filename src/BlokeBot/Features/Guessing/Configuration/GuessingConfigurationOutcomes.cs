@@ -15,17 +15,10 @@ public sealed record GuessingProfileCreated(int ProfileId, string Message);
 
 public sealed record GuessingProfileDeleted(string Message);
 
-public abstract record GuessingConfigurationLoadFailure
+public sealed record GuessingConfigurationLoadFailure
 {
-    private GuessingConfigurationLoadFailure() { }
-
-    public abstract string Message { get; }
-
-    public sealed record ProfileNotFound : GuessingConfigurationLoadFailure
-    {
-        public override string Message =>
-            "That round type is no longer available. Reloaded the current settings.";
-    }
+    public string Message =>
+        "That round type is no longer available. Reloaded the current settings.";
 }
 
 public abstract record GuessingConfigurationSaveFailure
@@ -57,16 +50,9 @@ public abstract record GuessingConfigurationSaveFailure
     }
 }
 
-public abstract record GuessingProfileCreateFailure
+public sealed record GuessingProfileCreateFailure
 {
-    private GuessingProfileCreateFailure() { }
-
-    public abstract string Message { get; }
-
-    public sealed record DuplicateName : GuessingProfileCreateFailure
-    {
-        public override string Message => "A round type with that name already exists.";
-    }
+    public string Message => "A round type with that name already exists.";
 }
 
 public abstract record GuessingProfileDeleteFailure

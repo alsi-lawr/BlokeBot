@@ -92,7 +92,9 @@ public sealed class PointsConfigurationCommandTests
             .ExecuteAsync(CancellationToken.None);
         var failure = result.Match<PointsConfigurationSaveFailure?>(_ => null, error => error);
 
-        failure.ShouldBe(new PointsConfigurationSaveFailure.AliasAlreadyUsed("shared"));
+        failure.ShouldNotBeNull();
+        failure.ShouldBe(new PointsConfigurationSaveFailure("shared"));
+        failure.Message.ShouldBe("!shared is already used by another bot command.");
         await using var db = await dbFactory.CreateDbContextAsync();
         (await db.PointsSettings.CountAsync()).ShouldBe(0);
         (await db.CommandAliases.SingleAsync()).Alias.ShouldBe("shared");

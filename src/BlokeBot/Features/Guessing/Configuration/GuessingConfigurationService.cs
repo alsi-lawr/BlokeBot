@@ -73,7 +73,7 @@ public sealed class GuessingConfigurationService(
         if (await db.Profiles.AnyAsync(x => x.HostId == hostId && x.Slug == command.Slug, ct))
         {
             return Result<GuessingProfileCreated, GuessingProfileCreateFailure>.Error(
-                new GuessingProfileCreateFailure.DuplicateName()
+                new GuessingProfileCreateFailure()
             );
         }
 
@@ -203,7 +203,7 @@ public sealed class GuessingConfigurationService(
         if (selectedProfileId is not { } profileId)
         {
             return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Error(
-                new GuessingConfigurationLoadFailure.ProfileNotFound()
+                new GuessingConfigurationLoadFailure()
             );
         }
 
@@ -211,7 +211,7 @@ public sealed class GuessingConfigurationService(
         if (profile is null)
         {
             return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Error(
-                new GuessingConfigurationLoadFailure.ProfileNotFound()
+                new GuessingConfigurationLoadFailure()
             );
         }
 

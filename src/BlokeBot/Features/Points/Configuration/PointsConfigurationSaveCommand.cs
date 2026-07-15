@@ -118,14 +118,7 @@ public sealed record PointsConfigurationSaveCommand
 
 public readonly record struct PointsConfigurationSaved;
 
-public abstract record PointsConfigurationSaveFailure
+public sealed record PointsConfigurationSaveFailure(string Alias)
 {
-    private PointsConfigurationSaveFailure() { }
-
-    public abstract string Message { get; }
-
-    public sealed record AliasAlreadyUsed(string Alias) : PointsConfigurationSaveFailure
-    {
-        public override string Message => $"!{Alias} is already used by another bot command.";
-    }
+    public string Message => $"!{Alias} is already used by another bot command.";
 }
