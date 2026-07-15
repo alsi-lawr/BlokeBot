@@ -17,7 +17,6 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton<ChatCommandRegistrationSnapshot>();
         services.TryAddSingleton<ChatCommandRegistry>();
         services.TryAddSingleton(serviceProvider => new ChatCommandDispatcher(
             serviceProvider.GetRequiredService<ChatCommandRegistry>()

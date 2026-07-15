@@ -3,16 +3,16 @@ namespace BlokeBot.Commands;
 internal sealed class ChatCommandRegistry
 {
     public ChatCommandRegistry(
-        ChatCommandRegistrationSnapshot registrations,
+        IEnumerable<ChatCommandRegistration> registrations,
         IEnumerable<IChatCommandModule> modules,
         IEnumerable<IChatCommandFilter> filters
     )
     {
         var builder = new ChatCommandPlanBuilder(filters);
 
-        foreach (var callback in registrations.CommandCallbacks)
+        foreach (var registration in registrations)
         {
-            callback(builder);
+            registration.Configure(builder);
         }
 
         foreach (var module in modules)
