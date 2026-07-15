@@ -808,6 +808,9 @@ public sealed class WhisperResponseTests
                 return request.RequestUri?.AbsolutePath switch
                 {
                     "/oauth2/validate" => Task.FromResult(ValidationResponse(request)),
+                    "/oauth2/token" when !validationAccepted => Task.FromResult(
+                        new HttpResponseMessage(HttpStatusCode.BadRequest)
+                    ),
                     "/helix/users" when usersException is not null =>
                         Task.FromException<HttpResponseMessage>(usersException),
                     "/helix/users" => Task.FromResult(JsonResponse(usersJson)),
