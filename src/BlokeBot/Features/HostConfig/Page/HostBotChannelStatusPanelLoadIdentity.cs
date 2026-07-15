@@ -12,10 +12,7 @@ public sealed record HostBotChannelStatusPanelLoadIdentity
 
     public string ReloadKey { get; }
 
-    public static HostBotChannelStatusPanelLoadIdentity? From(
-        string hostLogin,
-        string? reloadKey
-    )
+    public static HostBotChannelStatusPanelLoadIdentity? From(string hostLogin, string? reloadKey)
     {
         return string.IsNullOrWhiteSpace(hostLogin)
             ? null
