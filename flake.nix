@@ -12,6 +12,11 @@
       ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: import nixpkgs { inherit system; };
+      developmentPackages = pkgs: [
+        pkgs.dotnet-sdk_10
+        pkgs.nodejs_22
+        pkgs.nixfmt
+      ];
       packageFor =
         system:
         let
@@ -94,10 +99,15 @@
         in
         {
           default = pkgs.mkShellNoCC {
-            packages = [
-              pkgs.dotnet-sdk_10
-              pkgs.nodejs_22
-              pkgs.nixfmt
+            packages = developmentPackages pkgs;
+          };
+
+          simulation = pkgs.mkShellNoCC {
+            packages = developmentPackages pkgs ++ [
+              pkgs.chromium
+              pkgs.curl
+              pkgs.imagemagick
+              pkgs.libwebp
             ];
           };
         }
