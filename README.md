@@ -22,8 +22,8 @@ service.
 - Create guessing rounds and profiles, and review history and leaderboards.
 - Track points balances, gambling, scheduled giveaways, and points leaderboards.
 - Authorise dashboard users and bot accounts through separate Twitch OAuth settings.
-- Handle IRC and EventSub runtime recovery, with durable public-chat delivery and configurable
-  private-response fallbacks.
+- Handle IRC and EventSub runtime recovery, with durable public-chat delivery and redacted
+  private-response failure handling.
 
 ## Get started
 
