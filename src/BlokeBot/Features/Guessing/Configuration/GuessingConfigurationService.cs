@@ -189,16 +189,26 @@ public sealed class GuessingConfigurationService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var profiles = await LoadProfileSummariesAsync(db, hostId, ct);
-        var selectedProfileId = selection switch
+        int? selectedProfileId = selection switch
         {
-            GuessingProfileSelection.Default => profiles.Single(profile => profile.IsDefault).Id,
+            GuessingProfileSelection.Default => profiles
+                .SingleOrDefault(profile => profile.IsDefault)
+                ?.Id,
             GuessingProfileSelection.Selected selected
                 when profiles.Any(profile => profile.Id == selected.ProfileId) =>
                 selected.ProfileId,
-            GuessingProfileSelection.Selected => 0,
+            GuessingProfileSelection.Selected => null,
             _ => throw new InvalidOperationException("Unknown guessing profile selection."),
         };
-        if (selectedProfileId == 0)
+        if (selectedProfileId is not { } profileId)
+        {
+            return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Error(
+                new GuessingConfigurationLoadFailure.ProfileNotFound()
+            );
+        }
+
+        var profile = await LoadProfileEditorAsync(db, hostId, profileId, ct);
+        if (profile is null)
         {
             return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Error(
                 new GuessingConfigurationLoadFailure.ProfileNotFound()
@@ -207,29 +217,29 @@ public sealed class GuessingConfigurationService(
 
         var aliases = await db
             .CommandAliases.AsNoTracking()
-            .Where(x => x.HostId == hostId && x.GuessRoundProfileId == selectedProfileId)
+            .Where(x => x.HostId == hostId && x.GuessRoundProfileId == profileId)
             .ToListAsync(ct);
         var replyDelivery = await ReplyDeliverySettingWriter.LoadAsync(
             db,
             hostId,
             ReplyFeature.Guessing,
-            selectedProfileId,
+            profileId,
             ct
         );
         var whisperResponsesEnabled = await WhisperResponsesEnabledAsync(db, hostId, ct);
         var draft = new GuessingConfiguration(
             new CommandAliasEditor
             {
-                StartAliases = JoinAliases(aliases, GuessCommandKind.Start, selectedProfileId),
-                StopAliases = JoinAliases(aliases, GuessCommandKind.Stop, selectedProfileId),
-                WinAliases = JoinAliases(aliases, GuessCommandKind.Win, selectedProfileId),
-                GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, selectedProfileId),
-                GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, selectedProfileId),
+                StartAliases = JoinAliases(aliases, GuessCommandKind.Start, profileId),
+                StopAliases = JoinAliases(aliases, GuessCommandKind.Stop, profileId),
+                WinAliases = JoinAliases(aliases, GuessCommandKind.Win, profileId),
+                GuessAliases = JoinAliases(aliases, GuessCommandKind.Guess, profileId),
+                GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, profileId),
             },
             ReplyDeliveryEditor.From(replyDelivery),
             whisperResponsesEnabled,
             profiles,
-            await LoadProfileEditorAsync(db, hostId, selectedProfileId, ct)
+            profile
         );
         return Result<GuessingConfiguration, GuessingConfigurationLoadFailure>.Success(draft);
     }
@@ -448,7 +458,7 @@ public sealed class GuessingConfigurationService(
         );
     }
 
-    private static async Task<GuessRoundProfileEditor> LoadProfileEditorAsync(
+    internal static async Task<GuessRoundProfileEditor?> LoadProfileEditorAsync(
         BlokeBotDbContext db,
         int hostId,
         int profileId,
@@ -459,7 +469,11 @@ public sealed class GuessingConfigurationService(
             .Profiles.AsNoTracking()
             .Include(x => x.ReplySettings)
             .Include(x => x.Options)
-            .SingleAsync(x => x.Id == profileId && x.HostId == hostId, ct);
+            .SingleOrDefaultAsync(x => x.Id == profileId && x.HostId == hostId, ct);
+        if (profile is null)
+        {
+            return null;
+        }
         var options = profile
             .Options.OrderBy(option => option.SortOrder)
             .ThenBy(option => option.Name)
