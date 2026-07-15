@@ -2,12 +2,38 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-requested_target="${1:-$repo_root/assets/simulation}"
+requested_target="$repo_root/assets/simulation"
+requested_matrix="$repo_root/scripts/simulation-capture-matrix.json"
+
+usage() {
+  printf 'usage: %s [TARGET] [--matrix MATRIX]\n' "${0##*/}"
+}
+
+if [[ "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+if (($#)) && [[ "$1" != "--matrix" ]]; then
+  requested_target="$1"
+  shift
+fi
+if (($#)); then
+  if [[ "$1" != "--matrix" || "$#" -ne 2 ]]; then
+    usage >&2
+    exit 2
+  fi
+  requested_matrix="$2"
+fi
+
 if [[ "$requested_target" != /* ]]; then
   requested_target="$repo_root/$requested_target"
 fi
 target="$(realpath -m "$requested_target")"
 target_marker="$target/.blokebot-simulation-output"
+if [[ "$requested_matrix" != /* ]]; then
+  requested_matrix="$repo_root/$requested_matrix"
+fi
+matrix="$(realpath -m "$requested_matrix")"
 
 if [[ -e "$target" && ! -d "$target" ]]; then
   printf 'Simulation output target is not a directory: %s\n' "$target" >&2
@@ -32,29 +58,25 @@ browser_log="$target/chromium.log"
 browser_profile="$runtime/chromium-profile"
 frame_template="$repo_root/scripts/simulation-frame.html"
 animation_script="$repo_root/scripts/capture-simulation-animations.mjs"
+matrix_script="$repo_root/scripts/simulation-capture-matrix.mjs"
 server_pid=""
 
-command -v "$browser" >/dev/null || {
-  printf 'Browser not found: %s\n' "$browser" >&2
-  printf 'Run this command from nix develop .#simulation.\n' >&2
+[[ -f "$matrix" ]] || {
+  printf 'Capture matrix not found: %s\n' "$matrix" >&2
   exit 2
 }
-command -v magick >/dev/null || {
-  printf 'ImageMagick not found. Run this command from nix develop .#simulation.\n' >&2
-  exit 2
-}
-command -v img2webp >/dev/null || {
-  printf 'img2webp not found. Run this command from nix develop .#simulation.\n' >&2
-  exit 2
-}
-command -v webpmux >/dev/null || {
-  printf 'webpmux not found. Run this command from nix develop .#simulation.\n' >&2
-  exit 2
-}
-command -v node >/dev/null || {
-  printf 'Node.js not found. Run this command from nix develop .#simulation.\n' >&2
-  exit 2
-}
+for required_command in "$browser" magick img2webp webpmux node; do
+  command -v "$required_command" >/dev/null || {
+    printf 'Required command not found: %s\n' "$required_command" >&2
+    printf 'Run this command from nix develop .#simulation.\n' >&2
+    exit 2
+  }
+done
+
+screenshot_rows="$(node "$matrix_script" screenshots "$matrix")"
+animation_rows="$(node "$matrix_script" animations "$matrix")"
+mapfile -t screenshot_matrix <<<"$screenshot_rows"
+mapfile -t animation_matrix <<<"$animation_rows"
 
 cleanup_server() {
   if [[ -z "$server_pid" ]] || ! kill -0 "$server_pid" 2>/dev/null; then
@@ -155,62 +177,25 @@ if ! grep -q "Sample Channel" "$target/login.html"; then
   exit 1
 fi
 
-views=(
-  home
-  channel-setup
-  alerts
-  guessing
-  guessing-settings
-  points
-  points-settings
-  custom-commands
-  admin
-  guessing-leaderboard
-  points-leaderboard
-)
-themes=(
-  light
-  dark
-)
+capture_screenshot() {
+  local name device theme view viewport_width viewport_height frame_width frame_height
+  IFS=$'\t' read -r \
+    name device theme view viewport_width viewport_height frame_width frame_height <<<"$1"
 
-capture_raw() {
-  local device="$1"
-  local theme="$2"
-  local view="$3"
-  local window_size
-  case "$device" in
-    laptop) window_size="1180,720" ;;
-    phone) window_size="390,844" ;;
-    *) return 2 ;;
-  esac
-
-  local screenshot="$raw/$device-$theme-$view.png"
-  local capture_profile="$browser_profile/raw-$device-$theme-$view"
+  local raw_image="$raw/$name.png"
+  local capture_profile="$browser_profile/raw-$name"
   "$browser" \
     "${chromium_flags[@]}" \
     --user-data-dir="$capture_profile" \
     --virtual-time-budget=4000 \
-    --window-size="$window_size" \
-    --screenshot="$screenshot" \
+    --window-size="$viewport_width,$viewport_height" \
+    --screenshot="$raw_image" \
     "$base_url/simulation/login?view=$view&theme=$theme" \
     >>"$browser_log" 2>&1
-  test -s "$screenshot"
-}
+  test -s "$raw_image"
 
-frame_capture() {
-  local device="$1"
-  local theme="$2"
-  local view="$3"
-  local window_size
-  case "$device" in
-    laptop) window_size="1360,900" ;;
-    phone) window_size="560,1040" ;;
-    *) return 2 ;;
-  esac
-
-  local raw_image="$raw/$device-$theme-$view.png"
-  local screenshot="$output/$device-$theme-$view.png"
-  local capture_profile="$browser_profile/frame-$device-$theme-$view"
+  local screenshot="$output/$name.png"
+  capture_profile="$browser_profile/frame-$name"
   local frame_url="file://$frame_template?device=$device&image=file://$raw_image"
   "$browser" \
     "${chromium_flags[@]}" \
@@ -218,23 +203,18 @@ frame_capture() {
     --default-background-color=00000000 \
     --user-data-dir="$capture_profile" \
     --virtual-time-budget=1000 \
-    --window-size="$window_size" \
+    --window-size="$frame_width,$frame_height" \
     --screenshot="$screenshot" \
     "$frame_url" \
     >>"$browser_log" 2>&1
   test -s "$screenshot"
 }
 
-for theme in "${themes[@]}"; do
-  for view in "${views[@]}"; do
-    capture_raw laptop "$theme" "$view"
-    frame_capture laptop "$theme" "$view"
-    capture_raw phone "$theme" "$view"
-    frame_capture phone "$theme" "$view"
-  done
+for screenshot_case in "${screenshot_matrix[@]}"; do
+  capture_screenshot "$screenshot_case"
 done
 
-expected_count=$((${#views[@]} * ${#themes[@]} * 2))
+expected_count=${#screenshot_matrix[@]}
 raw_count=$(find "$raw" -maxdepth 1 -type f -name '*.png' -size +0c | wc -l)
 actual_count=$(find "$output" -maxdepth 1 -type f -name '*.png' -size +0c | wc -l)
 if [[ "$raw_count" -ne "$expected_count" || "$actual_count" -ne "$expected_count" ]]; then
@@ -243,10 +223,8 @@ if [[ "$raw_count" -ne "$expected_count" || "$actual_count" -ne "$expected_count
   exit 1
 fi
 
-expected_device_count=$((${#views[@]} * ${#themes[@]}))
-unique_laptop_count=$(sha256sum "$output"/laptop-*.png | cut -d' ' -f1 | sort -u | wc -l)
-unique_phone_count=$(sha256sum "$output"/phone-*.png | cut -d' ' -f1 | sort -u | wc -l)
-if [[ "$unique_laptop_count" -ne "$expected_device_count" || "$unique_phone_count" -ne "$expected_device_count" ]]; then
+unique_count=$(sha256sum "$output"/*.png | cut -d' ' -f1 | sort -u | wc -l)
+if [[ "$unique_count" -ne "$expected_count" ]]; then
   printf 'Expected every framed route capture to be distinct.\n' >&2
   exit 1
 fi
@@ -268,13 +246,14 @@ done
 node "$animation_script" \
   --browser "$browser" \
   --base-url "$base_url" \
+  --matrix "$matrix" \
   --frame-template "$frame_template" \
   --frames "$animation_frames" \
   --output "$animations" \
   --profile "$browser_profile/animations" \
   --browser-log "$browser_log"
 
-expected_animation_count=8
+expected_animation_count=${#animation_matrix[@]}
 animation_count=$(find "$animations" -maxdepth 1 -type f -name '*.webp' -size +0c | wc -l)
 if [[ "$animation_count" -ne "$expected_animation_count" ]]; then
   printf 'Expected %d WebP animations, found %d.\n' \

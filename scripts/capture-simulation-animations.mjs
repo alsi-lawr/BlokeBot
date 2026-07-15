@@ -7,6 +7,11 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import {
+  deviceCatalog,
+  loadCaptureMatrix,
+} from "./simulation-capture-matrix.mjs";
+
 const execute = promisify(execFile);
 const framesPerSecond = 30;
 
@@ -30,6 +35,7 @@ function parseArguments(arguments_) {
   return {
     baseUrl: required("base-url"),
     browser: required("browser"),
+    matrix: resolve(required("matrix")),
     frameTemplate: resolve(required("frame-template")),
     framesDirectory: resolve(required("frames")),
     outputDirectory: resolve(required("output")),
@@ -172,34 +178,25 @@ async function navigate(connection, url) {
   );
 }
 
-async function setViewport(connection, device, transparent) {
-  const viewport =
-    device === "laptop"
-      ? { width: 1180, height: 720, mobile: false }
-      : { width: 390, height: 844, mobile: true };
+async function setViewport(connection, device) {
+  const viewport = device.viewport;
   await connection.send("Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
     height: viewport.height,
     screenWidth: viewport.width,
     screenHeight: viewport.height,
     deviceScaleFactor: 1,
-    mobile: viewport.mobile,
+    mobile: device.mobile,
   });
   await connection.send("Emulation.setTouchEmulationEnabled", {
-    enabled: viewport.mobile,
-    maxTouchPoints: viewport.mobile ? 5 : 1,
+    enabled: device.mobile,
+    maxTouchPoints: device.mobile ? 5 : 1,
   });
-  await connection.send(
-    "Emulation.setDefaultBackgroundColorOverride",
-    transparent ? { color: { r: 0, g: 0, b: 0, a: 0 } } : {},
-  );
+  await connection.send("Emulation.setDefaultBackgroundColorOverride", {});
 }
 
 async function setFrameViewport(connection, device) {
-  const viewport =
-    device === "laptop"
-      ? { width: 1360, height: 900 }
-      : { width: 560, height: 1040 };
+  const viewport = device.frame;
   await connection.send("Emulation.setDeviceMetricsOverride", {
     width: viewport.width,
     height: viewport.height,
@@ -227,7 +224,7 @@ async function capture(connection, destination) {
 }
 
 async function openSimulation(connection, baseUrl, view, theme, device) {
-  await setViewport(connection, device, false);
+  await setViewport(connection, device);
   await navigate(
     connection,
     `${baseUrl}/simulation/login?view=${encodeURIComponent(view)}&theme=${theme}`,
@@ -286,7 +283,7 @@ async function setTouchIndicator(connection, visible, x = 0, y = 0) {
   );
 }
 
-async function captureHomeScroll(connection, directory, device) {
+async function captureHomeScroll(connection, directory, touchEnabled) {
   const metrics = await evaluate(
     connection,
     `({
@@ -295,7 +292,6 @@ async function captureHomeScroll(connection, directory, device) {
       maximumScroll: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
     })`,
   );
-  const touchEnabled = device === "phone";
   await installTouchIndicator(connection, touchEnabled);
 
   const frames = [];
@@ -510,9 +506,9 @@ async function elementCentre(connection, selectorExpression) {
   return centre;
 }
 
-async function capturePointsWorkflow(connection, directory) {
+async function capturePointsWorkflow(connection, directory, touchEnabled) {
   const frames = [];
-  await installTouchIndicator(connection, true);
+  await installTouchIndicator(connection, touchEnabled);
 
   await evaluate(
     connection,
@@ -539,7 +535,12 @@ async function capturePointsWorkflow(connection, directory) {
       return label && document.getElementById(label.htmlFor);
     })()`,
   );
-  await setTouchIndicator(connection, true, fieldCentre.x, fieldCentre.y);
+  await setTouchIndicator(
+    connection,
+    touchEnabled,
+    fieldCentre.x,
+    fieldCentre.y,
+  );
   await addTimedFrame(connection, directory, frames, 3);
   await setTouchIndicator(connection, false);
   await setFieldByLabel(connection, "Find viewer", "n");
@@ -554,7 +555,12 @@ async function capturePointsWorkflow(connection, directory) {
     `[...document.querySelectorAll("button")]
       .find(candidate => candidate.textContent.trim() === "Search")`,
   );
-  await setTouchIndicator(connection, true, searchCentre.x, searchCentre.y);
+  await setTouchIndicator(
+    connection,
+    touchEnabled,
+    searchCentre.x,
+    searchCentre.y,
+  );
   await addTimedFrame(connection, directory, frames, 3);
   await clickButton(connection, "Search");
   await setTouchIndicator(connection, false);
@@ -570,6 +576,7 @@ async function capturePointsWorkflow(connection, directory) {
 async function frameAnimation(
   connection,
   frameTemplate,
+  deviceName,
   device,
   rawFrames,
   destination,
@@ -579,7 +586,7 @@ async function frameAnimation(
   await mkdir(framedDirectory, { recursive: true });
 
   const pageUrl = new URL(pathToFileURL(frameTemplate));
-  pageUrl.searchParams.set("device", device);
+  pageUrl.searchParams.set("device", deviceName);
   pageUrl.searchParams.set("image", pathToFileURL(rawFrames[0].path).href);
   pageUrl.searchParams.set("animation", "true");
   await navigate(connection, pageUrl.href);
@@ -650,8 +657,22 @@ async function assembleWebp(frames, output) {
   }
 }
 
+async function captureWorkflow(connection, directory, kind, touchEnabled) {
+  switch (kind) {
+    case "scroll":
+      return captureHomeScroll(connection, directory, touchEnabled);
+    case "guessing":
+      return captureGuessingWorkflow(connection, directory);
+    case "points":
+      return capturePointsWorkflow(connection, directory, touchEnabled);
+    default:
+      throw new Error(`Unknown animation workflow: ${kind}.`);
+  }
+}
+
 async function main() {
   const options = parseArguments(process.argv.slice(2));
+  const matrix = await loadCaptureMatrix(options.matrix);
   await mkdir(options.profileDirectory, { recursive: true });
   await mkdir(options.framesDirectory, { recursive: true });
   await mkdir(options.outputDirectory, { recursive: true });
@@ -692,49 +713,16 @@ async function main() {
     await connection.send("Page.enable");
     await connection.send("Runtime.enable");
 
-    const scenarios = [];
-    for (const theme of ["light", "dark"]) {
-      scenarios.push(
-        {
-          name: `laptop-${theme}-home-scroll`,
-          device: "laptop",
-          theme,
-          view: "home",
-          kind: "scroll",
-        },
-        {
-          name: `phone-${theme}-home-scroll`,
-          device: "phone",
-          theme,
-          view: "home",
-          kind: "scroll",
-        },
-        {
-          name: `laptop-${theme}-guessing-workflow`,
-          device: "laptop",
-          theme,
-          view: "guessing",
-          kind: "guessing",
-        },
-        {
-          name: `phone-${theme}-points-workflow`,
-          device: "phone",
-          theme,
-          view: "points",
-          kind: "points",
-        },
-      );
-    }
-
     const manifest = [];
     const selectedScenarios = options.only
-      ? scenarios.filter((scenario) => scenario.name === options.only)
-      : scenarios;
+      ? matrix.animations.filter((scenario) => scenario.name === options.only)
+      : matrix.animations;
     if (selectedScenarios.length === 0) {
       throw new Error(`Unknown animation scenario: ${options.only}.`);
     }
 
     for (const scenario of selectedScenarios) {
+      const device = deviceCatalog[scenario.device];
       const scenarioDirectory = join(options.framesDirectory, scenario.name);
       const rawDirectory = join(scenarioDirectory, "raw");
       await mkdir(rawDirectory, { recursive: true });
@@ -743,19 +731,20 @@ async function main() {
         options.baseUrl,
         scenario.view,
         scenario.theme,
-        scenario.device,
+        device,
       );
 
-      const rawFrames =
-        scenario.kind === "scroll"
-          ? await captureHomeScroll(connection, rawDirectory, scenario.device)
-          : scenario.kind === "guessing"
-            ? await captureGuessingWorkflow(connection, rawDirectory)
-            : await capturePointsWorkflow(connection, rawDirectory);
+      const rawFrames = await captureWorkflow(
+        connection,
+        rawDirectory,
+        scenario.kind,
+        device.mobile,
+      );
       const framedFrames = await frameAnimation(
         connection,
         options.frameTemplate,
         scenario.device,
+        device,
         rawFrames,
         scenarioDirectory,
       );
