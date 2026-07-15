@@ -1,0 +1,48 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">BlokeBot</title>
+  <desc id="desc">BlokeBot wordmark beside an abstract pair of connected chat panels.</desc>
+  <defs>
+    <linearGradient id="backdrop" x1="40" y1="20" x2="1160" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111315"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="86" y1="70" x2="274" y2="192" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="104" y1="154" x2="284" y2="258" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" stroke="#94A3B8" stroke-opacity="0.07"/>
+    </pattern>
+  </defs>
+
+  <rect x="2" y="2" width="1196" height="316" rx="38" fill="url(#backdrop)" stroke="#334155" stroke-width="4"/>
+  <rect x="2" y="2" width="1196" height="316" rx="38" fill="url(#grid)"/>
+
+  <g aria-hidden="true">
+    <rect x="72" y="52" width="232" height="216" rx="54" fill="#020617" fill-opacity="0.62" stroke="#475569" stroke-width="2"/>
+    <path d="M104 82C104 69.85 113.85 60 126 60H241C260.33 60 276 75.67 276 95V139C276 158.33 260.33 174 241 174H168L128 202V174H126C113.85 174 104 164.15 104 152V82Z" fill="url(#violet)"/>
+    <path d="M116 166C116 146.67 131.67 131 151 131H238C257.33 131 273 146.67 273 166V211C273 223.15 263.15 233 251 233H247V260L210 233H151C131.67 233 116 217.33 116 198V166Z" fill="url(#teal)" stroke="#5EEAD4" stroke-opacity="0.5" stroke-width="2"/>
+    <path d="M151 164H225M151 186H207" stroke="#ECFEFF" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="246" cy="102" r="9" fill="#F5F3FF"/>
+  </g>
+
+  <g fill="#F8FAFC">
+    <text x="356" y="153" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="86" font-weight="800" letter-spacing="-3">BlokeBot</text>
+    <text x="360" y="205" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="28" font-weight="500" letter-spacing="0.4" fill="#CBD5E1">Own your channel tools.</text>
+  </g>
+
+  <path d="M360 232H1050" stroke="#334155" stroke-width="2"/>
+  <g fill="#94A3B8" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="17" font-weight="700" letter-spacing="2.2">
+    <text x="360" y="267">COMMANDS</text>
+    <circle cx="500" cy="261" r="3" fill="#2DD4BF"/>
+    <text x="521" y="267">GAMES</text>
+    <circle cx="620" cy="261" r="3" fill="#A855F7"/>
+    <text x="641" y="267">POINTS</text>
+    <circle cx="754" cy="261" r="3" fill="#2DD4BF"/>
+    <text x="775" y="267">GIVEAWAYS</text>
+  </g>
+</svg>

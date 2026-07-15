@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">BlokeBot</title>
+  <desc id="desc">An abstract pair of connected chat panels.</desc>
+  <defs>
+    <linearGradient id="backdrop" x1="36" y1="24" x2="476" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111315"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="112" y1="104" x2="402" y2="284" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="130" y1="228" x2="396" y2="408" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#0F766E"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="12" y="12" width="488" height="488" rx="112" fill="url(#backdrop)" stroke="#334155" stroke-width="24"/>
+  <path d="M104 124C104 91.97 129.97 66 162 66H344C383.76 66 416 98.24 416 138V212C416 251.76 383.76 284 344 284H226L154 334V284H162C129.97 284 104 258.03 104 226V124Z" fill="url(#violet)"/>
+  <path d="M116 250C116 210.24 148.24 178 188 178H334C373.76 178 406 210.24 406 250V326C406 358.03 380.03 384 348 384H338V440L264 384H188C148.24 384 116 351.76 116 312V250Z" fill="url(#teal)" stroke="#5EEAD4" stroke-opacity="0.55" stroke-width="8"/>
+  <path d="M178 238H326M178 286H286" stroke="#ECFEFF" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="350" cy="152" r="18" fill="#F5F3FF"/>
+</svg>

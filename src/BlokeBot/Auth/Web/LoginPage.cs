@@ -94,7 +94,7 @@ internal static class LoginPage
                     <section class="surface w-full max-w-md rounded-lg p-8 shadow-xl shadow-slate-200/70">
                         <div class="mb-7">
                             <div class="flex items-center gap-3">
-                                <img class="surface-muted h-10 w-10 rounded-lg p-1" src="/blokedroid.svg" alt="" />
+                                <img class="surface-muted h-10 w-10 rounded-lg" src="/blokebot-mark.svg" alt="" />
                                 <p class="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">BlokeBot</p>
                             </div>
                             <h1 class="mt-2 text-2xl font-semibold tracking-tight text-foreground">Sign in to BlokeBot</h1>
