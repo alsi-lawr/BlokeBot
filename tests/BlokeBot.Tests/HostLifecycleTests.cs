@@ -92,7 +92,8 @@ public sealed class HostLifecycleTests
         var service = new BotHostProvisioningService(
             dbFactory,
             new HostedChannelChangeNotifier(events),
-            []
+            [],
+            TimeProvider.System
         );
 
         var hostId = await service.EnsureHostAsync(

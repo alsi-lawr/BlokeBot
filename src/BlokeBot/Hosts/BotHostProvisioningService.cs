@@ -9,7 +9,8 @@ namespace BlokeBot.Hosts;
 public sealed class BotHostProvisioningService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     HostedChannelChangeNotifier changes,
-    IEnumerable<IBotHostSeeder> seeders
+    IEnumerable<IBotHostSeeder> seeders,
+    TimeProvider clock
 )
 {
     public async Task<int> EnsureHostAsync(
@@ -27,7 +28,7 @@ public sealed class BotHostProvisioningService(
         {
             host = new BotHost
             {
-                CreatedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = clock.GetUtcNow().UtcDateTime,
                 DisplayName = string.IsNullOrWhiteSpace(displayName)
                     ? normalized.Value
                     : displayName.Trim(),
