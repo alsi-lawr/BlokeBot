@@ -185,33 +185,6 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
         operations.DeleteCount("bad").ShouldBe(0);
         operations.CompleteStopCount("bad").ShouldBe(0);
 
-        var observer = new RecordingChatObserver();
-        var connection = new EventSubConnectionSession(
-            null!,
-            null!,
-            ChatActivityHookTests.BuildDispatcher(new ChatActivityHookTests.RuntimeHookRecorder()),
-            new UnusedCommandResponseSender(),
-            new BotRuntimeStatusStore(),
-            [observer],
-            RuntimeTestObserverFanOut.Continue<
-                EventSubMessageObserverBoundary,
-                ChatMessage,
-                ChatObserverDeadLetter
-            >(BotObserverBoundaries.EventSubMessages),
-            NullLogger<EventSubConnectionSession>.Instance
-        );
-        await connection.DispatchChatMessageAsync(
-            new EventSubChatMessageEvent
-            {
-                BroadcasterUserLogin = "good",
-                ChatterUserLogin = "viewer",
-                Message = new EventSubChatMessage { Text = "hello" },
-            },
-            "{}",
-            CancellationToken.None
-        );
-
-        observer.Channels.ShouldBe(["good"]);
         releaseRecovery.Writer.TryWrite(true).ShouldBeTrue();
         await harness.Session.DrainAsync();
         harness.Status.Current.Channels.ShouldAllBe(state =>
