@@ -46,6 +46,11 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Prove the immutable JReleaser image is version 1.25.0
+        run: |
+          version_output=$(docker run --rm "$JRELEASER_IMAGE" --version)
+          printf '%s\n' "$version_output"
+          grep -Fqx 'jreleaser 1.25.0' <<< "$version_output"
       - name: Create five publish-directory fixtures
         run: |
           for rid in linux-x64 linux-arm64 osx-arm64; do
@@ -127,7 +132,12 @@ jobs:
           test -f out/jreleaser/prepare/blokebot/scoop/bucket/blokebot.json
           test -f out/jreleaser/prepare/blokebot/chocolatey/blokebot/blokebot.nuspec
           test -f out/jreleaser/prepare/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/1.2.3/alsi-lawr.BlokeBot.installer.yaml
-          grep -F 'blokebot-v1.2.3-osx-arm64.zip' out/jreleaser/prepare/blokebot/brew/Formula/blokebot.rb
+          formula=out/jreleaser/prepare/blokebot/brew/Formula/blokebot.rb
+          grep -F 'blokebot-v1.2.3-osx-arm64.zip' "$formula"
+          if grep -Eiq 'depends_on.*(java|openjdk)|JAVA_HOME' "$formula"; then
+            echo 'Generated Homebrew metadata unexpectedly declares a Java dependency.' >&2
+            exit 1
+          fi
           grep -F '"bin/blokebot.exe", "blokebot"' out/jreleaser/prepare/blokebot/scoop/bucket/blokebot.json
           grep -F 'Architecture: x64' out/jreleaser/prepare/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/1.2.3/alsi-lawr.BlokeBot.installer.yaml
           if grep -R -F 'win-arm64.zip' out/jreleaser/prepare/blokebot/{scoop,chocolatey,winget}; then
@@ -277,6 +287,121 @@ jobs:
           if unpinned:
               raise SystemExit("Unpinned actions:\n" + "\n".join(unpinned))
           PY
+      - name: Assert release publication gates and promotion invariants
+        run: |
+          ruby <<'RUBY'
+          require "set"
+          require "yaml"
+
+          release_path = ".github/workflows/release.yml"
+          release_text = File.read(release_path)
+          jobs = YAML.safe_load_file(release_path, aliases: true).fetch("jobs")
+
+          def assert(condition, message)
+            raise message unless condition
+          end
+
+          def needs(jobs, job_name)
+            Array(jobs.fetch(job_name).fetch("needs", []))
+          end
+
+          def depends_on?(jobs, job_name, prerequisite, visited = Set.new)
+            return false unless visited.add?(job_name)
+
+            dependencies = needs(jobs, job_name)
+            dependencies.include?(prerequisite) || dependencies.any? do |dependency|
+              jobs.key?(dependency) && depends_on?(jobs, dependency, prerequisite, visited.dup)
+            end
+          end
+
+          def step(jobs, job_name, step_name)
+            jobs.fetch(job_name).fetch("steps").find { |candidate| candidate["name"] == step_name } ||
+              raise("Missing #{job_name} step: #{step_name}")
+          end
+
+          def scripts(jobs, job_name)
+            jobs.fetch(job_name).fetch("steps").filter_map { |candidate| candidate["run"] }.join("\n")
+          end
+
+          gate = "docker-hub-gate"
+          %w[release-assets github-release docker-hub-images nix-images].each do |job_name|
+            assert(needs(jobs, job_name).include?(gate), "#{job_name} must directly require #{gate}")
+          end
+          %w[docker-hub-manifests nix-manifests promote-latest].each do |job_name|
+            assert(depends_on?(jobs, job_name, gate), "#{job_name} must transitively require #{gate}")
+          end
+          gate_script = scripts(jobs, gate)
+          assert(gate_script.include?("DOCKERHUB_USERNAME is required."), "Docker Hub username is not mandatory")
+          assert(gate_script.include?("DOCKERHUB_TOKEN is required."), "Docker Hub token is not mandatory")
+
+          %w[docker-hub-manifests nix-manifests].each do |job_name|
+            manifest_script = scripts(jobs, job_name)
+            assert(manifest_script.include?(".platform.os"), "#{job_name} does not inspect manifest operating systems")
+            assert(manifest_script.include?(".platform.architecture"), "#{job_name} does not inspect manifest architectures")
+            assert(manifest_script.include?("linux/amd64 linux/arm64"), "#{job_name} does not require the exact platform set")
+            assert(manifest_script.include?("diff -u expected-platforms.txt actual-platforms.txt"), "#{job_name} does not compare the platform inventory")
+          end
+
+          promotion = jobs.fetch("promote-latest")
+          required_promotion_needs = %w[
+            github-release
+            publish-homebrew-scoop
+            publish-chocolatey
+            winget-bundle
+            docker-hub-manifests
+            nix-manifests
+          ]
+          assert((required_promotion_needs - needs(jobs, "promote-latest")).empty?, "Latest promotion can run before immutable publication completes")
+          assert(promotion.dig("permissions", "contents") == "write", "Latest release promotion lacks contents: write")
+          container_promotion = step(jobs, "promote-latest", "Promote only the recorded immutable manifests").fetch("run")
+          assert(container_promotion.include?('latest=$(docker buildx imagetools inspect "$image:latest"'), "Container latest tags have no digest readback")
+          assert(container_promotion.include?('test "$latest" = "$digest"'), "Container latest digest is not compared with the immutable digest")
+          release_promotion = step(jobs, "promote-latest", "Promote the GitHub release to Latest and verify by readback").fetch("run")
+          assert(release_promotion.include?('gh release edit "v$VERSION"'), "GitHub release is not promoted to Latest")
+          assert(release_promotion.include?('releases/latest'), "GitHub Latest release has no API readback")
+          assert(release_promotion.include?('test "$latest_tag" = "v$VERSION"'), "GitHub Latest tag readback is not verified")
+
+          scoop_install = step(jobs, "package-windows-test", "Install pinned Scoop from verified official content")
+          assert(scoop_install.dig("env", "SCOOP_INSTALLER_COMMIT") == "b0ee913725139b816f9178163af0aecdba07a7ed", "Scoop installer commit changed")
+          assert(scoop_install.dig("env", "SCOOP_INSTALLER_SHA256") == "48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae", "Scoop installer digest changed")
+          assert(scoop_install.dig("env", "SCOOP_COMMIT") == "b588a06e41d920d2123ec70aee682bae14935939", "Scoop archive commit changed")
+          assert(scoop_install.dig("env", "SCOOP_ARCHIVE_SHA256") == "630206995f30866a0b25b00c14c74be9ef9b79c4911f72f6efd2625cfe19a645", "Scoop archive digest changed")
+          assert(scoop_install.dig("env", "SCOOP_MAIN_COMMIT") == "76b24868f4295551f741a1c7ff711975eb89e7dc", "Scoop Main archive commit changed")
+          assert(scoop_install.dig("env", "SCOOP_MAIN_ARCHIVE_SHA256") == "9fbb4d1c07aff3c1222ab96688a00bb53662a87323ad3246b7185fc55ab8ee1e", "Scoop Main archive digest changed")
+          assert(scoop_install.fetch("run").include?("Get-FileHash -Algorithm SHA256"), "Scoop content is not integrity checked")
+          assert(scoop_install.fetch("run").include?("& $installer -RunAsAdmin"), "Elevated Scoop installation does not use the documented flag")
+          assert(scoop_install.fetch("run").include?("ScoopInstaller/Scoop/archive/$env:SCOOP_COMMIT.zip"), "Scoop archive URL is not commit-pinned")
+          assert(scoop_install.fetch("run").include?("ScoopInstaller/Main/archive/$env:SCOOP_MAIN_COMMIT.zip"), "Scoop Main archive URL is not commit-pinned")
+          scoop_lifecycle = step(jobs, "package-windows-test", "Test the mandatory Scoop lifecycle").fetch("run")
+          %w[install update uninstall].each do |operation|
+            assert(scoop_lifecycle.include?("scoop #{operation}"), "Scoop #{operation} is not mandatory")
+          end
+          assert(!scoop_lifecycle.include?("Scoop is unavailable"), "Scoop lifecycle can still silently skip")
+
+          winget_job = jobs.fetch("package-winget-test")
+          assert(winget_job.fetch("runs-on") == "windows-11-arm", "WinGet lifecycle is not on the Windows client runner")
+          winget_install = step(jobs, "package-winget-test", "Require or install the pinned official WinGet client")
+          assert(winget_install.dig("env", "WINGET_VERSION") == "1.29.280", "WinGet client version is not immutable")
+          assert(winget_install.fetch("run").include?("github.com/microsoft/winget-cli/releases/download/v"), "WinGet is not installed from Microsoft's official release")
+          assert(winget_install.fetch("run").include?("Get-FileHash -Algorithm SHA256"), "WinGet content is not integrity checked")
+          assert(winget_install.fetch("run").include?("Get-Command winget"), "Runner-provided WinGet is not detected")
+          assert(winget_install.fetch("run").include?("runner-provided WinGet client is unusable"), "Broken runner-provided WinGet does not hard-fail")
+          winget_lifecycle = step(jobs, "package-winget-test", "Validate and test the mandatory WinGet lifecycle").fetch("run")
+          %w[validate install uninstall].each do |operation|
+            assert(winget_lifecycle.include?("winget #{operation}"), "WinGet #{operation} is not mandatory")
+          end
+          assert(!winget_lifecycle.include?("WinGet is unavailable"), "WinGet lifecycle can still silently skip")
+
+          winget_bundle = scripts(jobs, "winget-bundle")
+          assert(winget_bundle.include?("No upstream WinGet pull request was created"), "Manual upstream WinGet submission is no longer explicit")
+          chocolatey = scripts(jobs, "publish-chocolatey")
+          assert(chocolatey.include?("CHOCOLATEY_API_KEY is absent; upload is skipped"), "Chocolatey missing-authority behavior is no longer honest")
+          assert(chocolatey.include?("public availability remains pending moderation"), "Chocolatey moderation status is no longer explicit")
+
+          pinned_jreleaser = "jreleaser/jreleaser-slim@sha256:18f1e6106f1a540348cd0aafdb600702397c6873ce1ab5bfc0ad25082d13db5f"
+          image_references = release_text.scan(%r{jreleaser/jreleaser-slim@[^\s]+})
+          assert(!image_references.empty? && image_references.all? { |reference| reference == pinned_jreleaser }, "Release JReleaser image digest changed")
+          RUBY
       - name: Exercise strict release-tag validation
         run: |
           valid() { [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }

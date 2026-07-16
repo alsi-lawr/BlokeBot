@@ -165,6 +165,7 @@ jobs:
     needs:
       - version
       - native-publish
+      - docker-hub-gate
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -286,6 +287,7 @@ jobs:
     needs:
       - version
       - release-assets
+      - docker-hub-gate
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -346,7 +348,7 @@ jobs:
           test "$(cat "$state_directory/marker")" = preserve
 
   package-windows-test:
-    name: Test Scoop, Chocolatey, and WinGet lifecycles
+    name: Test Scoop and Chocolatey lifecycles
     needs:
       - version
       - github-release
@@ -361,24 +363,101 @@ jobs:
         with:
           name: package-metadata-${{ needs.version.outputs.version }}
           path: artifacts/package-metadata
-      - name: Test Scoop when available
+      - name: Install pinned Scoop from verified official content
+        shell: pwsh
+        env:
+          SCOOP_INSTALLER_COMMIT: b0ee913725139b816f9178163af0aecdba07a7ed
+          SCOOP_INSTALLER_SHA256: 48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae
+          SCOOP_COMMIT: b588a06e41d920d2123ec70aee682bae14935939
+          SCOOP_ARCHIVE_SHA256: 630206995f30866a0b25b00c14c74be9ef9b79c4911f72f6efd2625cfe19a645
+          SCOOP_MAIN_COMMIT: 76b24868f4295551f741a1c7ff711975eb89e7dc
+          SCOOP_MAIN_ARCHIVE_SHA256: 9fbb4d1c07aff3c1222ab96688a00bb53662a87323ad3246b7185fc55ab8ee1e
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+
+          $installer = Join-Path $env:RUNNER_TEMP 'scoop-install.ps1'
+          $scoopArchive = Join-Path $env:RUNNER_TEMP 'scoop.zip'
+          $mainArchive = Join-Path $env:RUNNER_TEMP 'scoop-main.zip'
+          $downloads = @(
+              @{
+                  Uri = "https://raw.githubusercontent.com/ScoopInstaller/Install/$env:SCOOP_INSTALLER_COMMIT/install.ps1"
+                  Path = $installer
+                  Sha256 = $env:SCOOP_INSTALLER_SHA256
+              },
+              @{
+                  Uri = "https://github.com/ScoopInstaller/Scoop/archive/$env:SCOOP_COMMIT.zip"
+                  Path = $scoopArchive
+                  Sha256 = $env:SCOOP_ARCHIVE_SHA256
+              },
+              @{
+                  Uri = "https://github.com/ScoopInstaller/Main/archive/$env:SCOOP_MAIN_COMMIT.zip"
+                  Path = $mainArchive
+                  Sha256 = $env:SCOOP_MAIN_ARCHIVE_SHA256
+              }
+          )
+          foreach ($download in $downloads) {
+              Invoke-WebRequest -Uri $download.Uri -OutFile $download.Path
+              $actual = (Get-FileHash -Algorithm SHA256 $download.Path).Hash.ToLowerInvariant()
+              if ($actual -ne $download.Sha256) {
+                  throw "SHA-256 mismatch for $($download.Uri): $actual"
+              }
+          }
+
+          $scoopArchiveUri = [Uri]::new((Resolve-Path $scoopArchive).Path).AbsoluteUri
+          $mainArchiveUri = [Uri]::new((Resolve-Path $mainArchive).Path).AbsoluteUri
+          $installerContent = Get-Content -Raw $installer
+          $installerContent = $installerContent.Replace(
+              "if (Test-CommandAvailable('git')) {",
+              'if ($False) {'
+          ).Replace(
+              "`$SCOOP_PACKAGE_REPO = 'https://github.com/ScoopInstaller/Scoop/archive/master.zip'",
+              "`$SCOOP_PACKAGE_REPO = '$scoopArchiveUri'"
+          ).Replace(
+              "`$SCOOP_MAIN_BUCKET_REPO = 'https://github.com/ScoopInstaller/Main/archive/master.zip'",
+              "`$SCOOP_MAIN_BUCKET_REPO = '$mainArchiveUri'"
+          )
+          if ($installerContent.Contains('archive/master.zip') -or $installerContent.Contains("if (Test-CommandAvailable('git')) {")) {
+              throw 'Failed to bind the verified Scoop installer to the verified archives.'
+          }
+          Set-Content -Path $installer -Value $installerContent -Encoding utf8 -NoNewline
+          $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
+          $isAdministrator = $principal.IsInRole(
+              [Security.Principal.WindowsBuiltInRole]::Administrator
+          )
+          if ($isAdministrator) {
+              & $installer -RunAsAdmin
+              $installerSucceeded = $?
+          } else {
+              & $installer
+              $installerSucceeded = $?
+          }
+          if (-not $installerSucceeded) { throw 'Scoop installer failed.' }
+
+          $shims = Join-Path $env:USERPROFILE 'scoop\shims'
+          $env:PATH = "$shims;$env:PATH"
+          $shims | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          scoop help | Out-Null
+          if (-not $?) { throw 'The pinned Scoop installation is unusable.' }
+      - name: Test the mandatory Scoop lifecycle
         shell: pwsh
         run: |
-          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-              Write-Host '::notice::Scoop is unavailable; prepared manifest validation remains required.'
-              exit 0
-          }
           $version = '${{ needs.version.outputs.version }}'
           $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           $manifest = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package-metadata/blokebot/scoop/bucket/blokebot.json'
           scoop install $manifest
+          if ($LASTEXITCODE -ne 0) { throw 'Scoop install failed.' }
           python packaging/smoke/native_smoke.py (Get-Command blokebot).Source --version $version
+          if ($LASTEXITCODE -ne 0) { throw 'Scoop smoke test failed.' }
           scoop update blokebot
+          if ($LASTEXITCODE -ne 0) { throw 'Scoop update failed.' }
           if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Scoop update changed user data.' }
           scoop uninstall blokebot
+          if ($LASTEXITCODE -ne 0) { throw 'Scoop uninstall failed.' }
           if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'Scoop left the command installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Scoop uninstall changed user data.' }
       - name: Test Chocolatey package lifecycle
         shell: pwsh
         run: |
@@ -396,21 +475,104 @@ jobs:
           choco uninstall blokebot --yes --no-progress
           refreshenv
           if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'Chocolatey left the command installed.' }
-      - name: Validate and test WinGet when available
+
+  package-winget-test:
+    name: Test the WinGet lifecycle on a Windows client
+    needs:
+      - version
+      - github-release
+    runs-on: windows-11-arm
+    permissions:
+      contents: read
+    steps:
+      - name: Check out smoke tooling
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Download JReleaser package metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: package-metadata-${{ needs.version.outputs.version }}
+          path: artifacts/package-metadata
+      - name: Require or install the pinned official WinGet client
+        shell: pwsh
+        env:
+          WINGET_VERSION: 1.29.280
+          WINGET_BUNDLE_SHA256: 0809fa9f52e395d6e7de692331dce847ac991952675116bb4d8aae2ddcc20946
+          WINGET_DEPENDENCIES_SHA256: 3bbfcaa5cb011c48fac48d896d64a5c7c6898859a9f3d01555c8cd000f4e2962
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $existing = Get-Command winget -ErrorAction SilentlyContinue
+          if ($null -ne $existing) {
+              $actualVersion = (& $existing.Source --version).Trim()
+              if ($LASTEXITCODE -ne 0 -or $actualVersion -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+                  throw "The runner-provided WinGet client is unusable: $actualVersion"
+              }
+              Write-Host "Using runner-provided WinGet $actualVersion."
+          } else {
+              $releaseBase = "https://github.com/microsoft/winget-cli/releases/download/v$env:WINGET_VERSION"
+              $bundle = Join-Path $env:RUNNER_TEMP 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
+              $dependenciesArchive = Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies.zip'
+              $dependenciesDirectory = Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies'
+              $downloads = @(
+                  @{
+                      Uri = "$releaseBase/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+                      Path = $bundle
+                      Sha256 = $env:WINGET_BUNDLE_SHA256
+                  },
+                  @{
+                      Uri = "$releaseBase/DesktopAppInstaller_Dependencies.zip"
+                      Path = $dependenciesArchive
+                      Sha256 = $env:WINGET_DEPENDENCIES_SHA256
+                  }
+              )
+              foreach ($download in $downloads) {
+                  Invoke-WebRequest -Uri $download.Uri -OutFile $download.Path
+                  $actual = (Get-FileHash -Algorithm SHA256 $download.Path).Hash.ToLowerInvariant()
+                  if ($actual -ne $download.Sha256) {
+                      throw "SHA-256 mismatch for $($download.Uri): $actual"
+                  }
+              }
+
+              Expand-Archive -Path $dependenciesArchive -DestinationPath $dependenciesDirectory
+              $dependencyPaths = @(
+                  Get-ChildItem -Path (Join-Path $dependenciesDirectory 'arm64') -Filter '*.appx' -File |
+                      Select-Object -ExpandProperty FullName
+              )
+              if ($dependencyPaths.Count -eq 0) { throw 'The pinned WinGet release has no ARM64 dependencies.' }
+              Add-AppxPackage -Path $bundle -DependencyPath $dependencyPaths
+
+              $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller |
+                  Sort-Object Version -Descending |
+                  Select-Object -First 1
+              if ($null -eq $package) { throw 'The pinned WinGet package was not installed.' }
+              $package.InstallLocation | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              $env:PATH = "$($package.InstallLocation);$env:PATH"
+              $actualVersion = (winget --version).Trim()
+              if ($LASTEXITCODE -ne 0 -or $actualVersion -ne "v$env:WINGET_VERSION") {
+                  throw "Unexpected WinGet version after pinned installation: $actualVersion"
+              }
+          }
+      - name: Validate and test the mandatory WinGet lifecycle
         shell: pwsh
         run: |
-          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-              Write-Host '::notice::WinGet is unavailable; the manual upstream bundle remains reviewable but unpublished.'
-              exit 0
-          }
           $version = '${{ needs.version.outputs.version }}'
+          $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
+          New-Item -ItemType Directory -Force $stateDirectory | Out-Null
+          Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           $manifestDirectory = Join-Path $env:GITHUB_WORKSPACE "artifacts/package-metadata/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/$version"
           winget validate --manifest $manifestDirectory
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet manifest validation failed.' }
           winget settings --enable LocalManifestFiles
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet could not enable local manifest files.' }
           winget install --manifest $manifestDirectory --accept-package-agreements --accept-source-agreements --disable-interactivity
-          $env:PATH = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet install failed.' }
+          $links = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+          $env:PATH = "$links;$env:PATH"
           python packaging/smoke/native_smoke.py (Get-Command blokebot).Source --version $version
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet smoke test failed.' }
           winget uninstall --id alsi-lawr.BlokeBot --exact --disable-interactivity
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet uninstall failed.' }
+          if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'WinGet left the command installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'WinGet uninstall changed user data.' }
 
   publish-homebrew-scoop:
     name: Publish Homebrew and Scoop metadata when authorised
@@ -494,7 +656,7 @@ jobs:
     name: Produce the manual WinGet submission bundle
     needs:
       - version
-      - package-windows-test
+      - package-winget-test
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -649,6 +811,11 @@ jobs:
           docker buildx imagetools create --tag "${{ matrix.image }}:$VERSION" "${references[@]}"
           digest=$(docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" --raw \
+            | jq -r '.manifests[] | "\(.platform.os)/\(.platform.architecture)"' \
+            | LC_ALL=C sort > actual-platforms.txt
+          printf '%s\n' linux/amd64 linux/arm64 > expected-platforms.txt
+          diff -u expected-platforms.txt actual-platforms.txt
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           mkdir -p artifacts/final
           printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/final/dockerhub-${{ matrix.kind }}.digest"
@@ -668,7 +835,9 @@ jobs:
 
   nix-images:
     name: Build, smoke, and publish Nix ${{ matrix.kind }} ${{ matrix.arch }}
-    needs: version
+    needs:
+      - version
+      - docker-hub-gate
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -802,6 +971,11 @@ jobs:
           docker buildx imagetools create --tag "${{ matrix.image }}:$VERSION" "${references[@]}"
           digest=$(docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" --raw \
+            | jq -r '.manifests[] | "\(.platform.os)/\(.platform.architecture)"' \
+            | LC_ALL=C sort > actual-platforms.txt
+          printf '%s\n' linux/amd64 linux/arm64 > expected-platforms.txt
+          diff -u expected-platforms.txt actual-platforms.txt
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           mkdir -p artifacts/final
           printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/final/ghcr-${{ matrix.kind }}.digest"
@@ -831,6 +1005,7 @@ jobs:
       - nix-manifests
     runs-on: ubuntu-24.04
     permissions:
+      contents: write
       packages: write
     steps:
       - name: Download all final image digests
@@ -860,4 +1035,14 @@ jobs:
             published=$(docker buildx imagetools inspect "$image:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
             test "$published" = "$digest"
             docker buildx imagetools create --tag "$image:latest" "$immutable"
+            latest=$(docker buildx imagetools inspect "$image:latest" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
+            test "$latest" = "$digest"
           done
+      - name: Promote the GitHub release to Latest and verify by readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --latest
+          latest_tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
+          test "$latest_tag" = "v$VERSION"
