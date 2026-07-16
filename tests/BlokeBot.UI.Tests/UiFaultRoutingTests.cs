@@ -131,6 +131,9 @@ public sealed class UiFaultRoutingTests
         var cancellationObserved = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
+        var loaderStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
         var component = context.Render<TestBackgroundComponent>(parameters =>
             parameters
                 .Add(x => x.Identity, new TestLoadIdentity("first"))
@@ -139,12 +142,14 @@ public sealed class UiFaultRoutingTests
                     async ct =>
                     {
                         using var registration = ct.Register(cancellationObserved.SetResult);
+                        loaderStarted.SetResult();
                         await Task.Delay(Timeout.InfiniteTimeSpan, ct);
                         return Result<string, TestExpectedFailure>.Success("first");
                     }
                 )
         );
 
+        await loaderStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
         component.Render(parameters =>
             parameters
                 .Add(x => x.Identity, new TestLoadIdentity("second"))
