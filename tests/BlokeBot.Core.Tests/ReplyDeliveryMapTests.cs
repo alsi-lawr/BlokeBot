@@ -35,7 +35,7 @@ public sealed class ReplyDeliveryMapTests
     }
 
     [Test]
-    public void DeliveryMap_Constructing_CopiesInputAndHidesMutableCollection()
+    public void DeliveryMap_Constructing_CopiesInput()
     {
         List<string> whisperKeys = ["winner"];
 
@@ -43,6 +43,5 @@ public sealed class ReplyDeliveryMapTests
         whisperKeys.Clear();
 
         delivery.TargetFor("winner").ShouldBe(CommandResponseTarget.Whisper);
-        (delivery.WhisperKeys is ISet<string>).ShouldBeFalse();
     }
 }

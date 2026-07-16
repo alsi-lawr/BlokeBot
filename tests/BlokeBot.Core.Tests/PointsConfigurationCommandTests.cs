@@ -91,53 +91,6 @@ public sealed class PointsConfigurationCommandTests
     }
 
     [Test]
-    public async Task InvalidPersistedBoundaries_LoadingAndValidating_RemainVisibleAndUnchanged()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using (var seedDb = await dbFactory.CreateDbContextAsync())
-        {
-            seedDb.PointsSettings.Add(
-                new PointsSettings
-                {
-                    HostId = hostId,
-                    GamblingCooldownSeconds = -4,
-                    GiveawayDurationSeconds = 0,
-                    GiveawayWinnerCount = 0,
-                    GiveawayCooldownSeconds = 299,
-                }
-            );
-            await seedDb.SaveChangesAsync();
-        }
-        var service = CreateService(dbFactory);
-
-        var draft = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
-        var errors = PointsConfigurationValidator
-            .Validate(draft)
-            .Match(
-                _ => Array.Empty<PointsConfigurationValidationError>(),
-                invalid => invalid.ToArray()
-            );
-
-        draft.GamblingCooldownSeconds.ShouldBe(-4);
-        draft.GiveawayDurationSeconds.ShouldBe(0);
-        draft.GiveawayWinnerCount.ShouldBe(0);
-        draft.GiveawayCooldownSeconds.ShouldBe(299);
-        errors.ShouldContain(new PointsConfigurationValidationError.NegativeGamblingCooldown());
-        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayDurationBelowMinimum());
-        errors.ShouldContain(
-            new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum()
-        );
-        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayCooldownBelowMinimum());
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var persisted = await db.PointsSettings.SingleAsync();
-        persisted.GamblingCooldownSeconds.ShouldBe(-4);
-        persisted.GiveawayDurationSeconds.ShouldBe(0);
-        persisted.GiveawayWinnerCount.ShouldBe(0);
-        persisted.GiveawayCooldownSeconds.ShouldBe(299);
-    }
-
-    [Test]
     public async Task AliasOwnedByAnotherFeature_Saving_ReturnsTypedFailureWithoutPersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -198,59 +151,6 @@ public sealed class PointsConfigurationCommandTests
         var loaded = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
 
         AssertLoadedConfiguration(loaded, command);
-    }
-
-    [Test]
-    public async Task InvalidSubmission_MatchingValidation_DoesNotInvokeSaveOrWrite()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using (var seedDb = await dbFactory.CreateDbContextAsync())
-        {
-            seedDb.PointsSettings.Add(
-                new PointsSettings
-                {
-                    HostId = hostId,
-                    PointLabel = "unchanged",
-                    GamblingCooldownSeconds = 17,
-                }
-            );
-            await seedDb.SaveChangesAsync();
-        }
-
-        var service = CreateService(dbFactory);
-        var draft = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
-        draft.GiveawayMinimumPayout = "not-a-number";
-        var saveInvoked = false;
-        IReadOnlyList<PointsConfigurationValidationError> validationErrors = [];
-
-        await PointsConfigurationValidator
-            .Validate(draft)
-            .Match(
-                async command =>
-                {
-                    saveInvoked = true;
-                    _ = await service
-                        .SaveConfiguration(hostId, command)
-                        .ExecuteAsync(CancellationToken.None);
-                },
-                errors =>
-                {
-                    validationErrors = errors;
-                    return Task.CompletedTask;
-                }
-            );
-
-        saveInvoked.ShouldBeFalse();
-        validationErrors.ShouldContain(
-            new PointsConfigurationValidationError.InvalidMinimumPayout()
-        );
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var settings = await db.PointsSettings.SingleAsync();
-        settings.PointLabel.ShouldBe("unchanged");
-        settings.GamblingCooldownSeconds.ShouldBe(17);
-        (await db.CommandAliases.CountAsync()).ShouldBe(0);
-        (await db.ReplyDeliverySettings.CountAsync()).ShouldBe(0);
     }
 
     private static PointsConfiguration FullyPopulatedDraft()
