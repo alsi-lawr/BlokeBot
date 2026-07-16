@@ -43,6 +43,35 @@
         {
             <a class="btn-secondary" href="@_editHostHref" data-enhance-nav="false">Manage channel</a>
         }
-        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@_pendingRemoval" @onclick="RemoveHostAsync">Remove</button>
+        <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50" disabled="@_pendingRemoval" @onclick="OpenRemovalConfirmation">Remove</button>
     </div>
 </div>
+
+@if (_showRemovalConfirmation)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" data-channel-removal-dialog>
+        <section class="surface w-full max-w-lg rounded-xl p-6 shadow-xl"
+                 role="alertdialog"
+                 aria-modal="true"
+                 aria-labelledby="channel-removal-title"
+                 aria-describedby="channel-removal-warning">
+            <h2 id="channel-removal-title" class="text-lg font-bold text-slate-950">Permanently remove #@Host.Login?</h2>
+            <p id="channel-removal-warning" class="mt-2 text-sm leading-6 text-slate-600">Removing this channel stops the bot and permanently deletes channel settings, moderator access, guessing history, points data, giveaways, and custom commands. This cannot be undone.</p>
+            <div class="mt-4 space-y-2">
+                <label class="label" for="@_removalConfirmationInputId">Type @Host.Login to confirm</label>
+                <input id="@_removalConfirmationInputId"
+                       class="input"
+                       aria-label="Type channel login to confirm removal"
+                       value="@_removalConfirmation"
+                       @oninput="UpdateRemovalConfirmation" />
+            </div>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+                <button class="btn-secondary" @onclick="CancelRemoval">Cancel</button>
+                <button class="control-surface inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-red-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Permanently remove channel"
+                        disabled="@(!_canConfirmRemoval)"
+                        @onclick="ConfirmRemovalAsync">Permanently remove</button>
+            </div>
+        </section>
+    </div>
+}

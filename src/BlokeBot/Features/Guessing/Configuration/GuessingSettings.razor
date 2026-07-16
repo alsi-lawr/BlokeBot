@@ -60,3 +60,22 @@
         </div>
     }
 </div>
+
+@if (_pendingProfileId is not null)
+{
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" data-unsaved-profile-dialog>
+        <section class="surface w-full max-w-lg rounded-xl p-6 shadow-xl"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="unsaved-profile-title"
+                 aria-describedby="unsaved-profile-description">
+            <h2 id="unsaved-profile-title" class="text-lg font-bold text-slate-950">Unsaved round type changes</h2>
+            <p id="unsaved-profile-description" class="mt-2 text-sm leading-6 text-slate-600">Choose what to do with your changes before switching round type.</p>
+            <div class="mt-5 grid gap-2 sm:grid-cols-3">
+                <button class="btn-primary" @onclick="SaveAndSwitchAsync">Save and switch</button>
+                <button class="btn-secondary" @onclick="DiscardAndSwitchAsync">Discard and switch</button>
+                <button class="btn-secondary" @onclick="KeepEditing">Keep editing</button>
+            </div>
+        </section>
+    </div>
+}

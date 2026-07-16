@@ -29,6 +29,7 @@ using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.SiteAccess;
 using BlokeBot.Features.Toasts;
 using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
@@ -44,6 +45,8 @@ public partial class HostedChannelRow
 {
     private const int _removalAnimationDelayMs = 150;
     private bool _pendingRemoval;
+    private string _removalConfirmation = string.Empty;
+    private bool _showRemovalConfirmation;
 
     [Parameter, EditorRequired]
     public HostedChannelAdminView Host { get; set; } =
@@ -70,6 +73,12 @@ public partial class HostedChannelRow
 
     private string _editHostHref =>
         $"/admin/select-host?hostId={Host.Id}&returnUrl={Uri.EscapeDataString("/admin")}";
+
+    private string _removalConfirmationInputId => $"remove-host-{Host.Id}-confirmation";
+
+    private bool _canConfirmRemoval =>
+        Login.Normalize(_removalConfirmation) is { Length: > 0 } confirmation
+        && string.Equals(confirmation, Login.Normalize(Host.Login), StringComparison.Ordinal);
 
     private string _rowClass =>
         _pendingRemoval
@@ -152,5 +161,38 @@ public partial class HostedChannelRow
         {
             _pendingRemoval = false;
         }
+    }
+
+    private void OpenRemovalConfirmation()
+    {
+        if (_pendingRemoval)
+        {
+            return;
+        }
+
+        _removalConfirmation = string.Empty;
+        _showRemovalConfirmation = true;
+    }
+
+    private void UpdateRemovalConfirmation(ChangeEventArgs args)
+    {
+        _removalConfirmation = args.Value?.ToString() ?? string.Empty;
+    }
+
+    private void CancelRemoval()
+    {
+        _removalConfirmation = string.Empty;
+        _showRemovalConfirmation = false;
+    }
+
+    private async Task ConfirmRemovalAsync()
+    {
+        if (!_canConfirmRemoval)
+        {
+            return;
+        }
+
+        _showRemovalConfirmation = false;
+        await RemoveHostAsync();
     }
 }
