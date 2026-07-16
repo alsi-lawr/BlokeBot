@@ -6,6 +6,7 @@ internal static class SiteRoutes
     [
         "/",
         "/how-it-works",
+        "/install",
         "/guide",
         "/guide/getting-started",
         "/dashboard",
@@ -22,5 +23,5 @@ internal static class SiteRoutes
         "/server-owners",
     ];
 
-    internal static IReadOnlyList<string> GuideTopics { get; } = All.Skip(3).ToArray();
+    internal static IReadOnlyList<string> GuideTopics { get; } = All.Skip(4).ToArray();
 }

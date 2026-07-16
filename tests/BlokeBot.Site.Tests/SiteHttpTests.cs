@@ -44,6 +44,12 @@ public sealed class SiteHttpTests
             content.ShouldContain("<h1");
             content.ShouldNotContain("<form", Case.Insensitive);
             content.ShouldNotContain("_framework/blazor", Case.Insensitive);
+            if (route == "/install")
+            {
+                content.ShouldContain("Release-ready, not yet published");
+                content.ShouldContain("blokebot help");
+                content.ShouldContain("manual upstream review pending");
+            }
         }
 
         foreach (var asset in _staticAssets)

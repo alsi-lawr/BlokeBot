@@ -11,6 +11,7 @@ public sealed class SiteBoundaryTests
     [
         "/",
         "/how-it-works",
+        "/install",
         "/guide",
         "/guide/getting-started",
         "/dashboard",
@@ -56,9 +57,7 @@ public sealed class SiteBoundaryTests
 
     private static readonly IReadOnlyList<string> _technicalInstructions =
     [
-        "docker run",
         "dotnet run",
-        "nix run",
         "systemctl",
         "BotUsername",
         "ClientSecret",
@@ -112,10 +111,30 @@ public sealed class SiteBoundaryTests
     }
 
     [Test]
-    public void PublicRouteContract_IsExactAndHasNoInstallationRoute()
+    public void PublicRouteContract_IncludesOnlyTheAuthorisedInstallationRoute()
     {
         SiteRoutes.All.ShouldBe(_expectedRoutes);
-        SiteRoutes.All.ShouldNotContain("/install");
+        SiteRoutes.All.ShouldContain("/install");
         SiteRoutes.All.ShouldNotContain("/installation");
+    }
+
+    [Test]
+    public void InstallationCommands_AreConfinedToTheAuthorisedStaticPage()
+    {
+        var pages = Path.Combine(SiteTestPaths.SiteRoot, "Components", "Pages");
+        var installPage = Path.Combine(pages, "Install.razor");
+        var installSource = File.ReadAllText(installPage);
+        var otherSource = string.Join(
+            '\n',
+            Directory
+                .EnumerateFiles(pages, "*.razor", SearchOption.TopDirectoryOnly)
+                .Where(path => !string.Equals(path, installPage, StringComparison.Ordinal))
+                .Select(File.ReadAllText)
+        );
+
+        installSource.ShouldContain("nix run github:alsi-lawr/BlokeBot#blokebot -- serve");
+        installSource.ShouldContain("docker run --rm -p 8080:8080");
+        otherSource.ShouldNotContain("docker run", Case.Insensitive);
+        otherSource.ShouldNotContain("nix run", Case.Insensitive);
     }
 }

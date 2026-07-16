@@ -363,6 +363,299 @@ jobs:
             --title "BlokeBot v0.1.0" \
             --notes "Immutable BlokeBot v0.1.0 application archives and checksums."
 
+  package-metadata:
+    name: Generate and validate package-channel metadata
+    needs: github-release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out package-channel tooling
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up Java 21 for pinned JReleaser
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Download the immutable published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p artifacts/release
+          test -z "$(find artifacts/release -mindepth 1 -print -quit)"
+          gh release download v0.1.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir artifacts/release \
+            --pattern 'blokebot-v0.1.0-*' \
+            --pattern checksums.toml
+      - name: Verify release assets before generating metadata
+        run: >-
+          python scripts/release_artifacts.py verify
+          --archive-dir artifacts/release
+          --checksums artifacts/release/checksums.toml
+      - name: Generate deterministic package metadata
+        run: >-
+          python scripts/package_metadata.py generate
+          --release-dir artifacts/release
+          --checksums artifacts/release/checksums.toml
+          --output-dir artifacts/package-metadata
+      - name: Validate generated package metadata
+        run: >-
+          python scripts/package_metadata.py validate
+          --release-dir artifacts/release
+          --checksums artifacts/release/checksums.toml
+          --output-dir artifacts/package-metadata
+      - name: Validate the real JReleaser 1.25.0 schema
+        env:
+          JRELEASER_GITHUB_TOKEN: validation-only
+        run: >-
+          python scripts/run_jreleaser.py
+          --cache-dir "$RUNNER_TEMP/jreleaser"
+          --
+          config
+          --strict
+          --full
+          --git-root-search
+          --basedir="$GITHUB_WORKSPACE/artifacts/package-metadata/jreleaser"
+          --config-file="$GITHUB_WORKSPACE/artifacts/package-metadata/jreleaser/jreleaser.yml"
+          --output-directory="$RUNNER_TEMP/jreleaser-output"
+      - name: Revalidate the reviewable metadata file set
+        run: >-
+          python scripts/package_metadata.py validate
+          --release-dir artifacts/release
+          --checksums artifacts/release/checksums.toml
+          --output-dir artifacts/package-metadata
+      - name: Upload reviewable package metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: package-metadata-v0.1.0
+          path: artifacts/package-metadata
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  package-homebrew-test:
+    name: Test Homebrew package lifecycle
+    needs: package-metadata
+    runs-on: macos-15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out package smoke tooling
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Download package metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: package-metadata-v0.1.0
+          path: artifacts/package-metadata
+      - name: Clean install, smoke, upgrade, and uninstall Homebrew formula
+        run: |
+          state_directory="$RUNNER_TEMP/blokebot-user-data"
+          mkdir -p "$state_directory"
+          printf 'preserve\n' > "$state_directory/marker"
+          formula="$GITHUB_WORKSPACE/artifacts/package-metadata/homebrew/Formula/blokebot.rb"
+          brew install --formula "$formula"
+          blokebot version | grep -F 'blokebot 0.1.0'
+          blokebot help | grep -F 'blokebot serve'
+          python scripts/release_smoke.py "$(command -v blokebot)"
+          brew reinstall --formula "$formula"
+          test "$(cat "$state_directory/marker")" = preserve
+          brew uninstall blokebot
+          if command -v blokebot; then
+            echo 'Homebrew left the blokebot executable installed.' >&2
+            exit 1
+          fi
+          test "$(cat "$state_directory/marker")" = preserve
+
+  package-windows-test:
+    name: Test Windows package lifecycles (${{ matrix.architecture }})
+    needs: package-metadata
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2025
+          - architecture: arm64
+            runner: windows-11-arm
+    steps:
+      - name: Check out package smoke tooling
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Download package metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: package-metadata-v0.1.0
+          path: artifacts/package-metadata
+      - name: Test Scoop when available on the native runner
+        shell: pwsh
+        run: |
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+              Write-Host '::notice::Scoop is unavailable on this native runner; deterministic manifest validation remains required.'
+              exit 0
+          }
+          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-scoop-user-data'
+          New-Item -ItemType Directory -Force $stateDirectory | Out-Null
+          Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
+          $manifest = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package-metadata/scoop/blokebot.json'
+          scoop install $manifest
+          blokebot version | Select-String -SimpleMatch 'blokebot 0.1.0'
+          blokebot help | Select-String -SimpleMatch 'blokebot serve'
+          python scripts/release_smoke.py (Get-Command blokebot).Source
+          scoop update blokebot
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Scoop upgrade changed user data.' }
+          scoop uninstall blokebot
+          if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'Scoop left the blokebot shim installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Scoop uninstall changed user data.' }
+      - name: Test Chocolatey when available on the native runner
+        shell: pwsh
+        run: |
+          if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+              Write-Host '::notice::Chocolatey is unavailable on this native runner; metadata generation and validation remain required.'
+              exit 0
+          }
+          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-chocolatey-user-data'
+          New-Item -ItemType Directory -Force $stateDirectory | Out-Null
+          Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
+          $packageDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-chocolatey-package'
+          New-Item -ItemType Directory -Force $packageDirectory | Out-Null
+          choco pack artifacts/package-metadata/chocolatey/blokebot.nuspec --output-directory $packageDirectory
+          choco install blokebot --source $packageDirectory --version 0.1.0 --yes --no-progress
+          refreshenv
+          blokebot version | Select-String -SimpleMatch 'blokebot 0.1.0'
+          blokebot help | Select-String -SimpleMatch 'blokebot serve'
+          python scripts/release_smoke.py (Get-Command blokebot).Source
+          choco upgrade blokebot --source $packageDirectory --version 0.1.0 --force --yes --no-progress
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Chocolatey upgrade changed user data.' }
+          choco uninstall blokebot --yes --no-progress
+          refreshenv
+          if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'Chocolatey left the blokebot shim installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Chocolatey uninstall changed user data.' }
+      - name: Validate and test WinGet when available on the native runner
+        shell: pwsh
+        run: |
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+              Write-Host '::notice::WinGet is unavailable on this native runner; the manual upstream-PR bundle remains unpublished.'
+              exit 0
+          }
+          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-winget-user-data'
+          New-Item -ItemType Directory -Force $stateDirectory | Out-Null
+          Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
+          $manifestDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package-metadata/winget/manifests/a/alsi-lawr/BlokeBot/0.1.0'
+          winget validate --manifest $manifestDirectory
+          winget settings --enable LocalManifestFiles
+          winget install --manifest $manifestDirectory --accept-package-agreements --accept-source-agreements --disable-interactivity
+          $env:PATH = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
+          blokebot version | Select-String -SimpleMatch 'blokebot 0.1.0'
+          blokebot help | Select-String -SimpleMatch 'blokebot serve'
+          python scripts/release_smoke.py (Get-Command blokebot).Source
+          winget upgrade --id alsi-lawr.BlokeBot --version 0.1.0 --exact --force --accept-package-agreements --accept-source-agreements --disable-interactivity
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'WinGet upgrade changed user data.' }
+          winget uninstall --id alsi-lawr.BlokeBot --exact --disable-interactivity
+          $env:PATH = [Environment]::GetEnvironmentVariable('Path', 'User') + ';' + [Environment]::GetEnvironmentVariable('Path', 'Machine')
+          if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'WinGet left the portable alias installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'WinGet uninstall changed user data.' }
+
+  publish-homebrew-scoop:
+    name: Publish Homebrew and Scoop metadata when authorised
+    needs:
+      - package-homebrew-test
+      - package-windows-test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out publication boundary
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Download validated package metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: package-metadata-v0.1.0
+          path: artifacts/package-metadata
+      - name: Detect package-repository publication authority
+        id: gate
+        env:
+          PACKAGE_REPOSITORY_TOKEN: ${{ secrets.PACKAGE_REPOSITORY_TOKEN }}
+        run: |
+          if test -z "$PACKAGE_REPOSITORY_TOKEN"; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::PACKAGE_REPOSITORY_TOKEN is absent; Homebrew and Scoop publication is skipped, not reported as successful.'
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish without creating repositories or overwriting v0.1.0 metadata
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGE_REPOSITORY_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          publish_file() {
+            repository="$1"
+            source="$2"
+            target="$3"
+            gh repo view "$repository" >/dev/null
+            checkout="$RUNNER_TEMP/${repository##*/}"
+            gh repo clone "$repository" "$checkout" -- --depth=1
+            if test -e "$checkout/$target"; then
+              echo "Refusing to overwrite existing immutable package metadata: $repository/$target" >&2
+              exit 1
+            fi
+            mkdir -p "$(dirname "$checkout/$target")"
+            cp "$source" "$checkout/$target"
+            git -C "$checkout" config user.name 'github-actions[bot]'
+            git -C "$checkout" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git -C "$checkout" add -- "$target"
+            git -C "$checkout" commit -m 'feat: add blokebot v0.1.0'
+            git -C "$checkout" push origin HEAD
+          }
+          publish_file \
+            alsi-lawr/homebrew-tap \
+            "$GITHUB_WORKSPACE/artifacts/package-metadata/homebrew/Formula/blokebot.rb" \
+            Formula/blokebot.rb
+          publish_file \
+            alsi-lawr/scoop-bucket \
+            "$GITHUB_WORKSPACE/artifacts/package-metadata/scoop/blokebot.json" \
+            bucket/blokebot.json
+
+  publish-chocolatey:
+    name: Submit Chocolatey package when authorised
+    needs: package-windows-test
+    runs-on: windows-2025
+    permissions:
+      contents: read
+    steps:
+      - name: Download validated package metadata
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: package-metadata-v0.1.0
+          path: artifacts/package-metadata
+      - name: Always build the reviewable Chocolatey metadata package
+        shell: pwsh
+        run: choco pack artifacts/package-metadata/chocolatey/blokebot.nuspec --output-directory artifacts/chocolatey
+      - name: Upload reviewable Chocolatey package metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: chocolatey-metadata-v0.1.0
+          path: artifacts/chocolatey/blokebot.0.1.0.nupkg
+          if-no-files-found: error
+          retention-days: 30
+      - name: Submit only when the Chocolatey API key exists
+        shell: pwsh
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CHOCOLATEY_API_KEY)) {
+              Write-Host '::notice::CHOCOLATEY_API_KEY is absent; Chocolatey publication is skipped, not reported as successful.'
+              exit 0
+          }
+          choco push artifacts/chocolatey/blokebot.0.1.0.nupkg `
+              --source https://push.chocolatey.org/ `
+              --api-key $env:CHOCOLATEY_API_KEY
+          Write-Host '::notice::Chocolatey upload completed; public availability remains pending Chocolatey moderation.'
+
   promote-latest:
     name: Promote attested images to latest
     needs:

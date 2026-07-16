@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 from pathlib import Path
 import stat
+from unittest.mock import patch
 import tempfile
 import unittest
 import zipfile
@@ -72,6 +73,23 @@ class JReleaserRunnerTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(run_jreleaser.JReleaserInstallError, "Unsafe"):
             run_jreleaser.install_archive(archive, self.root / "unsafe", digest)
+
+    def test_argument_separator_is_not_forwarded_to_jreleaser(self) -> None:
+        launcher = self.root / "jreleaser"
+        launcher.write_bytes(b"launcher")
+        completed = run_jreleaser.subprocess.CompletedProcess([], 0)
+
+        with (
+            patch.object(run_jreleaser, "download_archive", return_value=self.root / "archive"),
+            patch.object(run_jreleaser, "install_archive", return_value=launcher),
+            patch.object(run_jreleaser.subprocess, "run", return_value=completed) as run,
+        ):
+            result = run_jreleaser.main(
+                ["--cache-dir", str(self.root / "cache"), "--", "--version"]
+            )
+
+        self.assertEqual(result, 0)
+        run.assert_called_once_with([str(launcher), "--version"], check=False)
 
 
 if __name__ == "__main__":

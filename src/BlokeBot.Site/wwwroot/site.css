@@ -411,6 +411,46 @@ main {
     font-size: 1.4rem;
 }
 
+.status-panel,
+.install-index {
+    margin-block: 2rem;
+    padding: 1.4rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: 0.85rem;
+    background: var(--surface-soft);
+}
+
+.status-panel h2,
+.install-index h2 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+.status-panel p,
+.install-index ul {
+    margin-bottom: 0;
+}
+
+.install-index ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    padding-left: 1.25rem;
+}
+
+.install-page pre {
+    overflow-x: auto;
+    padding: 1rem;
+    border: 0.0625rem solid var(--line);
+    border-radius: 0.65rem;
+    color: var(--ink);
+    background: var(--surface);
+}
+
+.install-page code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 .site-footer {
     margin-top: 2rem;
     border-top: 0.0625rem solid var(--line);

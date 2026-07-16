@@ -18,6 +18,7 @@ class ReleaseConfigurationTests(unittest.TestCase):
             "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4"),
             "actions/download-artifact": ("d3f86a106a0bac45b974a628896c90dbdf5c8093", "v4"),
             "actions/attest": ("a1948c3f048ba23858d222213b7c278aabede763", "v4"),
+            "actions/setup-java": ("0f481fcb613427c0f801b606911222b5b6f3083a", "v5"),
             "cachix/install-nix-action": (
                 "630ae543ea3a38a9a4166f03376c02c50f408342",
                 "v31",
@@ -52,6 +53,55 @@ class ReleaseConfigurationTests(unittest.TestCase):
         self.assertNotIn("capture-site-media", workflow)
         self.assertLess(workflow.index("Generate and verify final checksums"), workflow.index("Attest the final archive"))
         self.assertLess(workflow.index("Attest the final multi-architecture digest"), workflow.index("Promote attested images to latest"))
+
+    def test_package_metadata_runs_only_after_release_and_uses_pinned_jreleaser(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        package_section = workflow.split("  package-metadata:", 1)[1].split(
+            "  package-homebrew-test:", 1
+        )[0]
+
+        self.assertIn("needs: github-release", package_section)
+        self.assertIn("gh release download v0.1.0", package_section)
+        self.assertIn("scripts/package_metadata.py generate", package_section)
+        self.assertIn("scripts/package_metadata.py validate", package_section)
+        self.assertIn("scripts/run_jreleaser.py", package_section)
+        invocation = """--
+          config
+          --strict
+          --full
+          --git-root-search
+          --basedir="$GITHUB_WORKSPACE/artifacts/package-metadata/jreleaser"
+          --config-file="$GITHUB_WORKSPACE/artifacts/package-metadata/jreleaser/jreleaser.yml"
+          --output-directory="$RUNNER_TEMP/jreleaser-output"""
+        self.assertIn(invocation, package_section)
+        self.assertIn("JRELEASER_GITHUB_TOKEN: validation-only", package_section)
+        self.assertIn("package-metadata-v0.1.0", package_section)
+
+    def test_package_publication_is_secret_gated_and_winget_stays_manual(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("PACKAGE_REPOSITORY_TOKEN is absent", workflow)
+        self.assertIn("CHOCOLATEY_API_KEY is absent", workflow)
+        self.assertIn("pending Chocolatey moderation", workflow)
+        self.assertIn("alsi-lawr/homebrew-tap", workflow)
+        self.assertIn("alsi-lawr/scoop-bucket", workflow)
+        self.assertIn("winget validate --manifest", workflow)
+        self.assertNotIn("wingetcreate submit", workflow.casefold())
+        self.assertNotIn("microsoft/winget-pkgs.git", workflow)
+
+    def test_package_lifecycle_matrix_preserves_external_user_data(self) -> None:
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+
+        for manager in ("brew install", "scoop install", "choco install", "winget install"):
+            self.assertIn(manager, workflow)
+        for operation in ("upgrade", "uninstall"):
+            self.assertIn(operation, workflow)
+        self.assertIn("blokebot version", workflow)
+        self.assertIn("blokebot help", workflow)
+        self.assertIn("scripts/release_smoke.py", workflow)
+        self.assertGreaterEqual(workflow.count("marker"), 8)
+        self.assertIn('brew reinstall --formula "$formula"', workflow)
+        self.assertNotIn("brew upgrade blokebot", workflow)
 
     def test_publish_configuration_excludes_non_release_content(self) -> None:
         project = (ROOT / "src" / "BlokeBot" / "BlokeBot.csproj").read_text(

@@ -1,0 +1,91 @@
+@page "/install"
+
+<PageTitle>Install BlokeBot — release-ready routes</PageTitle>
+
+<article class="article-shell install-page">
+    <header class="article-header">
+        <p class="eyebrow">Installation</p>
+        <h1>Choose how to install BlokeBot</h1>
+        <p class="lede">BlokeBot is free, open-source and easy to host. The routes below are configured for v0.1.0 and show their publication status honestly.</p>
+    </header>
+
+    <aside class="status-panel" aria-labelledby="install-status-title">
+        <h2 id="install-status-title">Release-ready, not yet published</h2>
+        <p>BlokeBot v0.1.0 has not been released yet. The archives, images and package metadata are configured, but the external channels below must not be treated as live until their stated publication or review step finishes.</p>
+    </aside>
+
+    <nav class="install-index" aria-label="Installation routes">
+        <h2>Installation routes</h2>
+        <ul>
+            <li><a href="#archives">Direct archives</a></li>
+            <li><a href="#nix">Nix</a></li>
+            <li><a href="#containers">Containers</a></li>
+            <li><a href="#homebrew">Homebrew</a></li>
+            <li><a href="#scoop">Scoop</a></li>
+            <li><a href="#chocolatey">Chocolatey</a></li>
+            <li><a href="#winget">WinGet</a></li>
+        </ul>
+    </nav>
+
+    <section id="archives" aria-labelledby="archives-title">
+        <h2 id="archives-title">Direct archives</h2>
+        <p><strong>Status: pending the immutable v0.1.0 GitHub release.</strong> These links will provide the original self-contained application directories. Verify the selected file against <a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/checksums.toml">checksums.toml</a>; package channels consume these same bytes rather than rebuilding them.</p>
+        <ul class="link-list">
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-x64.tar.gz">Linux x64 archive</a></li>
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-arm64.tar.gz">Linux ARM64 archive</a></li>
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-osx-arm64.tar.gz">macOS Apple Silicon archive</a></li>
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-x64.zip">Windows x64 archive</a></li>
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-arm64.zip">Windows ARM64 archive</a></li>
+        </ul>
+    </section>
+
+    <section id="nix" aria-labelledby="nix-title">
+        <h2 id="nix-title">Nix</h2>
+        <p><strong>Status: configured in the repository; the v0.1.0 tag is pending.</strong> Until that tag exists, pin a reviewed commit rather than assuming a release version.</p>
+        <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot -- serve</code></pre>
+    </section>
+
+    <section id="containers" aria-labelledby="containers-title">
+        <h2 id="containers-title">Containers</h2>
+        <p><strong>Status: release-ready, with v0.1.0 images pending publication.</strong> The bot image uses external durable state at <code>/data</code>; do not put that state in a disposable container layer.</p>
+        <pre><code>docker run --rm -p 8080:8080 -v blokebot-data:/data ghcr.io/alsi-lawr/blokebot:v0.1.0</code></pre>
+        <p>The separate stateless public site image will use <code>ghcr.io/alsi-lawr/blokebot-site:v0.1.0</code> after the same immutable release succeeds.</p>
+    </section>
+
+    <section id="homebrew" aria-labelledby="homebrew-title">
+        <h2 id="homebrew-title">Homebrew on Apple Silicon</h2>
+        <p><strong>Status: formula ready; tap repository not created.</strong> <code>alsi-lawr/homebrew-tap</code> does not exist yet, so this command is not live.</p>
+        <pre><code>brew install alsi-lawr/tap/blokebot</code></pre>
+    </section>
+
+    <section id="scoop" aria-labelledby="scoop-title">
+        <h2 id="scoop-title">Scoop on Windows</h2>
+        <p><strong>Status: x64 and ARM64 manifest ready; bucket repository not created.</strong> <code>alsi-lawr/scoop-bucket</code> does not exist yet, so these commands are not live.</p>
+        <pre><code>scoop bucket add alsi-lawr https://github.com/alsi-lawr/scoop-bucket
+scoop install blokebot</code></pre>
+    </section>
+
+    <section id="chocolatey" aria-labelledby="chocolatey-title">
+        <h2 id="chocolatey-title">Chocolatey on Windows</h2>
+        <p><strong>Status: x64 and ARM64 metadata ready; publication and moderation pending.</strong> The release workflow submits only when its Chocolatey API key exists. Even after submission, this command is not live until Chocolatey approves the package.</p>
+        <pre><code>choco install blokebot --version=0.1.0</code></pre>
+    </section>
+
+    <section id="winget" aria-labelledby="winget-title">
+        <h2 id="winget-title">WinGet on Windows</h2>
+        <p><strong>Status: x64 and ARM64 portable manifests ready; manual upstream review pending.</strong> Automation creates a reviewable bundle but does not open the upstream pull request. This command is not live until that manual submission is accepted.</p>
+        <pre><code>winget install --id alsi-lawr.BlokeBot --version 0.1.0 --exact</code></pre>
+    </section>
+
+    <section aria-labelledby="after-install-title">
+        <h2 id="after-install-title">After installation</h2>
+        <p>Every route exposes the lowercase <code>blokebot</code> command and starts nothing automatically. Begin with:</p>
+        <pre><code>blokebot help</code></pre>
+        <p>Persistent state belongs in the platform data location or an explicit data directory, not in the package installation directory. Upgrades and uninstalls are designed to leave that user data in place.</p>
+    </section>
+
+    <section aria-labelledby="server-owner-title">
+        <h2 id="server-owner-title">Server owners configure Twitch</h2>
+        <p>The person operating the server is responsible for the Twitch application, client secret, redirect URI and callback configuration. Continue to the <a href="/server-owners">server owner page</a> and the <a href="https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide">technical Server Owner Guide</a> instead of sharing those secrets with channel owners or moderators.</p>
+    </section>
+</article>

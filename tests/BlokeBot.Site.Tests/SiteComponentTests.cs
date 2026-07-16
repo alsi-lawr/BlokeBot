@@ -105,7 +105,7 @@ public sealed class SiteComponentTests
         }
 
         internalLinks.Except(SiteRoutes.All).ShouldBeEmpty();
-        internalLinks.ShouldNotContain("/install");
+        internalLinks.ShouldContain("/install");
         mediaSources.ShouldBe(_expectedMedia, ignoreOrder: true);
 
         foreach (var source in mediaSources)
@@ -132,6 +132,60 @@ public sealed class SiteComponentTests
             .Find("a[href^='https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide']")
             .TextContent.Trim()
             .ShouldBe("Open the technical Server Owner Guide");
+    }
+
+    [Test]
+    public void InstallationPage_ShowsConfiguredRoutesWithoutClaimingTheyAreLive()
+    {
+        using var context = new BunitContext();
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/install");
+        var rendered = context.Render<Routes>();
+
+        rendered.Find("h1").TextContent.Trim().ShouldBe("Choose how to install BlokeBot");
+        rendered
+            .Find(".status-panel h2")
+            .TextContent.Trim()
+            .ShouldBe("Release-ready, not yet published");
+        rendered.Find("nav[aria-label='Installation routes']").ShouldNotBeNull();
+        rendered
+            .FindAll("#archives a[href*='/releases/download/v0.1.0/blokebot-v0.1.0-']")
+            .Count.ShouldBe(5);
+
+        var content = rendered.Markup;
+        foreach (
+            var status in new[]
+            {
+                "v0.1.0 has not been released yet",
+                "tap repository not created",
+                "bucket repository not created",
+                "publication and moderation pending",
+                "manual upstream review pending",
+            }
+        )
+        {
+            content.ShouldContain(status);
+        }
+
+        foreach (
+            var command in new[]
+            {
+                "nix run github:alsi-lawr/BlokeBot#blokebot -- serve",
+                "ghcr.io/alsi-lawr/blokebot:v0.1.0",
+                "brew install alsi-lawr/tap/blokebot",
+                "scoop install blokebot",
+                "choco install blokebot --version=0.1.0",
+                "winget install --id alsi-lawr.BlokeBot --version 0.1.0 --exact",
+                "blokebot help",
+            }
+        )
+        {
+            content.ShouldContain(command);
+        }
+
+        rendered.Find("a[href='/server-owners']").ShouldNotBeNull();
+        rendered
+            .Find("a[href^='https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide']")
+            .ShouldNotBeNull();
     }
 
     private static void AssertHeadingOrder(IReadOnlyList<IElement> headings, string route)

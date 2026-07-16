@@ -140,9 +140,10 @@ def main(arguments: list[str] | None = None) -> int:
     args = _parser().parse_args(arguments)
     archive = args.cache_dir / f"jreleaser-{JRELEASER_VERSION}.zip"
     installation_root = args.cache_dir / "installations"
+    jreleaser_arguments = args.arguments[1:] if args.arguments[:1] == ["--"] else args.arguments
     try:
         launcher = install_archive(download_archive(archive), installation_root)
-        return subprocess.run([str(launcher), *args.arguments], check=False).returncode
+        return subprocess.run([str(launcher), *jreleaser_arguments], check=False).returncode
     except (JReleaserInstallError, OSError, urllib.error.URLError) as error:
         print(f"run-jreleaser: {error}", file=sys.stderr)
         return 2
