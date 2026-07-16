@@ -9,6 +9,7 @@ public sealed class PointsGiveawayMessageFormatter
 {
     private const string _streamLivenessUnavailableReply =
         "Stream status could not be checked right now.";
+    private const string _invalidConfigurationReply = "Giveaway is unavailable.";
     private const string _payoutFailedReply = "Giveaway prizes could not be awarded.";
 
     public PointOperationOutcome Reply(
@@ -19,6 +20,11 @@ public sealed class PointsGiveawayMessageFormatter
         return outcome.Match<PointOperationOutcome>(
             started =>
                 Succeeded(FormatPlain(started.Settings.GiveawayStartedReply, started.Settings)),
+            invalidConfiguration =>
+                Failed(
+                    $"{_invalidConfigurationReply} {invalidConfiguration.Failure.Message}",
+                    CommandResponseTarget.Chat
+                ),
             alreadyActive =>
                 Failed(
                     FormatPlain(

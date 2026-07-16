@@ -1,5 +1,6 @@
 using BlokeBot.Features.Commands;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.Replies;
@@ -456,6 +457,20 @@ public sealed class GambleCommandStrategy(
             return;
         }
 
+        if (resolution.Settings.GamblingCooldownSeconds < 0)
+        {
+            var failure = new PointsConfigurationValidationError.NegativeGamblingCooldown();
+            await ReplyAsync(
+                context,
+                new PointOperationOutcome.Failed(
+                    $"Gambling is unavailable. {failure.Message}",
+                    CommandResponseTarget.Chat
+                ),
+                cancellationToken
+            );
+            return;
+        }
+
         var source = await balances.GetBalanceAsync(
             resolution.HostId,
             context.Command.Message.Login,
@@ -540,10 +555,9 @@ public sealed class GambleCommandStrategy(
 
     private TimeSpan Cooldown(PointsSettings settings)
     {
-        var seconds = Math.Max(
-            Math.Max(0, settings.GamblingCooldownSeconds),
-            Math.Max(0, options.Value.Points.MinimumGamblingCooldownSeconds)
-        );
+        var configuredSeconds = settings.GamblingCooldownSeconds;
+        var minimumSeconds = options.Value.Points.MinimumGamblingCooldownSeconds;
+        var seconds = configuredSeconds < minimumSeconds ? minimumSeconds : configuredSeconds;
         return TimeSpan.FromSeconds(seconds);
     }
 }

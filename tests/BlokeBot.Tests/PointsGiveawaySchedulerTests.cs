@@ -9,6 +9,7 @@ using BlokeBot.Features.HostedChannels.Runtime;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Gambling;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Replies;
@@ -755,10 +756,19 @@ public sealed class PointsGiveawaySchedulerTests
     }
 
     [Test]
-    public async Task ActiveGiveaway_RequestingStartOutcome_ReturnsAlreadyActive()
+    public async Task InvalidSettingsWithActiveGiveaway_RequestingStartOutcome_ReturnsAlreadyActive()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(
+            dbFactory,
+            hostId,
+            settings =>
+            {
+                settings.GiveawayDurationSeconds = 0;
+                settings.GiveawayWinnerCount = 0;
+            }
+        );
         await SeedGiveawayAsync(dbFactory, hostId, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
         var service = CreateGiveawayService(dbFactory, new RecordingGiveawayScheduler());
 
@@ -770,6 +780,58 @@ public sealed class PointsGiveawaySchedulerTests
         );
 
         outcome.ShouldBeOfType<PointsGiveawayStartOutcome.AlreadyActive>();
+    }
+
+    [Test]
+    public async Task DurationBelowOne_RequestingStartOutcome_ReturnsInvalidWithoutStarting()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(
+            dbFactory,
+            hostId,
+            settings => settings.GiveawayDurationSeconds = 0
+        );
+        var scheduler = new RecordingGiveawayScheduler();
+        var service = CreateGiveawayService(dbFactory, scheduler, streamIsLive: true);
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        var invalid = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.InvalidConfiguration>();
+        invalid.Settings.GiveawayDurationSeconds.ShouldBe(0);
+        invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayDurationBelowMinimum>();
+        scheduler.Scheduled.ShouldBeEmpty();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PointsGiveaways.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task WinnerCountBelowOne_RequestingStartOutcome_ReturnsInvalidWithoutStarting()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedSettingsAsync(dbFactory, hostId, settings => settings.GiveawayWinnerCount = 0);
+        var scheduler = new RecordingGiveawayScheduler();
+        var service = CreateGiveawayService(dbFactory, scheduler, streamIsLive: true);
+
+        var outcome = await service.StartOutcomeAsync(
+            hostId,
+            "streamer",
+            null,
+            CancellationToken.None
+        );
+
+        var invalid = outcome.ShouldBeOfType<PointsGiveawayStartOutcome.InvalidConfiguration>();
+        invalid.Settings.GiveawayWinnerCount.ShouldBe(0);
+        invalid.Failure.ShouldBeOfType<PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum>();
+        scheduler.Scheduled.ShouldBeEmpty();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PointsGiveaways.CountAsync(x => x.HostId == hostId)).ShouldBe(0);
     }
 
     [Test]
@@ -1085,10 +1147,11 @@ public sealed class PointsGiveawaySchedulerTests
     private static PointsGiveawayService CreateGiveawayService(
         SqliteBlokeBotDbFactory dbFactory,
         IPointsGiveawayScheduler scheduler,
-        IHostBotAppAccessTokenSource? appTokens = null
+        IHostBotAppAccessTokenSource? appTokens = null,
+        bool streamIsLive = false
     )
     {
-        var httpClientFactory = new FakeHttpClientFactory();
+        var httpClientFactory = new FakeHttpClientFactory(streamIsLive);
         var options = BotSettings.FromOptions(new BotOptions());
         var helix = new HelixClient(httpClientFactory);
         var status = new HostBotStatusService(
@@ -1622,7 +1685,12 @@ public sealed class PointsGiveawaySchedulerTests
     {
         public List<int> Cancelled { get; } = [];
 
-        public void Schedule(PointsGiveawaySchedule schedule) { }
+        public List<PointsGiveawaySchedule> Scheduled { get; } = [];
+
+        public void Schedule(PointsGiveawaySchedule schedule)
+        {
+            Scheduled.Add(schedule);
+        }
 
         public void Cancel(int giveawayId)
         {
@@ -1643,16 +1711,16 @@ public sealed class PointsGiveawaySchedulerTests
         }
     }
 
-    private sealed class FakeHttpClientFactory : IHttpClientFactory
+    private sealed class FakeHttpClientFactory(bool streamIsLive = false) : IHttpClientFactory
     {
-        private readonly Handler _handler = new();
+        private readonly Handler _handler = new(streamIsLive);
 
         public HttpClient CreateClient(string name)
         {
             return new(_handler, disposeHandler: false);
         }
 
-        private sealed class Handler : HttpMessageHandler
+        private sealed class Handler(bool streamIsLive) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
@@ -1663,7 +1731,31 @@ public sealed class PointsGiveawaySchedulerTests
                     new HttpResponseMessage(HttpStatusCode.OK)
                     {
                         Content = new StringContent(
-                            """{"data":[]}""",
+                            streamIsLive
+                                ? """
+                                {
+                                  "data": [
+                                    {
+                                      "id": "stream-id",
+                                      "user_id": "user-id",
+                                      "user_login": "streamer",
+                                      "user_name": "Streamer",
+                                      "game_id": "game-id",
+                                      "game_name": "Example Game",
+                                      "type": "live",
+                                      "title": "Representative stream",
+                                      "tags": [],
+                                      "viewer_count": 42,
+                                      "started_at": "2026-07-13T12:34:56Z",
+                                      "language": "en",
+                                      "thumbnail_url": "https://example.test/{width}x{height}.jpg",
+                                      "is_mature": false
+                                    }
+                                  ],
+                                  "pagination": {}
+                                }
+                                """
+                                : """{"data":[],"pagination":{}}""",
                             Encoding.UTF8,
                             "application/json"
                         ),

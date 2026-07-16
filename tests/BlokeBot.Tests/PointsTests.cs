@@ -530,6 +530,49 @@ public sealed class PointsTests
     }
 
     [Test]
+    public async Task NegativeGamblingCooldown_ExecutingGamble_ReturnsUnavailableWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedPointsSettingsAsync(
+            dbFactory,
+            hostId,
+            settings =>
+            {
+                settings.GamblingWinRatePercent = 100;
+                settings.GamblingCooldownSeconds = -1;
+            }
+        );
+        await AddBalanceAsync(dbFactory, hostId, "alice", "100");
+        var strategy = CreateGambleStrategy(dbFactory, clock);
+        List<string> replies = [];
+
+        await strategy.ExecuteAsync(
+            CommandContext(
+                hostId,
+                "alice",
+                "streamer",
+                "gamble",
+                ["10"],
+                replies,
+                PointsCommandKind.Gamble
+            ),
+            CancellationToken.None
+        );
+
+        replies.ShouldBe(["Gambling is unavailable. The wait between gambles cannot be negative."]);
+        var balance = await new PointBalanceService(dbFactory).GetBalanceAsync(
+            hostId,
+            "alice",
+            CancellationToken.None
+        );
+        balance.Balance.ToString().ShouldBe("100");
+    }
+
+    [Test]
     public async Task ChangedGamblingCooldown_SavingConfiguration_RoundTripsValue()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

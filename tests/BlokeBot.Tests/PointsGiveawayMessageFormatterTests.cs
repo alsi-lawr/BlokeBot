@@ -1,5 +1,6 @@
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Points.Giveaways;
 using BlokeBot.Features.Points.Replies;
 using BlokeBot.Features.Replies;
@@ -31,6 +32,17 @@ public sealed class PointsGiveawayMessageFormatterTests
         AssertSucceeded(
             _formatter.Reply(new PointsGiveawayStartOutcome.Started(_settings), delivery),
             "Giveaway started. Type !join to enter.",
+            CommandResponseTarget.Chat
+        );
+        AssertFailed(
+            _formatter.Reply(
+                new PointsGiveawayStartOutcome.InvalidConfiguration(
+                    _settings,
+                    new PointsConfigurationValidationError.GiveawayDurationBelowMinimum()
+                ),
+                delivery
+            ),
+            "Giveaway is unavailable. Giveaway entry time must be at least 1 second.",
             CommandResponseTarget.Chat
         );
         AssertFailed(

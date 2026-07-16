@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Features.Replies;
 using BlokeBot.Functional;
 using BlokeBot.Identity;
@@ -57,6 +58,15 @@ public sealed class PointsGiveawayService(
             return new PointsGiveawayStartOutcome.AlreadyActive(settings);
         }
 
+        var configurationFailure = StartConfigurationFailure(settings);
+        if (configurationFailure is not null)
+        {
+            return new PointsGiveawayStartOutcome.InvalidConfiguration(
+                settings,
+                configurationFailure
+            );
+        }
+
         var now = DateTime.UtcNow;
         var cooldownStart = now.AddSeconds(-settings.GiveawayCooldownSeconds);
         var lastStartedResult = await PointsGiveawayQueries
@@ -99,10 +109,10 @@ public sealed class PointsGiveawayService(
             HostId = hostId,
             Status = PointsGiveawayStatus.Active,
             StartedAtUtc = now,
-            EndsAtUtc = now.AddSeconds(Math.Max(1, settings.GiveawayDurationSeconds)),
+            EndsAtUtc = now.AddSeconds(settings.GiveawayDurationSeconds),
             MinimumPayout = settings.GiveawayMinimumPayout,
             MaximumPayout = settings.GiveawayMaximumPayout,
-            WinnerCount = Math.Max(1, settings.GiveawayWinnerCount),
+            WinnerCount = settings.GiveawayWinnerCount,
             Eligibility = settings.GiveawayEligibility,
         };
         db.PointsGiveaways.Add(giveaway);
@@ -119,6 +129,20 @@ public sealed class PointsGiveawayService(
         );
         await changes.NotifyChangedAsync(ct);
         return new PointsGiveawayStartOutcome.Started(settings);
+    }
+
+    private static PointsConfigurationValidationError? StartConfigurationFailure(
+        PointsSettings settings
+    )
+    {
+        if (settings.GiveawayDurationSeconds < 1)
+        {
+            return new PointsConfigurationValidationError.GiveawayDurationBelowMinimum();
+        }
+
+        return settings.GiveawayWinnerCount < 1
+            ? new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum()
+            : null;
     }
 
     public async Task<PointOperationOutcome> JoinAsync(

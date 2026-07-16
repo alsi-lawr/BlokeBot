@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using BlokeBot.Features.HostedChannels.Status;
 using BlokeBot.Features.Points.Balances;
+using BlokeBot.Features.Points.Configuration;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Features.Points.Giveaways;
@@ -11,6 +12,7 @@ public abstract record PointsGiveawayStartOutcome
 
     public abstract TResult Match<TResult>(
         Func<Started, TResult> started,
+        Func<InvalidConfiguration, TResult> invalidConfiguration,
         Func<AlreadyActive, TResult> alreadyActive,
         Func<Cooldown, TResult> cooldown,
         Func<StreamOffline, TResult> streamOffline,
@@ -22,6 +24,7 @@ public abstract record PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
@@ -33,10 +36,30 @@ public abstract record PointsGiveawayStartOutcome
         }
     }
 
+    public sealed record InvalidConfiguration(
+        PointsSettings Settings,
+        PointsConfigurationValidationError Failure
+    ) : PointsGiveawayStartOutcome
+    {
+        public override TResult Match<TResult>(
+            Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
+            Func<AlreadyActive, TResult> alreadyActive,
+            Func<Cooldown, TResult> cooldown,
+            Func<StreamOffline, TResult> streamOffline,
+            Func<StreamLivenessUnavailable, TResult> streamLivenessUnavailable,
+            Func<FollowerEligibilityUnavailable, TResult> followerEligibilityUnavailable
+        )
+        {
+            return invalidConfiguration(this);
+        }
+    }
+
     public sealed record AlreadyActive(PointsSettings Settings) : PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
@@ -53,6 +76,7 @@ public abstract record PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
@@ -68,6 +92,7 @@ public abstract record PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
@@ -86,6 +111,7 @@ public abstract record PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
@@ -102,6 +128,7 @@ public abstract record PointsGiveawayStartOutcome
     {
         public override TResult Match<TResult>(
             Func<Started, TResult> started,
+            Func<InvalidConfiguration, TResult> invalidConfiguration,
             Func<AlreadyActive, TResult> alreadyActive,
             Func<Cooldown, TResult> cooldown,
             Func<StreamOffline, TResult> streamOffline,
