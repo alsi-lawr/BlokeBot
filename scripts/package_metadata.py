@@ -177,6 +177,7 @@ def _chocolatey_install(artifacts: dict[str, dict[str, object]]) -> str:
     x64_name, x64_digest = _artifact(artifacts, "win-x64")
     arm64_name, arm64_digest = _artifact(artifacts, "win-arm64")
     return f'''$ErrorActionPreference = 'Stop'
+$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 $architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
 switch ($architecture) {{
@@ -207,6 +208,7 @@ Write-Host 'Persistent state stays in the platform data directory or an explicit
 
 def _chocolatey_uninstall() -> str:
     return '''$ErrorActionPreference = 'Stop'
+$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 Uninstall-BinFile -Name 'blokebot'
 $installDirectory = Join-Path $toolsDir 'install'
@@ -501,6 +503,19 @@ def validate(output_directory: Path, release_directory: Path, checksums_path: Pa
     install = (output_directory / "chocolatey/tools/chocolateyinstall.ps1").read_text(
         encoding="utf-8"
     )
+    uninstall = (output_directory / "chocolatey/tools/chocolateyuninstall.ps1").read_text(
+        encoding="utf-8"
+    )
+    tools_directory_definition = (
+        "$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition"
+    )
+    for name, script in (("install", install), ("uninstall", uninstall)):
+        if script.count(tools_directory_definition) != 1 or script.index(
+            tools_directory_definition
+        ) != script.index("$toolsDir"):
+            raise PackageMetadataError(
+                f"Chocolatey {name} script does not define $toolsDir before first use"
+            )
     for rid in ("win-x64", "win-arm64"):
         name, digest = _artifact(artifacts, rid)
         _validate_url_and_hash(install, name, digest)

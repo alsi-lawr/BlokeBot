@@ -169,7 +169,7 @@ public sealed class SiteComponentTests
         foreach (
             var command in new[]
             {
-                "nix run github:alsi-lawr/BlokeBot#blokebot -- serve",
+                "nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve",
                 "ghcr.io/alsi-lawr/blokebot:v0.1.0",
                 "brew install alsi-lawr/tap/blokebot",
                 "scoop install blokebot",
@@ -181,6 +181,8 @@ public sealed class SiteComponentTests
         {
             content.ShouldContain(command);
         }
+
+        content.ShouldNotContain("github:alsi-lawr/BlokeBot#blokebot");
 
         rendered.Find("a[href='/server-owners']").ShouldNotBeNull();
         rendered

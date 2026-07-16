@@ -102,6 +102,14 @@ class ReleaseConfigurationTests(unittest.TestCase):
         self.assertGreaterEqual(workflow.count("marker"), 8)
         self.assertIn('brew reinstall --formula "$formula"', workflow)
         self.assertNotIn("brew upgrade blokebot", workflow)
+        self.assertIn(
+            'state_directory="$HOME/Library/Application Support/BlokeBot"', workflow
+        )
+        self.assertEqual(workflow.count("Join-Path $env:LOCALAPPDATA 'BlokeBot'"), 3)
+        self.assertNotIn("$RUNNER_TEMP/blokebot-user-data", workflow)
+        self.assertNotIn("blokebot-scoop-user-data", workflow)
+        self.assertNotIn("blokebot-chocolatey-user-data", workflow)
+        self.assertNotIn("blokebot-winget-user-data", workflow)
 
     def test_publish_configuration_excludes_non_release_content(self) -> None:
         project = (ROOT / "src" / "BlokeBot" / "BlokeBot.csproj").read_text(

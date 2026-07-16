@@ -450,7 +450,7 @@ jobs:
           path: artifacts/package-metadata
       - name: Clean install, smoke, upgrade, and uninstall Homebrew formula
         run: |
-          state_directory="$RUNNER_TEMP/blokebot-user-data"
+          state_directory="$HOME/Library/Application Support/BlokeBot"
           mkdir -p "$state_directory"
           printf 'preserve\n' > "$state_directory/marker"
           formula="$GITHUB_WORKSPACE/artifacts/package-metadata/homebrew/Formula/blokebot.rb"
@@ -496,7 +496,7 @@ jobs:
               Write-Host '::notice::Scoop is unavailable on this native runner; deterministic manifest validation remains required.'
               exit 0
           }
-          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-scoop-user-data'
+          $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           $manifest = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package-metadata/scoop/blokebot.json'
@@ -516,7 +516,7 @@ jobs:
               Write-Host '::notice::Chocolatey is unavailable on this native runner; metadata generation and validation remain required.'
               exit 0
           }
-          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-chocolatey-user-data'
+          $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           $packageDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-chocolatey-package'
@@ -540,7 +540,7 @@ jobs:
               Write-Host '::notice::WinGet is unavailable on this native runner; the manual upstream-PR bundle remains unpublished.'
               exit 0
           }
-          $stateDirectory = Join-Path $env:RUNNER_TEMP 'blokebot-winget-user-data'
+          $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           $manifestDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/package-metadata/winget/manifests/a/alsi-lawr/BlokeBot/0.1.0'

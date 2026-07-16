@@ -137,6 +137,11 @@ class PackageMetadataTests(unittest.TestCase):
         self.assertIn("Install-BinFile -Name 'blokebot'", install)
         self.assertIn("Uninstall-BinFile -Name 'blokebot'", uninstall)
         self.assertIn("$toolsDir 'install'", uninstall)
+        definition = "$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition"
+        for script in (install, uninstall):
+            self.assertEqual(script.count(definition), 1)
+            self.assertEqual(script.index("$toolsDir"), script.index(definition))
+            self.assertLess(script.index(definition), script.index("Join-Path $toolsDir"))
         self.assertNotIn("APPDATA", uninstall.upper())
         self.assertNotIn("USERPROFILE", uninstall.upper())
 
@@ -219,6 +224,27 @@ class PackageMetadataTests(unittest.TestCase):
 
         with self.assertRaises(package_metadata.PackageMetadataError):
             package_metadata.validate(output, self.release, self.checksums)
+
+    def test_validation_rejects_chocolatey_tools_directory_use_before_definition(self) -> None:
+        definition = "$toolsDir = Split-Path -Parent $MyInvocation.MyCommand.Definition\n"
+        for index, relative in enumerate(
+            (
+                "chocolatey/tools/chocolateyinstall.ps1",
+                "chocolatey/tools/chocolateyuninstall.ps1",
+            )
+        ):
+            with self.subTest(relative=relative):
+                output = self.generate(f"missing-tools-directory-{index}")
+                script = output / relative
+                script.write_text(
+                    script.read_text(encoding="utf-8").replace(definition, ""),
+                    encoding="utf-8",
+                )
+
+                with self.assertRaisesRegex(
+                    package_metadata.PackageMetadataError, "define \\$toolsDir before first use"
+                ):
+                    package_metadata.validate(output, self.release, self.checksums)
 
     def test_generation_failure_leaves_no_partial_output(self) -> None:
         bad_checksums = self.root / "bad-checksums.toml"

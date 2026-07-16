@@ -132,7 +132,8 @@ public sealed class SiteBoundaryTests
                 .Select(File.ReadAllText)
         );
 
-        installSource.ShouldContain("nix run github:alsi-lawr/BlokeBot#blokebot -- serve");
+        installSource.ShouldContain("nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve");
+        installSource.ShouldNotContain("github:alsi-lawr/BlokeBot#blokebot");
         installSource.ShouldContain("docker run --rm -p 8080:8080");
         otherSource.ShouldNotContain("docker run", Case.Insensitive);
         otherSource.ShouldNotContain("nix run", Case.Insensitive);

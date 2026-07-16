@@ -49,6 +49,8 @@ public sealed class SiteHttpTests
                 content.ShouldContain("Release-ready, not yet published");
                 content.ShouldContain("blokebot help");
                 content.ShouldContain("manual upstream review pending");
+                content.ShouldContain("nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve");
+                content.ShouldNotContain("github:alsi-lawr/BlokeBot#blokebot");
             }
         }
 
