@@ -13,5 +13,7 @@
 
   <PropertyGroup>
     <AssemblyName>BlokeBot.Simulation</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
   </PropertyGroup>
 </Project>

@@ -95,6 +95,19 @@ public sealed class RepositoryAssetTests
         site.Descendants("ProjectReference").ShouldBeEmpty();
     }
 
+    [Test]
+    public void ApplicationProjects_DeclarePackingAndPublishingBoundaries()
+    {
+        var core = XDocument.Load(RepositoryPath("src/BlokeBot.Core/BlokeBot.Core.csproj"));
+        ProjectProperty(core, "IsPackable").ShouldBe("false");
+
+        var simulation = XDocument.Load(
+            RepositoryPath("src/BlokeBot.Simulation/BlokeBot.Simulation.csproj")
+        );
+        ProjectProperty(simulation, "IsPackable").ShouldBe("false");
+        ProjectProperty(simulation, "IsPublishable").ShouldBe("false");
+    }
+
     private static void ValidateManifest(string relativeManifest, string extension, int count)
     {
         var manifest = RepositoryPath(relativeManifest);
@@ -118,6 +131,11 @@ public sealed class RepositoryAssetTests
     private static string Hash(string path)
     {
         return Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
+    }
+
+    private static string ProjectProperty(XDocument project, string propertyName)
+    {
+        return project.Descendants(propertyName).Single().Value;
     }
 
     private static string RepositoryPath(string relativePath)

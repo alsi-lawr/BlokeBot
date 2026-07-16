@@ -16,6 +16,20 @@ namespace BlokeBot.Simulation.Tests;
 public sealed class SimulationLifecycleTests
 {
     [Test]
+    public async Task ApplicationEnvironment_RemainsSimulationWhenArgumentsConflict()
+    {
+        await using var app = SimulationApplication.Build(["--environment", "Development"]);
+        try
+        {
+            app.Environment.EnvironmentName.ShouldBe(SimulationMode.EnvironmentName);
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
+        }
+    }
+
+    [Test]
     public async Task SharedMemoryDatabase_PersistsAcrossContextsWhileKeeperLives()
     {
         await using var app = SimulationApplication.Build(["--environment", "Simulation"]);

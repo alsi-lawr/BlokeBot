@@ -11,6 +11,7 @@
 
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <IsPackable>false</IsPackable>
     <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
     <!-- SDK 10.0.301 Razor source generation misparses component tags as the first markup inside code blocks. -->
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>

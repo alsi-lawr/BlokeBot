@@ -25,6 +25,7 @@ internal static class SimulationApplication
                 Args = arguments,
                 ApplicationName = typeof(SimulationApplication).Assembly.GetName().Name,
                 ContentRootPath = AppContext.BaseDirectory,
+                EnvironmentName = SimulationMode.EnvironmentName,
             }
         );
         builder.Host.UseSerilog(
