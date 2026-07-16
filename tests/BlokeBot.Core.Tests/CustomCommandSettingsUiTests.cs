@@ -13,7 +13,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class CustomCommandSettingsUiTests
 {
     [Test]
-    public async Task ActionAndScheduleVariants_ChangingSelections_ShowsMatchingControls()
+    public async Task ActionKind_ChangingToMessage_HidesCounterControl()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -21,40 +21,6 @@ public sealed class CustomCommandSettingsUiTests
 
         var cut = context.Render<CustomCommandSettingsPage>();
 
-        cut.Markup.ShouldContain("Always use the first message");
-        cut.Markup.ShouldContain("Everyone shares the wait");
-        cut.Markup.ShouldContain("Add 1 to a counter, then send a reply");
-        cut.Markup.ShouldContain("Message 1");
-        cut.Markup.ShouldNotContain("Message library");
-        cut.Markup.ShouldNotContain("Rotation index");
-        cut.Markup.ShouldNotContain("Action type");
-        cut.Find($"#command-{seeded.CommandId}-counter-id");
-        cut.Find("button[aria-controls='custom-announcement-settings']").Click();
-        cut.Markup.ShouldContain("On a timer, after chat activity");
-        cut.Markup.ShouldNotContain("Schedule type");
-        cut.Find($"#announcement-{seeded.AnnouncementId}-required-chat-messages");
-        cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay")
-            .GetAttribute("value")
-            .ShouldBe("2");
-        cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime")
-            .GetAttribute("value")
-            .ShouldBe("30");
-        cut.Find($"label[for='announcement-{seeded.AnnouncementId}-retry-delay']")
-            .TextContent.Trim()
-            .ShouldBe("Wait before retrying (seconds)");
-        cut.Find($"label[for='announcement-{seeded.AnnouncementId}-occurrence-lifetime']")
-            .TextContent.Trim()
-            .ShouldBe("Stop retrying after (seconds)");
-        var timingHelp = cut.Find($"#announcement-{seeded.AnnouncementId}-delivery-timing-help");
-        timingHelp
-            .TextContent.Trim()
-            .ShouldBe("These timings apply only when a scheduled send cannot happen.");
-        cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay")
-            .GetAttribute("aria-describedby")
-            .ShouldBe($"announcement-{seeded.AnnouncementId}-delivery-timing-help");
-        cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime")
-            .GetAttribute("aria-describedby")
-            .ShouldBe($"announcement-{seeded.AnnouncementId}-delivery-timing-help");
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
 

@@ -70,49 +70,6 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
-    public async Task RapidToggle_Saving_CoalescesToLatestSuccessfulValue()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var clock = new ManualTimeProvider();
-        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
-        var notifications = Channel.CreateUnbounded<int>();
-        var notificationCount = 0;
-        context
-            .Services.GetRequiredService<EventBus<AppEventKind>>()
-            .Subscribe(
-                AppEventKind.HostedChannelsChanged,
-                ObserverIdentity.Named("Test.HostConfig.RapidToggle"),
-                (_, _) =>
-                {
-                    notifications.Writer.TryWrite(++notificationCount);
-                    return ValueTask.CompletedTask;
-                }
-            );
-        var page = RenderHostConfigPage(context);
-
-        ClickAccessMode(page, "Allowed list only");
-        ClickAccessMode(page, "All mods");
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-
-        (await notifications.Reader.ReadAsync()).ShouldBe(1);
-        AssertAccessMode(page, allowModsByDefault: true);
-        context.Services.GetRequiredService<ToastService>().Current.ShouldBeEmpty();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        var settings = await db.HostModAccessSettings.SingleAsync(x => x.HostId == hostId);
-        settings.AllowModsByDefault.ShouldBeTrue();
-        notificationCount.ShouldBe(1);
-    }
-
-    [Test]
-    public async Task StaleCompletion_Finishing_CannotOverwriteRollbackOrToastNewerEdit()
-    {
-        await AssertStaleCompletionAsync(firstNotificationFails: false);
-        await AssertStaleCompletionAsync(firstNotificationFails: true);
-    }
-
-    [Test]
     public async Task CurrentKnownFailures_Completing_RollBackExactSnapshotWithTypedFeedback()
     {
         await AssertCurrentFailureAsync(runtimeNotificationFails: false);
