@@ -354,7 +354,8 @@ public sealed class AccessListPolicyTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var events = TestEventBus.Create<AppEventKind>();
+        var eventing = TestEventBus.CreateContinueAndRecord<AppEventKind>();
+        var events = eventing.Events;
         var notificationCount = 0;
         events.Subscribe(
             AppEventKind.HostedChannelsChanged,
@@ -378,6 +379,9 @@ public sealed class AccessListPolicyTests
             .Match<HostModAccessSaveFailure?>(_ => null, failure => failure)
             .ShouldBe(new HostModAccessSaveFailure.RuntimeNotificationFailed(1, 0));
         notificationCount.ShouldBe(2);
+        eventing
+            .Reports.ShouldHaveSingleItem()
+            .FailureType.ShouldBe(typeof(InvalidOperationException).FullName);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             (await db.HostModAccessSettings.AnyAsync(x => x.HostId == hostId)).ShouldBeFalse();

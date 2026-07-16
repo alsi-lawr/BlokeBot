@@ -38,7 +38,7 @@ internal static class PublicChatIntegrationTestSupport
             new PublicChatQueueBacklogMonitor(),
             new PublicChatQueueAlertDispatcher(
                 observers ?? [],
-                TestObserverFanOut.Continue<
+                TestObserverFanOut.FailOnObserverFailure<
                     PublicChatQueueAlertObserverBoundary,
                     PublicChatQueueBacklog,
                     PublicChatQueueAlertDeadLetter

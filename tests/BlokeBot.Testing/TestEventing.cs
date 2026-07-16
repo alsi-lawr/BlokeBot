@@ -15,7 +15,7 @@ public static class TestEventBus
     public static EventBus<TKey> Create<TKey>(Func<TKey, ObserverEventIdentity> eventIdentity)
         where TKey : notnull
     {
-        var fanOut = TestObserverFanOut.Continue<
+        var fanOut = TestObserverFanOut.FailOnObserverFailure<
             EventBusObserverBoundary<TKey>,
             EventNotification<TKey>,
             EventBusDeadLetter
@@ -23,6 +23,33 @@ public static class TestEventBus
         return new EventBus<TKey>(
             fanOut,
             new EventBusEventIdentity<TKey> { Project = eventIdentity }
+        );
+    }
+
+    public static TestEventBusRecording<TKey> CreateContinueAndRecord<TKey>()
+        where TKey : notnull
+    {
+        return CreateContinueAndRecord<TKey>(key =>
+            ObserverEventIdentity.Named($"Test.{typeof(TKey).Name}.{RequireKeyText(key)}")
+        );
+    }
+
+    public static TestEventBusRecording<TKey> CreateContinueAndRecord<TKey>(
+        Func<TKey, ObserverEventIdentity> eventIdentity
+    )
+        where TKey : notnull
+    {
+        var recording = TestObserverFanOut.ContinueAndRecord<
+            EventBusObserverBoundary<TKey>,
+            EventNotification<TKey>,
+            EventBusDeadLetter
+        >(ObserverBoundary.Named($"Test.{typeof(TKey).Name}.Events"));
+        return new(
+            new EventBus<TKey>(
+                recording.FanOut,
+                new EventBusEventIdentity<TKey> { Project = eventIdentity }
+            ),
+            recording.Reports
         );
     }
 
@@ -37,7 +64,7 @@ public static class TestEventBus
 
 public static class TestObserverFanOut
 {
-    public static ObserverFanOut<TBoundary, TEvent, TDeadLetter> Continue<
+    public static ObserverFanOut<TBoundary, TEvent, TDeadLetter> FailOnObserverFailure<
         TBoundary,
         TEvent,
         TDeadLetter
@@ -49,21 +76,55 @@ public static class TestObserverFanOut
             {
                 Boundary = boundary,
             },
-            new TestObserverFailureReporter(),
+            new FailingObserverFailureReporter(),
             new TestObserverCorrelationIdProvider()
         );
     }
 
-    private sealed class TestObserverFailureReporter : IObserverFailureDiagnosticReporter
+    public static TestObserverFanOutRecording<TBoundary, TEvent, TDeadLetter> ContinueAndRecord<
+        TBoundary,
+        TEvent,
+        TDeadLetter
+    >(ObserverBoundary boundary)
+        where TDeadLetter : IObserverDeadLetterPayload
     {
-        private readonly List<ObserverFailureDiagnosticReport> _reports = [];
+        var reporter = new RecordingObserverFailureReporter();
+        return new(
+            new(
+                new ObserverFailurePolicy<TBoundary, TDeadLetter>.ContinueAndReport
+                {
+                    Boundary = boundary,
+                },
+                reporter,
+                new TestObserverCorrelationIdProvider()
+            ),
+            reporter.Reports
+        );
+    }
+
+    private sealed class FailingObserverFailureReporter : IObserverFailureDiagnosticReporter
+    {
+        public ValueTask ReportAsync(
+            ObserverFailureDiagnosticReport report,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromException(
+                new InvalidOperationException("A test event observer failed.")
+            );
+        }
+    }
+
+    private sealed class RecordingObserverFailureReporter : IObserverFailureDiagnosticReporter
+    {
+        public List<ObserverFailureSummary> Reports { get; } = [];
 
         public ValueTask ReportAsync(
             ObserverFailureDiagnosticReport report,
             CancellationToken cancellationToken
         )
         {
-            _reports.Add(report);
+            Reports.Add(report.Summary);
             return ValueTask.CompletedTask;
         }
     }
@@ -78,3 +139,15 @@ public static class TestObserverFanOut
         }
     }
 }
+
+public sealed record TestEventBusRecording<TKey>(
+    EventBus<TKey> Events,
+    IReadOnlyList<ObserverFailureSummary> Reports
+)
+    where TKey : notnull;
+
+public sealed record TestObserverFanOutRecording<TBoundary, TEvent, TDeadLetter>(
+    ObserverFanOut<TBoundary, TEvent, TDeadLetter> FanOut,
+    IReadOnlyList<ObserverFailureSummary> Reports
+)
+    where TDeadLetter : IObserverDeadLetterPayload;
