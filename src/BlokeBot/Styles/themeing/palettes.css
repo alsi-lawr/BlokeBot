@@ -53,7 +53,13 @@ html {
 
 @media (min-width: 40rem) {
     html {
-        --app-topbar-sticky-offset: 6.875rem;
+        --app-topbar-sticky-offset: 6.8125rem;
+    }
+}
+
+@media (min-width: 64rem) {
+    html {
+        --app-topbar-sticky-offset: 6.5625rem;
     }
 }
 
