@@ -63,7 +63,7 @@ public sealed class OAuthTests
             store,
             new AccessTokenCache()
         );
-        var state = flow.CreateAuthorizationUri().Query.Split("state=")[1];
+        var state = IssuedState(flow);
 
         var outcome = await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
         var token = outcome.ShouldBeOfType<OAuthFlowCompletionOutcome.Completed>().Token;
@@ -517,7 +517,7 @@ public sealed class OAuthTests
         Success(await provider.GetAccessToken().ExecuteAsync(CancellationToken.None))
             .ShouldBe("old-access");
         var flow = new OAuthFlow(IdentityWithPath("tokens.json"), oauth, states, store, cache);
-        var state = flow.CreateAuthorizationUri().Query.Split("state=")[1];
+        var state = IssuedState(flow);
 
         await flow.CompleteAuthorizationAsync("code", state, CancellationToken.None);
         var accessToken = Success(
@@ -526,6 +526,15 @@ public sealed class OAuthTests
 
         accessToken.ShouldBe("new-access");
         store.Saved.ShouldBe(oauth.ExchangeResult);
+    }
+
+    private static string IssuedState(OAuthFlow flow)
+    {
+        var query = flow.CreateAuthorizationUri().Query.TrimStart('?');
+        var state = query
+            .Split('&')
+            .Single(parameter => parameter.StartsWith("state=", StringComparison.Ordinal));
+        return Uri.UnescapeDataString(state["state=".Length..]);
     }
 
     private static AccessTokenProvider Provider(

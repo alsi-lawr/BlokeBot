@@ -26,7 +26,7 @@ public sealed class BotIdentityTests
         {
             BotUsername = string.Empty,
             ClientId = string.Empty,
-            ClientSecret = string.Empty,
+            ClientSecret = "client-secret-value",
             RedirectUri = string.Empty,
             Scopes = null!,
             TokenCachePath = string.Empty,
@@ -35,10 +35,23 @@ public sealed class BotIdentityTests
         var result = new BotIdentityOptionsValidator().Validate("TwitchBot.Identity", options);
 
         result.Failed.ShouldBeTrue();
-        result.Failures.ShouldContain(failure =>
-            failure.Contains(nameof(options.Scopes), StringComparison.Ordinal)
-        );
-        string.Join(' ', result.Failures).ShouldNotContain("client-secret-value");
+        foreach (
+            var propertyName in new[]
+            {
+                nameof(options.BotUsername),
+                nameof(options.ClientId),
+                nameof(options.RedirectUri),
+                nameof(options.Scopes),
+                nameof(options.TokenCachePath),
+            }
+        )
+        {
+            result.Failures.ShouldContain(failure =>
+                failure.Contains(propertyName, StringComparison.Ordinal)
+            );
+        }
+
+        string.Join(' ', result.Failures).ShouldNotContain(options.ClientSecret);
     }
 
     [Test]
