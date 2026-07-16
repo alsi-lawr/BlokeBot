@@ -162,22 +162,24 @@
             </div>
         </CollapsibleSection>
 
-        <BotAccountAuthorizationSection Status="@_state.BotOverride.Status"
-                                        Title="Use your own bot account"
-                                        Description="Use a Twitch account you control as the bot for this channel."
-                                        AuthorizeButtonText="Connect custom bot"
-                                        AuthorizationStartUrl="/oauth/host-bot/start"
-                                        Disabled="@(!_state.BotOverride.Enabled)"
-                                        DisabledMessage="Turn this on before connecting your own bot account."
-                                        ConfiguredAccountFallbackText="custom bot account"
-                                        ShowEnableToggle="true"
-                                        EnableToggleValue="@_state.BotOverride.Enabled"
-                                        EnableToggleLabel="Use custom bot"
-                                        EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
-                                        Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
-                                        Refresh="LoadAsync"
-                                        Collapsible="true"
-                                        InitiallyOpen="true" />
+        <div id="custom-bot" class="scroll-mt-24">
+            <BotAccountAuthorizationSection Status="@_state.BotOverride.Status"
+                                            Title="Use your own bot account"
+                                            Description="Use a Twitch account you control as the bot for this channel."
+                                            AuthorizeButtonText="Connect custom bot"
+                                            AuthorizationStartUrl="/oauth/host-bot/start"
+                                            Disabled="@(!_state.BotOverride.Enabled)"
+                                            DisabledMessage="Turn this on before connecting your own bot account."
+                                            ConfiguredAccountFallbackText="custom bot account"
+                                            ShowEnableToggle="true"
+                                            EnableToggleValue="@_state.BotOverride.Enabled"
+                                            EnableToggleLabel="Use custom bot"
+                                            EnableToggleChanged="enabled => SetBotOverrideEnabledAsync(hostId, enabled)"
+                                            Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
+                                            Refresh="LoadAsync"
+                                            Collapsible="true"
+                                            InitiallyOpen="true" />
+        </div>
 
         <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="true">
             <div class="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_16rem]">

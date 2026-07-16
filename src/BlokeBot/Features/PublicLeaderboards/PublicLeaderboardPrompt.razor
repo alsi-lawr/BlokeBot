@@ -8,10 +8,24 @@
             <option value="guessing">Guessing</option>
             <option value="points">Points</option>
         </select>
-        <input class="input" placeholder="channel" aria-label="Channel" @bind="_channel" @bind:event="oninput" />
-        <button class="btn-secondary h-10 w-full disabled:cursor-not-allowed disabled:opacity-50"
+        <div class="space-y-2">
+            <label class="label" for="public-leaderboard-channel">Twitch channel name</label>
+            <input class="input"
+                   id="public-leaderboard-channel"
+                   placeholder="samplechannel"
+                   value="@_channel"
+                   aria-describedby="public-leaderboard-channel-hint public-leaderboard-channel-error"
+                   aria-invalid="@(_channelError is null ? "false" : "true")"
+                   @ref="_channelInput"
+                   @oninput="UpdateChannel" />
+            <p id="public-leaderboard-channel-hint" class="text-xs font-medium text-slate-500">You can enter samplechannel, @@samplechannel, or #samplechannel.</p>
+            <p id="public-leaderboard-channel-error"
+               class="text-sm font-semibold text-red-700"
+               role="alert"
+               hidden="@(_channelError is null)">Enter a Twitch channel name.</p>
+        </div>
+        <button class="btn-secondary h-10 w-full"
                 type="button"
-                disabled="@(!_canNavigate)"
                 @onclick="OpenLeaderboard">
             View leaderboard
         </button>
@@ -20,7 +34,9 @@
 
 @code {
     private string _channel = string.Empty;
+    private string? _channelError;
     private string _feature = "guessing";
+    private ElementReference _channelInput;
     private string? _normalizedInitialChannel;
 
     [Parameter]
@@ -28,8 +44,6 @@
 
     [Parameter]
     public string? InitialChannel { get; set; }
-
-    private bool _canNavigate => _normalizedChannel.Length > 0;
 
     private string _normalizedChannel => Login.Normalize(_channel);
 
@@ -48,10 +62,18 @@
         }
     }
 
-    private void OpenLeaderboard()
+    private void UpdateChannel(ChangeEventArgs args)
     {
-        if (!_canNavigate)
+        _channel = args.Value?.ToString() ?? string.Empty;
+        _channelError = null;
+    }
+
+    private async Task OpenLeaderboard()
+    {
+        if (_normalizedChannel.Length == 0)
         {
+            _channelError = "Enter a Twitch channel name.";
+            await _channelInput.FocusAsync();
             return;
         }
 

@@ -5,9 +5,6 @@ namespace BlokeBot.Components;
 
 public partial class ReplyDeliverySettingsSection
 {
-    private const string _whisperDisabledTooltip =
-        "Turn on whisper responses in Channel setup before sending replies as whispers.";
-
     [Parameter]
     public string Title { get; set; } = "Whisper replies";
 
@@ -24,8 +21,6 @@ public partial class ReplyDeliverySettingsSection
     public bool WhisperResponsesEnabled { get; set; }
 
     private bool _whisperDisabled => !WhisperResponsesEnabled;
-
-    private string _whisperTitle => _whisperDisabled ? _whisperDisabledTooltip : string.Empty;
 
     private string _whisperLabelClass =>
         _whisperDisabled

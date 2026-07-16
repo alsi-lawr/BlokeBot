@@ -42,6 +42,8 @@ namespace BlokeBot.Components;
 
 public partial class TextAreaField
 {
+    private readonly string _inputId = $"text-area-{Guid.NewGuid():N}";
+
     [Parameter]
     public string Label { get; set; } = string.Empty;
 

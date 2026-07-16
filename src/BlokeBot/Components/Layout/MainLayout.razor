@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using BlokeBot.Hosts
+@inject IJSRuntime _js
 
 <div class="app-shell min-h-screen bg-background text-foreground">
     <div class="app-shell__sidebar fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-slate-200 bg-white/90 backdrop-blur-xl lg:block">
@@ -8,7 +9,12 @@
 
     <div class="@_mobileDrawerOverlayClass" aria-hidden="true" @onclick="CloseMobileNavigation"></div>
 
-    <aside class="@_mobileDrawerClass" aria-label="Main navigation" aria-hidden="@(!_mobileNavigationOpen)">
+    <aside id="@_mobileDrawerId"
+           class="@_mobileDrawerClass"
+           aria-label="Main navigation"
+           aria-hidden="@(_mobileNavigationOpen ? "false" : "true")"
+           inert="@(!_mobileNavigationOpen)"
+           tabindex="-1">
         <button class="mobile-drawer__close"
                 type="button"
                 aria-label="Close navigation menu"
@@ -25,9 +31,10 @@
         <header class="app-shell__topbar sticky top-0 z-20 border-b border-slate-200 bg-white/75 backdrop-blur-xl">
             <div class="app-topbar__inner px-4 sm:px-6 lg:px-8">
                 <button class="mobile-nav-button lg:hidden"
+                        id="@_mobileMenuButtonId"
                         type="button"
                         aria-label="Open navigation menu"
-                        aria-expanded="@_mobileNavigationOpen"
+                        aria-expanded="@(_mobileNavigationOpen ? "true" : "false")"
                         @onclick="OpenMobileNavigation">
                     <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 7h16" />
@@ -64,6 +71,9 @@
 </div>
 
 @code {
+    private const string _mobileDrawerId = "mobile-navigation-drawer";
+    private const string _mobileMenuButtonId = "mobile-navigation-menu-button";
+    private MobileNavigationFocusTarget? _pendingMobileNavigationFocus;
     private bool _mobileNavigationOpen;
 
     private string _mobileDrawerClass =>
@@ -78,11 +88,50 @@
 
     private void CloseMobileNavigation()
     {
+        if (!_mobileNavigationOpen)
+        {
+            return;
+        }
+
         _mobileNavigationOpen = false;
+        _pendingMobileNavigationFocus = MobileNavigationFocusTarget.MenuButton;
     }
 
     private void OpenMobileNavigation()
     {
+        if (_mobileNavigationOpen)
+        {
+            return;
+        }
+
         _mobileNavigationOpen = true;
+        _pendingMobileNavigationFocus = MobileNavigationFocusTarget.Drawer;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var target = _pendingMobileNavigationFocus;
+        _pendingMobileNavigationFocus = null;
+
+        if (target is not null)
+        {
+            await _js.InvokeVoidAsync("blokeBotNavigation.focus", FocusElementId(target.Value));
+        }
+    }
+
+    private static string FocusElementId(MobileNavigationFocusTarget target)
+    {
+        return target switch
+        {
+            MobileNavigationFocusTarget.Drawer => _mobileDrawerId,
+            MobileNavigationFocusTarget.MenuButton => _mobileMenuButtonId,
+            _ => throw new ArgumentOutOfRangeException(nameof(target), target, null),
+        };
+    }
+
+    private enum MobileNavigationFocusTarget
+    {
+        Drawer,
+        MenuButton,
     }
 }

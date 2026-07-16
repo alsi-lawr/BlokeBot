@@ -44,8 +44,6 @@ namespace BlokeBot.Features.Guessing.Configuration;
 public partial class GuessOptionsSettingsSection
 {
     private const int _removalAnimationDelayMs = 150;
-    private const string _whisperDisabledTooltip =
-        "Enable whisper responses in Channel setup before using whisper replies.";
     private readonly HashSet<GuessOptionEditor> _pendingRemovals = [];
 
     [Parameter, EditorRequired]
@@ -67,8 +65,6 @@ public partial class GuessOptionsSettingsSection
     public EventCallback<GuessOptionEditor> RemoveOption { get; set; }
 
     private bool _whisperDisabled => !WhisperResponsesEnabled;
-
-    private string _whisperTitle => _whisperDisabled ? _whisperDisabledTooltip : string.Empty;
 
     private string _whisperLabelClass =>
         _whisperDisabled

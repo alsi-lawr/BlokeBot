@@ -44,17 +44,25 @@ internal static class LoginPage
                     event.preventDefault();
                     const feature = form.querySelector("[name='feature']")?.value ?? "guessing";
                     const channelInput = form.querySelector("[name='channel']");
+                    const channelError = form.querySelector("[data-channel-error]");
                     const channel = (channelInput?.value ?? "")
                         .trim()
                         .replace(/^[@#]+/, "")
                         .toLowerCase();
 
                     if (!channel) {
+                        channelInput?.setAttribute("aria-invalid", "true");
+                        channelError?.classList.remove("hidden");
                         channelInput?.focus();
                         return;
                     }
 
                     window.location.href = `/${feature}/leaderboard/${encodeURIComponent(channel)}`;
+                });
+
+                form.querySelector("[name='channel']")?.addEventListener("input", event => {
+                    event.currentTarget.setAttribute("aria-invalid", "false");
+                    form.querySelector("[data-channel-error]")?.classList.add("hidden");
                 });
             });
         </script>
@@ -109,7 +117,20 @@ internal static class LoginPage
                                     <option value="guessing">Guessing</option>
                                     <option value="points">Points</option>
                                 </select>
-                                <input class="input" name="channel" placeholder="channel" aria-label="Channel" />
+                                <div class="space-y-2">
+                                    <label class="label" for="public-leaderboard-channel">Twitch channel name</label>
+                                    <input class="input"
+                                           id="public-leaderboard-channel"
+                                           name="channel"
+                                           placeholder="samplechannel"
+                                           aria-describedby="public-leaderboard-channel-hint public-leaderboard-channel-error"
+                                           aria-invalid="false" />
+                                    <p id="public-leaderboard-channel-hint" class="text-xs font-medium text-slate-500">You can enter samplechannel, @samplechannel, or #samplechannel.</p>
+                                    <p id="public-leaderboard-channel-error"
+                                       class="hidden text-sm font-semibold text-red-700"
+                                       role="alert"
+                                       data-channel-error>Enter a Twitch channel name.</p>
+                                </div>
                                 <button class="btn-secondary h-10 w-full" type="submit">View leaderboard</button>
                             </form>
                         </div>
