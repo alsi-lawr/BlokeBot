@@ -19,7 +19,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new InvalidOperationException("terminal protocol failure");
         var listening = new ScriptedEstablishedSession();
         listening.Enqueue(_ => FailedListeningAsync(failure));
@@ -45,7 +45,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new ApplicationException("unexpected listening defect");
         var listening = new ScriptedEstablishedSession();
         listening.Enqueue(_ => FailedListeningAsync(failure));
@@ -71,7 +71,7 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var listeningFailure = new IOException("established session disconnected");
         var cleanupFailure = new IOException("session cleanup failed");
         var listening = new ScriptedEstablishedSession { DisposeException = cleanupFailure };

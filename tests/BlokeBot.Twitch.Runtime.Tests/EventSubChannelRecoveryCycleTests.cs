@@ -151,7 +151,7 @@ public sealed class EventSubChannelRecoveryCycleTests : EventSubChannelRecoveryT
     }
 
     [Test]
-    public async Task HealthyChannel_DispatchingWhileSiblingRecoveryIsPending_RemainsAvailable()
+    public async Task HealthyChannel_SiblingRecoveryPending_RemainsHealthyAndActive()
     {
         var initialFailure = new IOException("temporary account failure");
         var enteredRecovery = Channel.CreateUnbounded<bool>();

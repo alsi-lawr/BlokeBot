@@ -17,7 +17,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
     public async Task EventSubProtocolReconnect_RunningRuntime_EstablishesRequestedTargetThroughPipeline()
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(ChatRuntime.EventSub, attemptLimit: 3);
+        var harness = CreateEventSubProtocolHarness(attemptLimit: 3);
         var reconnectEndpoint = new Uri("wss://example.test/reconnect");
         var firstListening = new ScriptedEstablishedSession();
         firstListening.Enqueue(_ =>
@@ -153,7 +153,7 @@ public sealed class RuntimeSessionProtocolHandoffTests : RuntimeSessionResilienc
     public async Task EventSubProtocolHandoff_FollowedByIdle_ResetsExpiredTargetBeforeRecheck()
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(ChatRuntime.EventSub, attemptLimit: 3);
+        var harness = CreateEventSubProtocolHarness(attemptLimit: 3);
         var reconnectEndpoint = new Uri("wss://example.test/expired-reconnect");
         var previousSession = new ScriptedEstablishedSession();
         previousSession.Enqueue(_ =>

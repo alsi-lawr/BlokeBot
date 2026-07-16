@@ -58,74 +58,94 @@ public abstract class RuntimeSessionResilienceTestBase
         report.Exception.ShouldBeSameAs(exception);
     }
 
-    private protected static RuntimeHarness CreateHarness(ChatRuntime runtime, int attemptLimit)
+    private protected static RuntimeHarness CreateEventSubProtocolHarness(int attemptLimit)
     {
         var session = new ScriptedConnectionSession();
         var health = new RecordingHealthReporter();
         var status = new BotRuntimeStatusStore();
         var idleWait = new RecordingIdleWait();
         var builder = new ResiliencePipelineBuilder();
-        switch (runtime)
+        RuntimeSessionResilience.ConfigureEventSub(
+            builder,
+            new EventSubSessionResiliencePolicy
+            {
+                AttemptLimit = attemptLimit,
+                Delay = TimeSpan.Zero,
+                MaximumDelay = TimeSpan.FromTicks(1),
+                DelayBackoffType = DelayBackoffType.Constant,
+                AttemptTimeout = TimeSpan.FromMinutes(1),
+            },
+            health
+        );
+        var eventSub = new EventSubRuntime(
+            session,
+            new EventSubSessionResiliencePipeline(builder.Build()),
+            health,
+            status,
+            idleWait
+        );
+        return new RuntimeHarness(
+            session,
+            health,
+            status,
+            idleWait,
+            eventSub.EstablishSessionAsync,
+            eventSub.RunAsync
+        );
+    }
+
+    private protected static RuntimeHarness CreateRunnerHarness(int attemptLimit)
+    {
+        var session = new ScriptedConnectionSession();
+        var health = new RecordingHealthReporter();
+        var status = new BotRuntimeStatusStore();
+        var idleWait = new RecordingIdleWait();
+        var builder = new ResiliencePipelineBuilder();
+        RuntimeSessionResilience.ConfigureIrc(
+            builder,
+            new IrcSessionResiliencePolicy
+            {
+                AttemptLimit = attemptLimit,
+                Delay = TimeSpan.Zero,
+                MaximumDelay = TimeSpan.FromTicks(1),
+                DelayBackoffType = DelayBackoffType.Constant,
+                AttemptTimeout = TimeSpan.FromMinutes(1),
+            },
+            health
+        );
+        var pipeline = new IrcSessionResiliencePipeline(builder.Build());
+
+        Task<RuntimeSessionOutcome> EstablishAsync(
+            RuntimeConnectionTarget target,
+            CancellationToken cancellationToken
+        )
         {
-            case ChatRuntime.Irc:
-                RuntimeSessionResilience.ConfigureIrc(
-                    builder,
-                    new IrcSessionResiliencePolicy
-                    {
-                        AttemptLimit = attemptLimit,
-                        Delay = TimeSpan.Zero,
-                        MaximumDelay = TimeSpan.FromTicks(1),
-                        DelayBackoffType = DelayBackoffType.Constant,
-                        AttemptTimeout = TimeSpan.FromMinutes(1),
-                    },
-                    health
-                );
-                var irc = new IrcRuntime(
-                    session,
-                    new IrcSessionResiliencePipeline(builder.Build()),
-                    health,
-                    status,
-                    idleWait
-                );
-                return new RuntimeHarness(
-                    session,
-                    health,
-                    status,
-                    idleWait,
-                    irc.EstablishSessionAsync,
-                    irc.RunAsync
-                );
-            case ChatRuntime.EventSub:
-                RuntimeSessionResilience.ConfigureEventSub(
-                    builder,
-                    new EventSubSessionResiliencePolicy
-                    {
-                        AttemptLimit = attemptLimit,
-                        Delay = TimeSpan.Zero,
-                        MaximumDelay = TimeSpan.FromTicks(1),
-                        DelayBackoffType = DelayBackoffType.Constant,
-                        AttemptTimeout = TimeSpan.FromMinutes(1),
-                    },
-                    health
-                );
-                var eventSub = new EventSubRuntime(
-                    session,
-                    new EventSubSessionResiliencePipeline(builder.Build()),
-                    health,
-                    status,
-                    idleWait
-                );
-                return new RuntimeHarness(
-                    session,
-                    health,
-                    status,
-                    idleWait,
-                    eventSub.EstablishSessionAsync,
-                    eventSub.RunAsync
-                );
-            default:
-                throw new UnreachableException($"Unknown Twitch runtime: {runtime}.");
+            return RuntimeSessionRunner.EstablishOnceAsync(
+                ChatRuntime.Irc,
+                token => session.EstablishAsync(target, token),
+                pipeline.ExecuteAsync,
+                IrcSessionFailureClassifier.Classify,
+                health,
+                status,
+                cancellationToken
+            );
         }
+
+        Task RunAsync(CancellationToken cancellationToken)
+        {
+            return RuntimeSessionRunner.RunUntilStoppedAsync(
+                ChatRuntime.Irc,
+                new RuntimeConnectionTarget.Initial(),
+                EstablishAsync,
+                IrcSessionFailureClassifier.Classify,
+                health,
+                status,
+                idleWait,
+                cancellationToken
+            );
+        }
+
+        return new(session, health, status, idleWait, EstablishAsync, RunAsync);
     }
 
     private protected sealed class RuntimeHarness(

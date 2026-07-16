@@ -19,7 +19,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var listening = new ScriptedEstablishedSession();
         harness.Session.Enqueue(
             (_, _) =>
@@ -51,7 +51,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new IOException("transport unavailable");
         var listening = new ScriptedEstablishedSession();
         var connectedTransitions = new List<bool>();
@@ -102,7 +102,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         harness.Session.Enqueue(
             (_, _) =>
             {
@@ -133,7 +133,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var failure = new ApplicationException("unexpected runtime defect");
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(failure));
 
@@ -161,7 +161,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 2);
+        var harness = CreateRunnerHarness(attemptLimit: 2);
         var failure = new TimeoutRejectedException("establishment timed out");
         var listening = new ScriptedEstablishedSession();
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(failure));
@@ -193,7 +193,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var first = new IOException("first transport failure");
         var second = new IOException("second transport failure");
         var final = new IOException("final transport failure");
@@ -242,7 +242,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
         ChatRuntime runtime
     )
     {
-        var harness = CreateHarness(runtime, attemptLimit: 1);
+        var harness = CreateRunnerHarness(attemptLimit: 1);
         var failure = new IOException("only establishment attempt failed");
         harness.Session.Enqueue((_, _) => FailedEstablishmentAsync(failure));
 
@@ -271,7 +271,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     )
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         harness.Session.Enqueue(
             (_, attemptToken) =>
             {
@@ -297,7 +297,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     )
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         harness.Session.Enqueue((_, _) => IdleAsync());
         harness.Session.Enqueue(
             (_, attemptToken) =>
@@ -321,7 +321,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     )
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var listening = new ScriptedEstablishedSession();
         listening.Enqueue(listeningToken =>
         {
@@ -346,7 +346,7 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
     )
     {
         using var cancellation = new CancellationTokenSource();
-        var harness = CreateHarness(runtime, attemptLimit: 3);
+        var harness = CreateRunnerHarness(attemptLimit: 3);
         var firstEstablishmentFailure = new IOException("cycle one failure");
         var disconnect = new IOException("established session disconnected");
         var secondCycleFirstFailure = new IOException("cycle two first failure");
