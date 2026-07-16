@@ -1,18 +1,20 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.BotRuntime;
 using BlokeBot.Features.HostedChannels.Authorization;
 using BlokeBot.Features.HostedChannels.Runtime;
+using BlokeBot.Hosts;
 using BlokeBot.Twitch.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -39,16 +41,16 @@ public sealed class BotOAuthEndpointIntegrationTests
     }
 
     [Test]
-    public async Task UnavailableBotOAuth_AuthenticatedBotAdminStarting_ReturnsSetupBadRequest()
+    public async Task UnavailableBotOAuth_AuthenticatedBotAdminStarting_ReturnsActionableResult()
     {
         await using var host = await EndpointHost.StartAsync(configured: false);
 
         using var response = await host.Client.GetAsync("/oauth/start");
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await response.Content.ReadFromJsonAsync<string>()).ShouldBe(
-            "The bot account is not set up yet."
-        );
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Twitch connection unavailable");
+        page.ShouldContain("Return to Admin");
         response.Headers.Location.ShouldBeNull();
     }
 
@@ -64,9 +66,158 @@ public sealed class BotOAuthEndpointIntegrationTests
         using var response = await host.Client.GetAsync("/oauth/callback?code=code&state=replayed");
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await response.Content.ReadFromJsonAsync<string>()).ShouldBe(
-            "This Twitch sign-in expired. Try again."
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Connection expired");
+        page.ShouldContain("No changes were made.");
+        page.ShouldContain("Try again");
+        page.ShouldContain("Return to Channel setup");
+        page.ShouldContain("Close window");
+    }
+
+    [Test]
+    public async Task CancelledGlobalOAuth_AccessDenied_RedactsProviderMessage()
+    {
+        await using var host = await EndpointHost.StartAsync(configured: true);
+
+        using var response = await host.Client.GetAsync("/oauth/callback?error=access_denied");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Connection cancelled");
+        page.ShouldNotContain("access_denied");
+    }
+
+    [Test]
+    public async Task GlobalOAuth_UnexpectedProviderError_ReturnsTemporaryFailureWithSupportReference()
+    {
+        await using var host = await EndpointHost.StartAsync(configured: true);
+
+        using var response = await host.Client.GetAsync("/oauth/callback?error=provider-secret");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Twitch is temporarily unavailable");
+        page.ShouldContain("Support reference:");
+        page.ShouldContain("Get help");
+        page.ShouldNotContain("provider-secret");
+    }
+
+    [Test]
+    public async Task ConfiguredBotOAuth_AuthenticatedNonAdminStarting_ReturnsAdministratorGuidance()
+    {
+        await using var host = await EndpointHost.StartAsync(configured: true, isBotAdmin: false);
+
+        using var response = await host.Client.GetAsync("/oauth/start");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("Only a BlokeBot administrator can open this page.");
+        page.ShouldContain("Return to Admin");
+    }
+
+    [Test]
+    public async Task ChannelOAuth_NoSelectedChannel_ReturnsExactChannelGuidance()
+    {
+        await using var host = await EndpointHost.StartAsync(configured: true);
+
+        using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Choose a channel to continue");
+    }
+
+    [Test]
+    public async Task ChannelOAuth_SelectedNonOwnerStarting_ReturnsOperatorAccessGuidance()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Moderator,
+            login: "moderator"
         );
+
+        using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain(
+            "The channel owner or server administrator must grant you access before you can reconnect the bot."
+        );
+        page.ShouldNotContain("Channel owner needs to reconnect the bot.");
+    }
+
+    [Test]
+    public async Task ConnectionResultPages_RenderListedOutcomesWithAppropriateActions()
+    {
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.Cancelled("/oauth/channel-bot/start"),
+            HttpStatusCode.BadRequest,
+            "Connection cancelled",
+            "Try again"
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.Expired("/oauth/channel-bot/start"),
+            HttpStatusCode.BadRequest,
+            "Connection expired",
+            "Try again"
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.WrongChannelAccount("streamer", "/oauth/channel-bot/start"),
+            HttpStatusCode.BadRequest,
+            "@streamer is the Twitch account needed for this channel.",
+            "Try again"
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.PermissionNeeded("/oauth/channel-bot/start"),
+            HttpStatusCode.BadRequest,
+            "More Twitch access is needed",
+            "Try again and approve every permission Twitch shows."
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                "/oauth/channel-bot/start",
+                "request<&"
+            ),
+            HttpStatusCode.BadGateway,
+            "Twitch is temporarily unavailable",
+            "Support reference: <code>request&lt;&amp;</code>"
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.NoChannelSelected(),
+            HttpStatusCode.Forbidden,
+            "Choose a channel to continue",
+            "Return to Channel setup"
+        );
+        await AssertResultPageAsync(
+            TwitchConnectionResultPage.OperatorAccessRequired(),
+            HttpStatusCode.Forbidden,
+            "The channel owner or server administrator must grant you access before you can reconnect the bot.",
+            "Return to Channel setup"
+        );
+    }
+
+    private static async Task AssertResultPageAsync(
+        IResult result,
+        HttpStatusCode expectedStatus,
+        string expectedCopy,
+        string expectedAction
+    )
+    {
+        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        context.RequestServices = services;
+
+        await result.ExecuteAsync(context);
+
+        context.Response.StatusCode.ShouldBe((int)expectedStatus);
+        context.Response.ContentType.ShouldStartWith("text/html");
+        context.Response.Body.Position = 0;
+        var page = await new StreamReader(context.Response.Body, Encoding.UTF8).ReadToEndAsync();
+        page.ShouldContain("BlokeBot");
+        page.ShouldContain(expectedCopy);
+        page.ShouldContain("No changes were made.");
+        page.ShouldContain(expectedAction);
+        page.ShouldContain("Close window");
     }
 
     private sealed class EndpointHost(WebApplication app, HttpClient client) : IAsyncDisposable
@@ -75,10 +226,16 @@ public sealed class BotOAuthEndpointIntegrationTests
 
         public static async Task<EndpointHost> StartAsync(
             bool configured,
-            StubOAuthFlow? flow = null
+            StubOAuthFlow? flow = null,
+            bool isBotAdmin = true,
+            AuthRole? selectedRole = null,
+            string login = "admin"
         )
         {
             var builder = WebApplication.CreateBuilder();
+            builder.Services.AddSingleton(
+                new TestAuthenticationSettings(isBotAdmin, selectedRole, login)
+            );
             builder
                 .Services.AddAuthentication(TestAuthenticationHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
@@ -174,24 +331,37 @@ public sealed class BotOAuthEndpointIntegrationTests
     private sealed class TestAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder
+        UrlEncoder encoder,
+        TestAuthenticationSettings settings
     ) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         public const string SchemeName = "BotAdminTest";
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var identity = new ClaimsIdentity(
-                [
-                    new Claim(ClaimTypes.NameIdentifier, "admin-id"),
-                    new Claim(ClaimTypes.Name, "admin"),
-                    new Claim(AuthClaims.Login, "admin"),
-                    new Claim(AuthClaims.IsBotAdmin, "true"),
-                ],
-                Scheme.Name
-            );
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, $"{settings.Login}-id"),
+                new(ClaimTypes.Name, settings.Login),
+                new(AuthClaims.Login, settings.Login),
+                new(AuthClaims.IsBotAdmin, settings.IsBotAdmin.ToString()),
+            };
+            if (settings.SelectedRole is { } role)
+            {
+                var channel = new BotHostChoice(1, "streamer", "Streamer", role);
+                claims.Add(new(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(channel)));
+                claims.Add(new(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(channel)));
+            }
+
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
             var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
     }
+
+    private sealed record TestAuthenticationSettings(
+        bool IsBotAdmin,
+        AuthRole? SelectedRole,
+        string Login
+    );
 }

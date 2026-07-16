@@ -22,7 +22,7 @@
                              PopupName="blokebot-channel-oauth"
                              OpeningText="Opening..."
                              OnClosed="ReloadForEventAsync">
-                Connect bot
+                @(_selectedHostStatus.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")
             </AuthPopupButton>
         }
         else

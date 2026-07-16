@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net;
 using System.Security.Cryptography;
 using BlokeBot.Auth.Sessions;
 using BlokeBot.Features.HostedChannels.Authorization;
@@ -12,8 +11,17 @@ internal static class BotOAuthEndpoints
 {
     public static void MapUnavailableBotOAuthEndpoint(this WebApplication app)
     {
-        app.MapGet("/oauth/start", () => Results.BadRequest("The bot account is not set up yet."))
-            .RequireAuthorization("BotAdmin");
+        app.MapGet(
+                "/oauth/start",
+                (HttpContext context) =>
+                    AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
+                        ? TwitchConnectionResultPage.ConnectionUnavailable(
+                            "/admin",
+                            "Return to Admin"
+                        )
+                        : TwitchConnectionResultPage.AdministratorAccessRequired()
+            )
+            .RequireAuthorization();
     }
 
     public static void MapBotOAuthEndpoints(this WebApplication app)
@@ -23,9 +31,12 @@ internal static class BotOAuthEndpoints
         botOAuth
             .MapGet(
                 "/start",
-                (IOAuthFlow oauth) => Results.Redirect(oauth.CreateAuthorizationUri().ToString())
+                (HttpContext context, IOAuthFlow oauth) =>
+                    AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
+                        ? Results.Redirect(oauth.CreateAuthorizationUri().ToString())
+                        : TwitchConnectionResultPage.AdministratorAccessRequired()
             )
-            .RequireAuthorization("BotAdmin");
+            .RequireAuthorization();
 
         botOAuth
             .MapGet(
@@ -58,25 +69,22 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.IsBotAdmin)
                     {
-                        return Results.Forbid();
+                        return TwitchConnectionResultPage.AdministratorAccessRequired();
                     }
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return Results.Content(
-                            $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
-                            "text/plain"
-                        );
+                        return ProviderErrorResult(error, "/oauth/start", context);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return Results.BadRequest("Twitch sign-in did not finish. Try again.");
+                        return TwitchConnectionResultPage.Cancelled("/oauth/start");
                     }
 
                     if (string.IsNullOrWhiteSpace(state))
                     {
-                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
+                        return TwitchConnectionResultPage.Expired("/oauth/start");
                     }
 
                     var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
@@ -84,11 +92,14 @@ internal static class BotOAuthEndpoints
                         async _ =>
                         {
                             await changes.NotifyChangedAsync(ct);
-                            return BotAccountConnectedResult();
+                            return TwitchConnectionResultPage.ConnectionSaved(
+                                "/admin",
+                                "Return to Admin"
+                            );
                         },
                         static _ =>
                             Task.FromResult<IResult>(
-                                Results.BadRequest("This Twitch sign-in expired. Try again.")
+                                TwitchConnectionResultPage.Expired("/oauth/start")
                             )
                     );
                 }
@@ -108,7 +119,7 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
                     {
-                        return Results.Forbid();
+                        return ConnectionAccessResult(session);
                     }
 
                     var selectedHost = session.State.Match<BotHostChoice?>(
@@ -138,11 +149,15 @@ internal static class BotOAuthEndpoints
                                 );
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
-                            static _ => Results.BadRequest("TwitchBot client ID is missing.")
+                            _ =>
+                                TwitchConnectionResultPage.ConnectionUnavailable(
+                                    "/host",
+                                    "Return to Channel setup"
+                                )
                         );
                 }
             )
-            .RequireAuthorization("Operator");
+            .RequireAuthorization();
 
         botOAuth
             .MapGet(
@@ -160,7 +175,7 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
                     {
-                        return Results.Forbid();
+                        return ConnectionAccessResult(session);
                     }
 
                     var storedState = context.Request.Cookies["BlokeBot.ChannelBotState"];
@@ -168,15 +183,12 @@ internal static class BotOAuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return Results.Content(
-                            $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
-                            "text/plain"
-                        );
+                        return ProviderErrorResult(error, "/oauth/channel-bot/start", context);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return Results.BadRequest("Twitch connection did not finish. Try again.");
+                        return TwitchConnectionResultPage.Cancelled("/oauth/channel-bot/start");
                     }
 
                     if (
@@ -185,7 +197,7 @@ internal static class BotOAuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return Results.BadRequest("This Twitch connection expired. Try again.");
+                        return TwitchConnectionResultPage.Expired("/oauth/channel-bot/start");
                     }
 
                     var selectedHost = session.State.Match<BotHostChoice?>(
@@ -195,7 +207,7 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return Results.BadRequest("Choose your channel before connecting it.");
+                        return TwitchConnectionResultPage.NoChannelSelected();
                     }
 
                     try
@@ -208,33 +220,41 @@ internal static class BotOAuthEndpoints
                                     .Authorize(selectedHost.Id, completed.Grant)
                                     .ExecuteAsync(ct);
                                 return authorization.Match(
-                                    MapChannelAuthorization,
+                                    outcome =>
+                                        MapChannelAuthorization(
+                                            outcome,
+                                            selectedHost.Login,
+                                            "/oauth/channel-bot/start"
+                                        ),
                                     _ => throw new UnreachableException()
                                 );
                             },
-                            static _ =>
+                            _ =>
                                 Task.FromResult<IResult>(
-                                    Results.BadRequest("TwitchBot client credentials are missing.")
+                                    TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                                        "/oauth/channel-bot/start",
+                                        context.TraceIdentifier
+                                    )
                                 ),
-                            static _ =>
+                            _ =>
                                 Task.FromResult<IResult>(
-                                    Results.BadRequest(
-                                        "Twitch did not finish connecting this channel."
+                                    TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                                        "/oauth/channel-bot/start",
+                                        context.TraceIdentifier
                                     )
                                 )
                         );
                     }
                     catch (HttpRequestException)
                     {
-                        return Results.Problem(
-                            "Twitch could not finish connecting this channel.",
-                            statusCode: StatusCodes.Status502BadGateway,
-                            title: "Channel connection failed"
+                        return TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                            "/oauth/channel-bot/start",
+                            context.TraceIdentifier
                         );
                     }
                 }
             )
-            .RequireAuthorization("Operator");
+            .RequireAuthorization();
 
         botOAuth
             .MapGet(
@@ -249,7 +269,7 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.CanAuthorizeSelectedHost)
                     {
-                        return Results.Forbid();
+                        return ConnectionAccessResult(session);
                     }
 
                     var selectedHost = session.State.Match<BotHostChoice?>(
@@ -259,12 +279,12 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return Results.BadRequest("Choose your channel before connecting it.");
+                        return TwitchConnectionResultPage.NoChannelSelected();
                     }
 
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
                     {
-                        return Results.BadRequest("Turn on custom bot before connecting it.");
+                        return TwitchConnectionResultPage.CustomBotMustBeEnabled();
                     }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -291,11 +311,15 @@ internal static class BotOAuthEndpoints
                                 );
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
-                            static _ => Results.BadRequest("The bot account is not set up yet.")
+                            static _ =>
+                                TwitchConnectionResultPage.ConnectionUnavailable(
+                                    "/host",
+                                    "Return to Channel setup"
+                                )
                         );
                 }
             )
-            .RequireAuthorization("Operator");
+            .RequireAuthorization();
     }
 
     private static async Task<IResult> CompleteHostBotAuthorizationAsync(
@@ -311,7 +335,7 @@ internal static class BotOAuthEndpoints
         var session = AuthenticatedSession.FromPrincipal(context.User);
         if (!session.CanAuthorizeSelectedHost)
         {
-            return Results.Forbid();
+            return ConnectionAccessResult(session);
         }
 
         var storedState = context.Request.Cookies["BlokeBot.HostBotState"];
@@ -319,15 +343,12 @@ internal static class BotOAuthEndpoints
 
         if (!string.IsNullOrWhiteSpace(error))
         {
-            return Results.Content(
-                $"Twitch could not finish this connection: {WebUtility.HtmlEncode(error)}",
-                "text/plain"
-            );
+            return ProviderErrorResult(error, "/oauth/host-bot/start", context);
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return Results.BadRequest("Twitch connection did not finish. Try again.");
+            return TwitchConnectionResultPage.Cancelled("/oauth/host-bot/start");
         }
 
         if (
@@ -336,7 +357,7 @@ internal static class BotOAuthEndpoints
             || !string.Equals(state, storedState, StringComparison.Ordinal)
         )
         {
-            return Results.BadRequest("This Twitch connection expired. Try again.");
+            return TwitchConnectionResultPage.Expired("/oauth/host-bot/start");
         }
 
         var selectedHost = session.State.Match<BotHostChoice?>(
@@ -346,7 +367,7 @@ internal static class BotOAuthEndpoints
         );
         if (selectedHost is null)
         {
-            return Results.BadRequest("Choose your channel before connecting it.");
+            return TwitchConnectionResultPage.NoChannelSelected();
         }
 
         try
@@ -359,108 +380,97 @@ internal static class BotOAuthEndpoints
                         .Authorize(selectedHost.Id, completed.Grant)
                         .ExecuteAsync(ct);
                     return authorization.Match(
-                        MapHostBotAuthorization,
+                        outcome => MapHostBotAuthorization(outcome, "/oauth/host-bot/start"),
                         _ => throw new UnreachableException()
                     );
                 },
-                static _ =>
+                _ =>
                     Task.FromResult<IResult>(
-                        Results.BadRequest("The bot account is not set up yet.")
+                        TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                            "/oauth/host-bot/start",
+                            context.TraceIdentifier
+                        )
                     ),
-                static _ =>
+                _ =>
                     Task.FromResult<IResult>(
-                        Results.BadRequest("Twitch did not validate the bot account grant.")
+                        TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                            "/oauth/host-bot/start",
+                            context.TraceIdentifier
+                        )
                     )
             );
         }
         catch (HttpRequestException)
         {
-            return Results.Problem(
-                "Twitch could not finish connecting the custom bot.",
-                statusCode: StatusCodes.Status502BadGateway,
-                title: "Custom bot connection failed"
+            return TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                "/oauth/host-bot/start",
+                context.TraceIdentifier
             );
         }
     }
 
-    private static IResult MapChannelAuthorization(ChannelBotAuthorizationOutcome outcome)
+    private static IResult MapChannelAuthorization(
+        ChannelBotAuthorizationOutcome outcome,
+        string requiredChannelLogin,
+        string tryAgainUrl
+    )
     {
         return outcome switch
         {
-            ChannelBotAuthorizationOutcome.Authorized => ChannelConnectedResult(),
-            ChannelBotAuthorizationOutcome.HostNotFound => Results.BadRequest(
-                "Channel setup was not found."
+            ChannelBotAuthorizationOutcome.Authorized => TwitchConnectionResultPage.ConnectionSaved(
+                "/host",
+                "Return to Channel setup"
             ),
-            ChannelBotAuthorizationOutcome.GrantMismatch => Results.BadRequest(
-                "That Twitch sign-in belongs to a different channel."
-            ),
-            ChannelBotAuthorizationOutcome.MissingScopes => Results.BadRequest(
-                "The bot still needs more Twitch access for this channel."
-            ),
+            ChannelBotAuthorizationOutcome.HostNotFound =>
+                TwitchConnectionResultPage.NoChannelSelected(),
+            ChannelBotAuthorizationOutcome.GrantMismatch =>
+                TwitchConnectionResultPage.WrongChannelAccount(requiredChannelLogin, tryAgainUrl),
+            ChannelBotAuthorizationOutcome.MissingScopes =>
+                TwitchConnectionResultPage.PermissionNeeded(tryAgainUrl),
             _ => throw new UnreachableException(),
         };
     }
 
-    private static IResult MapHostBotAuthorization(HostBotAccountAuthorizationOutcome outcome)
+    private static IResult MapHostBotAuthorization(
+        HostBotAccountAuthorizationOutcome outcome,
+        string tryAgainUrl
+    )
     {
         return outcome switch
         {
-            HostBotAccountAuthorizationOutcome.Authorized => BotAccountConnectedResult(),
-            HostBotAccountAuthorizationOutcome.HostNotFound => Results.BadRequest(
-                "Channel was not found."
-            ),
-            HostBotAccountAuthorizationOutcome.OverrideDisabled => Results.BadRequest(
-                "Turn on custom bot before connecting it."
-            ),
-            HostBotAccountAuthorizationOutcome.MissingScopes => Results.BadRequest(
-                "The bot account needs more Twitch access."
-            ),
+            HostBotAccountAuthorizationOutcome.Authorized =>
+                TwitchConnectionResultPage.ConnectionSaved("/host", "Return to Channel setup"),
+            HostBotAccountAuthorizationOutcome.HostNotFound =>
+                TwitchConnectionResultPage.NoChannelSelected(),
+            HostBotAccountAuthorizationOutcome.OverrideDisabled =>
+                TwitchConnectionResultPage.CustomBotMustBeEnabled(),
+            HostBotAccountAuthorizationOutcome.MissingScopes =>
+                TwitchConnectionResultPage.PermissionNeeded(tryAgainUrl),
             _ => throw new UnreachableException(),
         };
     }
 
-    private static IResult BotAccountConnectedResult()
+    private static IResult ConnectionAccessResult(AuthenticatedSession session)
     {
-        return Results.Content(
-            """
-            <!doctype html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <title>BlokeBot connection complete</title>
-            </head>
-            <body>
-                <p>Bot account connected. You can close this window.</p>
-                <script>
-                    window.close();
-                </script>
-            </body>
-            </html>
-            """,
-            "text/html"
+        return session.State.Match<IResult>(
+            static _ => TwitchConnectionResultPage.NoChannelSelected(),
+            static _ => TwitchConnectionResultPage.OperatorAccessRequired(),
+            static _ => TwitchConnectionResultPage.NoChannelSelected()
         );
     }
 
-    private static IResult ChannelConnectedResult()
+    private static IResult ProviderErrorResult(
+        string error,
+        string tryAgainUrl,
+        HttpContext context
+    )
     {
-        return Results.Content(
-            """
-            <!doctype html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <title>BlokeBot connection complete</title>
-            </head>
-            <body>
-                <p>Channel connected. You can close this window.</p>
-                <script>
-                    window.close();
-                </script>
-            </body>
-            </html>
-            """,
-            "text/html"
-        );
+        return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
+            ? TwitchConnectionResultPage.Cancelled(tryAgainUrl)
+            : TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                tryAgainUrl,
+                context.TraceIdentifier
+            );
     }
 
     private static CookieOptions ChannelBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)

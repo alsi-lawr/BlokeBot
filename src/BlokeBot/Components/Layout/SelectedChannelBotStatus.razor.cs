@@ -110,15 +110,21 @@ public partial class SelectedChannelBotStatus
             ? status.Lifecycle.Match(
                 _ =>
                     status.IsChannelBotAuthorized
-                        ? status.ChannelBotAuthorizationScopesCurrent
-                            ? "chat connected"
-                            : "reconnect chat"
-                        : "chat not connected",
+                        ? (
+                            status.ChannelBotAuthorizationScopesCurrent ? "chat connected"
+                            : CanAuthorizeSelectedHost() ? "reconnect bot"
+                            : "Channel owner needs to reconnect the bot"
+                        )
+                        : (
+                            CanAuthorizeSelectedHost()
+                                ? "connect bot"
+                                : "Channel owner needs to reconnect the bot"
+                        ),
                 static _ => "bot starting",
                 static _ => "bot running",
                 static _ => "bot stopping"
             )
-            : "chat not connected";
+            : "Channel owner needs to reconnect the bot";
 
     protected override void OnInitialized()
     {
