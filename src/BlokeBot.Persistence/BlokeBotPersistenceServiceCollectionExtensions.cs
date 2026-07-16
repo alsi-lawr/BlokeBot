@@ -11,21 +11,30 @@ public static class BlokeBotPersistenceServiceCollectionExtensions
         string databasePath
     )
     {
-        services.AddDbContextFactory<BlokeBotDbContext>(db =>
+        var fullPath = Path.GetFullPath(databasePath);
+        var directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(directory))
         {
-            var fullPath = Path.GetFullPath(databasePath);
-            var directory = Path.GetDirectoryName(fullPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
+            Directory.CreateDirectory(directory);
+        }
 
-            var connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = fullPath,
-            }.ToString();
-            db.UseSqlite(connectionString);
-        });
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = fullPath,
+        }.ToString();
+        return services.AddBlokeBotPersistence(_ => connectionString);
+    }
+
+    public static IServiceCollection AddBlokeBotPersistence(
+        this IServiceCollection services,
+        Func<IServiceProvider, string> connectionString
+    )
+    {
+        ArgumentNullException.ThrowIfNull(connectionString);
+
+        services.AddDbContextFactory<BlokeBotDbContext>(
+            (provider, db) => db.UseSqlite(connectionString(provider))
+        );
         services.AddSingleton<BlokeBotDatabaseInitializer>();
 
         return services;

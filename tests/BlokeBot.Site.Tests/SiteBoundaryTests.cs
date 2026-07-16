@@ -66,12 +66,18 @@ public sealed class SiteBoundaryTests
     ];
 
     [Test]
-    public void SiteProject_HasNoProjectOrRuntimePackageDependencies()
+    public void SiteProject_HasNoProjectDependenciesAndOnlyHostLoggingPackages()
     {
         var project = XDocument.Load(Path.Combine(SiteTestPaths.SiteRoot, "BlokeBot.Site.csproj"));
 
         project.Descendants("ProjectReference").ShouldBeEmpty();
-        project.Descendants("PackageReference").ShouldBeEmpty();
+        project
+            .Descendants("PackageReference")
+            .Select(reference => reference.Attribute("Include")?.Value)
+            .ShouldBe(
+                ["Serilog.AspNetCore", "Serilog.Settings.Configuration", "Serilog.Sinks.Console"],
+                ignoreOrder: true
+            );
         Directory.Exists(Path.Combine(SiteTestPaths.SiteRoot, "node_modules")).ShouldBeFalse();
         File.Exists(Path.Combine(SiteTestPaths.SiteRoot, "package.json")).ShouldBeFalse();
         Directory

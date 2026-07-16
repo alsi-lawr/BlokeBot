@@ -1,18 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BlokeBot.Commands\BlokeBot.Commands.csproj" />
-    <ProjectReference Include="..\..\src\BlokeBot.Functional\BlokeBot.Functional.csproj" />
     <ProjectReference Include="..\..\src\BlokeBot\BlokeBot.csproj" />
-    <ProjectReference Include="..\..\src\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
-    <ProjectReference Include="..\..\src\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
-    <ProjectReference Include="..\..\src\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
-    <ProjectReference Include="..\..\src\BlokeBot.Twitch\BlokeBot.Twitch.csproj" />
-    <ProjectReference Include="..\BlokeBot.Testing\BlokeBot.Testing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content
+      Include="..\..\src\BlokeBot\appsettings.json"
+      Link="appsettings.json"
+      CopyToOutputDirectory="PreserveNewest"
+    />
   </ItemGroup>
 </Project>

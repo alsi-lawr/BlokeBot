@@ -1,6 +1,16 @@
 using BlokeBot.Site;
+using Serilog;
 
-var app = SiteApplication.Build(args);
-app.Run();
+SiteApplication.ConfigureBootstrapLogging();
+
+try
+{
+    await using var app = SiteApplication.Build(args);
+    await app.RunAsync();
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
 
 public partial class Program;

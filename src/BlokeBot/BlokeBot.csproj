@@ -1,43 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
-    <ProjectReference Include="..\BlokeBot.Commands\BlokeBot.Commands.csproj" />
-    <ProjectReference Include="..\BlokeBot.Eventing\BlokeBot.Eventing.csproj" />
-    <ProjectReference Include="..\BlokeBot.Functional\BlokeBot.Functional.csproj" />
+    <ProjectReference Include="..\BlokeBot.Core\BlokeBot.Core.csproj" />
     <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
-    <ProjectReference Include="..\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
-    <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
-    <ProjectReference Include="..\BlokeBot.Twitch\BlokeBot.Twitch.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
     <AssemblyName>blokebot</AssemblyName>
     <PackageId>blokebot</PackageId>
-    <Version>0.1.0</Version>
-    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
-    <!-- SDK 10.0.301 Razor source generation misparses component tags as the first markup inside code blocks. -->
-    <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
   </PropertyGroup>
 
   <ItemGroup>
     <Content
-      Update="appsettings.Development.json;appsettings.Simulation.json;package.json;package-lock.json;*.tokens.json;*.db;*.db-shm;*.db-wal"
+      Update="appsettings.Development.json;*.tokens.json;*.db;*.db-shm;*.db-wal"
       CopyToPublishDirectory="Never"
     />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Spectre.Console.Cli" />
   </ItemGroup>
-
-  <Target
-    Name="RestoreNodePackages"
-    Inputs="$(MSBuildProjectDirectory)/package-lock.json"
-    Outputs="$(MSBuildProjectDirectory)/node_modules/.package-lock.json"
-  >
-    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)" />
-  </Target>
-
-  <Target
-    Name="BuildTailwindCss"
-    BeforeTargets="ComputeStaticWebAssets"
-    DependsOnTargets="RestoreNodePackages"
-  >
-    <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
-  </Target>
 </Project>

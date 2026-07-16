@@ -4,11 +4,14 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog.Core;
+using Serilog.Events;
 using Shouldly;
 using TUnit.Core;
 
 namespace BlokeBot.Site.Tests;
 
+[NotInParallel]
 public sealed class SiteHttpTests
 {
     private static readonly IReadOnlyList<string> _staticAssets =
@@ -63,11 +66,58 @@ public sealed class SiteHttpTests
         }
     }
 
+    [Test]
+    public async Task HttpRequest_EmitsSerilogRequestCompletionEvent()
+    {
+        var sink = new CapturingSink();
+        await using var app = SiteApplication.Build(
+            ["--environment", "Development"],
+            logging => logging.WriteTo.Sink(sink)
+        );
+        app.Urls.Add("http://127.0.0.1:0");
+        await app.StartAsync();
+
+        using var client = new HttpClient { BaseAddress = new Uri(GetListeningAddress(app)) };
+        using var response = await client.GetAsync("/");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        sink.Events.ShouldContain(logEvent =>
+            logEvent.MessageTemplate.Text.StartsWith(
+                "HTTP {RequestMethod} {RequestPath}",
+                StringComparison.Ordinal
+            )
+        );
+    }
+
     private static string GetListeningAddress(WebApplication app)
     {
         return app.Services.GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()
                 ?.Addresses.Single()
             ?? throw new InvalidOperationException("The site did not report a listening address.");
+    }
+
+    private sealed class CapturingSink : ILogEventSink
+    {
+        private readonly List<LogEvent> _events = [];
+
+        internal IReadOnlyList<LogEvent> Events
+        {
+            get
+            {
+                lock (_events)
+                {
+                    return _events.ToArray();
+                }
+            }
+        }
+
+        public void Emit(LogEvent logEvent)
+        {
+            lock (_events)
+            {
+                _events.Add(logEvent);
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("BlokeBot.Twitch.Auth.Tests")]
-[assembly: InternalsVisibleTo("BlokeBot.Tests")]
+[assembly: InternalsVisibleTo("BlokeBot.Core.Tests")]

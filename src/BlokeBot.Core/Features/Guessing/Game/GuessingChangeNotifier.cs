@@ -1,0 +1,6 @@
+using BlokeBot.Eventing;
+
+namespace BlokeBot.Core.Features.Guessing.Game;
+
+public sealed class GuessingChangeNotifier(EventBus<AppEventKind> events)
+    : EventNotifier<AppEventKind>(events, AppEventKind.GuessingChanged) { }

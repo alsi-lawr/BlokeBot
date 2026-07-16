@@ -1,6 +1,5 @@
 using BlokeBot.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.Extensions.Configuration;
 using Shouldly;
 using TUnit.Core;
 
@@ -132,23 +131,11 @@ public sealed class BlokeBotStatePathTests
     }
 
     [Test]
-    public void ExplicitUrlConfiguration_Detecting_OnlyAppliesDefaultWhenAbsent()
+    public void ExplicitUrl_Building_UsesDocumentedDefaultsForMissingValues()
     {
-        var empty = Configuration([]);
-        var urls = Configuration(new Dictionary<string, string?> { ["urls"] = "http://*:9000" });
-        var ports = Configuration(new Dictionary<string, string?> { ["HTTP_PORTS"] = "9001" });
-        var kestrel = Configuration(
-            new Dictionary<string, string?>
-            {
-                ["Kestrel:Endpoints:Http:Url"] = "http://127.0.0.1:9002",
-            }
-        );
-
-        BlokeBotServerUrlPolicy.HasExplicitConfiguration(empty).ShouldBeFalse();
-        BlokeBotServerUrlPolicy.HasExplicitConfiguration(urls).ShouldBeTrue();
-        BlokeBotServerUrlPolicy.HasExplicitConfiguration(ports).ShouldBeTrue();
-        BlokeBotServerUrlPolicy.HasExplicitConfiguration(kestrel).ShouldBeTrue();
         BlokeBotServerUrlPolicy.DefaultUrl.ShouldBe("http://127.0.0.1:8080");
+        BlokeBotServerUrlPolicy.ExplicitUrl(null, 9001).ShouldBe("http://127.0.0.1:9001");
+        BlokeBotServerUrlPolicy.ExplicitUrl("0.0.0.0", null).ShouldBe("http://0.0.0.0:8080");
     }
 
     [Test]
@@ -160,30 +147,6 @@ public sealed class BlokeBotStatePathTests
         BlokeBotServerUrlPolicy.LocalUrl(addresses).ShouldBe("http://127.0.0.1:43127");
     }
 
-    [Test]
-    public void MissingTwitchConfiguration_Inspecting_ReportsActionableEnvironmentFields()
-    {
-        var configuration = Configuration(
-            new Dictionary<string, string?>
-            {
-                ["TwitchBot:Identity:RedirectUri"] = "http://127.0.0.1/oauth/callback",
-            }
-        );
-
-        var missing = BlokeBotTwitchConfiguration.MissingFields(configuration);
-        var guidance = BlokeBotTwitchConfiguration.OfflineGuidance(missing);
-
-        missing
-            .Select(field => field.EnvironmentKey)
-            .ShouldBe([
-                "TwitchBot__Identity__BotUsername",
-                "TwitchBot__Identity__ClientId",
-                "TwitchBot__Identity__ClientSecret",
-            ]);
-        guidance.ShouldContain("Twitch features are offline");
-        guidance.ShouldContain("restart blokebot");
-    }
-
     private static BlokeBotStatePaths Resolve(
         BlokeBotOperatingSystem operatingSystem,
         BlokeBotPlatformEnvironment environment
@@ -193,10 +156,5 @@ public sealed class BlokeBotStatePathTests
             .Resolve(new(operatingSystem, environment, null, null, null))
             .ShouldBeOfType<BlokeBotStatePathResolution.Resolved>()
             .Paths;
-    }
-
-    private static IConfiguration Configuration(IEnumerable<KeyValuePair<string, string?>> values)
-    {
-        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
     }
 }

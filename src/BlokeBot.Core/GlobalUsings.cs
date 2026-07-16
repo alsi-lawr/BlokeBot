@@ -1,0 +1,12 @@
+global using BlokeBot.Commands;
+global using BlokeBot.Twitch;
+global using BlokeBot.Twitch.Auth;
+global using BlokeBot.Twitch.Runtime;
+global using Microsoft.AspNetCore.Builder;
+global using Microsoft.AspNetCore.Hosting;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.AspNetCore.Routing;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Logging;

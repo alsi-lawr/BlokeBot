@@ -57,7 +57,12 @@ internal sealed record BlokeBotStatePathRequest(
     string? ExplicitTokenCachePath
 );
 
-internal sealed record BlokeBotStatePaths(string DatabasePath, string TokenCachePath);
+internal sealed record BlokeBotStatePaths(string DatabasePath, string TokenCachePath)
+{
+    internal string StateDirectory =>
+        Path.GetDirectoryName(DatabasePath)
+        ?? throw new InvalidOperationException("The database path has no parent directory.");
+}
 
 internal abstract record BlokeBotStatePathResolution
 {
@@ -257,7 +262,7 @@ internal static class BlokeBotStatePathPreparer
         catch (Exception exception) when (IsPathFailure(exception))
         {
             return new BlokeBotStatePathPreparation.Failed(
-                $"blokebot could not prepare its state files: {exception.Message}{Environment.NewLine}Choose a writable directory with 'blokebot serve --data-dir PATH' or set BlokeBot__DatabasePath and TwitchBot__Identity__TokenCachePath explicitly."
+                "blokebot could not prepare its state files. Choose a writable directory with 'blokebot serve --data-dir PATH' or set BlokeBot__DatabasePath and TwitchBot__Identity__TokenCachePath explicitly."
             );
         }
     }

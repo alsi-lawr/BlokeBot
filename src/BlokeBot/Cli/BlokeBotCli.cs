@@ -1,36 +1,84 @@
-using System.Reflection;
+using BlokeBot.Hosting;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace BlokeBot.Cli;
 
 internal static class BlokeBotCli
 {
-    internal const int InvalidCommandExitCode = 2;
+    internal static Task<int> RunAsync(
+        IReadOnlyList<string> arguments,
+        IBlokeBotCommandRuntime? runtime = null,
+        IAnsiConsole? console = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        runtime ??= new BlokeBotCommandRuntime();
+        console ??= AnsiConsole.Console;
 
-    internal static string Version =>
-        typeof(BlokeBotCli)
-            .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion.Split('+', 2)[0]
-        ?? "0.1.0";
+        var registrar = new BlokeBotTypeRegistrar();
+        registrar.RegisterInstance(runtime);
+        registrar.RegisterInstance(console);
 
-    internal static string HelpText =>
-        $$"""
-            blokebot {{Version}}
+        var app = new CommandApp(registrar);
+        app.Configure(configuration =>
+        {
+            configuration.SetApplicationName("blokebot");
+            configuration.SetApplicationVersion(BlokeBotVersion.Current);
+            configuration.ConfigureConsole(console);
+            configuration.UseStrictParsing();
+            configuration.SetExceptionHandler(
+                (exception, _) =>
+                {
+                    BlokeBotHostLogging.HostFailure(exception);
+                    console.MarkupLine(
+                        $"[red]blokebot failed ({Markup.Escape(exception.GetType().Name)}).[/]"
+                    );
+                    return 1;
+                }
+            );
+            configuration
+                .AddCommand<BlokeBotHelpCommand>("help")
+                .WithDescription("Show help and exit.");
+            configuration
+                .AddCommand<BlokeBotVersionCommand>("version")
+                .WithDescription("Show version information and exit.");
+            configuration
+                .AddCommand<BlokeBotServeCommand>("serve")
+                .WithDescription("Start the bot and dashboard.");
+        });
+
+        var normalizedArguments = arguments.Count == 0 ? ["help"] : arguments;
+        return app.RunAsync(normalizedArguments, cancellationToken);
+    }
+}
+
+internal sealed class BlokeBotHelpCommand(IAnsiConsole console) : Command
+{
+    protected override int Execute(CommandContext context, CancellationToken cancellationToken)
+    {
+        console.WriteLine(
+            $$"""
+            blokebot {{BlokeBotVersion.Current}}
             BlokeBot is free, open-source, and easy to host.
 
             Usage:
               blokebot
               blokebot help
               blokebot version
-              blokebot serve [--data-dir PATH] [ASP.NET options]
+              blokebot serve [--host HOST] [--port PORT] [--data-dir PATH] [--config PATH]
 
             Commands:
               help     Show this help and exit.
-              version  Show package version information and exit.
+              version  Show version information and exit.
               serve    Start the bot and dashboard.
 
             Serve options:
+              --host HOST      Dashboard host. Default: 127.0.0.1.
+              --port PORT      Dashboard port. Default: 8080.
               --data-dir PATH  Store blokebot.db and twitch.tokens.json in PATH unless
                                either path is set explicitly in configuration.
+              --config PATH    Load an additional JSON configuration file.
 
             Required Twitch configuration for online mode:
               BotUsername  TwitchBot__Identity__BotUsername; the bot account login.
@@ -50,120 +98,129 @@ internal static class BlokeBotCli
             Guides:
               User Guide: https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide
               Server Owner Guide: https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide
-            """;
-
-    internal static BlokeBotCliInvocation Parse(IReadOnlyList<string> arguments)
-    {
-        if (arguments.Count == 0)
-        {
-            return new BlokeBotCliInvocation.Help();
-        }
-
-        return arguments[0] switch
-        {
-            "help" => arguments.Count == 1
-                ? new BlokeBotCliInvocation.Help()
-                : Invalid("The help command does not accept arguments."),
-            "version" => arguments.Count == 1
-                ? new BlokeBotCliInvocation.Version()
-                : Invalid("The version command does not accept arguments."),
-            "serve" => ParseServe(arguments),
-            _ => Invalid($"Unknown command '{arguments[0]}'."),
-        };
-    }
-
-    internal static BlokeBotCliTerminalResponse Render(BlokeBotCliInvocation invocation)
-    {
-        return invocation switch
-        {
-            BlokeBotCliInvocation.Help => new(0, HelpText + Environment.NewLine, string.Empty),
-            BlokeBotCliInvocation.Version => new(
-                0,
-                $"blokebot {Version}{Environment.NewLine}",
-                string.Empty
-            ),
-            BlokeBotCliInvocation.Invalid invalid => new(
-                InvalidCommandExitCode,
-                string.Empty,
-                $"blokebot: {invalid.Message}{Environment.NewLine}{Environment.NewLine}{HelpText}{Environment.NewLine}"
-            ),
-            BlokeBotCliInvocation.Serve => throw new InvalidOperationException(
-                "Serve commands do not have terminal output."
-            ),
-            _ => throw new InvalidOperationException("Unknown blokebot CLI invocation."),
-        };
-    }
-
-    private static BlokeBotCliInvocation ParseServe(IReadOnlyList<string> arguments)
-    {
-        string? dataDirectory = null;
-        var aspNetArguments = new List<string>();
-        for (var index = 1; index < arguments.Count; index++)
-        {
-            var argument = arguments[index];
-            if (argument.StartsWith("--data-dir=", StringComparison.Ordinal))
-            {
-                return Invalid("Use '--data-dir PATH' with the path as a separate argument.");
-            }
-
-            if (!string.Equals(argument, "--data-dir", StringComparison.Ordinal))
-            {
-                aspNetArguments.Add(argument);
-                continue;
-            }
-
-            if (dataDirectory is not null)
-            {
-                return Invalid("The --data-dir option can only be specified once.");
-            }
-
-            if (
-                index + 1 >= arguments.Count
-                || string.IsNullOrWhiteSpace(arguments[index + 1])
-                || arguments[index + 1].StartsWith("--", StringComparison.Ordinal)
-            )
-            {
-                return Invalid("The --data-dir option requires a path.");
-            }
-
-            dataDirectory = arguments[++index];
-        }
-
-        return new BlokeBotCliInvocation.Serve(dataDirectory, aspNetArguments);
-    }
-
-    private static BlokeBotCliInvocation.Invalid Invalid(string message)
-    {
-        return new(message);
+            """
+        );
+        return 0;
     }
 }
 
-internal abstract record BlokeBotCliInvocation
+internal sealed class BlokeBotVersionCommand(IAnsiConsole console) : Command
 {
-    private BlokeBotCliInvocation() { }
-
-    internal sealed record Help : BlokeBotCliInvocation;
-
-    internal sealed record Version : BlokeBotCliInvocation;
-
-    internal sealed record Invalid(string Message) : BlokeBotCliInvocation;
-
-    internal sealed record Serve : BlokeBotCliInvocation
+    protected override int Execute(CommandContext context, CancellationToken cancellationToken)
     {
-        internal Serve(string? dataDirectory, IEnumerable<string> aspNetArguments)
-        {
-            DataDirectory = dataDirectory;
-            AspNetArguments = Array.AsReadOnly(aspNetArguments.ToArray());
-        }
-
-        internal string? DataDirectory { get; }
-
-        internal IReadOnlyList<string> AspNetArguments { get; }
+        console.WriteLine($"blokebot {BlokeBotVersion.Current}");
+        return 0;
     }
 }
 
-internal sealed record BlokeBotCliTerminalResponse(
-    int ExitCode,
-    string StandardOutput,
-    string StandardError
+internal sealed class BlokeBotServeSettings : CommandSettings
+{
+    [CommandOption("--host <HOST>")]
+    public string? Host { get; init; }
+
+    [CommandOption("--port <PORT>")]
+    public int? Port { get; init; }
+
+    [CommandOption("--data-dir <PATH>")]
+    public string? DataDirectory { get; init; }
+
+    [CommandOption("--config <PATH>")]
+    public string? ConfigurationPath { get; init; }
+}
+
+internal sealed class BlokeBotServeCommand(IBlokeBotCommandRuntime runtime, IAnsiConsole console)
+    : AsyncCommand<BlokeBotServeSettings>
+{
+    protected override Task<int> ExecuteAsync(
+        CommandContext context,
+        BlokeBotServeSettings settings,
+        CancellationToken cancellationToken
+    )
+    {
+        return runtime.ServeAsync(
+            new BlokeBotServeOptions(
+                settings.Host,
+                settings.Port,
+                settings.DataDirectory,
+                settings.ConfigurationPath
+            ),
+            console,
+            cancellationToken
+        );
+    }
+}
+
+internal interface IBlokeBotCommandRuntime
+{
+    Task<int> ServeAsync(
+        BlokeBotServeOptions options,
+        IAnsiConsole console,
+        CancellationToken cancellationToken
+    );
+}
+
+internal sealed class BlokeBotCommandRuntime : IBlokeBotCommandRuntime
+{
+    public Task<int> ServeAsync(
+        BlokeBotServeOptions options,
+        IAnsiConsole console,
+        CancellationToken cancellationToken
+    )
+    {
+        return BlokeBotHost.RunAsync(options, console, cancellationToken);
+    }
+}
+
+internal sealed record BlokeBotServeOptions(
+    string? Host,
+    int? Port,
+    string? DataDirectory,
+    string? ConfigurationPath
 );
+
+internal sealed class BlokeBotTypeRegistrar : ITypeRegistrar
+{
+    private readonly IServiceCollection _services = new ServiceCollection();
+
+    public ITypeResolver Build()
+    {
+        return new BlokeBotTypeResolver(_services.BuildServiceProvider());
+    }
+
+    public void Register(Type service, Type implementation)
+    {
+        _services.AddSingleton(service, implementation);
+    }
+
+    public void RegisterInstance(Type service, object implementation)
+    {
+        _services.AddSingleton(service, implementation);
+    }
+
+    public void RegisterLazy(Type service, Func<object> factory)
+    {
+        _services.AddSingleton(service, _ => factory());
+    }
+
+    internal void RegisterInstance<TService>(TService implementation)
+        where TService : class
+    {
+        RegisterInstance(typeof(TService), implementation);
+    }
+}
+
+internal sealed class BlokeBotTypeResolver(IServiceProvider services) : ITypeResolver, IDisposable
+{
+    public object? Resolve(Type? type)
+    {
+        return type is null ? null : services.GetService(type);
+    }
+
+    public void Dispose()
+    {
+        if (services is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+}

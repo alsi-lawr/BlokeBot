@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <ItemGroup>
+    <ProjectReference Include="..\BlokeBot.Commands\BlokeBot.Commands.csproj" />
+    <ProjectReference Include="..\BlokeBot.Eventing\BlokeBot.Eventing.csproj" />
+    <ProjectReference Include="..\BlokeBot.Functional\BlokeBot.Functional.csproj" />
+    <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
+    <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
+    <ProjectReference Include="..\BlokeBot.Twitch\BlokeBot.Twitch.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <!-- SDK 10.0.301 Razor source generation misparses component tags as the first markup inside code blocks. -->
+    <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Content Update="package.json;package-lock.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <Target
+    Name="RestoreNodePackages"
+    Inputs="$(MSBuildProjectDirectory)/package-lock.json"
+    Outputs="$(MSBuildProjectDirectory)/node_modules/.package-lock.json"
+  >
+    <Exec Command="npm ci" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <Target
+    Name="BuildTailwindCss"
+    BeforeTargets="PrepareForBuild"
+    DependsOnTargets="RestoreNodePackages"
+  >
+    <Exec Command="npm run css:build" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

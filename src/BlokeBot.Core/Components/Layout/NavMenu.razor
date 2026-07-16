@@ -1,0 +1,224 @@
+@using BlokeBot.Core.Auth.Sessions
+@using BlokeBot.Core.Features.HostedChannels
+@using BlokeBot.Core.Hosts
+@using BlokeBot.Persistence.Models
+@inject EventBus<AppEventKind> _events
+@inject HostFeatureService _features
+@inject IJSRuntime _js
+@inject BlokeBotPageContextAccessor _pageContext
+@implements IAsyncDisposable
+
+<div class="nav-menu flex h-full flex-col">
+    <div class="nav-menu__brand flex items-center gap-3 border-b px-5 py-5">
+        <img class="h-11 w-11 rounded-xl border shadow-soft" src="/blokebot-mark.svg" alt="" />
+        <div>
+            <a class="block text-base font-bold text-slate-950" href="">BlokeBot</a>
+            <p class="text-xs font-medium text-slate-500">Channel tools</p>
+        </div>
+    </div>
+
+    <nav class="flex flex-1 flex-col gap-3 px-3 py-4">
+        <AuthorizeView>
+            <Authorized Context="navAuth">
+                @{
+                    var navContext = _pageContext.FromPrincipal(navAuth.User);
+                    var session = navContext.Session;
+                    var selection = session.State.Match<BotHostSelection?>(
+                        _ => null,
+                        selected => selected.Selection,
+                        _ => null
+                    );
+                    var showHostConfig = session.CanOpenHostConfig(_existingHostIds);
+                    var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
+                    var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
+                    var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
+                    var showAlerts = selection is not null && !session.IsBotAccount;
+                    var showBotFunctions = showGuessing || showPoints || showCustomCommands;
+                }
+
+                <AuthorizeView Policy="BotAdmin">
+                    <Authorized>
+                <div class="nav-menu__panel nav-menu__panel--admin rounded-xl p-1.5">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
+                             href="admin"
+                             @onclick="NotifyNavigatedAsync">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
+                            <path d="m9.5 12 1.7 1.7 3.6-4" />
+                        </svg>
+                        </span>
+                        Admin
+                    </NavLink>
+                </div>
+                <div class="nav-menu__separator" aria-hidden="true"></div>
+                    </Authorized>
+                </AuthorizeView>
+
+                <div class="nav-menu__panel rounded-xl p-1.5">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                             ActiveClass="nav-menu__item-active"
+                             Match="NavLinkMatch.All"
+                             href=""
+                             @onclick="NotifyNavigatedAsync">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
+                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M4 5h6v6H4Z" />
+                                <path d="M14 5h6v6h-6Z" />
+                                <path d="M4 15h6v4H4Z" />
+                                <path d="M14 15h6v4h-6Z" />
+                            </svg>
+                        </span>
+                        Home
+                    </NavLink>
+                </div>
+
+                @if (showAlerts)
+                {
+                    <div class="nav-menu__panel rounded-xl p-1.5">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="alerts"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M10.3 4.3 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
+                                    <path d="M12 9v4" />
+                                    <path d="M12 17h.01" />
+                                </svg>
+                            </span>
+                            Alerts
+                        </NavLink>
+                    </div>
+                }
+
+                @if (showHostConfig)
+                {
+                    <div class="nav-menu__panel rounded-xl p-1.5">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-3 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active nav-menu__item-active--host"
+                                 href="host"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M4 10.5 12 4l8 6.5V20H4Z" />
+                                    <path d="M9 20v-6h6v6" />
+                                </svg>
+                            </span>
+                            Channel setup
+                        </NavLink>
+                    </div>
+                }
+
+                @if (showBotFunctions)
+                {
+        <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>
+        @if (showGuessing)
+        {
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="guessing" open="@_guessingOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleGuessingAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
+                        <path d="M9 9h.01" />
+                        <path d="M15 9h.01" />
+                        <path d="M12 12h.01" />
+                        <path d="M9 15h.01" />
+                        <path d="M15 15h.01" />
+                    </svg>
+                </span>
+                <span class="min-w-0 flex-1">Guessing game</span>
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         Match="NavLinkMatch.All"
+                         href="guessing"
+                         @onclick="NotifyNavigatedAsync">
+                    Dashboard
+                </NavLink>
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="guessing/settings"
+                         @onclick="NotifyNavigatedAsync">
+                    Settings
+                </NavLink>
+            </div>
+        </details>
+        }
+        @if (showPoints)
+        {
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="points" open="@_pointsOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="TogglePointsAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
+                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v18" />
+                        <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
+                    </svg>
+                </span>
+                <span class="min-w-0 flex-1">Points</span>
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         Match="NavLinkMatch.All"
+                         href="points"
+                         @onclick="NotifyNavigatedAsync">
+                    Dashboard
+                </NavLink>
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="points/settings"
+                         @onclick="NotifyNavigatedAsync">
+                    Settings
+                </NavLink>
+            </div>
+        </details>
+        }
+        @if (showCustomCommands)
+        {
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1.5" data-nav-section="custom-commands" open="@_customCommandsOpen">
+            <summary class="nav-menu__summary flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleCustomCommandsAsync">
+                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700">
+                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h16" />
+                        <path d="M4 12h10" />
+                        <path d="M4 17h7" />
+                        <path d="m16 14 3 3-3 3" />
+                    </svg>
+                </span>
+                <span class="min-w-0 flex-1">Custom commands</span>
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="nav-menu__section-body mt-1 grid gap-1 border-t border-slate-100 pt-1">
+                <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-11 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="custom-commands/settings"
+                         @onclick="NotifyNavigatedAsync">
+                    Settings
+                </NavLink>
+            </div>
+        </details>
+        }
+                }
+
+                @if (selection is not null)
+                {
+                    <div class="nav-menu__active-channel mt-auto rounded-xl p-3">
+                        <p class="text-sm font-bold text-slate-950">Active channel</p>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">Choose a channel from the top bar when you manage more than one.</p>
+                    </div>
+                }
+            </Authorized>
+        </AuthorizeView>
+    </nav>
+</div>

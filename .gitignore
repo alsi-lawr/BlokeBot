@@ -79,6 +79,7 @@ artifacts/
 
 # Node
 node_modules/
+/src/BlokeBot.Core/wwwroot/app.css
 
 # Tye
 .tye/

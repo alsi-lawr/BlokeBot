@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\BlokeBot.Core\BlokeBot.Core.csproj" />
+    <ProjectReference Include="..\BlokeBot.Persistence\BlokeBot.Persistence.csproj" />
+    <ProjectReference Include="..\BlokeBot.Twitch.Runtime\BlokeBot.Twitch.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <AssemblyName>BlokeBot.Simulation</AssemblyName>
+  </PropertyGroup>
+</Project>

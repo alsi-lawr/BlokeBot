@@ -6,5 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
   </PropertyGroup>
 </Project>

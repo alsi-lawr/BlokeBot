@@ -1,0 +1,72 @@
+using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Auth.Web;
+using BlokeBot.Core.Features.SiteAccess;
+using BlokeBot.Core.Hosts;
+
+namespace BlokeBot.Core.Features.HostConfig.Page;
+
+internal static class HostConfigEndpoints
+{
+    public static void MapHostConfigEndpoints(this WebApplication app)
+    {
+        app.MapGet(
+                "/host/create",
+                async (
+                    HttpContext context,
+                    string? returnUrl,
+                    BotHostProvisioningService provisioning,
+                    AuthSessionService session,
+                    SiteAccessService siteAccess,
+                    CancellationToken ct
+                ) =>
+                {
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var login = currentSession.Login;
+                    if (string.IsNullOrWhiteSpace(login))
+                    {
+                        return Results.Redirect("/auth/login");
+                    }
+
+                    if (!await siteAccess.CanCreateHostAsync(login, ct))
+                    {
+                        return Results.Forbid();
+                    }
+
+                    var userId = currentSession.UserId;
+                    var displayName = string.IsNullOrWhiteSpace(currentSession.DisplayName)
+                        ? login
+                        : currentSession.DisplayName;
+                    var profileImageUrl = currentSession.ProfileImageUrl;
+                    var hostId = await provisioning.EnsureHostAsync(
+                        login,
+                        userId,
+                        displayName,
+                        profileImageUrl,
+                        ct
+                    );
+                    var host = new BotHostChoice(
+                        hostId,
+                        login,
+                        displayName,
+                        AuthRole.Streamer,
+                        profileImageUrl
+                    );
+                    var available = currentSession
+                        .AvailableHosts.Where(x => x.Id != host.Id)
+                        .Append(host)
+                        .ToArray();
+
+                    await session.SignInHostAsync(
+                        context,
+                        available,
+                        host,
+                        currentSession.IsBotAdmin,
+                        adminEditingLogin: null
+                    );
+
+                    return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/host"));
+                }
+            )
+            .RequireAuthorization();
+    }
+}

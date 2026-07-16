@@ -1,5 +1,7 @@
+using System.Globalization;
 using BlokeBot.Cli;
 using Shouldly;
+using Spectre.Console;
 using TUnit.Core;
 
 namespace BlokeBot.Tests;
@@ -7,122 +9,114 @@ namespace BlokeBot.Tests;
 public sealed class BlokeBotCliTests
 {
     [Test]
-    public void NoArguments_Parsing_RendersHelpWithSuccessfulExit()
+    public async Task NoArguments_RendersHelpWithSuccessfulExit()
     {
-        var response = Terminal([]);
+        var response = await TerminalAsync([]);
 
         response.ExitCode.ShouldBe(0);
-        response.StandardOutput.ShouldContain("blokebot 0.1.0");
-        response.StandardOutput.ShouldContain("blokebot serve [--data-dir PATH] [ASP.NET options]");
-        response.StandardOutput.ShouldContain("BlokeBot is free, open-source, and easy to host.");
-        response.StandardOutput.ShouldContain("BotUsername");
-        response.StandardOutput.ShouldContain("ClientId");
-        response.StandardOutput.ShouldContain("ClientSecret");
-        response.StandardOutput.ShouldContain("RedirectUri");
-        response.StandardOutput.ShouldContain(
-            "must exactly match the callback registered with Twitch"
+        response.Output.ShouldContain("blokebot 0.0.0-dev+");
+        response.Output.ShouldContain(
+            "blokebot serve [--host HOST] [--port PORT] [--data-dir PATH] [--config PATH]"
         );
-        response.StandardOutput.ShouldContain("$XDG_STATE_HOME/blokebot");
-        response.StandardOutput.ShouldContain("~/.local/state/blokebot");
-        response.StandardOutput.ShouldContain("~/Library/Application Support/BlokeBot");
-        response.StandardOutput.ShouldContain("%LOCALAPPDATA%\\BlokeBot");
-        response.StandardOutput.ShouldContain(
-            "Explicit database/token configuration overrides --data-dir"
-        );
-        response.StandardOutput.ShouldContain(
-            "https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide"
-        );
-        response.StandardOutput.ShouldContain(
-            "https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide"
-        );
-        response.StandardOutput.ShouldNotContain("Self-hosted Twitch bot and dashboard.");
-        response.StandardOutput.ShouldNotContain("does not open a browser or install a service");
-        response.StandardError.ShouldBeEmpty();
+        response.Output.ShouldContain("BlokeBot is free, open-source, and easy to host.");
+        response.Output.ShouldContain("TwitchBot__Identity__ClientSecret");
+        response.Output.ShouldContain("$XDG_STATE_HOME/blokebot");
+        response.Output.ShouldContain("Explicit database/token configuration overrides --data-dir");
     }
 
     [Test]
-    public void HelpCommand_Parsing_RendersHelpWithSuccessfulExit()
+    public async Task VersionCommand_RendersDevelopmentVersionWithFullRevision()
     {
-        var response = Terminal(["help"]);
+        var response = await TerminalAsync(["version"]);
 
         response.ExitCode.ShouldBe(0);
-        response.StandardOutput.ShouldContain("Commands:");
-        response.StandardError.ShouldBeEmpty();
-    }
-
-    [Test]
-    public void VersionCommand_Parsing_RendersSemanticPackageVersion()
-    {
-        var response = Terminal(["version"]);
-
-        response.ExitCode.ShouldBe(0);
-        response.StandardOutput.ShouldBe($"blokebot 0.1.0{Environment.NewLine}");
-        response.StandardError.ShouldBeEmpty();
+        response.Output.Trim().ShouldBe($"blokebot {BlokeBotVersion.Current}");
+        BlokeBotVersion.Current.ShouldMatch("^0\\.0\\.0-dev\\+[0-9a-f]{40}$");
         typeof(BlokeBotCli).Assembly.GetName().Name.ShouldBe("blokebot");
     }
 
     [Test]
-    public void UnknownCommand_Parsing_RendersHelpWithNonzeroExit()
+    public async Task ServeCommand_HandsOnlyDocumentedOptionsToRuntime()
     {
-        var response = Terminal(["start"]);
+        var runtime = new CapturingRuntime();
 
-        response.ExitCode.ShouldBe(BlokeBotCli.InvalidCommandExitCode);
-        response.StandardOutput.ShouldBeEmpty();
-        response.StandardError.ShouldContain("Unknown command 'start'.");
-        response.StandardError.ShouldContain("blokebot serve");
+        var response = await TerminalAsync(
+            [
+                "serve",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "9090",
+                "--data-dir",
+                "/tmp/blokebot-state",
+                "--config",
+                "operator.json",
+            ],
+            runtime
+        );
+
+        response.ExitCode.ShouldBe(23);
+        runtime.Options.ShouldBe(
+            new BlokeBotServeOptions("0.0.0.0", 9090, "/tmp/blokebot-state", "operator.json")
+        );
     }
 
     [Test]
-    public void UndocumentedAliases_Parsing_AreUnknownCommands()
+    public async Task UnknownCommandAndAspNetPassThrough_ReturnSafeNonzeroSummary()
     {
-        foreach (var alias in new[] { "-h", "--help", "-v", "--version" })
-        {
-            var response = Terminal([alias]);
+        var unknown = await TerminalAsync(["start-secret-value"]);
+        var passThrough = await TerminalAsync(["serve", "--urls", "http://secret.invalid"]);
 
-            response.ExitCode.ShouldBe(BlokeBotCli.InvalidCommandExitCode);
-            response.StandardOutput.ShouldBeEmpty();
-            response.StandardError.ShouldContain($"Unknown command '{alias}'.");
-            response.StandardError.ShouldContain("blokebot serve");
+        unknown.ExitCode.ShouldNotBe(0);
+        unknown.Output.ShouldContain("blokebot failed (CommandParseException).");
+        unknown.Output.ShouldNotContain("start-secret-value");
+        passThrough.ExitCode.ShouldNotBe(0);
+        passThrough.Output.ShouldNotContain("secret.invalid");
+    }
+
+    [Test]
+    public void InformationalVersion_Display_IsDeterministicForTaggedAndDevelopmentBuilds()
+    {
+        BlokeBotVersion.Display("1.2.3+build.47").ShouldBe("1.2.3");
+        BlokeBotVersion
+            .Display("0.0.0-dev+0123456789abcdef0123456789abcdef01234567")
+            .ShouldBe("0.0.0-dev+0123456789abcdef0123456789abcdef01234567");
+    }
+
+    private static async Task<CliResponse> TerminalAsync(
+        IReadOnlyList<string> arguments,
+        IBlokeBotCommandRuntime? runtime = null
+    )
+    {
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        var console = AnsiConsole.Create(
+            new AnsiConsoleSettings
+            {
+                Ansi = AnsiSupport.No,
+                ColorSystem = ColorSystemSupport.NoColors,
+                Interactive = InteractionSupport.No,
+                Out = new AnsiConsoleOutput(writer),
+            }
+        );
+
+        var exitCode = await BlokeBotCli.RunAsync(arguments, runtime, console);
+        return new CliResponse(exitCode, writer.ToString());
+    }
+
+    private sealed class CapturingRuntime : IBlokeBotCommandRuntime
+    {
+        internal BlokeBotServeOptions? Options { get; private set; }
+
+        public Task<int> ServeAsync(
+            BlokeBotServeOptions options,
+            IAnsiConsole console,
+            CancellationToken cancellationToken
+        )
+        {
+            Options = options;
+            return Task.FromResult(23);
         }
     }
 
-    [Test]
-    public void ServeWithDataDirectory_Parsing_ConsumesOnlyDataDirectoryOption()
-    {
-        var invocation = BlokeBotCli.Parse([
-            "serve",
-            "--environment",
-            "Development",
-            "--data-dir",
-            "/tmp/blokebot-state",
-            "--urls",
-            "http://127.0.0.1:0",
-        ]);
-
-        var serve = invocation.ShouldBeOfType<BlokeBotCliInvocation.Serve>();
-        serve.DataDirectory.ShouldBe("/tmp/blokebot-state");
-        serve.AspNetArguments.ShouldBe([
-            "--environment",
-            "Development",
-            "--urls",
-            "http://127.0.0.1:0",
-        ]);
-    }
-
-    [Test]
-    public void MissingOrRepeatedDataDirectory_Parsing_RendersActionableFailure()
-    {
-        var missing = Terminal(["serve", "--data-dir", "--urls", "http://127.0.0.1:0"]);
-        var repeated = Terminal(["serve", "--data-dir", "/first", "--data-dir", "/second"]);
-
-        missing.ExitCode.ShouldBe(BlokeBotCli.InvalidCommandExitCode);
-        missing.StandardError.ShouldContain("requires a path");
-        repeated.ExitCode.ShouldBe(BlokeBotCli.InvalidCommandExitCode);
-        repeated.StandardError.ShouldContain("can only be specified once");
-    }
-
-    private static BlokeBotCliTerminalResponse Terminal(IReadOnlyList<string> arguments)
-    {
-        return BlokeBotCli.Render(BlokeBotCli.Parse(arguments));
-    }
+    private sealed record CliResponse(int ExitCode, string Output);
 }
