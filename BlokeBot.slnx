@@ -23,7 +23,6 @@
     <Project Path="tests/BlokeBot.Twitch.Auth.Tests/BlokeBot.Twitch.Auth.Tests.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Runtime.Tests/BlokeBot.Twitch.Runtime.Tests.csproj" />
     <Project Path="tests/BlokeBot.Twitch.Tests/BlokeBot.Twitch.Tests.csproj" />
-    <Project Path="tests/BlokeBot.Simulation.Tests/BlokeBot.Simulation.Tests.csproj" />
     <Project Path="tests/BlokeBot.Tests/BlokeBot.Tests.csproj" />
   </Folder>
 </Solution>
