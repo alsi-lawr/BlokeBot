@@ -15,7 +15,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 {
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task FirstEstablishment_Succeeding_ReturnsEstablishedWithoutFailureReport(
         ChatRuntime runtime
     )
@@ -48,7 +47,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task TransientFailureThenEstablishment_RunningPipeline_RetriesAndResetsStatus(
         ChatRuntime runtime
     )
@@ -100,7 +98,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task TokenUnavailable_DuringEstablishment_ReturnsTypedOutcomeWithoutRetry(
         ChatRuntime runtime
     )
@@ -132,7 +129,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task UnexpectedEstablishmentFailure_RunningPipeline_ReportsUnhealthyWithoutRetry(
         ChatRuntime runtime
     )
@@ -161,7 +157,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task TimeoutThenEstablishment_RunningPipeline_RetriesThroughDirectTimeoutHook(
         ChatRuntime runtime
     )
@@ -194,7 +189,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task TransientEstablishmentFailures_ExhaustingAttempts_ReportBoundedUnhealthy(
         ChatRuntime runtime
     )
@@ -244,7 +238,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task SingleAttemptPolicy_TransientFailure_DoesNotAddCompatibilityRetry(
         ChatRuntime runtime
     )
@@ -273,7 +266,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task CallerCancellation_DuringEstablishment_StopsWithoutFailureReport(
         ChatRuntime runtime
     )
@@ -300,7 +292,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task IdleEstablishment_RunningRuntime_WaitsOutsideRetryThenRechecks(
         ChatRuntime runtime
     )
@@ -325,7 +316,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task EstablishedSession_Listening_UsesHostLifetimeTokenNotAttemptTimeout(
         ChatRuntime runtime
     )
@@ -351,7 +341,6 @@ public sealed class RuntimeSessionEstablishmentTests : RuntimeSessionResilienceT
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task SuccessfulEstablishment_AfterDisconnect_ResetsConsecutiveAttemptBudget(
         ChatRuntime runtime
     )

@@ -1,13 +1,6 @@
 using System.Threading.Channels;
-using BlokeBot.Commands;
 using BlokeBot.Eventing;
-using BlokeBot.Functional;
-using BlokeBot.Twitch.Auth;
-using Microsoft.Extensions.Logging.Abstractions;
-using Polly;
-using Polly.Timeout;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
@@ -51,10 +44,8 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 {
                     throw failure;
                 }
-
                 _reports.Add(report);
             }
-
             _transitions.Writer.TryWrite(report.Status).ShouldBeTrue();
         }
 
@@ -72,7 +63,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
             {
                 _reports.Clear();
             }
-
             while (_transitions.Reader.TryRead(out _)) { }
         }
 
@@ -82,38 +72,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
         }
     }
 
-    private protected sealed class RecordingChatObserver : IChatMessageObserver
-    {
-        internal List<string> Channels { get; } = [];
-
-        public ValueTask MessageReceivedAsync(
-            ChatMessage message,
-            CancellationToken cancellationToken
-        )
-        {
-            Channels.Add(message.Channel);
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private protected sealed class UnusedCommandResponseSender : ICommandResponseSender
-    {
-        public ValueTask SendAsync(
-            ChatMessage sourceMessage,
-            CommandResponse response,
-            CancellationToken cancellationToken
-        )
-        {
-            throw new InvalidOperationException("No command response was expected.");
-        }
-    }
-
     private protected sealed class FixedTimeProvider(DateTimeOffset initialNow) : TimeProvider
     {
         private readonly object _gate = new();
         private readonly HashSet<ManualTimer> _timers = [];
         private DateTimeOffset _now = initialNow;
-
         public override long TimestampFrequency => TimeSpan.TicksPerSecond;
 
         public override DateTimeOffset GetUtcNow()
@@ -149,7 +112,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 _now = _now.Add(duration);
                 due = _timers.Where(timer => timer.IsDue(_now)).ToArray();
             }
-
             foreach (var timer in due)
             {
                 timer.Fire();
@@ -195,7 +157,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     {
                         return false;
                     }
-
                     _period = period;
                     _dueAt =
                         dueTime == Timeout.InfiniteTimeSpan
@@ -214,13 +175,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     {
                         return;
                     }
-
                     _dueAt =
                         _period == Timeout.InfiniteTimeSpan
                             ? DateTimeOffset.MaxValue
                             : owner._now.Add(_period);
                 }
-
                 callback(state);
             }
 
@@ -232,7 +191,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     {
                         return;
                     }
-
                     _disposed = true;
                     owner.Remove(this);
                 }

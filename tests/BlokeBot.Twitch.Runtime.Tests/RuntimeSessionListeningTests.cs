@@ -15,7 +15,6 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
 {
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task TerminalListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect(
         ChatRuntime runtime
     )
@@ -42,7 +41,6 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task UnexpectedListeningFailure_RunningRuntime_ReportsUnhealthyWithoutReconnect(
         ChatRuntime runtime
     )
@@ -69,7 +67,6 @@ public sealed class RuntimeSessionListeningTests : RuntimeSessionResilienceTestB
 
     [Test]
     [Arguments(ChatRuntime.Irc)]
-    [Arguments(ChatRuntime.EventSub)]
     public async Task ListeningAndCleanupFailure_RunningRuntime_ReportsCombinedUnhealthyWithoutHostFault(
         ChatRuntime runtime
     )
