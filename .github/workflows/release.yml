@@ -461,20 +461,29 @@ jobs:
       - name: Test Chocolatey package lifecycle
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $version = '${{ needs.version.outputs.version }}'
           $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
           New-Item -ItemType Directory -Force artifacts/chocolatey | Out-Null
           choco pack artifacts/package-metadata/blokebot/chocolatey/blokebot/blokebot.nuspec --output-directory artifacts/chocolatey
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey pack failed.' }
           choco install blokebot --source artifacts/chocolatey --version $version --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey install failed.' }
           refreshenv
+          if (-not $?) { throw 'Chocolatey environment refresh failed after install.' }
           python packaging/smoke/native_smoke.py (Get-Command blokebot).Source --version $version
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey smoke test failed.' }
           choco upgrade blokebot --source artifacts/chocolatey --version $version --force --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey upgrade failed.' }
           if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Chocolatey update changed user data.' }
           choco uninstall blokebot --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Chocolatey uninstall failed.' }
           refreshenv
+          if (-not $?) { throw 'Chocolatey environment refresh failed after uninstall.' }
           if (Get-Command blokebot -ErrorAction SilentlyContinue) { throw 'Chocolatey left the command installed.' }
+          if ((Get-Content (Join-Path $stateDirectory 'marker')) -ne 'preserve') { throw 'Chocolatey uninstall changed user data.' }
 
   package-winget-test:
     name: Test the WinGet lifecycle on a Windows client
