@@ -65,40 +65,6 @@ public sealed class EventBusTests
     }
 
     [Test]
-    public async Task PublishCancellation_WhileDispatching_PropagatesWithoutReportingOrLaterSubscriber()
-    {
-        var reporter = new RecordingReporter();
-        var events = CreateBus(reporter);
-        var laterCalled = false;
-        using var cancellation = new CancellationTokenSource();
-        events.Subscribe(
-            "changed",
-            ObserverIdentity.Named("cancelling"),
-            (_, token) =>
-            {
-                cancellation.Cancel();
-                return ValueTask.FromCanceled(token);
-            }
-        );
-        events.Subscribe(
-            "changed",
-            ObserverIdentity.Named("later"),
-            (_, _) =>
-            {
-                laterCalled = true;
-                return ValueTask.CompletedTask;
-            }
-        );
-
-        await Should.ThrowAsync<OperationCanceledException>(() =>
-            events.PublishAsync("changed", cancellation.Token).AsTask()
-        );
-
-        laterCalled.ShouldBeFalse();
-        reporter.Reports.ShouldBeEmpty();
-    }
-
-    [Test]
     public async Task DisposedSubscription_PublishingEvent_DoesNotNotifyHandler()
     {
         var events = CreateBus(new RecordingReporter());

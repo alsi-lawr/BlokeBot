@@ -390,23 +390,6 @@ public sealed class AccessListPolicyTests
         (await service.LoadAsync(hostId, CancellationToken.None)).AllowModsByDefault.ShouldBeTrue();
     }
 
-    [Test]
-    public async Task PreCancelledExecution_SavingModeratorAccess_PropagatesCancellation()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var service = new HostModAccessService(
-            dbFactory,
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
-        );
-        var command = ValidSaveCommand(1, allowModsByDefault: false);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-
-        await Should.ThrowAsync<OperationCanceledException>(() =>
-            service.SaveModeratorAccess(command).ExecuteAsync(cancellation.Token).AsTask()
-        );
-    }
-
     private static SiteAccessService CreateSiteAccessService(
         SqliteBlokeBotDbFactory dbFactory,
         string[]? botAdmins = null

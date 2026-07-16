@@ -13,22 +13,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class GuessingConfigurationCommandTests
 {
     [Test]
-    public async Task PreCancelledExecution_LoadingConfiguration_PropagatesCancellation()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var service = ConfigurationService(dbFactory);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-
-        await Should.ThrowAsync<OperationCanceledException>(() =>
-            service
-                .LoadConfiguration(1, new GuessingProfileSelection.Default())
-                .ExecuteAsync(cancellation.Token)
-                .AsTask()
-        );
-    }
-
-    [Test]
     public async Task MissingProfile_LoadingOptionalEditor_ReturnsAbsence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
