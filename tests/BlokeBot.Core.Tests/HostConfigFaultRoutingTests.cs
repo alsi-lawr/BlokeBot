@@ -100,50 +100,6 @@ public sealed class HostConfigFaultRoutingTests
         context.Services.AddSingleton(new UiFaultTelemetry(logger));
     }
 
-    private static async Task AssertStaleCompletionAsync(bool firstNotificationFails)
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var clock = new ManualTimeProvider();
-        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
-        var notifications = new NotificationGate();
-        context
-            .Services.GetRequiredService<EventBus<AppEventKind>>()
-            .Subscribe(
-                AppEventKind.HostedChannelsChanged,
-                ObserverIdentity.Named(
-                    firstNotificationFails
-                        ? "Test.HostConfig.StaleFailure"
-                        : "Test.HostConfig.StaleSuccess"
-                ),
-                notifications.ObserveAsync
-            );
-        var page = RenderHostConfigPage(context);
-
-        ClickAccessMode(page, "Allowed list only");
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-        (await notifications.WaitForEntryAsync()).ShouldBe(1);
-        ClickAccessMode(page, "All mods");
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-        notifications.Release(
-            firstNotificationFails ? NotificationResult.Failure : NotificationResult.Success
-        );
-        if (firstNotificationFails)
-        {
-            (await notifications.WaitForEntryAsync()).ShouldBe(2);
-            notifications.Release(NotificationResult.Success);
-        }
-
-        var finalNotification = firstNotificationFails ? 3 : 2;
-        (await notifications.WaitForEntryAsync()).ShouldBe(finalNotification);
-
-        AssertAccessMode(page, allowModsByDefault: true);
-        context.Services.GetRequiredService<ToastService>().Current.ShouldBeEmpty();
-        notifications.Release(NotificationResult.Success);
-        await notifications.WaitForExitAsync(finalNotification);
-    }
-
     private static async Task AssertCurrentFailureAsync(bool runtimeNotificationFails)
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -282,51 +238,6 @@ public sealed class HostConfigFaultRoutingTests
         }
 
         return host.Id;
-    }
-
-    private enum NotificationResult
-    {
-        Success,
-        Failure,
-    }
-
-    private sealed class NotificationGate
-    {
-        private readonly Channel<int> _entered = Channel.CreateUnbounded<int>();
-        private readonly Channel<int> _exited = Channel.CreateUnbounded<int>();
-        private readonly Channel<NotificationResult> _results =
-            Channel.CreateUnbounded<NotificationResult>();
-        private int _notificationCount;
-
-        public async ValueTask ObserveAsync(
-            EventNotification<AppEventKind> notification,
-            CancellationToken cancellationToken
-        )
-        {
-            var count = ++_notificationCount;
-            _entered.Writer.TryWrite(count);
-            var result = await _results.Reader.ReadAsync(cancellationToken);
-            _exited.Writer.TryWrite(count);
-            if (result is NotificationResult.Failure)
-            {
-                throw new InvalidOperationException("runtime unavailable");
-            }
-        }
-
-        public ValueTask<int> WaitForEntryAsync()
-        {
-            return _entered.Reader.ReadAsync();
-        }
-
-        public async ValueTask WaitForExitAsync(int expectedNotification)
-        {
-            while (await _exited.Reader.ReadAsync() != expectedNotification) { }
-        }
-
-        public void Release(NotificationResult result)
-        {
-            _results.Writer.TryWrite(result);
-        }
     }
 
     private sealed class FaultingDbContextFactory(IDbContextFactory<BlokeBotDbContext> innerFactory)
