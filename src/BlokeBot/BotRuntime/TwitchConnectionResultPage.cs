@@ -25,6 +25,78 @@ internal static class TwitchConnectionResultPage
         );
     }
 
+    public static IResult BotAccountConnectionSaved()
+    {
+        return Render(
+            new(
+                "Bot account connected",
+                "BlokeBot has saved Twitch access for the bot account.",
+                "The bot account connection has been updated.",
+                "You can return to Admin or close this window.",
+                null,
+                "/admin",
+                "Return to Admin",
+                StatusCodes.Status200OK,
+                false,
+                null
+            )
+        );
+    }
+
+    public static IResult BotAccountConnectionCancelled()
+    {
+        return Render(
+            new(
+                "Connection cancelled",
+                "Twitch did not connect the BlokeBot bot account.",
+                "No changes were made.",
+                "A BlokeBot administrator can try again when they are ready.",
+                "/oauth/start",
+                "/admin",
+                "Return to Admin",
+                StatusCodes.Status400BadRequest,
+                false,
+                null
+            )
+        );
+    }
+
+    public static IResult BotAccountConnectionExpired()
+    {
+        return Render(
+            new(
+                "Connection expired",
+                "That bot-account connection has expired.",
+                "No changes were made.",
+                "A BlokeBot administrator can start a new connection.",
+                "/oauth/start",
+                "/admin",
+                "Return to Admin",
+                StatusCodes.Status400BadRequest,
+                false,
+                null
+            )
+        );
+    }
+
+    public static IResult BotAccountProviderTemporarilyUnavailable(string supportReference)
+    {
+        return Render(
+            new(
+                "Twitch is temporarily unavailable",
+                "BlokeBot could not finish connecting the bot account right now.",
+                "No changes were made.",
+                "A BlokeBot administrator can try again in a few minutes. If this keeps happening, use the support reference below.",
+                "/oauth/start",
+                "/admin",
+                "Return to Admin",
+                StatusCodes.Status502BadGateway,
+                true,
+                supportReference
+            )
+        );
+    }
+
     public static IResult Cancelled(string tryAgainUrl)
     {
         return Render(

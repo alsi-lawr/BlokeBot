@@ -74,17 +74,17 @@ internal static class BotOAuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return ProviderErrorResult(error, "/oauth/start", context);
+                        return BotAccountProviderErrorResult(error, context);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return TwitchConnectionResultPage.Cancelled("/oauth/start");
+                        return TwitchConnectionResultPage.BotAccountConnectionCancelled();
                     }
 
                     if (string.IsNullOrWhiteSpace(state))
                     {
-                        return TwitchConnectionResultPage.Expired("/oauth/start");
+                        return TwitchConnectionResultPage.BotAccountConnectionExpired();
                     }
 
                     var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
@@ -92,14 +92,11 @@ internal static class BotOAuthEndpoints
                         async _ =>
                         {
                             await changes.NotifyChangedAsync(ct);
-                            return TwitchConnectionResultPage.ConnectionSaved(
-                                "/admin",
-                                "Return to Admin"
-                            );
+                            return TwitchConnectionResultPage.BotAccountConnectionSaved();
                         },
                         static _ =>
                             Task.FromResult<IResult>(
-                                TwitchConnectionResultPage.Expired("/oauth/start")
+                                TwitchConnectionResultPage.BotAccountConnectionExpired()
                             )
                     );
                 }
@@ -469,6 +466,15 @@ internal static class BotOAuthEndpoints
             ? TwitchConnectionResultPage.Cancelled(tryAgainUrl)
             : TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
                 tryAgainUrl,
+                context.TraceIdentifier
+            );
+    }
+
+    private static IResult BotAccountProviderErrorResult(string error, HttpContext context)
+    {
+        return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
+            ? TwitchConnectionResultPage.BotAccountConnectionCancelled()
+            : TwitchConnectionResultPage.BotAccountProviderTemporarilyUnavailable(
                 context.TraceIdentifier
             );
     }
