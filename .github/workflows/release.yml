@@ -492,7 +492,7 @@ jobs:
         with:
           name: package-metadata-${{ needs.version.outputs.version }}
           path: artifacts/package-metadata
-      - name: Require or install the pinned official WinGet client
+      - name: Require a working runner WinGet client or install a verified pinned fallback
         shell: pwsh
         env:
           WINGET_VERSION: 1.29.280
