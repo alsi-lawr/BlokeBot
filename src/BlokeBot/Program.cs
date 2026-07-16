@@ -6,6 +6,7 @@ using BlokeBot.Auth.Users;
 using BlokeBot.Auth.Web;
 using BlokeBot.BotRuntime;
 using BlokeBot.BotStatus;
+using BlokeBot.Cli;
 using BlokeBot.Components;
 using BlokeBot.Eventing;
 using BlokeBot.Features.AccessLists;
@@ -42,9 +43,57 @@ using BlokeBot.Persistence;
 using BlokeBot.Simulation;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-var builder = WebApplication.CreateBuilder(args);
+var cliInvocation = BlokeBotCli.Parse(args);
+if (cliInvocation is not BlokeBotCliInvocation.Serve serve)
+{
+    var response = BlokeBotCli.Render(cliInvocation);
+    Console.Out.Write(response.StandardOutput);
+    Console.Error.Write(response.StandardError);
+    return response.ExitCode;
+}
+
+var builder = WebApplication.CreateBuilder(serve.AspNetArguments.ToArray());
+if (!BlokeBotServerUrlPolicy.HasExplicitConfiguration(builder.Configuration))
+{
+    builder.WebHost.UseUrls(BlokeBotServerUrlPolicy.DefaultUrl);
+}
+
+var (operatingSystem, platformEnvironment) = BlokeBotPlatformEnvironment.Current();
+var pathResolution = BlokeBotStatePathResolver.Resolve(
+    new BlokeBotStatePathRequest(
+        operatingSystem,
+        platformEnvironment,
+        serve.DataDirectory,
+        builder.Configuration["BlokeBot:DatabasePath"],
+        builder.Configuration["TwitchBot:Identity:TokenCachePath"]
+    )
+);
+if (pathResolution is BlokeBotStatePathResolution.Failed pathFailure)
+{
+    Console.Error.WriteLine($"blokebot: {pathFailure.Message}");
+    return 1;
+}
+
+var resolvedPaths = ((BlokeBotStatePathResolution.Resolved)pathResolution).Paths;
+var pathPreparation = BlokeBotStatePathPreparer.Prepare(resolvedPaths);
+if (pathPreparation is BlokeBotStatePathPreparation.Failed preparationFailure)
+{
+    Console.Error.WriteLine(preparationFailure.Message);
+    return 1;
+}
+
+var statePaths = ((BlokeBotStatePathPreparation.Prepared)pathPreparation).Paths;
+builder.Configuration.AddInMemoryCollection(
+    new Dictionary<string, string?>
+    {
+        ["BlokeBot:DatabasePath"] = statePaths.DatabasePath,
+        ["TwitchBot:Identity:TokenCachePath"] = statePaths.TokenCachePath,
+    }
+);
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
@@ -60,7 +109,8 @@ builder.Services.AddOptions<WebAuthOptions>().BindConfiguration("TwitchWebAuth")
 builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
 
 var botSection = builder.Configuration.GetSection("TwitchBot");
-var botRuntimeConfigured = IsBotRuntimeConfigured(botSection);
+var missingTwitchFields = BlokeBotTwitchConfiguration.MissingFields(builder.Configuration);
+var botRuntimeConfigured = missingTwitchFields.Count == 0;
 
 builder.Services.AddBlokeBotPersistence(
     builder.Configuration.GetSection("BlokeBot").Get<BlokeBotOptions>()?.DatabasePath
@@ -188,7 +238,7 @@ if (simulationEnabled)
     builder.Services.AddBlokeBotSimulation();
 }
 
-var app = builder.Build();
+await using var app = builder.Build();
 
 await app
     .Services.GetRequiredService<BlokeBotDatabaseInitializer>()
@@ -224,13 +274,14 @@ else
 }
 app.MapHostConfigEndpoints();
 
-app.Run();
-
-static bool IsBotRuntimeConfigured(IConfiguration section)
+await app.StartAsync();
+if (missingTwitchFields.Count > 0)
 {
-    var identity = section.GetSection("Identity");
-    return !string.IsNullOrWhiteSpace(identity["BotUsername"])
-        && !string.IsNullOrWhiteSpace(identity["ClientId"])
-        && !string.IsNullOrWhiteSpace(identity["ClientSecret"])
-        && !string.IsNullOrWhiteSpace(identity["RedirectUri"]);
+    Console.Out.WriteLine(BlokeBotTwitchConfiguration.OfflineGuidance(missingTwitchFields));
 }
+
+var server = app.Services.GetRequiredService<IServer>();
+var localUrl = BlokeBotServerUrlPolicy.LocalUrl(server.Features.Get<IServerAddressesFeature>());
+Console.Out.WriteLine($"BlokeBot is available at {localUrl}");
+await app.WaitForShutdownAsync();
+return 0;

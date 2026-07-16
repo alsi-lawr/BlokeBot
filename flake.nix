@@ -23,8 +23,8 @@
           pkgs = pkgsFor system;
         in
         pkgs.buildDotnetModule {
-          pname = "BlokeBot";
-          version = "0.0.0";
+          pname = "blokebot";
+          version = "0.1.0";
           src = pkgs.lib.cleanSourceWith {
             src = ./.;
             filter = path: type: baseNameOf path != "dotnet-tools.json";
@@ -34,11 +34,11 @@
           nugetDeps = ./deps.json;
           dotnet-sdk = pkgs.dotnet-sdk_10;
           dotnet-runtime = pkgs.dotnet-aspnetcore_10;
-          executables = [ "BlokeBot" ];
+          executables = [ "blokebot" ];
           makeWrapperArgs = [
             "--set-default"
             "ASPNETCORE_CONTENTROOT"
-            "${placeholder "out"}/lib/BlokeBot"
+            "${placeholder "out"}/lib/blokebot"
           ];
 
           npmRoot = "src/BlokeBot";
@@ -61,7 +61,7 @@
           meta = {
             description = "Self-hosted Twitch bot and Blazor admin dashboard";
             license = pkgs.lib.licenses.mit;
-            mainProgram = "BlokeBot";
+            mainProgram = "blokebot";
           };
         };
     in
@@ -86,7 +86,7 @@
           default = self.apps.${system}.blokebot;
           blokebot = {
             type = "app";
-            program = "${package}/bin/BlokeBot";
+            program = "${package}/bin/blokebot";
             meta.description = "Run BlokeBot";
           };
         }

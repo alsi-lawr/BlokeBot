@@ -97,7 +97,7 @@ in
         };
 
       serviceConfig = {
-        ExecStart = lib.getExe cfg.package;
+        ExecStart = "${lib.getExe cfg.package} serve";
         User = "blokebot";
         Group = "blokebot";
         WorkingDirectory = stateDir;

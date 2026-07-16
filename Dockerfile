@@ -37,4 +37,5 @@ USER app
 
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "BlokeBot.dll"]
+ENTRYPOINT ["dotnet", "blokebot.dll"]
+CMD ["serve"]

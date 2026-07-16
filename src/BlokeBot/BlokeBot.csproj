@@ -10,6 +10,9 @@
   </ItemGroup>
 
   <PropertyGroup>
+    <AssemblyName>blokebot</AssemblyName>
+    <PackageId>blokebot</PackageId>
+    <Version>0.1.0</Version>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <!-- SDK 10.0.301 Razor source generation misparses component tags as the first markup inside code blocks. -->
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
