@@ -1,3 +1,4 @@
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Guessing.Configuration;
 using BlokeBot.Core.Features.Guessing.Profiles;
 using BlokeBot.Core.Features.PublicLeaderboards;
@@ -45,6 +46,7 @@ public sealed class PublicEntryAccessibilityTests
                 .Add(component => component.WhisperResponsesEnabled, false)
         );
 
+        delivery.Find("button.disclosure-trigger").Click();
         delivery.Find("input[type='checkbox']").HasAttribute("disabled").ShouldBeTrue();
         delivery.Find("a[href='/host#custom-bot']").ShouldNotBeNull();
     }
