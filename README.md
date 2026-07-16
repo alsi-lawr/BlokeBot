@@ -47,7 +47,7 @@ docker run --rm --init --publish 8080:8080 --volume blokebot-data:/data blokebot
 ### Nix
 
 ```console
-nix run github:alsi-lawr/BlokeBot
+nix run github:alsi-lawr/BlokeBot#blokebot -- serve
 ```
 
 Open the dashboard, then follow the [server owner guide](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide)
