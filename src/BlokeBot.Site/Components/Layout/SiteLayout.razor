@@ -1,0 +1,25 @@
+@inherits LayoutComponentBase
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<header class="site-header">
+    <div class="header-inner">
+        <a class="brand" href="/" aria-label="BlokeBot home">
+            <span class="brand-mark" aria-hidden="true"><span></span></span>
+            <span>BlokeBot</span>
+        </a>
+        <nav aria-label="Main navigation">
+            <a href="/how-it-works">How it works</a>
+            <a href="/guide">User guide</a>
+            <a href="/server-owners">Server owners</a>
+        </nav>
+    </div>
+</header>
+<main id="main-content" tabindex="-1">
+    @Body
+</main>
+<footer class="site-footer">
+    <div class="footer-inner">
+        <p><strong>BlokeBot</strong> is free, open-source, easy to host, and available.</p>
+        <p><a href="/guide">User guide</a> · <a href="/server-owners">Server owner guide</a></p>
+    </div>
+</footer>

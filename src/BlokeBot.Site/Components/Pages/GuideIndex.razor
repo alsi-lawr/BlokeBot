@@ -1,0 +1,36 @@
+@page "/guide"
+
+<PageTitle>BlokeBot user guide</PageTitle>
+
+<article class="article-shell">
+    <header class="article-header">
+        <p class="eyebrow">User guide</p>
+        <h1>Run your channel tools with confidence</h1>
+        <p class="lede">Start with the task in front of you. Each guide explains what to check, what to do next and where to get help.</p>
+    </header>
+
+    <section aria-labelledby="guide-start-heading">
+        <h2 id="guide-start-heading">Start here</h2>
+        <a class="guide-start-card" href="/guide/getting-started">
+            <span>
+                <strong>Sign in and choose your channel</strong>
+                <span>Learn which account to use and how to select the channel you want to manage.</span>
+            </span>
+            <span aria-hidden="true">→</span>
+        </a>
+    </section>
+
+    <section aria-labelledby="guide-topics-heading">
+        <h2 id="guide-topics-heading">Find a task</h2>
+        <div class="guide-grid">
+            @foreach (var topic in SiteGuideCatalog.All.Skip(1))
+            {
+                <article class="guide-card">
+                    <p class="eyebrow">@topic.Eyebrow</p>
+                    <h3><a href="@topic.Route">@topic.Title</a></h3>
+                    <p>@topic.Summary</p>
+                </article>
+            }
+        </div>
+    </section>
+</article>
