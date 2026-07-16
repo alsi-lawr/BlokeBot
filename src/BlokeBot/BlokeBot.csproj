@@ -18,6 +18,13 @@
     <UseRazorSourceGenerator>false</UseRazorSourceGenerator>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Content
+      Update="appsettings.Development.json;appsettings.Simulation.json;package.json;package-lock.json;*.tokens.json;*.db;*.db-shm;*.db-wal"
+      CopyToPublishDirectory="Never"
+    />
+  </ItemGroup>
+
   <Target
     Name="RestoreNodePackages"
     Inputs="$(MSBuildProjectDirectory)/package-lock.json"
