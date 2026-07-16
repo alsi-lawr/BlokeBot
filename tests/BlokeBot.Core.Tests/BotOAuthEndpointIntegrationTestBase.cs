@@ -29,326 +29,13 @@ using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class BotOAuthEndpointIntegrationTests
+public abstract class BotOAuthEndpointIntegrationTestBase
 {
-    private static readonly Uri _authorizationUri = new(
+    private protected static readonly Uri AuthorizationUri = new(
         "https://id.twitch.tv/oauth2/authorize?state=test"
     );
 
-    [Test]
-    public async Task ConfiguredBotOAuth_AuthenticatedBotAdminStarting_RedirectsToAuthorization()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true);
-
-        using var response = await host.Client.GetAsync("/oauth/start");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Redirect);
-        response.Headers.Location.ShouldBe(_authorizationUri);
-    }
-
-    [Test]
-    public async Task UnavailableBotOAuth_AuthenticatedBotAdminStarting_ReturnsActionableResult()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: false);
-
-        using var response = await host.Client.GetAsync("/oauth/start");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch connection unavailable");
-        page.ShouldContain("Return to Admin");
-        response.Headers.Location.ShouldBeNull();
-    }
-
-    [Test]
-    public async Task ReplayedGlobalOAuthState_AuthenticatedBotAdminCompleting_ReturnsExpiredState()
-    {
-        var flow = new StubOAuthFlow(_authorizationUri)
-        {
-            CompletionOutcome = new OAuthFlowCompletionOutcome.InvalidState(),
-        };
-        await using var host = await EndpointHost.StartAsync(configured: true, flow);
-
-        using var response = await host.Client.GetAsync("/oauth/callback?code=code&state=replayed");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Connection expired");
-        page.ShouldContain("That bot-account connection has expired.");
-        page.ShouldContain("No changes were made.");
-        page.ShouldContain("A BlokeBot administrator can start a new connection.");
-        page.ShouldContain("Try again");
-        page.ShouldContain("Return to Admin");
-        page.ShouldContain("Close window");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
-    }
-
-    [Test]
-    public async Task CancelledGlobalOAuth_AccessDenied_RedactsProviderMessage()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true);
-
-        using var response = await host.Client.GetAsync("/oauth/callback?error=access_denied");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Connection cancelled");
-        page.ShouldContain("Twitch did not connect the BlokeBot bot account.");
-        page.ShouldContain("A BlokeBot administrator can try again when they are ready.");
-        page.ShouldContain("Return to Admin");
-        page.ShouldNotContain("access_denied");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
-    }
-
-    [Test]
-    public async Task GlobalOAuth_UnexpectedProviderError_ReturnsTemporaryFailureWithSupportReference()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true);
-
-        using var response = await host.Client.GetAsync("/oauth/callback?error=provider-secret");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldContain("BlokeBot could not finish connecting the bot account right now.");
-        page.ShouldContain("A BlokeBot administrator can try again in a few minutes.");
-        page.ShouldContain("Support reference:");
-        page.ShouldContain("Get help");
-        page.ShouldContain("Return to Admin");
-        page.ShouldNotContain("provider-secret");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
-    }
-
-    [Test]
-    public async Task GlobalOAuth_Completed_ReturnsBotAccountSpecificSuccess()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true);
-
-        using var response = await host.Client.GetAsync("/oauth/callback?code=code&state=state");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Bot account connected");
-        page.ShouldContain("BlokeBot has saved Twitch access for the bot account.");
-        page.ShouldContain("The bot account connection has been updated.");
-        page.ShouldContain("Return to Admin");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
-    }
-
-    [Test]
-    public async Task ConfiguredBotOAuth_AuthenticatedNonAdminStarting_ReturnsAdministratorGuidance()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true, isBotAdmin: false);
-
-        using var response = await host.Client.GetAsync("/oauth/start");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Only a BlokeBot administrator can open this page.");
-        page.ShouldContain("Return to Admin");
-    }
-
-    [Test]
-    public async Task ChannelOAuth_NoSelectedChannel_ReturnsExactChannelGuidance()
-    {
-        await using var host = await EndpointHost.StartAsync(configured: true);
-
-        using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await response.Content.ReadAsStringAsync()).ShouldContain("Choose a channel to continue");
-    }
-
-    [Test]
-    public async Task ChannelOAuth_SelectedNonOwnerStarting_ReturnsOperatorAccessGuidance()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Moderator,
-            login: "moderator"
-        );
-
-        using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain(
-            "The channel owner or server administrator must grant you access before you can reconnect the bot."
-        );
-        page.ShouldNotContain("Channel owner needs to reconnect the bot.");
-    }
-
-    [Test]
-    public async Task ChannelOAuth_WrongAccountCompleting_IdentifiesRequiredChannelAccount()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Streamer,
-            login: "streamer",
-            endpointScenario: EndpointScenario.ChannelWrongAccount
-        );
-
-        using var request = CallbackRequest(
-            "/oauth/channel-bot/callback?code=code&state=state",
-            "BlokeBot.ChannelBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("@streamer is the Twitch account needed for this channel.");
-        page.ShouldContain("The channel owner needs to reconnect the bot using that account.");
-        page.ShouldContain("Try again");
-        page.ShouldContain("Return to Channel setup");
-    }
-
-    [Test]
-    public async Task ChannelOAuth_MissingPermissionCompleting_ReturnsPermissionGuidance()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Streamer,
-            login: "streamer",
-            endpointScenario: EndpointScenario.ChannelMissingPermission
-        );
-
-        using var request = CallbackRequest(
-            "/oauth/channel-bot/callback?code=code&state=state",
-            "BlokeBot.ChannelBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("More Twitch access is needed");
-        page.ShouldContain("Try again and approve every permission Twitch shows.");
-        page.ShouldContain("Return to Channel setup");
-    }
-
-    [Test]
-    public async Task ChannelOAuth_UnexpectedProviderError_ReturnsTemporaryFailureWithoutRawError()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Streamer,
-            login: "streamer"
-        );
-
-        using var request = CallbackRequest(
-            "/oauth/channel-bot/callback?error=provider-secret",
-            "BlokeBot.ChannelBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldContain("Support reference:");
-        page.ShouldContain("Return to Channel setup");
-        page.ShouldNotContain("provider-secret");
-    }
-
-    [Test]
-    public async Task HostBotOAuth_MissingPermissionCompleting_ReturnsPermissionGuidance()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Streamer,
-            login: "streamer",
-            endpointScenario: EndpointScenario.HostMissingPermission
-        );
-
-        using var request = CallbackRequest(
-            "/oauth/callback?code=code&state=state",
-            "BlokeBot.HostBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("More Twitch access is needed");
-        page.ShouldContain("Try again and approve every permission Twitch shows.");
-        page.ShouldContain("Return to Channel setup");
-    }
-
-    [Test]
-    public async Task HostBotOAuth_UnexpectedProviderError_ReturnsTemporaryFailureWithoutRawError()
-    {
-        await using var host = await EndpointHost.StartAsync(
-            configured: true,
-            selectedRole: AuthRole.Streamer,
-            login: "streamer"
-        );
-
-        using var request = CallbackRequest(
-            "/oauth/callback?error=provider-secret",
-            "BlokeBot.HostBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
-        var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldContain("Support reference:");
-        page.ShouldContain("Return to Channel setup");
-        page.ShouldNotContain("provider-secret");
-    }
-
-    [Test]
-    public async Task ConnectionResultPages_RenderListedOutcomesWithAppropriateActions()
-    {
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.Cancelled("/oauth/channel-bot/start"),
-            HttpStatusCode.BadRequest,
-            "Connection cancelled",
-            "Try again"
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.Expired("/oauth/channel-bot/start"),
-            HttpStatusCode.BadRequest,
-            "Connection expired",
-            "Try again"
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.WrongChannelAccount("streamer", "/oauth/channel-bot/start"),
-            HttpStatusCode.BadRequest,
-            "@streamer is the Twitch account needed for this channel.",
-            "Try again"
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.PermissionNeeded("/oauth/channel-bot/start"),
-            HttpStatusCode.BadRequest,
-            "More Twitch access is needed",
-            "Try again and approve every permission Twitch shows."
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
-                "/oauth/channel-bot/start",
-                "request<&"
-            ),
-            HttpStatusCode.BadGateway,
-            "Twitch is temporarily unavailable",
-            "Support reference: <code>request&lt;&amp;</code>"
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.NoChannelSelected(),
-            HttpStatusCode.Forbidden,
-            "Choose a channel to continue",
-            "Return to Channel setup"
-        );
-        await AssertResultPageAsync(
-            TwitchConnectionResultPage.OperatorAccessRequired(),
-            HttpStatusCode.Forbidden,
-            "The channel owner or server administrator must grant you access before you can reconnect the bot.",
-            "Return to Channel setup"
-        );
-    }
-
-    private static async Task AssertResultPageAsync(
+    private protected static async Task AssertResultPageAsync(
         IResult result,
         HttpStatusCode expectedStatus,
         string expectedCopy,
@@ -373,14 +60,14 @@ public sealed class BotOAuthEndpointIntegrationTests
         page.ShouldContain("Close window");
     }
 
-    private static HttpRequestMessage CallbackRequest(string path, string stateCookieName)
+    private protected static HttpRequestMessage CallbackRequest(string path, string stateCookieName)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Add("Cookie", $"{stateCookieName}=state");
         return request;
     }
 
-    private sealed class EndpointHost(
+    private protected sealed class EndpointHost(
         WebApplication app,
         HttpClient client,
         SqliteBlokeBotDbFactory? dbFactory
@@ -431,7 +118,7 @@ public sealed class BotOAuthEndpointIntegrationTests
                 )
             );
             builder.Services.AddSingleton<IAuthorizationHandler, AuthSessionCapabilityHandler>();
-            builder.Services.AddSingleton<IOAuthFlow>(flow ?? new StubOAuthFlow(_authorizationUri));
+            builder.Services.AddSingleton<IOAuthFlow>(flow ?? new StubOAuthFlow(AuthorizationUri));
 
             var app = builder.Build();
             app.Urls.Add("http://127.0.0.1:0");
@@ -630,7 +317,7 @@ public sealed class BotOAuthEndpointIntegrationTests
         );
     }
 
-    private sealed class StubOAuthFlow(Uri authorizationUri) : IOAuthFlow
+    private protected sealed class StubOAuthFlow(Uri authorizationUri) : IOAuthFlow
     {
         public OAuthFlowCompletionOutcome CompletionOutcome { get; init; } =
             new OAuthFlowCompletionOutcome.Completed(
@@ -652,7 +339,7 @@ public sealed class BotOAuthEndpointIntegrationTests
         }
     }
 
-    private sealed class EndpointOAuthHttpClientFactory(
+    private protected sealed class EndpointOAuthHttpClientFactory(
         string userId,
         string login,
         IReadOnlyList<string> scopes
@@ -723,7 +410,7 @@ public sealed class BotOAuthEndpointIntegrationTests
         }
     }
 
-    private sealed class TestAuthenticationHandler(
+    private protected sealed class TestAuthenticationHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
         UrlEncoder encoder,
@@ -759,14 +446,14 @@ public sealed class BotOAuthEndpointIntegrationTests
         }
     }
 
-    private sealed record TestAuthenticationSettings(
+    private protected sealed record TestAuthenticationSettings(
         bool IsBotAdmin,
         AuthRole? SelectedRole,
         string Login,
         int SelectedHostId
     );
 
-    private enum EndpointScenario
+    private protected enum EndpointScenario
     {
         None,
         ChannelWrongAccount,
