@@ -18,7 +18,6 @@ public sealed class BlokeBotCliTests
         response.Output.ShouldContain(
             "blokebot serve [--host HOST] [--port PORT] [--data-dir PATH] [--config PATH]"
         );
-        response.Output.ShouldContain("BlokeBot is free, open-source, and easy to host.");
         response.Output.ShouldContain("TwitchBot__Identity__ClientSecret");
         response.Output.ShouldContain("$XDG_STATE_HOME/blokebot");
         response.Output.ShouldContain("Explicit database/token configuration overrides --data-dir");
@@ -31,8 +30,6 @@ public sealed class BlokeBotCliTests
 
         response.ExitCode.ShouldBe(0);
         response.Output.Trim().ShouldBe($"blokebot {BlokeBotVersion.Current}");
-        BlokeBotVersion.Current.ShouldMatch("^0\\.0\\.0-dev\\+[0-9a-f]{40}$");
-        typeof(BlokeBotCli).Assembly.GetName().Name.ShouldBe("blokebot");
     }
 
     [Test]

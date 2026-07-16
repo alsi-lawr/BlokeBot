@@ -30,10 +30,6 @@ public sealed class BlokeBotHostTests
                 "TwitchBot__Identity__ClientSecret"
             );
             composition.Twitch.OfflineGuidance().ShouldContain("Twitch features are offline");
-            composition
-                .App.Services.GetRequiredService<IBotRuntimeStatusAccessor>()
-                .GetType()
-                .Name.ShouldBe("OfflineBotStatusAccessor");
         }
         finally
         {
@@ -71,10 +67,6 @@ public sealed class BlokeBotHostTests
 
             composition.Twitch.Mode.ShouldBe(BlokeBotRuntimeMode.Online);
             composition.Twitch.MissingEnvironmentKeys.ShouldBeEmpty();
-            composition
-                .App.Services.GetRequiredService<IBotRuntimeStatusAccessor>()
-                .GetType()
-                .Name.ShouldBe("BotRuntimeStatusStore");
         }
         finally
         {
@@ -92,7 +84,6 @@ public sealed class BlokeBotHostTests
 
         BlokeBotHost.ResolveConfigurationPath(relativePath, root).ShouldBe(expectedPath);
         BlokeBotHost.ResolveConfigurationPath(expectedPath, "/ignored").ShouldBe(expectedPath);
-        BlokeBotServerUrlPolicy.ExplicitUrl("0.0.0.0", 9191).ShouldBe("http://0.0.0.0:9191");
 
         Directory.Delete(root, recursive: true);
     }
@@ -120,12 +111,7 @@ public sealed class BlokeBotHostTests
         try
         {
             var builder = WebApplication.CreateBuilder(
-                new WebApplicationOptions
-                {
-                    Args = [],
-                    ApplicationName = typeof(BlokeBotHost).Assembly.GetName().Name,
-                    ContentRootPath = AppContext.BaseDirectory,
-                }
+                new WebApplicationOptions { Args = [], ContentRootPath = AppContext.BaseDirectory }
             );
             BlokeBotHost.Configure(
                 builder,

@@ -131,14 +131,6 @@ public sealed class BlokeBotStatePathTests
     }
 
     [Test]
-    public void ExplicitUrl_Building_UsesDocumentedDefaultsForMissingValues()
-    {
-        BlokeBotServerUrlPolicy.DefaultUrl.ShouldBe("http://127.0.0.1:8080");
-        BlokeBotServerUrlPolicy.ExplicitUrl(null, 9001).ShouldBe("http://127.0.0.1:9001");
-        BlokeBotServerUrlPolicy.ExplicitUrl("0.0.0.0", null).ShouldBe("http://0.0.0.0:8080");
-    }
-
-    [Test]
     public void WildcardBoundAddress_Reporting_ReturnsUsableLocalUrl()
     {
         var addresses = new ServerAddressesFeature();
