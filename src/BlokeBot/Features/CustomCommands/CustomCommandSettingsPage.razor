@@ -35,6 +35,22 @@
     }
     else
     {
+        @if (_validationErrors.Count > 0)
+        {
+            <section class="card border-red-200 bg-red-50 p-5"
+                     role="alert"
+                     aria-labelledby="custom-command-validation-title"
+                     data-validation-summary>
+                <h2 id="custom-command-validation-title" class="text-base font-bold text-red-800">Check these settings</h2>
+                <ul class="mt-3 list-disc space-y-1 pl-5 text-sm font-medium text-red-700">
+                    @foreach (var error in _validationErrors)
+                    {
+                        <li>@error.Message</li>
+                    }
+                </ul>
+            </section>
+        }
+
         <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -278,23 +294,27 @@
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-retry-delay")">Retry delay (seconds)</label>
+                                        <label class="label" for="@($"announcement-{announcement.Id}-retry-delay")">Wait before retrying (seconds)</label>
                                         <input id="@($"announcement-{announcement.Id}-retry-delay")"
                                                class="input"
                                                type="number"
                                                min="1"
                                                max="59"
+                                               aria-describedby="@($"announcement-{announcement.Id}-delivery-timing-help")"
                                                @bind="announcement.RetryDelaySeconds" />
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-occurrence-lifetime")">Occurrence lifetime (seconds)</label>
+                                        <label class="label" for="@($"announcement-{announcement.Id}-occurrence-lifetime")">Stop retrying after (seconds)</label>
                                         <input id="@($"announcement-{announcement.Id}-occurrence-lifetime")"
                                                class="input"
                                                type="number"
                                                min="1"
                                                max="60"
+                                               aria-describedby="@($"announcement-{announcement.Id}-delivery-timing-help")"
                                                @bind="announcement.OccurrenceLifetimeSeconds" />
                                     </div>
+                                    <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
+                                       class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">

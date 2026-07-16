@@ -36,6 +36,26 @@ public static class PointsConfigurationValidator
             errors.Add(new PointsConfigurationValidationError.InvalidGamblingWinRate());
         }
 
+        if (draft.GamblingCooldownSeconds < 0)
+        {
+            errors.Add(new PointsConfigurationValidationError.NegativeGamblingCooldown());
+        }
+
+        if (draft.GiveawayDurationSeconds < 1)
+        {
+            errors.Add(new PointsConfigurationValidationError.GiveawayDurationBelowMinimum());
+        }
+
+        if (draft.GiveawayWinnerCount < 1)
+        {
+            errors.Add(new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum());
+        }
+
+        if (draft.GiveawayCooldownSeconds < MinimumGiveawayCooldownSeconds)
+        {
+            errors.Add(new PointsConfigurationValidationError.GiveawayCooldownBelowMinimum());
+        }
+
         if (!Enum.IsDefined(draft.GiveawayEligibility))
         {
             errors.Add(new PointsConfigurationValidationError.InvalidGiveawayEligibility());
@@ -70,13 +90,13 @@ public static class PointsConfigurationValidator
                 SnapshotReplies(draft.Replies),
                 draft.ReplyDelivery.ToMap(),
                 draft.GamblingWinRatePercent,
-                Math.Max(0, draft.GamblingCooldownSeconds),
-                Math.Max(1, draft.GiveawayDurationSeconds),
+                draft.GamblingCooldownSeconds,
+                draft.GiveawayDurationSeconds,
                 minimumPayout!.Value,
                 maximumPayout!.Value,
-                Math.Max(1, draft.GiveawayWinnerCount),
+                draft.GiveawayWinnerCount,
                 draft.GiveawayEligibility,
-                Math.Max(MinimumGiveawayCooldownSeconds, draft.GiveawayCooldownSeconds)
+                draft.GiveawayCooldownSeconds
             )
         );
     }
@@ -210,6 +230,27 @@ public abstract record PointsConfigurationValidationError
     public sealed record InvalidGamblingWinRate : PointsConfigurationValidationError
     {
         public override string Message => "The chance of winning must be between 0% and 100%.";
+    }
+
+    public sealed record NegativeGamblingCooldown : PointsConfigurationValidationError
+    {
+        public override string Message => "The wait between gambles cannot be negative.";
+    }
+
+    public sealed record GiveawayDurationBelowMinimum : PointsConfigurationValidationError
+    {
+        public override string Message => "Giveaway entry time must be at least 1 second.";
+    }
+
+    public sealed record GiveawayWinnerCountBelowMinimum : PointsConfigurationValidationError
+    {
+        public override string Message => "A giveaway needs at least 1 winner.";
+    }
+
+    public sealed record GiveawayCooldownBelowMinimum : PointsConfigurationValidationError
+    {
+        public override string Message =>
+            $"The wait between giveaways must be at least {PointsConfigurationValidator.MinimumGiveawayCooldownSeconds} seconds.";
     }
 
     public sealed record InvalidGiveawayEligibility : PointsConfigurationValidationError

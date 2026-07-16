@@ -24,6 +24,7 @@ public partial class CustomCommandSettingsPage
     private CustomCommandConfiguration? _config;
     private bool _featureEnabled;
     private int _nextTemporaryId = -1;
+    private IReadOnlyList<CustomCommandConfigurationValidationError> _validationErrors = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,6 +58,7 @@ public partial class CustomCommandSettingsPage
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
         _nextTemporaryId = -1;
+        _validationErrors = [];
     }
 
     private Task SaveAsync()
@@ -74,10 +76,14 @@ public partial class CustomCommandSettingsPage
         await CustomCommandConfigurationValidator
             .Validate(_config)
             .Match(
-                SaveCommandAsync,
+                command =>
+                {
+                    _validationErrors = [];
+                    return SaveCommandAsync(command);
+                },
                 errors =>
                 {
-                    _toasts.Publish(new ToastRequest<ErrorToastStrategy>(errors[0].Message));
+                    _validationErrors = errors.ToArray();
                     return Task.CompletedTask;
                 }
             );
@@ -96,6 +102,7 @@ public partial class CustomCommandSettingsPage
                     CancellationToken.None
                 );
                 _nextTemporaryId = -1;
+                _validationErrors = [];
                 _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Custom commands saved."));
             },
             failure =>
@@ -272,8 +279,6 @@ public partial class CustomCommandSettingsPage
                 Id = NextTemporaryId(),
                 Name = "New announcement",
                 MessageLibraryEntryId = _config.MessageEntries[0].Id,
-                RetryDelaySeconds = 0,
-                OccurrenceLifetimeSeconds = 0,
                 Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
             }
         );

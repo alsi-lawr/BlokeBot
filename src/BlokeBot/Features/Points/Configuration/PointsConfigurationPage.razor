@@ -32,6 +32,19 @@
     }
     else
     {
+        var gamblingCooldownError = _validationErrors
+            .OfType<PointsConfigurationValidationError.NegativeGamblingCooldown>()
+            .FirstOrDefault();
+        var giveawayDurationError = _validationErrors
+            .OfType<PointsConfigurationValidationError.GiveawayDurationBelowMinimum>()
+            .FirstOrDefault();
+        var giveawayWinnerCountError = _validationErrors
+            .OfType<PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum>()
+            .FirstOrDefault();
+        var giveawayCooldownError = _validationErrors
+            .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
+            .FirstOrDefault();
+
         <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
@@ -41,7 +54,17 @@
                 </div>
                 <div class="space-y-2">
                     <label class="label" for="gamblingCooldown">Wait between gambles (seconds)</label>
-                    <input id="gamblingCooldown" class="input" type="number" min="0" @bind="_config.GamblingCooldownSeconds" />
+                    <input id="gamblingCooldown"
+                           class="input"
+                           type="number"
+                           min="0"
+                           aria-invalid="@(gamblingCooldownError is null ? "false" : "true")"
+                           aria-describedby="@(gamblingCooldownError is null ? null : "gamblingCooldown-error")"
+                           @bind="_config.GamblingCooldownSeconds" />
+                    @if (gamblingCooldownError is not null)
+                    {
+                        <p id="gamblingCooldown-error" class="text-sm font-semibold text-red-700">@gamblingCooldownError.Message</p>
+                    }
                 </div>
             </div>
         </CollapsibleSection>
@@ -64,18 +87,48 @@
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <div class="space-y-2">
                     <label class="label" for="duration">Time to enter (seconds)</label>
-                    <input id="duration" class="input" type="number" min="1" @bind="_config.GiveawayDurationSeconds" />
+                    <input id="duration"
+                           class="input"
+                           type="number"
+                           min="1"
+                           aria-invalid="@(giveawayDurationError is null ? "false" : "true")"
+                           aria-describedby="@(giveawayDurationError is null ? null : "duration-error")"
+                           @bind="_config.GiveawayDurationSeconds" />
+                    @if (giveawayDurationError is not null)
+                    {
+                        <p id="duration-error" class="text-sm font-semibold text-red-700">@giveawayDurationError.Message</p>
+                    }
                 </div>
                 <Field Label="Smallest prize" @bind-Value="_config.GiveawayMinimumPayout" Placeholder="10" />
                 <Field Label="Largest prize" @bind-Value="_config.GiveawayMaximumPayout" Placeholder="100" />
                 <div class="space-y-2">
                     <label class="label" for="winnerCount">Number of winners</label>
-                    <input id="winnerCount" class="input" type="number" min="1" @bind="_config.GiveawayWinnerCount" />
+                    <input id="winnerCount"
+                           class="input"
+                           type="number"
+                           min="1"
+                           aria-invalid="@(giveawayWinnerCountError is null ? "false" : "true")"
+                           aria-describedby="@(giveawayWinnerCountError is null ? null : "winnerCount-error")"
+                           @bind="_config.GiveawayWinnerCount" />
+                    @if (giveawayWinnerCountError is not null)
+                    {
+                        <p id="winnerCount-error" class="text-sm font-semibold text-red-700">@giveawayWinnerCountError.Message</p>
+                    }
                 </div>
                 <PointsEligibilitySelector HostLogin="@Host.Login" @bind-Value="_config.GiveawayEligibility" />
                 <div class="space-y-2">
                     <label class="label" for="cooldown">Wait between giveaways (seconds)</label>
-                    <input id="cooldown" class="input" type="number" min="@PointsConfigurationValidator.MinimumGiveawayCooldownSeconds" @bind="_config.GiveawayCooldownSeconds" />
+                    <input id="cooldown"
+                           class="input"
+                           type="number"
+                           min="@PointsConfigurationValidator.MinimumGiveawayCooldownSeconds"
+                           aria-invalid="@(giveawayCooldownError is null ? "false" : "true")"
+                           aria-describedby="@(giveawayCooldownError is null ? null : "cooldown-error")"
+                           @bind="_config.GiveawayCooldownSeconds" />
+                    @if (giveawayCooldownError is not null)
+                    {
+                        <p id="cooldown-error" class="text-sm font-semibold text-red-700">@giveawayCooldownError.Message</p>
+                    }
                 </div>
             </div>
         </CollapsibleSection>

@@ -17,10 +17,10 @@ public sealed class PointsConfigurationCommandTests
         var draft = new PointsConfiguration
         {
             PointLabel = " channel points ",
-            GamblingCooldownSeconds = -10,
-            GiveawayDurationSeconds = 0,
-            GiveawayWinnerCount = 0,
-            GiveawayCooldownSeconds = 1,
+            GamblingCooldownSeconds = 0,
+            GiveawayDurationSeconds = 1,
+            GiveawayWinnerCount = 1,
+            GiveawayCooldownSeconds = PointsConfigurationValidator.MinimumGiveawayCooldownSeconds,
         };
         draft.Aliases.PointsAliases = " Score, POINTS ";
         draft.Replies.BalanceReply = " Balance: {balance}. ";
@@ -58,7 +58,10 @@ public sealed class PointsConfigurationCommandTests
         {
             GamblingWinRatePercent = 101,
             GamblingCooldownSeconds = -4,
+            GiveawayDurationSeconds = 0,
             GiveawayMinimumPayout = "not-a-number",
+            GiveawayWinnerCount = 0,
+            GiveawayCooldownSeconds = 299,
         };
         draft.Aliases.PointsAliases = "shared";
         draft.Aliases.GivePointsAliases = "SHARED";
@@ -72,10 +75,66 @@ public sealed class PointsConfigurationCommandTests
 
         errors.ShouldContain(new PointsConfigurationValidationError.InvalidMinimumPayout());
         errors.ShouldContain(new PointsConfigurationValidationError.InvalidGamblingWinRate());
+        errors.ShouldContain(new PointsConfigurationValidationError.NegativeGamblingCooldown());
+        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayDurationBelowMinimum());
+        errors.ShouldContain(
+            new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum()
+        );
+        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayCooldownBelowMinimum());
         errors.ShouldContain(new PointsConfigurationValidationError.DuplicateAlias("shared"));
         draft.GamblingCooldownSeconds.ShouldBe(-4);
+        draft.GiveawayDurationSeconds.ShouldBe(0);
         draft.GiveawayMinimumPayout.ShouldBe("not-a-number");
+        draft.GiveawayWinnerCount.ShouldBe(0);
+        draft.GiveawayCooldownSeconds.ShouldBe(299);
         draft.Aliases.PointsAliases.ShouldBe("shared");
+    }
+
+    [Test]
+    public async Task InvalidPersistedBoundaries_LoadingAndValidating_RemainVisibleAndUnchanged()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using (var seedDb = await dbFactory.CreateDbContextAsync())
+        {
+            seedDb.PointsSettings.Add(
+                new PointsSettings
+                {
+                    HostId = hostId,
+                    GamblingCooldownSeconds = -4,
+                    GiveawayDurationSeconds = 0,
+                    GiveawayWinnerCount = 0,
+                    GiveawayCooldownSeconds = 299,
+                }
+            );
+            await seedDb.SaveChangesAsync();
+        }
+        var service = CreateService(dbFactory);
+
+        var draft = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        var errors = PointsConfigurationValidator
+            .Validate(draft)
+            .Match(
+                _ => Array.Empty<PointsConfigurationValidationError>(),
+                invalid => invalid.ToArray()
+            );
+
+        draft.GamblingCooldownSeconds.ShouldBe(-4);
+        draft.GiveawayDurationSeconds.ShouldBe(0);
+        draft.GiveawayWinnerCount.ShouldBe(0);
+        draft.GiveawayCooldownSeconds.ShouldBe(299);
+        errors.ShouldContain(new PointsConfigurationValidationError.NegativeGamblingCooldown());
+        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayDurationBelowMinimum());
+        errors.ShouldContain(
+            new PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum()
+        );
+        errors.ShouldContain(new PointsConfigurationValidationError.GiveawayCooldownBelowMinimum());
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var persisted = await db.PointsSettings.SingleAsync();
+        persisted.GamblingCooldownSeconds.ShouldBe(-4);
+        persisted.GiveawayDurationSeconds.ShouldBe(0);
+        persisted.GiveawayWinnerCount.ShouldBe(0);
+        persisted.GiveawayCooldownSeconds.ShouldBe(299);
     }
 
     [Test]
@@ -238,13 +297,13 @@ public sealed class PointsConfigurationCommandTests
                 FollowerEligibilityUnavailableReply = " Follower eligibility unavailable reply. ",
             },
             GamblingWinRatePercent = 63,
-            GamblingCooldownSeconds = -10,
-            GiveawayDurationSeconds = 0,
+            GamblingCooldownSeconds = 10,
+            GiveawayDurationSeconds = 120,
             GiveawayMinimumPayout = " 20 ",
             GiveawayMaximumPayout = " 250 ",
-            GiveawayWinnerCount = 0,
+            GiveawayWinnerCount = 3,
             GiveawayEligibility = PointsEligibilityMode.Followers,
-            GiveawayCooldownSeconds = 1,
+            GiveawayCooldownSeconds = 600,
         };
         foreach (var replyKey in PointsReplyKeys.WhisperableKeys)
         {
@@ -343,15 +402,13 @@ public sealed class PointsConfigurationCommandTests
             "Follower eligibility unavailable reply."
         );
         command.GamblingWinRatePercent.ShouldBe(63);
-        command.GamblingCooldownSeconds.ShouldBe(0);
-        command.GiveawayDurationSeconds.ShouldBe(1);
+        command.GamblingCooldownSeconds.ShouldBe(10);
+        command.GiveawayDurationSeconds.ShouldBe(120);
         command.GiveawayMinimumPayout.ToString().ShouldBe("20");
         command.GiveawayMaximumPayout.ToString().ShouldBe("250");
-        command.GiveawayWinnerCount.ShouldBe(1);
+        command.GiveawayWinnerCount.ShouldBe(3);
         command.GiveawayEligibility.ShouldBe(PointsEligibilityMode.Followers);
-        command.GiveawayCooldownSeconds.ShouldBe(
-            PointsConfigurationValidator.MinimumGiveawayCooldownSeconds
-        );
+        command.GiveawayCooldownSeconds.ShouldBe(600);
         foreach (var replyKey in PointsReplyKeys.WhisperableKeys)
         {
             command.ReplyDelivery.IsWhisper(replyKey).ShouldBeTrue();

@@ -10,6 +10,15 @@ namespace BlokeBot.Tests;
 public sealed class CustomCommandConfigurationTests
 {
     [Test]
+    public void NewAnnouncementEditor_Creating_UsesValidDeliveryTimingDefaults()
+    {
+        var announcement = new CustomAnnouncementEditor();
+
+        announcement.RetryDelaySeconds.ShouldBe(2);
+        announcement.OccurrenceLifetimeSeconds.ShouldBe(30);
+    }
+
+    [Test]
     public async Task CompleteCustomCommandDraft_SavingThenLoading_RoundTripsConfiguration()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

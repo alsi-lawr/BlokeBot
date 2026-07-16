@@ -68,6 +68,7 @@ public partial class PointsConfigurationPage
 
     private PointsConfiguration? _config;
     private bool _featureEnabled;
+    private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -100,6 +101,7 @@ public partial class PointsConfigurationPage
         _config = _featureEnabled
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
+        _validationErrors = [];
     }
 
     private Task SaveAsync()
@@ -117,9 +119,14 @@ public partial class PointsConfigurationPage
         await PointsConfigurationValidator
             .Validate(_config)
             .Match(
-                SaveCommandAsync,
+                command =>
+                {
+                    _validationErrors = [];
+                    return SaveCommandAsync(command);
+                },
                 errors =>
                 {
+                    _validationErrors = errors.ToArray();
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(
                             string.Join(" ", errors.Select(error => error.Message))
@@ -142,6 +149,7 @@ public partial class PointsConfigurationPage
                     HostId,
                     CancellationToken.None
                 );
+                _validationErrors = [];
                 _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Points settings saved."));
             },
             failure =>

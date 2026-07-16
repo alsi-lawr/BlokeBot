@@ -135,9 +135,9 @@ public sealed class CustomAnnouncementEditor
 
     public int MessageLibraryEntryId { get; set; }
 
-    public required int RetryDelaySeconds { get; set; }
+    public int RetryDelaySeconds { get; set; } = 2;
 
-    public required int OccurrenceLifetimeSeconds { get; set; }
+    public int OccurrenceLifetimeSeconds { get; set; } = 30;
 
     public ICustomAnnouncementScheduleEditor Schedule
     {
