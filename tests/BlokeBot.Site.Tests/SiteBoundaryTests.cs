@@ -141,6 +141,11 @@ public sealed class SiteBoundaryTests
         installSource.ShouldContain("nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve");
         installSource.ShouldNotContain("github:alsi-lawr/BlokeBot#blokebot");
         installSource.ShouldContain("docker run --rm -p 8080:8080");
+        installSource.ShouldContain("docker.io/alsilawr/blokebot:0.1.0");
+        installSource.ShouldContain("ghcr.io/alsi-lawr/blokebot:0.1.0");
+        installSource.ShouldContain("blokebot-v0.1.0-osx-arm64.zip");
+        installSource.ShouldContain("checksums_sha256.txt");
+        installSource.ShouldNotContain("checksums.toml");
         otherSource.ShouldNotContain("docker run", Case.Insensitive);
         otherSource.ShouldNotContain("nix run", Case.Insensitive);
     }

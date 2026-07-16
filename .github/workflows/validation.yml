@@ -1,0 +1,333 @@
+name: Validation
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dotnet:
+    name: Restore, format, build, and test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.301
+      - name: Restore solution and tools
+        run: |
+          dotnet restore BlokeBot.slnx
+          dotnet tool restore
+      - name: Check CSharpier formatting
+        run: dotnet csharpier check .
+      - name: Build with warnings as errors
+        run: dotnet build BlokeBot.slnx --no-restore -warnaserror
+      - name: Run the complete Microsoft Testing Platform suite
+        run: dotnet test BlokeBot.slnx --no-build
+
+  jreleaser:
+    name: Validate deterministic JReleaser packaging
+    runs-on: ubuntu-24.04
+    env:
+      JRELEASER_IMAGE: jreleaser/jreleaser-slim@sha256:18f1e6106f1a540348cd0aafdb600702397c6873ce1ab5bfc0ad25082d13db5f
+      JRELEASER_PROJECT_VERSION: 1.2.3
+      JRELEASER_GITHUB_TOKEN: validation-only
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Create five publish-directory fixtures
+        run: |
+          for rid in linux-x64 linux-arm64 osx-arm64; do
+            mkdir -p "artifacts/publish/$rid"
+            printf 'fixture %s\n' "$rid" > "artifacts/publish/$rid/blokebot"
+            chmod +x "artifacts/publish/$rid/blokebot"
+          done
+          for rid in win-x64 win-arm64; do
+            mkdir -p "artifacts/publish/$rid"
+            printf 'fixture %s\n' "$rid" > "artifacts/publish/$rid/blokebot.exe"
+          done
+      - name: Validate strict full configuration
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)"
+          -v "$PWD:/workspace"
+          -e JRELEASER_PROJECT_VERSION
+          -e JRELEASER_GITHUB_TOKEN
+          "$JRELEASER_IMAGE"
+          config --strict --full --reproducible
+          --basedir /workspace
+          --config-file packaging/jreleaser/jreleaser.yml
+      - name: Assemble package archives
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/workspace" \
+            -e JRELEASER_PROJECT_VERSION \
+            -e JRELEASER_GITHUB_TOKEN \
+            "$JRELEASER_IMAGE" \
+            assemble --strict --reproducible \
+            --basedir /workspace \
+            --config-file packaging/jreleaser/jreleaser.yml
+      - name: Remove nondeterministic ZIP extra fields with standard tools
+        run: |
+          for archive in out/jreleaser/assemble/blokebot-zip/archive/*.zip; do
+            archive=$(realpath "$archive")
+            temporary=$(mktemp -d)
+            normalized="${archive%.zip}.normalized.zip"
+            unzip -q "$archive" -d "$temporary"
+            find "$temporary" -exec touch -h -d '2026-01-01T00:00:00Z' {} +
+            (cd "$temporary" && find . -mindepth 1 -print | LC_ALL=C sort | zip -X -y -q "$normalized" -@)
+            mv "$normalized" "$archive"
+            rm -rf "$temporary"
+          done
+      - name: Generate checksums and prepare package channels
+        run: |
+          for phase in checksum prepare; do
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$PWD:/workspace" \
+              -e JRELEASER_PROJECT_VERSION \
+              -e JRELEASER_GITHUB_TOKEN \
+              "$JRELEASER_IMAGE" \
+              "$phase" --strict --reproducible \
+              --basedir /workspace \
+              --config-file packaging/jreleaser/jreleaser.yml
+          done
+      - name: Validate archive, checksum, and package inventory
+        run: |
+          find out/jreleaser/assemble -maxdepth 4 -type f \
+            \( -name '*.tar.gz' -o -name '*.zip' \) \
+            -printf '%f\n' | sort > artifacts/archive-inventory.txt
+          cat > artifacts/expected-archive-inventory.txt <<'EOF'
+          blokebot-v1.2.3-linux-arm64.tar.gz
+          blokebot-v1.2.3-linux-x64.tar.gz
+          blokebot-v1.2.3-osx-arm64.zip
+          blokebot-v1.2.3-win-arm64.zip
+          blokebot-v1.2.3-win-x64.zip
+          EOF
+          diff -u artifacts/expected-archive-inventory.txt artifacts/archive-inventory.txt
+
+          cp out/jreleaser/checksums/checksums_sha256.txt artifacts/checksums_sha256.txt
+          cmp out/jreleaser/checksums/checksums_sha256.txt artifacts/checksums_sha256.txt
+          while IFS= read -r archive; do
+            source=$(find out/jreleaser/assemble -type f -name "$archive" -print -quit)
+            cp "$source" artifacts/
+          done < artifacts/archive-inventory.txt
+          (cd artifacts && sha256sum --check checksums_sha256.txt)
+
+          test -f out/jreleaser/prepare/blokebot/brew/Formula/blokebot.rb
+          test -f out/jreleaser/prepare/blokebot/scoop/bucket/blokebot.json
+          test -f out/jreleaser/prepare/blokebot/chocolatey/blokebot/blokebot.nuspec
+          test -f out/jreleaser/prepare/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/1.2.3/alsi-lawr.BlokeBot.installer.yaml
+          grep -F 'blokebot-v1.2.3-osx-arm64.zip' out/jreleaser/prepare/blokebot/brew/Formula/blokebot.rb
+          grep -F '"bin/blokebot.exe", "blokebot"' out/jreleaser/prepare/blokebot/scoop/bucket/blokebot.json
+          grep -F 'Architecture: x64' out/jreleaser/prepare/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/1.2.3/alsi-lawr.BlokeBot.installer.yaml
+          if grep -R -F 'win-arm64.zip' out/jreleaser/prepare/blokebot/{scoop,chocolatey,winget}; then
+            exit 1
+          fi
+      - name: Prove archive determinism
+        run: |
+          find out/jreleaser/assemble -maxdepth 4 -type f \
+            \( -name '*.tar.gz' -o -name '*.zip' \) -print0 \
+            | sort -z | xargs -0 sha256sum \
+            | sed 's#out/jreleaser/assemble/[^/]*/archive/##' \
+            > artifacts/first-archive-hashes.txt
+          rm -rf out/jreleaser/assemble out/jreleaser/checksums
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/workspace" \
+            -e JRELEASER_PROJECT_VERSION \
+            -e JRELEASER_GITHUB_TOKEN \
+            "$JRELEASER_IMAGE" \
+            assemble --strict --reproducible \
+            --basedir /workspace \
+            --config-file packaging/jreleaser/jreleaser.yml
+          for archive in out/jreleaser/assemble/blokebot-zip/archive/*.zip; do
+            archive=$(realpath "$archive")
+            temporary=$(mktemp -d)
+            normalized="${archive%.zip}.normalized.zip"
+            unzip -q "$archive" -d "$temporary"
+            find "$temporary" -exec touch -h -d '2026-01-01T00:00:00Z' {} +
+            (cd "$temporary" && find . -mindepth 1 -print | LC_ALL=C sort | zip -X -y -q "$normalized" -@)
+            mv "$normalized" "$archive"
+            rm -rf "$temporary"
+          done
+          find out/jreleaser/assemble -maxdepth 4 -type f \
+            \( -name '*.tar.gz' -o -name '*.zip' \) -print0 \
+            | sort -z | xargs -0 sha256sum \
+            | sed 's#out/jreleaser/assemble/[^/]*/archive/##' \
+            > artifacts/second-archive-hashes.txt
+          diff -u artifacts/first-archive-hashes.txt artifacts/second-archive-hashes.txt
+
+  nix:
+    name: Evaluate, build, and smoke Nix outputs
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Install pinned Nix
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Check Nix formatting and all-system evaluation
+        run: |
+          nix fmt -- --check flake.nix
+          nix flake check --no-build --all-systems --show-trace
+          nix flake show --all-systems
+      - name: Build bot and site packages and inspect apps
+        run: |
+          nix build .#blokebot --out-link result-bot
+          nix build .#blokebot-site --out-link result-site
+          test "$(result-bot/bin/blokebot version)" = "blokebot 0.0.0-dev+${GITHUB_SHA}"
+          test -x "$(nix eval --raw .#apps.x86_64-linux.blokebot.program)"
+          test -x "$(nix eval --raw .#apps.x86_64-linux.blokebot-site.program)"
+          test "$(nix eval --raw .#nixosModules.default --apply builtins.typeOf)" = lambda
+          test "$(nix eval --raw .#nixosModules.blokebot --apply builtins.typeOf)" = lambda
+          test "$(nix eval --raw .#nixosModules.blokebot-site --apply builtins.typeOf)" = lambda
+      - name: Build and fully smoke Nix OCI images
+        run: |
+          revision="$GITHUB_SHA"
+          version="0.0.0-dev"
+          cli_version="$version+$revision"
+          nix build .#blokebot-image --out-link result-bot-image
+          nix build .#blokebot-site-image --out-link result-site-image
+          bot_image=$(docker load < result-bot-image | sed -n 's/^Loaded image: //p' | tail -n 1)
+          site_image=$(docker load < result-site-image | sed -n 's/^Loaded image: //p' | tail -n 1)
+          python3 packaging/smoke/container_smoke.py \
+            --image "$bot_image" --kind bot --version "$version" --cli-version "$cli_version" --revision "$revision"
+          python3 packaging/smoke/container_smoke.py \
+            --image "$site_image" --kind site --version "$version" --revision "$revision"
+
+  dockerfiles:
+    name: Build ${{ matrix.kind }} Dockerfile on ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: bot
+            arch: amd64
+            runner: ubuntu-24.04
+            dockerfile: packaging/docker/blokebot.Dockerfile
+            image: docker.io/alsilawr/blokebot
+          - kind: bot
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            dockerfile: packaging/docker/blokebot.Dockerfile
+            image: docker.io/alsilawr/blokebot
+          - kind: site
+            arch: amd64
+            runner: ubuntu-24.04
+            dockerfile: packaging/docker/blokebot-site.Dockerfile
+            image: docker.io/alsilawr/blokebot-site
+          - kind: site
+            arch: arm64
+            runner: ubuntu-24.04-arm
+            dockerfile: packaging/docker/blokebot-site.Dockerfile
+            image: docker.io/alsilawr/blokebot-site
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Confirm native architecture
+        run: |
+          case "${{ matrix.arch }}" in
+            amd64) expected=x86_64 ;;
+            arm64) expected=aarch64 ;;
+            *) exit 1 ;;
+          esac
+          test "$(uname -m)" = "$expected"
+      - name: Build the root-context Dockerfile
+        run: |
+          docker build \
+            --file "${{ matrix.dockerfile }}" \
+            --tag "${{ matrix.image }}:validation-${{ matrix.arch }}" \
+            --build-arg BLOKEBOT_VERSION=1.2.3 \
+            --build-arg SOURCE_REVISION_ID="$GITHUB_SHA" \
+            .
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "${{ matrix.image }}:validation-${{ matrix.arch }}")" = 1.2.3
+          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "${{ matrix.image }}:validation-${{ matrix.arch }}")" = "$GITHUB_SHA"
+
+  repository:
+    name: Validate workflow and repository boundaries
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Parse workflow YAML
+        run: ruby -e 'require "yaml"; Dir[".github/workflows/*.yml"].each { |path| YAML.parse_file(path) }'
+      - name: Require immutable action pins
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          action = re.compile(r"^\s*uses:\s*[^#\s]+@([0-9a-f]{40})(?:\s+#.*)?$")
+          unpinned = []
+          for workflow in Path(".github/workflows").glob("*.yml"):
+              for number, line in enumerate(workflow.read_text().splitlines(), 1):
+                  if line.lstrip().startswith("uses:") and not line.lstrip().startswith("uses: ./") and not action.match(line):
+                      unpinned.append(f"{workflow}:{number}:{line.strip()}")
+          if unpinned:
+              raise SystemExit("Unpinned actions:\n" + "\n".join(unpinned))
+          PY
+      - name: Exercise strict release-tag validation
+        run: |
+          valid() { [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }
+          valid v0.1.0
+          valid v10.20.30
+          for tag in 0.1.0 v1.2 v1.2.3-rc1 v01.2.3 vx.y.z; do
+            if valid "$tag"; then
+              echo "Accepted invalid tag $tag" >&2
+              exit 1
+            fi
+          done
+      - name: Exercise cross-tool version mismatch rejection
+        run: |
+          same_version() {
+            expected="$1"
+            shift
+            for actual in "$@"; do
+              test "$actual" = "$expected" || return 1
+            done
+          }
+          same_version 1.2.3 1.2.3 1.2.3 1.2.3
+          for versions in \
+            '1.2.3 1.2.4 1.2.3 1.2.3' \
+            '1.2.3 1.2.3 1.2.4 1.2.3' \
+            '1.2.3 1.2.3 1.2.3 1.2.4'; do
+            read -r expected dotnet_version nix_version jreleaser_version <<< "$versions"
+            if same_version "$expected" "$dotnet_version" "$nix_version" "$jreleaser_version"; then
+              echo "Accepted mismatched version flow: $versions" >&2
+              exit 1
+            fi
+          done
+      - name: Prove removed paths and packaging boundaries
+        run: |
+          for path in Dockerfile .dockerignore deps.json distribution nix release scripts tests/distribution docs tests/README.md; do
+            test ! -e "$path"
+          done
+          test -f packaging/archives/SERVER_SETUP.md
+          test -f packaging/docker/blokebot.Dockerfile
+          test -f packaging/docker/blokebot-site.Dockerfile
+          test -f packaging/jreleaser/jreleaser.yml
+          test -f packaging/nix/deps.json
+          test -f packaging/nix/module.nix
+          test -f packaging/smoke/native_smoke.py
+          test -f packaging/smoke/container_smoke.py
+          test "$(grep -c 'Immutable architecture tag already exists' .github/workflows/release.yml)" -eq 2
+          test "$(grep -c 'Immutable multi-architecture tag already exists' .github/workflows/release.yml)" -eq 2
+          grep -F 'refusing to overwrite it' .github/workflows/release.yml
+          if grep -R -E 'BlokeBot[.]Simulation|assets/simulation|simulation-capture|capture-simulation' packaging flake.nix; then
+            exit 1
+          fi
+          if grep -R -E 'checksums[.]toml|release_artifacts[.]py|package_metadata[.]py|run_jreleaser[.]py' .github/workflows/release.yml packaging README.md CONTRIBUTING.md src/BlokeBot.Site; then
+            exit 1
+          fi
+          git diff --check

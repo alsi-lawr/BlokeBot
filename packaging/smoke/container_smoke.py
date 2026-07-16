@@ -15,17 +15,15 @@ class ContainerSmokeError(RuntimeError):
     pass
 
 
-def _docker(*arguments: str, capture: bool = True) -> str:
+def _docker(*arguments: str) -> str:
     completed = subprocess.run(
         ["docker", *arguments],
         check=False,
-        capture_output=capture,
+        capture_output=True,
         text=True,
     )
     if completed.returncode != 0:
-        raise ContainerSmokeError(
-            f"docker {' '.join(arguments)} failed: {completed.stderr.strip()}"
-        )
+        raise ContainerSmokeError(f"docker {' '.join(arguments)} failed")
     return completed.stdout.strip()
 
 
@@ -56,10 +54,9 @@ def _wait_for_page(
     port: str,
     markers: tuple[str, ...],
     accepted_statuses: frozenset[int],
-    timeout: float = 30,
 ) -> None:
     url = f"http://127.0.0.1:{port}/"
-    deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + 30
     last_error: Exception | None = None
     while time.monotonic() < deadline:
         try:
@@ -68,13 +65,13 @@ def _wait_for_page(
             if missing:
                 raise ContainerSmokeError(f"{url} is missing: {', '.join(missing)}")
             return
-        except (OSError, urllib.error.URLError) as error:
+        except (OSError, urllib.error.URLError, ContainerSmokeError) as error:
             last_error = error
             time.sleep(0.25)
     raise ContainerSmokeError(f"Container page did not become ready: {last_error}")
 
 
-def smoke(image: str, kind: str, expected_revision: str | None) -> None:
+def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) -> None:
     inspected = _inspect(image)
     config = inspected.get("Config")
     if not isinstance(config, dict):
@@ -87,16 +84,12 @@ def smoke(image: str, kind: str, expected_revision: str | None) -> None:
         raise ContainerSmokeError("Image has no OCI labels")
     expected_labels = {
         "org.opencontainers.image.source": "https://github.com/alsi-lawr/BlokeBot",
-        "org.opencontainers.image.version": "0.1.0",
+        "org.opencontainers.image.version": version,
+        "org.opencontainers.image.revision": revision,
     }
     for name, value in expected_labels.items():
         if labels.get(name) != value:
             raise ContainerSmokeError(f"OCI label {name} is not {value!r}")
-    revision = labels.get("org.opencontainers.image.revision")
-    if not isinstance(revision, str) or not revision:
-        raise ContainerSmokeError("OCI revision label is empty")
-    if expected_revision is not None and revision != expected_revision:
-        raise ContainerSmokeError(f"OCI revision is {revision!r}, expected {expected_revision!r}")
 
     entrypoint = config.get("Entrypoint")
     if not isinstance(entrypoint, list) or not entrypoint:
@@ -106,11 +99,20 @@ def smoke(image: str, kind: str, expected_revision: str | None) -> None:
         raise ContainerSmokeError("Image entrypoint is invalid")
 
     if kind == "bot":
-        if entrypoint[1:] != ["serve"] or not executable.endswith("/bin/blokebot"):
+        expected_arguments = [
+            "serve",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8080",
+            "--data-dir",
+            "/data",
+        ]
+        if entrypoint[1:] != expected_arguments or not executable.endswith("/bin/blokebot"):
             raise ContainerSmokeError(f"Unexpected bot entrypoint: {entrypoint}")
-        version = _docker("run", "--rm", "--entrypoint", executable, image, "version")
-        if version != "blokebot 0.1.0":
-            raise ContainerSmokeError(f"Unexpected container version output: {version!r}")
+        actual_version = _docker("run", "--rm", "--entrypoint", executable, image, "version")
+        if actual_version != f"blokebot {cli_version}":
+            raise ContainerSmokeError(f"Unexpected container version output: {actual_version!r}")
         internal_port = "8080"
         markers = ("Sign in to BlokeBot", "Continue with Twitch", "Public leaderboard")
         accepted_statuses = frozenset({200, 503})
@@ -145,13 +147,21 @@ def smoke(image: str, kind: str, expected_revision: str | None) -> None:
 
 
 def main(arguments: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inspect and HTTP-smoke a BlokeBot OCI image.")
+    parser = argparse.ArgumentParser(description="Inspect and HTTP-smoke a Nix OCI image.")
     parser.add_argument("--image", required=True)
     parser.add_argument("--kind", required=True, choices=("bot", "site"))
-    parser.add_argument("--revision")
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--cli-version")
+    parser.add_argument("--revision", required=True)
     args = parser.parse_args(arguments)
     try:
-        smoke(args.image, args.kind, args.revision)
+        smoke(
+            args.image,
+            args.kind,
+            args.version,
+            args.cli_version or args.version,
+            args.revision,
+        )
     except ContainerSmokeError as error:
         print(f"container-smoke: {error}", file=sys.stderr)
         return 2

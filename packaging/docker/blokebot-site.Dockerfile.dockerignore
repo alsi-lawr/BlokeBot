@@ -1,0 +1,9 @@
+**
+!global.json
+!Directory.Build.props
+!Directory.Packages.props
+!src/BlokeBot.Site/**
+
+**/appsettings.Development.json
+**/bin/
+**/obj/

@@ -1,0 +1,180 @@
+project:
+  name: blokebot
+  description: Free, open-source Twitch bot and dashboard
+  longDescription: BlokeBot is a self-hosted Twitch bot and dashboard for channel tools.
+  authors:
+    - BlokeBot contributors
+  license: MIT
+  inceptionYear: "2026"
+  links:
+    homepage: https://github.com/alsi-lawr/BlokeBot
+    documentation: https://github.com/alsi-lawr/BlokeBot/wiki
+    bugTracker: https://github.com/alsi-lawr/BlokeBot/issues
+  tags:
+    - twitch
+    - bot
+    - cli
+  stereotype: CLI
+
+release:
+  github:
+    owner: alsi-lawr
+    name: BlokeBot
+    tagName: v{{projectVersion}}
+    overwrite: false
+    skipRelease: true
+
+checksum:
+  artifacts: true
+  files: false
+  individual: false
+
+assemble:
+  archive:
+    blokebot-tar:
+      active: ALWAYS
+      exported: false
+      distributionType: BINARY
+      attachPlatform: false
+      archiveName: blokebot-v{{projectVersion}}-{{matrix.rid}}
+      formats:
+        - TAR_GZ
+      applyDefaultMatrix: false
+      matrix:
+        rows:
+          - rid: linux-x64
+            os: linux
+            arch: x86_64
+          - rid: linux-arm64
+            os: linux
+            arch: aarch_64
+      options:
+        timestamp: 2026-01-01T00:00:00Z
+      fileSets:
+        - input: artifacts/publish/{{matrix.rid}}
+          output: bin
+        - input: .
+          output: .
+          includes:
+            - LICENSE
+        - input: packaging/archives
+          output: .
+          includes:
+            - SERVER_SETUP.md
+    blokebot-zip:
+      active: ALWAYS
+      exported: false
+      distributionType: BINARY
+      attachPlatform: false
+      archiveName: blokebot-v{{projectVersion}}-{{matrix.rid}}
+      formats:
+        - ZIP
+      applyDefaultMatrix: false
+      matrix:
+        rows:
+          - rid: osx-arm64
+            os: osx
+            arch: aarch_64
+          - rid: win-x64
+            os: windows
+            arch: x86_64
+          - rid: win-arm64
+            os: windows
+            arch: aarch_64
+      options:
+        timestamp: 2026-01-01T00:00:00Z
+      fileSets:
+        - input: artifacts/publish/{{matrix.rid}}
+          output: bin
+        - input: .
+          output: .
+          includes:
+            - LICENSE
+        - input: packaging/archives
+          output: .
+          includes:
+            - SERVER_SETUP.md
+
+distributions:
+  blokebot:
+    type: BINARY
+    stereotype: CLI
+    executable:
+      name: blokebot
+      windowsExtension: exe
+    extraProperties:
+      skipJava: "true"
+    artifacts:
+      - path: out/jreleaser/assemble/blokebot-tar/archive/blokebot-v{{projectVersion}}-linux-x64.tar.gz
+        platform: linux-x86_64
+        extraProperties:
+          skipBrew: "true"
+          skipScoop: "true"
+          skipChocolatey: "true"
+          skipWinget: "true"
+      - path: out/jreleaser/assemble/blokebot-tar/archive/blokebot-v{{projectVersion}}-linux-arm64.tar.gz
+        platform: linux-aarch_64
+        extraProperties:
+          skipBrew: "true"
+          skipScoop: "true"
+          skipChocolatey: "true"
+          skipWinget: "true"
+      - path: out/jreleaser/assemble/blokebot-zip/archive/blokebot-v{{projectVersion}}-osx-arm64.zip
+        platform: osx-aarch_64
+        extraProperties:
+          skipScoop: "true"
+          skipChocolatey: "true"
+          skipWinget: "true"
+      - path: out/jreleaser/assemble/blokebot-zip/archive/blokebot-v{{projectVersion}}-win-x64.zip
+        platform: windows-x86_64
+        extraProperties:
+          skipBrew: "true"
+      - path: out/jreleaser/assemble/blokebot-zip/archive/blokebot-v{{projectVersion}}-win-arm64.zip
+        platform: windows-aarch_64
+        extraProperties:
+          skipBrew: "true"
+          skipScoop: "true"
+          skipChocolatey: "true"
+          skipWinget: "true"
+
+packagers:
+  brew:
+    active: ALWAYS
+    downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
+    formulaName: blokebot
+    repository:
+      owner: alsi-lawr
+      name: homebrew-tap
+  scoop:
+    active: ALWAYS
+    downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
+    packageName: blokebot
+    templateDirectory: packaging/jreleaser/templates/scoop
+    repository:
+      owner: alsi-lawr
+      name: scoop-bucket
+  chocolatey:
+    active: ALWAYS
+    downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
+    remoteBuild: true
+    packageName: blokebot
+    title: BlokeBot
+  winget:
+    active: ALWAYS
+    skipPublishing: true
+    downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
+    templateDirectory: packaging/jreleaser/templates/winget
+    author: BlokeBot contributors
+    moniker: blokebot
+    package:
+      identifier: alsi-lawr.BlokeBot
+      name: BlokeBot
+      version: "{{projectVersion}}"
+      url: https://github.com/alsi-lawr/BlokeBot
+    publisher:
+      name: alsi-lawr
+      url: https://github.com/alsi-lawr
+      supportUrl: https://github.com/alsi-lawr/BlokeBot/issues
+    installer:
+      type: ZIP
+      command: blokebot

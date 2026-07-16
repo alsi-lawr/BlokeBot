@@ -11,7 +11,8 @@
         "aarch64-linux"
         "aarch64-darwin"
       ];
-      releaseVersion = "0.1.0";
+      environmentVersion = builtins.getEnv "BLOKEBOT_VERSION";
+      releaseVersion = if environmentVersion == "" then "0.0.0-dev" else environmentVersion;
       imageSource = "https://github.com/alsi-lawr/BlokeBot";
       imageRevision = self.rev or self.dirtyRev or "unknown";
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -21,26 +22,58 @@
         pkgs.nodejs_22
         pkgs.nixfmt
       ];
-      source =
+      commonSourceFiles = lib: [
+        ./Directory.Build.props
+        ./Directory.Packages.props
+        ./global.json
+      ];
+      botSource =
         pkgs:
-        pkgs.lib.cleanSourceWith {
-          src = ./.;
-          filter = path: type: baseNameOf path != "dotnet-tools.json";
+        pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions (
+            commonSourceFiles pkgs.lib
+            ++ [
+              ./src/BlokeBot
+              ./src/BlokeBot.Commands
+              ./src/BlokeBot.Core
+              ./src/BlokeBot.Eventing
+              ./src/BlokeBot.Functional
+              ./src/BlokeBot.Persistence
+              ./src/BlokeBot.Twitch
+              ./src/BlokeBot.Twitch.Auth
+              ./src/BlokeBot.Twitch.Runtime
+            ]
+          );
+        };
+      siteSource =
+        pkgs:
+        pkgs.lib.fileset.toSource {
+          root = ./.;
+          fileset = pkgs.lib.fileset.unions (
+            commonSourceFiles pkgs.lib
+            ++ [
+              ./src/BlokeBot.Site
+            ]
+          );
         };
       botPackageFor =
         system:
         let
           pkgs = pkgsFor system;
+          src = botSource pkgs;
         in
         pkgs.buildDotnetModule {
           pname = "blokebot";
-          version = "0.1.0";
-          src = source pkgs;
+          version = releaseVersion;
+          inherit src;
+          enableParallelBuilding = false;
 
           projectFile = "src/BlokeBot/BlokeBot.csproj";
-          nugetDeps = ./deps.json;
+          nugetDeps = ./packaging/nix/deps.json;
           dotnet-sdk = pkgs.dotnet-sdk_10;
           dotnet-runtime = pkgs.dotnet-aspnetcore_10;
+          dotnetBuildFlags = [ "-p:SourceRevisionId=${imageRevision}" ];
           executables = [ "blokebot" ];
           makeWrapperArgs = [
             "--set-default"
@@ -48,10 +81,10 @@
             "${placeholder "out"}/lib/blokebot"
           ];
 
-          npmRoot = "src/BlokeBot";
+          npmRoot = "src/BlokeBot.Core";
           npmDeps = pkgs.fetchNpmDeps {
-            src = ./.;
-            npmRoot = "src/BlokeBot";
+            inherit src;
+            npmRoot = "src/BlokeBot.Core";
             hash = "sha256-LqmXiyTdzKlsubgaD93Zlb9aOoKSQd+7zHcpMcHpbXg=";
           };
           nativeBuildInputs = [
@@ -60,7 +93,7 @@
           ];
 
           preBuild = ''
-            pushd src/BlokeBot
+            pushd src/BlokeBot.Core
             npm run css:build
             popd
           '';
@@ -78,21 +111,15 @@
         in
         pkgs.buildDotnetModule {
           pname = "blokebot-site";
-          version = "0.1.0";
-          src = pkgs.lib.fileset.toSource {
-            root = ./.;
-            fileset = pkgs.lib.fileset.unions [
-              ./Directory.Build.props
-              ./Directory.Packages.props
-              ./global.json
-              ./src/BlokeBot.Site
-            ];
-          };
+          version = releaseVersion;
+          src = siteSource pkgs;
+          enableParallelBuilding = false;
 
           projectFile = "src/BlokeBot.Site/BlokeBot.Site.csproj";
-          nugetDeps = [ ];
+          nugetDeps = ./packaging/nix/deps.json;
           dotnet-sdk = pkgs.dotnet-sdk_10;
           dotnet-runtime = pkgs.dotnet-aspnetcore_10;
+          dotnetBuildFlags = [ "-p:SourceRevisionId=${imageRevision}" ];
           executables = [ "BlokeBot.Site" ];
           makeWrapperArgs = [
             "--set-default"
@@ -117,7 +144,7 @@
           aarch64-linux = "arm64";
         }
         .${system} or (throw "Container images are unsupported on ${system}");
-      imageTagFor = system: "v${releaseVersion}-${imageArchitectureFor system}";
+      imageTagFor = system: "${releaseVersion}-${imageArchitectureFor system}";
       imageLabels = title: {
         "org.opencontainers.image.source" = imageSource;
         "org.opencontainers.image.version" = releaseVersion;
@@ -151,10 +178,15 @@
               Entrypoint = [
                 "${packages.blokebot}/bin/blokebot"
                 "serve"
+                "--host"
+                "0.0.0.0"
+                "--port"
+                "8080"
+                "--data-dir"
+                "/data"
               ];
               Env = [
                 "ASPNETCORE_ENVIRONMENT=Production"
-                "ASPNETCORE_URLS=http://0.0.0.0:8080"
                 "BlokeBot__DatabasePath=/data/blokebot.db"
                 "HOME=/data"
                 "TwitchBot__Identity__TokenCachePath=/data/twitch.tokens.json"
@@ -240,24 +272,14 @@
             packages = developmentPackages pkgs;
           };
         }
-        // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
-          simulation = pkgs.mkShellNoCC {
-            packages = developmentPackages pkgs ++ [
-              pkgs.chromium
-              pkgs.curl
-              pkgs.imagemagick
-              pkgs.libwebp
-            ];
-          };
-        }
       );
 
       formatter = forAllSystems (system: (pkgsFor system).nixfmt);
 
       nixosModules = {
         default = self.nixosModules.blokebot;
-        blokebot = import ./nix/module.nix { inherit self; };
-        blokebot-site = self.nixosModules.blokebot;
+        blokebot = import ./packaging/nix/module.nix { inherit self; };
+        blokebot-site = import ./packaging/nix/module.nix { inherit self; };
       };
     };
 }

@@ -1,72 +1,24 @@
 # Contributing to BlokeBot
 
-Contributions should make one focused, reviewable change. Discuss changes that alter public
-behavior, persisted data, security, compatibility, or project scope before investing in an
-implementation.
+Keep changes focused and do not commit credentials, local configuration, databases, or generated output.
 
-Do not commit credentials, tokens, local configuration, databases, or generated build output.
-
-## Development environment
-
-The recommended environment is the repository's Nix development shell:
+Enter the supported development environment with `nix develop`, or install the .NET SDK selected by `global.json` plus Node.js and npm.
 
 ```console
-nix develop
-```
-
-Without Nix, install the .NET SDK selected by `global.json` and Node.js with npm. Restore the
-pinned CSharpier tool before formatting:
-
-```console
+dotnet restore BlokeBot.slnx
 dotnet tool restore
-```
-
-The [development guide](https://github.com/alsi-lawr/BlokeBot/wiki/Development) documents the
-toolchain and frontend workflow in more detail.
-
-## Build and test
-
-Restore and build the complete solution:
-
-```console
-dotnet restore BlokeBot.slnx --disable-parallel
-dotnet build BlokeBot.slnx --no-restore --disable-parallel -warnaserror
-```
-
-Run the active test set:
-
-```console
-dotnet test BlokeBot.slnx --no-restore --disable-parallel -v:minimal
-```
-
-BlokeBot uses TUnit on Microsoft Testing Platform. Use `--treenode-filter` for focused runs, not
-the legacy VSTest `--filter` option.
-
-Tests should protect observable behavior owned by BlokeBot. Prefer focused feature tests. Add a
-characterization test only when existing behavior genuinely needs to be captured before it is
-changed. Do not add reflection-based shape tests, tests of .NET or framework behavior, or tests
-that merely restate plainly visible code.
-
-## Formatting
-
-CSharpier is the repository's C# formatter:
-
-```console
-dotnet csharpier format .
 dotnet csharpier check .
+dotnet build BlokeBot.slnx --no-restore -warnaserror
+dotnet test BlokeBot.slnx --no-build
 ```
 
-Run `nix fmt` when changing Nix files. Build and analyzer verification remain separate from
-formatting.
+Use `--treenode-filter` for focused TUnit/Microsoft Testing Platform runs. Format C# with `dotnet csharpier format .`.
 
-## Submitting a change
+For Nix changes:
 
-- Keep the change limited to its stated purpose and remove anything it supersedes.
-- Update user documentation when public behavior changes.
-- Include only tests that protect meaningful product behavior.
-- State what you verified and identify any remaining risk in the pull request.
+```console
+nix fmt
+nix flake check --no-build --all-systems
+```
 
-## Licence
-
-BlokeBot is distributed under the [MIT License](LICENSE). Only submit work that you have the right
-to contribute. Contributions accepted into the repository are distributed under the same terms.
+See the technical [development guide](https://github.com/alsi-lawr/BlokeBot/wiki/Development), [installation guide](https://github.com/alsi-lawr/BlokeBot/wiki/Installation), and [server owner guide](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide).

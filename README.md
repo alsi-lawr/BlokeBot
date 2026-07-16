@@ -40,7 +40,7 @@ The **[User guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide)** walk
 ### Docker
 
 ```console
-docker build --tag blokebot .
+docker build --file packaging/docker/blokebot.Dockerfile --tag blokebot .
 docker run --rm --init --publish 8080:8080 --volume blokebot-data:/data blokebot
 ```
 

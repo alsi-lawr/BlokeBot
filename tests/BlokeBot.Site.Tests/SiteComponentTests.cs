@@ -150,6 +150,8 @@ public sealed class SiteComponentTests
         rendered
             .FindAll("#archives a[href*='/releases/download/v0.1.0/blokebot-v0.1.0-']")
             .Count.ShouldBe(5);
+        rendered.Find("#archives a[href$='/blokebot-v0.1.0-osx-arm64.zip']").ShouldNotBeNull();
+        rendered.Find("#archives a[href$='/checksums_sha256.txt']").ShouldNotBeNull();
 
         var content = rendered.Markup;
         foreach (
@@ -160,6 +162,7 @@ public sealed class SiteComponentTests
                 "bucket repository not created",
                 "publication and moderation pending",
                 "manual upstream review pending",
+                "Windows ARM64 remains available as a direct archive",
             }
         )
         {
@@ -170,7 +173,10 @@ public sealed class SiteComponentTests
             var command in new[]
             {
                 "nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve",
-                "ghcr.io/alsi-lawr/blokebot:v0.1.0",
+                "docker.io/alsilawr/blokebot:0.1.0",
+                "ghcr.io/alsi-lawr/blokebot:0.1.0",
+                "docker.io/alsilawr/blokebot-site:0.1.0",
+                "ghcr.io/alsi-lawr/blokebot-site:0.1.0",
                 "brew install alsi-lawr/tap/blokebot",
                 "scoop install blokebot",
                 "choco install blokebot --version=0.1.0",

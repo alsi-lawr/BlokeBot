@@ -116,13 +116,21 @@ in
           ) botCfg.environment
           // {
             ASPNETCORE_ENVIRONMENT = "Production";
-            ASPNETCORE_URLS = "http://${botCfg.listenAddress}:${toString botCfg.port}";
             BlokeBot__DatabasePath = "${stateDir}/blokebot.db";
             TwitchBot__Identity__TokenCachePath = "${stateDir}/twitch.tokens.json";
           };
 
         serviceConfig = {
-          ExecStart = "${lib.getExe botCfg.package} serve";
+          ExecStart = lib.escapeShellArgs [
+            (lib.getExe botCfg.package)
+            "serve"
+            "--host"
+            botCfg.listenAddress
+            "--port"
+            (toString botCfg.port)
+            "--data-dir"
+            stateDir
+          ];
           User = "blokebot";
           Group = "blokebot";
           WorkingDirectory = stateDir;

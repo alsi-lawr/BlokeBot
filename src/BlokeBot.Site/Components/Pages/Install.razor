@@ -29,11 +29,11 @@
 
     <section id="archives" aria-labelledby="archives-title">
         <h2 id="archives-title">Direct archives</h2>
-        <p><strong>Status: pending the immutable v0.1.0 GitHub release.</strong> These links will provide the original self-contained application directories. Verify the selected file against <a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/checksums.toml">checksums.toml</a>; package channels consume these same bytes rather than rebuilding them.</p>
+        <p><strong>Status: pending the immutable v0.1.0 GitHub release.</strong> These links will provide the original self-contained application directories. Verify the selected file against <a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/checksums_sha256.txt">checksums_sha256.txt</a>; package channels consume these same bytes rather than rebuilding them.</p>
         <ul class="link-list">
             <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-x64.tar.gz">Linux x64 archive</a></li>
             <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-arm64.tar.gz">Linux ARM64 archive</a></li>
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-osx-arm64.tar.gz">macOS Apple Silicon archive</a></li>
+            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-osx-arm64.zip">macOS Apple Silicon archive</a></li>
             <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-x64.zip">Windows x64 archive</a></li>
             <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-arm64.zip">Windows ARM64 archive</a></li>
         </ul>
@@ -47,9 +47,10 @@
 
     <section id="containers" aria-labelledby="containers-title">
         <h2 id="containers-title">Containers</h2>
-        <p><strong>Status: release-ready, with v0.1.0 images pending publication.</strong> The bot image uses external durable state at <code>/data</code>; do not put that state in a disposable container layer.</p>
-        <pre><code>docker run --rm -p 8080:8080 -v blokebot-data:/data ghcr.io/alsi-lawr/blokebot:v0.1.0</code></pre>
-        <p>The separate stateless public site image will use <code>ghcr.io/alsi-lawr/blokebot-site:v0.1.0</code> after the same immutable release succeeds.</p>
+        <p><strong>Status: release-ready, with 0.1.0 images pending publication.</strong> The Dockerfile-built images publish to Docker Hub, while independently Nix-built images publish to GHCR. The bot image uses external durable state at <code>/data</code>; do not put that state in a disposable container layer.</p>
+        <pre><code>docker run --rm -p 8080:8080 -v blokebot-data:/data docker.io/alsilawr/blokebot:0.1.0
+docker run --rm -p 8080:8080 -v blokebot-data:/data ghcr.io/alsi-lawr/blokebot:0.1.0</code></pre>
+        <p>The separate stateless public site images will use <code>docker.io/alsilawr/blokebot-site:0.1.0</code> and <code>ghcr.io/alsi-lawr/blokebot-site:0.1.0</code> after the same immutable release succeeds.</p>
     </section>
 
     <section id="homebrew" aria-labelledby="homebrew-title">
@@ -60,20 +61,20 @@
 
     <section id="scoop" aria-labelledby="scoop-title">
         <h2 id="scoop-title">Scoop on Windows</h2>
-        <p><strong>Status: x64 and ARM64 manifest ready; bucket repository not created.</strong> <code>alsi-lawr/scoop-bucket</code> does not exist yet, so these commands are not live.</p>
+        <p><strong>Status: x64 manifest ready; bucket repository not created.</strong> <code>alsi-lawr/scoop-bucket</code> does not exist yet, so these commands are not live. Windows ARM64 remains available as a direct archive.</p>
         <pre><code>scoop bucket add alsi-lawr https://github.com/alsi-lawr/scoop-bucket
 scoop install blokebot</code></pre>
     </section>
 
     <section id="chocolatey" aria-labelledby="chocolatey-title">
         <h2 id="chocolatey-title">Chocolatey on Windows</h2>
-        <p><strong>Status: x64 and ARM64 metadata ready; publication and moderation pending.</strong> The release workflow submits only when its Chocolatey API key exists. Even after submission, this command is not live until Chocolatey approves the package.</p>
+        <p><strong>Status: x64 metadata ready; publication and moderation pending.</strong> The release workflow submits only when its Chocolatey API key exists. Even after submission, this command is not live until Chocolatey approves the package. Windows ARM64 remains available as a direct archive.</p>
         <pre><code>choco install blokebot --version=0.1.0</code></pre>
     </section>
 
     <section id="winget" aria-labelledby="winget-title">
         <h2 id="winget-title">WinGet on Windows</h2>
-        <p><strong>Status: x64 and ARM64 portable manifests ready; manual upstream review pending.</strong> Automation creates a reviewable bundle but does not open the upstream pull request. This command is not live until that manual submission is accepted.</p>
+        <p><strong>Status: x64 portable manifests ready; manual upstream review pending.</strong> Automation creates a reviewable bundle but does not open the upstream pull request. This command is not live until that manual submission is accepted. Windows ARM64 remains available as a direct archive.</p>
         <pre><code>winget install --id alsi-lawr.BlokeBot --version 0.1.0 --exact</code></pre>
     </section>
 
