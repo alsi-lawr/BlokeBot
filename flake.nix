@@ -1,5 +1,5 @@
 {
-  description = "Self-hosted Twitch bot and Blazor admin dashboard";
+  description = "BlokeBot Twitch bot, dashboard, and public site";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
@@ -9,6 +9,7 @@
       supportedSystems = [
         "x86_64-linux"
         "aarch64-linux"
+        "aarch64-darwin"
       ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgsFor = system: import nixpkgs { inherit system; };
@@ -17,7 +18,13 @@
         pkgs.nodejs_22
         pkgs.nixfmt
       ];
-      packageFor =
+      source =
+        pkgs:
+        pkgs.lib.cleanSourceWith {
+          src = ./.;
+          filter = path: type: baseNameOf path != "dotnet-tools.json";
+        };
+      botPackageFor =
         system:
         let
           pkgs = pkgsFor system;
@@ -25,10 +32,7 @@
         pkgs.buildDotnetModule {
           pname = "blokebot";
           version = "0.1.0";
-          src = pkgs.lib.cleanSourceWith {
-            src = ./.;
-            filter = path: type: baseNameOf path != "dotnet-tools.json";
-          };
+          src = source pkgs;
 
           projectFile = "src/BlokeBot/BlokeBot.csproj";
           nugetDeps = ./deps.json;
@@ -64,30 +68,75 @@
             mainProgram = "blokebot";
           };
         };
+      sitePackageFor =
+        system:
+        let
+          pkgs = pkgsFor system;
+        in
+        pkgs.buildDotnetModule {
+          pname = "blokebot-site";
+          version = "0.1.0";
+          src = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              ./Directory.Build.props
+              ./Directory.Packages.props
+              ./global.json
+              ./src/BlokeBot.Site
+            ];
+          };
+
+          projectFile = "src/BlokeBot.Site/BlokeBot.Site.csproj";
+          nugetDeps = [ ];
+          dotnet-sdk = pkgs.dotnet-sdk_10;
+          dotnet-runtime = pkgs.dotnet-aspnetcore_10;
+          executables = [ "BlokeBot.Site" ];
+          makeWrapperArgs = [
+            "--set-default"
+            "ASPNETCORE_CONTENTROOT"
+            "${placeholder "out"}/lib/blokebot-site"
+          ];
+
+          postFixup = ''
+            mv "$out/bin/BlokeBot.Site" "$out/bin/blokebot-site"
+          '';
+
+          meta = {
+            description = "BlokeBot public product and user guide site";
+            license = pkgs.lib.licenses.mit;
+            mainProgram = "blokebot-site";
+          };
+        };
     in
     {
       packages = forAllSystems (
         system:
         let
-          package = packageFor system;
+          blokebot = botPackageFor system;
+          blokebot-site = sitePackageFor system;
         in
         {
-          default = package;
-          blokebot = package;
+          default = blokebot;
+          inherit blokebot blokebot-site;
         }
       );
 
       apps = forAllSystems (
         system:
         let
-          package = self.packages.${system}.blokebot;
+          packages = self.packages.${system};
         in
         {
           default = self.apps.${system}.blokebot;
           blokebot = {
             type = "app";
-            program = "${package}/bin/blokebot";
+            program = "${packages.blokebot}/bin/blokebot";
             meta.description = "Run BlokeBot";
+          };
+          blokebot-site = {
+            type = "app";
+            program = "${packages.blokebot-site}/bin/blokebot-site";
+            meta.description = "Run the BlokeBot public site";
           };
         }
       );
@@ -101,7 +150,8 @@
           default = pkgs.mkShellNoCC {
             packages = developmentPackages pkgs;
           };
-
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           simulation = pkgs.mkShellNoCC {
             packages = developmentPackages pkgs ++ [
               pkgs.chromium
@@ -118,6 +168,7 @@
       nixosModules = {
         default = self.nixosModules.blokebot;
         blokebot = import ./nix/module.nix { inherit self; };
+        blokebot-site = self.nixosModules.blokebot;
       };
     };
 }

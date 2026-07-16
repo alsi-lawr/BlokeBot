@@ -6,7 +6,8 @@
   ...
 }:
 let
-  cfg = config.services.blokebot;
+  botCfg = config.services.blokebot;
+  siteCfg = config.services.blokebot-site;
   stateDir = "/var/lib/blokebot";
 in
 {
@@ -67,52 +68,120 @@ in
     };
   };
 
-  config = lib.mkIf cfg.enable {
-    users.groups.blokebot = { };
-    users.users.blokebot = {
-      isSystemUser = true;
-      group = "blokebot";
-      home = stateDir;
+  options.services.blokebot-site = {
+    enable = lib.mkEnableOption "the BlokeBot public site";
+
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.blokebot-site;
+      defaultText = lib.literalExpression "inputs.blokebot.packages.${pkgs.stdenv.hostPlatform.system}.blokebot-site";
+      description = "BlokeBot public site package to run.";
     };
 
-    networking.firewall.allowedTCPPorts = lib.optional cfg.openFirewall cfg.port;
+    listenAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "Address on which the BlokeBot public site listens.";
+    };
 
-    systemd.tmpfiles.rules = [ "d ${stateDir} 0700 blokebot blokebot -" ];
-
-    systemd.services.blokebot = {
-      description = "BlokeBot Twitch bot and admin dashboard";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-
-      environment =
-        lib.mapAttrs (
-          _: value: if lib.isBool value then lib.boolToString value else toString value
-        ) cfg.environment
-        // {
-          ASPNETCORE_ENVIRONMENT = "Production";
-          ASPNETCORE_URLS = "http://${cfg.listenAddress}:${toString cfg.port}";
-          BlokeBot__DatabasePath = "${stateDir}/blokebot.db";
-          TwitchBot__Identity__TokenCachePath = "${stateDir}/twitch.tokens.json";
-        };
-
-      serviceConfig = {
-        ExecStart = "${lib.getExe cfg.package} serve";
-        User = "blokebot";
-        Group = "blokebot";
-        WorkingDirectory = stateDir;
-        Restart = "on-failure";
-        UMask = "0077";
-
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        ProtectHome = true;
-        ProtectSystem = "strict";
-        ReadWritePaths = [ stateDir ];
-      }
-      // lib.optionalAttrs (cfg.environmentFile != null) {
-        EnvironmentFile = cfg.environmentFile;
-      };
+    port = lib.mkOption {
+      type = lib.types.port;
+      default = 8081;
+      description = "TCP port on which the BlokeBot public site listens.";
     };
   };
+
+  config = lib.mkMerge [
+    (lib.mkIf botCfg.enable {
+      users.groups.blokebot = { };
+      users.users.blokebot = {
+        isSystemUser = true;
+        group = "blokebot";
+        home = stateDir;
+      };
+
+      networking.firewall.allowedTCPPorts = lib.optional botCfg.openFirewall botCfg.port;
+
+      systemd.tmpfiles.rules = [ "d ${stateDir} 0700 blokebot blokebot -" ];
+
+      systemd.services.blokebot = {
+        description = "BlokeBot Twitch bot and admin dashboard";
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        wantedBy = [ "multi-user.target" ];
+
+        environment =
+          lib.mapAttrs (
+            _: value: if lib.isBool value then lib.boolToString value else toString value
+          ) botCfg.environment
+          // {
+            ASPNETCORE_ENVIRONMENT = "Production";
+            ASPNETCORE_URLS = "http://${botCfg.listenAddress}:${toString botCfg.port}";
+            BlokeBot__DatabasePath = "${stateDir}/blokebot.db";
+            TwitchBot__Identity__TokenCachePath = "${stateDir}/twitch.tokens.json";
+          };
+
+        serviceConfig = {
+          ExecStart = "${lib.getExe botCfg.package} serve";
+          User = "blokebot";
+          Group = "blokebot";
+          WorkingDirectory = stateDir;
+          Restart = "on-failure";
+          UMask = "0077";
+
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+          ProtectHome = true;
+          ProtectSystem = "strict";
+          ReadWritePaths = [ stateDir ];
+        }
+        // lib.optionalAttrs (botCfg.environmentFile != null) {
+          EnvironmentFile = botCfg.environmentFile;
+        };
+      };
+    })
+    (lib.mkIf siteCfg.enable {
+      systemd.services.blokebot-site = {
+        description = "BlokeBot public site";
+        after = [ "network.target" ];
+        wantedBy = [ "multi-user.target" ];
+
+        environment = {
+          ASPNETCORE_ENVIRONMENT = "Production";
+          ASPNETCORE_URLS = "http://${siteCfg.listenAddress}:${toString siteCfg.port}";
+        };
+
+        serviceConfig = {
+          ExecStart = lib.getExe siteCfg.package;
+          DynamicUser = true;
+          Restart = "on-failure";
+          UMask = "0077";
+
+          AmbientCapabilities = [ ];
+          CapabilityBoundingSet = [ ];
+          LockPersonality = true;
+          NoNewPrivileges = true;
+          PrivateDevices = true;
+          PrivateTmp = true;
+          ProtectClock = true;
+          ProtectControlGroups = true;
+          ProtectHome = true;
+          ProtectHostname = true;
+          ProtectKernelLogs = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectSystem = "strict";
+          RestrictAddressFamilies = [
+            "AF_INET"
+            "AF_INET6"
+            "AF_UNIX"
+          ];
+          RestrictNamespaces = true;
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          SystemCallArchitectures = "native";
+        };
+      };
+    })
+  ];
 }
