@@ -45,7 +45,7 @@ public sealed class HostConfigFaultRoutingTests
             builder.OpenComponent<HostConfigPage>(0);
             builder.CloseComponent();
         };
-        var boundary = context.Render<UiFaultRoutingTests.CapturingErrorBoundary>(parameters =>
+        var boundary = context.Render<CapturingErrorBoundary>(parameters =>
             parameters.Add(x => x.ChildContent, content)
         );
         ClickAccessMode(boundary, "Allowed list only");
@@ -59,6 +59,7 @@ public sealed class HostConfigFaultRoutingTests
             boundary.Instance.CapturedException.ShouldBeSameAs(exception)
         );
         var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Error);
         entry.Exception.ShouldBeNull();
         entry.Properties["UiComponent"].ShouldBe(nameof(HostConfigPage));
         entry.Properties["UiOperation"].ShouldBe("PersistAllowModsByDefaultAsync");
@@ -531,40 +532,4 @@ public sealed class HostConfigFaultRoutingTests
             }
         }
     }
-
-    private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
-    {
-        public List<LogEntry> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter
-        )
-        {
-            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
-            Entries.Add(new(exception, formatter(state, exception), properties));
-        }
-    }
-
-    private sealed record LogEntry(
-        Exception? Exception,
-        string Message,
-        IReadOnlyDictionary<string, object?> Properties
-    );
 }

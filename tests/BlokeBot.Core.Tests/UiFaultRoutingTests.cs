@@ -3,8 +3,6 @@ using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Functional;
 using Bunit;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Rendering;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Shouldly;
@@ -198,67 +196,7 @@ public sealed class UiFaultRoutingTests
         }
     }
 
-    public sealed class CapturingErrorBoundary : ErrorBoundaryBase
-    {
-        public Exception? CapturedException { get; private set; }
-
-        protected override Task OnErrorAsync(Exception exception)
-        {
-            CapturedException = exception;
-            return Task.CompletedTask;
-        }
-
-        protected override void BuildRenderTree(RenderTreeBuilder builder)
-        {
-            if (CapturedException is null)
-            {
-                builder.AddContent(0, ChildContent);
-            }
-            else
-            {
-                builder.AddContent(1, "failed");
-            }
-        }
-    }
-
     public sealed record TestExpectedFailure(string Message);
 
     public sealed record TestLoadIdentity(string Value);
-
-    private sealed class RecordingLogger<TCategory> : ILogger<TCategory>
-    {
-        public List<LogEntry> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state)
-            where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter
-        )
-        {
-            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
-                ? values.ToDictionary(pair => pair.Key, pair => pair.Value)
-                : new Dictionary<string, object?>();
-            Entries.Add(new(logLevel, exception, formatter(state, exception), properties));
-        }
-    }
-
-    private sealed record LogEntry(
-        LogLevel Level,
-        Exception? Exception,
-        string Message,
-        IReadOnlyDictionary<string, object?> Properties
-    );
 }
