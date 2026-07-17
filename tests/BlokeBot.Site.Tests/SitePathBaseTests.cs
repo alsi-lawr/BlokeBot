@@ -41,6 +41,9 @@ public sealed class SitePathBaseTests
 
             var stylesheet = await client.GetAsync("/blokebot/site.css");
             stylesheet.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var favicon = await client.GetAsync("/blokebot/favicon.ico");
+            favicon.StatusCode.ShouldBe(HttpStatusCode.OK);
         }
         finally
         {

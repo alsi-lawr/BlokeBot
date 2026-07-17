@@ -163,6 +163,11 @@ public static class BlokeBotApplication
         app.UseAuthentication();
         app.UseAuthorization();
 
+        app.MapMethods(
+            "/favicon.ico",
+            ["GET", "HEAD"],
+            () => Results.Redirect("/blokebot-mark.svg")
+        );
         app.UseStaticFiles();
         app.MapStaticAssets();
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
@@ -230,4 +235,5 @@ public static class BlokeBotApplication
                     .AddRequirements(new AuthSessionCapabilityRequirement(capability))
         );
     }
+
 }

@@ -56,6 +56,11 @@ internal static class SiteApplication
         }
 
         app.UseSerilogRequestLogging();
+        app.MapMethods(
+            "/favicon.ico",
+            ["GET", "HEAD"],
+            () => Results.Redirect("blokebot-mark.svg")
+        );
         app.MapStaticAssets();
         app.MapRazorComponents<App>().DisableAntiforgery();
         return app;
