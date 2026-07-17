@@ -163,6 +163,7 @@ public static class BlokeBotApplication
         app.UseAuthentication();
         app.UseAuthorization();
 
+        app.UseStaticFiles();
         app.MapStaticAssets();
         app.MapRazorComponents<App>().AddInteractiveServerRenderMode().RequireAuthorization();
         app.MapAuthEndpoints();
