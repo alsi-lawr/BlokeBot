@@ -71,6 +71,29 @@ def _wait_for_page(
     raise ContainerSmokeError(f"Container page did not become ready: {last_error}")
 
 
+def _assert_bot_framework_script(port: str) -> None:
+    url = f"http://127.0.0.1:{port}/_framework/blazor.web.js"
+    try:
+        response = urllib.request.urlopen(url, timeout=2)
+    except urllib.error.HTTPError as error:
+        with error:
+            status = error.code
+            content_type = error.headers.get_content_type()
+            body = error.read()
+    else:
+        with response:
+            status = response.status
+            content_type = response.headers.get_content_type()
+            body = response.read()
+
+    if status != 200:
+        raise ContainerSmokeError(f"Unexpected HTTP status {status} from {url}")
+    if content_type not in {"application/javascript", "text/javascript"}:
+        raise ContainerSmokeError(f"Unexpected content type {content_type!r} from {url}")
+    if body.startswith(b"<!DOCTYPE html"):
+        raise ContainerSmokeError(f"{url} returned HTML instead of the Blazor framework script")
+
+
 def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) -> None:
     inspected = _inspect(image)
     config = inspected.get("Config")
@@ -137,6 +160,8 @@ def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) 
         mapping = _docker("port", container, f"{internal_port}/tcp")
         port = mapping.rsplit(":", 1)[-1]
         _wait_for_page(port, markers, accepted_statuses)
+        if kind == "bot":
+            _assert_bot_framework_script(port)
     finally:
         subprocess.run(
             ["docker", "rm", "--force", container],
