@@ -4,10 +4,53 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="BlokeBot brings Twitch commands, guessing games, points and giveaways into one channel dashboard." />
+    <script>
+        (() => {
+            const storedTheme = () => {
+                try {
+                    return window.localStorage.getItem("blokebot.theme");
+                } catch {
+                    return null;
+                }
+            };
+            const savedTheme = storedTheme();
+            const theme = savedTheme === "dark" || savedTheme === "light"
+                ? savedTheme
+                : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.style.colorScheme = theme;
+        })();
+    </script>
     <link rel="stylesheet" href="/site.css" />
     <HeadOutlet />
 </head>
 <body>
     <Routes />
+    <script>
+        (() => {
+            const button = document.querySelector("[data-theme-toggle]");
+            if (!button)
+                return;
+
+            const applyTheme = theme => {
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.style.colorScheme = theme;
+                button.setAttribute("aria-pressed", String(theme === "dark"));
+                button.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+                button.setAttribute("title", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+            };
+
+            applyTheme(document.documentElement.dataset.theme);
+            button.addEventListener("click", () => {
+                const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+                try {
+                    window.localStorage.setItem("blokebot.theme", theme);
+                } catch {
+                }
+                applyTheme(theme);
+            });
+        })();
+    </script>
 </body>
 </html>
