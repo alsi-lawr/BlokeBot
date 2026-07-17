@@ -149,21 +149,9 @@ h3 {
 }
 
 .brand-mark {
-    display: grid;
     width: 2rem;
     aspect-ratio: 1;
-    place-items: center;
-    background: var(--brand);
-    border-radius: 0.55rem 0.55rem 0.55rem 0.15rem;
-}
-
-.brand-mark span {
-    width: 0.6rem;
-    aspect-ratio: 1;
-    background: white;
-    border-radius: 50%;
-    box-shadow: 0.75rem 0 white;
-    transform: translateX(-0.375rem);
+    border-radius: 0.55rem;
 }
 
 .header-actions,

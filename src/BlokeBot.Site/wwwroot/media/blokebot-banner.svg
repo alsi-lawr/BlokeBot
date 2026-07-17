@@ -1,6 +1,6 @@
 <svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">BlokeBot</title>
-  <desc id="desc">BlokeBot wordmark beside an abstract pair of connected chat panels.</desc>
+  <desc id="desc">BlokeBot wordmark beside Blokedroid, the blocky robot mascot.</desc>
   <defs>
     <linearGradient id="backdrop" x1="40" y1="20" x2="1160" y2="300" gradientUnits="userSpaceOnUse">
       <stop stop-color="#0F172A"/>
@@ -17,17 +17,51 @@
     <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
       <path d="M32 0H0V32" stroke="#94A3B8" stroke-opacity="0.07"/>
     </pattern>
+    <linearGradient id="droidBodyShade" x1="128" y1="96" x2="384" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8fd46f"/>
+      <stop offset="1" stop-color="#3f8f46"/>
+    </linearGradient>
+    <linearGradient id="droidVisorShade" x1="166" y1="160" x2="346" y2="222" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f2937"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+    <filter id="droidSoftShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
   </defs>
 
   <rect x="2" y="2" width="1196" height="316" rx="38" fill="url(#backdrop)" stroke="#334155" stroke-width="4"/>
   <rect x="2" y="2" width="1196" height="316" rx="38" fill="url(#grid)"/>
 
   <g aria-hidden="true">
-    <rect x="72" y="52" width="232" height="216" rx="54" fill="#020617" fill-opacity="0.62" stroke="#475569" stroke-width="2"/>
-    <path d="M104 82C104 69.85 113.85 60 126 60H241C260.33 60 276 75.67 276 95V139C276 158.33 260.33 174 241 174H168L128 202V174H126C113.85 174 104 164.15 104 152V82Z" fill="url(#violet)"/>
-    <path d="M116 166C116 146.67 131.67 131 151 131H238C257.33 131 273 146.67 273 166V211C273 223.15 263.15 233 251 233H247V260L210 233H151C131.67 233 116 217.33 116 198V166Z" fill="url(#teal)" stroke="#5EEAD4" stroke-opacity="0.5" stroke-width="2"/>
-    <path d="M151 164H225M151 186H207" stroke="#ECFEFF" stroke-width="10" stroke-linecap="round"/>
-    <circle cx="246" cy="102" r="9" fill="#F5F3FF"/>
+    <g transform="translate(80 52) scale(0.421875)" filter="url(#droidSoftShadow)">
+      <rect width="512" height="512" rx="48" fill="#101820"/>
+      <path d="M184 104 L144 54" stroke="#79c85e" stroke-width="18" stroke-linecap="round"/>
+      <path d="M328 104 L368 54" stroke="#79c85e" stroke-width="18" stroke-linecap="round"/>
+      <rect x="128" y="32" width="38" height="38" rx="8" fill="#9ee37d"/>
+      <rect x="346" y="32" width="38" height="38" rx="8" fill="#9ee37d"/>
+      <rect x="112" y="96" width="288" height="154" rx="26" fill="url(#droidBodyShade)" stroke="#b7f59d" stroke-width="8"/>
+      <rect x="76" y="142" width="42" height="76" rx="12" fill="#4f9f4e" stroke="#b7f59d" stroke-width="6"/>
+      <rect x="394" y="142" width="42" height="76" rx="12" fill="#4f9f4e" stroke="#b7f59d" stroke-width="6"/>
+      <rect x="156" y="148" width="200" height="72" rx="18" fill="url(#droidVisorShade)" stroke="#d6ffca" stroke-width="6"/>
+      <rect x="188" y="170" width="42" height="28" rx="6" fill="#98f5ff"/>
+      <rect x="282" y="170" width="42" height="28" rx="6" fill="#98f5ff"/>
+      <rect x="236" y="202" width="40" height="8" rx="4" fill="#87c7cd" opacity="0.55"/>
+      <rect x="214" y="244" width="84" height="34" rx="8" fill="#34783b"/>
+      <rect x="136" y="270" width="240" height="140" rx="24" fill="url(#droidBodyShade)" stroke="#b7f59d" stroke-width="8"/>
+      <rect x="178" y="300" width="156" height="72" rx="14" fill="#2f6d38" stroke="#9ee37d" stroke-width="5"/>
+      <rect x="202" y="320" width="34" height="34" rx="8" fill="#99f178"/>
+      <rect x="250" y="320" width="60" height="12" rx="6" fill="#b7f59d"/>
+      <rect x="250" y="344" width="44" height="12" rx="6" fill="#7edc67"/>
+      <rect x="76" y="286" width="54" height="112" rx="16" fill="#4f9f4e" stroke="#b7f59d" stroke-width="6"/>
+      <rect x="382" y="286" width="54" height="112" rx="16" fill="#4f9f4e" stroke="#b7f59d" stroke-width="6"/>
+      <rect x="62" y="392" width="68" height="42" rx="12" fill="#7edc67"/>
+      <rect x="382" y="392" width="68" height="42" rx="12" fill="#7edc67"/>
+      <rect x="172" y="404" width="62" height="58" rx="12" fill="#3f8f46"/>
+      <rect x="278" y="404" width="62" height="58" rx="12" fill="#3f8f46"/>
+      <rect x="148" y="452" width="92" height="36" rx="10" fill="#7edc67"/>
+      <rect x="272" y="452" width="92" height="36" rx="10" fill="#7edc67"/>
+    </g>
   </g>
 
   <g fill="#F8FAFC">
