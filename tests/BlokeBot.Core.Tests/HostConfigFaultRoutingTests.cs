@@ -107,18 +107,17 @@ public sealed class HostConfigFaultRoutingTests
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var clock = new ManualTimeProvider();
         ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
+        TestEventBusRecording<AppEventKind>? intentionalEventing = null;
         if (runtimeNotificationFails)
         {
-            context
-                .Services.GetRequiredService<EventBus<AppEventKind>>()
-                .Subscribe(
-                    AppEventKind.HostedChannelsChanged,
-                    ObserverIdentity.Named("Test.HostConfig.CurrentFailure"),
-                    (_, _) =>
-                        ValueTask.FromException(
-                            new InvalidOperationException("runtime unavailable")
-                        )
-                );
+            intentionalEventing = TestEventBus.CreateContinueAndRecord<AppEventKind>();
+            context.Services.AddSingleton(intentionalEventing.Events);
+            intentionalEventing.Events.Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostConfig.CurrentFailure"),
+                (_, _) =>
+                    ValueTask.FromException(new InvalidOperationException("runtime unavailable"))
+            );
         }
 
         var page = RenderHostConfigPage(context);
@@ -153,6 +152,14 @@ public sealed class HostConfigFaultRoutingTests
                 ? new HostModAccessSaveFailure.RuntimeNotificationFailed(1, 1).Message
                 : new HostModAccessSaveFailure.HostNotFound().Message
         );
+        if (intentionalEventing is not null)
+        {
+            intentionalEventing.Reports.Count.ShouldBe(2);
+            intentionalEventing.Reports.ShouldAllBe(report =>
+                report.Observer == ObserverIdentity.Named("Test.HostConfig.CurrentFailure")
+                && report.FailureType == typeof(InvalidOperationException).FullName
+            );
+        }
     }
 
     private static IRenderedComponent<HostConfigPage> RenderHostConfigPage(BunitContext context)
