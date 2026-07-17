@@ -161,7 +161,11 @@ packagers:
     title: BlokeBot
   winget:
     active: ALWAYS
-    skipPublishing: true
+    repository:
+      owner: alsi-lawr
+      name: winget-pkgs
+      branch: master
+      branchPush: winget-blokebot-v{{projectVersion}}
     downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
     templateDirectory: packaging/jreleaser/templates/winget
     author: BlokeBot contributors
