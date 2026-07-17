@@ -12,295 +12,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  package:
+    uses: ./.github/workflows/package.yml
+    permissions:
+      contents: read
+
   validation:
-    name: Reuse branch and pull-request validation
+    needs: package
     uses: ./.github/workflows/validation.yml
-    permissions:
-      contents: read
-
-  version:
-    name: Validate and compare the release version
-    needs: validation
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      revision: ${{ steps.version.outputs.revision }}
-    env:
-      JRELEASER_IMAGE: jreleaser/jreleaser-slim@sha256:18f1e6106f1a540348cd0aafdb600702397c6873ce1ab5bfc0ad25082d13db5f
-    steps:
-      - name: Check out the immutable release commit
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
-        with:
-          dotnet-version: 10.0.301
-      - name: Install pinned Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
-        with:
-          extra_nix_config: experimental-features = nix-command flakes
-      - name: Derive one strict X.Y.Z version
-        id: version
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="$GITHUB_REF_NAME"
-          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "Tag is not strict vX.Y.Z: $tag" >&2
-            exit 1
-          fi
-          version="${tag#v}"
-          test "v$version" = "$tag"
-          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $tag already exists; refusing to overwrite it." >&2
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-      - name: Compare .NET CLI output
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          dotnet publish src/BlokeBot/BlokeBot.csproj \
-            --configuration Release \
-            --runtime linux-x64 \
-            --self-contained false \
-            --output artifacts/version-check \
-            -p:Version="$VERSION" \
-            -p:SourceRevisionId="$GITHUB_SHA"
-          test "$(artifacts/version-check/blokebot version)" = "blokebot $VERSION"
-      - name: Compare Nix package version
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: test "$(BLOKEBOT_VERSION="$VERSION" nix eval --impure --raw .#packages.x86_64-linux.blokebot.version)" = "$VERSION"
-      - name: Compare JReleaser project version
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
-          JRELEASER_GITHUB_TOKEN: validation-only
-        run: |
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -v "$PWD:/workspace" \
-            -e JRELEASER_PROJECT_VERSION \
-            -e JRELEASER_GITHUB_TOKEN \
-            "$JRELEASER_IMAGE" \
-            config --strict --full --reproducible \
-            --basedir /workspace \
-            --config-file packaging/jreleaser/jreleaser.yml
-          test "$(sed -n 's/^projectVersion=//p' out/jreleaser/output.properties)" = "$VERSION"
-
-  native-publish:
-    name: Publish ${{ matrix.rid }} directory
-    needs: version
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rid: linux-x64
-            runner: ubuntu-24.04
-            machine: x86_64
-            executable: artifacts/publish/linux-x64/blokebot
-          - rid: linux-arm64
-            runner: ubuntu-24.04-arm
-            machine: aarch64
-            executable: artifacts/publish/linux-arm64/blokebot
-          - rid: osx-arm64
-            runner: macos-15
-            machine: arm64
-            executable: artifacts/publish/osx-arm64/blokebot
-          - rid: win-x64
-            runner: windows-2025
-            machine: amd64
-            executable: artifacts/publish/win-x64/blokebot.exe
-          - rid: win-arm64
-            runner: windows-11-arm
-            machine: arm64
-            executable: artifacts/publish/win-arm64/blokebot.exe
-    steps:
-      - name: Check out the immutable release commit
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - name: Set up .NET 10
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
-        with:
-          dotnet-version: 10.0.301
-      - name: Confirm the native runner architecture
-        shell: pwsh
-        run: >-
-          python -c "import platform, sys; actual = platform.machine().lower(); expected = '${{ matrix.machine }}'; print(f'runner architecture: {actual}'); sys.exit(0 if actual == expected else 1)"
-      - name: Publish the self-contained untrimmed directory
-        shell: pwsh
-        run: >-
-          dotnet publish src/BlokeBot/BlokeBot.csproj
-          --configuration Release
-          --runtime "${{ matrix.rid }}"
-          --self-contained true
-          --output "artifacts/publish/${{ matrix.rid }}"
-          -p:Version="${{ needs.version.outputs.version }}"
-          -p:SourceRevisionId="${{ needs.version.outputs.revision }}"
-          -p:DebugSymbols=false
-          -p:DebugType=None
-          -p:PublishTrimmed=false
-          -p:PublishSingleFile=false
-      - name: Smoke version, help, and offline serve
-        shell: pwsh
-        run: >-
-          python packaging/smoke/native_smoke.py
-          "${{ matrix.executable }}"
-          --version "${{ needs.version.outputs.version }}"
-      - name: Upload the RID publish directory
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: publish-${{ matrix.rid }}
-          path: artifacts/publish
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
-
-  release-assets:
-    name: Assemble, checksum, prepare, and attest release assets
-    needs:
-      - version
-      - native-publish
-      - docker-hub-gate
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    env:
-      JRELEASER_IMAGE: jreleaser/jreleaser-slim@sha256:18f1e6106f1a540348cd0aafdb600702397c6873ce1ab5bfc0ad25082d13db5f
-      JRELEASER_PROJECT_VERSION: ${{ needs.version.outputs.version }}
-      JRELEASER_GITHUB_TOKEN: validation-only
-    steps:
-      - name: Check out release packaging
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - name: Download all five publish directories
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: publish-*
-          path: artifacts/publish
-          merge-multiple: true
-      - name: Validate the downloaded RID inventory
-        run: |
-          find artifacts/publish -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort > artifacts/publish-rids.txt
-          cat > artifacts/expected-publish-rids.txt <<'EOF'
-          linux-arm64
-          linux-x64
-          osx-arm64
-          win-arm64
-          win-x64
-          EOF
-          diff -u artifacts/expected-publish-rids.txt artifacts/publish-rids.txt
-      - name: Run JReleaser assembly
-        run: |
-          docker run --rm --user "$(id -u):$(id -g)" \
-            -v "$PWD:/workspace" \
-            -e JRELEASER_PROJECT_VERSION \
-            -e JRELEASER_GITHUB_TOKEN \
-            "$JRELEASER_IMAGE" \
-            assemble --strict --reproducible \
-            --basedir /workspace \
-            --config-file packaging/jreleaser/jreleaser.yml
-      - name: Remove nondeterministic ZIP extra fields with standard tools
-        run: |
-          for archive in out/jreleaser/assemble/blokebot-zip/archive/*.zip; do
-            archive=$(realpath "$archive")
-            temporary=$(mktemp -d)
-            normalized="${archive%.zip}.normalized.zip"
-            unzip -q "$archive" -d "$temporary"
-            find "$temporary" -exec touch -h -d '2026-01-01T00:00:00Z' {} +
-            (cd "$temporary" && find . -mindepth 1 -print | LC_ALL=C sort | zip -X -y -q "$normalized" -@)
-            mv "$normalized" "$archive"
-            rm -rf "$temporary"
-          done
-      - name: Run JReleaser checksum and package preparation
-        run: |
-          for phase in checksum prepare; do
-            docker run --rm --user "$(id -u):$(id -g)" \
-              -v "$PWD:/workspace" \
-              -e JRELEASER_PROJECT_VERSION \
-              -e JRELEASER_GITHUB_TOKEN \
-              "$JRELEASER_IMAGE" \
-              "$phase" --strict --reproducible \
-              --basedir /workspace \
-              --config-file packaging/jreleaser/jreleaser.yml
-          done
-      - name: Materialize and validate the exact release inventory
-        run: |
-          mkdir -p artifacts/release artifacts/package-metadata
-          find out/jreleaser/assemble -maxdepth 4 -type f \
-            \( -name '*.tar.gz' -o -name '*.zip' \) \
-            -exec cp {} artifacts/release/ \;
-          cp out/jreleaser/checksums/checksums_sha256.txt artifacts/release/checksums_sha256.txt
-          cmp out/jreleaser/checksums/checksums_sha256.txt artifacts/release/checksums_sha256.txt
-          cp -R out/jreleaser/prepare/. artifacts/package-metadata/
-
-          find artifacts/release -maxdepth 1 -type f -printf '%f\n' | sort > artifacts/release-inventory.txt
-          printf '%s\n' \
-            "blokebot-v${JRELEASER_PROJECT_VERSION}-linux-arm64.tar.gz" \
-            "blokebot-v${JRELEASER_PROJECT_VERSION}-linux-x64.tar.gz" \
-            "blokebot-v${JRELEASER_PROJECT_VERSION}-osx-arm64.zip" \
-            "blokebot-v${JRELEASER_PROJECT_VERSION}-win-arm64.zip" \
-            "blokebot-v${JRELEASER_PROJECT_VERSION}-win-x64.zip" \
-            checksums_sha256.txt \
-            > artifacts/expected-release-inventory.txt
-          diff -u artifacts/expected-release-inventory.txt artifacts/release-inventory.txt
-          (cd artifacts/release && sha256sum --check checksums_sha256.txt)
-          test "$(sed -n 's/^projectVersion=//p' out/jreleaser/output.properties)" = "$JRELEASER_PROJECT_VERSION"
-          grep -F "blokebot-v${JRELEASER_PROJECT_VERSION}-osx-arm64.zip" artifacts/package-metadata/blokebot/brew/Formula/blokebot.rb
-          grep -F 'Architecture: x64' "artifacts/package-metadata/blokebot/winget/manifests/a/alsi-lawr/BlokeBot/${JRELEASER_PROJECT_VERSION}/alsi-lawr.BlokeBot.installer.yaml"
-      - name: Attest the immutable release files
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-path: artifacts/release/*
-      - name: Upload release assets
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: release-assets-${{ needs.version.outputs.version }}
-          path: artifacts/release
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 30
-      - name: Upload reviewable package metadata
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: package-metadata-${{ needs.version.outputs.version }}
-          path: artifacts/package-metadata
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 30
-      - name: Upload the JReleaser publication workspace
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: jreleaser-workspace-${{ needs.version.outputs.version }}
-          path: out/jreleaser
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 30
+    with:
+      version: ${{ needs.package.outputs.version }}
 
   github-release:
-    name: Create the no-overwrite GitHub release
+    name: Create the GitHub release
     needs:
-      - version
-      - release-assets
+      - package
+      - validation
       - docker-hub-gate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
     steps:
-      - name: Download attested release assets
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: Download release assets
+        uses: actions/download-artifact@v4
         with:
-          name: release-assets-${{ needs.version.outputs.version }}
+          name: release-assets-${{ needs.package.outputs.version }}
           path: artifacts/release
-      - name: Create the immutable release
+      - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
           if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release v$VERSION already exists; refusing to overwrite it." >&2
@@ -316,22 +57,22 @@ jobs:
   package-homebrew-test:
     name: Test the Homebrew lifecycle
     needs:
-      - version
+      - package
       - github-release
     runs-on: macos-15
     permissions:
       contents: read
     steps:
       - name: Check out smoke tooling
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@v6
       - name: Download JReleaser package metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: package-metadata-${{ needs.version.outputs.version }}
+          name: package-metadata-${{ needs.package.outputs.version }}
           path: artifacts/package-metadata
       - name: Install, smoke, reinstall, and uninstall the formula
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
           state_directory="$HOME/Library/Application Support/BlokeBot"
           mkdir -p "$state_directory"
@@ -350,99 +91,31 @@ jobs:
   package-windows-test:
     name: Test Scoop and Chocolatey lifecycles
     needs:
-      - version
+      - package
       - github-release
     runs-on: windows-2025
     permissions:
       contents: read
     steps:
       - name: Check out smoke tooling
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@v6
       - name: Download JReleaser package metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: package-metadata-${{ needs.version.outputs.version }}
+          name: package-metadata-${{ needs.package.outputs.version }}
           path: artifacts/package-metadata
-      - name: Install pinned Scoop from verified official content
+      - name: Install Scoop
         shell: pwsh
-        env:
-          SCOOP_INSTALLER_COMMIT: b0ee913725139b816f9178163af0aecdba07a7ed
-          SCOOP_INSTALLER_SHA256: 48f6ea398b3a3fa26fae0093d37bd85b13e7eaa5d1d4a3e208408768408e35ae
-          SCOOP_COMMIT: b588a06e41d920d2123ec70aee682bae14935939
-          SCOOP_ARCHIVE_SHA256: 630206995f30866a0b25b00c14c74be9ef9b79c4911f72f6efd2625cfe19a645
-          SCOOP_MAIN_COMMIT: 76b24868f4295551f741a1c7ff711975eb89e7dc
-          SCOOP_MAIN_ARCHIVE_SHA256: 9fbb4d1c07aff3c1222ab96688a00bb53662a87323ad3246b7185fc55ab8ee1e
         run: |
-          $ErrorActionPreference = 'Stop'
           Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
-
-          $installer = Join-Path $env:RUNNER_TEMP 'scoop-install.ps1'
-          $scoopArchive = Join-Path $env:RUNNER_TEMP 'scoop.zip'
-          $mainArchive = Join-Path $env:RUNNER_TEMP 'scoop-main.zip'
-          $downloads = @(
-              @{
-                  Uri = "https://raw.githubusercontent.com/ScoopInstaller/Install/$env:SCOOP_INSTALLER_COMMIT/install.ps1"
-                  Path = $installer
-                  Sha256 = $env:SCOOP_INSTALLER_SHA256
-              },
-              @{
-                  Uri = "https://github.com/ScoopInstaller/Scoop/archive/$env:SCOOP_COMMIT.zip"
-                  Path = $scoopArchive
-                  Sha256 = $env:SCOOP_ARCHIVE_SHA256
-              },
-              @{
-                  Uri = "https://github.com/ScoopInstaller/Main/archive/$env:SCOOP_MAIN_COMMIT.zip"
-                  Path = $mainArchive
-                  Sha256 = $env:SCOOP_MAIN_ARCHIVE_SHA256
-              }
-          )
-          foreach ($download in $downloads) {
-              Invoke-WebRequest -Uri $download.Uri -OutFile $download.Path
-              $actual = (Get-FileHash -Algorithm SHA256 $download.Path).Hash.ToLowerInvariant()
-              if ($actual -ne $download.Sha256) {
-                  throw "SHA-256 mismatch for $($download.Uri): $actual"
-              }
-          }
-
-          $scoopArchiveUri = [Uri]::new((Resolve-Path $scoopArchive).Path).AbsoluteUri
-          $mainArchiveUri = [Uri]::new((Resolve-Path $mainArchive).Path).AbsoluteUri
-          $installerContent = Get-Content -Raw $installer
-          $installerContent = $installerContent.Replace(
-              "if (Test-CommandAvailable('git')) {",
-              'if ($False) {'
-          ).Replace(
-              "`$SCOOP_PACKAGE_REPO = 'https://github.com/ScoopInstaller/Scoop/archive/master.zip'",
-              "`$SCOOP_PACKAGE_REPO = '$scoopArchiveUri'"
-          ).Replace(
-              "`$SCOOP_MAIN_BUCKET_REPO = 'https://github.com/ScoopInstaller/Main/archive/master.zip'",
-              "`$SCOOP_MAIN_BUCKET_REPO = '$mainArchiveUri'"
-          )
-          if ($installerContent.Contains('archive/master.zip') -or $installerContent.Contains("if (Test-CommandAvailable('git')) {")) {
-              throw 'Failed to bind the verified Scoop installer to the verified archives.'
-          }
-          Set-Content -Path $installer -Value $installerContent -Encoding utf8 -NoNewline
-          $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
-          $isAdministrator = $principal.IsInRole(
-              [Security.Principal.WindowsBuiltInRole]::Administrator
-          )
-          if ($isAdministrator) {
-              & $installer -RunAsAdmin
-              $installerSucceeded = $?
-          } else {
-              & $installer
-              $installerSucceeded = $?
-          }
-          if (-not $installerSucceeded) { throw 'Scoop installer failed.' }
-
+          Invoke-RestMethod https://get.scoop.sh | Invoke-Expression
           $shims = Join-Path $env:USERPROFILE 'scoop\shims'
           $env:PATH = "$shims;$env:PATH"
           $shims | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          scoop help | Out-Null
-          if (-not $?) { throw 'The pinned Scoop installation is unusable.' }
       - name: Test the mandatory Scoop lifecycle
         shell: pwsh
         run: |
-          $version = '${{ needs.version.outputs.version }}'
+          $version = '${{ needs.package.outputs.version }}'
           $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
@@ -462,7 +135,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '${{ needs.version.outputs.version }}'
+          $version = '${{ needs.package.outputs.version }}'
           $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
@@ -488,82 +161,30 @@ jobs:
   package-winget-test:
     name: Test the WinGet lifecycle on a Windows client
     needs:
-      - version
+      - package
       - github-release
     runs-on: windows-11-arm
     permissions:
       contents: read
     steps:
       - name: Check out smoke tooling
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@v6
       - name: Download JReleaser package metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: package-metadata-${{ needs.version.outputs.version }}
+          name: package-metadata-${{ needs.package.outputs.version }}
           path: artifacts/package-metadata
-      - name: Require a working runner WinGet client or install a verified pinned fallback
+      - name: Require the runner WinGet client
         shell: pwsh
-        env:
-          WINGET_VERSION: 1.29.280
-          WINGET_BUNDLE_SHA256: 0809fa9f52e395d6e7de692331dce847ac991952675116bb4d8aae2ddcc20946
-          WINGET_DEPENDENCIES_SHA256: 3bbfcaa5cb011c48fac48d896d64a5c7c6898859a9f3d01555c8cd000f4e2962
         run: |
-          $ErrorActionPreference = 'Stop'
-          $existing = Get-Command winget -ErrorAction SilentlyContinue
-          if ($null -ne $existing) {
-              $actualVersion = (& $existing.Source --version).Trim()
-              if ($LASTEXITCODE -ne 0 -or $actualVersion -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
-                  throw "The runner-provided WinGet client is unusable: $actualVersion"
-              }
-              Write-Host "Using runner-provided WinGet $actualVersion."
-          } else {
-              $releaseBase = "https://github.com/microsoft/winget-cli/releases/download/v$env:WINGET_VERSION"
-              $bundle = Join-Path $env:RUNNER_TEMP 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'
-              $dependenciesArchive = Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies.zip'
-              $dependenciesDirectory = Join-Path $env:RUNNER_TEMP 'DesktopAppInstaller_Dependencies'
-              $downloads = @(
-                  @{
-                      Uri = "$releaseBase/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-                      Path = $bundle
-                      Sha256 = $env:WINGET_BUNDLE_SHA256
-                  },
-                  @{
-                      Uri = "$releaseBase/DesktopAppInstaller_Dependencies.zip"
-                      Path = $dependenciesArchive
-                      Sha256 = $env:WINGET_DEPENDENCIES_SHA256
-                  }
-              )
-              foreach ($download in $downloads) {
-                  Invoke-WebRequest -Uri $download.Uri -OutFile $download.Path
-                  $actual = (Get-FileHash -Algorithm SHA256 $download.Path).Hash.ToLowerInvariant()
-                  if ($actual -ne $download.Sha256) {
-                      throw "SHA-256 mismatch for $($download.Uri): $actual"
-                  }
-              }
-
-              Expand-Archive -Path $dependenciesArchive -DestinationPath $dependenciesDirectory
-              $dependencyPaths = @(
-                  Get-ChildItem -Path (Join-Path $dependenciesDirectory 'arm64') -Filter '*.appx' -File |
-                      Select-Object -ExpandProperty FullName
-              )
-              if ($dependencyPaths.Count -eq 0) { throw 'The pinned WinGet release has no ARM64 dependencies.' }
-              Add-AppxPackage -Path $bundle -DependencyPath $dependencyPaths
-
-              $package = Get-AppxPackage -Name Microsoft.DesktopAppInstaller |
-                  Sort-Object Version -Descending |
-                  Select-Object -First 1
-              if ($null -eq $package) { throw 'The pinned WinGet package was not installed.' }
-              $package.InstallLocation | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-              $env:PATH = "$($package.InstallLocation);$env:PATH"
-              $actualVersion = (winget --version).Trim()
-              if ($LASTEXITCODE -ne 0 -or $actualVersion -ne "v$env:WINGET_VERSION") {
-                  throw "Unexpected WinGet version after pinned installation: $actualVersion"
-              }
-          }
+          $client = Get-Command winget -ErrorAction SilentlyContinue
+          if ($null -eq $client) { throw 'WinGet is not available on this runner.' }
+          & $client.Source --version
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet is unusable on this runner.' }
       - name: Validate and test the mandatory WinGet lifecycle
         shell: pwsh
         run: |
-          $version = '${{ needs.version.outputs.version }}'
+          $version = '${{ needs.package.outputs.version }}'
           $stateDirectory = Join-Path $env:LOCALAPPDATA 'BlokeBot'
           New-Item -ItemType Directory -Force $stateDirectory | Out-Null
           Set-Content (Join-Path $stateDirectory 'marker') 'preserve'
@@ -586,22 +207,22 @@ jobs:
   publish-homebrew-scoop:
     name: Publish Homebrew and Scoop metadata when authorised
     needs:
-      - version
+      - package
       - package-homebrew-test
       - package-windows-test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     env:
-      JRELEASER_IMAGE: jreleaser/jreleaser-slim@sha256:18f1e6106f1a540348cd0aafdb600702397c6873ce1ab5bfc0ad25082d13db5f
-      JRELEASER_PROJECT_VERSION: ${{ needs.version.outputs.version }}
+      JRELEASER_IMAGE: jreleaser/jreleaser-slim:1.25.0
+      JRELEASER_PROJECT_VERSION: ${{ needs.package.outputs.version }}
     steps:
       - name: Check out publication configuration
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@v6
       - name: Download the prepared JReleaser workspace
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: jreleaser-workspace-${{ needs.version.outputs.version }}
+          name: jreleaser-workspace-${{ needs.package.outputs.version }}
           path: out/jreleaser
       - name: Publish only with package-repository authority
         env:
@@ -624,16 +245,16 @@ jobs:
   publish-chocolatey:
     name: Build and optionally submit the Chocolatey package
     needs:
-      - version
+      - package
       - package-windows-test
     runs-on: windows-2025
     permissions:
       contents: read
     steps:
       - name: Download JReleaser package metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: package-metadata-${{ needs.version.outputs.version }}
+          name: package-metadata-${{ needs.package.outputs.version }}
           path: artifacts/package-metadata
       - name: Build the reviewable package
         shell: pwsh
@@ -641,10 +262,10 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/chocolatey | Out-Null
           choco pack artifacts/package-metadata/blokebot/chocolatey/blokebot/blokebot.nuspec --output-directory artifacts/chocolatey
       - name: Upload the reviewable Chocolatey package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
-          name: chocolatey-${{ needs.version.outputs.version }}
-          path: artifacts/chocolatey/blokebot.${{ needs.version.outputs.version }}.nupkg
+          name: chocolatey-${{ needs.package.outputs.version }}
+          path: artifacts/chocolatey/blokebot.${{ needs.package.outputs.version }}.nupkg
           if-no-files-found: error
           retention-days: 30
       - name: Submit only when the API key exists
@@ -656,7 +277,7 @@ jobs:
               Write-Host '::notice::CHOCOLATEY_API_KEY is absent; upload is skipped and availability remains pending.'
               exit 0
           }
-          choco push "artifacts/chocolatey/blokebot.${{ needs.version.outputs.version }}.nupkg" `
+          choco push "artifacts/chocolatey/blokebot.${{ needs.package.outputs.version }}.nupkg" `
             --source https://push.chocolatey.org/ `
             --api-key $env:CHOCOLATEY_API_KEY
           Write-Host '::notice::Chocolatey upload completed; public availability remains pending moderation.'
@@ -664,36 +285,36 @@ jobs:
   winget-bundle:
     name: Produce the manual WinGet submission bundle
     needs:
-      - version
+      - package
       - package-winget-test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
     steps:
       - name: Download JReleaser package metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@v4
         with:
-          name: package-metadata-${{ needs.version.outputs.version }}
+          name: package-metadata-${{ needs.package.outputs.version }}
           path: artifacts/package-metadata
       - name: Create a reviewable, manually submitted bundle
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
           cd artifacts/package-metadata/blokebot/winget
           zip -r "$GITHUB_WORKSPACE/artifacts/winget-pr-$VERSION.zip" manifests
           echo '::notice::No upstream WinGet pull request was created; manual submission and review remain required.'
       - name: Upload the manual WinGet bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@v4
         with:
-          name: winget-manual-${{ needs.version.outputs.version }}
-          path: artifacts/winget-pr-${{ needs.version.outputs.version }}.zip
+          name: winget-manual-${{ needs.package.outputs.version }}
+          path: artifacts/winget-pr-${{ needs.package.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 30
 
   docker-hub-gate:
     name: Require Docker Hub release credentials
-    needs: version
-    runs-on: ubuntu-24.04
+    needs: package
+    runs-on: ubuntu-26.04
     steps:
       - name: Fail unless both mandatory credentials exist
         env:
@@ -706,87 +327,60 @@ jobs:
   docker-hub-images:
     name: Publish Docker Hub ${{ matrix.kind }} ${{ matrix.arch }}
     needs:
-      - version
+      - package
       - docker-hub-gate
     runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
           - kind: blokebot
             arch: amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             dockerfile: packaging/docker/blokebot.Dockerfile
             image: docker.io/alsilawr/blokebot
           - kind: blokebot
             arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             dockerfile: packaging/docker/blokebot.Dockerfile
             image: docker.io/alsilawr/blokebot
           - kind: blokebot-site
             arch: amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             dockerfile: packaging/docker/blokebot-site.Dockerfile
             image: docker.io/alsilawr/blokebot-site
           - kind: blokebot-site
             arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             dockerfile: packaging/docker/blokebot-site.Dockerfile
             image: docker.io/alsilawr/blokebot-site
     steps:
-      - name: Check out the immutable release commit
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Check out the release commit
+        uses: actions/checkout@v6
       - name: Log in to Docker Hub
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: echo "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
-      - name: Build, compare labels, and push the immutable architecture tag
-        id: push
+      - name: Build and push the architecture tag
         env:
-          VERSION: ${{ needs.version.outputs.version }}
-          REVISION: ${{ needs.version.outputs.revision }}
+          VERSION: ${{ needs.package.outputs.version }}
+          REVISION: ${{ needs.package.outputs.revision }}
         run: |
-          reference="${{ matrix.image }}:${VERSION}-${{ matrix.arch }}"
-          if docker manifest inspect "$reference" >/dev/null 2>&1; then
-            echo "Immutable architecture tag already exists: $reference" >&2
-            exit 1
-          fi
           docker build \
             --file "${{ matrix.dockerfile }}" \
-            --tag "$reference" \
+            --tag "${{ matrix.image }}:${VERSION}-${{ matrix.arch }}" \
             --build-arg BLOKEBOT_VERSION="$VERSION" \
             --build-arg SOURCE_REVISION_ID="$REVISION" \
             .
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$reference")" = "$VERSION"
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$reference")" = "$REVISION"
-          docker push "$reference"
-          docker pull "$reference"
-          repository_digest=$(docker image inspect --format '{{ index .RepoDigests 0 }}' "$reference")
-          digest="${repository_digest#*@}"
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          mkdir -p artifacts/digests
-          printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/digests/dockerhub-${{ matrix.kind }}-${{ matrix.arch }}.digest"
-      - name: Upload the architecture digest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: dockerhub-${{ matrix.kind }}-${{ matrix.arch }}
-          path: artifacts/digests/dockerhub-${{ matrix.kind }}-${{ matrix.arch }}.digest
-          if-no-files-found: error
-          retention-days: 7
+          docker push "${{ matrix.image }}:${VERSION}-${{ matrix.arch }}"
 
   docker-hub-manifests:
-    name: Publish and attest Docker Hub manifests
+    name: Publish Docker Hub ${{ matrix.kind }} manifest
     needs:
-      - version
+      - package
       - docker-hub-images
-    runs-on: ubuntu-24.04
-    permissions:
-      id-token: write
-      attestations: write
+    runs-on: ubuntu-26.04
     strategy:
       matrix:
         include:
@@ -795,64 +389,29 @@ jobs:
           - kind: blokebot-site
             image: docker.io/alsilawr/blokebot-site
     steps:
-      - name: Download architecture digests
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: dockerhub-${{ matrix.kind }}-*
-          path: artifacts/digests
-          merge-multiple: true
       - name: Log in to Docker Hub
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: echo "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
-      - name: Publish the immutable multi-architecture tag
-        id: manifest
+      - name: Publish the multi-architecture version tag
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
-          mapfile -t references < <(cat artifacts/digests/*.digest)
-          test "${#references[@]}" -eq 2
-          if docker manifest inspect "${{ matrix.image }}:$VERSION" >/dev/null 2>&1; then
-            echo "Immutable multi-architecture tag already exists: ${{ matrix.image }}:$VERSION" >&2
-            exit 1
-          fi
-          docker buildx imagetools create --tag "${{ matrix.image }}:$VERSION" "${references[@]}"
-          digest=$(docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" --raw \
-            | jq -r '.manifests[] | "\(.platform.os)/\(.platform.architecture)"' \
-            | LC_ALL=C sort > actual-platforms.txt
-          printf '%s\n' linux/amd64 linux/arm64 > expected-platforms.txt
-          diff -u expected-platforms.txt actual-platforms.txt
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          mkdir -p artifacts/final
-          printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/final/dockerhub-${{ matrix.kind }}.digest"
-      - name: Attest the immutable Docker Hub manifest
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.manifest.outputs.digest }}
-          push-to-registry: true
-      - name: Upload the final Docker Hub digest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: final-dockerhub-${{ matrix.kind }}
-          path: artifacts/final/dockerhub-${{ matrix.kind }}.digest
-          if-no-files-found: error
-          retention-days: 7
+          docker buildx imagetools create \
+            --tag "${{ matrix.image }}:$VERSION" \
+            "${{ matrix.image }}:${VERSION}-amd64" \
+            "${{ matrix.image }}:${VERSION}-arm64"
 
   nix-images:
     name: Build, smoke, and publish Nix ${{ matrix.kind }} ${{ matrix.arch }}
     needs:
-      - version
+      - package
       - docker-hub-gate
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -860,94 +419,64 @@ jobs:
           - kind: blokebot
             smoke_kind: bot
             arch: amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             output: blokebot-image
             image: ghcr.io/alsi-lawr/blokebot
           - kind: blokebot
             smoke_kind: bot
             arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             output: blokebot-image
             image: ghcr.io/alsi-lawr/blokebot
           - kind: blokebot-site
             smoke_kind: site
             arch: amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-26.04
             output: blokebot-site-image
             image: ghcr.io/alsi-lawr/blokebot-site
           - kind: blokebot-site
             smoke_kind: site
             arch: arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-26.04-arm
             output: blokebot-site-image
             image: ghcr.io/alsi-lawr/blokebot-site
     steps:
-      - name: Check out the immutable release commit
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - name: Install pinned Nix
-        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: experimental-features = nix-command flakes
-      - name: Build, load, and fully smoke the Nix image
-        id: image
+      - name: Build and smoke the Nix image
         env:
-          VERSION: ${{ needs.version.outputs.version }}
-          REVISION: ${{ needs.version.outputs.revision }}
+          VERSION: ${{ needs.package.outputs.version }}
+          REVISION: ${{ needs.package.outputs.revision }}
         run: |
           BLOKEBOT_VERSION="$VERSION" nix build --impure ".#${{ matrix.output }}" --out-link result-image
           loaded=$(docker load < result-image | sed -n 's/^Loaded image: //p' | tail -n 1)
-          expected_loaded="${{ matrix.image }}:${VERSION}-${{ matrix.arch }}"
-          test "$loaded" = "$expected_loaded"
           python3 packaging/smoke/container_smoke.py \
             --image "$loaded" \
             --kind "${{ matrix.smoke_kind }}" \
             --version "$VERSION" \
             --revision "$REVISION"
-          echo "reference=$loaded" >> "$GITHUB_OUTPUT"
+          docker tag "$loaded" "${{ matrix.image }}:${VERSION}-${{ matrix.arch }}"
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
         run: echo "$GH_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
-      - name: Push the immutable architecture tag
-        id: push
-        run: |
-          reference="${{ steps.image.outputs.reference }}"
-          if docker manifest inspect "$reference" >/dev/null 2>&1; then
-            echo "Immutable architecture tag already exists: $reference" >&2
-            exit 1
-          fi
-          docker push "$reference"
-          docker pull "$reference"
-          repository_digest=$(docker image inspect --format '{{ index .RepoDigests 0 }}' "$reference")
-          digest="${repository_digest#*@}"
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          mkdir -p artifacts/digests
-          printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/digests/ghcr-${{ matrix.kind }}-${{ matrix.arch }}.digest"
-      - name: Attest the immutable architecture digest
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-      - name: Upload the architecture digest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ghcr-${{ matrix.kind }}-${{ matrix.arch }}
-          path: artifacts/digests/ghcr-${{ matrix.kind }}-${{ matrix.arch }}.digest
-          if-no-files-found: error
-          retention-days: 7
+      - name: Push the architecture tag
+        env:
+          VERSION: ${{ needs.package.outputs.version }}
+        run: docker push "${{ matrix.image }}:${VERSION}-${{ matrix.arch }}"
 
   nix-manifests:
-    name: Publish and attest Nix GHCR manifests
+    name: Publish Nix GHCR ${{ matrix.kind }} manifest
     needs:
-      - version
+      - package
       - nix-images
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       packages: write
-      id-token: write
-      attestations: write
     strategy:
       matrix:
         include:
@@ -956,73 +485,34 @@ jobs:
           - kind: blokebot-site
             image: ghcr.io/alsi-lawr/blokebot-site
     steps:
-      - name: Download architecture digests
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: ghcr-${{ matrix.kind }}-*
-          path: artifacts/digests
-          merge-multiple: true
       - name: Log in to GHCR
         env:
           GH_TOKEN: ${{ github.token }}
         run: echo "$GH_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
-      - name: Publish the immutable multi-architecture tag
-        id: manifest
+      - name: Publish the multi-architecture version tag
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
-          mapfile -t references < <(cat artifacts/digests/*.digest)
-          test "${#references[@]}" -eq 2
-          if docker manifest inspect "${{ matrix.image }}:$VERSION" >/dev/null 2>&1; then
-            echo "Immutable multi-architecture tag already exists: ${{ matrix.image }}:$VERSION" >&2
-            exit 1
-          fi
-          docker buildx imagetools create --tag "${{ matrix.image }}:$VERSION" "${references[@]}"
-          digest=$(docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          docker buildx imagetools inspect "${{ matrix.image }}:$VERSION" --raw \
-            | jq -r '.manifests[] | "\(.platform.os)/\(.platform.architecture)"' \
-            | LC_ALL=C sort > actual-platforms.txt
-          printf '%s\n' linux/amd64 linux/arm64 > expected-platforms.txt
-          diff -u expected-platforms.txt actual-platforms.txt
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          mkdir -p artifacts/final
-          printf '%s@%s\n' "${{ matrix.image }}" "$digest" > "artifacts/final/ghcr-${{ matrix.kind }}.digest"
-      - name: Attest the immutable Nix GHCR manifest
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
-        with:
-          subject-name: ${{ matrix.image }}
-          subject-digest: ${{ steps.manifest.outputs.digest }}
-          push-to-registry: true
-      - name: Upload the final Nix GHCR digest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: final-ghcr-${{ matrix.kind }}
-          path: artifacts/final/ghcr-${{ matrix.kind }}.digest
-          if-no-files-found: error
-          retention-days: 7
+          docker buildx imagetools create \
+            --tag "${{ matrix.image }}:$VERSION" \
+            "${{ matrix.image }}:${VERSION}-amd64" \
+            "${{ matrix.image }}:${VERSION}-arm64"
 
   promote-latest:
-    name: Promote latest after all immutable release work succeeds
+    name: Promote the release version to latest
     needs:
-      - version
+      - package
       - github-release
       - publish-homebrew-scoop
       - publish-chocolatey
       - winget-bundle
       - docker-hub-manifests
       - nix-manifests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     permissions:
       contents: write
       packages: write
     steps:
-      - name: Download all final image digests
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          pattern: final-*
-          path: artifacts/final
-          merge-multiple: true
       - name: Log in to Docker Hub and GHCR
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -1031,27 +521,19 @@ jobs:
         run: |
           echo "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
           echo "$GH_TOKEN" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
-      - name: Promote only the recorded immutable manifests
+      - name: Promote the version tags
         env:
-          VERSION: ${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.package.outputs.version }}
         run: |
-          test "$(find artifacts/final -type f -name '*.digest' | wc -l)" -eq 4
-          for record in artifacts/final/*.digest; do
-            immutable=$(cat "$record")
-            image="${immutable%@*}"
-            digest="${immutable#*@}"
-            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-            published=$(docker buildx imagetools inspect "$image:$VERSION" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-            test "$published" = "$digest"
-            docker buildx imagetools create --tag "$image:latest" "$immutable"
-            latest=$(docker buildx imagetools inspect "$image:latest" | sed -n 's/^Digest:[[:space:]]*//p' | head -n 1)
-            test "$latest" = "$digest"
+          for image in \
+            docker.io/alsilawr/blokebot \
+            docker.io/alsilawr/blokebot-site \
+            ghcr.io/alsi-lawr/blokebot \
+            ghcr.io/alsi-lawr/blokebot-site; do
+            docker buildx imagetools create --tag "$image:latest" "$image:$VERSION"
           done
-      - name: Promote the GitHub release to Latest and verify by readback
+      - name: Promote the GitHub release to Latest
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.version.outputs.version }}
-        run: |
-          gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --latest
-          latest_tag=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)
-          test "$latest_tag" = "v$VERSION"
+          VERSION: ${{ needs.package.outputs.version }}
+        run: gh release edit "v$VERSION" --repo "$GITHUB_REPOSITORY" --latest

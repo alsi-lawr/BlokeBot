@@ -1,0 +1,220 @@
+name: Package
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: Release version without the v prefix.
+        value: ${{ jobs.version.outputs.version }}
+      revision:
+        description: Source revision used for the package.
+        value: ${{ jobs.version.outputs.revision }}
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Validate and compare the release version
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      revision: ${{ steps.version.outputs.revision }}
+    env:
+      JRELEASER_IMAGE: jreleaser/jreleaser-slim:1.25.0
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.301
+      - name: Install pinned Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Derive one strict X.Y.Z version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          if [[ ! "$tag" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Tag is not strict vX.Y.Z: $tag" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          test "v$version" = "$tag"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "revision=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - name: Compare .NET CLI output
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet publish src/BlokeBot/BlokeBot.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained false \
+            --output artifacts/version-check \
+            -p:Version="$VERSION" \
+            -p:SourceRevisionId="$GITHUB_SHA"
+          test "$(artifacts/version-check/blokebot version)" = "blokebot $VERSION"
+      - name: Compare Nix package version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: test "$(BLOKEBOT_VERSION="$VERSION" nix eval --impure --raw .#packages.x86_64-linux.blokebot.version)" = "$VERSION"
+      - name: Compare JReleaser project version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          JRELEASER_PROJECT_VERSION: ${{ steps.version.outputs.version }}
+          JRELEASER_GITHUB_TOKEN: validation-only
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/workspace" \
+            -e JRELEASER_PROJECT_VERSION \
+            -e JRELEASER_GITHUB_TOKEN \
+            "$JRELEASER_IMAGE" \
+            config --strict --full --reproducible \
+            --basedir /workspace \
+            --config-file packaging/jreleaser/jreleaser.yml
+          test "$(sed -n 's/^projectVersion=//p' out/jreleaser/output.properties)" = "$VERSION"
+
+  native-publish:
+    name: Publish ${{ matrix.rid }} directory
+    needs: version
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-26.04
+            machine: x86_64
+            executable: artifacts/publish/linux-x64/blokebot
+          - rid: linux-arm64
+            runner: ubuntu-26.04-arm
+            machine: aarch64
+            executable: artifacts/publish/linux-arm64/blokebot
+          - rid: osx-arm64
+            runner: macos-15
+            machine: arm64
+            executable: artifacts/publish/osx-arm64/blokebot
+          - rid: win-x64
+            runner: windows-2025
+            machine: amd64
+            executable: artifacts/publish/win-x64/blokebot.exe
+          - rid: win-arm64
+            runner: windows-11-arm
+            machine: arm64
+            executable: artifacts/publish/win-arm64/blokebot.exe
+    steps:
+      - name: Check out the release commit
+        uses: actions/checkout@v6
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.301
+      - name: Confirm the native runner architecture
+        shell: pwsh
+        run: >-
+          python -c "import platform, sys; actual = platform.machine().lower(); expected = '${{ matrix.machine }}'; print(f'runner architecture: {actual}'); sys.exit(0 if actual == expected else 1)"
+      - name: Publish the self-contained untrimmed directory
+        shell: pwsh
+        run: >-
+          dotnet publish src/BlokeBot/BlokeBot.csproj
+          --configuration Release
+          --runtime "${{ matrix.rid }}"
+          --self-contained true
+          --output "artifacts/publish/${{ matrix.rid }}"
+          -p:Version="${{ needs.version.outputs.version }}"
+          -p:SourceRevisionId="${{ needs.version.outputs.revision }}"
+          -p:DebugSymbols=false
+          -p:DebugType=None
+          -p:PublishTrimmed=false
+          -p:PublishSingleFile=false
+      - name: Smoke version, help, and offline serve
+        shell: pwsh
+        run: >-
+          python packaging/smoke/native_smoke.py
+          "${{ matrix.executable }}"
+          --version "${{ needs.version.outputs.version }}"
+      - name: Upload the RID publish directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-${{ matrix.rid }}
+          path: artifacts/publish
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  release-assets:
+    name: Assemble release assets
+    needs:
+      - version
+      - native-publish
+    runs-on: ubuntu-26.04
+    env:
+      JRELEASER_IMAGE: jreleaser/jreleaser-slim:1.25.0
+      JRELEASER_PROJECT_VERSION: ${{ needs.version.outputs.version }}
+      JRELEASER_GITHUB_TOKEN: validation-only
+    steps:
+      - name: Check out release packaging
+        uses: actions/checkout@v6
+      - name: Download all publish directories
+        uses: actions/download-artifact@v4
+        with:
+          pattern: publish-*
+          path: artifacts/publish
+          merge-multiple: true
+      - name: Assemble archives and package metadata
+        run: |
+          for phase in assemble checksum prepare; do
+            docker run --rm --user "$(id -u):$(id -g)" \
+              -v "$PWD:/workspace" \
+              -e JRELEASER_PROJECT_VERSION \
+              -e JRELEASER_GITHUB_TOKEN \
+              "$JRELEASER_IMAGE" \
+              "$phase" --strict --reproducible \
+              --basedir /workspace \
+              --config-file packaging/jreleaser/jreleaser.yml
+          done
+      - name: Collect release assets and package metadata
+        run: |
+          mkdir -p artifacts/release artifacts/package-metadata
+          find out/jreleaser/assemble -maxdepth 4 -type f \
+            \( -name '*.tar.gz' -o -name '*.zip' \) \
+            -exec cp {} artifacts/release/ \;
+          cp out/jreleaser/checksums/checksums_sha256.txt artifacts/release/
+          cp -R out/jreleaser/prepare/. artifacts/package-metadata/
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ needs.version.outputs.version }}
+          path: artifacts/release
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload package metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-metadata-${{ needs.version.outputs.version }}
+          path: artifacts/package-metadata
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload the JReleaser workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: jreleaser-workspace-${{ needs.version.outputs.version }}
+          path: out/jreleaser
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
