@@ -89,6 +89,13 @@ in
       default = 8081;
       description = "TCP port on which the BlokeBot public site listens.";
     };
+
+    pathBase = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "/blokebot";
+      description = "Optional URL path prefix under which the public site is served.";
+    };
   };
 
   config = lib.mkMerge [
@@ -157,6 +164,9 @@ in
         environment = {
           ASPNETCORE_ENVIRONMENT = "Production";
           ASPNETCORE_URLS = "http://${siteCfg.listenAddress}:${toString siteCfg.port}";
+        }
+        // lib.optionalAttrs (siteCfg.pathBase != null) {
+          BlokeBotSite__PathBase = siteCfg.pathBase;
         };
 
         serviceConfig = {

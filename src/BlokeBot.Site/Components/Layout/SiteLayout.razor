@@ -1,18 +1,19 @@
 @inherits LayoutComponentBase
+@inject NavigationManager Navigation
 
-<a class="skip-link" href="#main-content">Skip to main content</a>
+<a class="skip-link" href="@($"{new Uri(Navigation.Uri).AbsolutePath}#main-content")">Skip to main content</a>
 <header class="site-header">
     <div class="header-inner">
-        <a class="brand" href="/" aria-label="BlokeBot home">
-            <img class="brand-mark" src="/media/blokedroid.svg" alt="" />
+        <a class="brand" href="./" aria-label="BlokeBot home">
+            <img class="brand-mark" src="media/blokedroid.svg" alt="" />
             <span>BlokeBot</span>
         </a>
         <div class="header-actions">
             <nav aria-label="Main navigation">
-                <a href="/how-it-works">How it works</a>
-                <a href="/install">Install</a>
-                <a href="/guide">User guide</a>
-                <a href="/server-owners">Server owners</a>
+                <a href="how-it-works">How it works</a>
+                <a href="install">Install</a>
+                <a href="guide">User guide</a>
+                <a href="server-owners">Server owners</a>
             </nav>
             <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
                 <span class="theme-toggle__sun" aria-hidden="true">☀</span>
@@ -27,6 +28,6 @@
 <footer class="site-footer">
     <div class="footer-inner">
         <p><strong>BlokeBot</strong> is free, open-source, easy to host, and available.</p>
-        <p><a href="/install">Install</a> · <a href="/guide">User guide</a> · <a href="/server-owners">Server owner guide</a></p>
+        <p><a href="install">Install</a> · <a href="guide">User guide</a> · <a href="server-owners">Server owner guide</a></p>
     </div>
 </footer>

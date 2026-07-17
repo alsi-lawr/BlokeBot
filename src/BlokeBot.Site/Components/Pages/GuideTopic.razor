@@ -88,6 +88,8 @@
 
     protected override void OnParametersSet()
     {
-        _page = SiteGuideCatalog.Get(new Uri(Navigation.Uri).AbsolutePath);
+        var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var relativePath = relativeUri.Split('?', '#')[0];
+        _page = SiteGuideCatalog.Get($"/{relativePath.TrimStart('/')}");
     }
 }

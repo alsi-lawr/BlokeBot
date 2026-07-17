@@ -1,9 +1,12 @@
+@inject NavigationManager Navigation
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="BlokeBot brings Twitch commands, guessing games, points and giveaways into one channel dashboard." />
+    <base href="@Navigation.BaseUri" />
     <script>
         (() => {
             const storedTheme = () => {
@@ -22,7 +25,7 @@
             document.documentElement.style.colorScheme = theme;
         })();
     </script>
-    <link rel="stylesheet" href="/site.css" />
+    <link rel="stylesheet" href="site.css" />
     <HeadOutlet />
 </head>
 <body>

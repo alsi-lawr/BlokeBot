@@ -49,6 +49,12 @@ internal static class SiteApplication
         builder.Services.AddRazorComponents();
 
         var app = builder.Build();
+        var pathBase = app.Configuration["BlokeBotSite:PathBase"];
+        if (!string.IsNullOrWhiteSpace(pathBase))
+        {
+            app.UsePathBase(pathBase);
+        }
+
         app.UseSerilogRequestLogging();
         app.MapStaticAssets();
         app.MapRazorComponents<App>().DisableAntiforgery();

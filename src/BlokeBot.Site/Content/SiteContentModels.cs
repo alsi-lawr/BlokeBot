@@ -21,6 +21,8 @@ internal sealed record SiteGuidePage
 {
     internal required string Route { get; init; }
 
+    internal string Href => Route.TrimStart('/');
+
     internal required string Eyebrow { get; init; }
 
     internal required string Title { get; init; }

@@ -61,7 +61,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Learn the dashboard", "/dashboard")],
+            Next = [new SiteLink("Learn the dashboard", "dashboard")],
         };
 
         yield return new SiteGuidePage
@@ -105,8 +105,8 @@ internal static class SiteGuideCatalog
             ],
             Next =
             [
-                new SiteLink("Manage channels and access", "/channels"),
-                new SiteLink("Connect the bot", "/connect"),
+                new SiteLink("Manage channels and access", "channels"),
+                new SiteLink("Connect the bot", "connect"),
             ],
         };
 
@@ -145,8 +145,8 @@ internal static class SiteGuideCatalog
             ],
             Next =
             [
-                new SiteLink("Connect this channel", "/connect"),
-                new SiteLink("Let moderators help", "/moderators"),
+                new SiteLink("Connect this channel", "connect"),
+                new SiteLink("Let moderators help", "moderators"),
             ],
         };
 
@@ -192,8 +192,8 @@ internal static class SiteGuideCatalog
             ],
             Next =
             [
-                new SiteLink("Choose channel tools", "/tools"),
-                new SiteLink("Troubleshoot a connection", "/troubleshooting"),
+                new SiteLink("Choose channel tools", "tools"),
+                new SiteLink("Troubleshoot a connection", "troubleshooting"),
             ],
         };
 
@@ -221,15 +221,15 @@ internal static class SiteGuideCatalog
                     Heading = "What you can add",
                     Links =
                     [
-                        new SiteLink("Commands and announcements", "/commands"),
-                        new SiteLink("Guessing games", "/guessing"),
-                        new SiteLink("Points", "/points"),
-                        new SiteLink("Giveaways", "/giveaways"),
-                        new SiteLink("Public leaderboards", "/leaderboards"),
+                        new SiteLink("Commands and announcements", "commands"),
+                        new SiteLink("Guessing games", "guessing"),
+                        new SiteLink("Points", "points"),
+                        new SiteLink("Giveaways", "giveaways"),
+                        new SiteLink("Public leaderboards", "leaderboards"),
                     ],
                 },
             ],
-            Next = [new SiteLink("Create a command", "/commands")],
+            Next = [new SiteLink("Create a command", "commands")],
         };
 
         yield return new SiteGuidePage
@@ -271,7 +271,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Choose another tool", "/tools")],
+            Next = [new SiteLink("Choose another tool", "tools")],
         };
 
         yield return new SiteGuidePage
@@ -313,7 +313,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Share a leaderboard", "/leaderboards")],
+            Next = [new SiteLink("Share a leaderboard", "leaderboards")],
         };
 
         yield return new SiteGuidePage
@@ -351,7 +351,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Run a points giveaway", "/giveaways")],
+            Next = [new SiteLink("Run a points giveaway", "giveaways")],
         };
 
         yield return new SiteGuidePage
@@ -393,7 +393,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Review points", "/points")],
+            Next = [new SiteLink("Review points", "points")],
         };
 
         yield return new SiteGuidePage
@@ -431,7 +431,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Run a guessing game", "/guessing")],
+            Next = [new SiteLink("Run a guessing game", "guessing")],
         };
 
         yield return new SiteGuidePage
@@ -465,8 +465,8 @@ internal static class SiteGuideCatalog
             ],
             Next =
             [
-                new SiteLink("Check channel connections", "/connect"),
-                new SiteLink("Open the server owner guide", "/server-owners"),
+                new SiteLink("Check channel connections", "connect"),
+                new SiteLink("Open the server owner guide", "server-owners"),
             ],
         };
 
@@ -505,7 +505,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Manage channels", "/channels")],
+            Next = [new SiteLink("Manage channels", "channels")],
         };
 
         yield return new SiteGuidePage
@@ -533,7 +533,7 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Return to the user guide", "/guide")],
+            Next = [new SiteLink("Return to the user guide", "guide")],
         };
     }
 }
