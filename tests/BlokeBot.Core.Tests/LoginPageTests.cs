@@ -14,6 +14,7 @@ public sealed class LoginPageTests
         page.ShouldContain("<!DOCTYPE html>");
         page.ShouldContain("<title>Sign in to BlokeBot</title>");
         page.ShouldContain("href=\"/app.css\"");
+        page.ShouldContain("href=\"/blokebot-mark.svg\"");
         page.ShouldContain("href=\"/auth/login?start=true\"");
         page.ShouldContain("data-public-leaderboard-form");
         page.ShouldContain("name=\"feature\"");

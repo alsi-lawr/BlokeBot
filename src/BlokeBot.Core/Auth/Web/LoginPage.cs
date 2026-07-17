@@ -91,11 +91,12 @@ internal static class LoginPage
             <!DOCTYPE html>
             <html lang="en">
             <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <title>Sign in to BlokeBot</title>
-                {{_themeScript}}
-                <link rel="stylesheet" href="/app.css" />
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Sign in to BlokeBot</title>
+            <link rel="icon" type="image/svg+xml" href="/blokebot-mark.svg" />
+            {{_themeScript}}
+            <link rel="stylesheet" href="/app.css" />
             </head>
             <body class="min-h-screen bg-background text-foreground">
                 <main class="flex min-h-screen items-center justify-center px-4">

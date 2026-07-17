@@ -34,6 +34,7 @@ public sealed class SitePathBaseTests
             home.ShouldContain("href=\"guide\"");
             home.ShouldContain("src=\"media/blokebot-banner.svg\"");
             home.ShouldContain("href=\"/blokebot/#main-content\"");
+            home.ShouldContain("<link rel=\"icon\" type=\"image/svg+xml\" href=\"blokebot-mark.svg\"");
 
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
