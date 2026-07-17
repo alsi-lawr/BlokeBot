@@ -83,8 +83,7 @@
 
           npmRoot = "src/BlokeBot.Core";
           npmDeps = pkgs.fetchNpmDeps {
-            inherit src;
-            npmRoot = "src/BlokeBot.Core";
+            src = src + "/src/BlokeBot.Core";
             hash = "sha256-LqmXiyTdzKlsubgaD93Zlb9aOoKSQd+7zHcpMcHpbXg=";
           };
           nativeBuildInputs = [
