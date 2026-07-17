@@ -1,4 +1,7 @@
 @inject NavigationManager Navigation
+@{
+    var baseHref = new Uri(Navigation.BaseUri).AbsolutePath;
+}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -6,7 +9,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="BlokeBot brings Twitch commands, guessing games, points and giveaways into one channel dashboard." />
-    <base href="@Navigation.BaseUri" />
+    <base href="@baseHref" />
     <script>
         (() => {
             const storedTheme = () => {

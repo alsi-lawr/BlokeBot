@@ -30,7 +30,7 @@ public sealed class SitePathBaseTests
             using var client = new HttpClient { BaseAddress = new Uri(address) };
 
             var home = await client.GetStringAsync("/blokebot/");
-            home.ShouldContain($"<base href=\"{address}/blokebot/\" />");
+            home.ShouldContain("<base href=\"/blokebot/\" />");
             home.ShouldContain("href=\"guide\"");
             home.ShouldContain("src=\"media/blokebot-banner.svg\"");
             home.ShouldContain("href=\"/blokebot/#main-content\"");
