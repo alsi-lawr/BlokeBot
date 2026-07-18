@@ -79,48 +79,6 @@ internal sealed class DisabledCustomAnnouncementSender : ICustomAnnouncementSend
     }
 }
 
-internal sealed class PublicChatCustomAnnouncementSender(PublicChatMessageQueue queue)
-    : ICustomAnnouncementSender
-{
-    public async ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-        CustomAnnouncementDeliveryRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        return await queue.EnqueueAsync(
-            new PublicChatEnqueueCommand
-            {
-                Channel = request.Channel,
-                Message = request.Message,
-                Deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(request.ExpiresAt),
-            },
-            cancellationToken
-        ) switch
-        {
-            PublicChatEnqueueOutcome.Accepted => new AnnouncementEnqueueOutcome.Accepted(),
-            PublicChatEnqueueOutcome.Rejected => new AnnouncementEnqueueOutcome.Rejected(),
-            PublicChatEnqueueOutcome.SafePreEnqueueTransient transient =>
-                new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
-                    new AnnouncementEnqueueFailureType(transient.Cause.GetType().Name)
-                ),
-            PublicChatEnqueueOutcome.Ambiguous ambiguous =>
-                new AnnouncementEnqueueOutcome.Ambiguous(
-                    new AnnouncementEnqueueFailureType(ambiguous.Cause.GetType().Name)
-                ),
-            PublicChatEnqueueOutcome.Unexpected unexpected =>
-                new AnnouncementEnqueueOutcome.Unexpected(
-                    new AnnouncementEnqueueFailureType(unexpected.Cause.GetType().Name)
-                ),
-            _ => throw new UnreachableException("Unknown public-chat enqueue outcome."),
-        };
-    }
-
-    private static AnnouncementEnqueueFailureType FailureType(Exception exception)
-    {
-        return new(exception.GetType().Name);
-    }
-}
-
 internal sealed class TwitchAnnouncementCustomAnnouncementSender(
     PublicChatMessageQueue queue,
     ITwitchAnnouncementAccessService access,

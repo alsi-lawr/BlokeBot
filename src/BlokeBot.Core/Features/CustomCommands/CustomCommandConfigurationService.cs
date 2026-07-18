@@ -1,6 +1,7 @@
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.CustomCommands;
@@ -136,7 +137,13 @@ public sealed class CustomCommandConfigurationService(
             }
         }
 
-        var graphFailure = await graphWriter.WriteAsync(hostId, command, ct);
+        var commandForSave = await DisableUnavailableNativeAnnouncementsAsync(
+            db,
+            hostId,
+            command,
+            ct
+        );
+        var graphFailure = await graphWriter.WriteAsync(hostId, commandForSave, ct);
         if (graphFailure is not null)
         {
             return Result<
@@ -162,6 +169,54 @@ public sealed class CustomCommandConfigurationService(
                 builtIn.Alias
             ),
             custom => new CustomCommandConfigurationSaveFailure.CustomAliasCollision(custom.Alias)
+        );
+    }
+
+    private async Task<CustomCommandConfigurationSaveCommand> DisableUnavailableNativeAnnouncementsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CustomCommandConfigurationSaveCommand command,
+        CancellationToken ct
+    )
+    {
+        if (
+            !command.Announcements.Any(x =>
+                x.Enabled && x.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+            )
+        )
+        {
+            return command;
+        }
+
+        var channelLogin = await db
+            .Hosts.AsNoTracking()
+            .Where(x => x.Id == hostId)
+            .Select(x => x.Login)
+            .SingleOrDefaultAsync(ct);
+        var readiness = string.IsNullOrWhiteSpace(channelLogin)
+            ? new TwitchAnnouncementReadiness(
+                TwitchAnnouncementAvailability.Unavailable,
+                string.Empty
+            )
+            : await twitchAnnouncementAccess.GetReadinessAsync(channelLogin, ct);
+        if (readiness.Availability == TwitchAnnouncementAvailability.Available)
+        {
+            return command;
+        }
+
+        return new(
+            command.TimeZone,
+            command.MessageEntries,
+            command.Commands,
+            command.Counters,
+            command.Announcements.Select(announcement =>
+                announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+                    ? announcement with
+                    {
+                        Enabled = false,
+                    }
+                    : announcement
+            )
         );
     }
 }

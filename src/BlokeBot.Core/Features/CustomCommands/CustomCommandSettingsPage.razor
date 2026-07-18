@@ -251,7 +251,10 @@
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "scheduled message")</p>
-                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add scheduled message</button>
+                    <button class="btn-secondary"
+                            data-action="add-scheduled-message"
+                            disabled="@(_config.MessageEntries.Count == 0)"
+                            @onclick="AddAnnouncement">Add scheduled message</button>
                 </div>
 
                 @if (_config.Announcements.Count == 0)
@@ -267,7 +270,10 @@
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
                                     <Field Label="Scheduled message name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
                                     <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
-                                        <input class="h-4 w-4" type="checkbox" @bind="announcement.Enabled" />
+                                        <input class="h-4 w-4"
+                                               type="checkbox"
+                                               disabled="@NativeDeliveryUnavailable(announcement)"
+                                               @bind="announcement.Enabled" />
                                         Turned on
                                     </label>
                                     <button class="btn-secondary" @onclick="() => RemoveAnnouncement(announcement)">Delete</button>

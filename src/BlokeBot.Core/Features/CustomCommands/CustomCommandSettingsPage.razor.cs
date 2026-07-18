@@ -409,6 +409,13 @@ public partial class CustomCommandSettingsPage
         };
     }
 
+    private bool NativeDeliveryUnavailable(CustomAnnouncementEditor announcement)
+    {
+        return announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+            && _config?.TwitchAnnouncementReadiness.Availability
+                != TwitchAnnouncementAvailability.Available;
+    }
+
     private static string TimeZoneLabel(TimeZoneInfo timeZone)
     {
         return timeZone.DisplayName;

@@ -37,9 +37,7 @@ public sealed class CustomCommandSettingsUiTests
         var cut = context.Render<CustomCommandSettingsPage>();
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
 
-        cut.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Add announcement")
-            .Click();
+        cut.Find("button[data-action='add-scheduled-message']").Click();
 
         cut.Find("#announcement--1-retry-delay").GetAttribute("value").ShouldBe("2");
         cut.Find("#announcement--1-occurrence-lifetime").GetAttribute("value").ShouldBe("30");

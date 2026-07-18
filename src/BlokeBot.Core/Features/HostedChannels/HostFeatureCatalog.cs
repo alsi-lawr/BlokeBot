@@ -23,7 +23,7 @@ public static class HostFeatureCatalog
             new(
                 HostFeatureFlags.CustomCommands,
                 "Custom commands",
-                "Create chat commands, keep counters, and send automatic announcements.",
+                "Create chat commands, keep counters, and schedule messages.",
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
         ];

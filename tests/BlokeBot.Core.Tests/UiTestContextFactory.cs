@@ -40,6 +40,9 @@ internal static class UiTestContextFactory
         context.Services.AddSingleton<HostFeatureService>();
         context.Services.AddBlokeBotAlerts();
         context.Services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
+        context.Services.AddSingleton<ITwitchAnnouncementReadinessProvider>(
+            new UnavailableTwitchAnnouncementReadinessProvider()
+        );
         context.Services.AddBlokeBotToasts();
 
         var host = new BotHostChoice(hostId, hostLogin, "Streamer", AuthRole.Streamer);
@@ -65,6 +68,20 @@ internal static class UiTestContextFactory
         public override DateTimeOffset GetUtcNow()
         {
             return now;
+        }
+    }
+
+    private sealed class UnavailableTwitchAnnouncementReadinessProvider
+        : ITwitchAnnouncementReadinessProvider
+    {
+        public Task<TwitchAnnouncementReadiness> GetReadinessAsync(
+            string channelLogin,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(
+                new TwitchAnnouncementReadiness(TwitchAnnouncementAvailability.Unavailable, "bot")
+            );
         }
     }
 }

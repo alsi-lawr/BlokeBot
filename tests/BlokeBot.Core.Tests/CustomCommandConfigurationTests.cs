@@ -449,6 +449,35 @@ public sealed class CustomCommandConfigurationTests
             .ShouldContain(error => error.Message.Contains("at most 500 characters"));
     }
 
+    [Test]
+    [Arguments(TwitchAnnouncementAvailability.Available, true)]
+    [Arguments(TwitchAnnouncementAvailability.ReconnectRequired, false)]
+    [Arguments(TwitchAnnouncementAvailability.AuthorityRequired, false)]
+    [Arguments(TwitchAnnouncementAvailability.Unavailable, false)]
+    public async Task NativeAnnouncementReadiness_Saving_PersistsExpectedEffectiveEnablement(
+        TwitchAnnouncementAvailability availability,
+        bool expectedEnabled
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, availability);
+        var configuration = ConfigurationWithAnnouncement(
+            new IntervalCustomAnnouncementScheduleEditor()
+        );
+        configuration.Announcements.Single().DeliveryType =
+            CustomAnnouncementDeliveryType.TwitchAnnouncement;
+
+        await SaveValidAsync(service, hostId, configuration);
+
+        var stored = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        stored.TwitchAnnouncementReadiness.Availability.ShouldBe(availability);
+        stored.Announcements.Single().Enabled.ShouldBe(expectedEnabled);
+        stored
+            .Announcements.Single()
+            .DeliveryType.ShouldBe(CustomAnnouncementDeliveryType.TwitchAnnouncement);
+    }
+
     private static CustomCommandConfiguration ConfigurationWithCommands(
         params (string Name, string Aliases)[] commands
     )
@@ -503,7 +532,8 @@ public sealed class CustomCommandConfigurationTests
     }
 
     private static CustomCommandConfigurationService CreateService(
-        SqliteBlokeBotDbFactory dbFactory
+        SqliteBlokeBotDbFactory dbFactory,
+        TwitchAnnouncementAvailability availability = TwitchAnnouncementAvailability.Available
     )
     {
         var events = TestEventBus.Create<AppEventKind>();
@@ -512,22 +542,21 @@ public sealed class CustomCommandConfigurationTests
             new CustomCommandAliasRegistry(),
             new CustomCommandConfigurationGraphWriter(dbFactory, TimeProvider.System),
             new HostCustomCommandSettingsService(dbFactory, events),
-            new AvailableTwitchAnnouncementReadinessProvider(),
+            new AvailableTwitchAnnouncementReadinessProvider(availability),
             events
         );
     }
 
-    private sealed class AvailableTwitchAnnouncementReadinessProvider
-        : ITwitchAnnouncementReadinessProvider
+    private sealed class AvailableTwitchAnnouncementReadinessProvider(
+        TwitchAnnouncementAvailability availability
+    ) : ITwitchAnnouncementReadinessProvider
     {
         public Task<TwitchAnnouncementReadiness> GetReadinessAsync(
             string channelLogin,
             CancellationToken cancellationToken
         )
         {
-            return Task.FromResult(
-                new TwitchAnnouncementReadiness(TwitchAnnouncementAvailability.Available, "bot")
-            );
+            return Task.FromResult(new TwitchAnnouncementReadiness(availability, "bot"));
         }
     }
 

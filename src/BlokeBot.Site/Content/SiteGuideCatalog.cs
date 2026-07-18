@@ -221,7 +221,7 @@ internal static class SiteGuideCatalog
                     Heading = "What you can add",
                     Links =
                     [
-                        new SiteLink("Commands and announcements", "commands"),
+                        new SiteLink("Commands and scheduled messages", "commands"),
                         new SiteLink("Guessing games", "guessing"),
                         new SiteLink("Points", "points"),
                         new SiteLink("Giveaways", "giveaways"),
@@ -236,13 +236,13 @@ internal static class SiteGuideCatalog
         {
             Route = "/commands",
             Eyebrow = "Custom commands",
-            Title = "Create commands and announcements",
+            Title = "Create commands and scheduled messages",
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
             Media = new SiteMedia(
                 "/media/custom-commands.png",
                 "Custom commands settings showing saved replies and a hydration reminder.",
-                "Replies are reusable messages that commands and announcements can send."
+                "Replies are reusable messages that commands and scheduled messages can send."
             ),
             Sections =
             [
@@ -262,11 +262,11 @@ internal static class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Add a counter or announcement",
+                    Heading = "Add a counter or scheduled message",
                     Bullets =
                     [
                         "Counters let a command change and report a saved number.",
-                        "Announcements send a saved reply on a timer, after chat activity or once a week.",
+                        "Scheduled messages send a saved reply on a timer, after chat activity or once a week. Choose Twitch announcement only when you need Twitch's native announcement delivery.",
                         "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
                     ],
                 },
