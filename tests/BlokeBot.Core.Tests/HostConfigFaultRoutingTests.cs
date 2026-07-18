@@ -1,4 +1,9 @@
+using System.Net;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Channels;
+using BlokeBot.Core.Auth.Moderation;
+using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
@@ -9,6 +14,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosting;
+using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -17,6 +23,8 @@ using BlokeBot.Twitch.Auth;
 using BlokeBot.Twitch.Runtime;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,6 +37,77 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostConfigFaultRoutingTests
 {
+    [Test]
+    public async Task UnavailableAuthority_PolicyModeRemainsUnchangedUntilSameChoiceCanBeSaved()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var clock = new ManualTimeProvider();
+        var tokens = new ScriptedAppAccessTokenSource();
+        tokens.Enqueue(Task.FromException<string>(new TimeoutException()));
+        tokens.Enqueue(Task.FromResult("app-token"));
+        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
+        ConfigureModeratorAuthorityServices(context, tokens);
+
+        var page = RenderAuthorityHostConfigPage(
+            context,
+            AuthenticationState(hostId, AuthRole.Streamer)
+        );
+        await page.Instance.UpdateSessionAsync(AuthenticationState(hostId, AuthRole.Moderator));
+
+        ClickAccessMode(page, "Allowed list only");
+
+        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+        tokens.RequestCount.ShouldBe(1);
+
+        ClickAccessMode(page, "Allowed list only");
+        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: false));
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+        page.WaitForAssertion(() =>
+            ReadAllowModsByDefaultAsync(dbFactory, hostId).GetAwaiter().GetResult().ShouldBeFalse()
+        );
+        tokens.RequestCount.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task ReorderedAuthorityCompletions_KeepLatestPolicyIntentAndDoNotSaveStaleGrant()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var clock = new ManualTimeProvider();
+        var tokens = new ScriptedAppAccessTokenSource();
+        var first = tokens.EnqueuePending();
+        var second = tokens.EnqueuePending();
+        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
+        ConfigureModeratorAuthorityServices(context, tokens);
+
+        var page = RenderAuthorityHostConfigPage(
+            context,
+            AuthenticationState(hostId, AuthRole.Streamer)
+        );
+        await page.Instance.UpdateSessionAsync(AuthenticationState(hostId, AuthRole.Moderator));
+
+        var firstClick = ClickAccessModeAsync(page, "Allowed list only");
+        tokens.RequestCount.ShouldBe(1);
+        ClickAccessMode(page, "All mods");
+        var secondClick = ClickAccessModeAsync(page, "Allowed list only");
+        tokens.RequestCount.ShouldBe(2);
+
+        second.SetException(new TimeoutException());
+        await secondClick;
+        first.SetResult("app-token");
+        await firstClick;
+
+        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+    }
+
     [Test]
     public async Task DetachedSave_Faulting_RedactsTelemetryAndReachesErrorBoundary()
     {
@@ -100,6 +179,45 @@ public sealed class HostConfigFaultRoutingTests
         context.Services.AddSingleton(new UiFaultTelemetry(logger));
     }
 
+    private static void ConfigureModeratorAuthorityServices(
+        BunitContext context,
+        IHostBotAppAccessTokenSource tokens
+    )
+    {
+        context.Services.AddSingleton<ModeratorAuthorityService>(
+            serviceProvider => new ModeratorAuthorityService(
+                tokens,
+                new HelixClient(new ModeratedChannelsHttpClientFactory()),
+                serviceProvider.GetRequiredService<BotSettings>(),
+                serviceProvider.GetRequiredService<HostModAccessService>(),
+                serviceProvider.GetRequiredService<TimeProvider>()
+            )
+        );
+    }
+
+    private static Task<AuthenticationState> AuthenticationState(int hostId, AuthRole role)
+    {
+        var host = new BotHostChoice(hostId, "streamer", "Streamer", role);
+        var identity = new ClaimsIdentity(
+            [
+                new Claim(
+                    ClaimTypes.NameIdentifier,
+                    role == AuthRole.Moderator ? "moderator-id" : "streamer-id"
+                ),
+                new Claim(ClaimTypes.Name, role == AuthRole.Moderator ? "moderator" : "streamer"),
+                new Claim(AuthClaims.Login, role == AuthRole.Moderator ? "moderator" : "streamer"),
+                new Claim(AuthClaims.Role, AuthRoleCodec.Encode(role)),
+                new Claim(AuthClaims.CanCreateHost, "false"),
+                new Claim(AuthClaims.IsBotAdmin, "false"),
+                new Claim(AuthClaims.IsBotAccount, "false"),
+                new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(host)),
+                new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(host)),
+            ],
+            "test"
+        );
+        return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity)));
+    }
+
     private static async Task AssertCurrentFailureAsync(bool runtimeNotificationFails)
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -168,6 +286,17 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
+    private static IRenderedComponent<HostConfigAuthorityHarness> RenderAuthorityHostConfigPage(
+        BunitContext context,
+        Task<AuthenticationState> authenticationState
+    )
+    {
+        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        return context.Render<HostConfigAuthorityHarness>(parameters =>
+            parameters.Add(x => x.Session, authenticationState)
+        );
+    }
+
     private static void ClickAccessMode<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
@@ -175,6 +304,17 @@ public sealed class HostConfigFaultRoutingTests
         where TComponent : IComponent
     {
         page.FindAll("button").Single(button => button.TextContent.Trim() == text).Click();
+    }
+
+    private static Task ClickAccessModeAsync<TComponent>(
+        IRenderedComponent<TComponent> page,
+        string text
+    )
+        where TComponent : IComponent
+    {
+        return page.FindAll("button")
+            .Single(button => button.TextContent.Trim() == text)
+            .ClickAsync(new());
     }
 
     private static void AssertAccessMode<TComponent>(
@@ -199,6 +339,18 @@ public sealed class HostConfigFaultRoutingTests
         var host = await db.Hosts.SingleAsync(x => x.Id == hostId);
         db.Hosts.Remove(host);
         await db.SaveChangesAsync();
+    }
+
+    private static async Task<bool> ReadAllowModsByDefaultAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        return await db
+            .HostModAccessSettings.Where(settings => settings.HostId == hostId)
+            .Select(settings => settings.AllowModsByDefault)
+            .SingleAsync();
     }
 
     private static async Task<int> SeedHostAsync(
@@ -266,6 +418,93 @@ public sealed class HostConfigFaultRoutingTests
                     innerFactory.CreateDbContextAsync(cancellationToken)
                 )
                 : ValueTask.FromException<BlokeBotDbContext>(Failure);
+        }
+    }
+
+    private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
+    {
+        private readonly Queue<Task<string>> _tokens = [];
+
+        public int RequestCount { get; private set; }
+
+        public void Enqueue(Task<string> token)
+        {
+            _tokens.Enqueue(token);
+        }
+
+        public TaskCompletionSource<string> EnqueuePending()
+        {
+            var pending = new TaskCompletionSource<string>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            _tokens.Enqueue(pending.Task);
+            return pending;
+        }
+
+        public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            cancellationToken.ThrowIfCancellationRequested();
+            return _tokens.Dequeue();
+        }
+    }
+
+    private sealed class HostConfigAuthorityHarness : ComponentBase
+    {
+        [Parameter]
+        public Task<AuthenticationState> Session { get; set; } =
+            Task.FromResult(new AuthenticationState(new ClaimsPrincipal()));
+
+        public Task UpdateSessionAsync(Task<AuthenticationState> session)
+        {
+            Session = session;
+            return InvokeAsync(StateHasChanged);
+        }
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<CascadingValue<Task<AuthenticationState>>>(0);
+            builder.AddAttribute(1, "Value", Session);
+            builder.AddAttribute(
+                2,
+                "ChildContent",
+                (RenderFragment)(
+                    content =>
+                    {
+                        content.OpenComponent<HostConfigPage>(0);
+                        content.CloseComponent();
+                    }
+                )
+            );
+            builder.CloseComponent();
+        }
+    }
+
+    private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler());
+        }
+
+        private sealed class Handler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken
+            )
+            {
+                return Task.FromResult(
+                    new HttpResponseMessage(HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            """{"data":[{"broadcaster_login":"streamer"}],"pagination":{}}""",
+                            Encoding.UTF8,
+                            "application/json"
+                        ),
+                    }
+                );
+            }
         }
     }
 

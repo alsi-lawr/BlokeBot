@@ -12,6 +12,7 @@ public partial class HostConfigPage
 
     private readonly SemaphoreSlim _allowModsByDefaultSaveGate = new(1, 1);
     private readonly HostModAccessSaveSequence _allowModsByDefaultSaves = new();
+    private long _allowModsByDefaultIntent;
     private string _newBlacklistLogin = string.Empty;
     private string _newWhitelistLogin = string.Empty;
     private IReadOnlyList<AccessListEntryProfile> _blacklistEntries = [];
@@ -94,6 +95,7 @@ public partial class HostConfigPage
 
     private Task SetAllowModsByDefaultAsync(int hostId, bool allowByDefault)
     {
+        var intent = ++_allowModsByDefaultIntent;
         if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
         {
             return Task.CompletedTask;
@@ -105,7 +107,7 @@ public partial class HostConfigPage
                 command =>
                     RunSelectedHostMutationAsync(
                         hostId,
-                        () => BeginAllowModsByDefaultSaveAsync(command, allowByDefault)
+                        () => BeginAllowModsByDefaultSaveAsync(command, allowByDefault, intent)
                     ),
                 errors =>
                 {
@@ -122,10 +124,15 @@ public partial class HostConfigPage
 
     private Task BeginAllowModsByDefaultSaveAsync(
         HostModAccessSaveCommand command,
-        bool allowByDefault
+        bool allowByDefault,
+        long intent
     )
     {
-        if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
+        if (
+            intent != _allowModsByDefaultIntent
+            || _state is null
+            || _state.ModAccess.AllowModsByDefault == allowByDefault
+        )
         {
             return Task.CompletedTask;
         }

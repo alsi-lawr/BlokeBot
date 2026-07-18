@@ -286,42 +286,6 @@ public sealed class ModeratorAuthorityServiceTests
         recovery.Hosts.ShouldBe([remaining]);
     }
 
-    [Test]
-    public async Task UnavailableModerator_ExecutingMutation_LeavesSelectionAndPermitsRetry()
-    {
-        await using var fixture = await Fixture.CreateAsync();
-        fixture.Tokens.Exception = new TimeoutException();
-        using var services = MutationServices(fixture, out _, out var navigation);
-        var component = CreateMutationComponent(services, fixture.HostId);
-        var policyStateChanged = false;
-
-        await component.MutateAsync(
-            fixture.HostId,
-            () =>
-            {
-                policyStateChanged = true;
-                return Task.CompletedTask;
-            }
-        );
-
-        policyStateChanged.ShouldBeFalse();
-        navigation.LastUri.ShouldBeNull();
-        fixture.Tokens.Exception = null;
-        fixture.Helix.Respond(_ => AllowedResponse());
-
-        await component.MutateAsync(
-            fixture.HostId,
-            () =>
-            {
-                policyStateChanged = true;
-                return Task.CompletedTask;
-            }
-        );
-
-        policyStateChanged.ShouldBeTrue();
-        fixture.Tokens.RequestCount.ShouldBe(2);
-    }
-
     private static AuthenticatedSession Session(
         AuthRole role,
         int hostId,
