@@ -5,13 +5,21 @@ on:
     tags:
       - v*.*.*
 
-permissions: {}
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+  packages: write
 
 jobs:
   release:
     name: Run reusable release workflow
     uses: alsi-lawr/package-release-workflows/.github/workflows/package-dotnet.yml@main
-    secrets: inherit
+    secrets:
+      CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      PACKAGE_REPOSITORY_TOKEN: ${{ secrets.PACKAGE_REPOSITORY_TOKEN }}
     with:
       dotnet_version: '10.0.301'
       dotnet_project_path: src/BlokeBot/BlokeBot.csproj
@@ -42,8 +50,9 @@ jobs:
       run_homebrew_test: true
       run_windows_packaging_tests: true
       run_winget_test: true
-      jreleaser_image: jreleaser/jreleaser-slim:1.25.0
+      jreleaser_image: jreleaser/jreleaser-slim:v1.25.0
       jreleaser_config: packaging/jreleaser/jreleaser.yml
+      package_metadata_finalize_script: packaging/jreleaser/finalize_metadata.sh
       winget_upstream_repo: microsoft/winget-pkgs
       winget_fork_owner: ${{ github.repository_owner }}
       winget_fork_repo: winget-pkgs
@@ -53,6 +62,8 @@ jobs:
       nix_fork_repo: nixpkgs
       nix_branch_prefix: blokebot-v
       nix_package_name: blokebot
+      nix_package_template_path: packaging/nix/nixpkgs-package.nix
+      nix_package_dependencies_path: packaging/nix/deps.json
       docker_build_matrix: '[{"kind":"blokebot","arch":"amd64","runner":"ubuntu-26.04","dockerfile":"packaging/docker/blokebot.Dockerfile","image":"docker.io/alsilawr/blokebot"},{"kind":"blokebot","arch":"arm64","runner":"ubuntu-26.04-arm","dockerfile":"packaging/docker/blokebot.Dockerfile","image":"docker.io/alsilawr/blokebot"},{"kind":"blokebot-site","arch":"amd64","runner":"ubuntu-26.04","dockerfile":"packaging/docker/blokebot-site.Dockerfile","image":"docker.io/alsilawr/blokebot-site"},{"kind":"blokebot-site","arch":"arm64","runner":"ubuntu-26.04-arm","dockerfile":"packaging/docker/blokebot-site.Dockerfile","image":"docker.io/alsilawr/blokebot-site"}]'
       docker_manifest_images: '["docker.io/alsilawr/blokebot","docker.io/alsilawr/blokebot-site"]'
       ghcr_build_matrix: '[{"kind":"blokebot","smoke_kind":"bot","arch":"amd64","runner":"ubuntu-26.04","output":"blokebot-image","image":"ghcr.io/alsi-lawr/blokebot"},{"kind":"blokebot","smoke_kind":"bot","arch":"arm64","runner":"ubuntu-26.04-arm","output":"blokebot-image","image":"ghcr.io/alsi-lawr/blokebot"},{"kind":"blokebot-site","smoke_kind":"site","arch":"amd64","runner":"ubuntu-26.04","output":"blokebot-site-image","image":"ghcr.io/alsi-lawr/blokebot-site"},{"kind":"blokebot-site","smoke_kind":"site","arch":"arm64","runner":"ubuntu-26.04-arm","output":"blokebot-site-image","image":"ghcr.io/alsi-lawr/blokebot-site"}]'

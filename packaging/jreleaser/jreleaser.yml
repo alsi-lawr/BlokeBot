@@ -1,3 +1,15 @@
+hooks:
+  script:
+    before:
+      - filter:
+          includes:
+            - publish
+        run: >-
+          {{basedir}}/packaging/jreleaser/finalize_metadata.sh
+          --version {{projectVersion}}
+          --release-directory {{basedir}}/artifacts/release
+          --metadata-directory {{basedir}}/out/jreleaser/package
+
 project:
   name: blokebot
   description: Free, open-source Twitch bot and dashboard

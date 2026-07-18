@@ -235,5 +235,4 @@ public static class BlokeBotApplication
                     .AddRequirements(new AuthSessionCapabilityRequirement(capability))
         );
     }
-
 }
