@@ -55,6 +55,34 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
+    [Arguments(ValidationSection.Replies)]
+    [Arguments(ValidationSection.Commands)]
+    [Arguments(ValidationSection.Counters)]
+    public async Task CollapsedValidationSection_SavingInvalidEntity_ReopensAndFocusesTarget(
+        ValidationSection section
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+        var expected = InvalidateSection(cut, seeded, section);
+        var disclosure = cut.Find($"button[aria-controls='{expected.ContentId}']");
+
+        disclosure.Click();
+
+        cut.FindAll($"#{expected.ContentId}").ShouldBeEmpty();
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        cut.Find($"#{expected.ContentId}").ShouldNotBeNull();
+        var control = cut.Find($"#{expected.ControlId}");
+        control.GetAttribute("aria-invalid").ShouldBe("true");
+        control.GetAttribute("aria-describedby").ShouldBe($"{expected.ControlId}-error");
+        var focus = context.JSInterop.VerifyFocusAsyncInvoke();
+        focus.Arguments[0].ShouldBeElementReferenceTo(control);
+    }
+
+    [Test]
     public async Task InvalidCustomCommandEditor_Saving_ShowsAllErrorsUntilCorrected()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -203,6 +231,52 @@ public sealed class CustomCommandSettingsUiTests
         return summary.QuerySelectorAll("li").Select(item => item.TextContent.Trim()).ToArray();
     }
 
+    private static ValidationSectionExpectation InvalidateSection(
+        IRenderedComponent<CustomCommandSettingsPage> page,
+        SeededConfiguration seeded,
+        ValidationSection section
+    )
+    {
+        return section switch
+        {
+            ValidationSection.Replies => InvalidateReply(page, seeded),
+            ValidationSection.Commands => InvalidateCommand(page, seeded),
+            ValidationSection.Counters => InvalidateCounter(page, seeded),
+            _ => throw new ArgumentOutOfRangeException(nameof(section), section, null),
+        };
+    }
+
+    private static ValidationSectionExpectation InvalidateReply(
+        IRenderedComponent<CustomCommandSettingsPage> page,
+        SeededConfiguration seeded
+    )
+    {
+        page.Find("#custom-command-message-library-tab").Click();
+        var controlId = $"message-entry-{seeded.MessageEntryId}-name";
+        page.Find($"#{controlId}").Input(string.Empty);
+        return new("custom-command-replies-settings", controlId);
+    }
+
+    private static ValidationSectionExpectation InvalidateCommand(
+        IRenderedComponent<CustomCommandSettingsPage> page,
+        SeededConfiguration seeded
+    )
+    {
+        var controlId = $"command-{seeded.CommandId}-name";
+        page.Find($"#{controlId}").Input(string.Empty);
+        return new("custom-command-chat-commands-settings", controlId);
+    }
+
+    private static ValidationSectionExpectation InvalidateCounter(
+        IRenderedComponent<CustomCommandSettingsPage> page,
+        SeededConfiguration seeded
+    )
+    {
+        var controlId = $"counter-{seeded.CounterId}-name";
+        page.Find($"#{controlId}").Input(string.Empty);
+        return new("custom-command-counters-settings", controlId);
+    }
+
     private static async Task<SeededConfiguration> SeedConfigurationAsync(
         SqliteBlokeBotDbFactory dbFactory
     )
@@ -270,7 +344,7 @@ public sealed class CustomCommandSettingsUiTests
         };
         db.AddRange(command, announcement);
         await db.SaveChangesAsync();
-        return new SeededConfiguration(host.Id, entry.Id, command.Id, announcement.Id);
+        return new SeededConfiguration(host.Id, entry.Id, command.Id, counter.Id, announcement.Id);
     }
 
     private static async Task<int> SeedEmptyConfigurationAsync(SqliteBlokeBotDbFactory dbFactory)
@@ -292,6 +366,16 @@ public sealed class CustomCommandSettingsUiTests
         int HostId,
         int MessageEntryId,
         int CommandId,
+        int CounterId,
         int AnnouncementId
     );
+
+    public enum ValidationSection
+    {
+        Replies,
+        Commands,
+        Counters,
+    }
+
+    private sealed record ValidationSectionExpectation(string ContentId, string ControlId);
 }

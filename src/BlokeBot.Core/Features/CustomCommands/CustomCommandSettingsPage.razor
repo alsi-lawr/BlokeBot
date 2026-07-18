@@ -91,7 +91,11 @@
              aria-labelledby="custom-command-message-library-tab"
              hidden="@(_activeTab != CustomCommandSettingsTab.MessageLibrary)"
              tabindex="0">
-        <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
+        <CollapsibleSection ContentId="custom-command-replies-settings"
+                            Title="Replies"
+                            Description="Save one or more messages for the bot to choose from."
+                            InitiallyOpen="true"
+                            OpenRequest="@_replySectionOpenRequest">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.MessageEntries.Count, "reply")</p>
@@ -187,7 +191,11 @@
              hidden="@(_activeTab != CustomCommandSettingsTab.Commands)"
              tabindex="0">
 
-        <CollapsibleSection Title="Chat commands" Description="Choose what viewers type and what the bot should do." InitiallyOpen="true">
+        <CollapsibleSection ContentId="custom-command-chat-commands-settings"
+                            Title="Chat commands"
+                            Description="Choose what viewers type and what the bot should do."
+                            InitiallyOpen="true"
+                            OpenRequest="@_commandSectionOpenRequest">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Commands.Count, "command")</p>
@@ -319,7 +327,11 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Counters" Description="Keep track of things such as deaths, wins, or drinks." InitiallyOpen="true">
+        <CollapsibleSection ContentId="custom-command-counters-settings"
+                            Title="Counters"
+                            Description="Keep track of things such as deaths, wins, or drinks."
+                            InitiallyOpen="true"
+                            OpenRequest="@_counterSectionOpenRequest">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Counters.Count, "counter")</p>

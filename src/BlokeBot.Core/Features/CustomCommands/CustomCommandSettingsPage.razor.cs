@@ -35,6 +35,9 @@ public partial class CustomCommandSettingsPage
     private long _focusRequest;
     private CustomCommandSettingsTab? _pendingTabFocus;
     private string? _pendingControlFocusId;
+    private long _replySectionOpenRequest;
+    private long _commandSectionOpenRequest;
+    private long _counterSectionOpenRequest;
     private long _announcementSectionOpenRequest;
     private long _timeZoneSectionOpenRequest;
     private readonly Dictionary<string, ElementReference> _controls = [];
@@ -207,19 +210,48 @@ public partial class CustomCommandSettingsPage
     private void FocusValidationTarget(CustomCommandConfigurationValidationTarget target)
     {
         _activeTab = target.Tab;
+        OpenValidationSection(target);
         _focusTarget = target;
         _focusRequest++;
         _pendingControlFocusId = ValidationControlId(target);
-        if (target.EntityKind == CustomCommandValidationEntityKind.ScheduledMessage)
+    }
+
+    private void OpenValidationSection(CustomCommandConfigurationValidationTarget target)
+    {
+        switch (target)
         {
-            _announcementSectionOpenRequest++;
-        }
-        else if (
-            target.EntityKind == CustomCommandValidationEntityKind.Configuration
-            && target.FieldKind == CustomCommandValidationFieldKind.TimeZone
-        )
-        {
-            _timeZoneSectionOpenRequest++;
+            case {
+                Tab: CustomCommandSettingsTab.MessageLibrary,
+                EntityKind: CustomCommandValidationEntityKind.Reply
+                    or CustomCommandValidationEntityKind.Variant,
+            }:
+                _replySectionOpenRequest++;
+                break;
+            case {
+                Tab: CustomCommandSettingsTab.Commands,
+                EntityKind: CustomCommandValidationEntityKind.Command,
+            }:
+                _commandSectionOpenRequest++;
+                break;
+            case {
+                Tab: CustomCommandSettingsTab.Commands,
+                EntityKind: CustomCommandValidationEntityKind.Counter,
+            }:
+                _counterSectionOpenRequest++;
+                break;
+            case {
+                Tab: CustomCommandSettingsTab.Commands,
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+            }:
+                _announcementSectionOpenRequest++;
+                break;
+            case {
+                Tab: CustomCommandSettingsTab.Commands,
+                EntityKind: CustomCommandValidationEntityKind.Configuration,
+                FieldKind: CustomCommandValidationFieldKind.TimeZone,
+            }:
+                _timeZoneSectionOpenRequest++;
+                break;
         }
     }
 
