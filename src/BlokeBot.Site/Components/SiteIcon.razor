@@ -1,0 +1,69 @@
+<svg class="site-icon @Class"
+     viewBox="0 0 24 24"
+     fill="none"
+     stroke="currentColor"
+     stroke-width="1.9"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     aria-hidden="true">
+    @switch (Name)
+    {
+        case "book":
+            <path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H11v16H5.5A2.5 2.5 0 0 0 3 21.5z" />
+            <path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H13v16h5.5a2.5 2.5 0 0 1 2.5 2.5z" />
+            break;
+        case "server":
+            <rect width="18" height="7" x="3" y="3" rx="2" />
+            <rect width="18" height="7" x="3" y="14" rx="2" />
+            <path d="M7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6" />
+            break;
+        case "shield":
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+            <path d="m9 12 2 2 4-4" />
+            break;
+        case "command":
+            <path d="m8 9-3 3 3 3M16 9l3 3-3 3M14 5l-4 14" />
+            break;
+        case "trophy":
+            <path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0z" />
+            <path d="M7 6H4v1a4 4 0 0 0 4 4M17 6h3v1a4 4 0 0 1-4 4" />
+            break;
+        case "coins":
+            <ellipse cx="12" cy="6" rx="7" ry="3" />
+            <path d="M5 6v5c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 11v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5" />
+            break;
+        case "alert":
+            <path d="M10.3 3.8 2.5 18a2 2 0 0 0 1.8 3h15.4a2 2 0 0 0 1.8-3L13.7 3.8a2 2 0 0 0-3.4 0" />
+            <path d="M12 9v4M12 17h.01" />
+            break;
+        case "wrench":
+            <path d="M14.7 6.3a4 4 0 0 0-5-5L12 3.6 9.6 6 7.3 3.7a4 4 0 0 0 5 5l-7.9 7.9a2.1 2.1 0 0 0 3 3z" />
+            break;
+        case "github":
+            <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7A5.4 5.4 0 0 0 19.4 4 5 5 0 0 0 19.3.5S18.2.1 15 1.9a13.4 13.4 0 0 0-6 0C5.8.1 4.7.5 4.7.5A5 5 0 0 0 4.6 4a5.4 5.4 0 0 0-1.4 3.7c0 5.3 3.5 6.5 6.8 6.9A4.8 4.8 0 0 0 9 18v4" />
+            <path d="M9 18c-4.5 2-5-2-7-2" />
+            break;
+        case "sun":
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" />
+            break;
+        case "moon":
+            <path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8" />
+            break;
+        case "arrow":
+            <path d="M5 12h14M13 6l6 6-6 6" />
+            break;
+        default:
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v4l2.5 2.5" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string Name { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+}

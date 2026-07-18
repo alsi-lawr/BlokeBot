@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using BlokeBot.Site;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -28,11 +29,23 @@ public sealed class SitePathBaseTests
                 .Features.Get<IServerAddressesFeature>()!
                 .Addresses.Single();
             using var client = new HttpClient { BaseAddress = new Uri(address) };
+            client.DefaultRequestHeaders.AcceptEncoding.Add(
+                new StringWithQualityHeaderValue("gzip")
+            );
 
             var home = await client.GetStringAsync("/blokebot/");
             home.ShouldContain("<base href=\"/blokebot/\" />");
             home.ShouldContain("href=\"guide\"");
-            home.ShouldContain("src=\"media/blokebot-banner.svg\"");
+            home.ShouldContain(
+                "data-theme-light-source=\"media/dashboard-scroll-laptop-light.webp\""
+            );
+            home.ShouldContain(
+                "data-theme-dark-source=\"media/dashboard-scroll-laptop-dark.webp\""
+            );
+            home.ShouldContain(
+                "data-theme-light-source=\"media/dashboard-scroll-phone-light.webp\""
+            );
+            home.ShouldContain("<span><strong>BlokeBot</strong><small>Help &amp; guides</small>");
             home.ShouldContain("href=\"/blokebot/#main-content\"");
             home.ShouldContain(
                 "<link rel=\"icon\" type=\"image/svg+xml\" href=\"blokebot-mark.svg\""
@@ -43,6 +56,13 @@ public sealed class SitePathBaseTests
 
             var stylesheet = await client.GetAsync("/blokebot/site.css");
             stylesheet.StatusCode.ShouldBe(HttpStatusCode.OK);
+            stylesheet.Content.Headers.ContentType!.MediaType.ShouldBe("text/css");
+            (await stylesheet.Content.ReadAsByteArrayAsync()).ShouldNotBeEmpty();
+
+            var showcase = await client.GetAsync(
+                "/blokebot/media/dashboard-scroll-laptop-light.webp"
+            );
+            showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var favicon = await client.GetAsync("/blokebot/favicon.ico");
             favicon.StatusCode.ShouldBe(HttpStatusCode.OK);

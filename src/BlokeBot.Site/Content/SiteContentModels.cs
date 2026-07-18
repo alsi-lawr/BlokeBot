@@ -15,6 +15,10 @@ internal sealed record SiteGuideSection
     internal IReadOnlyList<string> Bullets { get; init; } = [];
 
     internal IReadOnlyList<SiteLink> Links { get; init; } = [];
+
+    internal string? Code { get; init; }
+
+    internal string? Note { get; init; }
 }
 
 internal sealed record SiteGuidePage

@@ -28,6 +28,7 @@ internal static class SiteApplication
                 ApplicationName = typeof(SiteApplication).Assembly.GetName().Name,
             }
         );
+        builder.WebHost.UseStaticWebAssets();
         builder.Host.UseSerilog(
             (context, services, logging) =>
             {

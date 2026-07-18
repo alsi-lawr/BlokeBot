@@ -5,19 +5,19 @@
 <header class="site-header">
     <div class="header-inner">
         <a class="brand" href="./" aria-label="BlokeBot home">
-            <img class="brand-mark" src="media/blokedroid.svg" alt="" />
-            <span>BlokeBot</span>
+            <span class="brand-mark-wrap"><img class="brand-mark" src="media/blokedroid.svg" alt="" /></span>
+            <span><strong>BlokeBot</strong><small>Help &amp; guides</small></span>
         </a>
         <div class="header-actions">
             <nav aria-label="Main navigation">
-                <a href="how-it-works">How it works</a>
+                <a href="how-it-works">Overview</a>
+                <a href="guide">Use BlokeBot</a>
                 <a href="install">Install</a>
-                <a href="guide">User guide</a>
-                <a href="server-owners">Server owners</a>
+                <a href="server-owners">Run a server</a>
             </nav>
             <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
-                <span class="theme-toggle__sun" aria-hidden="true">☀</span>
-                <span class="theme-toggle__moon" aria-hidden="true">☾</span>
+                <SiteIcon Name="sun" Class="theme-toggle__sun" />
+                <SiteIcon Name="moon" Class="theme-toggle__moon" />
             </button>
         </div>
     </div>
@@ -27,7 +27,15 @@
 </main>
 <footer class="site-footer">
     <div class="footer-inner">
-        <p><strong>BlokeBot</strong> is free, open-source, easy to host, and available.</p>
-        <p><a href="install">Install</a> · <a href="guide">User guide</a> · <a href="server-owners">Server owner guide</a></p>
+        <div>
+            <p class="footer-title"><strong>BlokeBot</strong> keeps your Twitch channel tools under your control.</p>
+            <p class="footer-meta">Free and open source · Local durable state · Built for channel owners and moderators</p>
+        </div>
+        <nav aria-label="Footer navigation">
+            <a href="guide"><SiteIcon Name="book" />User guide</a>
+            <a href="troubleshooting"><SiteIcon Name="wrench" />Troubleshooting</a>
+            <a href="install"><SiteIcon Name="server" />Install</a>
+            <a href="https://github.com/alsi-lawr/BlokeBot"><SiteIcon Name="github" />Source</a>
+        </nav>
     </div>
 </footer>

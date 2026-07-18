@@ -1,92 +1,97 @@
 @page "/install"
 
-<PageTitle>Install BlokeBot — release-ready routes</PageTitle>
+<PageTitle>Install BlokeBot</PageTitle>
 
 <article class="article-shell install-page">
     <header class="article-header">
         <p class="eyebrow">Installation</p>
-        <h1>Choose how to install BlokeBot</h1>
-        <p class="lede">BlokeBot is free, open-source and easy to host. The routes below are configured for v0.1.0 and show their publication status honestly.</p>
+        <h1>Run BlokeBot on infrastructure you control.</h1>
+        <p class="lede">Use Nix for the shortest reproducible route, Docker for an isolated service, or the source tree while developing. Every command below works from the current repository—there are no unreleased package placeholders.</p>
     </header>
 
-    <aside class="status-panel" aria-labelledby="install-status-title">
-        <h2 id="install-status-title">Release-ready, not yet published</h2>
-        <p>BlokeBot v0.1.0 has not been released yet. The archives, images and package metadata are configured, but the external channels below must not be treated as live until their stated publication or review step finishes.</p>
+    <aside class="status-panel status-panel--ready" aria-labelledby="install-status-title">
+        <span class="status-panel__mark" aria-hidden="true">✓</span>
+        <div>
+            <h2 id="install-status-title">Available from source now</h2>
+            <p>BlokeBot has not published a stable binary release. Nix and Docker build the current open-source revision directly, so pin the Git revision in production and review updates before deployment.</p>
+        </div>
     </aside>
 
     <nav class="install-index" aria-label="Installation routes">
-        <h2>Installation routes</h2>
+        <h2>Choose a route</h2>
         <ul>
-            <li><a href="install#archives">Direct archives</a></li>
             <li><a href="install#nix">Nix</a></li>
-            <li><a href="install#containers">Containers</a></li>
-            <li><a href="install#homebrew">Homebrew</a></li>
-            <li><a href="install#scoop">Scoop</a></li>
-            <li><a href="install#chocolatey">Chocolatey</a></li>
-            <li><a href="install#winget">WinGet</a></li>
+            <li><a href="install#docker">Docker</a></li>
+            <li><a href="install#source">Source checkout</a></li>
+            <li><a href="install#site">Help site</a></li>
+            <li><a href="install#next">Next steps</a></li>
         </ul>
     </nav>
 
-    <section id="archives" aria-labelledby="archives-title">
-        <h2 id="archives-title">Direct archives</h2>
-        <p><strong>Status: pending the immutable v0.1.0 GitHub release.</strong> These links will provide the original self-contained application directories. Verify the selected file against <a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/checksums_sha256.txt">checksums_sha256.txt</a>; package channels consume these same bytes rather than rebuilding them.</p>
-        <ul class="link-list">
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-x64.tar.gz">Linux x64 archive</a></li>
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-linux-arm64.tar.gz">Linux ARM64 archive</a></li>
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-osx-arm64.zip">macOS Apple Silicon archive</a></li>
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-x64.zip">Windows x64 archive</a></li>
-            <li><a href="https://github.com/alsi-lawr/BlokeBot/releases/download/v0.1.0/blokebot-v0.1.0-win-arm64.zip">Windows ARM64 archive</a></li>
-        </ul>
-    </section>
-
     <section id="nix" aria-labelledby="nix-title">
+        <p class="section-number">01</p>
         <h2 id="nix-title">Nix</h2>
-        <p><strong>Status: configured for the pending immutable v0.1.0 tag.</strong> This command is not live until that tag exists and the release is published.</p>
-        <pre><code>nix run github:alsi-lawr/BlokeBot/v0.1.0#blokebot -- serve</code></pre>
+        <p>Run the current BlokeBot flake without installing it globally. The first command confirms the CLI; the second starts the dashboard and writes durable state to the supplied directory.</p>
+        <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot -- help
+nix run github:alsi-lawr/BlokeBot#blokebot -- \
+  serve --host 127.0.0.1 --port 8080 --data-dir "$HOME/.local/state/blokebot"</code></pre>
+        <p>For a NixOS service, import <code>github:alsi-lawr/BlokeBot</code> and enable <code>services.blokebot</code>. Put credentials in <code>services.blokebot.environmentFile</code>; ordinary <code>environment</code> values are stored in the world-readable Nix store.</p>
     </section>
 
-    <section id="containers" aria-labelledby="containers-title">
-        <h2 id="containers-title">Containers</h2>
-        <p><strong>Status: release-ready, with 0.1.0 images pending publication.</strong> The Dockerfile-built images publish to Docker Hub, while independently Nix-built images publish to GHCR. The bot image uses external durable state at <code>/data</code>; do not put that state in a disposable container layer.</p>
-        <pre><code>docker run --rm -p 8080:8080 -v blokebot-data:/data docker.io/alsilawr/blokebot:0.1.0
-docker run --rm -p 8080:8080 -v blokebot-data:/data ghcr.io/alsi-lawr/blokebot:0.1.0</code></pre>
-        <p>The separate stateless public site images will use <code>docker.io/alsilawr/blokebot-site:0.1.0</code> and <code>ghcr.io/alsi-lawr/blokebot-site:0.1.0</code> after the same immutable release succeeds.</p>
+    <section id="docker" aria-labelledby="docker-title">
+        <p class="section-number">02</p>
+        <h2 id="docker-title">Docker</h2>
+        <p>Build the production Dockerfile from a source checkout, then mount <code>/data</code> as durable state. Configuration can be supplied with environment variables or an environment file.</p>
+        <pre><code>git clone https://github.com/alsi-lawr/BlokeBot.git
+cd BlokeBot
+docker build --file packaging/docker/blokebot.Dockerfile --tag blokebot:local .
+docker run --rm --init \
+  --publish 8080:8080 \
+  --volume blokebot-data:/data \
+  --env-file /etc/blokebot/blokebot.env \
+  blokebot:local</code></pre>
+        <p>Back up the named volume before replacing or removing it. The image already starts <code>blokebot serve</code> on port 8080 and keeps the database and token cache under <code>/data</code>.</p>
     </section>
 
-    <section id="homebrew" aria-labelledby="homebrew-title">
-        <h2 id="homebrew-title">Homebrew on Apple Silicon</h2>
-        <p><strong>Status: formula ready; tap repository not created.</strong> <code>alsi-lawr/homebrew-tap</code> does not exist yet, so this command is not live.</p>
-        <pre><code>brew install alsi-lawr/tap/blokebot</code></pre>
+    <section id="source" aria-labelledby="source-title">
+        <p class="section-number">03</p>
+        <h2 id="source-title">Source checkout</h2>
+        <p>Use the repository directly when changing BlokeBot. Install the .NET 10 SDK and Node.js; the Core build restores its pinned npm dependencies and compiles Tailwind automatically.</p>
+        <pre><code>git clone https://github.com/alsi-lawr/BlokeBot.git
+cd BlokeBot
+dotnet restore BlokeBot.slnx
+dotnet run --project src/BlokeBot -- help
+dotnet run --project src/BlokeBot -- \
+  serve --host 127.0.0.1 --port 8080 --data-dir ./.local/blokebot</code></pre>
     </section>
 
-    <section id="scoop" aria-labelledby="scoop-title">
-        <h2 id="scoop-title">Scoop on Windows</h2>
-        <p><strong>Status: x64 manifest ready; bucket repository not created.</strong> <code>alsi-lawr/scoop-bucket</code> does not exist yet, so these commands are not live. Windows ARM64 remains available as a direct archive.</p>
-        <pre><code>scoop bucket add alsi-lawr https://github.com/alsi-lawr/scoop-bucket
-scoop install blokebot</code></pre>
+    <section id="site" aria-labelledby="site-title">
+        <p class="section-number">04</p>
+        <h2 id="site-title">Run the separate help site</h2>
+        <p>The site is stateless and does not reference the bot, persistence or Twitch projects. Run it independently on port 8081:</p>
+        <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot-site -- \
+  --urls http://127.0.0.1:8081</code></pre>
+        <p>When a reverse proxy publishes it below a path such as <code>/blokebot</code>, set the path base as well. The generated base URL, internal links, theme media and static assets then stay under that prefix:</p>
+        <pre><code>nix run github:alsi-lawr/BlokeBot#blokebot-site -- \
+  --urls http://127.0.0.1:8081 \
+  --BlokeBotSite:PathBase=/blokebot</code></pre>
+        <p>The NixOS module exposes the same setting as <code>services.blokebot-site.pathBase = "/blokebot";</code>.</p>
+        <p>Or build its dedicated container:</p>
+        <pre><code>docker build --file packaging/docker/blokebot-site.Dockerfile \
+  --tag blokebot-site:local .
+docker run --rm --init --publish 8081:8081 \
+  --env BlokeBotSite__PathBase=/blokebot \
+  blokebot-site:local</code></pre>
+        <p>Omit <code>BlokeBotSite__PathBase</code> when the help site has its own host name or is served at <code>/</code>.</p>
     </section>
 
-    <section id="chocolatey" aria-labelledby="chocolatey-title">
-        <h2 id="chocolatey-title">Chocolatey on Windows</h2>
-        <p><strong>Status: x64 metadata ready; publication and moderation pending.</strong> The release workflow submits only when its Chocolatey API key exists. Even after submission, this command is not live until Chocolatey approves the package. Windows ARM64 remains available as a direct archive.</p>
-        <pre><code>choco install blokebot --version=0.1.0</code></pre>
-    </section>
-
-    <section id="winget" aria-labelledby="winget-title">
-        <h2 id="winget-title">WinGet on Windows</h2>
-        <p><strong>Status: x64 portable manifests ready; manual upstream review pending.</strong> Automation creates a reviewable bundle but does not open the upstream pull request. This command is not live until that manual submission is accepted. Windows ARM64 remains available as a direct archive.</p>
-        <pre><code>winget install --id alsi-lawr.BlokeBot --version 0.1.0 --exact</code></pre>
-    </section>
-
-    <section aria-labelledby="after-install-title">
-        <h2 id="after-install-title">After installation</h2>
-        <p>Every route exposes the lowercase <code>blokebot</code> command and starts nothing automatically. Begin with:</p>
-        <pre><code>blokebot help</code></pre>
-        <p>Persistent state belongs in the platform data location or an explicit data directory, not in the package installation directory. Upgrades and uninstalls are designed to leave that user data in place.</p>
-    </section>
-
-    <section aria-labelledby="server-owner-title">
-        <h2 id="server-owner-title">Server owners configure Twitch</h2>
-        <p>The person operating the server is responsible for the Twitch application, client secret, redirect URI and callback configuration. Continue to the <a href="server-owners">server owner page</a> and the <a href="https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide">technical Server Owner Guide</a> instead of sharing those secrets with channel owners or moderators.</p>
+    <section id="next" aria-labelledby="after-install-title">
+        <p class="section-number">05</p>
+        <h2 id="after-install-title">Configure Twitch and public HTTPS</h2>
+        <p>A running process is only the first half of server setup. Create the Twitch developer application, register both callback paths, keep the client secret outside source and give the public dashboard a trusted HTTPS address.</p>
+        <div class="action-row">
+            <a class="button button-primary" href="server-owners"><SiteIcon Name="server" />Complete server setup</a>
+            <a class="button button-secondary" href="guide/getting-started"><SiteIcon Name="book" />Then connect a channel</a>
+        </div>
     </section>
 </article>

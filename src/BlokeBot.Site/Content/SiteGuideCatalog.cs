@@ -72,7 +72,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "The menu follows the selected channel and shows only the tools that channel has turned on.",
             Media = new SiteMedia(
-                "/media/dashboard-home.png",
+                "media/dashboard-home.png",
                 "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
             ),
@@ -118,7 +118,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Each Twitch channel keeps its own connection, tools, games, points and people who can help.",
             Media = new SiteMedia(
-                "/media/channel-setup.png",
+                "media/channel-setup.png",
                 "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
                 "Channel setup keeps the selected channel's connection and tool controls together."
             ),
@@ -158,7 +158,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "BlokeBot explains which Twitch account or permission is needed and keeps the bot stopped until the channel is ready.",
             Media = new SiteMedia(
-                "/media/channel-setup.png",
+                "media/channel-setup.png",
                 "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
                 "Connection actions and readiness messages appear beside the channel's bot controls."
             ),
@@ -166,27 +166,36 @@ internal static class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
-                    Heading = "Connect the channel",
+                    Heading = "Connect the channel account",
                     Steps =
                     [
                         "Select the channel and open Channel setup.",
                         "Under Twitch chat, select Connect channel.",
-                        "Complete Twitch using the channel owner or an account allowed to authorize the channel.",
-                        "Return and check that BlokeBot says the bot can chat in this channel.",
+                        "Complete Twitch as the channel owner. This grants the channel-level permission used by the bot.",
+                        "Return to the same selected channel and confirm that the channel connection is ready.",
                     ],
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Start the bot",
+                    Heading = "Connect the bot account",
                     Steps =
                     [
-                        "Complete every connection or permission named beside Bot status.",
+                        "Sign out of Twitch in the connection pop-up if it is using your normal account.",
+                        "Select Connect bot and sign in as the dedicated bot account named by BlokeBot.",
+                        "Make the bot a moderator in your Twitch channel. This is the recommended setup for announcements and follower-only chat.",
                         "Select Start bot when the controls become available.",
                         "Use Stop bot when you intentionally want BlokeBot out of chat.",
                     ],
+                    Note =
+                        "Twitch does not provide an API that lets BlokeBot make its bot account follow your channel. If the channel uses follower-only chat and the bot is not a moderator, sign into Twitch as the bot and follow the channel manually. BlokeBot checks this state and alerts when follower-only delivery is rejected.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Reconnect the right identity",
                     Paragraphs =
                     [
-                        "Use Reconnect when Twitch access needs refreshing. If the wrong account was used, follow the page's account-specific recovery action.",
+                        "Use the reconnect action beside the connection that is stale. Channel and bot connections are different OAuth grants; reconnecting one does not repair the other.",
+                        "If Twitch used the wrong account, close the result window, sign out of Twitch in that browser context and repeat the account-specific action.",
                     ],
                 },
             ],
@@ -240,7 +249,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
             Media = new SiteMedia(
-                "/media/custom-commands.png",
+                "media/custom-commands.png",
                 "Custom commands settings showing saved replies and a hydration reminder.",
                 "Replies are reusable messages that commands and scheduled messages can send."
             ),
@@ -251,22 +260,26 @@ internal static class SiteGuideCatalog
                     Heading = "Create a chat reply and command",
                     Steps =
                     [
-                        "Open Custom commands, then Settings, and add a reply with at least one message.",
+                        "Open Custom commands, then Settings, and stay on the Commands tab.",
                         "Add a command, enter its command words without the exclamation mark and choose who may use it.",
-                        "Choose the saved reply under What happens, then select Save changes.",
+                        "Open Message library, add a reply with at least one message, then return to Commands.",
+                        "Choose the saved reply under What happens and select Save changes.",
                     ],
                     Paragraphs =
                     [
-                        "Replies can include viewer, channel and argument placeholders. The settings page explains each supported placeholder.",
+                        "Replies can include viewer, channel and argument placeholders. The Message library keeps reusable text separate from command structure.",
                     ],
+                    Note =
+                        "A command without a message cannot be saved. BlokeBot opens the relevant tab or section, focuses the field and shows the validation message instead of silently discarding the command.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "Add a counter or scheduled message",
+                    Heading = "Add a counter, scheduled message or Twitch announcement",
                     Bullets =
                     [
                         "Counters let a command change and report a saved number.",
-                        "Scheduled messages send a saved reply on a timer, after chat activity or once a week. Choose Twitch announcement only when you need Twitch's native announcement delivery.",
+                        "Scheduled chat sends a saved reply on a timer, after chat activity or once a week.",
+                        "Twitch announcement uses Twitch's coloured announcement surface. The bot must currently be a moderator and authorised for announcements.",
                         "If a scheduled send cannot happen, open its Alerts section and follow the displayed next action.",
                     ],
                 },
@@ -282,7 +295,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
             Media = new SiteMedia(
-                "/media/guessing-workflow.webp",
+                "media/guessing-workflow.webp",
                 "Animated BlokeBot guessing dashboard moving through a live round workflow.",
                 "The live dashboard keeps round status, votes, answers and winner controls together."
             ),
@@ -324,7 +337,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Give each viewer a channel balance that can be checked, transferred, adjusted, gambled or awarded as a prize.",
             Media = new SiteMedia(
-                "/media/points-settings.png",
+                "media/points-settings.png",
                 "Points settings showing the point label, gambling chance, cooldown and chat command words.",
                 "Points settings define the channel's terminology, gambling rules and command words."
             ),
@@ -362,7 +375,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Open timed entry while the channel is live, choose eligibility and winner count, then award random point prizes.",
             Media = new SiteMedia(
-                "/media/points-settings.png",
+                "media/points-settings.png",
                 "Points settings page where channel point commands and giveaway rules are configured.",
                 "Giveaway rules live on the Points settings page alongside the channel's points configuration."
             ),
@@ -404,7 +417,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Viewers can open read-only guessing or points rankings without permission to manage the channel.",
             Media = new SiteMedia(
-                "/media/guessing-leaderboard.png",
+                "media/guessing-leaderboard.png",
                 "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
                 "Public leaderboards turn completed channel activity into a shareable read-only ranking."
             ),
@@ -456,6 +469,18 @@ internal static class SiteGuideCatalog
                 },
                 new SiteGuideSection
                 {
+                    Heading = "Common Twitch failures",
+                    Bullets =
+                    [
+                        "Wrong account: repeat the specific Channel or Bot connection action after signing out of Twitch in the pop-up.",
+                        "Moderator-only action unavailable: confirm the bot is still a moderator, then reconnect if its grant predates the required scope.",
+                        "Follower-only rejection: make the bot a moderator or manually follow the channel while signed in as the bot account.",
+                        "Announcement rejected: confirm the bot is a moderator and reconnect it to grant moderator:manage:announcements.",
+                        "Dashboard script or stylesheet missing: ask the server owner to verify the reverse proxy path and static assets rather than repeatedly reconnecting Twitch.",
+                    ],
+                },
+                new SiteGuideSection
+                {
                     Heading = "Ask for useful help",
                     Paragraphs =
                     [
@@ -478,7 +503,7 @@ internal static class SiteGuideCatalog
             Summary =
                 "Channel owners decide whether current Twitch moderators can use BlokeBot and whether access is open to all moderators or limited by lists.",
             Media = new SiteMedia(
-                "/media/channel-setup.png",
+                "media/channel-setup.png",
                 "Channel setup containing readiness and access controls for the selected channel.",
                 "Moderator access is managed from Channel setup for the channel currently selected."
             ),
@@ -500,9 +525,12 @@ internal static class SiteGuideCatalog
                     Bullets =
                     [
                         "Moderator access applies only to the selected channel.",
-                        "A moderator may use tools without being allowed to change channel setup.",
+                        "An allowed current Twitch moderator can operate tools and change the selected channel's configuration.",
+                        "BlokeBot rechecks Twitch moderator authority at sensitive changes and does not trust the role for the whole login session.",
                         "Turning moderator help off keeps the saved lists for later.",
                     ],
+                    Note =
+                        "If Twitch removes your moderator role, a later change can be refused even while the page is still open. Refresh the page or choose another channel; do not ask the server owner to bypass Twitch authority.",
                 },
             ],
             Next = [new SiteLink("Manage channels", "channels")],
@@ -512,23 +540,129 @@ internal static class SiteGuideCatalog
         {
             Route = "/server-owners",
             Eyebrow = "Technical operations",
-            Title = "Do you run BlokeBot?",
+            Title = "Install and operate BlokeBot",
             Summary =
-                "Installation, Twitch application configuration, state, backups and service operation stay in the technical wiki.",
+                "Create the Twitch application, provide public HTTPS, keep credentials out of source and operate the bot and help site as separate services.",
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Use the server owner guide",
-                    Paragraphs =
+                    Heading = "1. Create the Twitch developer application",
+                    Steps =
                     [
-                        "The wiki is the maintained technical reference for people who install and operate BlokeBot. This public guide stays focused on channel owners and moderators using the dashboard.",
+                        "Open the Twitch Developer Console and sign in with the account that will own the application.",
+                        "Create an application with a recognisable name and choose Website Integration as its category.",
+                        "Add both HTTPS OAuth redirect URLs shown below, replacing bot.example.com with the public dashboard host.",
+                        "Copy the Client ID and generate a Client Secret. Treat the secret as a password and rotate it after accidental disclosure.",
                     ],
+                    Code =
+                        "https://bot.example.com/auth/twitch/callback\nhttps://bot.example.com/oauth/callback",
                     Links =
                     [
                         new SiteLink(
-                            "Open the technical Server Owner Guide",
-                            "https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide"
+                            "Open the Twitch Developer Console",
+                            "https://dev.twitch.tv/console/apps"
+                        ),
+                    ],
+                    Note =
+                        "The registered callback text must match exactly, including scheme, host, port and path. The first callback signs dashboard users in; the second connects the bot account.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "2. Configure the bot identity",
+                    Paragraphs =
+                    [
+                        "The same Twitch application credentials are used for dashboard sign-in and bot authorization. Configure a dedicated bot account login and the public bot callback URI.",
+                    ],
+                    Code = """
+                        TwitchBot__Identity__BotUsername=your_bot_login
+                        TwitchBot__Identity__ClientId=your_application_client_id
+                        TwitchBot__Identity__ClientSecret=keep_this_out_of_source
+                        TwitchBot__Identity__RedirectUri=https://bot.example.com/oauth/callback
+                        BlokeBot__BotAdmins__0=your_twitch_login
+                        """,
+                    Note =
+                        "Environment variables use double underscores for configuration nesting. With NixOS, put ClientSecret in services.blokebot.environmentFile; do not put it in the ordinary environment attribute because Nix store paths are world-readable.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "3. Put trusted HTTPS in front",
+                    Paragraphs =
+                    [
+                        "For a public service, bind BlokeBot to loopback and terminate HTTPS in Caddy, nginx or another reverse proxy. Forward the original scheme and host so OAuth builds the public callback correctly.",
+                    ],
+                    Code =
+                        "blokebot serve --host 127.0.0.1 --port 8080 --data-dir /var/lib/blokebot",
+                    Note =
+                        "Twitch callbacks must use the public HTTPS origin. Do not register the reverse proxy's internal HTTP address.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Local Kestrel HTTPS configuration",
+                    Paragraphs =
+                    [
+                        "For local setup, export a development certificate and point a separate JSON configuration file at it. This example serves https://localhost:8080 and keeps the certificate password in local-only configuration.",
+                    ],
+                    Code = """
+                        {
+                          "Kestrel": {
+                            "Endpoints": {
+                              "Https": {
+                                "Url": "https://localhost:8080",
+                                "Certificate": {
+                                  "Path": "/home/you/.aspnet/https/blokebot.pfx",
+                                  "Password": "change-me"
+                                }
+                              }
+                            }
+                          }
+                        }
+                        """,
+                    Note =
+                        "Keep this file outside source control and replace /home/you with the real absolute path. The browser, Kestrel configuration and Twitch callbacks must all use localhost consistently.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create the local certificate and serve",
+                    Paragraphs =
+                    [
+                        "Export and trust the standard .NET development certificate, then pass the JSON file to BlokeBot. When Kestrel endpoints are configured, do not add conflicting --host or --port flags.",
+                    ],
+                    Code = """
+                        dotnet dev-certs https --trust
+                        dotnet dev-certs https -ep "$HOME/.aspnet/https/blokebot.pfx" -p change-me
+                        blokebot serve --config ./blokebot.local.json --data-dir ./.local/blokebot
+                        """,
+                    Note =
+                        "The browser must trust the certificate. A certificate for 127.0.0.1 does not automatically cover localhost, and vice versa; open the same host name configured in the certificate and Twitch callback.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "4. Protect and back up state",
+                    Bullets =
+                    [
+                        "Give only the service account access to the data directory.",
+                        "Back up blokebot.db and twitch.tokens.json together while the service is stopped or from one consistent filesystem snapshot.",
+                        "Keep the help site stateless and run it separately from the bot service.",
+                        "Review active alerts and service logs after every update before promoting the new generation.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "5. Verify the service",
+                    Steps =
+                    [
+                        "Run blokebot version and record the deployed revision.",
+                        "Open the public HTTPS dashboard and confirm the Blazor client connects without script or stylesheet errors.",
+                        "Sign in, select a test channel, connect the channel and bot identities, then start and stop the bot.",
+                        "Open the help site independently and verify its media and internal links under the configured path base.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Choose an installation route", "install"),
+                        new SiteLink(
+                            "Review the source repository",
+                            "https://github.com/alsi-lawr/BlokeBot"
                         ),
                     ],
                 },

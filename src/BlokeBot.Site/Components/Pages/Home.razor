@@ -1,56 +1,108 @@
 @page "/"
 
-<PageTitle>BlokeBot — Own your channel tools</PageTitle>
+<PageTitle>BlokeBot — Twitch channel tools you control</PageTitle>
 
 <section class="hero section-shell" aria-labelledby="home-title">
     <div class="hero-copy">
-        <p class="eyebrow">Twitch channel tools</p>
-        <h1 id="home-title">Own your channel tools.</h1>
-        <p class="lede">Run commands, guessing games, points and giveaways from one dashboard built around your Twitch channel.</p>
-        <p class="availability">BlokeBot is free, open-source, easy to host, and available now.</p>
+        <p class="eyebrow">Self-hosted Twitch channel tools</p>
+        <h1 id="home-title">Your channel. Your bot. Your rules.</h1>
+        <p class="lede">BlokeBot puts commands, guessing games, points, giveaways and moderation-ready controls in one dashboard—without handing your community data to another service.</p>
         <div class="action-row" aria-label="Get started">
-            <a class="button button-primary" href="how-it-works">See how it works</a>
-            <a class="button button-secondary" href="guide">Read the user guide</a>
+            <a class="button button-primary" href="guide/getting-started"><SiteIcon Name="book" />Set up a channel</a>
+            <a class="button button-secondary" href="install"><SiteIcon Name="server" />Run your own copy</a>
+        </div>
+        <ul class="hero-facts" aria-label="BlokeBot at a glance">
+            <li>Free and open source</li>
+            <li>Desktop and mobile</li>
+            <li>State stays on your server</li>
+        </ul>
+    </div>
+    <DeviceShowcase />
+</section>
+
+<section class="role-strip section-shell" aria-labelledby="choose-path-heading">
+    <div class="section-intro">
+        <p class="eyebrow">Start with your job</p>
+        <h2 id="choose-path-heading">The right instructions, without the infrastructure detour</h2>
+        <p>Most people using BlokeBot do not need to install anything. Pick the path that matches what you are doing today.</p>
+    </div>
+    <div class="path-grid">
+        <a class="path-card path-card--owner" href="guide/getting-started">
+            <span class="path-card__number"><SiteIcon Name="book" />01</span>
+            <span>
+                <strong>Channel owner</strong>
+                <small>Sign in, connect Twitch and choose the tools your channel needs.</small>
+            </span>
+            <SiteIcon Name="arrow" />
+        </a>
+        <a class="path-card path-card--moderator" href="moderators">
+            <span class="path-card__number"><SiteIcon Name="shield" />02</span>
+            <span>
+                <strong>Moderator</strong>
+                <small>Learn what you can operate and why access can change while you are signed in.</small>
+            </span>
+            <SiteIcon Name="arrow" />
+        </a>
+        <a class="path-card path-card--server" href="server-owners">
+            <span class="path-card__number"><SiteIcon Name="server" />03</span>
+            <span>
+                <strong>Server owner</strong>
+                <small>Install, configure Twitch OAuth, provide HTTPS and protect state.</small>
+            </span>
+            <SiteIcon Name="arrow" />
+        </a>
+    </div>
+</section>
+
+<section class="feature-band" aria-labelledby="tools-heading">
+    <div class="section-shell">
+        <div class="section-intro section-intro--light">
+            <p class="eyebrow">One dashboard, practical tools</p>
+            <h2 id="tools-heading">Prepare calmly. Run live. Review afterwards.</h2>
+        </div>
+        <div class="bento-grid">
+            <article class="bento-card bento-card--wide">
+                <span class="feature-icon"><SiteIcon Name="alert" /></span>
+                <h3>Readiness you can act on</h3>
+                <p>Connection state, moderator authority, follower-only chat and delivery failures point to a next action instead of leaving the bot silently offline.</p>
+                <a href="connect">Connect Twitch correctly</a>
+            </article>
+            <article class="bento-card">
+                <span class="feature-icon"><SiteIcon Name="command" /></span>
+                <h3>Commands &amp; messages</h3>
+                <p>Reusable replies, aliases, counters, cooldowns, scheduled chat and native Twitch announcements.</p>
+                <a href="commands">Build a command</a>
+            </article>
+            <article class="bento-card">
+                <span class="feature-icon"><SiteIcon Name="trophy" /></span>
+                <h3>Guessing games</h3>
+                <p>Reusable round types, live votes, history and public rankings.</p>
+                <a href="guessing">Run a round</a>
+            </article>
+            <article class="bento-card">
+                <span class="feature-icon"><SiteIcon Name="coins" /></span>
+                <h3>Points &amp; giveaways</h3>
+                <p>Balances, transfers, gambling, prizes and controlled giveaway entry.</p>
+                <a href="points">Manage points</a>
+            </article>
+            <article class="bento-card bento-card--accent">
+                <span class="feature-icon"><SiteIcon Name="arrow" /></span>
+                <h3>Public leaderboards</h3>
+                <p>Share read-only results without giving viewers dashboard access.</p>
+                <a href="leaderboards">Share a ranking</a>
+            </article>
         </div>
     </div>
-    <MediaFigure
-        Source="media/blokebot-banner.svg"
-        Alt="BlokeBot banner with illustrated chat and dashboard panels."
-        Caption="One place for the channel tools you run with your community." />
 </section>
 
-<section class="section-shell split-section" aria-labelledby="dashboard-heading">
+<section class="docs-callout section-shell" aria-labelledby="docs-heading">
     <div>
-        <p class="eyebrow">Built around your channel</p>
-        <h2 id="dashboard-heading">See what is ready before you go live</h2>
-        <p>The selected channel, connection status and enabled tools stay visible together, so owners and moderators can act on the right channel.</p>
-        <p><a class="text-link" href="dashboard">Explore the dashboard</a></p>
+        <p class="eyebrow">Documentation that follows the product</p>
+        <h2 id="docs-heading">From first sign-in to a backed-up production service</h2>
+        <p>The user guide explains the screen in front of you. Installation and server setup cover the technical boundary separately, including Twitch callbacks, HTTPS, configuration and durable state.</p>
     </div>
-    <MediaFigure
-        Source="media/dashboard-home.png"
-        Alt="BlokeBot dashboard showing Sample Channel, channel setup and enabled chat tools."
-        Caption="The dashboard keeps channel readiness and everyday tools close together." />
-</section>
-
-<section class="section-shell" aria-labelledby="tools-heading">
-    <p class="eyebrow">Choose what fits</p>
-    <h2 id="tools-heading">Practical tools for live communities</h2>
-    <div class="card-grid">
-        <article class="feature-card">
-            <h3><a href="commands">Commands</a></h3>
-            <p>Save reusable replies, counters and scheduled messages for your chat.</p>
-        </article>
-        <article class="feature-card">
-            <h3><a href="guessing">Guessing games</a></h3>
-            <p>Prepare round types, collect guesses and record winners from one live view.</p>
-        </article>
-        <article class="feature-card">
-            <h3><a href="points">Points</a></h3>
-            <p>Give viewers a channel balance with transfers, gambling and prizes.</p>
-        </article>
-        <article class="feature-card">
-            <h3><a href="giveaways">Giveaways</a></h3>
-            <p>Run timed points giveaways with clear eligibility and winner controls.</p>
-        </article>
+    <div class="docs-callout__actions">
+        <a class="button button-primary" href="guide"><SiteIcon Name="book" />Browse the user guide</a>
+        <a class="text-link" href="troubleshooting">Something is not working</a>
     </div>
 </section>

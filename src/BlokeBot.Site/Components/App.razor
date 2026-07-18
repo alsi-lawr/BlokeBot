@@ -46,6 +46,14 @@
                 button.setAttribute("aria-pressed", String(theme === "dark"));
                 button.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
                 button.setAttribute("title", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+
+                for (const media of document.querySelectorAll("[data-theme-media]")) {
+                    const source = theme === "dark"
+                        ? media.dataset.themeDarkSource
+                        : media.dataset.themeLightSource;
+                    if (source && media.getAttribute("src") !== source)
+                        media.setAttribute("src", source);
+                }
             };
 
             applyTheme(document.documentElement.dataset.theme);
