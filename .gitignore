@@ -1,5 +1,7 @@
 # Local configuration and state
 .env
+/MANUAL_VERIFICATION.md
+/blokebot.json
 **/appsettings.Development.json
 *.tokens.json
 *.db
