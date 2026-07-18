@@ -5,7 +5,8 @@ internal sealed record BlokeBotAuthResult(
     BlokeBotAuthStatus Status,
     BlokeBotAuthRetryAction RetryAction,
     BlokeBotAuthReturnAction ReturnAction,
-    string? SupportReference
+    string? SupportReference,
+    BlokeBotAuthContext? Context = null
 ) : IResult
 {
     public Task ExecuteAsync(HttpContext httpContext)
@@ -20,9 +21,12 @@ internal enum BlokeBotAuthOutcome
     Cancelled,
     InvalidOrExpired,
     PermissionOrAccount,
+    WrongAccount,
     ProviderUnavailable,
     Unavailable,
     AccessRequired,
+    NoChannelSelected,
+    CustomBotDisabled,
 }
 
 internal enum BlokeBotAuthStatus
@@ -48,4 +52,19 @@ internal enum BlokeBotAuthReturnAction
     SignIn,
     ChannelSetup,
     Admin,
+}
+
+internal abstract record BlokeBotAuthContext
+{
+    private BlokeBotAuthContext() { }
+
+    internal sealed record Success(BlokeBotAuthSuccessKind Kind) : BlokeBotAuthContext;
+
+    internal sealed record RequiredChannel(string Login) : BlokeBotAuthContext;
+}
+
+internal enum BlokeBotAuthSuccessKind
+{
+    ChannelConnection,
+    BotAccount,
 }

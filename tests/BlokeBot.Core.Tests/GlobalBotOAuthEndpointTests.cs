@@ -121,8 +121,8 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch access saved");
-        page.ShouldContain("BlokeBot has saved this Twitch connection.");
+        page.ShouldContain("Bot account connected");
+        page.ShouldContain("The bot account connection was saved.");
         page.ShouldContain("Return to Admin");
     }
 

@@ -462,7 +462,7 @@ internal static class AuthEndpoints
             context.TraceIdentifier
         );
         return Result(
-            BlokeBotAuthOutcome.InvalidOrExpired,
+            BlokeBotAuthOutcome.ProviderUnavailable,
             BlokeBotAuthStatus.BadRequest,
             BlokeBotAuthRetryAction.SignIn,
             BlokeBotAuthReturnAction.SignIn,
@@ -475,10 +475,11 @@ internal static class AuthEndpoints
         BlokeBotAuthStatus status,
         BlokeBotAuthRetryAction retryAction,
         BlokeBotAuthReturnAction returnAction,
-        string? supportReference = null
+        string? supportReference = null,
+        BlokeBotAuthContext? resultContext = null
     )
     {
-        return new(outcome, status, retryAction, returnAction, supportReference);
+        return new(outcome, status, retryAction, returnAction, supportReference, resultContext);
     }
 
     private abstract record LoginAction

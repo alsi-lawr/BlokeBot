@@ -8,7 +8,7 @@ internal static class BlokeBotAuthResultPage
     public static IResult Render(BlokeBotAuthResult result)
     {
         var encode = (string value) => WebUtility.HtmlEncode(value);
-        var view = View(result.Outcome);
+        var view = View(result);
         var retry = RetryAction(result.RetryAction) is { } action
             ? $"<a class=\"button button-primary\" href=\"{action.Url}\">{action.Text}</a>"
             : string.Empty;
@@ -23,7 +23,7 @@ internal static class BlokeBotAuthResultPage
             <head>
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>{{view.Title}} | BlokeBot</title>
+                <title>{{encode(view.Title)}} | BlokeBot</title>
                 <script>
                     (() => {
                         const storageKey = "blokebot.theme";
@@ -73,10 +73,10 @@ internal static class BlokeBotAuthResultPage
                     <article>
                         <div class="brand">BlokeBot</div>
                         <section role="{{role}}">
-                            <h1>{{view.Title}}</h1>
-                            <p>{{view.Message}}</p>
-                            <p class="change">No changes were made.</p>
-                            <p>{{view.NextAction}}</p>
+                            <h1>{{encode(view.Title)}}</h1>
+                            <p>{{encode(view.Message)}}</p>
+                            <p class="change">{{encode(view.ChangeSummary)}}</p>
+                            <p>{{encode(view.NextAction)}}</p>
                         </section>
                         <div class="actions">
                             {{retry}}
@@ -92,46 +92,99 @@ internal static class BlokeBotAuthResultPage
         return Results.Content(html, "text/html", Encoding.UTF8, (int)result.Status);
     }
 
-    private static BlokeBotAuthResultView View(BlokeBotAuthOutcome outcome)
+    private static BlokeBotAuthResultView View(BlokeBotAuthResult result)
     {
-        return outcome switch
+        return result.Outcome switch
         {
-            BlokeBotAuthOutcome.Success => new(
-                "Twitch access saved",
-                "BlokeBot has saved this Twitch connection.",
-                "You can return or close this window."
-            ),
+            BlokeBotAuthOutcome.Success => SuccessView(result.Context),
             BlokeBotAuthOutcome.Cancelled => new(
                 "Connection cancelled",
                 "Twitch did not finish this connection.",
+                "No changes were made.",
                 "Try again when you are ready."
             ),
             BlokeBotAuthOutcome.InvalidOrExpired => new(
                 "Connection link expired",
                 "This Twitch connection link is no longer valid.",
+                "No changes were made.",
                 "Start a new connection to continue."
             ),
             BlokeBotAuthOutcome.PermissionOrAccount => new(
                 "Twitch access needed",
                 "Use the required Twitch account and approve every requested permission.",
+                "No changes were made.",
                 "Try again after checking the Twitch account and permissions."
             ),
+            BlokeBotAuthOutcome.WrongAccount => WrongAccountView(result.Context),
             BlokeBotAuthOutcome.ProviderUnavailable => new(
                 "Twitch is temporarily unavailable",
                 "BlokeBot could not finish this connection right now.",
+                "No changes were made.",
                 "Try again in a few minutes."
             ),
             BlokeBotAuthOutcome.Unavailable => new(
                 "Twitch connection unavailable",
                 "This Twitch connection is not available yet.",
+                "No changes were made.",
                 "An administrator needs to check the connection settings."
             ),
             BlokeBotAuthOutcome.AccessRequired => new(
                 "Access required",
                 "You do not have access to complete this Twitch connection.",
+                "No changes were made.",
                 "Ask the channel owner or a BlokeBot administrator for help."
             ),
-            _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null),
+            BlokeBotAuthOutcome.NoChannelSelected => new(
+                "Choose a channel to continue",
+                "Choose a channel before connecting Twitch.",
+                "No changes were made.",
+                "Open Channel setup, choose your channel, then try again."
+            ),
+            BlokeBotAuthOutcome.CustomBotDisabled => new(
+                "Turn on the custom bot first",
+                "Turn on the custom bot before connecting it to Twitch.",
+                "No changes were made.",
+                "Enable the custom bot in Channel setup, then try again."
+            ),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(result.Outcome),
+                result.Outcome,
+                null
+            ),
+        };
+    }
+
+    private static BlokeBotAuthResultView SuccessView(BlokeBotAuthContext? context)
+    {
+        return context switch
+        {
+            BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.ChannelConnection) => new(
+                "Twitch access saved",
+                "BlokeBot has saved this Twitch connection.",
+                "Twitch access for this channel was saved.",
+                "Your channel settings have been updated."
+            ),
+            BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.BotAccount) => new(
+                "Bot account connected",
+                "BlokeBot has saved Twitch access for the bot account.",
+                "The bot account connection was saved.",
+                "The bot account connection has been updated."
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
+        };
+    }
+
+    private static BlokeBotAuthResultView WrongAccountView(BlokeBotAuthContext? context)
+    {
+        return context switch
+        {
+            BlokeBotAuthContext.RequiredChannel required => new(
+                "Use the channel account",
+                $"@{required.Login} is the Twitch account needed for this channel.",
+                "No changes were made.",
+                "Reconnect using that channel account."
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(context), context, null),
         };
     }
 
@@ -159,7 +212,12 @@ internal static class BlokeBotAuthResultPage
         };
     }
 
-    private sealed record BlokeBotAuthResultView(string Title, string Message, string NextAction);
+    private sealed record BlokeBotAuthResultView(
+        string Title,
+        string Message,
+        string ChangeSummary,
+        string NextAction
+    );
 
     private sealed record BlokeBotAuthResultAction(string Url, string Text);
 }

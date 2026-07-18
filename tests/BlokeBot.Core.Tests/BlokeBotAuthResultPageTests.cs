@@ -33,26 +33,53 @@ public sealed class BlokeBotAuthResultPageTests
         page.ShouldContain("href=\"/host\">Return to Channel setup</a>");
         page.ShouldContain("type=\"button\" onclick=\"window.close()\">Close window</button>");
         page.ShouldContain("Support reference: <code>ref-42</code>");
+
+        var (_, expiredPage) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.SignIn,
+                BlokeBotAuthReturnAction.SignIn,
+                null
+            )
+        );
+        expiredPage.ShouldContain("Connection link expired");
+        page.ShouldNotContain("Connection link expired");
     }
 
     [Test]
     public async Task Success_RenderingUsesOneStatusWithReturnAndCloseActions()
     {
-        var (statusCode, page) = await RenderAsync(
+        var (statusCode, botAccountPage) = await RenderAsync(
             new BlokeBotAuthResult(
                 BlokeBotAuthOutcome.Success,
                 BlokeBotAuthStatus.Ok,
                 BlokeBotAuthRetryAction.None,
                 BlokeBotAuthReturnAction.ChannelSetup,
-                null
+                null,
+                new BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.BotAccount)
             )
         );
 
         statusCode.ShouldBe(StatusCodes.Status200OK);
-        CountOccurrences(page, "role=\"status\"").ShouldBe(1);
-        page.ShouldNotContain("role=\"alert\"");
-        page.ShouldContain("href=\"/host\">Return to Channel setup</a>");
-        page.ShouldContain("Close window</button>");
+        CountOccurrences(botAccountPage, "role=\"status\"").ShouldBe(1);
+        botAccountPage.ShouldNotContain("role=\"alert\"");
+        botAccountPage.ShouldContain("Bot account connected");
+        botAccountPage.ShouldContain("The bot account connection was saved.");
+        botAccountPage.ShouldContain("href=\"/host\">Return to Channel setup</a>");
+        botAccountPage.ShouldContain("Close window</button>");
+
+        var (_, channelPage) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.Success,
+                BlokeBotAuthStatus.Ok,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null,
+                new BlokeBotAuthContext.Success(BlokeBotAuthSuccessKind.ChannelConnection)
+            )
+        );
+        channelPage.ShouldContain("Twitch access for this channel was saved.");
     }
 
     [Test]
@@ -75,6 +102,46 @@ public sealed class BlokeBotAuthResultPageTests
         entry.Properties["Classification"].ShouldBe("InvalidProviderPayload");
         entry.Properties["FailureType"].ShouldBe("InvalidOperationException");
         entry.Message.ShouldNotContain(Sentinel);
+    }
+
+    [Test]
+    public async Task ContextualFailures_RenderSpecificGuidanceWithAnHtmlEncodedChannelLogin()
+    {
+        var (_, noChannelPage) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.NoChannelSelected,
+                BlokeBotAuthStatus.Forbidden,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null
+            )
+        );
+        var (_, disabledPage) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.CustomBotDisabled,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null
+            )
+        );
+        var (_, wrongAccountPage) = await RenderAsync(
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.WrongAccount,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.ChannelBot,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null,
+                new BlokeBotAuthContext.RequiredChannel("<streamer>&")
+            )
+        );
+
+        noChannelPage.ShouldContain("Choose a channel to continue");
+        noChannelPage.ShouldContain("Open Channel setup");
+        disabledPage.ShouldContain("Turn on the custom bot first");
+        disabledPage.ShouldContain("Enable the custom bot in Channel setup");
+        wrongAccountPage.ShouldContain("@&lt;streamer&gt;&amp; is the Twitch account needed");
+        wrongAccountPage.ShouldNotContain("@<streamer>& is the Twitch account needed");
     }
 
     private static async Task<(int StatusCode, string Page)> RenderAsync(IResult result)

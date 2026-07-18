@@ -55,25 +55,21 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
     }
 
     [Test]
-    public async Task HostBotOAuth_UnexpectedProviderError_ReturnsTemporaryFailureWithoutRawError()
+    public async Task HostBotOAuth_CustomBotDisabledStarting_ReturnsEnableCustomBotGuidance()
     {
         await using var host = await EndpointHost.StartAsync(
             configured: true,
             selectedRole: AuthRole.Streamer,
-            login: "streamer"
+            login: "streamer",
+            endpointScenario: EndpointScenario.HostCustomBotDisabled
         );
 
-        using var request = CallbackRequest(
-            "/oauth/callback?error=provider-secret",
-            "BlokeBot.HostBotState"
-        );
-        using var response = await host.Client.SendAsync(request);
+        using var response = await host.Client.GetAsync("/oauth/host-bot/start");
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldContain("Support reference:");
+        page.ShouldContain("Turn on the custom bot first");
+        page.ShouldContain("Enable the custom bot in Channel setup");
         page.ShouldContain("Return to Channel setup");
-        page.ShouldNotContain("provider-secret");
     }
 }

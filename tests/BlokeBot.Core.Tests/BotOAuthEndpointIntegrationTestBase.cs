@@ -209,6 +209,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     RegisterChannelServices(services, dbFactory, changes, "123", "streamer", []);
                     break;
                 case EndpointScenario.HostMissingPermission:
+                case EndpointScenario.HostCustomBotDisabled:
                     RegisterHostServices(services, dbFactory, changes);
                     break;
                 default:
@@ -467,5 +468,6 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         ChannelWrongAccount,
         ChannelMissingPermission,
         HostMissingPermission,
+        HostCustomBotDisabled,
     }
 }
