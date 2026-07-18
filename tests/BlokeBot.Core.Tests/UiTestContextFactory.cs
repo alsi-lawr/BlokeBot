@@ -25,6 +25,15 @@ internal static class UiTestContextFactory
         string hostLogin = "streamer"
     )
     {
+        return CreateWithAuthorization(dbFactory, hostId, hostLogin).Context;
+    }
+
+    public static UiTestContext CreateWithAuthorization(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        string hostLogin = "streamer"
+    )
+    {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         var events = TestEventBus.Create<AppEventKind>();
@@ -60,8 +69,13 @@ internal static class UiTestContextFactory
             new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(host)),
             new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(host))
         );
-        return context;
+        return new UiTestContext(context, authorization);
     }
+
+    internal sealed record UiTestContext(
+        BunitContext Context,
+        BunitAuthorizationContext Authorization
+    );
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

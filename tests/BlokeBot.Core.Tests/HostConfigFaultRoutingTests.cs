@@ -1,5 +1,4 @@
 using System.Net;
-using System.Security.Claims;
 using System.Text;
 using System.Threading.Channels;
 using BlokeBot.Core.Auth.Moderation;
@@ -22,9 +21,8 @@ using BlokeBot.Twitch;
 using BlokeBot.Twitch.Auth;
 using BlokeBot.Twitch.Runtime;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,7 +40,8 @@ public sealed class HostConfigFaultRoutingTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
         var clock = new ManualTimeProvider();
         var tokens = new ScriptedAppAccessTokenSource();
         tokens.Enqueue(Task.FromException<string>(new TimeoutException()));
@@ -50,11 +49,8 @@ public sealed class HostConfigFaultRoutingTests
         ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
         ConfigureModeratorAuthorityServices(context, tokens);
 
-        var page = RenderAuthorityHostConfigPage(
-            context,
-            AuthenticationState(hostId, AuthRole.Streamer)
-        );
-        await page.Instance.UpdateSessionAsync(AuthenticationState(hostId, AuthRole.Moderator));
+        var page = RenderHostConfigPage(context);
+        SetModeratorClaims(testContext.Authorization, hostId);
 
         ClickAccessMode(page, "Allowed list only");
 
@@ -78,7 +74,8 @@ public sealed class HostConfigFaultRoutingTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
         var clock = new ManualTimeProvider();
         var tokens = new ScriptedAppAccessTokenSource();
         var first = tokens.EnqueuePending();
@@ -86,19 +83,16 @@ public sealed class HostConfigFaultRoutingTests
         ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
         ConfigureModeratorAuthorityServices(context, tokens);
 
-        var page = RenderAuthorityHostConfigPage(
-            context,
-            AuthenticationState(hostId, AuthRole.Streamer)
-        );
-        await page.Instance.UpdateSessionAsync(AuthenticationState(hostId, AuthRole.Moderator));
+        var page = RenderHostConfigPage(context);
+        SetModeratorClaims(testContext.Authorization, hostId);
 
         var firstClick = ClickAccessModeAsync(page, "Allowed list only");
         tokens.RequestCount.ShouldBe(1);
-        ClickAccessMode(page, "All mods");
         var secondClick = ClickAccessModeAsync(page, "Allowed list only");
         tokens.RequestCount.ShouldBe(2);
+        ClickAccessMode(page, "All mods");
 
-        second.SetException(new TimeoutException());
+        second.SetResult("app-token");
         await secondClick;
         first.SetResult("app-token");
         await firstClick;
@@ -195,27 +189,19 @@ public sealed class HostConfigFaultRoutingTests
         );
     }
 
-    private static Task<AuthenticationState> AuthenticationState(int hostId, AuthRole role)
+    private static void SetModeratorClaims(BunitAuthorizationContext authorization, int hostId)
     {
-        var host = new BotHostChoice(hostId, "streamer", "Streamer", role);
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(
-                    ClaimTypes.NameIdentifier,
-                    role == AuthRole.Moderator ? "moderator-id" : "streamer-id"
-                ),
-                new Claim(ClaimTypes.Name, role == AuthRole.Moderator ? "moderator" : "streamer"),
-                new Claim(AuthClaims.Login, role == AuthRole.Moderator ? "moderator" : "streamer"),
-                new Claim(AuthClaims.Role, AuthRoleCodec.Encode(role)),
-                new Claim(AuthClaims.CanCreateHost, "false"),
-                new Claim(AuthClaims.IsBotAdmin, "false"),
-                new Claim(AuthClaims.IsBotAccount, "false"),
-                new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(host)),
-                new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(host)),
-            ],
-            "test"
+        var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
+        authorization.SetClaims(
+            TestPrincipals
+                .BlokeBotUser(
+                    "moderator",
+                    role: AuthRole.Moderator,
+                    availableHosts: [host],
+                    selectedHost: host
+                )
+                .Claims.ToArray()
         );
-        return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity)));
     }
 
     private static async Task AssertCurrentFailureAsync(bool runtimeNotificationFails)
@@ -284,17 +270,6 @@ public sealed class HostConfigFaultRoutingTests
     {
         context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         return context.Render<HostConfigPage>();
-    }
-
-    private static IRenderedComponent<HostConfigAuthorityHarness> RenderAuthorityHostConfigPage(
-        BunitContext context,
-        Task<AuthenticationState> authenticationState
-    )
-    {
-        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
-        return context.Render<HostConfigAuthorityHarness>(parameters =>
-            parameters.Add(x => x.Session, authenticationState)
-        );
     }
 
     private static void ClickAccessMode<TComponent>(
@@ -446,37 +421,6 @@ public sealed class HostConfigFaultRoutingTests
             RequestCount++;
             cancellationToken.ThrowIfCancellationRequested();
             return _tokens.Dequeue();
-        }
-    }
-
-    private sealed class HostConfigAuthorityHarness : ComponentBase
-    {
-        [Parameter]
-        public Task<AuthenticationState> Session { get; set; } =
-            Task.FromResult(new AuthenticationState(new ClaimsPrincipal()));
-
-        public Task UpdateSessionAsync(Task<AuthenticationState> session)
-        {
-            Session = session;
-            return InvokeAsync(StateHasChanged);
-        }
-
-        protected override void BuildRenderTree(RenderTreeBuilder builder)
-        {
-            builder.OpenComponent<CascadingValue<Task<AuthenticationState>>>(0);
-            builder.AddAttribute(1, "Value", Session);
-            builder.AddAttribute(
-                2,
-                "ChildContent",
-                (RenderFragment)(
-                    content =>
-                    {
-                        content.OpenComponent<HostConfigPage>(0);
-                        content.CloseComponent();
-                    }
-                )
-            );
-            builder.CloseComponent();
         }
     }
 
