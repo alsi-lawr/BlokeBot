@@ -94,6 +94,10 @@ public sealed class ModeratorAuthorityService(
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            return new ModeratorAuthorityOutcome.Unavailable();
+        }
         catch (HostBotAppAccessTokenUnavailableException)
         {
             return new ModeratorAuthorityOutcome.Unavailable();

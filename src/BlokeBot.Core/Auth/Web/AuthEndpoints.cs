@@ -302,15 +302,11 @@ internal static class AuthEndpoints
                 ) =>
                 {
                     var currentSession = AuthenticatedSession.FromPrincipal(context.User);
-                    var hosts = currentSession
-                        .AvailableHosts.Where(host =>
-                            host.Id != hostId || host.Role != AuthRole.Moderator
-                        )
-                        .ToArray();
+                    var recovery = ClearRevokedModeratorHost(currentSession, hostId);
                     await session.SignInHostSelectionAsync(
                         context,
-                        hosts,
-                        selectedHost: null,
+                        recovery.Hosts,
+                        recovery.SelectedHost,
                         currentSession.IsBotAdmin,
                         currentSession.AdminEditingLogin
                     );
@@ -433,6 +429,19 @@ internal static class AuthEndpoints
             .AllowAnonymous();
     }
 
+    internal static RecoveredModeratorHostSelection ClearRevokedModeratorHost(
+        AuthenticatedSession session,
+        int hostId
+    )
+    {
+        return new(
+            session
+                .AvailableHosts.Where(host => host.Id != hostId || host.Role != AuthRole.Moderator)
+                .ToArray(),
+            null
+        );
+    }
+
     internal static IResult MapAuthenticationError(
         WebAuthenticationError error,
         HttpContext context,
@@ -543,5 +552,10 @@ internal static class AuthEndpoints
         }
     }
 }
+
+internal sealed record RecoveredModeratorHostSelection(
+    IReadOnlyList<BotHostChoice> Hosts,
+    BotHostChoice? SelectedHost
+);
 
 internal sealed class WebAuthEndpointLog;

@@ -2,12 +2,18 @@ using System.Net;
 using System.Text;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Auth.Web;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using TUnit.Core;
 
@@ -133,6 +139,46 @@ public sealed class ModeratorAuthorityServiceTests
     }
 
     [Test]
+    public async Task ProviderCancellationNotRequestedByCaller_CheckingAuthority_DeniesWithoutCaching()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Tokens.Exception = new OperationCanceledException();
+
+        (
+            await fixture.Service.AuthorizeAsync(
+                Session(AuthRole.Moderator, fixture.HostId),
+                fixture.HostId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<ModeratorAuthorityOutcome.Unavailable>();
+        (
+            await fixture.Service.AuthorizeAsync(
+                Session(AuthRole.Moderator, fixture.HostId),
+                fixture.HostId,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<ModeratorAuthorityOutcome.Unavailable>();
+
+        fixture.Tokens.RequestCount.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task CallerCancellation_CheckingAuthority_PropagatesCancellation()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            fixture.Service.AuthorizeAsync(
+                Session(AuthRole.Moderator, fixture.HostId),
+                fixture.HostId,
+                cancellation.Token
+            )
+        );
+    }
+
+    [Test]
     [Arguments(AuthRole.Streamer)]
     [Arguments(AuthRole.Admin)]
     public async Task BroadcasterAndAdministrator_CheckingAuthority_BypassProvider(AuthRole role)
@@ -186,6 +232,96 @@ public sealed class ModeratorAuthorityServiceTests
         fixture.Helix.RequestCount.ShouldBe(0);
     }
 
+    [Test]
+    public async Task HostMismatch_ExecutingMutation_DoesNotInvokeCallback()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        using var services = MutationServices(fixture, out _, out _);
+        var component = CreateMutationComponent(services, fixture.HostId);
+        var invoked = false;
+
+        await component.MutateAsync(
+            fixture.HostId + 1,
+            () =>
+            {
+                invoked = true;
+                return Task.CompletedTask;
+            }
+        );
+
+        invoked.ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task RevokedModerator_ExecutingMutation_RecoversByClearingModeratorSelection()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Helix.Respond(_ => JsonResponse("""{"data":[],"pagination":{}}"""));
+        using var services = MutationServices(fixture, out _, out var navigation);
+        var component = CreateMutationComponent(services, fixture.HostId);
+        var invoked = false;
+
+        await component.MutateAsync(
+            fixture.HostId,
+            () =>
+            {
+                invoked = true;
+                return Task.CompletedTask;
+            }
+        );
+
+        invoked.ShouldBeFalse();
+        navigation.LastUri.ShouldNotBeNull();
+        navigation.LastUri!.ShouldContain("/auth/recover-moderator-access?hostId=");
+        var revoked = new BotHostChoice(fixture.HostId, "streamer", "Streamer", AuthRole.Moderator);
+        var remaining = new BotHostChoice(99, "other", "Other", AuthRole.Moderator);
+        var recovery = AuthEndpoints.ClearRevokedModeratorHost(
+            Session(AuthRole.Moderator, fixture.HostId) with
+            {
+                AvailableHosts = [revoked, remaining],
+            },
+            fixture.HostId
+        );
+        recovery.SelectedHost.ShouldBeNull();
+        recovery.Hosts.ShouldBe([remaining]);
+    }
+
+    [Test]
+    public async Task UnavailableModerator_ExecutingMutation_LeavesSelectionAndPermitsRetry()
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        fixture.Tokens.Exception = new TimeoutException();
+        using var services = MutationServices(fixture, out _, out var navigation);
+        var component = CreateMutationComponent(services, fixture.HostId);
+        var policyStateChanged = false;
+
+        await component.MutateAsync(
+            fixture.HostId,
+            () =>
+            {
+                policyStateChanged = true;
+                return Task.CompletedTask;
+            }
+        );
+
+        policyStateChanged.ShouldBeFalse();
+        navigation.LastUri.ShouldBeNull();
+        fixture.Tokens.Exception = null;
+        fixture.Helix.Respond(_ => AllowedResponse());
+
+        await component.MutateAsync(
+            fixture.HostId,
+            () =>
+            {
+                policyStateChanged = true;
+                return Task.CompletedTask;
+            }
+        );
+
+        policyStateChanged.ShouldBeTrue();
+        fixture.Tokens.RequestCount.ShouldBe(2);
+    }
+
     private static AuthenticatedSession Session(
         AuthRole role,
         int hostId,
@@ -200,6 +336,33 @@ public sealed class ModeratorAuthorityServiceTests
             Login = "moderator",
             State = new AuthSessionState.Selected(new BotHostSelection(host, [host])),
         };
+    }
+
+    private static ServiceProvider MutationServices(
+        Fixture fixture,
+        out ToastService toasts,
+        out RecordingNavigationManager navigation
+    )
+    {
+        toasts = new ToastService();
+        navigation = new RecordingNavigationManager();
+        return new ServiceCollection()
+            .AddSingleton(fixture.Service)
+            .AddSingleton(toasts)
+            .AddSingleton<NavigationManager>(navigation)
+            .BuildServiceProvider();
+    }
+
+    private static MutationComponent CreateMutationComponent(IServiceProvider services, int hostId)
+    {
+        var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
+        var principal = TestPrincipals.BlokeBotUser(
+            "moderator",
+            role: AuthRole.Moderator,
+            availableHosts: [host],
+            selectedHost: host
+        );
+        return new MutationComponent(Task.FromResult(new AuthenticationState(principal)), services);
     }
 
     private static HttpResponseMessage AllowedResponse()
@@ -298,6 +461,7 @@ public sealed class ModeratorAuthorityServiceTests
         public Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
         {
             RequestCount++;
+            cancellationToken.ThrowIfCancellationRequested();
             if (Exception is { } exception)
             {
                 return Task.FromException<string>(exception);
@@ -348,6 +512,39 @@ public sealed class ModeratorAuthorityServiceTests
                 owner.RequestCount++;
                 return Task.FromResult(owner._responses.Dequeue()(request));
             }
+        }
+    }
+
+    private sealed class MutationComponent : AuthenticatedPageComponent
+    {
+        public MutationComponent(
+            Task<AuthenticationState> authenticationState,
+            IServiceProvider services
+        )
+        {
+            AuthenticationState = authenticationState;
+            PageContexts = new BlokeBotPageContextAccessor();
+            Services = services;
+        }
+
+        public Task MutateAsync(int hostId, Func<Task> mutation)
+        {
+            return RunSelectedHostMutationAsync(hostId, mutation);
+        }
+    }
+
+    private sealed class RecordingNavigationManager : NavigationManager
+    {
+        public RecordingNavigationManager()
+        {
+            Initialize("https://blokebot.test/", "https://blokebot.test/host");
+        }
+
+        public string? LastUri { get; private set; }
+
+        protected override void NavigateToCore(string uri, NavigationOptions options)
+        {
+            LastUri = ToAbsoluteUri(uri).ToString();
         }
     }
 }

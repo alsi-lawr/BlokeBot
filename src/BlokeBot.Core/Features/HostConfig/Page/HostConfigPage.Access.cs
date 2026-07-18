@@ -92,21 +92,21 @@ public partial class HostConfigPage
         await LoadCoreAsync();
     }
 
-    private void SetAllowModsByDefault(int hostId, bool allowByDefault)
+    private Task SetAllowModsByDefaultAsync(int hostId, bool allowByDefault)
     {
         if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        HostModAccessSaveValidator
+        return HostModAccessSaveValidator
             .Validate(hostId, HostModeratorAccessMode.FromAllowModsByDefault(allowByDefault))
             .Match(
                 command =>
-                {
-                    BeginAllowModsByDefaultSave(command, allowByDefault);
-                    return true;
-                },
+                    RunSelectedHostMutationAsync(
+                        hostId,
+                        () => BeginAllowModsByDefaultSaveAsync(command, allowByDefault)
+                    ),
                 errors =>
                 {
                     _toasts.Publish(
@@ -115,16 +115,19 @@ public partial class HostConfigPage
                             "Mod help not saved"
                         )
                     );
-                    return false;
+                    return Task.CompletedTask;
                 }
             );
     }
 
-    private void BeginAllowModsByDefaultSave(HostModAccessSaveCommand command, bool allowByDefault)
+    private Task BeginAllowModsByDefaultSaveAsync(
+        HostModAccessSaveCommand command,
+        bool allowByDefault
+    )
     {
-        if (_state is null)
+        if (_state is null || _state.ModAccess.AllowModsByDefault == allowByDefault)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var previousAccess = _state.ModAccess;
@@ -133,10 +136,8 @@ public partial class HostConfigPage
         {
             ModAccess = previousAccess with { AllowModsByDefault = allowByDefault },
         };
-        _ = RunSelectedHostMutationAsync(
-            command.HostId,
-            () => PersistAllowModsByDefaultAsync(submission)
-        );
+        _ = PersistAllowModsByDefaultAsync(submission);
+        return Task.CompletedTask;
     }
 
     private async Task PersistAllowModsByDefaultAsync(HostModAccessSaveSubmission submission)
