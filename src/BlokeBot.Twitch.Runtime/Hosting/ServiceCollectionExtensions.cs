@@ -115,8 +115,14 @@ public static class ServiceCollectionExtensions
             PublicChatQueueBacklog,
             PublicChatQueueAlertDeadLetter
         >(BotObserverBoundaries.PublicChatQueueAlerts);
+        services.AddContinueAndReportObserverFanOut<
+            PublicChatTerminalRejectionObserverBoundary,
+            PublicChatTerminalRejection,
+            PublicChatTerminalRejectionDeadLetter
+        >(BotObserverBoundaries.PublicChatTerminalRejections);
         services.TryAddSingleton<PublicChatQueueBacklogMonitor>();
         services.TryAddSingleton<PublicChatQueueAlertDispatcher>();
+        services.TryAddSingleton<PublicChatTerminalRejectionDispatcher>();
         services.TryAddSingleton<IPublicChatTransport, HelixPublicChatTransport>();
         services.TryAddSingleton<ChatIdentityResolver>();
         services.TryAddSingleton<PublicChatMessageQueue>();

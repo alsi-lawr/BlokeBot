@@ -13,6 +13,9 @@ public static class BotObserverBoundaries
 
     public static ObserverBoundary PublicChatQueueAlerts { get; } =
         ObserverBoundary.Named("TwitchBot.PublicChat.QueueAlerts");
+
+    public static ObserverBoundary PublicChatTerminalRejections { get; } =
+        ObserverBoundary.Named("TwitchBot.PublicChat.TerminalRejections");
 }
 
 internal sealed class IrcMessageObserverBoundary;
@@ -20,6 +23,8 @@ internal sealed class IrcMessageObserverBoundary;
 internal sealed class EventSubMessageObserverBoundary;
 
 internal sealed class PublicChatQueueAlertObserverBoundary;
+
+internal sealed class PublicChatTerminalRejectionObserverBoundary;
 
 internal sealed record ChatObserverDeadLetter(string Channel) : IObserverDeadLetterPayload;
 
@@ -29,3 +34,6 @@ internal sealed record PublicChatQueueAlertDeadLetter(
     TimeSpan OldestPendingAge,
     DateTimeOffset OldestPendingAt
 ) : IObserverDeadLetterPayload;
+
+internal sealed record PublicChatTerminalRejectionDeadLetter(string Channel, string ProviderCode)
+    : IObserverDeadLetterPayload;

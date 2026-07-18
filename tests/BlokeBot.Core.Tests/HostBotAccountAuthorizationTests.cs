@@ -149,7 +149,11 @@ public sealed class HostBotAccountAuthorizationTests
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
-        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            includeFollowRead: true
+        );
 
         var status = await service.GetStatusAsync(hostId, CancellationToken.None);
 
@@ -367,7 +371,12 @@ public sealed class HostBotAccountAuthorizationTests
                 hostId,
                 CreateCustomBotGrant(
                     "override-token",
-                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
+                    ]
                 )
             )
             .RunAsync(CancellationToken.None);
@@ -380,6 +389,7 @@ public sealed class HostBotAccountAuthorizationTests
                         "chat:read",
                         "chat:edit",
                         Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
                         Scopes.UserManageWhispers,
                     ]
                 )
@@ -393,6 +403,33 @@ public sealed class HostBotAccountAuthorizationTests
         authorized.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
         status.RequiredScopes.ShouldContain(Scopes.UserManageWhispers);
+    }
+
+    [Test]
+    public async Task MissingFollowReadScope_AuthorizingCustomBot_RequiresReconnect()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            includeFollowRead: true
+        );
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+
+        var outcome = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "override-token",
+                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                )
+            )
+            .RunAsync(CancellationToken.None);
+
+        outcome
+            .ShouldBeOfType<HostBotAccountAuthorizationOutcome.MissingScopes>()
+            .Scopes.ShouldBe([Scopes.UserReadFollows]);
     }
 
     [Test]
@@ -443,7 +480,8 @@ public sealed class HostBotAccountAuthorizationTests
     private static HostBotAccountAuthorizationService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         IAccessTokenProvider? tokenProvider,
-        HostBotAccountHttpClientFactory? httpClientFactory = null
+        HostBotAccountHttpClientFactory? httpClientFactory = null,
+        bool includeFollowRead = false
     )
     {
         httpClientFactory ??= new HostBotAccountHttpClientFactory();
@@ -456,7 +494,15 @@ public sealed class HostBotAccountAuthorizationTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
+                    Scopes = includeFollowRead
+                        ?
+                        [
+                            "chat:read",
+                            "chat:edit",
+                            Scopes.UserReadModeratedChannels,
+                            Scopes.UserReadFollows,
+                        ]
+                        : ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
                 },
             }
         );
@@ -524,7 +570,12 @@ public sealed class HostBotAccountAuthorizationTests
                 hostId,
                 CreateCustomBotGrant(
                     "override-token",
-                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
+                    ]
                 )
             )
             .RunAsync(CancellationToken.None);
@@ -542,7 +593,12 @@ public sealed class HostBotAccountAuthorizationTests
                 hostId,
                 CreateCustomBotGrant(
                     "expired-token",
-                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
+                    ],
                     DateTimeOffset.UtcNow.AddMinutes(-1)
                 )
             )

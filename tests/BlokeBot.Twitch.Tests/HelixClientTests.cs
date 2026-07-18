@@ -119,6 +119,78 @@ public sealed class HelixClientTests
     }
 
     [Test]
+    public async Task ChatSettingsPayload_LoadingWithAppToken_ParsesFollowerModeAndDuration()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(request =>
+        {
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/settings");
+            request.RequestUri.Query.ShouldBe("?broadcaster_id=broadcaster-id");
+            request.Headers.Authorization!.Parameter.ShouldBe("app-token");
+            request.Headers.GetValues("Client-Id").Single().ShouldBe("client");
+            return JsonResponse(
+                """
+                {
+                  "data": [
+                    {"follower_mode":true,"follower_mode_duration":15}
+                  ]
+                }
+                """
+            );
+        });
+        var client = new HelixClient(factory);
+
+        var settings = await client.GetChatSettingsAsync(
+            new HelixRequestContext("client", "app-token"),
+            "broadcaster-id",
+            CancellationToken.None
+        );
+
+        settings.FollowerMode.ShouldBeTrue();
+        settings.FollowerModeDuration.ShouldBe(TimeSpan.FromMinutes(15));
+    }
+
+    [Test]
+    public async Task FollowedChannelPayload_CheckingActiveBotFollowStatus_UsesDirectActorQuery()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(request =>
+        {
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/channels/followed");
+            request.RequestUri.Query.ShouldContain("user_id=validated-bot-subject");
+            request.RequestUri.Query.ShouldContain("broadcaster_id=channel-id");
+            request.RequestUri.Query.ShouldNotContain("moderator_id=");
+            request.Headers.Authorization!.Parameter.ShouldBe("bot-token");
+            return JsonResponse(
+                """
+                {
+                  "data": [
+                    {
+                      "user_id":"validated-bot-subject",
+                      "user_login":"bot",
+                      "user_name":"Bot",
+                      "followed_at":"2026-07-18T11:30:00Z"
+                    }
+                  ]
+                }
+                """
+            );
+        });
+        var client = new HelixClient(factory);
+
+        var status = await client.GetFollowedChannelStatusAsync(
+            new HelixRequestContext("client", "bot-token"),
+            "validated-bot-subject",
+            "channel-id",
+            CancellationToken.None
+        );
+
+        status
+            .ShouldBeOfType<ActiveBotFollowStatus.Follows>()
+            .FollowedAtUtc.ShouldBe(new DateTimeOffset(2026, 7, 18, 11, 30, 0, TimeSpan.Zero));
+    }
+
+    [Test]
     public async Task StreamItemMissingRequiredField_CheckingStreamStatus_RejectsPayload()
     {
         var factory = RespondingWith(

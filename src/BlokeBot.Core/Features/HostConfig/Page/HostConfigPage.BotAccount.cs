@@ -8,6 +8,16 @@ namespace BlokeBot.Core.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
+    private string _activeBotAccountName =>
+        _state?.BotOverride.Enabled == true
+            ? _state.BotOverride.Status.AuthorizedLogin
+                ?? _state.BotOverride.Status.ConfiguredBotLogin
+                ?? "the custom bot account"
+            : _botSettings.Identity.BotUsername;
+
+    private string _activeBotReconnectUrl =>
+        _state?.BotOverride.Enabled == true ? "/oauth/host-bot/start" : "/oauth/start";
+
     private bool _botAccountCanStart =>
         _state?.BotOverride.Enabled != true
         || _state.BotOverride.Status.State == BotAccountAuthorizationState.Ready;

@@ -29,6 +29,7 @@ internal static class PublicChatIntegrationTestSupport
         TimeProvider timeProvider,
         BotOptions? options = null,
         IEnumerable<IPublicChatQueueAlertObserver>? observers = null,
+        IEnumerable<IPublicChatTerminalRejectionObserver>? rejectionObservers = null,
         ILogger<PublicChatMessageQueue>? logger = null
     )
     {
@@ -46,7 +47,15 @@ internal static class PublicChatIntegrationTestSupport
             ),
             outbox,
             transport,
-            logger ?? NullLogger<PublicChatMessageQueue>.Instance
+            logger ?? NullLogger<PublicChatMessageQueue>.Instance,
+            new PublicChatTerminalRejectionDispatcher(
+                rejectionObservers ?? [],
+                TestObserverFanOut.FailOnObserverFailure<
+                    PublicChatTerminalRejectionObserverBoundary,
+                    PublicChatTerminalRejection,
+                    PublicChatTerminalRejectionDeadLetter
+                >(BotObserverBoundaries.PublicChatTerminalRejections)
+            )
         );
     }
 

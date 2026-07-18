@@ -45,7 +45,12 @@ public sealed record BotIdentityOptions
     [Required]
     [MinLength(1)]
     public required string[] Scopes { get; set; } =
-    ["chat:read", "chat:edit", BlokeBot.Twitch.Scopes.UserReadModeratedChannels];
+    [
+        "chat:read",
+        "chat:edit",
+        BlokeBot.Twitch.Scopes.UserReadFollows,
+        BlokeBot.Twitch.Scopes.UserReadModeratedChannels,
+    ];
 
     /// <summary>
     /// Gets the token storage path used by the default token store.

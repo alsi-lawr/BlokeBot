@@ -15,7 +15,8 @@ internal sealed class PublicChatMessageQueue(
     PublicChatQueueAlertDispatcher alertDispatcher,
     IPublicChatOutbox outbox,
     IPublicChatTransport transport,
-    ILogger<PublicChatMessageQueue> log
+    ILogger<PublicChatMessageQueue> log,
+    PublicChatTerminalRejectionDispatcher? rejectionDispatcher = null
 )
 {
     private static readonly TimeSpan _claimContentionDelay = TimeSpan.FromMilliseconds(25);
@@ -342,6 +343,37 @@ internal sealed class PublicChatMessageQueue(
         {
             LogOutcome(message, outcome);
         }
+
+        if (
+            recorded is PublicChatClaimUpdate.Applied
+            && outcome
+                is PublicChatDeliveryOutcome.Rejection
+                {
+                    Reason: PublicChatRejectionReason.ProviderCode { Code: var code },
+                }
+        )
+        {
+            await NotifyTerminalRejectionAsync(
+                new PublicChatTerminalRejection(message.Channel, code.Value)
+            );
+        }
+    }
+
+    private async Task NotifyTerminalRejectionAsync(PublicChatTerminalRejection rejection)
+    {
+        if (rejectionDispatcher?.HasObservers != true)
+        {
+            return;
+        }
+
+        try
+        {
+            await rejectionDispatcher.NotifyAsync(rejection, CancellationToken.None);
+        }
+        catch (ObserverFanOutEscalationException escalation)
+        {
+            ReportTerminalRejectionEscalation(escalation, rejection);
+        }
     }
 
     private void LogOutcome(PublicChatClaimedMessage message, PublicChatDeliveryOutcome outcome)
@@ -541,6 +573,20 @@ internal sealed class PublicChatMessageQueue(
             handlingStages,
             handlingFailureTypes,
             correlations
+        );
+    }
+
+    private void ReportTerminalRejectionEscalation(
+        ObserverFanOutEscalationException escalation,
+        PublicChatTerminalRejection rejection
+    )
+    {
+        log.LogError(
+            "Public chat terminal rejection handling escalated for channel #{Channel} and provider code {ProviderCode} after {ObserverFailureCount} observer failures and {HandlingFailureCount} handling failures. Continuing queued chat processing.",
+            rejection.Channel,
+            rejection.ProviderCode,
+            escalation.Failures.Count,
+            escalation.HandlingFailures.Count
         );
     }
 

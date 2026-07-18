@@ -10,7 +10,10 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
 {
     private const string _usersEndpoint = "https://api.twitch.tv/helix/users";
     private const string _streamsEndpoint = "https://api.twitch.tv/helix/streams";
+    private const string _chatSettingsEndpoint = "https://api.twitch.tv/helix/chat/settings";
     private const string _followersEndpoint = "https://api.twitch.tv/helix/channels/followers";
+    private const string _followedChannelsEndpoint =
+        "https://api.twitch.tv/helix/channels/followed";
     private const string _moderatedChannelsEndpoint =
         "https://api.twitch.tv/helix/moderation/channels";
 
@@ -166,6 +169,35 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return payload?.Data.Length > 0;
     }
 
+    public async Task<ChatSettings> GetChatSettingsAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            $"{_chatSettingsEndpoint}?"
+            + QueryString.Create([
+                new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
+            ]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ChatSettingsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        var settings =
+            payload?.Data.SingleOrDefault()
+            ?? throw new JsonException("Twitch did not return chat settings.");
+
+        return new ChatSettings(
+            settings.FollowerMode,
+            settings.FollowerModeDuration is { } duration ? TimeSpan.FromMinutes(duration) : null
+        );
+    }
+
     public async Task<FollowerStatus> GetFollowerStatusAsync(
         HelixRequestContext context,
         string broadcasterId,
@@ -199,6 +231,39 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return payload?.Data.Length > 0
             ? new FollowerStatus.Follows()
             : new FollowerStatus.DoesNotFollow();
+    }
+
+    public async Task<ActiveBotFollowStatus> GetFollowedChannelStatusAsync(
+        HelixRequestContext context,
+        string userId,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            $"{_followedChannelsEndpoint}?"
+            + QueryString.Create(
+                new Dictionary<string, string?>
+                {
+                    ["user_id"] = userId,
+                    ["broadcaster_id"] = broadcasterId,
+                }
+            );
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized)
+        {
+            return new ActiveBotFollowStatus.Unavailable();
+        }
+
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<FollowerResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault() is { } follow
+            ? new ActiveBotFollowStatus.Follows(follow.FollowedAt)
+            : new ActiveBotFollowStatus.DoesNotFollow();
     }
 
     private static string ModeratedChannelsUri(string userId, string? cursor)
@@ -238,6 +303,21 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     {
         [JsonPropertyName("data")]
         public required ImmutableArray<FollowerItem> Data { get; init; }
+    }
+
+    private sealed record ChatSettingsResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<ChatSettingsItem> Data { get; init; }
+    }
+
+    private sealed record ChatSettingsItem
+    {
+        [JsonPropertyName("follower_mode")]
+        public required bool FollowerMode { get; init; }
+
+        [JsonPropertyName("follower_mode_duration")]
+        public required int? FollowerModeDuration { get; init; }
     }
 
     private sealed record StreamItem

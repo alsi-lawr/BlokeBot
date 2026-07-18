@@ -107,6 +107,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
                 DurablePublicChatQueueAlertObserver
             >()
         );
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<
+                IPublicChatTerminalRejectionObserver,
+                DurableFollowerOnlyChatAlertObserver
+            >()
+        );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
@@ -378,6 +384,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostedChannelRuntimeStatusService>();
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
+        services.AddSingleton<FollowerOnlyChatReadinessService>();
         services.AddSingleton<WhisperQuotaService>();
         services.AddSingleton<
             IPrivateDeliveryFailureHandler,

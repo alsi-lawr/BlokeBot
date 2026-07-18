@@ -23,6 +23,7 @@
 @inject NavigationManager _navigation
 @inject TimeProvider _timeProvider
 @inject ToastService _toasts
+@inject BotSettings _botSettings
 
 <PageTitle>BlokeBot | Channel Setup</PageTitle>
 
@@ -65,7 +66,7 @@
     else if (_state.HostId is { } hostId)
     {
         <CollapsibleSection Title="@($"#{_state.DisplayName}")" Description="Connect the bot and start or stop it for your channel." InitiallyOpen="true">
-            <div class="grid gap-3 p-4 lg:grid-cols-3">
+            <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch chat</p>
@@ -76,7 +77,7 @@
                     </div>
                     @if (_state.IsChannelBotAuthorized && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">The bot can chat in this channel.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">Channel chat access is connected. Check follower-only chat below for the active bot account.</p>
                         <div class="mt-2 flex flex-wrap gap-2">
                             <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
                                              Url="/oauth/channel-bot/start"
@@ -114,6 +115,10 @@
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@_state.Login" ReloadKey="@_botAccountStatusReloadKey" />
+                <FollowerOnlyChatStatusPanel HostLogin="@_state.Login"
+                                             BotAccountName="@_activeBotAccountName"
+                                             ReconnectUrl="@_activeBotReconnectUrl"
+                                             ReloadKey="@_botAccountStatusReloadKey" />
                 <div class="runtime-control-card surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>

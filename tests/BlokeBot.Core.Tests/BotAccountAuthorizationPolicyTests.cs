@@ -69,6 +69,25 @@ public sealed class BotAccountAuthorizationPolicyTests
     }
 
     [Test]
+    public async Task MissingFollowReadScope_LoadingConfiguredStatus_RequiresReconnect()
+    {
+        var requiredScopes = RequiredScopes();
+        var grantedScopes = ImmutableArray.Create(Scopes.UserReadModeratedChannels);
+        var status = await LoadConfiguredStatusAsync(
+            new TokenStatus.MissingScopes(
+                "saved-token",
+                Validation(grantedScopes),
+                requiredScopes,
+                grantedScopes,
+                ImmutableArray.Create(Scopes.UserReadFollows)
+            )
+        );
+
+        status.State.ShouldBe(BotAccountAuthorizationState.MissingScopes);
+        status.MissingScopes.ShouldBe([Scopes.UserReadFollows]);
+    }
+
+    [Test]
     public async Task ReadyToken_LoadingConfiguredStatus_ReportsReady()
     {
         var status = await LoadConfiguredStatusAsync(
@@ -154,7 +173,7 @@ public sealed class BotAccountAuthorizationPolicyTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost/oauth/callback",
-                    Scopes = [Scopes.UserReadModeratedChannels],
+                    Scopes = [Scopes.UserReadModeratedChannels, Scopes.UserReadFollows],
                     TokenCachePath = tokenCachePath,
                 },
             }
@@ -197,7 +216,7 @@ public sealed class BotAccountAuthorizationPolicyTests
 
     private static ImmutableArray<string> RequiredScopes()
     {
-        return [Scopes.UserReadModeratedChannels];
+        return [Scopes.UserReadModeratedChannels, Scopes.UserReadFollows];
     }
 
     private static TokenValidation Validation(IEnumerable<string> scopes)
