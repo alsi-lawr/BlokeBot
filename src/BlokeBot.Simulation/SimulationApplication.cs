@@ -28,6 +28,7 @@ internal static class SimulationApplication
                 EnvironmentName = SimulationMode.EnvironmentName,
             }
         );
+        builder.WebHost.UseStaticWebAssets();
         builder.Host.UseSerilog(
             (context, services, logging) =>
             {

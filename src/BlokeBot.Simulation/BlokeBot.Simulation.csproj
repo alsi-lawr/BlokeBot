@@ -15,5 +15,6 @@
     <AssemblyName>BlokeBot.Simulation</AssemblyName>
     <IsPackable>false</IsPackable>
     <IsPublishable>false</IsPublishable>
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 </Project>
