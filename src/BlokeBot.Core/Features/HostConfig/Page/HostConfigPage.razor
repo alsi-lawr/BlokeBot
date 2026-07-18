@@ -114,7 +114,7 @@
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@_state.Login" ReloadKey="@_botAccountStatusReloadKey" />
-                <div class="surface-muted rounded-lg px-3 py-2.5">
+                <div class="runtime-control-card surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
                         <span class="@_runtimeBadgeClass">
@@ -122,7 +122,7 @@
                             @_runtimeText
                         </span>
                     </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div class="runtime-control-actions mt-3">
                         <span class="block min-w-0" title="@_startRuntimeTooltip">
                             <button class="primary-control grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                                     type="button"
@@ -182,35 +182,37 @@
         </div>
 
         <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="true">
-            <div class="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_16rem]">
-                <div class="surface-muted rounded-lg px-3 py-2.5 @(!_state.BotOverride.Enabled ? "opacity-60" : null)">
-                    <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
-                        <input class="h-4 w-4"
-                               type="checkbox"
-                               checked="@_state.BotOverride.WhisperResponsesEnabled"
-                               disabled="@(!_state.BotOverride.Enabled)"
-                               @onchange="args => SetWhisperResponsesEnabledAsync(hostId, args.Value is true)" />
-                        Reply with whispers from the custom bot
-                    </label>
-                    <p class="mt-2 text-xs font-medium text-slate-500">
-                        @(_state.BotOverride.Enabled
-                            ? "Reconnect the custom bot if Twitch asks for more access."
-                            : "Turn on custom bot before enabling whisper responses.")
-                    </p>
-                </div>
+            <div class="p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
-                        <span class="@_whisperQuotaBadgeClass">
-                            <span class="@_whisperQuotaDotClass"></span>
-                            @_whisperQuotaText
-                        </span>
+                    <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
+                        <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
+                            <input class="h-4 w-4"
+                                   type="checkbox"
+                                   checked="@_state.BotOverride.WhisperResponsesEnabled"
+                                   disabled="@(!_state.BotOverride.Enabled)"
+                                   @onchange="args => SetWhisperResponsesEnabledAsync(hostId, args.Value is true)" />
+                            Reply with whispers from the custom bot
+                        </label>
+                        <p class="mt-2 text-xs font-medium text-slate-500">
+                            @(_state.BotOverride.Enabled
+                                ? "Reconnect the custom bot if Twitch asks for more access."
+                                : "Turn on custom bot before enabling whisper responses.")
+                        </p>
                     </div>
-                    <p class="mt-2 text-xs font-medium text-slate-500">
-                        @(_state.BotOverride.WhisperQuota.Exhausted
-                            ? "Twitch has paused whispers to new people for today."
-                            : $"The bot can whisper {_state.BotOverride.WhisperQuota.Remaining} more new people today.")
-                    </p>
+                    <div class="mt-4 border-t border-slate-200 pt-4">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">New people whispered today</p>
+                            <span class="@_whisperQuotaBadgeClass whitespace-nowrap">
+                                <span class="@_whisperQuotaDotClass"></span>
+                                @_whisperQuotaText
+                            </span>
+                        </div>
+                        <p class="mt-2 text-xs font-medium text-slate-500">
+                            @(_state.BotOverride.WhisperQuota.Exhausted
+                                ? "Twitch has paused whispers to new people for today."
+                                : $"The bot can whisper {_state.BotOverride.WhisperQuota.Remaining} more new people today.")
+                        </p>
+                    </div>
                 </div>
             </div>
         </CollapsibleSection>

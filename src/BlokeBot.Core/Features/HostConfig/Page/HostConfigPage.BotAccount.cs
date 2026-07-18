@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Core.Features.Toasts;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
@@ -22,22 +24,31 @@ public partial class HostConfigPage
                 string.Join(",", _state.BotOverride.Status.GrantedScopes)
             );
 
+    private WhisperQuotaPresentation _whisperQuotaPresentation =>
+        WhisperQuotaPresentation.From(_state?.BotOverride.WhisperQuota);
+
     private string _whisperQuotaBadgeClass =>
-        _state?.BotOverride.WhisperQuota.Exhausted == true
-        || _state?.BotOverride.WhisperQuota.Remaining == 0
-            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200"
-            : "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200";
+        _whisperQuotaPresentation.State switch
+        {
+            WhisperQuotaPresentationState.Healthy =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200",
+            WhisperQuotaPresentationState.Caution =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
+            WhisperQuotaPresentationState.Limit =>
+                "inline-flex h-6 items-center gap-1.5 rounded-full bg-red-50 px-2.5 text-xs font-bold text-red-700 ring-1 ring-red-200",
+            _ => throw new UnreachableException(),
+        };
 
     private string _whisperQuotaDotClass =>
-        _state?.BotOverride.WhisperQuota.Exhausted == true
-        || _state?.BotOverride.WhisperQuota.Remaining == 0
-            ? "h-1.5 w-1.5 rounded-full bg-amber-500"
-            : "h-1.5 w-1.5 rounded-full bg-emerald-500";
+        _whisperQuotaPresentation.State switch
+        {
+            WhisperQuotaPresentationState.Healthy => "h-1.5 w-1.5 rounded-full bg-slate-500",
+            WhisperQuotaPresentationState.Caution => "h-1.5 w-1.5 rounded-full bg-amber-500",
+            WhisperQuotaPresentationState.Limit => "h-1.5 w-1.5 rounded-full bg-red-500",
+            _ => throw new UnreachableException(),
+        };
 
-    private string _whisperQuotaText =>
-        _state?.BotOverride.WhisperQuota is { } quota
-            ? $"{quota.RecipientCount} of {quota.Limit}"
-            : "0 of 40";
+    private string _whisperQuotaText => _whisperQuotaPresentation.Text;
 
     private Task SetBotOverrideEnabledAsync(int hostId, bool enabled)
     {
@@ -138,5 +149,32 @@ public partial class HostConfigPage
                 );
             }
         }
+    }
+}
+
+internal enum WhisperQuotaPresentationState
+{
+    Healthy,
+    Caution,
+    Limit,
+}
+
+internal sealed record WhisperQuotaPresentation(string Text, WhisperQuotaPresentationState State)
+{
+    private const int _cautionRecipientCount = 30;
+
+    public static WhisperQuotaPresentation From(WhisperQuotaStatus? status)
+    {
+        var recipientCount = status?.RecipientCount ?? 0;
+        var atLimit =
+            status?.Exhausted == true || recipientCount >= WhisperQuotaService.UniqueRecipientLimit;
+        var displayedRecipientCount = atLimit
+            ? WhisperQuotaService.UniqueRecipientLimit
+            : recipientCount;
+        var state =
+            atLimit ? WhisperQuotaPresentationState.Limit
+            : recipientCount >= _cautionRecipientCount ? WhisperQuotaPresentationState.Caution
+            : WhisperQuotaPresentationState.Healthy;
+        return new($"{displayedRecipientCount}/{WhisperQuotaService.UniqueRecipientLimit}", state);
     }
 }
