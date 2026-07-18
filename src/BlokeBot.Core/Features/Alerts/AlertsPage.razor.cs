@@ -40,10 +40,16 @@ public partial class AlertsPage
             return;
         }
 
-        await _alerts
-            .Acknowledge(HostId, alert.Id, ActorLogin)
-            .ExecuteAsync(CancellationToken.None);
-        await LoadAsync();
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                await _alerts
+                    .Acknowledge(HostId, alert.Id, ActorLogin)
+                    .ExecuteAsync(CancellationToken.None);
+                await LoadAsync();
+            }
+        );
     }
 
     private async Task LoadAsync()

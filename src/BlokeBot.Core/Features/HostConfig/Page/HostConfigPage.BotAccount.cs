@@ -64,7 +64,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(SetBotOverrideEnabledAsync),
-            () => SetBotOverrideEnabledCoreAsync(hostId, enabled)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => SetBotOverrideEnabledCoreAsync(hostId, enabled)
+                )
         );
     }
 
@@ -113,7 +117,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(SetWhisperResponsesEnabledAsync),
-            () => SetWhisperResponsesEnabledCoreAsync(hostId, enabled)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => SetWhisperResponsesEnabledCoreAsync(hostId, enabled)
+                )
         );
     }
 

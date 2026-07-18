@@ -118,31 +118,39 @@ public partial class CustomCommandSettingsPage
 
     private async Task SaveCommandAsync(CustomCommandConfigurationSaveCommand command)
     {
-        var result = await _configuration
-            .SaveConfiguration(HostId, command)
-            .ExecuteAsync(CancellationToken.None);
-        await result.Match(
-            async _ =>
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
             {
-                _config = await _configuration.LoadConfigurationAsync(
-                    HostId,
-                    CancellationToken.None
-                );
-                _nextTemporaryId = -1;
-                _validationErrors = [];
-                _focusTarget = null;
-                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Custom commands saved."));
-            },
-            failure =>
-            {
-                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
-                if (AliasCollisionTarget(failure) is { } target)
-                {
-                    _validationErrors = [new(failure.Message, target)];
-                    FocusValidationTarget(target);
-                }
+                var result = await _configuration
+                    .SaveConfiguration(HostId, command)
+                    .ExecuteAsync(CancellationToken.None);
+                await result.Match(
+                    async _ =>
+                    {
+                        _config = await _configuration.LoadConfigurationAsync(
+                            HostId,
+                            CancellationToken.None
+                        );
+                        _nextTemporaryId = -1;
+                        _validationErrors = [];
+                        _focusTarget = null;
+                        _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>("Custom commands saved.")
+                        );
+                    },
+                    failure =>
+                    {
+                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        if (AliasCollisionTarget(failure) is { } target)
+                        {
+                            _validationErrors = [new(failure.Message, target)];
+                            FocusValidationTarget(target);
+                        }
 
-                return Task.CompletedTask;
+                        return Task.CompletedTask;
+                    }
+                );
             }
         );
     }

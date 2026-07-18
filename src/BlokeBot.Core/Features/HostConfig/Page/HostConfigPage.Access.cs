@@ -32,7 +32,7 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(AddAccessAsync),
-            () => AddAccessCoreAsync(hostId, kind)
+            () => RunSelectedHostMutationAsync(hostId, () => AddAccessCoreAsync(hostId, kind))
         );
     }
 
@@ -56,7 +56,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(RemoveAccessAsync),
-            () => RemoveAccessCoreAsync(hostId, kind, login)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => RemoveAccessCoreAsync(hostId, kind, login)
+                )
         );
     }
 
@@ -70,7 +74,7 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(SetModsEnabledAsync),
-            () => SetModsEnabledCoreAsync(hostId, args)
+            () => RunSelectedHostMutationAsync(hostId, () => SetModsEnabledCoreAsync(hostId, args))
         );
     }
 
@@ -129,7 +133,10 @@ public partial class HostConfigPage
         {
             ModAccess = previousAccess with { AllowModsByDefault = allowByDefault },
         };
-        _ = PersistAllowModsByDefaultAsync(submission);
+        _ = RunSelectedHostMutationAsync(
+            command.HostId,
+            () => PersistAllowModsByDefaultAsync(submission)
+        );
     }
 
     private async Task PersistAllowModsByDefaultAsync(HostModAccessSaveSubmission submission)

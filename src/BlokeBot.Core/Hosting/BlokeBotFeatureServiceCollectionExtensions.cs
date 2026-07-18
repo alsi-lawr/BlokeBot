@@ -408,6 +408,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddScoped<BlokeBotPageContextAccessor>();
         services.AddSingleton<WebAuthConfiguration>();
         services.AddTransient<ModeratedChannelLookupService>();
+        services.AddSingleton<ModeratorAuthorityService>();
         services.AddTransient<WebAuthService>();
         services.AddTransient<WebOAuthClient>();
         services.AddScoped<AuthSessionService>();

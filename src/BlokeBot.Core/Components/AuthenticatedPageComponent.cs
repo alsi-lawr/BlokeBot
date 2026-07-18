@@ -1,4 +1,6 @@
+using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -18,6 +20,9 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
 
     [Inject]
     protected UiFaultTelemetry UiFaults { get; set; } = default!;
+
+    [Inject]
+    protected IServiceProvider Services { get; set; } = default!;
 
     protected BlokeBotPageContext PageContext { get; private set; } = BlokeBotPageContext.Anonymous;
 
@@ -72,6 +77,81 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
             ReportUiFault(operation, exception);
             throw;
         }
+    }
+
+    protected async Task RunSelectedHostMutationAsync(int requestedHostId, Func<Task> mutation)
+    {
+        var pageContext = await LoadPageContextAsync();
+        var selectedHost = pageContext.Session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (
+            selectedHost?.Id == requestedHostId
+            && selectedHost.Role is AuthRole.Streamer or AuthRole.Admin
+        )
+        {
+            await mutation();
+            return;
+        }
+
+        var authority = await Services
+            .GetRequiredService<ModeratorAuthorityService>()
+            .AuthorizeAsync(pageContext.Session, requestedHostId, CancellationToken.None);
+        await authority.Match(
+            _ => mutation(),
+            _ => RecoverModeratorAccessAsync(requestedHostId),
+            _ =>
+            {
+                Services
+                    .GetRequiredService<ToastService>()
+                    .Publish(
+                        ToastRequest<ErrorToastStrategy>.WithTitle(
+                            "Your selected channel changed. Choose a channel and try again.",
+                            "Channel not selected"
+                        )
+                    );
+                return Task.CompletedTask;
+            },
+            _ =>
+            {
+                Services
+                    .GetRequiredService<ToastService>()
+                    .Publish(
+                        ToastRequest<WarningToastStrategy>.WithTitle(
+                            "BlokeBot could not confirm your moderator access. Try again, or find channels and sign in again.",
+                            "Moderator access needs checking"
+                        )
+                    );
+                return Task.CompletedTask;
+            }
+        );
+    }
+
+    private Task RecoverModeratorAccessAsync(int hostId)
+    {
+        Services
+            .GetRequiredService<ToastService>()
+            .Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(
+                    "You no longer have moderator access to this channel. Find channels and sign in again.",
+                    "Moderator access removed"
+                )
+            );
+        Services
+            .GetRequiredService<NavigationManager>()
+            .NavigateTo(
+                $"/auth/recover-moderator-access?hostId={hostId}&returnUrl={Uri.EscapeDataString(CurrentPath())}",
+                forceLoad: true
+            );
+        return Task.CompletedTask;
+    }
+
+    private string CurrentPath()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        return "/" + navigation.ToBaseRelativePath(navigation.Uri);
     }
 
     protected void ReportUiFault(string operation, Exception exception)

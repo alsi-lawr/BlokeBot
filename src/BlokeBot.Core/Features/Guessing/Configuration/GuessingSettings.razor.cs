@@ -149,25 +149,31 @@ public partial class GuessingSettings
 
     private async Task CreateProfileAsync(GuessingProfileCreateCommand command)
     {
-        var selectedId = _config?.Profile.Id;
-        var result = await _configuration
-            .CreateProfile(HostId, command)
-            .ExecuteAsync(CancellationToken.None);
-        await result.Match(
-            async created =>
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
             {
-                _toasts.Publish(new ToastRequest<SuccessToastStrategy>(created.Message));
-                _newProfileName = string.Empty;
-                await LoadConfigurationAsync(
-                    selectedId is { } id
-                        ? new GuessingProfileSelection.Selected(id)
-                        : new GuessingProfileSelection.Default()
+                var selectedId = _config?.Profile.Id;
+                var result = await _configuration
+                    .CreateProfile(HostId, command)
+                    .ExecuteAsync(CancellationToken.None);
+                await result.Match(
+                    async created =>
+                    {
+                        _toasts.Publish(new ToastRequest<SuccessToastStrategy>(created.Message));
+                        _newProfileName = string.Empty;
+                        await LoadConfigurationAsync(
+                            selectedId is { } id
+                                ? new GuessingProfileSelection.Selected(id)
+                                : new GuessingProfileSelection.Default()
+                        );
+                    },
+                    failure =>
+                    {
+                        _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
+                        return Task.CompletedTask;
+                    }
                 );
-            },
-            failure =>
-            {
-                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
-                return Task.CompletedTask;
             }
         );
     }
@@ -200,26 +206,32 @@ public partial class GuessingSettings
 
     private async Task DeleteProfileAsync(GuessingProfileDeleteCommand command)
     {
-        var result = await _configuration
-            .DeleteProfile(HostId, command)
-            .ExecuteAsync(CancellationToken.None);
-        await result.Match(
-            async deleted =>
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
             {
-                _toasts.Publish(new ToastRequest<SuccessToastStrategy>(deleted.Message));
-                await LoadConfigurationAsync(new GuessingProfileSelection.Default());
-            },
-            async failure =>
-            {
-                _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
-                if (
-                    failure
-                    is GuessingProfileDeleteFailure.ProfileNotFound
-                        or GuessingProfileDeleteFailure.ConcurrentEdit
-                )
-                {
-                    await LoadConfigurationAsync(new GuessingProfileSelection.Default());
-                }
+                var result = await _configuration
+                    .DeleteProfile(HostId, command)
+                    .ExecuteAsync(CancellationToken.None);
+                await result.Match(
+                    async deleted =>
+                    {
+                        _toasts.Publish(new ToastRequest<SuccessToastStrategy>(deleted.Message));
+                        await LoadConfigurationAsync(new GuessingProfileSelection.Default());
+                    },
+                    async failure =>
+                    {
+                        _toasts.Publish(new ToastRequest<WarningToastStrategy>(failure.Message));
+                        if (
+                            failure
+                            is GuessingProfileDeleteFailure.ProfileNotFound
+                                or GuessingProfileDeleteFailure.ConcurrentEdit
+                        )
+                        {
+                            await LoadConfigurationAsync(new GuessingProfileSelection.Default());
+                        }
+                    }
+                );
             }
         );
     }
@@ -260,36 +272,46 @@ public partial class GuessingSettings
         bool reloadAfterConcurrentFailure
     )
     {
-        var result = await _configuration
-            .SaveConfiguration(HostId, command)
-            .ExecuteAsync(CancellationToken.None);
-        return await result.Match(
-            async _ =>
+        var saved = false;
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
             {
-                await LoadConfigurationAsync(
-                    new GuessingProfileSelection.Selected(command.ProfileId)
-                );
-                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Guessing settings saved."));
-                return true;
-            },
-            async failure =>
-            {
-                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
-                if (
-                    reloadAfterConcurrentFailure
-                    && failure
-                        is GuessingConfigurationSaveFailure.ProfileNotFound
-                            or GuessingConfigurationSaveFailure.ConcurrentEdit
-                )
-                {
-                    await LoadConfigurationAsync(
-                        new GuessingProfileSelection.Selected(command.ProfileId)
-                    );
-                }
+                var result = await _configuration
+                    .SaveConfiguration(HostId, command)
+                    .ExecuteAsync(CancellationToken.None);
+                saved = await result.Match(
+                    async _ =>
+                    {
+                        await LoadConfigurationAsync(
+                            new GuessingProfileSelection.Selected(command.ProfileId)
+                        );
+                        _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>("Guessing settings saved.")
+                        );
+                        return true;
+                    },
+                    async failure =>
+                    {
+                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        if (
+                            reloadAfterConcurrentFailure
+                            && failure
+                                is GuessingConfigurationSaveFailure.ProfileNotFound
+                                    or GuessingConfigurationSaveFailure.ConcurrentEdit
+                        )
+                        {
+                            await LoadConfigurationAsync(
+                                new GuessingProfileSelection.Selected(command.ProfileId)
+                            );
+                        }
 
-                return false;
+                        return false;
+                    }
+                );
             }
         );
+        return saved;
     }
 
     private Task SelectProfileAsync(ChangeEventArgs args)

@@ -102,7 +102,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(ClearChannelAuthorizationAsync),
-            () => ClearChannelAuthorizationCoreAsync(hostId)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => ClearChannelAuthorizationCoreAsync(hostId)
+                )
         );
     }
 
@@ -121,7 +125,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(ClearBotOverrideAuthorizationAsync),
-            () => ClearBotOverrideAuthorizationCoreAsync(hostId)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => ClearBotOverrideAuthorizationCoreAsync(hostId)
+                )
         );
     }
 
@@ -139,7 +147,10 @@ public partial class HostConfigPage
 
     private Task StartAsync(int hostId)
     {
-        return ObserveUiOperationAsync(nameof(StartAsync), () => StartCoreAsync(hostId));
+        return ObserveUiOperationAsync(
+            nameof(StartAsync),
+            () => RunSelectedHostMutationAsync(hostId, () => StartCoreAsync(hostId))
+        );
     }
 
     private async Task StartCoreAsync(int hostId)
@@ -160,7 +171,10 @@ public partial class HostConfigPage
 
     private Task StopAsync(int hostId)
     {
-        return ObserveUiOperationAsync(nameof(StopAsync), () => StopCoreAsync(hostId));
+        return ObserveUiOperationAsync(
+            nameof(StopAsync),
+            () => RunSelectedHostMutationAsync(hostId, () => StopCoreAsync(hostId))
+        );
     }
 
     private async Task StopCoreAsync(int hostId)

@@ -293,6 +293,35 @@ internal static class AuthEndpoints
             .RequireAuthorization();
 
         app.MapGet(
+                "/auth/recover-moderator-access",
+                async (
+                    HttpContext context,
+                    int hostId,
+                    string? returnUrl,
+                    AuthSessionService session
+                ) =>
+                {
+                    var currentSession = AuthenticatedSession.FromPrincipal(context.User);
+                    var hosts = currentSession
+                        .AvailableHosts.Where(host =>
+                            host.Id != hostId || host.Role != AuthRole.Moderator
+                        )
+                        .ToArray();
+                    await session.SignInHostSelectionAsync(
+                        context,
+                        hosts,
+                        selectedHost: null,
+                        currentSession.IsBotAdmin,
+                        currentSession.AdminEditingLogin
+                    );
+                    return Results.Redirect(
+                        $"/auth/login?start=true&returnUrl={Uri.EscapeDataString(LocalReturnUrl.OrFallback(returnUrl, "/"))}"
+                    );
+                }
+            )
+            .RequireAuthorization();
+
+        app.MapGet(
                 "/admin/select-host",
                 async (
                     HttpContext context,

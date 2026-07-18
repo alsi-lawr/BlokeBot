@@ -78,7 +78,11 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(SetFeatureEnabledAsync),
-            () => SetFeatureEnabledCoreAsync(hostId, feature, enabled)
+            () =>
+                RunSelectedHostMutationAsync(
+                    hostId,
+                    () => SetFeatureEnabledCoreAsync(hostId, feature, enabled)
+                )
         );
     }
 

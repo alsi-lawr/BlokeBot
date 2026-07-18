@@ -139,23 +139,31 @@ public partial class PointsConfigurationPage
 
     private async Task SaveCommandAsync(PointsConfigurationSaveCommand command)
     {
-        var result = await _configuration
-            .SaveConfiguration(HostId, command)
-            .ExecuteAsync(CancellationToken.None);
-        await result.Match(
-            async _ =>
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
             {
-                _config = await _configuration.LoadConfigurationAsync(
-                    HostId,
-                    CancellationToken.None
+                var result = await _configuration
+                    .SaveConfiguration(HostId, command)
+                    .ExecuteAsync(CancellationToken.None);
+                await result.Match(
+                    async _ =>
+                    {
+                        _config = await _configuration.LoadConfigurationAsync(
+                            HostId,
+                            CancellationToken.None
+                        );
+                        _validationErrors = [];
+                        _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>("Points settings saved.")
+                        );
+                    },
+                    failure =>
+                    {
+                        _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                        return Task.CompletedTask;
+                    }
                 );
-                _validationErrors = [];
-                _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Points settings saved."));
-            },
-            failure =>
-            {
-                _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
-                return Task.CompletedTask;
             }
         );
     }

@@ -360,44 +360,50 @@ public partial class GuessingDashboard
             return;
         }
 
-        var execution = await operation().ExecuteAsync(CancellationToken.None);
-        var result = execution.Match(value => value, _ => throw new UnreachableException());
-        if (result is GuessingOperationOutcome.Succeeded)
-        {
-            var outcome = await _chat.SendAsync(
-                Host!.Login,
-                result.Message,
-                new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-                CancellationToken.None
-            );
-            outcome
-                .Match<Action>(
-                    _ => () => PublishResult(result),
-                    _ =>
-                        () =>
-                            _toasts.Publish(
-                                new ToastRequest<WarningToastStrategy>(
-                                    "The action completed, but its chat message could not be queued."
-                                )
-                            )
-                )
-                .Invoke();
-        }
-        else
-        {
-            PublishResult(result);
-        }
-        await LoadAsync();
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var execution = await operation().ExecuteAsync(CancellationToken.None);
+                var result = execution.Match(value => value, _ => throw new UnreachableException());
+                if (result is GuessingOperationOutcome.Succeeded)
+                {
+                    var outcome = await _chat.SendAsync(
+                        Host!.Login,
+                        result.Message,
+                        new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+                        CancellationToken.None
+                    );
+                    outcome
+                        .Match<Action>(
+                            _ => () => PublishResult(result),
+                            _ =>
+                                () =>
+                                    _toasts.Publish(
+                                        new ToastRequest<WarningToastStrategy>(
+                                            "The action completed, but its chat message could not be queued."
+                                        )
+                                    )
+                        )
+                        .Invoke();
+                }
+                else
+                {
+                    PublishResult(result);
+                }
+                await LoadAsync();
 
-        if (_leaderboard is not null)
-        {
-            await LoadLeaderboardAsync();
-        }
+                if (_leaderboard is not null)
+                {
+                    await LoadLeaderboardAsync();
+                }
 
-        if (_recentRounds is not null)
-        {
-            await LoadRecentRoundsAsync();
-        }
+                if (_recentRounds is not null)
+                {
+                    await LoadRecentRoundsAsync();
+                }
+            }
+        );
     }
 
     private void PublishResult(GuessingOperationOutcome result)

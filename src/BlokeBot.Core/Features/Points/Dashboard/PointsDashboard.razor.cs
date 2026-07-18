@@ -176,9 +176,15 @@ public partial class PointsDashboard
             return;
         }
 
-        var result = await operation();
-        PublishResult(result);
-        await LoadAsync();
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var result = await operation();
+                PublishResult(result);
+                await LoadAsync();
+            }
+        );
     }
 
     private Task StartGiveawayAsync()
