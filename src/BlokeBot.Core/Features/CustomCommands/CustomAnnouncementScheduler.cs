@@ -146,6 +146,7 @@ internal sealed class CustomAnnouncementScheduler(
         if (announcement.OccurrenceStatus == AnnouncementOccurrenceStatus.Attempting)
         {
             CompleteOccurrence(announcement, AnnouncementOccurrenceStatus.TerminalAmbiguous, now);
+            announcement.LatestDeliveryResult = CustomAnnouncementLatestDeliveryResult.Ambiguous;
             await db.SaveChangesAsync(cancellationToken);
             LogTerminal(announcement, candidate, "InterruptedAttempt");
             return;
@@ -248,11 +249,25 @@ internal sealed class CustomAnnouncementScheduler(
         await db.SaveChangesAsync(cancellationToken);
 
         var outcome = await sender.EnqueueAsync(
-            candidate.HostLogin,
-            message,
-            expiresAt,
+            new CustomAnnouncementDeliveryRequest(
+                candidate.HostLogin,
+                message,
+                expiresAt,
+                announcement.DeliveryType,
+                announcement.AnnouncementColor
+            ),
             cancellationToken
         );
+        announcement.LatestDeliveryResult = outcome switch
+        {
+            AnnouncementEnqueueOutcome.Accepted accepted => accepted.LatestDeliveryResult,
+            AnnouncementEnqueueOutcome.SafePreEnqueueTransient transient =>
+                transient.LatestDeliveryResult,
+            AnnouncementEnqueueOutcome.Rejected rejected => rejected.LatestDeliveryResult,
+            AnnouncementEnqueueOutcome.Ambiguous ambiguous => ambiguous.LatestDeliveryResult,
+            AnnouncementEnqueueOutcome.Unexpected unexpected => unexpected.LatestDeliveryResult,
+            _ => throw new UnreachableException("Unknown announcement enqueue outcome."),
+        };
         string? terminalReason = null;
         switch (outcome)
         {

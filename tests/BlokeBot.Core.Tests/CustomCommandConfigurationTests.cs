@@ -81,6 +81,12 @@ public sealed class CustomCommandConfigurationTests
                         Name = "Reminder",
                         Enabled = false,
                         MessageLibraryEntryId = -1,
+                        DeliveryType = CustomAnnouncementDeliveryType.TwitchAnnouncement,
+                        AnnouncementColor = BlokeBot
+                            .Persistence
+                            .Models
+                            .TwitchAnnouncementColor
+                            .Purple,
                         RetryDelaySeconds = 3,
                         OccurrenceLifetimeSeconds = 45,
                         Schedule = new WeeklyCustomAnnouncementScheduleEditor
@@ -121,6 +127,11 @@ public sealed class CustomCommandConfigurationTests
         announcement.Name.ShouldBe("Reminder");
         announcement.Enabled.ShouldBeFalse();
         announcement.MessageLibraryEntryId.ShouldBe(entry.Id);
+        announcement.DeliveryType.ShouldBe(CustomAnnouncementDeliveryType.TwitchAnnouncement);
+        announcement.AnnouncementColor.ShouldBe(
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Purple
+        );
+        announcement.LatestDeliveryResult.ShouldBe(CustomAnnouncementLatestDeliveryResult.None);
         announcement.RetryDelaySeconds.ShouldBe(3);
         announcement.OccurrenceLifetimeSeconds.ShouldBe(45);
         var schedule =
@@ -424,6 +435,20 @@ public sealed class CustomCommandConfigurationTests
         (await db.CustomAnnouncementDeliveryPolicies.CountAsync()).ShouldBe(0);
     }
 
+    [Test]
+    public void NativeAnnouncementReplyOver500Characters_Validating_ReturnsBusinessError()
+    {
+        var configuration = ConfigurationWithAnnouncement(
+            new IntervalCustomAnnouncementScheduleEditor()
+        );
+        configuration.Announcements.Single().DeliveryType =
+            CustomAnnouncementDeliveryType.TwitchAnnouncement;
+        configuration.MessageEntries.Single().Variants.Single().Text = new string('x', 501);
+
+        ValidationErrors(configuration)
+            .ShouldContain(error => error.Message.Contains("at most 500 characters"));
+    }
+
     private static CustomCommandConfiguration ConfigurationWithCommands(
         params (string Name, string Aliases)[] commands
     )
@@ -487,8 +512,23 @@ public sealed class CustomCommandConfigurationTests
             new CustomCommandAliasRegistry(),
             new CustomCommandConfigurationGraphWriter(dbFactory, TimeProvider.System),
             new HostCustomCommandSettingsService(dbFactory, events),
+            new AvailableTwitchAnnouncementReadinessProvider(),
             events
         );
+    }
+
+    private sealed class AvailableTwitchAnnouncementReadinessProvider
+        : ITwitchAnnouncementReadinessProvider
+    {
+        public Task<TwitchAnnouncementReadiness> GetReadinessAsync(
+            string channelLogin,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(
+                new TwitchAnnouncementReadiness(TwitchAnnouncementAvailability.Available, "bot")
+            );
+        }
     }
 
     private static CustomCommandConfigurationSaveCommand ValidCommand(

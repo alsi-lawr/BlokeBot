@@ -248,6 +248,124 @@ public sealed class TransportClientTests
         );
     }
 
+    [Test]
+    public async Task NativeAnnouncement_Sending_UsesActiveBotModeratorIdentityAndSelectedColor()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            async (request, cancellationToken) =>
+            {
+                AssertContext(request, HttpMethod.Post, "/helix/chat/announcements");
+                request.RequestUri!.Query.ShouldContain("broadcaster_id=channel-id");
+                request.RequestUri.Query.ShouldContain("moderator_id=validated-bot-subject");
+                using var payload = JsonDocument.Parse(
+                    await request.Content!.ReadAsStringAsync(cancellationToken)
+                );
+                payload
+                    .RootElement.GetProperty("message")
+                    .GetString()
+                    .ShouldBe("Native announcement");
+                payload.RootElement.GetProperty("color").GetString().ShouldBe("purple");
+                return new HttpResponseMessage(HttpStatusCode.NoContent);
+            }
+        );
+        var client = new ChatAnnouncementClient(factory);
+
+        var result = await client.SendAsync(
+            Context(),
+            "channel-id",
+            "validated-bot-subject",
+            "Native announcement",
+            TwitchAnnouncementColor.Purple,
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ChatAnnouncementSendResult.Sent>();
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.BadRequest, typeof(ChatAnnouncementSendResult.Invalid))]
+    [Arguments(HttpStatusCode.Unauthorized, typeof(ChatAnnouncementSendResult.PermissionDenied))]
+    [Arguments(HttpStatusCode.Forbidden, typeof(ChatAnnouncementSendResult.PermissionDenied))]
+    [Arguments(HttpStatusCode.TooManyRequests, typeof(ChatAnnouncementSendResult.RateLimited))]
+    [Arguments(HttpStatusCode.InternalServerError, typeof(ChatAnnouncementSendResult.Ambiguous))]
+    [Arguments(HttpStatusCode.NotFound, typeof(ChatAnnouncementSendResult.Unexpected))]
+    public async Task NativeAnnouncement_ResponseStatus_MapsTypedResult(
+        HttpStatusCode statusCode,
+        Type expectedResultType
+    )
+    {
+        var client = new ChatAnnouncementClient(RespondingWith(statusCode));
+
+        var result = await client.SendAsync(
+            Context(),
+            "channel-id",
+            "validated-bot-subject",
+            "Native announcement",
+            TwitchAnnouncementColor.Primary,
+            CancellationToken.None
+        );
+
+        result.GetType().ShouldBe(expectedResultType);
+    }
+
+    [Test]
+    public async Task NativeAnnouncement_InvalidLength_DoesNotSend()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        var client = new ChatAnnouncementClient(factory);
+
+        var result = await client.SendAsync(
+            Context(),
+            "channel-id",
+            "validated-bot-subject",
+            new string('x', 501),
+            TwitchAnnouncementColor.Primary,
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        factory.RequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task NativeAnnouncement_UnsupportedColor_DoesNotSend()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        var client = new ChatAnnouncementClient(factory);
+
+        var result = await client.SendAsync(
+            Context(),
+            "channel-id",
+            "validated-bot-subject",
+            "Native announcement",
+            (TwitchAnnouncementColor)99,
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ChatAnnouncementSendResult.Invalid>();
+        factory.RequestCount.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task NativeAnnouncement_TransportFailure_RemainsAmbiguous()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond((_, _) => throw new HttpRequestException("connection lost"));
+        var client = new ChatAnnouncementClient(factory);
+
+        var result = await client.SendAsync(
+            Context(),
+            "channel-id",
+            "validated-bot-subject",
+            "Native announcement",
+            TwitchAnnouncementColor.Primary,
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
+    }
+
     private static void AssertContext(
         HttpRequestMessage request,
         HttpMethod method,

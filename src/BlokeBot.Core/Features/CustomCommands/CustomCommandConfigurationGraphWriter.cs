@@ -254,6 +254,8 @@ public sealed class CustomCommandConfigurationGraphWriter(
             announcement.Name = TemporaryName("announcement", editor.Id);
             announcement.Enabled = editor.Enabled;
             announcement.MessageLibraryEntryId = messageEntries[editor.MessageLibraryEntryId].Id;
+            announcement.DeliveryType = editor.DeliveryType;
+            announcement.AnnouncementColor = editor.AnnouncementColor;
             announcement.Schedule = CustomCommandConfigurationMapper.ScheduleMatches(
                 announcement.Schedule,
                 editor.Schedule

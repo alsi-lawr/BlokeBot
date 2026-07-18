@@ -9,6 +9,15 @@ public sealed partial class BlokeBotDbContext
     private static readonly string[] _announcementOccurrenceStatuses =
         PersistedEnumTokens<AnnouncementOccurrenceStatus>.Values.ToArray();
 
+    private static readonly string[] _customAnnouncementDeliveryTypes =
+        PersistedEnumTokens<CustomAnnouncementDeliveryType>.Values.ToArray();
+
+    private static readonly string[] _twitchAnnouncementColors =
+        PersistedEnumTokens<TwitchAnnouncementColor>.Values.ToArray();
+
+    private static readonly string[] _customAnnouncementLatestDeliveryResults =
+        PersistedEnumTokens<CustomAnnouncementLatestDeliveryResult>.Values.ToArray();
+
     private static readonly string[] _customAnnouncementScheduleTypes =
     [
         IntervalCustomAnnouncementSchedule.Discriminator,
@@ -32,6 +41,18 @@ public sealed partial class BlokeBotDbContext
                     t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceStatus",
                         KindIn("OccurrenceStatus", _announcementOccurrenceStatuses)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_DeliveryType",
+                        KindIn("DeliveryType", _customAnnouncementDeliveryTypes)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_AnnouncementColor",
+                        KindIn("AnnouncementColor", _twitchAnnouncementColors)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_announcements_LatestDeliveryResult",
+                        KindIn("LatestDeliveryResult", _customAnnouncementLatestDeliveryResults)
                     );
                     t.HasCheckConstraint(
                         "CK_custom_announcements_OccurrenceState",
@@ -84,6 +105,29 @@ public sealed partial class BlokeBotDbContext
                     value => PersistedEnumTokens<AnnouncementOccurrenceStatus>.Parse(value)
                 )
                 .HasMaxLength(40);
+            b.Property(x => x.DeliveryType)
+                .HasConversion(
+                    value => PersistedEnumTokens<CustomAnnouncementDeliveryType>.Format(value),
+                    value => PersistedEnumTokens<CustomAnnouncementDeliveryType>.Parse(value)
+                )
+                .HasMaxLength(32)
+                .HasDefaultValue(CustomAnnouncementDeliveryType.ChatMessage);
+            b.Property(x => x.AnnouncementColor)
+                .HasConversion(
+                    value => PersistedEnumTokens<TwitchAnnouncementColor>.Format(value),
+                    value => PersistedEnumTokens<TwitchAnnouncementColor>.Parse(value)
+                )
+                .HasMaxLength(16)
+                .HasDefaultValue(TwitchAnnouncementColor.Primary);
+            b.Property(x => x.LatestDeliveryResult)
+                .HasConversion(
+                    value =>
+                        PersistedEnumTokens<CustomAnnouncementLatestDeliveryResult>.Format(value),
+                    value =>
+                        PersistedEnumTokens<CustomAnnouncementLatestDeliveryResult>.Parse(value)
+                )
+                .HasMaxLength(20)
+                .HasDefaultValue(CustomAnnouncementLatestDeliveryResult.None);
             b.Property(x => x.OccurrenceMessage).HasMaxLength(500);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
             b.HasOne<BotHost>()

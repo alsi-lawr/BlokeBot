@@ -8,5 +8,6 @@ public sealed class BlokeBotDatabaseInitializer(IDbContextFactory<BlokeBotDbCont
     {
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await CustomAnnouncementSchemaUpgrade.ApplyAsync(db, cancellationToken);
     }
 }

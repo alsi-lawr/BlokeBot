@@ -145,6 +145,8 @@ public sealed record CustomAnnouncementValue(
     string Name,
     bool Enabled,
     int MessageLibraryEntryId,
+    CustomAnnouncementDeliveryType DeliveryType,
+    BlokeBot.Persistence.Models.TwitchAnnouncementColor AnnouncementColor,
     AnnouncementRetryDelay RetryDelay,
     AnnouncementOccurrenceLifetime OccurrenceLifetime,
     CustomAnnouncementScheduleValue Schedule

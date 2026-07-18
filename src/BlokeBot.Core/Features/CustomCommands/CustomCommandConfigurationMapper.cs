@@ -67,6 +67,9 @@ internal static class CustomCommandConfigurationMapper
             Name = announcement.Name,
             Enabled = announcement.Enabled,
             MessageLibraryEntryId = announcement.MessageLibraryEntryId,
+            DeliveryType = announcement.DeliveryType,
+            AnnouncementColor = announcement.AnnouncementColor,
+            LatestDeliveryResult = announcement.LatestDeliveryResult,
             RetryDelaySeconds = ToWholeSeconds(
                 RequireRetryUntilExpiredThenSkip(announcement.DeliveryPolicy).RetryDelay.Value
             ),

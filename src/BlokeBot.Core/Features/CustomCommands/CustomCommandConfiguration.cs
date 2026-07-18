@@ -14,6 +14,9 @@ public sealed class CustomCommandConfiguration
 
     public List<CustomAnnouncementEditor> Announcements { get; set; } = [];
 
+    public TwitchAnnouncementReadiness TwitchAnnouncementReadiness { get; set; } =
+        new(TwitchAnnouncementAvailability.Unavailable, string.Empty);
+
     public CustomCommandAlertSummary AlertSummary { get; set; } = new();
 }
 
@@ -135,6 +138,15 @@ public sealed class CustomAnnouncementEditor
 
     public int MessageLibraryEntryId { get; set; }
 
+    public CustomAnnouncementDeliveryType DeliveryType { get; set; } =
+        CustomAnnouncementDeliveryType.ChatMessage;
+
+    public BlokeBot.Persistence.Models.TwitchAnnouncementColor AnnouncementColor { get; set; } =
+        BlokeBot.Persistence.Models.TwitchAnnouncementColor.Primary;
+
+    public CustomAnnouncementLatestDeliveryResult LatestDeliveryResult { get; set; } =
+        CustomAnnouncementLatestDeliveryResult.None;
+
     public int RetryDelaySeconds { get; set; } = 2;
 
     public int OccurrenceLifetimeSeconds { get; set; } = 30;
@@ -188,6 +200,19 @@ public sealed class CustomAnnouncementEditor
 
     public int ChatMessagesSinceLastSent { get; set; }
 }
+
+public enum TwitchAnnouncementAvailability
+{
+    Available,
+    ReconnectRequired,
+    AuthorityRequired,
+    Unavailable,
+}
+
+public sealed record TwitchAnnouncementReadiness(
+    TwitchAnnouncementAvailability Availability,
+    string BotLogin
+);
 
 public enum CustomAnnouncementScheduleKind
 {

@@ -36,6 +36,9 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
             stored.DeliveryPolicy.ShouldBeOfType<RetryUntilExpiredThenSkipCustomAnnouncementDeliveryPolicy>();
         policy.RetryDelay.Value.ShouldBe(TimeSpan.FromSeconds(2));
         policy.OccurrenceLifetime.Value.ShouldBe(TimeSpan.FromSeconds(30));
+        stored.DeliveryType.ShouldBe(CustomAnnouncementDeliveryType.ChatMessage);
+        stored.AnnouncementColor.ShouldBe(TwitchAnnouncementColor.Primary);
+        stored.LatestDeliveryResult.ShouldBe(CustomAnnouncementLatestDeliveryResult.None);
 
         var discriminator = await readDb
             .Database.SqlQueryRaw<string>(
@@ -45,6 +48,31 @@ public sealed class AnnouncementDeliveryPolicyPersistenceTests
         discriminator.ShouldBe(
             nameof(CustomAnnouncementDeliveryPolicyKind.RetryUntilExpiredThenSkip)
         );
+    }
+
+    [Test]
+    public async Task TwitchAnnouncementDelivery_Saving_RoundTripsTypeColorAndLatestResult()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        int announcementId;
+
+        await using (var writeDb = await dbFactory.CreateDbContextAsync())
+        {
+            var hostId = await CreateHostAsync(writeDb);
+            var announcement = CreateAnnouncement(hostId);
+            announcement.DeliveryType = CustomAnnouncementDeliveryType.TwitchAnnouncement;
+            announcement.AnnouncementColor = TwitchAnnouncementColor.Purple;
+            announcement.LatestDeliveryResult = CustomAnnouncementLatestDeliveryResult.Ambiguous;
+            writeDb.Add(announcement);
+            await writeDb.SaveChangesAsync();
+            announcementId = announcement.Id;
+        }
+
+        await using var readDb = await dbFactory.CreateDbContextAsync();
+        var stored = await readDb.CustomAnnouncements.SingleAsync(x => x.Id == announcementId);
+        stored.DeliveryType.ShouldBe(CustomAnnouncementDeliveryType.TwitchAnnouncement);
+        stored.AnnouncementColor.ShouldBe(TwitchAnnouncementColor.Purple);
+        stored.LatestDeliveryResult.ShouldBe(CustomAnnouncementLatestDeliveryResult.Ambiguous);
     }
 
     [Test]

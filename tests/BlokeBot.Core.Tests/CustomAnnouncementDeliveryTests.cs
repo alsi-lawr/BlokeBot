@@ -14,6 +14,59 @@ namespace BlokeBot.Core.Tests;
 public sealed class CustomAnnouncementDeliveryTests : CustomAnnouncementSchedulerTestBase
 {
     [Test]
+    public async Task NativeRateLimit_RunningTick_PersistsRetryResultAndRetainsSelectedMessage()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var hostId = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            changedAtUtc: now.AddHours(-1).UtcDateTime
+        );
+        var seed = await SeedAnnouncementAsync(
+            dbFactory,
+            hostId,
+            new IntervalCustomAnnouncementSchedule { IntervalMinutes = 30 },
+            ["Selected reply"],
+            now.AddMinutes(-30).UtcDateTime
+        );
+        await using (var configure = await dbFactory.CreateDbContextAsync())
+        {
+            var announcement = await configure.CustomAnnouncements.SingleAsync(x =>
+                x.Id == seed.AnnouncementId
+            );
+            announcement.DeliveryType = CustomAnnouncementDeliveryType.TwitchAnnouncement;
+            announcement.AnnouncementColor = BlokeBot
+                .Persistence
+                .Models
+                .TwitchAnnouncementColor
+                .Green;
+            await configure.SaveChangesAsync();
+        }
+        var sender = new ScriptedAnnouncementSender(
+            new AnnouncementEnqueueOutcome.SafePreEnqueueTransient(
+                new AnnouncementEnqueueFailureType("RateLimited"),
+                CustomAnnouncementLatestDeliveryResult.RateLimitRetry
+            )
+        );
+
+        await CreateScheduler(dbFactory, new ManualTimeProvider(now), sender)
+            .RunTickAsync(CancellationToken.None);
+
+        sender
+            .Calls.Single()
+            .DeliveryType.ShouldBe(CustomAnnouncementDeliveryType.TwitchAnnouncement);
+        sender
+            .Calls.Single()
+            .AnnouncementColor.ShouldBe(BlokeBot.Persistence.Models.TwitchAnnouncementColor.Green);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var stored = await verify.CustomAnnouncements.SingleAsync(x => x.Id == seed.AnnouncementId);
+        stored.OccurrenceStatus.ShouldBe(AnnouncementOccurrenceStatus.RetryScheduled);
+        stored.OccurrenceMessage.ShouldBe("Selected reply");
+        stored.LatestDeliveryResult.ShouldBe(CustomAnnouncementLatestDeliveryResult.RateLimitRetry);
+    }
+
+    [Test]
     public async Task DifferentPolicies_SafeTransientThenRestart_RetryAtPersistedOwnDelays()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

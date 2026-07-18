@@ -148,7 +148,9 @@ public abstract class CustomAnnouncementSchedulerTestBase
     private protected sealed record AnnouncementEnqueueCall(
         string Channel,
         string Message,
-        DateTimeOffset ExpiresAt
+        DateTimeOffset ExpiresAt,
+        CustomAnnouncementDeliveryType DeliveryType,
+        BlokeBot.Persistence.Models.TwitchAnnouncementColor AnnouncementColor
     );
 
     private protected sealed class ScriptedAnnouncementSender(
@@ -160,14 +162,20 @@ public abstract class CustomAnnouncementSchedulerTestBase
         public List<AnnouncementEnqueueCall> Calls { get; } = [];
 
         public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-            string channel,
-            string message,
-            DateTimeOffset expiresAt,
+            CustomAnnouncementDeliveryRequest request,
             CancellationToken cancellationToken
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Calls.Add(new AnnouncementEnqueueCall(channel, message, expiresAt));
+            Calls.Add(
+                new AnnouncementEnqueueCall(
+                    request.Channel,
+                    request.Message,
+                    request.ExpiresAt,
+                    request.DeliveryType,
+                    request.AnnouncementColor
+                )
+            );
             return ValueTask.FromResult(
                 _remaining.Count > 0
                     ? _remaining.Dequeue()
@@ -181,9 +189,7 @@ public abstract class CustomAnnouncementSchedulerTestBase
     ) : ICustomAnnouncementSender
     {
         public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-            string channel,
-            string message,
-            DateTimeOffset expiresAt,
+            CustomAnnouncementDeliveryRequest request,
             CancellationToken cancellationToken
         )
         {
@@ -198,18 +204,16 @@ public abstract class CustomAnnouncementSchedulerTestBase
         public List<string> AcceptedChannels { get; } = [];
 
         public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-            string channel,
-            string message,
-            DateTimeOffset expiresAt,
+            CustomAnnouncementDeliveryRequest request,
             CancellationToken cancellationToken
         )
         {
-            if (channel == throwingChannel)
+            if (request.Channel == throwingChannel)
             {
                 throw new InvalidOperationException("sensitive provider detail");
             }
 
-            AcceptedChannels.Add(channel);
+            AcceptedChannels.Add(request.Channel);
             return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
                 new AnnouncementEnqueueOutcome.Accepted()
             );
@@ -250,14 +254,12 @@ public abstract class CustomAnnouncementSchedulerTestBase
         public List<DateTimeOffset> Deadlines { get; } = [];
 
         public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-            string channel,
-            string message,
-            DateTimeOffset expiresAt,
+            CustomAnnouncementDeliveryRequest request,
             CancellationToken cancellationToken
         )
         {
-            Messages.Add(new SentChatMessage(channel, message));
-            Deadlines.Add(expiresAt);
+            Messages.Add(new SentChatMessage(request.Channel, request.Message));
+            Deadlines.Add(request.ExpiresAt);
             return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
                 new AnnouncementEnqueueOutcome.Accepted()
             );
@@ -270,13 +272,11 @@ public abstract class CustomAnnouncementSchedulerTestBase
         public List<SentChatMessage> Messages { get; } = [];
 
         public ValueTask<AnnouncementEnqueueOutcome> EnqueueAsync(
-            string channel,
-            string message,
-            DateTimeOffset expiresAt,
+            CustomAnnouncementDeliveryRequest request,
             CancellationToken cancellationToken
         )
         {
-            if (channel == failingChannel)
+            if (request.Channel == failingChannel)
             {
                 return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
                     new AnnouncementEnqueueOutcome.Unexpected(
@@ -285,7 +285,7 @@ public abstract class CustomAnnouncementSchedulerTestBase
                 );
             }
 
-            Messages.Add(new SentChatMessage(channel, message));
+            Messages.Add(new SentChatMessage(request.Channel, request.Message));
             return ValueTask.FromResult<AnnouncementEnqueueOutcome>(
                 new AnnouncementEnqueueOutcome.Accepted()
             );

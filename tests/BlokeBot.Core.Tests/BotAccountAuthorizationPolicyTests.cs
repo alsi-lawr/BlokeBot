@@ -88,6 +88,28 @@ public sealed class BotAccountAuthorizationPolicyTests
     }
 
     [Test]
+    public async Task MissingAnnouncementManagementScope_LoadingConfiguredStatus_RequiresReconnect()
+    {
+        var requiredScopes = RequiredScopes();
+        var grantedScopes = ImmutableArray.Create(
+            Scopes.UserReadModeratedChannels,
+            Scopes.UserReadFollows
+        );
+        var status = await LoadConfiguredStatusAsync(
+            new TokenStatus.MissingScopes(
+                "saved-token",
+                Validation(grantedScopes),
+                requiredScopes,
+                grantedScopes,
+                ImmutableArray.Create(Scopes.ModeratorManageAnnouncements)
+            )
+        );
+
+        status.State.ShouldBe(BotAccountAuthorizationState.MissingScopes);
+        status.MissingScopes.ShouldBe([Scopes.ModeratorManageAnnouncements]);
+    }
+
+    [Test]
     public async Task ReadyToken_LoadingConfiguredStatus_ReportsReady()
     {
         var status = await LoadConfiguredStatusAsync(
@@ -173,7 +195,12 @@ public sealed class BotAccountAuthorizationPolicyTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost/oauth/callback",
-                    Scopes = [Scopes.UserReadModeratedChannels, Scopes.UserReadFollows],
+                    Scopes =
+                    [
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
+                        Scopes.ModeratorManageAnnouncements,
+                    ],
                     TokenCachePath = tokenCachePath,
                 },
             }
@@ -216,7 +243,12 @@ public sealed class BotAccountAuthorizationPolicyTests
 
     private static ImmutableArray<string> RequiredScopes()
     {
-        return [Scopes.UserReadModeratedChannels, Scopes.UserReadFollows];
+        return
+        [
+            Scopes.UserReadModeratedChannels,
+            Scopes.UserReadFollows,
+            Scopes.ModeratorManageAnnouncements,
+        ];
     }
 
     private static TokenValidation Validation(IEnumerable<string> scopes)

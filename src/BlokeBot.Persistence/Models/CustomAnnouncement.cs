@@ -14,6 +14,15 @@ public sealed class CustomAnnouncement
 
     public int DeliveryPolicyId { get; set; }
 
+    public CustomAnnouncementDeliveryType DeliveryType { get; set; } =
+        CustomAnnouncementDeliveryType.ChatMessage;
+
+    public TwitchAnnouncementColor AnnouncementColor { get; set; } =
+        TwitchAnnouncementColor.Primary;
+
+    public CustomAnnouncementLatestDeliveryResult LatestDeliveryResult { get; set; } =
+        CustomAnnouncementLatestDeliveryResult.None;
+
     public DateTime? LastSentAtUtc { get; set; }
 
     public DateTime? LastOccurrenceAtUtc { get; set; }
@@ -43,6 +52,57 @@ public sealed class CustomAnnouncement
     public CustomAnnouncementSchedule Schedule { get; set; } = null!;
 
     public CustomAnnouncementDeliveryPolicy DeliveryPolicy { get; set; } = null!;
+}
+
+public enum CustomAnnouncementDeliveryType
+{
+    [PersistedToken("ChatMessage")]
+    ChatMessage,
+
+    [PersistedToken("TwitchAnnouncement")]
+    TwitchAnnouncement,
+}
+
+public enum TwitchAnnouncementColor
+{
+    [PersistedToken("Primary")]
+    Primary,
+
+    [PersistedToken("Blue")]
+    Blue,
+
+    [PersistedToken("Green")]
+    Green,
+
+    [PersistedToken("Orange")]
+    Orange,
+
+    [PersistedToken("Purple")]
+    Purple,
+}
+
+public enum CustomAnnouncementLatestDeliveryResult
+{
+    [PersistedToken("None")]
+    None,
+
+    [PersistedToken("Success")]
+    Success,
+
+    [PersistedToken("Permission")]
+    Permission,
+
+    [PersistedToken("Invalid")]
+    Invalid,
+
+    [PersistedToken("RateLimitRetry")]
+    RateLimitRetry,
+
+    [PersistedToken("Unexpected")]
+    Unexpected,
+
+    [PersistedToken("Ambiguous")]
+    Ambiguous,
 }
 
 public enum AnnouncementOccurrenceStatus

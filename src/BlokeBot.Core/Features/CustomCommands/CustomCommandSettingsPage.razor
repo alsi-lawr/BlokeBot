@@ -14,7 +14,7 @@
 
 <div class="mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Custom commands"
-                Description="Create chat commands, choose what the bot says, keep counters, and send automatic announcements.">
+                Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
         <button class="btn-primary"
                 aria-label="Save custom commands"
                 disabled="@(!_featureEnabled || _config is null)"
@@ -245,18 +245,18 @@
         </CollapsibleSection>
 
         <CollapsibleSection ContentId="custom-announcement-settings"
-                            Title="Announcements"
+                            Title="Scheduled messages"
                             Description="Send a saved reply automatically on a timer or after chat activity."
                             InitiallyOpen="false">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
-                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "announcement")</p>
-                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add announcement</button>
+                    <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "scheduled message")</p>
+                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddAnnouncement">Add scheduled message</button>
                 </div>
 
                 @if (_config.Announcements.Count == 0)
                 {
-                    <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No announcements yet.</p>
+                    <p class="surface-muted rounded-lg p-4 text-sm text-muted-foreground">No scheduled messages yet.</p>
                 }
                 else
                 {
@@ -265,7 +265,7 @@
                         {
                             <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
-                                    <Field Label="Announcement name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
+                                    <Field Label="Scheduled message name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
                                     <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
                                         <input class="h-4 w-4" type="checkbox" @bind="announcement.Enabled" />
                                         Turned on
@@ -282,6 +282,35 @@
                                             }
                                         </select>
                                     </div>
+                                    <div class="space-y-2">
+                                        <label class="label">Delivery type</label>
+                                        <select class="input" @bind="announcement.DeliveryType">
+                                            @foreach (var type in _announcementDeliveryTypes)
+                                            {
+                                                <option value="@type">@AnnouncementDeliveryTypeLabel(type)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    @if (announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement)
+                                    {
+                                        <div class="space-y-2">
+                                            <label class="label">Twitch announcement color</label>
+                                            <select class="input" @bind="announcement.AnnouncementColor">
+                                                @foreach (var color in _twitchAnnouncementColors)
+                                                {
+                                                    <option value="@color">@TwitchAnnouncementColorLabel(color)</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 md:col-span-2 xl:col-span-4">
+                                            <p>@TwitchAnnouncementCapabilityMessage(_config.TwitchAnnouncementReadiness)</p>
+                                            @if (_config.TwitchAnnouncementReadiness.Availability != TwitchAnnouncementAvailability.Available)
+                                            {
+                                                <a class="mt-1 inline-flex font-semibold text-blue-700" href="/host">Open Channel setup</a>
+                                            }
+                                            <p class="mt-1 text-xs text-slate-500">Twitch announcements use the selected reply; every reply message must be no longer than 500 characters.</p>
+                                        </div>
+                                    }
                                     <div class="space-y-2">
                                         <label class="label" for="@($"announcement-{announcement.Id}-schedule-kind")">When to send</label>
                                         <select id="@($"announcement-{announcement.Id}-schedule-kind")"
@@ -362,6 +391,10 @@
                                         <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
                                     </div>
                                     <div class="surface-row rounded-lg px-3 py-2">
+                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
+                                        <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                    </div>
+                                    <div class="surface-row rounded-lg px-3 py-2">
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
                                         <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
                                     </div>
@@ -373,7 +406,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Time zone" Description="Weekly announcements use this local time." InitiallyOpen="false">
+        <CollapsibleSection Title="Time zone" Description="Weekly scheduled messages use this local time." InitiallyOpen="false">
             <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <div class="space-y-2">
                     <label class="label">Time zone</label>

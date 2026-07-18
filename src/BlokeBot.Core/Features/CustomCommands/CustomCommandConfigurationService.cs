@@ -10,6 +10,7 @@ public sealed class CustomCommandConfigurationService(
     CustomCommandAliasRegistry aliasRegistry,
     CustomCommandConfigurationGraphWriter graphWriter,
     HostCustomCommandSettingsService hostSettings,
+    ITwitchAnnouncementReadinessProvider twitchAnnouncementAccess,
     EventBus<AppEventKind> events
 )
 {
@@ -59,6 +60,17 @@ public sealed class CustomCommandConfigurationService(
                 CreatedAtUtc = x.CreatedAtUtc,
             })
             .ToListAsync(ct);
+        var channelLogin = await db
+            .Hosts.AsNoTracking()
+            .Where(x => x.Id == hostId)
+            .Select(x => x.Login)
+            .SingleOrDefaultAsync(ct);
+        var twitchAnnouncementReadiness = string.IsNullOrWhiteSpace(channelLogin)
+            ? new TwitchAnnouncementReadiness(
+                TwitchAnnouncementAvailability.Unavailable,
+                string.Empty
+            )
+            : await twitchAnnouncementAccess.GetReadinessAsync(channelLogin, ct);
 
         return new CustomCommandConfiguration
         {
@@ -71,6 +83,7 @@ public sealed class CustomCommandConfigurationService(
             Announcements = announcements
                 .Select(CustomCommandConfigurationMapper.ToEditor)
                 .ToList(),
+            TwitchAnnouncementReadiness = twitchAnnouncementReadiness,
             AlertSummary = new CustomCommandAlertSummary
             {
                 ActiveCount = await alertQuery.CountAsync(ct),

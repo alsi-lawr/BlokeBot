@@ -255,7 +255,7 @@ public partial class PageHelpButton
                 ]
             ),
             new(
-                "Announcements",
+                "Scheduled messages",
                 "Choose a saved reply, then decide whether it should be sent on a timer, after enough chat activity, or once a week.",
                 []
             ),

@@ -18,7 +18,7 @@
 ## Inside BlokeBot
 
 - **One dashboard** - switch between the Twitch channels you help manage.
-- **Commands** - create replies, aliases, counters, cooldowns, and announcements.
+- **Commands** - create replies, aliases, counters, cooldowns, and scheduled messages.
 - **Guessing games** - run rounds, reward winners, and share leaderboards.
 - **Points and giveaways** - manage balances, gambling, prizes, and public rankings.
 - **Clear status** - see whether the bot is ready and what needs your attention.

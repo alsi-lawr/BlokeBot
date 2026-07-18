@@ -48,6 +48,7 @@ public sealed record BotIdentityOptions
     [
         "chat:read",
         "chat:edit",
+        BlokeBot.Twitch.Scopes.ModeratorManageAnnouncements,
         BlokeBot.Twitch.Scopes.UserReadFollows,
         BlokeBot.Twitch.Scopes.UserReadModeratedChannels,
     ];

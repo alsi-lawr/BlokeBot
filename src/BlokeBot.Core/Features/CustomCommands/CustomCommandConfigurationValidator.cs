@@ -1,6 +1,7 @@
 using BlokeBot.Announcements;
 using BlokeBot.Commands;
 using BlokeBot.Functional;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
@@ -9,6 +10,7 @@ public static class CustomCommandConfigurationValidator
     private const int _aliasMaxLength = 64;
     private const int _messageVariantMaxLength = 500;
     private const int _nameMaxLength = 128;
+    private const int _twitchAnnouncementMaxLength = 500;
 
     public static Validation<
         CustomCommandConfigurationSaveCommand,
@@ -59,6 +61,7 @@ public static class CustomCommandConfigurationValidator
             draft.Announcements,
             announcementNames,
             messageIds,
+            messageEntries.ToDictionary(entry => entry.Id),
             errors
         );
         EnsureUniqueAliases(commands, errors);
@@ -248,6 +251,7 @@ public static class CustomCommandConfigurationValidator
         IReadOnlyList<CustomAnnouncementEditor> editors,
         IReadOnlyList<string> names,
         IReadOnlySet<int> messageIds,
+        IReadOnlyDictionary<int, CustomMessageLibraryEntryValue> messageEntries,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
@@ -258,6 +262,33 @@ public static class CustomCommandConfigurationValidator
             if (!messageIds.Contains(editor.MessageLibraryEntryId))
             {
                 AddError(errors, $"Choose a saved reply for announcement '{names[index]}'.");
+            }
+
+            if (!Enum.IsDefined(editor.DeliveryType))
+            {
+                AddError(errors, $"Choose how scheduled message '{names[index]}' is delivered.");
+            }
+
+            if (!Enum.IsDefined(editor.AnnouncementColor))
+            {
+                AddError(
+                    errors,
+                    $"Choose a supported Twitch announcement color for '{names[index]}'."
+                );
+            }
+
+            if (
+                editor.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+                && messageEntries.TryGetValue(editor.MessageLibraryEntryId, out var messageEntry)
+                && messageEntry.Variants.Any(variant =>
+                    variant.Text.Length > _twitchAnnouncementMaxLength
+                )
+            )
+            {
+                AddError(
+                    errors,
+                    $"Every reply message for Twitch announcement '{names[index]}' must be at most {_twitchAnnouncementMaxLength} characters."
+                );
             }
 
             var retryDelay = RetryDelay(editor.RetryDelaySeconds, errors);
@@ -286,6 +317,8 @@ public static class CustomCommandConfigurationValidator
                     names[index],
                     editor.Enabled,
                     editor.MessageLibraryEntryId,
+                    editor.DeliveryType,
+                    editor.AnnouncementColor,
                     retryDelay,
                     occurrenceLifetime,
                     schedule

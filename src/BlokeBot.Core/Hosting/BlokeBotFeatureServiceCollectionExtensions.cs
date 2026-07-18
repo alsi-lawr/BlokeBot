@@ -65,6 +65,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandConfigurationGraphWriter>();
         services.AddSingleton<CustomCommandConfigurationService>();
         services.AddSingleton<HostCustomCommandSettingsService>();
+        services.AddSingleton<TwitchAnnouncementAccessService>();
+        services.AddSingleton<ITwitchAnnouncementAccessService>(serviceProvider =>
+            serviceProvider.GetRequiredService<TwitchAnnouncementAccessService>()
+        );
+        services.AddSingleton<ITwitchAnnouncementReadinessProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<TwitchAnnouncementAccessService>()
+        );
         services.TryAddSingleton<
             ICustomAnnouncementTickScheduler,
             TimeProviderCustomAnnouncementTickScheduler
@@ -80,7 +87,7 @@ public static class BlokeBotFeatureServiceCollectionExtensions
             case CustomAnnouncementDeliveryMode.PublicChat:
                 services.AddSingleton<
                     ICustomAnnouncementSender,
-                    PublicChatCustomAnnouncementSender
+                    TwitchAnnouncementCustomAnnouncementSender
                 >();
                 break;
             default:

@@ -17,6 +17,10 @@ public partial class CustomCommandSettingsPage
         Enum.GetValues<CustomCommandActionKind>();
     private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> _announcementScheduleKinds =
         Enum.GetValues<CustomAnnouncementScheduleKind>();
+    private static readonly IReadOnlyList<CustomAnnouncementDeliveryType> _announcementDeliveryTypes =
+        Enum.GetValues<CustomAnnouncementDeliveryType>();
+    private static readonly IReadOnlyList<BlokeBot.Persistence.Models.TwitchAnnouncementColor> _twitchAnnouncementColors =
+        Enum.GetValues<BlokeBot.Persistence.Models.TwitchAnnouncementColor>();
     private static readonly IReadOnlyList<DayOfWeek> _daysOfWeek = Enum.GetValues<DayOfWeek>();
     private static readonly IReadOnlyList<TimeZoneInfo> _timeZones =
         TimeZoneInfo.GetSystemTimeZones();
@@ -277,7 +281,7 @@ public partial class CustomCommandSettingsPage
             new CustomAnnouncementEditor
             {
                 Id = NextTemporaryId(),
-                Name = "New announcement",
+                Name = "New scheduled message",
                 MessageLibraryEntryId = _config.MessageEntries[0].Id,
                 Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
             }
@@ -344,6 +348,64 @@ public partial class CustomCommandSettingsPage
             CustomAnnouncementScheduleKind.IntervalAfterChat => "On a timer, after chat activity",
             CustomAnnouncementScheduleKind.Weekly => "Once a week",
             _ => "Choose when to send",
+        };
+    }
+
+    private static string AnnouncementDeliveryTypeLabel(CustomAnnouncementDeliveryType type)
+    {
+        return type switch
+        {
+            CustomAnnouncementDeliveryType.ChatMessage => "Chat message",
+            CustomAnnouncementDeliveryType.TwitchAnnouncement => "Twitch announcement",
+            _ => "Choose delivery type",
+        };
+    }
+
+    private static string TwitchAnnouncementColorLabel(
+        BlokeBot.Persistence.Models.TwitchAnnouncementColor color
+    )
+    {
+        return color switch
+        {
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Primary => "Channel color",
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Blue => "Blue",
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Green => "Green",
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Orange => "Orange",
+            BlokeBot.Persistence.Models.TwitchAnnouncementColor.Purple => "Purple",
+            _ => "Choose color",
+        };
+    }
+
+    private static string LatestDeliveryResultLabel(CustomAnnouncementLatestDeliveryResult result)
+    {
+        return result switch
+        {
+            CustomAnnouncementLatestDeliveryResult.None => "No delivery yet",
+            CustomAnnouncementLatestDeliveryResult.Success => "Sent",
+            CustomAnnouncementLatestDeliveryResult.Permission => "Permission needed",
+            CustomAnnouncementLatestDeliveryResult.Invalid => "Invalid message",
+            CustomAnnouncementLatestDeliveryResult.RateLimitRetry =>
+                "Rate limited; retry scheduled",
+            CustomAnnouncementLatestDeliveryResult.Unexpected => "Unexpected delivery failure",
+            CustomAnnouncementLatestDeliveryResult.Ambiguous =>
+                "Delivery may have happened; not retried",
+            _ => "Unknown delivery result",
+        };
+    }
+
+    private static string TwitchAnnouncementCapabilityMessage(TwitchAnnouncementReadiness readiness)
+    {
+        return readiness.Availability switch
+        {
+            TwitchAnnouncementAvailability.Available =>
+                "Native Twitch announcements are ready for the active bot account.",
+            TwitchAnnouncementAvailability.ReconnectRequired =>
+                "This native announcement is inactive until the active bot reconnects with Twitch announcement permission.",
+            TwitchAnnouncementAvailability.AuthorityRequired =>
+                "This native announcement is inactive until the active bot is the broadcaster or a channel moderator.",
+            TwitchAnnouncementAvailability.Unavailable =>
+                "This native announcement is inactive while BlokeBot cannot verify the active bot's Twitch authority.",
+            _ => "This native announcement is inactive.",
         };
     }
 

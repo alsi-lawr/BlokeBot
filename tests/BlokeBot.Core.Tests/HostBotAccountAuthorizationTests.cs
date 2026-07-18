@@ -433,6 +433,39 @@ public sealed class HostBotAccountAuthorizationTests
     }
 
     [Test]
+    public async Task MissingAnnouncementManagementScope_AuthorizingCustomBot_RequiresReconnect()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(
+            dbFactory,
+            new StaticTokenProvider("global-token"),
+            includeFollowRead: true,
+            includeAnnouncementManagement: true
+        );
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+
+        var outcome = await service
+            .Authorize(
+                hostId,
+                CreateCustomBotGrant(
+                    "override-token",
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        Scopes.UserReadFollows,
+                    ]
+                )
+            )
+            .RunAsync(CancellationToken.None);
+
+        outcome
+            .ShouldBeOfType<HostBotAccountAuthorizationOutcome.MissingScopes>()
+            .Scopes.ShouldBe([Scopes.ModeratorManageAnnouncements]);
+    }
+
+    [Test]
     public async Task RunningHostWithOverride_DisablingOverride_QueuesRestartWithGlobalAccount()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -481,7 +514,8 @@ public sealed class HostBotAccountAuthorizationTests
         SqliteBlokeBotDbFactory dbFactory,
         IAccessTokenProvider? tokenProvider,
         HostBotAccountHttpClientFactory? httpClientFactory = null,
-        bool includeFollowRead = false
+        bool includeFollowRead = false,
+        bool includeAnnouncementManagement = false
     )
     {
         httpClientFactory ??= new HostBotAccountHttpClientFactory();
@@ -494,15 +528,22 @@ public sealed class HostBotAccountAuthorizationTests
                     ClientId = "client",
                     ClientSecret = "secret",
                     RedirectUri = "https://localhost:7107/oauth/callback",
-                    Scopes = includeFollowRead
-                        ?
-                        [
-                            "chat:read",
-                            "chat:edit",
-                            Scopes.UserReadModeratedChannels,
-                            Scopes.UserReadFollows,
-                        ]
-                        : ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels],
+                    Scopes =
+                    [
+                        "chat:read",
+                        "chat:edit",
+                        Scopes.UserReadModeratedChannels,
+                        .. (
+                            includeFollowRead
+                                ? new[] { Scopes.UserReadFollows }
+                                : Array.Empty<string>()
+                        ),
+                        .. (
+                            includeAnnouncementManagement
+                                ? new[] { Scopes.ModeratorManageAnnouncements }
+                                : Array.Empty<string>()
+                        ),
+                    ],
                 },
             }
         );
