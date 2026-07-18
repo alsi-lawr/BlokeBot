@@ -47,7 +47,7 @@
 
         <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-3">
-                <Field Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
+                <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
                 <div class="space-y-2">
                     <label class="label" for="winRate">Chance of winning (%)</label>
                     <input id="winRate" class="input" type="number" min="0" max="100" @bind="_config.GamblingWinRatePercent" />
@@ -71,15 +71,15 @@
 
         <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-2">
-                <Field Label="Balance" @bind-Value="_config.Aliases.PointsAliases" Placeholder="points" />
-                <Field Label="Give" @bind-Value="_config.Aliases.GivePointsAliases" Placeholder="givepoints" />
-                <Field Label="Add" @bind-Value="_config.Aliases.AddPointsAliases" Placeholder="addpoints" />
-                <Field Label="Remove" @bind-Value="_config.Aliases.RemovePointsAliases" Placeholder="removepoints" />
-                <Field Label="Gamble" @bind-Value="_config.Aliases.GambleAliases" Placeholder="gamble" />
-                <Field Label="Start giveaway" @bind-Value="_config.Aliases.GiveawayAliases" Placeholder="giveaway" />
-                <Field Label="Join giveaway" @bind-Value="_config.Aliases.JoinAliases" Placeholder="join" />
-                <Field Label="End giveaway" @bind-Value="_config.Aliases.EndGiveawayAliases" Placeholder="endgiveaway" />
-                <Field Label="Cancel giveaway" @bind-Value="_config.Aliases.CancelGiveawayAliases" Placeholder="cancelgiveaway" />
+                <Field Id="points-aliases" Label="Balance" @bind-Value="_config.Aliases.PointsAliases" Placeholder="points" />
+                <Field Id="points-give-aliases" Label="Give" @bind-Value="_config.Aliases.GivePointsAliases" Placeholder="givepoints" />
+                <Field Id="points-add-aliases" Label="Add" @bind-Value="_config.Aliases.AddPointsAliases" Placeholder="addpoints" />
+                <Field Id="points-remove-aliases" Label="Remove" @bind-Value="_config.Aliases.RemovePointsAliases" Placeholder="removepoints" />
+                <Field Id="points-gamble-aliases" Label="Gamble" @bind-Value="_config.Aliases.GambleAliases" Placeholder="gamble" />
+                <Field Id="points-giveaway-aliases" Label="Start giveaway" @bind-Value="_config.Aliases.GiveawayAliases" Placeholder="giveaway" />
+                <Field Id="points-join-giveaway-aliases" Label="Join giveaway" @bind-Value="_config.Aliases.JoinAliases" Placeholder="join" />
+                <Field Id="points-end-giveaway-aliases" Label="End giveaway" @bind-Value="_config.Aliases.EndGiveawayAliases" Placeholder="endgiveaway" />
+                <Field Id="points-cancel-giveaway-aliases" Label="Cancel giveaway" @bind-Value="_config.Aliases.CancelGiveawayAliases" Placeholder="cancelgiveaway" />
             </div>
         </CollapsibleSection>
 
@@ -99,8 +99,8 @@
                         <p id="duration-error" class="text-sm font-semibold text-red-700">@giveawayDurationError.Message</p>
                     }
                 </div>
-                <Field Label="Smallest prize" @bind-Value="_config.GiveawayMinimumPayout" Placeholder="10" />
-                <Field Label="Largest prize" @bind-Value="_config.GiveawayMaximumPayout" Placeholder="100" />
+                <Field Id="points-giveaway-minimum-payout" Label="Smallest prize" @bind-Value="_config.GiveawayMinimumPayout" Placeholder="10" />
+                <Field Id="points-giveaway-maximum-payout" Label="Largest prize" @bind-Value="_config.GiveawayMaximumPayout" Placeholder="100" />
                 <div class="space-y-2">
                     <label class="label" for="winnerCount">Number of winners</label>
                     <input id="winnerCount"

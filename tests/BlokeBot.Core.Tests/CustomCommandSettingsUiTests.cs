@@ -23,6 +23,9 @@ public sealed class CustomCommandSettingsUiTests
         var cut = context.Render<CustomCommandSettingsPage>();
 
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
+        var reply = cut.Find($"#command-{seeded.CommandId}-reply");
+        reply.GetAttribute("aria-invalid").ShouldBeNull();
+        reply.GetAttribute("aria-describedby").ShouldBeNull();
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
 
         cut.FindAll($"#command-{seeded.CommandId}-counter-id").ShouldBeEmpty();
@@ -75,6 +78,12 @@ public sealed class CustomCommandSettingsUiTests
         var invalidMessage = cut.Find("textarea");
         invalidMessage.GetAttribute("aria-invalid").ShouldBe("true");
         invalidMessage.GetAttribute("aria-describedby").ShouldNotBeNull();
+        cut.Find("#custom-command-commands-tab").Click();
+        var invalidRetry = cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay");
+        invalidRetry.GetAttribute("aria-invalid").ShouldBe("true");
+        invalidRetry
+            .GetAttribute("aria-describedby")
+            .ShouldBe($"announcement-{seeded.AnnouncementId}-retry-delay-error");
         toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Error);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
@@ -88,8 +97,6 @@ public sealed class CustomCommandSettingsUiTests
 
         ValidationMessages(cut).Length.ShouldBe(2);
 
-        cut.Find("#custom-command-commands-tab").Click();
-        cut.Find("button[aria-controls='custom-announcement-settings']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("2");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("30");
         cut.Find("button[aria-label='Save custom commands']").Click();
@@ -156,14 +163,17 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("#custom-command-message-library-tab")
             .GetAttribute("aria-selected")
             .ShouldBe("true");
+        cut.Find("#custom-command-commands-panel").GetAttribute("hidden").ShouldNotBeNull();
         cut.Find("#custom-command-message-library-panel")
             .GetAttribute("aria-labelledby")
             .ShouldBe("custom-command-message-library-tab");
+        cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldBeNull();
 
         cut.Find("#custom-command-message-library-tab")
             .KeyDown(new KeyboardEventArgs { Key = "Home" });
 
         cut.Find("#custom-command-commands-tab").GetAttribute("aria-selected").ShouldBe("true");
+        cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldNotBeNull();
         cut.Find("#custom-command-commands-tab").KeyDown(new KeyboardEventArgs { Key = "End" });
         cut.Find("#custom-command-message-library-tab").GetAttribute("tabindex").ShouldBe("0");
     }

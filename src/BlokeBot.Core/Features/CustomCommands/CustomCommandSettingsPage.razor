@@ -48,6 +48,15 @@
                         <li>@error.Message</li>
                     }
                 </ul>
+                @if (ValidationMessage(ConfigurationTarget(CustomCommandValidationFieldKind.Identity)) is not null)
+                {
+                    <button id="@_reloadControlId"
+                            class="btn-secondary mt-3"
+                            @attributes="ValidationAttributes(_reloadControlId, ConfigurationTarget(CustomCommandValidationFieldKind.Identity))"
+                            @ref="_controls[_reloadControlId]"
+                            @onclick="LoadAsync">Reload settings</button>
+                    @(ValidationMessageFor(_reloadControlId, ConfigurationTarget(CustomCommandValidationFieldKind.Identity)))
+                }
             </section>
         }
 
@@ -77,11 +86,10 @@
                     @onkeydown="args => HandleTabKeyDown(args, CustomCommandSettingsTab.MessageLibrary)">Message Library</button>
         </div>
 
-        @if (_activeTab == CustomCommandSettingsTab.MessageLibrary)
-        {
         <div id="custom-command-message-library-panel"
              role="tabpanel"
              aria-labelledby="custom-command-message-library-tab"
+             hidden="@(_activeTab != CustomCommandSettingsTab.MessageLibrary)"
              tabindex="0">
         <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
             <div class="space-y-4 p-4">
@@ -101,22 +109,30 @@
                         {
                             <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,1.2fr)_12rem_auto] xl:items-end">
-                                    <Field Id="@($"message-entry-{entry.Id}-name")"
+                                    <Field Id="@MessageEntryNameFieldId(entry)"
                                            Label="Reply name"
+                                           ErrorMessage="@ValidationMessage(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@FocusRequestFor(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
                                            @bind-Value="entry.Name"
                                            Placeholder="welcome" />
                                     <div class="space-y-2">
-                                        <label class="label">How the bot chooses</label>
-                                        <select class="input" @bind="entry.SelectionMode">
+                                        <label class="label" for="@MessageSelectionFieldId(entry)">How the bot chooses</label>
+                                        <select id="@MessageSelectionFieldId(entry)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode))"
+                                                @ref="_controls[MessageSelectionFieldId(entry)]"
+                                                @bind="entry.SelectionMode">
                                             @foreach (var mode in _messageSelectionModes)
                                             {
                                                 <option value="@mode">@MessageSelectionLabel(mode)</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(MessageSelectionFieldId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.SelectionMode)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Next message</label>
-                                        <select class="input"
+                                        <label class="label" for="@MessageCurrentVariantFieldId(entry)">Next message</label>
+                                        <select id="@MessageCurrentVariantFieldId(entry)"
+                                                class="input"
                                                 disabled="@(entry.SelectionMode != CustomMessageSelectionMode.Sequential)"
                                                 @bind="entry.CurrentVariantIndex">
                                             @for (var i = 0; i < entry.Variants.Count; i++)
@@ -132,7 +148,12 @@
                                 <div class="space-y-2 border-t border-slate-200 pt-3">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
                                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Messages</p>
-                                        <button class="btn-secondary h-9 px-3 text-xs" @onclick="() => AddVariant(entry)">Add message</button>
+                                        <button id="@AddMessageVariantControlId(entry)"
+                                                class="btn-secondary h-9 px-3 text-xs"
+                                                @attributes="ValidationAttributes(AddMessageVariantControlId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.VariantText))"
+                                                @ref="_controls[AddMessageVariantControlId(entry)]"
+                                                @onclick="() => AddVariant(entry)">Add message</button>
+                                        @(ValidationMessageFor(AddMessageVariantControlId(entry), ReplyTarget(entry.Id, CustomCommandValidationFieldKind.VariantText)))
                                     </div>
                                     @for (var i = 0; i < entry.Variants.Count; i++)
                                     {
@@ -142,8 +163,8 @@
                                             <span class="rank-indicator mt-7">@(index + 1)</span>
                                             <TextAreaField Id="@MessageVariantFieldId(entry, variant)"
                                                            Label="@($"Message {index + 1}")"
-                                                           ErrorMessage="@ValidationMessage(new CustomCommandConfigurationValidationTarget.MessageVariant(entry.Id, variant.Id))"
-                                                           FocusRequest="@FocusRequestFor(new CustomCommandConfigurationValidationTarget.MessageVariant(entry.Id, variant.Id))"
+                                                           ErrorMessage="@ValidationMessage(VariantTarget(entry.Id, variant.Id))"
+                                                           FocusRequest="@FocusRequestFor(VariantTarget(entry.Id, variant.Id))"
                                                            @bind-Value="variant.Text" />
                                             <div class="mt-7 flex flex-wrap gap-2">
                                                 <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == 0)" @onclick="() => MoveVariant(entry, index, -1)">Up</button>
@@ -160,12 +181,10 @@
             </div>
         </CollapsibleSection>
         </div>
-        }
-        else
-        {
         <div id="custom-command-commands-panel"
              role="tabpanel"
              aria-labelledby="custom-command-commands-tab"
+             hidden="@(_activeTab != CustomCommandSettingsTab.Commands)"
              tabindex="0">
 
         <CollapsibleSection Title="Chat commands" Description="Choose what viewers type and what the bot should do." InitiallyOpen="true">
@@ -195,71 +214,90 @@
                         {
                             <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
-                                    <Field Label="Command name" @bind-Value="command.Name" Placeholder="Hello" />
+                                    <Field Id="@CommandNameFieldId(command)"
+                                           Label="Command name"
+                                           ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name))"
+                                           @bind-Value="command.Name"
+                                           Placeholder="Hello" />
                                     <Field Id="@CommandAliasesFieldId(command)"
                                            Label="Command words (without !)"
-                                           ErrorMessage="@ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id))"
-                                           FocusRequest="@FocusRequestFor(new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id))"
+                                           ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases))"
+                                           FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases))"
                                            @bind-Value="command.Aliases"
                                            Placeholder="hello, hi" />
                                     <button class="btn-secondary" @onclick="() => RemoveCommand(command)">Delete</button>
                                 </div>
                                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                     <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
-                                        <input class="h-4 w-4" type="checkbox" @bind="command.Enabled" />
+                                        <input id="@CommandEnabledToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.Enabled" />
                                         Turned on
                                     </label>
                                     <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
-                                        <input class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
+                                        <input id="@CommandModeratorOnlyToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
                                         Only moderators can use this
                                     </label>
                                     <div class="space-y-2">
-                                        <label class="label">Wait between uses (seconds)</label>
-                                        <input class="input" type="number" min="0" @bind="command.CooldownSeconds" />
+                                        <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
+                                        <input id="@CommandCooldownFieldId(command)"
+                                               class="input"
+                                               type="number"
+                                               min="0"
+                                               @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
+                                               @ref="_controls[CommandCooldownFieldId(command)]"
+                                               @bind="command.CooldownSeconds" />
+                                        @(ValidationMessageFor(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Who waits?</label>
-                                        <select class="input" @bind="command.CooldownScope">
+                                        <label class="label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
+                                        <select id="@CommandCooldownScopeFieldId(command)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
+                                                @ref="_controls[CommandCooldownScopeFieldId(command)]"
+                                                @bind="command.CooldownScope">
                                             @foreach (var scope in _cooldownScopes)
                                             {
                                                 <option value="@scope">@CooldownScopeLabel(scope)</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"command-{command.Id}-action-kind")">What happens?</label>
-                                        <select id="@($"command-{command.Id}-action-kind")"
+                                        <label class="label" for="@CommandActionFieldId(command)">What happens?</label>
+                                        <select id="@CommandActionFieldId(command)"
                                                 class="input"
+                                                @attributes="ValidationAttributes(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action))"
+                                                @ref="_controls[CommandActionFieldId(command)]"
                                                 @bind="command.ActionKind">
                                             @foreach (var action in _actionKinds)
                                             {
                                                 <option value="@action">@ActionKindLabel(action)</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"command-{command.Id}-reply")">Reply</label>
-                                        <select id="@($"command-{command.Id}-reply")"
+                                        <label class="label" for="@CommandReplyFieldId(command)">Reply</label>
+                                        <select id="@CommandReplyFieldId(command)"
                                                 class="input"
-                                                aria-describedby="@($"command-{command.Id}-reply-error")"
-                                                aria-invalid="@(ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandReply(command.Id)) is null ? "false" : "true")"
+                                                @attributes="ValidationAttributes(CommandReplyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply))"
+                                                @ref="_controls[CommandReplyFieldId(command)]"
                                                 @bind="command.Action.MessageLibraryEntryId">
                                             @foreach (var entry in _config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
                                         </select>
-                                        @if (ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandReply(command.Id)) is { } error)
-                                        {
-                                            <p id="@($"command-{command.Id}-reply-error")" class="text-sm font-semibold text-red-700" role="alert">@error</p>
-                                        }
+                                        @(ValidationMessageFor(CommandReplyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply)))
                                     </div>
                                     @if (command.Action is CounterCustomCommandActionEditor counterAction)
                                     {
                                         <div class="space-y-2 md:col-span-2">
-                                            <label class="label" for="@($"command-{command.Id}-counter-id")">Counter</label>
-                                            <select id="@($"command-{command.Id}-counter-id")"
+                                            <label class="label" for="@CommandCounterFieldId(command)">Counter</label>
+                                            <select id="@CommandCounterFieldId(command)"
                                                     class="input"
+                                                    @attributes="ValidationAttributes(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter))"
+                                                    @ref="_controls[CommandCounterFieldId(command)]"
                                                     @bind="counterAction.CounterId">
                                                 @if (_config.Counters.Count == 0)
                                                 {
@@ -270,6 +308,7 @@
                                                     <option value="@counter.Id">@counter.Name</option>
                                                 }
                                             </select>
+                                            @(ValidationMessageFor(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter)))
                                         </div>
                                     }
                                 </div>
@@ -297,10 +336,15 @@
                         @foreach (var counter in _config.Counters)
                         {
                             <div @key="counter" class="surface-muted grid gap-3 rounded-lg p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
-                                <Field Label="Counter name" @bind-Value="counter.Name" Placeholder="deaths" />
+                                <Field Id="@CounterNameFieldId(counter)"
+                                       Label="Counter name"
+                                       ErrorMessage="@ValidationMessage(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
+                                       FocusRequest="@FocusRequestFor(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
+                                       @bind-Value="counter.Name"
+                                       Placeholder="deaths" />
                                 <div class="space-y-2">
-                                    <label class="label">Current number</label>
-                                    <input class="input" type="number" @bind="counter.Value" />
+                                    <label class="label" for="@CounterValueFieldId(counter)">Current number</label>
+                                    <input id="@CounterValueFieldId(counter)" class="input" type="number" @bind="counter.Value" />
                                 </div>
                                 <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete</button>
                             </div>
@@ -313,7 +357,8 @@
         <CollapsibleSection ContentId="custom-announcement-settings"
                             Title="Scheduled messages"
                             Description="Send a saved reply automatically on a timer or after chat activity."
-                            InitiallyOpen="false">
+                            InitiallyOpen="false"
+                            OpenRequest="@_announcementSectionOpenRequest">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "scheduled message")</p>
@@ -334,9 +379,15 @@
                         {
                             <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
-                                    <Field Label="Scheduled message name" @bind-Value="announcement.Name" Placeholder="Hydrate reminder" />
+                                    <Field Id="@AnnouncementNameFieldId(announcement)"
+                                           Label="Scheduled message name"
+                                           ErrorMessage="@ValidationMessage(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@FocusRequestFor(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name))"
+                                           @bind-Value="announcement.Name"
+                                           Placeholder="Hydrate reminder" />
                                     <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
                                         <input class="h-4 w-4"
+                                               id="@AnnouncementEnabledToggleId(announcement)"
                                                type="checkbox"
                                                disabled="@NativeDeliveryUnavailable(announcement)"
                                                @bind="announcement.Enabled" />
@@ -346,33 +397,48 @@
                                 </div>
                                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                     <div class="space-y-2">
-                                        <label class="label">Reply to send</label>
-                                        <select class="input" @bind="announcement.MessageLibraryEntryId">
+                                        <label class="label" for="@AnnouncementReplyFieldId(announcement)">Reply to send</label>
+                                        <select id="@AnnouncementReplyFieldId(announcement)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply))"
+                                                @ref="_controls[AnnouncementReplyFieldId(announcement)]"
+                                                @bind="announcement.MessageLibraryEntryId">
                                             @foreach (var entry in _config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(AnnouncementReplyFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Reply)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Delivery type</label>
-                                        <select class="input" @bind="announcement.DeliveryType">
+                                        <label class="label" for="@AnnouncementDeliveryFieldId(announcement)">Delivery type</label>
+                                        <select id="@AnnouncementDeliveryFieldId(announcement)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery))"
+                                                @ref="_controls[AnnouncementDeliveryFieldId(announcement)]"
+                                                @bind="announcement.DeliveryType">
                                             @foreach (var type in _announcementDeliveryTypes)
                                             {
                                                 <option value="@type">@AnnouncementDeliveryTypeLabel(type)</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(AnnouncementDeliveryFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Delivery)))
                                     </div>
                                     @if (announcement.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label">Twitch announcement color</label>
-                                            <select class="input" @bind="announcement.AnnouncementColor">
+                                            <label class="label" for="@AnnouncementColorFieldId(announcement)">Twitch announcement color</label>
+                                            <select id="@AnnouncementColorFieldId(announcement)"
+                                                    class="input"
+                                                    @attributes="ValidationAttributes(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color))"
+                                                    @ref="_controls[AnnouncementColorFieldId(announcement)]"
+                                                    @bind="announcement.AnnouncementColor">
                                                 @foreach (var color in _twitchAnnouncementColors)
                                                 {
                                                     <option value="@color">@TwitchAnnouncementColorLabel(color)</option>
                                                 }
                                             </select>
+                                            @(ValidationMessageFor(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color)))
                                         </div>
                                         <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 md:col-span-2 xl:col-span-4">
                                             <p>@TwitchAnnouncementCapabilityMessage(_config.TwitchAnnouncementReadiness)</p>
@@ -384,78 +450,103 @@
                                         </div>
                                     }
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-schedule-kind")">When to send</label>
-                                        <select id="@($"announcement-{announcement.Id}-schedule-kind")"
+                                        <label class="label" for="@AnnouncementScheduleFieldId(announcement)">When to send</label>
+                                        <select id="@AnnouncementScheduleFieldId(announcement)"
                                                 class="input"
+                                                @attributes="ValidationAttributes(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule))"
+                                                @ref="_controls[AnnouncementScheduleFieldId(announcement)]"
                                                 @bind="announcement.ScheduleKind">
                                             @foreach (var type in _announcementScheduleKinds)
                                             {
                                                 <option value="@type">@AnnouncementScheduleLabel(type)</option>
                                             }
                                         </select>
+                                        @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-retry-delay")">Wait before retrying (seconds)</label>
-                                        <input id="@($"announcement-{announcement.Id}-retry-delay")"
+                                        <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
+                                        <input id="@AnnouncementRetryDelayFieldId(announcement)"
                                                class="input"
                                                type="number"
                                                min="1"
                                                max="59"
-                                               aria-describedby="@($"announcement-{announcement.Id}-delivery-timing-help")"
+                                               @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
+                                               @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
                                                @bind="announcement.RetryDelaySeconds" />
+                                        @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label" for="@($"announcement-{announcement.Id}-occurrence-lifetime")">Stop retrying after (seconds)</label>
-                                        <input id="@($"announcement-{announcement.Id}-occurrence-lifetime")"
+                                        <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
+                                        <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
                                                class="input"
                                                type="number"
                                                min="1"
                                                max="60"
-                                               aria-describedby="@($"announcement-{announcement.Id}-delivery-timing-help")"
+                                               @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
+                                               @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
                                                @bind="announcement.OccurrenceLifetimeSeconds" />
+                                        @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
                                     </div>
                                     <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
                                        class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label">Send every (minutes)</label>
-                                            <input class="input" type="number" min="1" @bind="interval.IntervalMinutes" />
+                                            <label class="label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
+                                            <input id="@AnnouncementIntervalFieldId(announcement)"
+                                                   class="input"
+                                                   type="number"
+                                                   min="1"
+                                                   @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                                   @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
+                                                   @bind="interval.IntervalMinutes" />
+                                            @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
                                         </div>
                                     }
                                     else if (announcement.Schedule is IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label" for="@($"announcement-{announcement.Id}-interval-minutes")">Send every (minutes)</label>
-                                            <input id="@($"announcement-{announcement.Id}-interval-minutes")"
+                                            <label class="label" for="@AnnouncementIntervalFieldId(announcement)">Send every (minutes)</label>
+                                            <input id="@AnnouncementIntervalFieldId(announcement)"
                                                    class="input"
                                                    type="number"
                                                    min="1"
+                                                   @attributes="ValidationAttributes(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval))"
+                                                   @ref="_controls[AnnouncementIntervalFieldId(announcement)]"
                                                    @bind="intervalAfterChat.IntervalMinutes" />
+                                            @(ValidationMessageFor(AnnouncementIntervalFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Interval)))
                                         </div>
                                         <div class="space-y-2">
-                                            <label class="label" for="@($"announcement-{announcement.Id}-required-chat-messages")">Chat messages needed</label>
-                                            <input id="@($"announcement-{announcement.Id}-required-chat-messages")"
+                                            <label class="label" for="@AnnouncementChatMessagesFieldId(announcement)">Chat messages needed</label>
+                                            <input id="@AnnouncementChatMessagesFieldId(announcement)"
                                                    class="input"
                                                    type="number"
                                                    min="1"
+                                                   @attributes="ValidationAttributes(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages))"
+                                                   @ref="_controls[AnnouncementChatMessagesFieldId(announcement)]"
                                                    @bind="intervalAfterChat.RequiredChatMessages" />
+                                            @(ValidationMessageFor(AnnouncementChatMessagesFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.ChatMessages)))
                                         </div>
                                     }
                                     else if (announcement.Schedule is WeeklyCustomAnnouncementScheduleEditor weekly)
                                     {
                                         <div class="space-y-2">
-                                            <label class="label">Day</label>
-                                            <select class="input" @bind="weekly.Day">
+                                            <label class="label" for="@AnnouncementDayFieldId(announcement)">Day</label>
+                                            <select id="@AnnouncementDayFieldId(announcement)"
+                                                    class="input"
+                                                    @attributes="ValidationAttributes(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day))"
+                                                    @ref="_controls[AnnouncementDayFieldId(announcement)]"
+                                                    @bind="weekly.Day">
                                                 @foreach (var day in _daysOfWeek)
                                                 {
                                                     <option value="@day">@day</option>
                                                 }
                                             </select>
+                                            @(ValidationMessageFor(AnnouncementDayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Day)))
                                         </div>
                                         <div class="space-y-2">
-                                            <label class="label">Time</label>
-                                            <input class="input" type="time" @bind="weekly.Time" />
+                                            <label class="label" for="@AnnouncementWeeklyTimeFieldId(announcement)">Time</label>
+                                            <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
                                     <div class="surface-row rounded-lg px-3 py-2">
@@ -478,16 +569,24 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Time zone" Description="Weekly scheduled messages use this local time." InitiallyOpen="false">
+        <CollapsibleSection Title="Time zone"
+                            Description="Weekly scheduled messages use this local time."
+                            InitiallyOpen="false"
+                            OpenRequest="@_timeZoneSectionOpenRequest">
             <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
                 <div class="space-y-2">
-                    <label class="label">Time zone</label>
-                    <select class="input" @bind="_config.TimeZoneId">
+                    <label class="label" for="@_timeZoneControlId">Time zone</label>
+                    <select id="@_timeZoneControlId"
+                            class="input"
+                            @attributes="ValidationAttributes(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone))"
+                            @ref="_controls[_timeZoneControlId]"
+                            @bind="_config.TimeZoneId">
                         @foreach (var timeZone in _timeZones)
                         {
                             <option value="@timeZone.Id">@TimeZoneLabel(timeZone)</option>
                         }
                     </select>
+                    @(ValidationMessageFor(_timeZoneControlId, ConfigurationTarget(CustomCommandValidationFieldKind.TimeZone)))
                 </div>
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Selected time zone</p>
@@ -528,6 +627,5 @@
             </div>
         </CollapsibleSection>
         </div>
-        }
     }
 </div>

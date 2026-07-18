@@ -15,7 +15,7 @@
         </div>
     </div>
     <div class="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-[1.2fr_auto] lg:items-end">
-        <Field Label="Round type name" @bind-Value="Configuration.Profile.Name" Placeholder="Round type name" />
+        <Field Id="@($"guess-profile-{Configuration.Profile.Id}-name")" Label="Round type name" @bind-Value="Configuration.Profile.Name" Placeholder="Round type name" />
         <div class="flex gap-2">
             <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
                 <input type="checkbox" class="h-4 w-4" @bind="Configuration.Profile.IsDefault" />
@@ -25,6 +25,6 @@
         </div>
     </div>
     <div class="grid gap-4 border-t border-slate-100 p-4 lg:grid-cols-2">
-        <Field Label="Points for a winning guess" @bind-Value="Configuration.Profile.WinningGuessPointReward" Placeholder="0" />
+        <Field Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")" Label="Points for a winning guess" @bind-Value="Configuration.Profile.WinningGuessPointReward" Placeholder="0" />
     </div>
 </CollapsibleSection>

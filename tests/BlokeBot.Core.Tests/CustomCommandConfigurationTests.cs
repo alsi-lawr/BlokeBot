@@ -407,6 +407,173 @@ public sealed class CustomCommandConfigurationTests
     }
 
     [Test]
+    public void ReplyValidation_Validating_TargetsReplyControls()
+    {
+        var draft = new CustomCommandConfiguration
+        {
+            MessageEntries =
+            [
+                new CustomMessageLibraryEntryEditor
+                {
+                    Id = -1,
+                    Name = string.Empty,
+                    SelectionMode = (CustomMessageSelectionMode)99,
+                },
+            ],
+        };
+
+        var targets = ValidationErrors(draft).Select(error => error.Target);
+
+        targets.ShouldContain(
+            new CustomCommandConfigurationValidationTarget(
+                CustomCommandSettingsTab.MessageLibrary,
+                CustomCommandValidationEntityKind.Reply,
+                -1,
+                CustomCommandValidationFieldKind.Name
+            )
+        );
+        targets.ShouldContain(
+            new CustomCommandConfigurationValidationTarget(
+                CustomCommandSettingsTab.MessageLibrary,
+                CustomCommandValidationEntityKind.Reply,
+                -1,
+                CustomCommandValidationFieldKind.SelectionMode
+            )
+        );
+        targets.ShouldContain(
+            new CustomCommandConfigurationValidationTarget(
+                CustomCommandSettingsTab.MessageLibrary,
+                CustomCommandValidationEntityKind.Reply,
+                -1,
+                CustomCommandValidationFieldKind.VariantText
+            )
+        );
+    }
+
+    [Test]
+    public void CommandValidation_Validating_TargetsCommandControls()
+    {
+        var draft = ConfigurationWithCommands(("Command", string.Empty));
+        var command = draft.Commands.Single();
+        command.Action = new CounterCustomCommandActionEditor
+        {
+            MessageLibraryEntryId = 0,
+            CounterId = 0,
+        };
+        command.CooldownSeconds = -1;
+        command.CooldownScope = (CustomCommandCooldownScope)99;
+        draft.Commands.Add(
+            new CustomCommandEditor
+            {
+                Id = -3,
+                Name = "Unsupported action",
+                Aliases = "unsupported",
+                Action = new UnsupportedCustomCommandActionEditor { MessageLibraryEntryId = -1 },
+            }
+        );
+
+        var targets = ValidationErrors(draft).Select(error => error.Target);
+
+        targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases));
+        targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply));
+        targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown));
+        targets.ShouldContain(
+            CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)
+        );
+        targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter));
+        targets.ShouldContain(CommandTarget(-3, CustomCommandValidationFieldKind.Action));
+    }
+
+    [Test]
+    public void ScheduledMessageValidation_Validating_TargetsScheduleControls()
+    {
+        var draft = ConfigurationWithCommands();
+        draft.Announcements =
+        [
+            new CustomAnnouncementEditor
+            {
+                Id = -3,
+                Name = "First",
+                MessageLibraryEntryId = 0,
+                DeliveryType = CustomAnnouncementDeliveryType.TwitchAnnouncement,
+                AnnouncementColor = (BlokeBot.Persistence.Models.TwitchAnnouncementColor)99,
+                RetryDelaySeconds = 0,
+                OccurrenceLifetimeSeconds = 61,
+                Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 0 },
+            },
+            new CustomAnnouncementEditor
+            {
+                Id = -4,
+                Name = "Second",
+                MessageLibraryEntryId = -1,
+                DeliveryType = (CustomAnnouncementDeliveryType)99,
+                Schedule = new IntervalAfterChatCustomAnnouncementScheduleEditor
+                {
+                    IntervalMinutes = 0,
+                    RequiredChatMessages = 0,
+                },
+            },
+            new CustomAnnouncementEditor
+            {
+                Id = -5,
+                Name = "Third",
+                MessageLibraryEntryId = -1,
+                Schedule = new WeeklyCustomAnnouncementScheduleEditor { Day = (DayOfWeek)99 },
+            },
+        ];
+
+        var targets = ValidationErrors(draft).Select(error => error.Target);
+
+        targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.Reply));
+        targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.Color));
+        targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.RetryDelay));
+        targets.ShouldContain(
+            AnnouncementTarget(-3, CustomCommandValidationFieldKind.OccurrenceLifetime)
+        );
+        targets.ShouldContain(AnnouncementTarget(-3, CustomCommandValidationFieldKind.Interval));
+        targets.ShouldContain(AnnouncementTarget(-4, CustomCommandValidationFieldKind.Interval));
+        targets.ShouldContain(AnnouncementTarget(-4, CustomCommandValidationFieldKind.Delivery));
+        targets.ShouldContain(
+            AnnouncementTarget(-4, CustomCommandValidationFieldKind.ChatMessages)
+        );
+        targets.ShouldContain(AnnouncementTarget(-5, CustomCommandValidationFieldKind.Day));
+    }
+
+    [Test]
+    public void ConfigurationIdentityAndTimeZone_Validating_TargetsReloadAndTimeZoneControls()
+    {
+        var draft = ConfigurationWithCommands();
+        draft.TimeZoneId = "Missing/Zone";
+        draft.MessageEntries.Add(
+            new CustomMessageLibraryEntryEditor
+            {
+                Id = -1,
+                Name = "Another reply",
+                Variants = [new CustomMessageVariantEditor { Id = -4, Text = "Another reply." }],
+            }
+        );
+
+        var targets = ValidationErrors(draft).Select(error => error.Target);
+
+        targets.ShouldContain(
+            new CustomCommandConfigurationValidationTarget(
+                CustomCommandSettingsTab.Commands,
+                CustomCommandValidationEntityKind.Configuration,
+                0,
+                CustomCommandValidationFieldKind.Identity
+            )
+        );
+        targets.ShouldContain(
+            new CustomCommandConfigurationValidationTarget(
+                CustomCommandSettingsTab.Commands,
+                CustomCommandValidationEntityKind.Configuration,
+                0,
+                CustomCommandValidationFieldKind.TimeZone
+            )
+        );
+    }
+
+    [Test]
     public async Task InvalidAnnouncementDeliveryTiming_Validating_DoesNotPersist()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -560,6 +727,13 @@ public sealed class CustomCommandConfigurationTests
         }
     }
 
+    private sealed class UnsupportedCustomCommandActionEditor : ICustomCommandActionEditor
+    {
+        public CustomCommandActionKind Kind => (CustomCommandActionKind)99;
+
+        public int MessageLibraryEntryId { get; set; }
+    }
+
     private static CustomCommandConfigurationSaveCommand ValidCommand(
         CustomCommandConfiguration draft
     )
@@ -582,6 +756,32 @@ public sealed class CustomCommandConfigurationTests
         return CustomCommandConfigurationValidator
             .Validate(draft)
             .Match(_ => Array.Empty<CustomCommandConfigurationValidationError>(), errors => errors);
+    }
+
+    private static CustomCommandConfigurationValidationTarget CommandTarget(
+        int commandId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Command,
+            commandId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
+        int announcementId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.ScheduledMessage,
+            announcementId,
+            field
+        );
     }
 
     private static async Task SaveValidAsync(

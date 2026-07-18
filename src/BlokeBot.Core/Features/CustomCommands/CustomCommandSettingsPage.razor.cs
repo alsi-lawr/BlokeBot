@@ -34,6 +34,10 @@ public partial class CustomCommandSettingsPage
     private CustomCommandConfigurationValidationTarget? _focusTarget;
     private long _focusRequest;
     private CustomCommandSettingsTab? _pendingTabFocus;
+    private string? _pendingControlFocusId;
+    private long _announcementSectionOpenRequest;
+    private long _timeZoneSectionOpenRequest;
+    private readonly Dictionary<string, ElementReference> _controls = [];
     private ElementReference _commandsTab;
     private ElementReference _messageLibraryTab;
 
@@ -97,15 +101,9 @@ public partial class CustomCommandSettingsPage
                 errors =>
                 {
                     _validationErrors = errors.ToArray();
-                    if (
-                        _validationErrors
-                            .Select(error => error.Target)
-                            .OfType<CustomCommandConfigurationValidationTarget>()
-                            .FirstOrDefault() is
-                        { } target
-                    )
+                    if (_validationErrors.FirstOrDefault() is { } error)
                     {
-                        FocusValidationTarget(target);
+                        FocusValidationTarget(error.Target);
                     }
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>("Custom commands need attention.")
@@ -148,17 +146,24 @@ public partial class CustomCommandSettingsPage
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_pendingTabFocus is not { } tab)
+        if (_pendingTabFocus is { } tab)
         {
-            return;
+            _pendingTabFocus = null;
+            await (
+                tab == CustomCommandSettingsTab.Commands
+                    ? _commandsTab.FocusAsync()
+                    : _messageLibraryTab.FocusAsync()
+            );
         }
 
-        _pendingTabFocus = null;
-        await (
-            tab == CustomCommandSettingsTab.Commands
-                ? _commandsTab.FocusAsync()
-                : _messageLibraryTab.FocusAsync()
-        );
+        if (
+            _pendingControlFocusId is { } controlId
+            && _controls.TryGetValue(controlId, out var control)
+        )
+        {
+            _pendingControlFocusId = null;
+            await control.FocusAsync();
+        }
     }
 
     private void ActivateTab(CustomCommandSettingsTab tab)
@@ -204,6 +209,18 @@ public partial class CustomCommandSettingsPage
         _activeTab = target.Tab;
         _focusTarget = target;
         _focusRequest++;
+        _pendingControlFocusId = ValidationControlId(target);
+        if (target.EntityKind == CustomCommandValidationEntityKind.ScheduledMessage)
+        {
+            _announcementSectionOpenRequest++;
+        }
+        else if (
+            target.EntityKind == CustomCommandValidationEntityKind.Configuration
+            && target.FieldKind == CustomCommandValidationFieldKind.TimeZone
+        )
+        {
+            _timeZoneSectionOpenRequest++;
+        }
     }
 
     private CustomCommandConfigurationValidationTarget? AliasCollisionTarget(
@@ -226,7 +243,90 @@ public partial class CustomCommandSettingsPage
         );
         return command is null
             ? null
-            : new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id);
+            : new(
+                CustomCommandSettingsTab.Commands,
+                CustomCommandValidationEntityKind.Command,
+                command.Id,
+                CustomCommandValidationFieldKind.Aliases
+            );
+    }
+
+    private static CustomCommandConfigurationValidationTarget ReplyTarget(
+        int replyId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.MessageLibrary,
+            CustomCommandValidationEntityKind.Reply,
+            replyId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget VariantTarget(
+        int replyId,
+        int variantId
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.MessageLibrary,
+            CustomCommandValidationEntityKind.Variant,
+            replyId,
+            CustomCommandValidationFieldKind.VariantText,
+            variantId
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget CommandTarget(
+        int commandId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Command,
+            commandId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget CounterTarget(
+        int counterId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Counter,
+            counterId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
+        int announcementId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.ScheduledMessage,
+            announcementId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget ConfigurationTarget(
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Configuration,
+            0,
+            field
+        );
     }
 
     private static string MessageVariantFieldId(
@@ -242,6 +342,141 @@ public partial class CustomCommandSettingsPage
         return $"command-{command.Id}-aliases";
     }
 
+    private static string MessageEntryNameFieldId(CustomMessageLibraryEntryEditor entry)
+    {
+        return $"message-entry-{entry.Id}-name";
+    }
+
+    private static string MessageSelectionFieldId(CustomMessageLibraryEntryEditor entry)
+    {
+        return $"message-entry-{entry.Id}-selection-mode";
+    }
+
+    private static string MessageCurrentVariantFieldId(CustomMessageLibraryEntryEditor entry)
+    {
+        return $"message-entry-{entry.Id}-current-variant";
+    }
+
+    private static string AddMessageVariantControlId(CustomMessageLibraryEntryEditor entry)
+    {
+        return $"message-entry-{entry.Id}-add-variant";
+    }
+
+    private static string CommandNameFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-name";
+    }
+
+    private static string CommandCooldownFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-cooldown";
+    }
+
+    private static string CommandEnabledToggleId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-enabled";
+    }
+
+    private static string CommandModeratorOnlyToggleId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-moderator-only";
+    }
+
+    private static string CommandCooldownScopeFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-cooldown-scope";
+    }
+
+    private static string CommandActionFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-action-kind";
+    }
+
+    private static string CommandReplyFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-reply";
+    }
+
+    private static string CommandCounterFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-counter-id";
+    }
+
+    private static string CounterNameFieldId(CustomCounterEditor counter)
+    {
+        return $"counter-{counter.Id}-name";
+    }
+
+    private static string CounterValueFieldId(CustomCounterEditor counter)
+    {
+        return $"counter-{counter.Id}-value";
+    }
+
+    private static string AnnouncementNameFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-name";
+    }
+
+    private static string AnnouncementReplyFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-reply";
+    }
+
+    private static string AnnouncementEnabledToggleId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-enabled";
+    }
+
+    private static string AnnouncementDeliveryFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-delivery";
+    }
+
+    private static string AnnouncementColorFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-color";
+    }
+
+    private static string AnnouncementScheduleFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-schedule-kind";
+    }
+
+    private static string AnnouncementRetryDelayFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-retry-delay";
+    }
+
+    private static string AnnouncementOccurrenceLifetimeFieldId(
+        CustomAnnouncementEditor announcement
+    )
+    {
+        return $"announcement-{announcement.Id}-occurrence-lifetime";
+    }
+
+    private static string AnnouncementIntervalFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-interval-minutes";
+    }
+
+    private static string AnnouncementChatMessagesFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-required-chat-messages";
+    }
+
+    private static string AnnouncementDayFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-day";
+    }
+
+    private static string AnnouncementWeeklyTimeFieldId(CustomAnnouncementEditor announcement)
+    {
+        return $"announcement-{announcement.Id}-weekly-time";
+    }
+
+    private const string _timeZoneControlId = "custom-command-time-zone";
+    private const string _reloadControlId = "custom-command-reload";
+
     private string? ValidationMessage(CustomCommandConfigurationValidationTarget target)
     {
         return _validationErrors.FirstOrDefault(error => error.Target == target)?.Message;
@@ -250,6 +485,122 @@ public partial class CustomCommandSettingsPage
     private long FocusRequestFor(CustomCommandConfigurationValidationTarget target)
     {
         return _focusTarget == target ? _focusRequest : 0;
+    }
+
+    private IReadOnlyDictionary<string, object> ValidationAttributes(
+        string controlId,
+        CustomCommandConfigurationValidationTarget target
+    )
+    {
+        return ValidationMessage(target) is null
+            ? []
+            : new Dictionary<string, object>
+            {
+                ["aria-invalid"] = "true",
+                ["aria-describedby"] = $"{controlId}-error",
+            };
+    }
+
+    private RenderFragment ValidationMessageFor(
+        string controlId,
+        CustomCommandConfigurationValidationTarget target
+    )
+    {
+        var message = ValidationMessage(target);
+        return builder =>
+        {
+            if (message is null)
+            {
+                return;
+            }
+
+            builder.OpenElement(0, "p");
+            builder.AddAttribute(1, "id", $"{controlId}-error");
+            builder.AddAttribute(2, "class", "text-sm font-semibold text-red-700");
+            builder.AddAttribute(3, "role", "alert");
+            builder.AddContent(4, message);
+            builder.CloseElement();
+        };
+    }
+
+    private static string? ValidationControlId(CustomCommandConfigurationValidationTarget target)
+    {
+        return target switch
+        {
+            {
+                EntityKind: CustomCommandValidationEntityKind.Configuration,
+                FieldKind: CustomCommandValidationFieldKind.Identity
+            } => _reloadControlId,
+            {
+                EntityKind: CustomCommandValidationEntityKind.Configuration,
+                FieldKind: CustomCommandValidationFieldKind.TimeZone
+            } => _timeZoneControlId,
+            {
+                EntityKind: CustomCommandValidationEntityKind.Reply,
+                FieldKind: CustomCommandValidationFieldKind.SelectionMode
+            } => $"message-entry-{target.EntityId}-selection-mode",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Reply,
+                FieldKind: CustomCommandValidationFieldKind.VariantText
+            } => $"message-entry-{target.EntityId}-add-variant",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.Cooldown
+            } => $"command-{target.EntityId}-cooldown",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.CooldownScope
+            } => $"command-{target.EntityId}-cooldown-scope",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.Action
+            } => $"command-{target.EntityId}-action-kind",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.Reply
+            } => $"command-{target.EntityId}-reply",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.Counter
+            } => $"command-{target.EntityId}-counter-id",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Reply
+            } => $"announcement-{target.EntityId}-reply",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Delivery
+            } => $"announcement-{target.EntityId}-delivery",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Color
+            } => $"announcement-{target.EntityId}-color",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.RetryDelay
+            } => $"announcement-{target.EntityId}-retry-delay",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.OccurrenceLifetime
+            } => $"announcement-{target.EntityId}-occurrence-lifetime",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Schedule
+            } => $"announcement-{target.EntityId}-schedule-kind",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Interval
+            } => $"announcement-{target.EntityId}-interval-minutes",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.ChatMessages
+            } => $"announcement-{target.EntityId}-required-chat-messages",
+            {
+                EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
+                FieldKind: CustomCommandValidationFieldKind.Day
+            } => $"announcement-{target.EntityId}-day",
+            _ => null,
+        };
     }
 
     private string TabClass(CustomCommandSettingsTab tab)

@@ -82,7 +82,7 @@
                     <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
                 </div>
                 <div class="grid gap-4 p-5 md:grid-cols-2">
-                    <Field Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
+                    <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
                     <div class="flex items-end">
                         <button class="btn-secondary" @onclick="LookupAsync">Search</button>
                     </div>
@@ -97,21 +97,21 @@
                 <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Move points</h3>
-                        <Field Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
-                        <Field Label="To viewer" @bind-Value="_giveTo" Placeholder="to username" />
-                        <Field Label="Amount" @bind-Value="_giveAmount" Placeholder="100, 50%, all" />
+                        <Field Id="points-dashboard-give-from" Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
+                        <Field Id="points-dashboard-give-to" Label="To viewer" @bind-Value="_giveTo" Placeholder="to username" />
+                        <Field Id="points-dashboard-give-amount" Label="Amount" @bind-Value="_giveAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="GiveAsync">Move points</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Add points</h3>
-                        <Field Label="Viewer" @bind-Value="_addLogin" Placeholder="username" />
-                        <Field Label="Amount" @bind-Value="_addAmount" Placeholder="100" />
+                        <Field Id="points-dashboard-add-login" Label="Viewer" @bind-Value="_addLogin" Placeholder="username" />
+                        <Field Id="points-dashboard-add-amount" Label="Amount" @bind-Value="_addAmount" Placeholder="100" />
                         <button class="btn-secondary" @onclick="AddAsync">Add points</button>
                     </div>
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Take away points</h3>
-                        <Field Label="Viewer" @bind-Value="_removeLogin" Placeholder="username" />
-                        <Field Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
+                        <Field Id="points-dashboard-remove-login" Label="Viewer" @bind-Value="_removeLogin" Placeholder="username" />
+                        <Field Id="points-dashboard-remove-amount" Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
                     </div>
                 </div>

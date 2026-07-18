@@ -18,33 +18,95 @@ public static class CustomCommandConfigurationValidator
     > Validate(CustomCommandConfiguration draft)
     {
         var errors = new List<CustomCommandConfigurationValidationError>();
-        EnsureUniqueEditorIds(draft.MessageEntries.Select(entry => entry.Id), "replies", errors);
-        EnsureUniqueEditorIds(draft.Counters.Select(counter => counter.Id), "counters", errors);
-        EnsureUniqueEditorIds(draft.Commands.Select(command => command.Id), "commands", errors);
-        EnsureUniqueEditorIds(
-            draft.Announcements.Select(announcement => announcement.Id),
-            "announcements",
-            errors
-        );
+        EnsureUniqueEditorIds(draft.MessageEntries.Select(entry => entry.Id), errors);
+        EnsureUniqueEditorIds(draft.Counters.Select(counter => counter.Id), errors);
+        EnsureUniqueEditorIds(draft.Commands.Select(command => command.Id), errors);
+        EnsureUniqueEditorIds(draft.Announcements.Select(announcement => announcement.Id), errors);
 
         var messageNames = draft
-            .MessageEntries.Select(entry => RequiredName(entry.Name, "Reply", errors))
+            .MessageEntries.Select(entry =>
+                RequiredName(
+                    entry.Name,
+                    "Reply",
+                    ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name),
+                    errors
+                )
+            )
             .ToArray();
         var counterNames = draft
-            .Counters.Select(counter => RequiredName(counter.Name, "Counter", errors))
+            .Counters.Select(counter =>
+                RequiredName(
+                    counter.Name,
+                    "Counter",
+                    CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name),
+                    errors
+                )
+            )
             .ToArray();
         var commandNames = draft
-            .Commands.Select(command => RequiredName(command.Name, "Command", errors))
+            .Commands.Select(command =>
+                RequiredName(
+                    command.Name,
+                    "Command",
+                    CommandTarget(command.Id, CustomCommandValidationFieldKind.Name),
+                    errors
+                )
+            )
             .ToArray();
         var announcementNames = draft
             .Announcements.Select(announcement =>
-                RequiredName(announcement.Name, "Announcement", errors)
+                RequiredName(
+                    announcement.Name,
+                    "Announcement",
+                    AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name),
+                    errors
+                )
             )
             .ToArray();
-        EnsureUniqueNames(messageNames, "reply", errors);
-        EnsureUniqueNames(counterNames, "counter", errors);
-        EnsureUniqueNames(commandNames, "command", errors);
-        EnsureUniqueNames(announcementNames, "announcement", errors);
+        EnsureUniqueNames(
+            draft.MessageEntries.Select(
+                (entry, index) =>
+                    (
+                        messageNames[index],
+                        ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name)
+                    )
+            ),
+            "reply",
+            errors
+        );
+        EnsureUniqueNames(
+            draft.Counters.Select(
+                (counter, index) =>
+                    (
+                        counterNames[index],
+                        CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name)
+                    )
+            ),
+            "counter",
+            errors
+        );
+        EnsureUniqueNames(
+            draft.Commands.Select(
+                (command, index) =>
+                    (
+                        commandNames[index],
+                        CommandTarget(command.Id, CustomCommandValidationFieldKind.Name)
+                    )
+            ),
+            "command",
+            errors
+        );
+        EnsureUniqueNames(
+            draft.Announcements.Select(
+                (announcement, index) =>
+                    (
+                        announcementNames[index],
+                        AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name)
+                    )
+            ),
+            "announcement",
+            errors
+        );
 
         var messageIds = draft.MessageEntries.Select(entry => entry.Id).ToHashSet();
         var counterIds = draft.Counters.Select(counter => counter.Id).ToHashSet();
@@ -61,7 +123,9 @@ public static class CustomCommandConfigurationValidator
             draft.Announcements,
             announcementNames,
             messageIds,
-            messageEntries.ToDictionary(entry => entry.Id),
+            messageEntries
+                .GroupBy(entry => entry.Id)
+                .ToDictionary(group => group.Key, group => group.First()),
             errors
         );
         EnsureUniqueAliases(commands, errors);
@@ -101,12 +165,20 @@ public static class CustomCommandConfigurationValidator
             var editor = editors[entryIndex];
             if (!Enum.IsDefined(editor.SelectionMode))
             {
-                AddError(errors, $"Choose how reply '{names[entryIndex]}' selects messages.");
+                AddError(
+                    errors,
+                    $"Choose how reply '{names[entryIndex]}' selects messages.",
+                    ReplyTarget(editor.Id, CustomCommandValidationFieldKind.SelectionMode)
+                );
             }
 
             if (editor.Variants.Count == 0)
             {
-                AddError(errors, $"Reply '{names[entryIndex]}' needs at least one message.");
+                AddError(
+                    errors,
+                    $"Reply '{names[entryIndex]}' needs at least one message.",
+                    ReplyTarget(editor.Id, CustomCommandValidationFieldKind.VariantText)
+                );
             }
 
             var variants = new List<CustomMessageVariantValue>(editor.Variants.Count);
@@ -118,8 +190,11 @@ public static class CustomCommandConfigurationValidator
                     AddError(
                         errors,
                         $"Reply '{names[entryIndex]}' has a blank message.",
-                        new CustomCommandConfigurationValidationTarget.MessageVariant(
+                        new(
+                            CustomCommandSettingsTab.MessageLibrary,
+                            CustomCommandValidationEntityKind.Variant,
                             editor.Id,
+                            CustomCommandValidationFieldKind.VariantText,
                             variant.Id
                         )
                     );
@@ -129,8 +204,11 @@ public static class CustomCommandConfigurationValidator
                     AddError(
                         errors,
                         $"Reply messages cannot exceed {_messageVariantMaxLength} characters.",
-                        new CustomCommandConfigurationValidationTarget.MessageVariant(
+                        new(
+                            CustomCommandSettingsTab.MessageLibrary,
+                            CustomCommandValidationEntityKind.Variant,
                             editor.Id,
+                            CustomCommandValidationFieldKind.VariantText,
                             variant.Id
                         )
                     );
@@ -182,18 +260,31 @@ public static class CustomCommandConfigurationValidator
                 AddError(
                     errors,
                     $"Choose a saved reply for command '{names[index]}'.",
-                    new CustomCommandConfigurationValidationTarget.CommandReply(editor.Id)
+                    new(
+                        CustomCommandSettingsTab.Commands,
+                        CustomCommandValidationEntityKind.Command,
+                        editor.Id,
+                        CustomCommandValidationFieldKind.Reply
+                    )
                 );
             }
 
             if (editor.CooldownSeconds < 0)
             {
-                AddError(errors, "The wait between command uses cannot be negative.");
+                AddError(
+                    errors,
+                    "The wait between command uses cannot be negative.",
+                    CommandTarget(editor.Id, CustomCommandValidationFieldKind.Cooldown)
+                );
             }
 
             if (!Enum.IsDefined(editor.CooldownScope))
             {
-                AddError(errors, $"Choose who waits for command '{names[index]}'.");
+                AddError(
+                    errors,
+                    $"Choose who waits for command '{names[index]}'.",
+                    CommandTarget(editor.Id, CustomCommandValidationFieldKind.CooldownScope)
+                );
             }
 
             var action = editor.Action switch
@@ -208,11 +299,12 @@ public static class CustomCommandConfigurationValidator
                         counter.CounterId
                     ),
                 CounterCustomCommandActionEditor counter => MissingCounterAction(
+                    editor.Id,
                     names[index],
                     counter,
                     errors
                 ),
-                _ => InvalidAction(names[index], editor.Action, errors),
+                _ => InvalidAction(editor.Id, names[index], editor.Action, errors),
             };
             var aliases = CommandAliasNormalizer.Split(editor.Aliases).ToArray();
             if (aliases.Length == 0)
@@ -220,7 +312,12 @@ public static class CustomCommandConfigurationValidator
                 AddError(
                     errors,
                     "Enter at least one command word.",
-                    new CustomCommandConfigurationValidationTarget.CommandAliases(editor.Id)
+                    new(
+                        CustomCommandSettingsTab.Commands,
+                        CustomCommandValidationEntityKind.Command,
+                        editor.Id,
+                        CustomCommandValidationFieldKind.Aliases
+                    )
                 );
             }
 
@@ -229,7 +326,12 @@ public static class CustomCommandConfigurationValidator
                 AddError(
                     errors,
                     $"Command words cannot exceed {_aliasMaxLength} characters.",
-                    new CustomCommandConfigurationValidationTarget.CommandAliases(editor.Id)
+                    new(
+                        CustomCommandSettingsTab.Commands,
+                        CustomCommandValidationEntityKind.Command,
+                        editor.Id,
+                        CustomCommandValidationFieldKind.Aliases
+                    )
                 );
             }
 
@@ -251,22 +353,32 @@ public static class CustomCommandConfigurationValidator
     }
 
     private static CustomCommandActionValue MissingCounterAction(
+        int commandId,
         string commandName,
         CounterCustomCommandActionEditor editor,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
-        AddError(errors, $"Choose a counter for command '{commandName}'.");
+        AddError(
+            errors,
+            $"Choose a counter for command '{commandName}'.",
+            CommandTarget(commandId, CustomCommandValidationFieldKind.Counter)
+        );
         return new CustomCommandActionValue.Counter(editor.MessageLibraryEntryId, editor.CounterId);
     }
 
     private static CustomCommandActionValue InvalidAction(
+        int commandId,
         string commandName,
         ICustomCommandActionEditor editor,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
-        AddError(errors, $"Choose what command '{commandName}' should do.");
+        AddError(
+            errors,
+            $"Choose what command '{commandName}' should do.",
+            CommandTarget(commandId, CustomCommandValidationFieldKind.Action)
+        );
         return new CustomCommandActionValue.Message(editor.MessageLibraryEntryId);
     }
 
@@ -284,19 +396,30 @@ public static class CustomCommandConfigurationValidator
             var editor = editors[index];
             if (!messageIds.Contains(editor.MessageLibraryEntryId))
             {
-                AddError(errors, $"Choose a saved reply for announcement '{names[index]}'.");
+                AddError(
+                    errors,
+                    $"Choose a saved reply for announcement '{names[index]}'.",
+                    AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.Reply)
+                );
             }
 
             if (!Enum.IsDefined(editor.DeliveryType))
             {
-                AddError(errors, $"Choose how scheduled message '{names[index]}' is delivered.");
+                AddError(
+                    errors,
+                    $"Choose how scheduled message '{names[index]}' is delivered.",
+                    AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.Delivery)
+                );
             }
 
             if (!Enum.IsDefined(editor.AnnouncementColor))
             {
                 AddError(
                     errors,
-                    $"Choose a supported Twitch announcement color for '{names[index]}'."
+                    $"Choose a supported Twitch announcement color for '{names[index]}'.",
+                    editor.DeliveryType == CustomAnnouncementDeliveryType.TwitchAnnouncement
+                        ? AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.Color)
+                        : AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.Delivery)
                 );
             }
 
@@ -310,12 +433,17 @@ public static class CustomCommandConfigurationValidator
             {
                 AddError(
                     errors,
-                    $"Every reply message for Twitch announcement '{names[index]}' must be at most {_twitchAnnouncementMaxLength} characters."
+                    $"Every reply message for Twitch announcement '{names[index]}' must be at most {_twitchAnnouncementMaxLength} characters.",
+                    AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.Reply)
                 );
             }
 
-            var retryDelay = RetryDelay(editor.RetryDelaySeconds, errors);
-            var occurrenceLifetime = OccurrenceLifetime(editor.OccurrenceLifetimeSeconds, errors);
+            var retryDelay = RetryDelay(editor.Id, editor.RetryDelaySeconds, errors);
+            var occurrenceLifetime = OccurrenceLifetime(
+                editor.Id,
+                editor.OccurrenceLifetimeSeconds,
+                errors
+            );
             if (
                 retryDelay is not null
                 && occurrenceLifetime is not null
@@ -324,11 +452,12 @@ public static class CustomCommandConfigurationValidator
             {
                 AddError(
                     errors,
-                    "Announcement retry delay must be less than its occurrence lifetime."
+                    "Announcement retry delay must be less than its occurrence lifetime.",
+                    AnnouncementTarget(editor.Id, CustomCommandValidationFieldKind.RetryDelay)
                 );
             }
 
-            var schedule = SnapshotSchedule(names[index], editor.Schedule, errors);
+            var schedule = SnapshotSchedule(editor.Id, names[index], editor.Schedule, errors);
             if (retryDelay is null || occurrenceLifetime is null)
             {
                 continue;
@@ -353,13 +482,18 @@ public static class CustomCommandConfigurationValidator
     }
 
     private static AnnouncementRetryDelay? RetryDelay(
+        int announcementId,
         int seconds,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
         if (seconds <= 0)
         {
-            AddError(errors, "Announcement retry delay must be positive.");
+            AddError(
+                errors,
+                "Announcement retry delay must be positive.",
+                AnnouncementTarget(announcementId, CustomCommandValidationFieldKind.RetryDelay)
+            );
             return null;
         }
 
@@ -367,6 +501,7 @@ public static class CustomCommandConfigurationValidator
     }
 
     private static AnnouncementOccurrenceLifetime? OccurrenceLifetime(
+        int announcementId,
         int seconds,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
@@ -375,7 +510,11 @@ public static class CustomCommandConfigurationValidator
         {
             AddError(
                 errors,
-                "Announcement occurrence lifetime must be positive and no greater than 60 seconds."
+                "Announcement occurrence lifetime must be positive and no greater than 60 seconds.",
+                AnnouncementTarget(
+                    announcementId,
+                    CustomCommandValidationFieldKind.OccurrenceLifetime
+                )
             );
             return null;
         }
@@ -384,6 +523,7 @@ public static class CustomCommandConfigurationValidator
     }
 
     private static CustomAnnouncementScheduleValue SnapshotSchedule(
+        int announcementId,
         string announcementName,
         ICustomAnnouncementScheduleEditor editor,
         ICollection<CustomCommandConfigurationValidationError> errors
@@ -394,19 +534,40 @@ public static class CustomCommandConfigurationValidator
             case IntervalCustomAnnouncementScheduleEditor interval:
                 if (interval.IntervalMinutes < 1)
                 {
-                    AddError(errors, "Announcements must wait at least 1 minute.");
+                    AddError(
+                        errors,
+                        "Announcements must wait at least 1 minute.",
+                        AnnouncementTarget(
+                            announcementId,
+                            CustomCommandValidationFieldKind.Interval
+                        )
+                    );
                 }
 
                 return new CustomAnnouncementScheduleValue.Interval(interval.IntervalMinutes);
             case IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat:
                 if (intervalAfterChat.IntervalMinutes < 1)
                 {
-                    AddError(errors, "Announcements must wait at least 1 minute.");
+                    AddError(
+                        errors,
+                        "Announcements must wait at least 1 minute.",
+                        AnnouncementTarget(
+                            announcementId,
+                            CustomCommandValidationFieldKind.Interval
+                        )
+                    );
                 }
 
                 if (intervalAfterChat.RequiredChatMessages < 1)
                 {
-                    AddError(errors, "Chat-based announcements need at least 1 chat message.");
+                    AddError(
+                        errors,
+                        "Chat-based announcements need at least 1 chat message.",
+                        AnnouncementTarget(
+                            announcementId,
+                            CustomCommandValidationFieldKind.ChatMessages
+                        )
+                    );
                 }
 
                 return new CustomAnnouncementScheduleValue.IntervalAfterChat(
@@ -416,12 +577,20 @@ public static class CustomCommandConfigurationValidator
             case WeeklyCustomAnnouncementScheduleEditor weekly:
                 if (!Enum.IsDefined(weekly.Day))
                 {
-                    AddError(errors, "Choose a valid day for weekly announcements.");
+                    AddError(
+                        errors,
+                        "Choose a valid day for weekly announcements.",
+                        AnnouncementTarget(announcementId, CustomCommandValidationFieldKind.Day)
+                    );
                 }
 
                 return new CustomAnnouncementScheduleValue.Weekly(weekly.Day, weekly.Time);
             default:
-                AddError(errors, $"Choose when announcement '{announcementName}' should be sent.");
+                AddError(
+                    errors,
+                    $"Choose when announcement '{announcementName}' should be sent.",
+                    AnnouncementTarget(announcementId, CustomCommandValidationFieldKind.Schedule)
+                );
                 return new CustomAnnouncementScheduleValue.Interval(1);
         }
     }
@@ -442,7 +611,12 @@ public static class CustomCommandConfigurationValidator
             AddError(
                 errors,
                 $"!{duplicate.Key} is already used by another custom command.",
-                new CustomCommandConfigurationValidationTarget.CommandAliases(duplicate.First().Id)
+                new(
+                    CustomCommandSettingsTab.Commands,
+                    CustomCommandValidationEntityKind.Command,
+                    duplicate.First().Id,
+                    CustomCommandValidationFieldKind.Aliases
+                )
             );
         }
     }
@@ -455,7 +629,16 @@ public static class CustomCommandConfigurationValidator
         var normalized = string.IsNullOrWhiteSpace(timeZoneId) ? "UTC" : timeZoneId.Trim();
         if (!TimeZoneInfo.TryFindSystemTimeZoneById(normalized, out _))
         {
-            AddError(errors, $"Time zone '{normalized}' was not found.");
+            AddError(
+                errors,
+                $"Time zone '{normalized}' was not found.",
+                new(
+                    CustomCommandSettingsTab.Commands,
+                    CustomCommandValidationEntityKind.Configuration,
+                    0,
+                    CustomCommandValidationFieldKind.TimeZone
+                )
+            );
         }
 
         return new(normalized);
@@ -464,17 +647,22 @@ public static class CustomCommandConfigurationValidator
     private static string RequiredName(
         string value,
         string entityName,
+        CustomCommandConfigurationValidationTarget target,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
         var trimmed = value.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
         {
-            AddError(errors, $"{entityName} name is required.");
+            AddError(errors, $"{entityName} name is required.", target);
         }
         else if (trimmed.Length > _nameMaxLength)
         {
-            AddError(errors, $"{entityName} names cannot exceed {_nameMaxLength} characters.");
+            AddError(
+                errors,
+                $"{entityName} names cannot exceed {_nameMaxLength} characters.",
+                target
+            );
         }
 
         return trimmed;
@@ -482,33 +670,36 @@ public static class CustomCommandConfigurationValidator
 
     private static void EnsureUniqueEditorIds(
         IEnumerable<int> ids,
-        string entityName,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
-        if (ids.GroupBy(id => id).Any(group => group.Count() > 1))
+        if (ids.GroupBy(id => id).FirstOrDefault(group => group.Count() > 1) is not null)
         {
             AddError(
                 errors,
-                $"Some {entityName} were duplicated while you were editing. Reload the page and try again."
+                "Some items were duplicated while you were editing. Reload the page and try again.",
+                ConfigurationTarget(CustomCommandValidationFieldKind.Identity)
             );
         }
     }
 
     private static void EnsureUniqueNames(
-        IEnumerable<string> names,
+        IEnumerable<(string Name, CustomCommandConfigurationValidationTarget Target)> names,
         string entityName,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
         var duplicate = names
-            .Where(name => !string.IsNullOrWhiteSpace(name))
-            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group => group.Count() > 1)
-            ?.Key;
+            .Where(value => !string.IsNullOrWhiteSpace(value.Name))
+            .GroupBy(value => value.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
         if (duplicate is not null)
         {
-            AddError(errors, $"Another {entityName} named '{duplicate}' already exists.");
+            AddError(
+                errors,
+                $"Another {entityName} named '{duplicate.Key}' already exists.",
+                duplicate.First().Target
+            );
         }
     }
 
@@ -517,10 +708,74 @@ public static class CustomCommandConfigurationValidator
         return variantCount <= 0 ? 0 : Math.Clamp(index, 0, variantCount - 1);
     }
 
+    private static CustomCommandConfigurationValidationTarget ReplyTarget(
+        int replyId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.MessageLibrary,
+            CustomCommandValidationEntityKind.Reply,
+            replyId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget CounterTarget(
+        int counterId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Counter,
+            counterId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget CommandTarget(
+        int commandId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Command,
+            commandId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget AnnouncementTarget(
+        int announcementId,
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.ScheduledMessage,
+            announcementId,
+            field
+        );
+    }
+
+    private static CustomCommandConfigurationValidationTarget ConfigurationTarget(
+        CustomCommandValidationFieldKind field
+    )
+    {
+        return new(
+            CustomCommandSettingsTab.Commands,
+            CustomCommandValidationEntityKind.Configuration,
+            0,
+            field
+        );
+    }
+
     private static void AddError(
         ICollection<CustomCommandConfigurationValidationError> errors,
         string message,
-        CustomCommandConfigurationValidationTarget? target = null
+        CustomCommandConfigurationValidationTarget target
     )
     {
         errors.Add(new(message, target));
@@ -529,5 +784,5 @@ public static class CustomCommandConfigurationValidator
 
 public sealed record CustomCommandConfigurationValidationError(
     string Message,
-    CustomCommandConfigurationValidationTarget? Target
+    CustomCommandConfigurationValidationTarget Target
 );

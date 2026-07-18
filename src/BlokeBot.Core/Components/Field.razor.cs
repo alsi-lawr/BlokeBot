@@ -45,7 +45,7 @@ public partial class Field
     private ElementReference _input;
 
     [Parameter]
-    public string? Id { get; set; }
+    public required string Id { get; set; }
 
     [Parameter]
     public string Label { get; set; } = string.Empty;
@@ -65,10 +65,7 @@ public partial class Field
     [Parameter]
     public EventCallback<string> ValueChanged { get; set; }
 
-    private string _inputId
-    {
-        get => string.IsNullOrWhiteSpace(Id) ? field : Id;
-    } = $"field-{Guid.NewGuid():N}";
+    private string _inputId => Id;
 
     private bool _hasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 

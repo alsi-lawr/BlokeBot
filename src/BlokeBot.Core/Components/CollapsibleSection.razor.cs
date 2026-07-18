@@ -60,6 +60,9 @@ public partial class CollapsibleSection
     public bool InitiallyOpen { get; set; } = true;
 
     [Parameter]
+    public long OpenRequest { get; set; }
+
+    [Parameter]
     public string Title { get; set; } = string.Empty;
 
     private string _panelClass =>
@@ -74,6 +77,19 @@ public partial class CollapsibleSection
     {
         _isOpen = InitiallyOpen;
     }
+
+    protected override void OnParametersSet()
+    {
+        if (OpenRequest <= _handledOpenRequest)
+        {
+            return;
+        }
+
+        _handledOpenRequest = OpenRequest;
+        _isOpen = true;
+    }
+
+    private long _handledOpenRequest;
 
     private void Toggle()
     {
