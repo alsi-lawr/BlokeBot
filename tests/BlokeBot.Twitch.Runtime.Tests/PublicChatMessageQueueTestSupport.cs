@@ -1,26 +1,14 @@
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Threading.Channels;
 using BlokeBot.Eventing;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Polly;
 using Shouldly;
-using TUnit.Core;
 
 namespace BlokeBot.Twitch.Runtime.Tests;
 
 public abstract partial class PublicChatMessageQueueTestBase
 {
-    private protected static readonly PublicChatRetryPolicy StandardRetryPolicy = new()
-    {
-        AttemptLimit = 3,
-        Delay = TimeSpan.FromSeconds(1),
-        MaximumDelay = TimeSpan.FromSeconds(30),
-        DelayBackoffType = DelayBackoffType.Exponential,
-    };
-
     private protected static PublicChatMessageQueue CreateQueue(
         BotOptions options,
         IPublicChatOutbox outbox,
@@ -48,11 +36,12 @@ public abstract partial class PublicChatMessageQueueTestBase
 
     private protected static async Task AssertMissingIdentityAsync(
         PublicChatPreparationOutcome outcome,
-        InMemoryOutbox.RowStatus expectedStatus,
+        Type expectedOutcomeType,
         string expectedDiagnostic
     )
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
+        outbox.ScriptClaims(new PublicChatClaimOutcome.Claimed(Claimed("secret chat payload")));
         var logger = new RecordingLogger<PublicChatMessageQueue>();
         var transport = new ScriptedTransport(
             (_, cancellationToken) =>
@@ -71,12 +60,12 @@ public abstract partial class PublicChatMessageQueueTestBase
         using var stopping = new CancellationTokenSource();
         var worker = queue.RunAsync(stopping.Token);
 
-        (await outbox.ReadCompletionAsync()).ShouldBe(expectedStatus);
+        var recorded = await outbox.ReadRecordDeliveryAsync();
         await StopAsync(stopping, worker);
 
-        var snapshot = outbox.SingleSnapshot;
-        snapshot.AttemptCount.ShouldBe(0);
-        snapshot.Message.ShouldBeNull();
+        recorded.Outcome.GetType().ShouldBe(expectedOutcomeType);
+        recorded.CancellationToken.ShouldBe(CancellationToken.None);
+        outbox.BeginSendCalls.ShouldBeEmpty();
         transport.PrepareCount.ShouldBe(1);
         transport.SendCount.ShouldBe(0);
         var entry = logger.Entries.ShouldHaveSingleItem();
@@ -93,6 +82,38 @@ public abstract partial class PublicChatMessageQueueTestBase
             Channel = channel,
             Message = message,
             Deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum(),
+        };
+    }
+
+    private protected static PublicChatEnqueueOutcome.Accepted Accepted(int messageCount = 1)
+    {
+        return new(
+            new PublicChatOutboxReceipt(
+                Enumerable.Range(1, messageCount).Select(Convert.ToInt64).ToImmutableArray()
+            )
+        );
+    }
+
+    private protected static PublicChatClaimedMessage Claimed(
+        string message,
+        string channel = "channel",
+        long id = 1
+    )
+    {
+        var enqueuedAt = Utc(12, 0, 0);
+        return new()
+        {
+            Id = id,
+            Channel = channel,
+            Message = message,
+            EnqueuedAt = enqueuedAt,
+            ExpiresAt = enqueuedAt.AddMinutes(1),
+            Attempt = 1,
+            ClaimToken = new PublicChatClaimToken(
+                Guid.Parse("10000000-0000-0000-0000-000000000001")
+            ),
+            ClaimExpiresAt = enqueuedAt.AddMinutes(5),
+            DeduplicationKey = PublicChatMessageDeduplication.Key(channel, message),
         };
     }
 

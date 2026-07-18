@@ -1,10 +1,4 @@
-using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Threading.Channels;
-using BlokeBot.Eventing;
 using BlokeBot.Twitch.Runtime;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Polly;
 using Shouldly;
 using TUnit.Core;
@@ -76,22 +70,21 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         string message
     )
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
         var transport = new RecordingTransport();
         var queue = CreateQueue(new BotOptions(), outbox, transport);
 
         var outcome = await queue.EnqueueAsync(Command(channel, message), CancellationToken.None);
 
         outcome.ShouldBeOfType<PublicChatEnqueueOutcome.Rejected>();
-        outbox.EnqueueCount.ShouldBe(0);
-        outbox.PendingMessages.ShouldBeEmpty();
+        outbox.EnqueueCalls.ShouldBeEmpty();
         transport.Deliveries.ShouldBeEmpty();
     }
 
     [Test]
     public async Task ValidMessage_Sending_ReturnsAcceptedAfterDurableEnqueue()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
         var transport = new RecordingTransport();
         var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
         var deadline = new PublicChatDeliveryDeadline.ProducerAbsolute(
@@ -106,9 +99,9 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         );
 
         outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
-        outbox.EnqueueCount.ShouldBe(1);
-        outbox.LastEnqueuedDeadline.ShouldBeSameAs(deadline);
-        outbox.PendingMessages.ShouldBe(["message"]);
+        var enqueued = outbox.EnqueueCalls.ShouldHaveSingleItem();
+        enqueued.Batch.Deadline.ShouldBeSameAs(deadline);
+        enqueued.Batch.Items.ShouldHaveSingleItem().Message.ShouldBe("message");
         transport.Deliveries.ShouldBeEmpty();
     }
 
@@ -120,7 +113,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         string message
     )
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
         var transport = new RecordingTransport();
         var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
@@ -132,8 +125,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         );
 
         outcome.ShouldBeOfType<PublicChatSendOutcome.Rejected>();
-        outbox.EnqueueCount.ShouldBe(0);
-        outbox.PendingMessages.ShouldBeEmpty();
+        outbox.EnqueueCalls.ShouldBeEmpty();
         transport.Deliveries.ShouldBeEmpty();
     }
 
@@ -141,7 +133,10 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
     public async Task InfrastructureFailure_Sending_PreservesOriginalException()
     {
         var failure = new IOException("private persistence detail");
-        var outbox = new InMemoryOutbox(StandardRetryPolicy) { EnqueueFailure = failure };
+        var outbox = new ScriptedOutbox
+        {
+            Enqueue = (_, _) => ValueTask.FromException<PublicChatEnqueueOutcome>(failure),
+        };
         var transport = new RecordingTransport();
         var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
@@ -157,7 +152,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         );
 
         thrown.ShouldBeSameAs(failure);
-        outbox.PendingMessages.ShouldBeEmpty();
+        outbox.EnqueueCalls.Count.ShouldBe(1);
         transport.Deliveries.ShouldBeEmpty();
     }
 
@@ -166,7 +161,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
     {
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
         var transport = new RecordingTransport();
         var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
@@ -182,7 +177,7 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         );
 
         thrown.CancellationToken.ShouldBe(cancellation.Token);
-        outbox.PendingMessages.ShouldBeEmpty();
+        outbox.EnqueueCalls.ShouldBeEmpty();
         transport.Deliveries.ShouldBeEmpty();
     }
 
@@ -190,7 +185,14 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
     public async Task CallerCanceledAfterCommit_Sending_ReturnsAcceptedDurableOutcome()
     {
         using var cancellation = new CancellationTokenSource();
-        var outbox = new InMemoryOutbox(StandardRetryPolicy) { AfterEnqueue = cancellation.Cancel };
+        var outbox = new ScriptedOutbox
+        {
+            Enqueue = (_, _) =>
+            {
+                cancellation.Cancel();
+                return ValueTask.FromResult<PublicChatEnqueueOutcome>(Accepted());
+            },
+        };
         var transport = new RecordingTransport();
         var sender = new PublicChatMessageSender(CreateQueue(new BotOptions(), outbox, transport));
 
@@ -203,25 +205,16 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
 
         outcome.ShouldBeOfType<PublicChatSendOutcome.Accepted>();
         cancellation.IsCancellationRequested.ShouldBeTrue();
-        outbox.PendingMessages.ShouldBe(["message"]);
+        outbox.EnqueueCalls.Count.ShouldBe(1);
         transport.Deliveries.ShouldBeEmpty();
     }
 
     [Test]
-    public async Task MessageOverLength_Enqueueing_PersistsEveryPartBeforeDelivery()
+    public async Task MessageOverLength_Enqueueing_WritesEveryPartInOneBatch()
     {
-        var outbox = new InMemoryOutbox(StandardRetryPolicy);
+        var outbox = new ScriptedOutbox();
         var transport = new RecordingTransport();
-        var queue = CreateQueue(
-            new BotOptions
-            {
-                ChatMessageSendIntervalSeconds = 0,
-                DuplicateChatMessageCooldownSeconds = 0,
-                MaxChatMessageLength = 10,
-            },
-            outbox,
-            transport
-        );
+        var queue = CreateQueue(new BotOptions { MaxChatMessageLength = 10 }, outbox, transport);
 
         var receipt = await queue.EnqueueAsync(
             Command("channel", "alpha beta gamma"),
@@ -231,13 +224,10 @@ public sealed class PublicChatMessageValidationTests : PublicChatMessageQueueTes
         receipt
             .ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>()
             .Receipt.MessageIds.Length.ShouldBe(2);
-        outbox.PendingMessages.ShouldBe(["alpha", "beta gamma"]);
+        outbox
+            .EnqueueCalls.ShouldHaveSingleItem()
+            .Batch.Items.Select(item => item.Message)
+            .ShouldBe(["alpha", "beta gamma"]);
         transport.Deliveries.ShouldBeEmpty();
-
-        using var stopping = new CancellationTokenSource();
-        var worker = queue.RunAsync(stopping.Token);
-        (await transport.ReadAsync()).Message.ShouldBe("alpha");
-        (await transport.ReadAsync()).Message.ShouldBe("beta gamma");
-        await StopAsync(stopping, worker);
     }
 }
