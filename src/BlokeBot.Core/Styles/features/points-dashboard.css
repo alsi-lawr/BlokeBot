@@ -1,0 +1,68 @@
+@layer components {
+    @media (max-width: 24.375rem) {
+        .points-dashboard__leaderboard {
+            overflow-x: hidden;
+        }
+
+        .points-dashboard__leaderboard table,
+        .points-dashboard__leaderboard tbody,
+        .points-dashboard__leaderboard tr,
+        .points-dashboard__leaderboard td {
+            display: block;
+        }
+
+        .points-dashboard__leaderboard thead {
+            border: 0;
+            clip: rect(0 0 0 0);
+            height: 1px;
+            margin: -1px;
+            overflow: hidden;
+            padding: 0;
+            position: absolute;
+            width: 1px;
+        }
+
+        .points-dashboard__leaderboard tbody {
+            display: grid;
+            gap: 0.75rem;
+            padding: 0.75rem;
+        }
+
+        .points-dashboard__leaderboard tr {
+            border: 1px solid var(--app-border);
+            border-radius: 0.5rem;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            overflow: hidden;
+        }
+
+        .points-dashboard__leaderboard td {
+            display: grid;
+            gap: 0.2rem;
+            min-width: 0;
+            padding: 0.75rem;
+        }
+
+        .points-dashboard__leaderboard td:nth-child(even) {
+            border-left: 1px solid var(--app-border);
+        }
+
+        .points-dashboard__leaderboard td:nth-child(n + 3) {
+            border-top: 1px solid var(--app-border);
+        }
+
+        .points-dashboard__leaderboard td::before {
+            color: var(--app-text-muted);
+            content: attr(data-label);
+            font-size: 0.7rem;
+            font-weight: 750;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .points-dashboard__leaderboard td:last-child .control-surface {
+            justify-content: center;
+            width: 100%;
+        }
+    }
+}

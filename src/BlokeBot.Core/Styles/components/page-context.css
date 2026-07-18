@@ -125,4 +125,36 @@
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    @media (max-width: 40rem) {
+        .live-round-summary {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            overflow: hidden;
+        }
+
+        .live-round-summary__metric,
+        .live-round-summary__metric--wide {
+            min-width: 0;
+        }
+
+        .live-round-summary__metric + .live-round-summary__metric {
+            border-left: 0;
+        }
+
+        .live-round-summary__metric:nth-child(even) {
+            border-left: 1px solid var(--app-border);
+        }
+
+        .live-round-summary__metric:nth-child(n + 3) {
+            border-top: 1px solid var(--app-border);
+        }
+
+        .live-round-summary__value,
+        .live-round-summary__detail {
+            overflow: visible;
+            text-overflow: clip;
+            white-space: normal;
+        }
+    }
 }

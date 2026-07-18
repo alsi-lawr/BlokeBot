@@ -106,11 +106,73 @@
                 for (const [key, datasetName] of states)
                     document.documentElement.dataset[datasetName] = readBoolean(key) ? "true" : "false";
             };
+            let deactivateMobileDrawer = () => {};
             const focus = id => document.getElementById(id)?.focus();
+            const mobileDrawerFocusableSelector = [
+                "a[href]",
+                "area[href]",
+                "button:not([disabled])",
+                "input:not([disabled]):not([type='hidden'])",
+                "select:not([disabled])",
+                "textarea:not([disabled])",
+                "[contenteditable='true']",
+                "[tabindex]:not([tabindex='-1'])",
+            ].join(",");
+
+            const mobileDrawerFocusables = drawer =>
+                [...drawer.querySelectorAll(mobileDrawerFocusableSelector)].filter(element =>
+                    element.tabIndex >= 0 &&
+                    !element.closest("[inert], [aria-hidden='true']") &&
+                    element.getClientRects().length > 0);
+
+            const activateMobileDrawer = (id, dotNetReference) => {
+                deactivateMobileDrawer();
+
+                const drawer = document.getElementById(id);
+                if (!drawer)
+                    return;
+
+                const onKeyDown = event => {
+                    if (event.key === "Escape") {
+                        event.preventDefault();
+                        dotNetReference.invokeMethodAsync("CloseMobileNavigationFromKeyboardAsync");
+                        return;
+                    }
+
+                    if (event.key !== "Tab")
+                        return;
+
+                    const focusables = mobileDrawerFocusables(drawer);
+                    if (focusables.length === 0) {
+                        event.preventDefault();
+                        drawer.focus();
+                        return;
+                    }
+
+                    const first = focusables[0];
+                    const last = focusables.at(-1);
+                    if (event.shiftKey && (document.activeElement === first || !drawer.contains(document.activeElement))) {
+                        event.preventDefault();
+                        last.focus();
+                    } else if (!event.shiftKey && (document.activeElement === last || !drawer.contains(document.activeElement))) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                };
+
+                document.addEventListener("keydown", onKeyDown);
+                mobileDrawerFocusables(drawer)[0]?.focus();
+                deactivateMobileDrawer = () => document.removeEventListener("keydown", onKeyDown);
+            };
 
             sync();
             window.addEventListener("pageshow", sync);
-            window.blokeBotNavigation = { focus, sync };
+            window.blokeBotNavigation = {
+                activateMobileDrawer,
+                deactivateMobileDrawer: () => deactivateMobileDrawer(),
+                focus,
+                sync,
+            };
         })();
     </script>
     <ResourcePreloader />

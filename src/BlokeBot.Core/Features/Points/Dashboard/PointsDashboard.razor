@@ -40,7 +40,7 @@
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
                 </div>
-                <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                <div class="points-dashboard__leaderboard scroll-panel scroll-panel--data-table overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
@@ -55,10 +55,10 @@
                             {
                                 var entry = _state.Leaderboard[i];
                                 <tr @key="entry.Login" class="motion-list__item">
-                                    <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@(i + 1)" /></td>
-                                    <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
-                                    <td class="px-5 py-3 text-slate-700">@entry.Balance.ToDisplayString()</td>
-                                    <td class="px-5 py-3">
+                                    <td data-label="Rank" class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@(i + 1)" /></td>
+                                    <td data-label="User" class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                    <td data-label="Balance" class="px-5 py-3 text-slate-700">@entry.Balance.ToDisplayString()</td>
+                                    <td data-label="Manage" class="px-5 py-3">
                                         <button class="control-surface inline-flex h-8 items-center rounded-md px-3 text-xs font-bold text-red-700 transition"
                                                 type="button"
                                                 @onclick="() => RemoveLeaderboardEntryAsync(entry.Login)">
