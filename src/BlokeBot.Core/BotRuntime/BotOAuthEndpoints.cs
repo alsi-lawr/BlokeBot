@@ -16,8 +16,18 @@ internal static class BotOAuthEndpoints
                 "/oauth/start",
                 (HttpContext context) =>
                     AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
-                        ? BlokeBotAuthResults.ConnectionUnavailable("/admin", "Return to Admin")
-                        : BlokeBotAuthResults.AdministratorAccessRequired()
+                        ? Result(
+                            BlokeBotAuthOutcome.Unavailable,
+                            BlokeBotAuthStatus.ServiceUnavailable,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.Admin
+                        )
+                        : Result(
+                            BlokeBotAuthOutcome.AccessRequired,
+                            BlokeBotAuthStatus.Forbidden,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.Admin
+                        )
             )
             .RequireAuthorization();
     }
@@ -32,7 +42,12 @@ internal static class BotOAuthEndpoints
                 (HttpContext context, IOAuthFlow oauth) =>
                     AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
                         ? Results.Redirect(oauth.CreateAuthorizationUri().ToString())
-                        : BlokeBotAuthResults.AdministratorAccessRequired()
+                        : Result(
+                            BlokeBotAuthOutcome.AccessRequired,
+                            BlokeBotAuthStatus.Forbidden,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.Admin
+                        )
             )
             .RequireAuthorization();
 
@@ -69,7 +84,12 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.IsBotAdmin)
                     {
-                        return BlokeBotAuthResults.AdministratorAccessRequired();
+                        return Result(
+                            BlokeBotAuthOutcome.AccessRequired,
+                            BlokeBotAuthStatus.Forbidden,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.Admin
+                        );
                     }
 
                     if (!string.IsNullOrWhiteSpace(error))
@@ -79,12 +99,22 @@ internal static class BotOAuthEndpoints
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return BlokeBotAuthResults.BotAccountConnectionCancelled();
+                        return Result(
+                            BlokeBotAuthOutcome.Cancelled,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.BotAccount,
+                            BlokeBotAuthReturnAction.Admin
+                        );
                     }
 
                     if (string.IsNullOrWhiteSpace(state))
                     {
-                        return BlokeBotAuthResults.BotAccountConnectionExpired();
+                        return Result(
+                            BlokeBotAuthOutcome.InvalidOrExpired,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.BotAccount,
+                            BlokeBotAuthReturnAction.Admin
+                        );
                     }
 
                     var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
@@ -92,11 +122,21 @@ internal static class BotOAuthEndpoints
                         async _ =>
                         {
                             await changes.NotifyChangedAsync(ct);
-                            return BlokeBotAuthResults.BotAccountConnectionSaved();
+                            return Result(
+                                BlokeBotAuthOutcome.Success,
+                                BlokeBotAuthStatus.Ok,
+                                BlokeBotAuthRetryAction.None,
+                                BlokeBotAuthReturnAction.Admin
+                            );
                         },
                         static _ =>
                             Task.FromResult<IResult>(
-                                BlokeBotAuthResults.BotAccountConnectionExpired()
+                                Result(
+                                    BlokeBotAuthOutcome.InvalidOrExpired,
+                                    BlokeBotAuthStatus.BadRequest,
+                                    BlokeBotAuthRetryAction.BotAccount,
+                                    BlokeBotAuthReturnAction.Admin
+                                )
                             )
                     );
                 }
@@ -147,9 +187,11 @@ internal static class BotOAuthEndpoints
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
                             _ =>
-                                BlokeBotAuthResults.ConnectionUnavailable(
-                                    "/host",
-                                    "Return to Channel setup"
+                                Result(
+                                    BlokeBotAuthOutcome.Unavailable,
+                                    BlokeBotAuthStatus.ServiceUnavailable,
+                                    BlokeBotAuthRetryAction.None,
+                                    BlokeBotAuthReturnAction.ChannelSetup
                                 )
                         );
                 }
@@ -183,7 +225,7 @@ internal static class BotOAuthEndpoints
                     {
                         return ProviderErrorResult(
                             error,
-                            "/oauth/channel-bot/start",
+                            BlokeBotAuthRetryAction.ChannelBot,
                             context,
                             logger
                         );
@@ -191,7 +233,12 @@ internal static class BotOAuthEndpoints
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return BlokeBotAuthResults.Cancelled("/oauth/channel-bot/start");
+                        return Result(
+                            BlokeBotAuthOutcome.Cancelled,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.ChannelBot,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
 
                     if (
@@ -200,7 +247,12 @@ internal static class BotOAuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return BlokeBotAuthResults.Expired("/oauth/channel-bot/start");
+                        return Result(
+                            BlokeBotAuthOutcome.InvalidOrExpired,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.ChannelBot,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
 
                     var selectedHost = session.State.Match<BotHostChoice?>(
@@ -210,7 +262,12 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return BlokeBotAuthResults.NoChannelSelected();
+                        return Result(
+                            BlokeBotAuthOutcome.AccessRequired,
+                            BlokeBotAuthStatus.Forbidden,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
 
                     try
@@ -223,19 +280,14 @@ internal static class BotOAuthEndpoints
                                     .Authorize(selectedHost.Id, completed.Grant)
                                     .ExecuteAsync(ct);
                                 return authorization.Match(
-                                    outcome =>
-                                        MapChannelAuthorization(
-                                            outcome,
-                                            selectedHost.Login,
-                                            "/oauth/channel-bot/start"
-                                        ),
+                                    outcome => MapChannelAuthorization(outcome),
                                     _ => throw new UnreachableException()
                                 );
                             },
                             configurationUnavailable =>
                                 Task.FromResult<IResult>(
                                     ProviderFailureResult(
-                                        "/oauth/channel-bot/start",
+                                        BlokeBotAuthRetryAction.ChannelBot,
                                         context,
                                         logger,
                                         "ConfigurationUnavailable",
@@ -245,7 +297,7 @@ internal static class BotOAuthEndpoints
                             providerNotValidated =>
                                 Task.FromResult<IResult>(
                                     ProviderFailureResult(
-                                        "/oauth/channel-bot/start",
+                                        BlokeBotAuthRetryAction.ChannelBot,
                                         context,
                                         logger,
                                         "ProviderNotValidated",
@@ -257,7 +309,7 @@ internal static class BotOAuthEndpoints
                     catch (HttpRequestException exception)
                     {
                         return ProviderFailureResult(
-                            "/oauth/channel-bot/start",
+                            BlokeBotAuthRetryAction.ChannelBot,
                             context,
                             logger,
                             "TransportFailure",
@@ -291,12 +343,22 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return BlokeBotAuthResults.NoChannelSelected();
+                        return Result(
+                            BlokeBotAuthOutcome.AccessRequired,
+                            BlokeBotAuthStatus.Forbidden,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
 
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
                     {
-                        return BlokeBotAuthResults.CustomBotMustBeEnabled();
+                        return Result(
+                            BlokeBotAuthOutcome.PermissionOrAccount,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -324,9 +386,11 @@ internal static class BotOAuthEndpoints
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
                             static _ =>
-                                BlokeBotAuthResults.ConnectionUnavailable(
-                                    "/host",
-                                    "Return to Channel setup"
+                                Result(
+                                    BlokeBotAuthOutcome.Unavailable,
+                                    BlokeBotAuthStatus.ServiceUnavailable,
+                                    BlokeBotAuthRetryAction.None,
+                                    BlokeBotAuthReturnAction.ChannelSetup
                                 )
                         );
                 }
@@ -356,12 +420,17 @@ internal static class BotOAuthEndpoints
 
         if (!string.IsNullOrWhiteSpace(error))
         {
-            return ProviderErrorResult(error, "/oauth/host-bot/start", context, logger);
+            return ProviderErrorResult(error, BlokeBotAuthRetryAction.HostBot, context, logger);
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return BlokeBotAuthResults.Cancelled("/oauth/host-bot/start");
+            return Result(
+                BlokeBotAuthOutcome.Cancelled,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
         }
 
         if (
@@ -370,7 +439,12 @@ internal static class BotOAuthEndpoints
             || !string.Equals(state, storedState, StringComparison.Ordinal)
         )
         {
-            return BlokeBotAuthResults.Expired("/oauth/host-bot/start");
+            return Result(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
         }
 
         var selectedHost = session.State.Match<BotHostChoice?>(
@@ -380,7 +454,12 @@ internal static class BotOAuthEndpoints
         );
         if (selectedHost is null)
         {
-            return BlokeBotAuthResults.NoChannelSelected();
+            return Result(
+                BlokeBotAuthOutcome.AccessRequired,
+                BlokeBotAuthStatus.Forbidden,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
         }
 
         try
@@ -393,14 +472,14 @@ internal static class BotOAuthEndpoints
                         .Authorize(selectedHost.Id, completed.Grant)
                         .ExecuteAsync(ct);
                     return authorization.Match(
-                        outcome => MapHostBotAuthorization(outcome, "/oauth/host-bot/start"),
+                        outcome => MapHostBotAuthorization(outcome),
                         _ => throw new UnreachableException()
                     );
                 },
                 configurationUnavailable =>
                     Task.FromResult<IResult>(
                         ProviderFailureResult(
-                            "/oauth/host-bot/start",
+                            BlokeBotAuthRetryAction.HostBot,
                             context,
                             logger,
                             "ConfigurationUnavailable",
@@ -410,7 +489,7 @@ internal static class BotOAuthEndpoints
                 providerNotValidated =>
                     Task.FromResult<IResult>(
                         ProviderFailureResult(
-                            "/oauth/host-bot/start",
+                            BlokeBotAuthRetryAction.HostBot,
                             context,
                             logger,
                             "ProviderNotValidated",
@@ -422,7 +501,7 @@ internal static class BotOAuthEndpoints
         catch (HttpRequestException exception)
         {
             return ProviderFailureResult(
-                "/oauth/host-bot/start",
+                BlokeBotAuthRetryAction.HostBot,
                 context,
                 logger,
                 "TransportFailure",
@@ -431,47 +510,61 @@ internal static class BotOAuthEndpoints
         }
     }
 
-    private static IResult MapChannelAuthorization(
-        ChannelBotAuthorizationOutcome outcome,
-        string requiredChannelLogin,
-        string tryAgainUrl
-    )
+    private static IResult MapChannelAuthorization(ChannelBotAuthorizationOutcome outcome)
     {
         return outcome switch
         {
-            ChannelBotAuthorizationOutcome.Authorized => BlokeBotAuthResults.ConnectionSaved(
-                "/host",
-                "Return to Channel setup"
+            ChannelBotAuthorizationOutcome.Authorized => Result(
+                BlokeBotAuthOutcome.Success,
+                BlokeBotAuthStatus.Ok,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
             ),
-            ChannelBotAuthorizationOutcome.HostNotFound => BlokeBotAuthResults.NoChannelSelected(),
-            ChannelBotAuthorizationOutcome.GrantMismatch => BlokeBotAuthResults.WrongChannelAccount(
-                requiredChannelLogin,
-                tryAgainUrl
+            ChannelBotAuthorizationOutcome.HostNotFound => Result(
+                BlokeBotAuthOutcome.AccessRequired,
+                BlokeBotAuthStatus.Forbidden,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
             ),
-            ChannelBotAuthorizationOutcome.MissingScopes => BlokeBotAuthResults.PermissionNeeded(
-                tryAgainUrl
+            ChannelBotAuthorizationOutcome.GrantMismatch
+            or ChannelBotAuthorizationOutcome.MissingScopes => Result(
+                BlokeBotAuthOutcome.PermissionOrAccount,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.ChannelBot,
+                BlokeBotAuthReturnAction.ChannelSetup
             ),
             _ => throw new UnreachableException(),
         };
     }
 
-    private static IResult MapHostBotAuthorization(
-        HostBotAccountAuthorizationOutcome outcome,
-        string tryAgainUrl
-    )
+    private static IResult MapHostBotAuthorization(HostBotAccountAuthorizationOutcome outcome)
     {
         return outcome switch
         {
-            HostBotAccountAuthorizationOutcome.Authorized => BlokeBotAuthResults.ConnectionSaved(
-                "/host",
-                "Return to Channel setup"
+            HostBotAccountAuthorizationOutcome.Authorized => Result(
+                BlokeBotAuthOutcome.Success,
+                BlokeBotAuthStatus.Ok,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
             ),
-            HostBotAccountAuthorizationOutcome.HostNotFound =>
-                BlokeBotAuthResults.NoChannelSelected(),
-            HostBotAccountAuthorizationOutcome.OverrideDisabled =>
-                BlokeBotAuthResults.CustomBotMustBeEnabled(),
-            HostBotAccountAuthorizationOutcome.MissingScopes =>
-                BlokeBotAuthResults.PermissionNeeded(tryAgainUrl),
+            HostBotAccountAuthorizationOutcome.HostNotFound => Result(
+                BlokeBotAuthOutcome.AccessRequired,
+                BlokeBotAuthStatus.Forbidden,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
+            ),
+            HostBotAccountAuthorizationOutcome.OverrideDisabled => Result(
+                BlokeBotAuthOutcome.PermissionOrAccount,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
+            ),
+            HostBotAccountAuthorizationOutcome.MissingScopes => Result(
+                BlokeBotAuthOutcome.PermissionOrAccount,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            ),
             _ => throw new UnreachableException(),
         };
     }
@@ -479,23 +572,46 @@ internal static class BotOAuthEndpoints
     private static IResult ConnectionAccessResult(AuthenticatedSession session)
     {
         return session.State.Match<IResult>(
-            static _ => BlokeBotAuthResults.NoChannelSelected(),
-            static _ => BlokeBotAuthResults.OperatorAccessRequired(),
-            static _ => BlokeBotAuthResults.NoChannelSelected()
+            static _ =>
+                Result(
+                    BlokeBotAuthOutcome.AccessRequired,
+                    BlokeBotAuthStatus.Forbidden,
+                    BlokeBotAuthRetryAction.None,
+                    BlokeBotAuthReturnAction.ChannelSetup
+                ),
+            static _ =>
+                Result(
+                    BlokeBotAuthOutcome.AccessRequired,
+                    BlokeBotAuthStatus.Forbidden,
+                    BlokeBotAuthRetryAction.None,
+                    BlokeBotAuthReturnAction.ChannelSetup
+                ),
+            static _ =>
+                Result(
+                    BlokeBotAuthOutcome.AccessRequired,
+                    BlokeBotAuthStatus.Forbidden,
+                    BlokeBotAuthRetryAction.None,
+                    BlokeBotAuthReturnAction.ChannelSetup
+                )
         );
     }
 
     private static IResult ProviderErrorResult(
         string error,
-        string tryAgainUrl,
+        BlokeBotAuthRetryAction retryAction,
         HttpContext context,
         ILogger<BotOAuthEndpointLog> logger
     )
     {
         return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
-            ? BlokeBotAuthResults.Cancelled(tryAgainUrl)
+            ? Result(
+                BlokeBotAuthOutcome.Cancelled,
+                BlokeBotAuthStatus.BadRequest,
+                retryAction,
+                BlokeBotAuthReturnAction.ChannelSetup
+            )
             : ProviderFailureResult(
-                tryAgainUrl,
+                retryAction,
                 context,
                 logger,
                 "OAuthErrorQuery",
@@ -510,7 +626,12 @@ internal static class BotOAuthEndpoints
     )
     {
         return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
-            ? BlokeBotAuthResults.BotAccountConnectionCancelled()
+            ? Result(
+                BlokeBotAuthOutcome.Cancelled,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.BotAccount,
+                BlokeBotAuthReturnAction.Admin
+            )
             : BotAccountProviderFailureResult(
                 context,
                 logger,
@@ -520,7 +641,7 @@ internal static class BotOAuthEndpoints
     }
 
     private static IResult ProviderFailureResult(
-        string tryAgainUrl,
+        BlokeBotAuthRetryAction retryAction,
         HttpContext context,
         ILogger<BotOAuthEndpointLog> logger,
         string classification,
@@ -528,8 +649,11 @@ internal static class BotOAuthEndpoints
     )
     {
         LogProviderFailure(logger, classification, failureType, context.TraceIdentifier);
-        return BlokeBotAuthResults.ProviderTemporarilyUnavailable(
-            tryAgainUrl,
+        return Result(
+            BlokeBotAuthOutcome.ProviderUnavailable,
+            BlokeBotAuthStatus.BadGateway,
+            retryAction,
+            BlokeBotAuthReturnAction.ChannelSetup,
             context.TraceIdentifier
         );
     }
@@ -542,7 +666,11 @@ internal static class BotOAuthEndpoints
     )
     {
         LogProviderFailure(logger, classification, failureType, context.TraceIdentifier);
-        return BlokeBotAuthResults.BotAccountProviderTemporarilyUnavailable(
+        return Result(
+            BlokeBotAuthOutcome.ProviderUnavailable,
+            BlokeBotAuthStatus.BadGateway,
+            BlokeBotAuthRetryAction.BotAccount,
+            BlokeBotAuthReturnAction.Admin,
             context.TraceIdentifier
         );
     }
@@ -560,6 +688,17 @@ internal static class BotOAuthEndpoints
             failureType,
             supportReference
         );
+    }
+
+    private static BlokeBotAuthResult Result(
+        BlokeBotAuthOutcome outcome,
+        BlokeBotAuthStatus status,
+        BlokeBotAuthRetryAction retryAction,
+        BlokeBotAuthReturnAction returnAction,
+        string? supportReference = null
+    )
+    {
+        return new(outcome, status, retryAction, returnAction, supportReference);
     }
 
     private static CookieOptions ChannelBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)

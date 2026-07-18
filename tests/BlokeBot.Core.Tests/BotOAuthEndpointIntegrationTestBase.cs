@@ -8,6 +8,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Hosting;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
@@ -81,10 +82,17 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             bool isBotAdmin = true,
             AuthRole? selectedRole = null,
             string login = "admin",
-            EndpointScenario endpointScenario = EndpointScenario.None
+            EndpointScenario endpointScenario = EndpointScenario.None,
+            CallbackLogCapture? logs = null
         )
         {
             var builder = WebApplication.CreateBuilder();
+            BlokeBotLogging.Configure(builder.Logging);
+            if (logs is not null)
+            {
+                builder.Logging.ClearProviders();
+                builder.Logging.AddProvider(logs);
+            }
             var changes = new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>());
             RegisterUnselectedEndpointServices(builder.Services, changes);
             var configuredServices = await ConfigureEndpointScenarioAsync(

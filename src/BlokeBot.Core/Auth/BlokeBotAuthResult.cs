@@ -1,14 +1,10 @@
 namespace BlokeBot.Core.Auth;
 
 internal sealed record BlokeBotAuthResult(
-    string Title,
-    string Message,
-    string ChangeSummary,
-    string NextAction,
-    BlokeBotAuthResultSeverity Severity,
-    int StatusCode,
-    BlokeBotAuthResultAction? RetryAction,
-    BlokeBotAuthResultAction ReturnAction,
+    BlokeBotAuthOutcome Outcome,
+    BlokeBotAuthStatus Status,
+    BlokeBotAuthRetryAction RetryAction,
+    BlokeBotAuthReturnAction ReturnAction,
     string? SupportReference
 ) : IResult
 {
@@ -18,10 +14,38 @@ internal sealed record BlokeBotAuthResult(
     }
 }
 
-internal enum BlokeBotAuthResultSeverity
+internal enum BlokeBotAuthOutcome
 {
     Success,
-    Failure,
+    Cancelled,
+    InvalidOrExpired,
+    PermissionOrAccount,
+    ProviderUnavailable,
+    Unavailable,
+    AccessRequired,
 }
 
-internal sealed record BlokeBotAuthResultAction(string Url, string Text);
+internal enum BlokeBotAuthStatus
+{
+    Ok = StatusCodes.Status200OK,
+    BadRequest = StatusCodes.Status400BadRequest,
+    Forbidden = StatusCodes.Status403Forbidden,
+    ServiceUnavailable = StatusCodes.Status503ServiceUnavailable,
+    BadGateway = StatusCodes.Status502BadGateway,
+}
+
+internal enum BlokeBotAuthRetryAction
+{
+    None,
+    SignIn,
+    BotAccount,
+    ChannelBot,
+    HostBot,
+}
+
+internal enum BlokeBotAuthReturnAction
+{
+    SignIn,
+    ChannelSetup,
+    Admin,
+}

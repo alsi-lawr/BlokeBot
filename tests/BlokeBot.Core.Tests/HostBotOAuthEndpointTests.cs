@@ -49,8 +49,8 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("More Twitch access is needed");
-        page.ShouldContain("Try again and approve every permission Twitch shows.");
+        page.ShouldContain("Twitch access needed");
+        page.ShouldContain("approve every requested permission");
         page.ShouldContain("Return to Channel setup");
     }
 

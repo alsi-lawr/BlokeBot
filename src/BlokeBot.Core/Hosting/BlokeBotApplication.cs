@@ -50,6 +50,7 @@ public static class BlokeBotApplication
         BlokeBotRuntimeMode runtime
     )
     {
+        BlokeBotLogging.Configure(builder.Logging);
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddHttpContextAccessor();

@@ -23,7 +23,12 @@ internal static class AuthEndpoints
                     var currentOptions = auth.CurrentOptions;
                     if (!auth.IsConfigured(currentOptions))
                     {
-                        return BlokeBotAuthResults.SignInUnavailable();
+                        return Result(
+                            BlokeBotAuthOutcome.Unavailable,
+                            BlokeBotAuthStatus.ServiceUnavailable,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.SignIn
+                        );
                     }
 
                     return action.Match<IResult>(
@@ -99,13 +104,23 @@ internal static class AuthEndpoints
                             "access_denied",
                             StringComparison.OrdinalIgnoreCase
                         )
-                            ? BlokeBotAuthResults.SignInCancelled()
+                            ? Result(
+                                BlokeBotAuthOutcome.Cancelled,
+                                BlokeBotAuthStatus.BadRequest,
+                                BlokeBotAuthRetryAction.SignIn,
+                                BlokeBotAuthReturnAction.SignIn
+                            )
                             : OAuthErrorFailure(context, logger);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return BlokeBotAuthResults.SignInCancelled();
+                        return Result(
+                            BlokeBotAuthOutcome.Cancelled,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.SignIn,
+                            BlokeBotAuthReturnAction.SignIn
+                        );
                     }
 
                     if (
@@ -114,7 +129,12 @@ internal static class AuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return BlokeBotAuthResults.SignInExpired();
+                        return Result(
+                            BlokeBotAuthOutcome.InvalidOrExpired,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.SignIn,
+                            BlokeBotAuthReturnAction.SignIn
+                        );
                     }
 
                     var result = await auth.Authenticate(context.Request, code)
@@ -139,14 +159,24 @@ internal static class AuthEndpoints
             {
                 return outcome switch
                 {
-                    WebAuthenticationOutcome.NotConfigured =>
-                        BlokeBotAuthResults.SignInNotConfigured(),
-                    WebAuthenticationOutcome.UserNotValidated =>
-                        BlokeBotAuthResults.SignInAccessDenied(
-                            "Twitch did not return the signed-in user."
-                        ),
-                    WebAuthenticationOutcome.NotAuthorized denied =>
-                        BlokeBotAuthResults.SignInAccessDenied(denied.Message),
+                    WebAuthenticationOutcome.NotConfigured => Result(
+                        BlokeBotAuthOutcome.Unavailable,
+                        BlokeBotAuthStatus.Forbidden,
+                        BlokeBotAuthRetryAction.None,
+                        BlokeBotAuthReturnAction.SignIn
+                    ),
+                    WebAuthenticationOutcome.UserNotValidated => Result(
+                        BlokeBotAuthOutcome.AccessRequired,
+                        BlokeBotAuthStatus.Forbidden,
+                        BlokeBotAuthRetryAction.SignIn,
+                        BlokeBotAuthReturnAction.SignIn
+                    ),
+                    WebAuthenticationOutcome.NotAuthorized => Result(
+                        BlokeBotAuthOutcome.AccessRequired,
+                        BlokeBotAuthStatus.Forbidden,
+                        BlokeBotAuthRetryAction.SignIn,
+                        BlokeBotAuthReturnAction.SignIn
+                    ),
                     _ => throw new UnreachableException(),
                 };
             }
@@ -411,7 +441,13 @@ internal static class AuthEndpoints
             failureType,
             context.TraceIdentifier
         );
-        return BlokeBotAuthResults.SignInProviderTemporarilyUnavailable(context.TraceIdentifier);
+        return Result(
+            BlokeBotAuthOutcome.ProviderUnavailable,
+            BlokeBotAuthStatus.BadGateway,
+            BlokeBotAuthRetryAction.SignIn,
+            BlokeBotAuthReturnAction.SignIn,
+            context.TraceIdentifier
+        );
     }
 
     internal static IResult OAuthErrorFailure(
@@ -425,7 +461,24 @@ internal static class AuthEndpoints
             "OAuthErrorQuery",
             context.TraceIdentifier
         );
-        return BlokeBotAuthResults.SignInProviderFailure(context.TraceIdentifier);
+        return Result(
+            BlokeBotAuthOutcome.InvalidOrExpired,
+            BlokeBotAuthStatus.BadRequest,
+            BlokeBotAuthRetryAction.SignIn,
+            BlokeBotAuthReturnAction.SignIn,
+            context.TraceIdentifier
+        );
+    }
+
+    private static BlokeBotAuthResult Result(
+        BlokeBotAuthOutcome outcome,
+        BlokeBotAuthStatus status,
+        BlokeBotAuthRetryAction retryAction,
+        BlokeBotAuthReturnAction returnAction,
+        string? supportReference = null
+    )
+    {
+        return new(outcome, status, retryAction, returnAction, supportReference);
     }
 
     private abstract record LoginAction

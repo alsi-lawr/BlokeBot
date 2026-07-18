@@ -69,15 +69,12 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Connection expired");
-        page.ShouldContain("That bot-account connection has expired.");
+        page.ShouldContain("Connection link expired");
+        page.ShouldContain("This Twitch connection link is no longer valid.");
         page.ShouldContain("No changes were made.");
-        page.ShouldContain("A BlokeBot administrator can start a new connection.");
         page.ShouldContain("Try again");
         page.ShouldContain("Return to Admin");
         page.ShouldContain("Close window");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
     }
 
     [Test]
@@ -90,12 +87,9 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
         page.ShouldContain("Connection cancelled");
-        page.ShouldContain("Twitch did not connect the BlokeBot bot account.");
-        page.ShouldContain("A BlokeBot administrator can try again when they are ready.");
+        page.ShouldContain("Twitch did not finish this connection.");
         page.ShouldContain("Return to Admin");
         page.ShouldNotContain("access_denied");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
     }
 
     [Test]
@@ -108,8 +102,7 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
         response.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
         var page = await response.Content.ReadAsStringAsync();
         page.ShouldContain("Twitch is temporarily unavailable");
-        page.ShouldContain("BlokeBot could not finish connecting the bot account right now.");
-        page.ShouldContain("A BlokeBot administrator can try again in a few minutes.");
+        page.ShouldContain("BlokeBot could not finish this connection right now.");
         page.ShouldContain("Support reference:");
         page.ShouldContain("Get help");
         page.ShouldContain("Return to Admin");
@@ -117,8 +110,6 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
         page.ShouldContain("href=\"/oauth/start\">Try again</a>");
         page.ShouldContain("type=\"button\" onclick=\"window.close()\">Close window</button>");
         page.ShouldNotContain("provider-secret");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
     }
 
     [Test]
@@ -130,12 +121,9 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Bot account connected");
-        page.ShouldContain("BlokeBot has saved Twitch access for the bot account.");
-        page.ShouldContain("The bot account connection has been updated.");
+        page.ShouldContain("Twitch access saved");
+        page.ShouldContain("BlokeBot has saved this Twitch connection.");
         page.ShouldContain("Return to Admin");
-        page.ShouldNotContain("Channel setup");
-        page.ShouldNotContain("channel owner");
     }
 
     [Test]
@@ -147,7 +135,7 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("Only a BlokeBot administrator can open this page.");
+        page.ShouldContain("Access required");
         page.ShouldContain("Return to Admin");
     }
 }

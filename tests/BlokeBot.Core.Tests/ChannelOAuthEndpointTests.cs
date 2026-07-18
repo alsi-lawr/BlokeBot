@@ -39,7 +39,7 @@ public sealed class ChannelOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await response.Content.ReadAsStringAsync()).ShouldContain("Choose a channel to continue");
+        (await response.Content.ReadAsStringAsync()).ShouldContain("Access required");
     }
 
     [Test]
@@ -55,10 +55,7 @@ public sealed class ChannelOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain(
-            "The channel owner or server administrator must grant you access before you can reconnect the bot."
-        );
-        page.ShouldNotContain("Channel owner needs to reconnect the bot.");
+        page.ShouldContain("You do not have access to complete this Twitch connection.");
     }
 
     [Test]
@@ -79,8 +76,8 @@ public sealed class ChannelOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("@streamer is the Twitch account needed for this channel.");
-        page.ShouldContain("The channel owner needs to reconnect the bot using that account.");
+        page.ShouldContain("Twitch access needed");
+        page.ShouldContain("Use the required Twitch account");
         page.ShouldContain("Try again");
         page.ShouldContain("Return to Channel setup");
     }
@@ -103,8 +100,8 @@ public sealed class ChannelOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         var page = await response.Content.ReadAsStringAsync();
-        page.ShouldContain("More Twitch access is needed");
-        page.ShouldContain("Try again and approve every permission Twitch shows.");
+        page.ShouldContain("Twitch access needed");
+        page.ShouldContain("approve every requested permission");
         page.ShouldContain("Return to Channel setup");
     }
 

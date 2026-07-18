@@ -14,7 +14,13 @@ public sealed class BlokeBotAuthResultPageTests
     public async Task ProviderFailure_RenderingUsesOneAlertWithResponsiveThemeAndActions()
     {
         var (statusCode, page) = await RenderAsync(
-            BlokeBotAuthResults.ProviderTemporarilyUnavailable("/oauth/channel-bot/start", "ref-42")
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.ProviderUnavailable,
+                BlokeBotAuthStatus.BadGateway,
+                BlokeBotAuthRetryAction.ChannelBot,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                "ref-42"
+            )
         );
 
         statusCode.ShouldBe(StatusCodes.Status502BadGateway);
@@ -33,7 +39,13 @@ public sealed class BlokeBotAuthResultPageTests
     public async Task Success_RenderingUsesOneStatusWithReturnAndCloseActions()
     {
         var (statusCode, page) = await RenderAsync(
-            BlokeBotAuthResults.ConnectionSaved("/host", "Return to Channel setup")
+            new BlokeBotAuthResult(
+                BlokeBotAuthOutcome.Success,
+                BlokeBotAuthStatus.Ok,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup,
+                null
+            )
         );
 
         statusCode.ShouldBe(StatusCodes.Status200OK);
