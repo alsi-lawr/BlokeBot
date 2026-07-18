@@ -113,6 +113,9 @@ public sealed class GlobalBotOAuthEndpointTests : BotOAuthEndpointIntegrationTes
         page.ShouldContain("Support reference:");
         page.ShouldContain("Get help");
         page.ShouldContain("Return to Admin");
+        page.ShouldContain("role=\"alert\"");
+        page.ShouldContain("href=\"/oauth/start\">Try again</a>");
+        page.ShouldContain("type=\"button\" onclick=\"window.close()\">Close window</button>");
         page.ShouldNotContain("provider-secret");
         page.ShouldNotContain("Channel setup");
         page.ShouldNotContain("channel owner");

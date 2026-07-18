@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using BlokeBot.Core.Auth;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Admin.HostedChannels;
 using BlokeBot.Core.Features.HostConfig.Access;
@@ -22,11 +23,7 @@ internal static class AuthEndpoints
                     var currentOptions = auth.CurrentOptions;
                     if (!auth.IsConfigured(currentOptions))
                     {
-                        return Results.Content(
-                            LoginPage.RenderError("Twitch sign-in is not set up yet."),
-                            "text/html",
-                            statusCode: StatusCodes.Status503ServiceUnavailable
-                        );
+                        return BlokeBotAuthResults.SignInUnavailable();
                     }
 
                     return action.Match<IResult>(
@@ -86,6 +83,7 @@ internal static class AuthEndpoints
                     string? error,
                     WebAuthService auth,
                     AuthSessionService session,
+                    ILogger<WebAuthEndpointLog> logger,
                     CancellationToken cancellationToken
                 ) =>
                 {
@@ -96,16 +94,18 @@ internal static class AuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return Results.Content(
-                            LoginPage.RenderError(error),
-                            "text/html",
-                            statusCode: StatusCodes.Status400BadRequest
-                        );
+                        return string.Equals(
+                            error,
+                            "access_denied",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                            ? BlokeBotAuthResults.SignInCancelled()
+                            : OAuthErrorFailure(context, logger);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return Results.BadRequest("Twitch sign-in did not finish. Try again.");
+                        return BlokeBotAuthResults.SignInCancelled();
                     }
 
                     if (
@@ -114,7 +114,7 @@ internal static class AuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return Results.BadRequest("This Twitch sign-in expired. Try again.");
+                        return BlokeBotAuthResults.SignInExpired();
                     }
 
                     var result = await auth.Authenticate(context.Request, code)
@@ -122,7 +122,7 @@ internal static class AuthEndpoints
                     return await result.Match(
                         outcome =>
                             CompleteAuthenticationAsync(outcome, context, session, returnUrl),
-                        error => Task.FromResult(MapAuthenticationError(error))
+                        error => Task.FromResult(MapAuthenticationError(error, context, logger))
                     );
                 }
             )
@@ -137,19 +137,18 @@ internal static class AuthEndpoints
         {
             if (outcome is not WebAuthenticationOutcome.Authorized authorized)
             {
-                var message = outcome switch
+                return outcome switch
                 {
-                    WebAuthenticationOutcome.NotConfigured => "Twitch sign-in is not set up yet.",
+                    WebAuthenticationOutcome.NotConfigured =>
+                        BlokeBotAuthResults.SignInNotConfigured(),
                     WebAuthenticationOutcome.UserNotValidated =>
-                        "Twitch did not return the signed-in user.",
-                    WebAuthenticationOutcome.NotAuthorized denied => denied.Message,
+                        BlokeBotAuthResults.SignInAccessDenied(
+                            "Twitch did not return the signed-in user."
+                        ),
+                    WebAuthenticationOutcome.NotAuthorized denied =>
+                        BlokeBotAuthResults.SignInAccessDenied(denied.Message),
                     _ => throw new UnreachableException(),
                 };
-                return Results.Content(
-                    LoginPage.RenderError(message),
-                    "text/html",
-                    statusCode: StatusCodes.Status403Forbidden
-                );
             }
 
             var currentSession = AuthenticatedSession.FromPrincipal(context.User);
@@ -163,24 +162,6 @@ internal static class AuthEndpoints
                 )
             );
             return Results.Redirect(LocalReturnUrl.OrFallback(returnUrl, "/"));
-        }
-
-        static IResult MapAuthenticationError(WebAuthenticationError error)
-        {
-            return error switch
-            {
-                WebAuthenticationError.TransportFailure => Results.Problem(
-                    "Twitch could not finish sign-in.",
-                    statusCode: StatusCodes.Status502BadGateway,
-                    title: "Twitch sign-in failed"
-                ),
-                WebAuthenticationError.InvalidProviderPayload invalid => Results.Problem(
-                    invalid.Cause.Message,
-                    statusCode: StatusCodes.Status502BadGateway,
-                    title: "Twitch sign-in failed"
-                ),
-                _ => throw new UnreachableException(),
-            };
         }
 
         app.MapGet(
@@ -393,6 +374,60 @@ internal static class AuthEndpoints
             .AllowAnonymous();
     }
 
+    internal static IResult MapAuthenticationError(
+        WebAuthenticationError error,
+        HttpContext context,
+        ILogger<WebAuthEndpointLog> logger
+    )
+    {
+        return error switch
+        {
+            WebAuthenticationError.TransportFailure transport => ProviderFailure(
+                context,
+                logger,
+                "TransportFailure",
+                transport.FailureType
+            ),
+            WebAuthenticationError.InvalidProviderPayload invalid => ProviderFailure(
+                context,
+                logger,
+                "InvalidProviderPayload",
+                invalid.FailureType
+            ),
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    internal static IResult ProviderFailure(
+        HttpContext context,
+        ILogger<WebAuthEndpointLog> logger,
+        string classification,
+        string failureType
+    )
+    {
+        logger.LogWarning(
+            "Twitch sign-in failed; Classification: {Classification}; FailureType: {FailureType}; SupportReference: {SupportReference}.",
+            classification,
+            failureType,
+            context.TraceIdentifier
+        );
+        return BlokeBotAuthResults.SignInProviderTemporarilyUnavailable(context.TraceIdentifier);
+    }
+
+    internal static IResult OAuthErrorFailure(
+        HttpContext context,
+        ILogger<WebAuthEndpointLog> logger
+    )
+    {
+        logger.LogWarning(
+            "Twitch sign-in failed; Classification: {Classification}; FailureType: {FailureType}; SupportReference: {SupportReference}.",
+            "OAuthErrorQuery",
+            "OAuthErrorQuery",
+            context.TraceIdentifier
+        );
+        return BlokeBotAuthResults.SignInProviderFailure(context.TraceIdentifier);
+    }
+
     private abstract record LoginAction
     {
         private LoginAction() { }
@@ -425,3 +460,5 @@ internal static class AuthEndpoints
         }
     }
 }
+
+internal sealed class WebAuthEndpointLog;

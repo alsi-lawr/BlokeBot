@@ -1,5 +1,3 @@
-using System.Net;
-
 namespace BlokeBot.Core.Auth.Web;
 
 internal static class LoginPage
@@ -70,22 +68,10 @@ internal static class LoginPage
 
     public static string Render()
     {
-        return RenderPage(string.Empty);
+        return RenderPage();
     }
 
-    public static string RenderError(string error)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(error);
-        return RenderPage(
-            $"""
-              <div class="mt-5 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-                  {WebUtility.HtmlEncode(error)}
-              </div>
-            """
-        );
-    }
-
-    private static string RenderPage(string errorBlock)
+    private static string RenderPage()
     {
         return $$"""
             <!DOCTYPE html>
@@ -135,7 +121,6 @@ internal static class LoginPage
                                 <button class="btn-secondary h-10 w-full" type="submit">View leaderboard</button>
                             </form>
                         </div>
-                        {{errorBlock}}
                     </section>
                 </main>
                 {{_leaderboardScript}}

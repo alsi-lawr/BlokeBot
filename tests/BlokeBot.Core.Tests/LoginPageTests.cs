@@ -42,27 +42,6 @@ public sealed class LoginPageTests
     }
 
     [Test]
-    public void ErrorPage_Rendering_EncodesErrorAndPreservesLoginMarkup()
-    {
-        const string ErrorMarkup = "<script>alert(1)</script>&";
-
-        var page = LoginPage.RenderError(ErrorMarkup);
-
-        page.ShouldContain("&lt;script&gt;alert(1)&lt;/script&gt;&amp;");
-        page.ShouldNotContain(ErrorMarkup);
-        page.ShouldContain("border-rose-200");
-        page.ShouldContain("href=\"/auth/login?start=true\"");
-    }
-
-    [Test]
-    public void InvalidError_Rendering_RejectsNullEmptyAndWhitespace()
-    {
-        Should.Throw<ArgumentException>(() => LoginPage.RenderError(null!));
-        Should.Throw<ArgumentException>(() => LoginPage.RenderError(string.Empty));
-        Should.Throw<ArgumentException>(() => LoginPage.RenderError(" \t\r\n"));
-    }
-
-    [Test]
     public void NormalPage_Rendering_PreservesThemePreferenceFallbackScript()
     {
         var page = LoginPage.Render();

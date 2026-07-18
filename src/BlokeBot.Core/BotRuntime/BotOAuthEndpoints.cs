@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using BlokeBot.Core.Auth;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -15,11 +16,8 @@ internal static class BotOAuthEndpoints
                 "/oauth/start",
                 (HttpContext context) =>
                     AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
-                        ? TwitchConnectionResultPage.ConnectionUnavailable(
-                            "/admin",
-                            "Return to Admin"
-                        )
-                        : TwitchConnectionResultPage.AdministratorAccessRequired()
+                        ? BlokeBotAuthResults.ConnectionUnavailable("/admin", "Return to Admin")
+                        : BlokeBotAuthResults.AdministratorAccessRequired()
             )
             .RequireAuthorization();
     }
@@ -34,7 +32,7 @@ internal static class BotOAuthEndpoints
                 (HttpContext context, IOAuthFlow oauth) =>
                     AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
                         ? Results.Redirect(oauth.CreateAuthorizationUri().ToString())
-                        : TwitchConnectionResultPage.AdministratorAccessRequired()
+                        : BlokeBotAuthResults.AdministratorAccessRequired()
             )
             .RequireAuthorization();
 
@@ -50,6 +48,7 @@ internal static class BotOAuthEndpoints
                     HostBotAccountOAuthService hostBotOAuth,
                     HostBotAccountAuthorizationService hostBotAuthorization,
                     HostedChannelChangeNotifier changes,
+                    ILogger<BotOAuthEndpointLog> logger,
                     CancellationToken ct
                 ) =>
                 {
@@ -62,6 +61,7 @@ internal static class BotOAuthEndpoints
                             error,
                             hostBotOAuth,
                             hostBotAuthorization,
+                            logger,
                             ct
                         );
                     }
@@ -69,22 +69,22 @@ internal static class BotOAuthEndpoints
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     if (!session.IsBotAdmin)
                     {
-                        return TwitchConnectionResultPage.AdministratorAccessRequired();
+                        return BlokeBotAuthResults.AdministratorAccessRequired();
                     }
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return BotAccountProviderErrorResult(error, context);
+                        return BotAccountProviderErrorResult(error, context, logger);
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return TwitchConnectionResultPage.BotAccountConnectionCancelled();
+                        return BlokeBotAuthResults.BotAccountConnectionCancelled();
                     }
 
                     if (string.IsNullOrWhiteSpace(state))
                     {
-                        return TwitchConnectionResultPage.BotAccountConnectionExpired();
+                        return BlokeBotAuthResults.BotAccountConnectionExpired();
                     }
 
                     var completion = await oauth.CompleteAuthorizationAsync(code, state, ct);
@@ -92,11 +92,11 @@ internal static class BotOAuthEndpoints
                         async _ =>
                         {
                             await changes.NotifyChangedAsync(ct);
-                            return TwitchConnectionResultPage.BotAccountConnectionSaved();
+                            return BlokeBotAuthResults.BotAccountConnectionSaved();
                         },
                         static _ =>
                             Task.FromResult<IResult>(
-                                TwitchConnectionResultPage.BotAccountConnectionExpired()
+                                BlokeBotAuthResults.BotAccountConnectionExpired()
                             )
                     );
                 }
@@ -147,7 +147,7 @@ internal static class BotOAuthEndpoints
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
                             _ =>
-                                TwitchConnectionResultPage.ConnectionUnavailable(
+                                BlokeBotAuthResults.ConnectionUnavailable(
                                     "/host",
                                     "Return to Channel setup"
                                 )
@@ -166,6 +166,7 @@ internal static class BotOAuthEndpoints
                     string? error,
                     ChannelBotOAuthService oauth,
                     ChannelBotAuthorizationService channelBotAuthorization,
+                    ILogger<BotOAuthEndpointLog> logger,
                     CancellationToken ct
                 ) =>
                 {
@@ -180,12 +181,17 @@ internal static class BotOAuthEndpoints
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return ProviderErrorResult(error, "/oauth/channel-bot/start", context);
+                        return ProviderErrorResult(
+                            error,
+                            "/oauth/channel-bot/start",
+                            context,
+                            logger
+                        );
                     }
 
                     if (string.IsNullOrWhiteSpace(code))
                     {
-                        return TwitchConnectionResultPage.Cancelled("/oauth/channel-bot/start");
+                        return BlokeBotAuthResults.Cancelled("/oauth/channel-bot/start");
                     }
 
                     if (
@@ -194,7 +200,7 @@ internal static class BotOAuthEndpoints
                         || !string.Equals(state, storedState, StringComparison.Ordinal)
                     )
                     {
-                        return TwitchConnectionResultPage.Expired("/oauth/channel-bot/start");
+                        return BlokeBotAuthResults.Expired("/oauth/channel-bot/start");
                     }
 
                     var selectedHost = session.State.Match<BotHostChoice?>(
@@ -204,7 +210,7 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return TwitchConnectionResultPage.NoChannelSelected();
+                        return BlokeBotAuthResults.NoChannelSelected();
                     }
 
                     try
@@ -226,27 +232,36 @@ internal static class BotOAuthEndpoints
                                     _ => throw new UnreachableException()
                                 );
                             },
-                            _ =>
+                            configurationUnavailable =>
                                 Task.FromResult<IResult>(
-                                    TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                                    ProviderFailureResult(
                                         "/oauth/channel-bot/start",
-                                        context.TraceIdentifier
+                                        context,
+                                        logger,
+                                        "ConfigurationUnavailable",
+                                        configurationUnavailable.GetType().Name
                                     )
                                 ),
-                            _ =>
+                            providerNotValidated =>
                                 Task.FromResult<IResult>(
-                                    TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                                    ProviderFailureResult(
                                         "/oauth/channel-bot/start",
-                                        context.TraceIdentifier
+                                        context,
+                                        logger,
+                                        "ProviderNotValidated",
+                                        providerNotValidated.GetType().Name
                                     )
                                 )
                         );
                     }
-                    catch (HttpRequestException)
+                    catch (HttpRequestException exception)
                     {
-                        return TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                        return ProviderFailureResult(
                             "/oauth/channel-bot/start",
-                            context.TraceIdentifier
+                            context,
+                            logger,
+                            "TransportFailure",
+                            exception.GetType().Name
                         );
                     }
                 }
@@ -276,12 +291,12 @@ internal static class BotOAuthEndpoints
                     );
                     if (selectedHost is null)
                     {
-                        return TwitchConnectionResultPage.NoChannelSelected();
+                        return BlokeBotAuthResults.NoChannelSelected();
                     }
 
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
                     {
-                        return TwitchConnectionResultPage.CustomBotMustBeEnabled();
+                        return BlokeBotAuthResults.CustomBotMustBeEnabled();
                     }
 
                     var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -309,7 +324,7 @@ internal static class BotOAuthEndpoints
                                 return Results.Redirect(ready.AuthorizationUri.ToString());
                             },
                             static _ =>
-                                TwitchConnectionResultPage.ConnectionUnavailable(
+                                BlokeBotAuthResults.ConnectionUnavailable(
                                     "/host",
                                     "Return to Channel setup"
                                 )
@@ -326,6 +341,7 @@ internal static class BotOAuthEndpoints
         string? error,
         HostBotAccountOAuthService oauth,
         HostBotAccountAuthorizationService hostBotAuthorization,
+        ILogger<BotOAuthEndpointLog> logger,
         CancellationToken ct
     )
     {
@@ -340,12 +356,12 @@ internal static class BotOAuthEndpoints
 
         if (!string.IsNullOrWhiteSpace(error))
         {
-            return ProviderErrorResult(error, "/oauth/host-bot/start", context);
+            return ProviderErrorResult(error, "/oauth/host-bot/start", context, logger);
         }
 
         if (string.IsNullOrWhiteSpace(code))
         {
-            return TwitchConnectionResultPage.Cancelled("/oauth/host-bot/start");
+            return BlokeBotAuthResults.Cancelled("/oauth/host-bot/start");
         }
 
         if (
@@ -354,7 +370,7 @@ internal static class BotOAuthEndpoints
             || !string.Equals(state, storedState, StringComparison.Ordinal)
         )
         {
-            return TwitchConnectionResultPage.Expired("/oauth/host-bot/start");
+            return BlokeBotAuthResults.Expired("/oauth/host-bot/start");
         }
 
         var selectedHost = session.State.Match<BotHostChoice?>(
@@ -364,7 +380,7 @@ internal static class BotOAuthEndpoints
         );
         if (selectedHost is null)
         {
-            return TwitchConnectionResultPage.NoChannelSelected();
+            return BlokeBotAuthResults.NoChannelSelected();
         }
 
         try
@@ -381,27 +397,36 @@ internal static class BotOAuthEndpoints
                         _ => throw new UnreachableException()
                     );
                 },
-                _ =>
+                configurationUnavailable =>
                     Task.FromResult<IResult>(
-                        TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                        ProviderFailureResult(
                             "/oauth/host-bot/start",
-                            context.TraceIdentifier
+                            context,
+                            logger,
+                            "ConfigurationUnavailable",
+                            configurationUnavailable.GetType().Name
                         )
                     ),
-                _ =>
+                providerNotValidated =>
                     Task.FromResult<IResult>(
-                        TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+                        ProviderFailureResult(
                             "/oauth/host-bot/start",
-                            context.TraceIdentifier
+                            context,
+                            logger,
+                            "ProviderNotValidated",
+                            providerNotValidated.GetType().Name
                         )
                     )
             );
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
-            return TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+            return ProviderFailureResult(
                 "/oauth/host-bot/start",
-                context.TraceIdentifier
+                context,
+                logger,
+                "TransportFailure",
+                exception.GetType().Name
             );
         }
     }
@@ -414,16 +439,18 @@ internal static class BotOAuthEndpoints
     {
         return outcome switch
         {
-            ChannelBotAuthorizationOutcome.Authorized => TwitchConnectionResultPage.ConnectionSaved(
+            ChannelBotAuthorizationOutcome.Authorized => BlokeBotAuthResults.ConnectionSaved(
                 "/host",
                 "Return to Channel setup"
             ),
-            ChannelBotAuthorizationOutcome.HostNotFound =>
-                TwitchConnectionResultPage.NoChannelSelected(),
-            ChannelBotAuthorizationOutcome.GrantMismatch =>
-                TwitchConnectionResultPage.WrongChannelAccount(requiredChannelLogin, tryAgainUrl),
-            ChannelBotAuthorizationOutcome.MissingScopes =>
-                TwitchConnectionResultPage.PermissionNeeded(tryAgainUrl),
+            ChannelBotAuthorizationOutcome.HostNotFound => BlokeBotAuthResults.NoChannelSelected(),
+            ChannelBotAuthorizationOutcome.GrantMismatch => BlokeBotAuthResults.WrongChannelAccount(
+                requiredChannelLogin,
+                tryAgainUrl
+            ),
+            ChannelBotAuthorizationOutcome.MissingScopes => BlokeBotAuthResults.PermissionNeeded(
+                tryAgainUrl
+            ),
             _ => throw new UnreachableException(),
         };
     }
@@ -435,14 +462,16 @@ internal static class BotOAuthEndpoints
     {
         return outcome switch
         {
-            HostBotAccountAuthorizationOutcome.Authorized =>
-                TwitchConnectionResultPage.ConnectionSaved("/host", "Return to Channel setup"),
+            HostBotAccountAuthorizationOutcome.Authorized => BlokeBotAuthResults.ConnectionSaved(
+                "/host",
+                "Return to Channel setup"
+            ),
             HostBotAccountAuthorizationOutcome.HostNotFound =>
-                TwitchConnectionResultPage.NoChannelSelected(),
+                BlokeBotAuthResults.NoChannelSelected(),
             HostBotAccountAuthorizationOutcome.OverrideDisabled =>
-                TwitchConnectionResultPage.CustomBotMustBeEnabled(),
+                BlokeBotAuthResults.CustomBotMustBeEnabled(),
             HostBotAccountAuthorizationOutcome.MissingScopes =>
-                TwitchConnectionResultPage.PermissionNeeded(tryAgainUrl),
+                BlokeBotAuthResults.PermissionNeeded(tryAgainUrl),
             _ => throw new UnreachableException(),
         };
     }
@@ -450,33 +479,87 @@ internal static class BotOAuthEndpoints
     private static IResult ConnectionAccessResult(AuthenticatedSession session)
     {
         return session.State.Match<IResult>(
-            static _ => TwitchConnectionResultPage.NoChannelSelected(),
-            static _ => TwitchConnectionResultPage.OperatorAccessRequired(),
-            static _ => TwitchConnectionResultPage.NoChannelSelected()
+            static _ => BlokeBotAuthResults.NoChannelSelected(),
+            static _ => BlokeBotAuthResults.OperatorAccessRequired(),
+            static _ => BlokeBotAuthResults.NoChannelSelected()
         );
     }
 
     private static IResult ProviderErrorResult(
         string error,
         string tryAgainUrl,
-        HttpContext context
+        HttpContext context,
+        ILogger<BotOAuthEndpointLog> logger
     )
     {
         return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
-            ? TwitchConnectionResultPage.Cancelled(tryAgainUrl)
-            : TwitchConnectionResultPage.ProviderTemporarilyUnavailable(
+            ? BlokeBotAuthResults.Cancelled(tryAgainUrl)
+            : ProviderFailureResult(
                 tryAgainUrl,
-                context.TraceIdentifier
+                context,
+                logger,
+                "OAuthErrorQuery",
+                "OAuthErrorQuery"
             );
     }
 
-    private static IResult BotAccountProviderErrorResult(string error, HttpContext context)
+    private static IResult BotAccountProviderErrorResult(
+        string error,
+        HttpContext context,
+        ILogger<BotOAuthEndpointLog> logger
+    )
     {
         return string.Equals(error, "access_denied", StringComparison.OrdinalIgnoreCase)
-            ? TwitchConnectionResultPage.BotAccountConnectionCancelled()
-            : TwitchConnectionResultPage.BotAccountProviderTemporarilyUnavailable(
-                context.TraceIdentifier
+            ? BlokeBotAuthResults.BotAccountConnectionCancelled()
+            : BotAccountProviderFailureResult(
+                context,
+                logger,
+                "OAuthErrorQuery",
+                "OAuthErrorQuery"
             );
+    }
+
+    private static IResult ProviderFailureResult(
+        string tryAgainUrl,
+        HttpContext context,
+        ILogger<BotOAuthEndpointLog> logger,
+        string classification,
+        string failureType
+    )
+    {
+        LogProviderFailure(logger, classification, failureType, context.TraceIdentifier);
+        return BlokeBotAuthResults.ProviderTemporarilyUnavailable(
+            tryAgainUrl,
+            context.TraceIdentifier
+        );
+    }
+
+    private static IResult BotAccountProviderFailureResult(
+        HttpContext context,
+        ILogger<BotOAuthEndpointLog> logger,
+        string classification,
+        string failureType
+    )
+    {
+        LogProviderFailure(logger, classification, failureType, context.TraceIdentifier);
+        return BlokeBotAuthResults.BotAccountProviderTemporarilyUnavailable(
+            context.TraceIdentifier
+        );
+    }
+
+    private static void LogProviderFailure(
+        ILogger<BotOAuthEndpointLog> logger,
+        string classification,
+        string failureType,
+        string supportReference
+    )
+    {
+        logger.LogWarning(
+            "Twitch bot OAuth failed; Classification: {Classification}; FailureType: {FailureType}; SupportReference: {SupportReference}.",
+            classification,
+            failureType,
+            supportReference
+        );
     }
 
     private static CookieOptions ChannelBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)
@@ -532,4 +615,6 @@ internal static class BotOAuthEndpoints
             new CookieOptions { Path = "/oauth/host-bot", Secure = context.Request.IsHttps }
         );
     }
+
+    private sealed class BotOAuthEndpointLog;
 }

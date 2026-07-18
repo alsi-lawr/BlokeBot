@@ -46,17 +46,17 @@ internal sealed class WebAuthService(
             catch (HttpRequestException exception)
             {
                 ct.ThrowIfCancellationRequested();
-                return Error(new WebAuthenticationError.TransportFailure(exception));
+                return Error(WebAuthenticationError.TransportFailure.From(exception));
             }
             catch (JsonException exception)
             {
                 ct.ThrowIfCancellationRequested();
-                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+                return Error(WebAuthenticationError.InvalidProviderPayload.From(exception));
             }
             catch (InvalidOperationException exception)
             {
                 ct.ThrowIfCancellationRequested();
-                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+                return Error(WebAuthenticationError.InvalidProviderPayload.From(exception));
             }
 
             try
@@ -70,12 +70,12 @@ internal sealed class WebAuthService(
             catch (HttpRequestException exception)
             {
                 ct.ThrowIfCancellationRequested();
-                return Error(new WebAuthenticationError.TransportFailure(exception));
+                return Error(WebAuthenticationError.TransportFailure.From(exception));
             }
             catch (JsonException exception)
             {
                 ct.ThrowIfCancellationRequested();
-                return Error(new WebAuthenticationError.InvalidProviderPayload(exception));
+                return Error(WebAuthenticationError.InvalidProviderPayload.From(exception));
             }
         });
     }
@@ -191,7 +191,19 @@ internal abstract record WebAuthenticationError
 {
     private WebAuthenticationError() { }
 
-    internal sealed record TransportFailure(HttpRequestException Cause) : WebAuthenticationError;
+    internal sealed record TransportFailure(string FailureType) : WebAuthenticationError
+    {
+        public static TransportFailure From(HttpRequestException exception)
+        {
+            return new(exception.GetType().Name);
+        }
+    }
 
-    internal sealed record InvalidProviderPayload(Exception Cause) : WebAuthenticationError;
+    internal sealed record InvalidProviderPayload(string FailureType) : WebAuthenticationError
+    {
+        public static InvalidProviderPayload From(Exception exception)
+        {
+            return new(exception.GetType().Name);
+        }
+    }
 }
