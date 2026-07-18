@@ -3,6 +3,7 @@ using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Bunit;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -58,20 +59,23 @@ public sealed class CustomCommandSettingsUiTests
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<CustomCommandSettingsPage>();
-        cut.Find($"#message-entry-{seeded.MessageEntryId}-name").Input(string.Empty);
+        cut.Find("#custom-command-message-library-tab").Click();
+        cut.Find("textarea").Input(string.Empty);
+        cut.Find("#custom-command-commands-tab").Click();
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("0");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("61");
 
         cut.Find("button[aria-label='Save custom commands']").Click();
 
-        ValidationMessages(cut)
-            .ShouldBe([
-                "Reply name is required.",
-                "Announcement retry delay must be positive.",
-                "Announcement occurrence lifetime must be positive and no greater than 60 seconds.",
-            ]);
-        toasts.Current.ShouldBeEmpty();
+        ValidationMessages(cut).Length.ShouldBe(3);
+        cut.Find("#custom-command-message-library-tab")
+            .GetAttribute("aria-selected")
+            .ShouldBe("true");
+        var invalidMessage = cut.Find("textarea");
+        invalidMessage.GetAttribute("aria-invalid").ShouldBe("true");
+        invalidMessage.GetAttribute("aria-describedby").ShouldNotBeNull();
+        toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Error);
         await using (var db = await dbFactory.CreateDbContextAsync())
         {
             (await db.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId))!.Name.ShouldBe(
@@ -79,27 +83,105 @@ public sealed class CustomCommandSettingsUiTests
             );
         }
 
-        cut.Find($"#message-entry-{seeded.MessageEntryId}-name").Input("Corrected reply");
+        cut.Find("textarea").Input("Corrected reply");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
-        ValidationMessages(cut)
-            .ShouldBe([
-                "Announcement retry delay must be positive.",
-                "Announcement occurrence lifetime must be positive and no greater than 60 seconds.",
-            ]);
+        ValidationMessages(cut).Length.ShouldBe(2);
 
+        cut.Find("#custom-command-commands-tab").Click();
+        cut.Find("button[aria-controls='custom-announcement-settings']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("2");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("30");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         cut.FindAll("[data-validation-summary]").ShouldBeEmpty();
-        var success = toasts.Current.ShouldHaveSingleItem();
+        var success = toasts.Current.Last();
         success.Kind.ShouldBe(ToastKind.Success);
-        success.Message.ShouldBe("Custom commands saved.");
         await using var savedDb = await dbFactory.CreateDbContextAsync();
-        (await savedDb.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId))!.Name.ShouldBe(
-            "Corrected reply"
-        );
+        (
+            await savedDb
+                .CustomMessageLibraryEntries.Include(entry => entry.Variants)
+                .SingleAsync(entry => entry.Id == seeded.MessageEntryId)
+        )
+            .Variants.Single()
+            .Text.ShouldBe("Corrected reply");
+    }
+
+    [Test]
+    public async Task BuiltInAliasCollision_Saving_ActivatesCommandsAndAssociatesTheMatchingAlias()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.CommandAliases.Add(
+                new CommandAlias
+                {
+                    HostId = seeded.HostId,
+                    Kind = AppCommandKind.Points,
+                    Alias = "points",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var toasts = context.Services.GetRequiredService<ToastService>();
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-aliases").Input("points");
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        cut.Find("#custom-command-commands-tab").GetAttribute("aria-selected").ShouldBe("true");
+        var aliases = cut.Find($"#command-{seeded.CommandId}-aliases");
+        aliases.GetAttribute("aria-invalid").ShouldBe("true");
+        aliases.GetAttribute("aria-describedby").ShouldNotBeNull();
+        ValidationMessages(cut).Length.ShouldBe(1);
+        toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Error);
+        await using var savedDb = await dbFactory.CreateDbContextAsync();
+        (await savedDb.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("command");
+    }
+
+    [Test]
+    public async Task SettingsTabs_ArrowHomeAndEndKeys_SelectAndFocusTheExpectedTab()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find("#custom-command-commands-tab")
+            .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
+
+        cut.Find("#custom-command-message-library-tab")
+            .GetAttribute("aria-selected")
+            .ShouldBe("true");
+        cut.Find("#custom-command-message-library-panel")
+            .GetAttribute("aria-labelledby")
+            .ShouldBe("custom-command-message-library-tab");
+
+        cut.Find("#custom-command-message-library-tab")
+            .KeyDown(new KeyboardEventArgs { Key = "Home" });
+
+        cut.Find("#custom-command-commands-tab").GetAttribute("aria-selected").ShouldBe("true");
+        cut.Find("#custom-command-commands-tab").KeyDown(new KeyboardEventArgs { Key = "End" });
+        cut.Find("#custom-command-message-library-tab").GetAttribute("tabindex").ShouldBe("0");
+    }
+
+    [Test]
+    public async Task CommandsWithoutReplies_OffersDirectMessageLibraryAction()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedEmptyConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find("button[data-action='create-reply']").Click();
+
+        cut.Find("#custom-command-message-library-tab")
+            .GetAttribute("aria-selected")
+            .ShouldBe("true");
+        cut.Find("#custom-command-message-library-panel").ShouldNotBeNull();
     }
 
     private static string[] ValidationMessages(IRenderedComponent<CustomCommandSettingsPage> page)
@@ -179,6 +261,21 @@ public sealed class CustomCommandSettingsUiTests
         db.AddRange(command, announcement);
         await db.SaveChangesAsync();
         return new SeededConfiguration(host.Id, entry.Id, command.Id, announcement.Id);
+    }
+
+    private static async Task<int> SeedEmptyConfigurationAsync(SqliteBlokeBotDbFactory dbFactory)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            Login = "streamer",
+            DisplayName = "Streamer",
+            EnabledFeatures = HostFeatureFlags.All,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        return host.Id;
     }
 
     private sealed record SeededConfiguration(

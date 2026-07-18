@@ -1,4 +1,14 @@
 <div class="space-y-2">
     <label class="label" for="@_inputId">@Label</label>
-    <textarea class="input min-h-24 resize-y" id="@_inputId" value="@Value" @oninput="OnInput"></textarea>
+    <textarea class="input min-h-24 resize-y"
+              id="@_inputId"
+              value="@Value"
+              aria-describedby="@_errorId"
+              aria-invalid="@(_hasError ? "true" : "false")"
+              @ref="_input"
+              @oninput="OnInput"></textarea>
+    @if (_hasError)
+    {
+        <p id="@_errorId" class="text-sm font-semibold text-red-700" role="alert">@ErrorMessage</p>
+    }
 </div>

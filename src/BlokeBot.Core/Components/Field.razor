@@ -1,4 +1,15 @@
 <div class="space-y-2">
     <label class="label" for="@_inputId">@Label</label>
-    <input id="@_inputId" class="input" placeholder="@Placeholder" value="@Value" @oninput="OnInput" />
+    <input id="@_inputId"
+           class="input"
+           placeholder="@Placeholder"
+           value="@Value"
+           aria-describedby="@_errorId"
+           aria-invalid="@(_hasError ? "true" : "false")"
+           @ref="_input"
+           @oninput="OnInput" />
+    @if (_hasError)
+    {
+        <p id="@_errorId" class="text-sm font-semibold text-red-700" role="alert">@ErrorMessage</p>
+    }
 </div>

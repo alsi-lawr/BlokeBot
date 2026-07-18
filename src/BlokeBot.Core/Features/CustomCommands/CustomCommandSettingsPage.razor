@@ -51,6 +51,38 @@
             </section>
         }
 
+        <div class="segmented-motion @(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "segmented-motion--second" : string.Empty)"
+             role="tablist"
+             aria-label="Custom command settings">
+            <span class="segmented-motion__indicator" aria-hidden="true"></span>
+            <button id="custom-command-commands-tab"
+                    class="@TabClass(CustomCommandSettingsTab.Commands)"
+                    type="button"
+                    role="tab"
+                    aria-selected="@(_activeTab == CustomCommandSettingsTab.Commands ? "true" : "false")"
+                    aria-controls="custom-command-commands-panel"
+                    tabindex="@TabIndex(CustomCommandSettingsTab.Commands)"
+                    @ref="_commandsTab"
+                    @onclick="() => ActivateTab(CustomCommandSettingsTab.Commands)"
+                    @onkeydown="args => HandleTabKeyDown(args, CustomCommandSettingsTab.Commands)">Commands</button>
+            <button id="custom-command-message-library-tab"
+                    class="@TabClass(CustomCommandSettingsTab.MessageLibrary)"
+                    type="button"
+                    role="tab"
+                    aria-selected="@(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "true" : "false")"
+                    aria-controls="custom-command-message-library-panel"
+                    tabindex="@TabIndex(CustomCommandSettingsTab.MessageLibrary)"
+                    @ref="_messageLibraryTab"
+                    @onclick="() => ActivateTab(CustomCommandSettingsTab.MessageLibrary)"
+                    @onkeydown="args => HandleTabKeyDown(args, CustomCommandSettingsTab.MessageLibrary)">Message Library</button>
+        </div>
+
+        @if (_activeTab == CustomCommandSettingsTab.MessageLibrary)
+        {
+        <div id="custom-command-message-library-panel"
+             role="tabpanel"
+             aria-labelledby="custom-command-message-library-tab"
+             tabindex="0">
         <CollapsibleSection Title="Replies" Description="Save one or more messages for the bot to choose from." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -108,7 +140,11 @@
                                         var variant = entry.Variants[index];
                                         <div @key="variant" class="grid gap-2 lg:grid-cols-[3rem_minmax(0,1fr)_auto] lg:items-start">
                                             <span class="rank-indicator mt-7">@(index + 1)</span>
-                                            <TextAreaField Label="@($"Message {index + 1}")" @bind-Value="variant.Text" />
+                                            <TextAreaField Id="@MessageVariantFieldId(entry, variant)"
+                                                           Label="@($"Message {index + 1}")"
+                                                           ErrorMessage="@ValidationMessage(new CustomCommandConfigurationValidationTarget.MessageVariant(entry.Id, variant.Id))"
+                                                           FocusRequest="@FocusRequestFor(new CustomCommandConfigurationValidationTarget.MessageVariant(entry.Id, variant.Id))"
+                                                           @bind-Value="variant.Text" />
                                             <div class="mt-7 flex flex-wrap gap-2">
                                                 <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == 0)" @onclick="() => MoveVariant(entry, index, -1)">Up</button>
                                                 <button class="btn-secondary h-9 px-3 text-xs" disabled="@(index == entry.Variants.Count - 1)" @onclick="() => MoveVariant(entry, index, 1)">Down</button>
@@ -123,12 +159,29 @@
                 }
             </div>
         </CollapsibleSection>
+        </div>
+        }
+        else
+        {
+        <div id="custom-command-commands-panel"
+             role="tabpanel"
+             aria-labelledby="custom-command-commands-tab"
+             tabindex="0">
 
         <CollapsibleSection Title="Chat commands" Description="Choose what viewers type and what the bot should do." InitiallyOpen="true">
             <div class="space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Commands.Count, "command")</p>
-                    <button class="btn-secondary" disabled="@(_config.MessageEntries.Count == 0)" @onclick="AddCommand">Add command</button>
+                    @if (_config.MessageEntries.Count == 0)
+                    {
+                        <button class="btn-secondary"
+                                data-action="create-reply"
+                                @onclick="() => ActivateTab(CustomCommandSettingsTab.MessageLibrary)">Create a reply in Message Library</button>
+                    }
+                    else
+                    {
+                        <button class="btn-secondary" @onclick="AddCommand">Add command</button>
+                    }
                 </div>
 
                 @if (_config.Commands.Count == 0)
@@ -143,7 +196,12 @@
                             <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
                                     <Field Label="Command name" @bind-Value="command.Name" Placeholder="Hello" />
-                                    <Field Label="Command words (without !)" @bind-Value="command.Aliases" Placeholder="hello, hi" />
+                                    <Field Id="@CommandAliasesFieldId(command)"
+                                           Label="Command words (without !)"
+                                           ErrorMessage="@ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id))"
+                                           FocusRequest="@FocusRequestFor(new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id))"
+                                           @bind-Value="command.Aliases"
+                                           Placeholder="hello, hi" />
                                     <button class="btn-secondary" @onclick="() => RemoveCommand(command)">Delete</button>
                                 </div>
                                 <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -180,13 +238,21 @@
                                         </select>
                                     </div>
                                     <div class="space-y-2">
-                                        <label class="label">Reply</label>
-                                        <select class="input" @bind="command.Action.MessageLibraryEntryId">
+                                        <label class="label" for="@($"command-{command.Id}-reply")">Reply</label>
+                                        <select id="@($"command-{command.Id}-reply")"
+                                                class="input"
+                                                aria-describedby="@($"command-{command.Id}-reply-error")"
+                                                aria-invalid="@(ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandReply(command.Id)) is null ? "false" : "true")"
+                                                @bind="command.Action.MessageLibraryEntryId">
                                             @foreach (var entry in _config.MessageEntries)
                                             {
                                                 <option value="@entry.Id">@entry.Name</option>
                                             }
                                         </select>
+                                        @if (ValidationMessage(new CustomCommandConfigurationValidationTarget.CommandReply(command.Id)) is { } error)
+                                        {
+                                            <p id="@($"command-{command.Id}-reply-error")" class="text-sm font-semibold text-red-700" role="alert">@error</p>
+                                        }
                                     </div>
                                     @if (command.Action is CounterCustomCommandActionEditor counterAction)
                                     {
@@ -461,5 +527,7 @@
                 }
             </div>
         </CollapsibleSection>
+        </div>
+        }
     }
 </div>

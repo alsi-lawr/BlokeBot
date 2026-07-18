@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace BlokeBot.Core.Features.CustomCommands;
 
@@ -29,6 +30,12 @@ public partial class CustomCommandSettingsPage
     private bool _featureEnabled;
     private int _nextTemporaryId = -1;
     private IReadOnlyList<CustomCommandConfigurationValidationError> _validationErrors = [];
+    private CustomCommandSettingsTab _activeTab;
+    private CustomCommandConfigurationValidationTarget? _focusTarget;
+    private long _focusRequest;
+    private CustomCommandSettingsTab? _pendingTabFocus;
+    private ElementReference _commandsTab;
+    private ElementReference _messageLibraryTab;
 
     protected override async Task OnInitializedAsync()
     {
@@ -63,6 +70,8 @@ public partial class CustomCommandSettingsPage
             : null;
         _nextTemporaryId = -1;
         _validationErrors = [];
+        _activeTab = CustomCommandSettingsTab.Commands;
+        _focusTarget = null;
     }
 
     private Task SaveAsync()
@@ -88,6 +97,19 @@ public partial class CustomCommandSettingsPage
                 errors =>
                 {
                     _validationErrors = errors.ToArray();
+                    if (
+                        _validationErrors
+                            .Select(error => error.Target)
+                            .OfType<CustomCommandConfigurationValidationTarget>()
+                            .FirstOrDefault() is
+                        { } target
+                    )
+                    {
+                        FocusValidationTarget(target);
+                    }
+                    _toasts.Publish(
+                        new ToastRequest<ErrorToastStrategy>("Custom commands need attention.")
+                    );
                     return Task.CompletedTask;
                 }
             );
@@ -107,14 +129,139 @@ public partial class CustomCommandSettingsPage
                 );
                 _nextTemporaryId = -1;
                 _validationErrors = [];
+                _focusTarget = null;
                 _toasts.Publish(new ToastRequest<SuccessToastStrategy>("Custom commands saved."));
             },
             failure =>
             {
                 _toasts.Publish(new ToastRequest<ErrorToastStrategy>(failure.Message));
+                if (AliasCollisionTarget(failure) is { } target)
+                {
+                    _validationErrors = [new(failure.Message, target)];
+                    FocusValidationTarget(target);
+                }
+
                 return Task.CompletedTask;
             }
         );
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingTabFocus is not { } tab)
+        {
+            return;
+        }
+
+        _pendingTabFocus = null;
+        await (
+            tab == CustomCommandSettingsTab.Commands
+                ? _commandsTab.FocusAsync()
+                : _messageLibraryTab.FocusAsync()
+        );
+    }
+
+    private void ActivateTab(CustomCommandSettingsTab tab)
+    {
+        _activeTab = tab;
+    }
+
+    private void HandleTabKeyDown(KeyboardEventArgs args, CustomCommandSettingsTab currentTab)
+    {
+        var tab = args.Key switch
+        {
+            "ArrowLeft" or "ArrowUp" => PreviousTab(currentTab),
+            "ArrowRight" or "ArrowDown" => NextTab(currentTab),
+            "Home" => CustomCommandSettingsTab.Commands,
+            "End" => CustomCommandSettingsTab.MessageLibrary,
+            _ => currentTab,
+        };
+        if (tab == currentTab && args.Key is not ("Home" or "End"))
+        {
+            return;
+        }
+
+        _activeTab = tab;
+        _pendingTabFocus = tab;
+    }
+
+    private static CustomCommandSettingsTab PreviousTab(CustomCommandSettingsTab tab)
+    {
+        return tab == CustomCommandSettingsTab.Commands
+            ? CustomCommandSettingsTab.MessageLibrary
+            : CustomCommandSettingsTab.Commands;
+    }
+
+    private static CustomCommandSettingsTab NextTab(CustomCommandSettingsTab tab)
+    {
+        return tab == CustomCommandSettingsTab.MessageLibrary
+            ? CustomCommandSettingsTab.Commands
+            : CustomCommandSettingsTab.MessageLibrary;
+    }
+
+    private void FocusValidationTarget(CustomCommandConfigurationValidationTarget target)
+    {
+        _activeTab = target.Tab;
+        _focusTarget = target;
+        _focusRequest++;
+    }
+
+    private CustomCommandConfigurationValidationTarget? AliasCollisionTarget(
+        CustomCommandConfigurationSaveFailure failure
+    )
+    {
+        return failure.Match<CustomCommandConfigurationValidationTarget?>(
+            builtInAliasCollision => CommandAliasesTarget(builtInAliasCollision.Alias),
+            customAliasCollision => CommandAliasesTarget(customAliasCollision.Alias),
+            _ => null
+        );
+    }
+
+    private CustomCommandConfigurationValidationTarget? CommandAliasesTarget(string alias)
+    {
+        var command = _config?.Commands.FirstOrDefault(command =>
+            CommandAliasNormalizer
+                .Split(command.Aliases)
+                .Contains(alias, StringComparer.OrdinalIgnoreCase)
+        );
+        return command is null
+            ? null
+            : new CustomCommandConfigurationValidationTarget.CommandAliases(command.Id);
+    }
+
+    private static string MessageVariantFieldId(
+        CustomMessageLibraryEntryEditor entry,
+        CustomMessageVariantEditor variant
+    )
+    {
+        return $"message-entry-{entry.Id}-variant-{variant.Id}";
+    }
+
+    private static string CommandAliasesFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-aliases";
+    }
+
+    private string? ValidationMessage(CustomCommandConfigurationValidationTarget target)
+    {
+        return _validationErrors.FirstOrDefault(error => error.Target == target)?.Message;
+    }
+
+    private long FocusRequestFor(CustomCommandConfigurationValidationTarget target)
+    {
+        return _focusTarget == target ? _focusRequest : 0;
+    }
+
+    private string TabClass(CustomCommandSettingsTab tab)
+    {
+        return tab == _activeTab
+            ? "segmented-motion__tab segmented-motion__tab--active"
+            : "segmented-motion__tab";
+    }
+
+    private int TabIndex(CustomCommandSettingsTab tab)
+    {
+        return _activeTab == tab ? 0 : -1;
     }
 
     private void AddMessageEntry()

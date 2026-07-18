@@ -115,13 +115,24 @@ public static class CustomCommandConfigurationValidator
                 var text = variant.Text.Trim();
                 if (string.IsNullOrWhiteSpace(text))
                 {
-                    AddError(errors, $"Reply '{names[entryIndex]}' has a blank message.");
+                    AddError(
+                        errors,
+                        $"Reply '{names[entryIndex]}' has a blank message.",
+                        new CustomCommandConfigurationValidationTarget.MessageVariant(
+                            editor.Id,
+                            variant.Id
+                        )
+                    );
                 }
                 else if (text.Length > _messageVariantMaxLength)
                 {
                     AddError(
                         errors,
-                        $"Reply messages cannot exceed {_messageVariantMaxLength} characters."
+                        $"Reply messages cannot exceed {_messageVariantMaxLength} characters.",
+                        new CustomCommandConfigurationValidationTarget.MessageVariant(
+                            editor.Id,
+                            variant.Id
+                        )
                     );
                 }
 
@@ -168,7 +179,11 @@ public static class CustomCommandConfigurationValidator
             var editor = editors[index];
             if (!messageIds.Contains(editor.Action.MessageLibraryEntryId))
             {
-                AddError(errors, $"Choose a saved reply for command '{names[index]}'.");
+                AddError(
+                    errors,
+                    $"Choose a saved reply for command '{names[index]}'.",
+                    new CustomCommandConfigurationValidationTarget.CommandReply(editor.Id)
+                );
             }
 
             if (editor.CooldownSeconds < 0)
@@ -202,12 +217,20 @@ public static class CustomCommandConfigurationValidator
             var aliases = CommandAliasNormalizer.Split(editor.Aliases).ToArray();
             if (aliases.Length == 0)
             {
-                AddError(errors, "Enter at least one command word.");
+                AddError(
+                    errors,
+                    "Enter at least one command word.",
+                    new CustomCommandConfigurationValidationTarget.CommandAliases(editor.Id)
+                );
             }
 
             if (aliases.Any(alias => alias.Length > _aliasMaxLength))
             {
-                AddError(errors, $"Command words cannot exceed {_aliasMaxLength} characters.");
+                AddError(
+                    errors,
+                    $"Command words cannot exceed {_aliasMaxLength} characters.",
+                    new CustomCommandConfigurationValidationTarget.CommandAliases(editor.Id)
+                );
             }
 
             values.Add(
@@ -409,18 +432,18 @@ public static class CustomCommandConfigurationValidator
     )
     {
         var duplicate = commands
-            .SelectMany(
-                (command, index) =>
-                    command.Aliases.Select(alias => new { Alias = alias, CommandIndex = index })
+            .SelectMany(command =>
+                command.Aliases.Select(alias => new { Alias = alias, command.Id })
             )
             .GroupBy(value => value.Alias, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(group =>
-                group.Select(value => value.CommandIndex).Distinct().Count() > 1
-            )
-            ?.Key;
+            .FirstOrDefault(group => group.Select(value => value.Id).Distinct().Count() > 1);
         if (duplicate is not null)
         {
-            AddError(errors, $"!{duplicate} is already used by another custom command.");
+            AddError(
+                errors,
+                $"!{duplicate.Key} is already used by another custom command.",
+                new CustomCommandConfigurationValidationTarget.CommandAliases(duplicate.First().Id)
+            );
         }
     }
 
@@ -496,19 +519,15 @@ public static class CustomCommandConfigurationValidator
 
     private static void AddError(
         ICollection<CustomCommandConfigurationValidationError> errors,
-        string message
+        string message,
+        CustomCommandConfigurationValidationTarget? target = null
     )
     {
-        errors.Add(new(message));
+        errors.Add(new(message, target));
     }
 }
 
-public sealed record CustomCommandConfigurationValidationError
-{
-    internal CustomCommandConfigurationValidationError(string message)
-    {
-        Message = message;
-    }
-
-    public string Message { get; }
-}
+public sealed record CustomCommandConfigurationValidationError(
+    string Message,
+    CustomCommandConfigurationValidationTarget? Target
+);
