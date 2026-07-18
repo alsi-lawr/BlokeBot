@@ -48,7 +48,7 @@ public partial class TextAreaField
     public string Label { get; set; } = string.Empty;
 
     [Parameter]
-    public string Id { get; set; } = string.Empty;
+    public required string Id { get; set; }
 
     [Parameter]
     public string? ErrorMessage { get; set; }
