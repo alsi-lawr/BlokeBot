@@ -1,7 +1,7 @@
 --[[
 # viset
 version = 1
-output_root = "../.agent-workspace/viset-candidate"
+output_root = "../assets/simulation"
 output = "animations/{device}-{theme}-home-scroll.webp"
 frame = "builtin:auto"
 frames_per_second = 50
@@ -80,16 +80,16 @@ local succeeded, failure = pcall(function()
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=home&theme=" .. theme)
   viset.page.wait_for(
-    viset.javascript [=[
+    viset.javascript([=[
       document.body.innerText.includes("Sample Channel") &&
         Boolean(document.querySelector("article"))
-    ]=],
+    ]=]),
     "20s"
   )
   viset.sleep("350ms")
 
   viset.page.evaluate(
-    viset.javascript [=[
+    viset.javascript([=[
       ({ touch }) => {
         window.scrollTo(0, 0);
         if (!touch) return true;
@@ -112,7 +112,7 @@ local succeeded, failure = pcall(function()
         document.body.append(indicator);
         return true;
       }
-    ]=],
+    ]=]),
     { touch = device.touch }
   )
 
@@ -143,12 +143,10 @@ local succeeded, failure = pcall(function()
       easing = "in_out_sine",
       update = viset.javascript(update),
     })
-    viset.page.evaluate(
-      viset.javascript [=[
+    viset.page.evaluate(viset.javascript([=[
         document.querySelector("#blokebot-simulation-touch")?.style.setProperty("opacity", "0");
         true
-      ]=]
-    )
+      ]=]))
   end
 
   local recording = viset.record()

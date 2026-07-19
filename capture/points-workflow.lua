@@ -1,8 +1,8 @@
 --[[
 # viset
 version = 1
-output_root = "../.agent-workspace/viset-candidate"
-output = "animations/{device}-{theme}-points-workflow.webp"
+output_root = "../assets/simulation"
+output = "animations/{device}-{theme}-home-scroll.webp"
 frame = "builtin:auto"
 frames_per_second = 50
 browser_arguments = [
@@ -70,15 +70,14 @@ local succeeded, failure = pcall(function()
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=points&theme=" .. theme)
   viset.page.wait_for(
-    viset.javascript [=[
+    viset.javascript([=[
       document.body.innerText.includes("Sample Channel") &&
         document.body.innerText.includes("Viewer points")
-    ]=],
+    ]=]),
     "20s"
   )
   viset.sleep("350ms")
-  viset.page.evaluate(
-    viset.javascript [=[
+  viset.page.evaluate(viset.javascript([=[
       (() => {
         const heading = [...document.querySelectorAll("h2")]
           .find(candidate => candidate.textContent.trim() === "Viewer points");
@@ -108,10 +107,9 @@ local succeeded, failure = pcall(function()
         document.body.append(indicator);
         return true;
       })()
-    ]=]
-  )
+    ]=]))
 
-  local touch = viset.javascript [=[
+  local touch = viset.javascript([=[
     ({ selector, label, visible }) => {
       const indicator = document.querySelector("#blokebot-simulation-touch");
       const target = label
@@ -125,8 +123,8 @@ local succeeded, failure = pcall(function()
       indicator.style.opacity = visible ? "1" : "0";
       return true;
     }
-  ]=]
-  local set_value = viset.javascript [=[
+  ]=])
+  local set_value = viset.javascript([=[
     ({ value }) => {
       const input = document.querySelector("#points-dashboard-lookup-login");
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -134,7 +132,7 @@ local succeeded, failure = pcall(function()
       input.dispatchEvent(new Event("input", { bubbles: true }));
       return true;
     }
-  ]=]
+  ]=])
 
   local recording = viset.record()
   recording:start()
@@ -150,8 +148,7 @@ local succeeded, failure = pcall(function()
   recording:during("267ms")
   viset.page.evaluate(touch, { label = "Search", visible = true })
   recording:during("100ms")
-  viset.page.evaluate(
-    viset.javascript [=[
+  viset.page.evaluate(viset.javascript([=[
       (() => {
         const button = [...document.querySelectorAll("button")]
           .find(candidate => candidate.textContent.trim() === "Search");
@@ -160,8 +157,7 @@ local succeeded, failure = pcall(function()
         document.querySelector("#blokebot-simulation-touch")?.style.setProperty("opacity", "0");
         return true;
       })()
-    ]=]
-  )
+    ]=]))
   viset.page.wait_for("document.body.innerText.includes('1,840 points')", "10s")
   recording:during("800ms")
   recording:stop()

@@ -1,8 +1,8 @@
 --[[
 # viset
 version = 1
-output_root = "../.agent-workspace/viset-candidate"
-output = "screenshots/{device}-{theme}-{view}.png"
+output_root = "../assets/simulation"
+output = "screenshots/{device}-{theme}-home-scroll.webp"
 frame = "builtin:auto"
 browser_arguments = [
   "--disable-background-networking",
@@ -83,10 +83,10 @@ local succeeded, failure = pcall(function()
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
   viset.page.wait_for(
-    viset.javascript [=[
+    viset.javascript([=[
       document.body.innerText.includes("Sample Channel") &&
         Boolean(document.querySelector("article"))
-    ]=],
+    ]=]),
     "20s"
   )
   viset.sleep("350ms")

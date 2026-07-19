@@ -1,8 +1,8 @@
 --[[
 # viset
 version = 1
-output_root = "../.agent-workspace/viset-candidate"
-output = "animations/{device}-{theme}-guessing-workflow.webp"
+output_root = "../assets/simulation"
+output = "animations/{device}-{theme}-home-scroll.webp"
 frame = "builtin:auto"
 frames_per_second = 50
 browser_arguments = [
@@ -70,15 +70,15 @@ local succeeded, failure = pcall(function()
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=guessing&theme=" .. theme)
   viset.page.wait_for(
-    viset.javascript [=[
+    viset.javascript([=[
       document.body.innerText.includes("Sample Channel") &&
         document.body.innerText.includes("Run a round")
-    ]=],
+    ]=]),
     "20s"
   )
   viset.sleep("350ms")
 
-  local click = viset.javascript [=[
+  local click = viset.javascript([=[
     ({ label }) => {
       const button = [...document.querySelectorAll("button")]
         .find(candidate => candidate.textContent.trim() === label);
@@ -86,7 +86,7 @@ local succeeded, failure = pcall(function()
       button.click();
       return true;
     }
-  ]=]
+  ]=])
 
   local recording = viset.record()
   recording:start()
@@ -102,8 +102,7 @@ local succeeded, failure = pcall(function()
   viset.page.wait_for("Boolean(document.querySelector('#leaderboard'))", "10s")
   recording:during("267ms")
   recording:during("600ms", function()
-    viset.page.evaluate(
-      viset.javascript [=[
+    viset.page.evaluate(viset.javascript([=[
         window.blokeBotCaptureScroll = (() => {
           const target = document.querySelector("#leaderboard");
           return {
@@ -112,21 +111,20 @@ local succeeded, failure = pcall(function()
           };
         })();
         true
-      ]=]
-    )
+      ]=]))
     viset.page.animate({
       duration = "600ms",
       easing = "in_out_sine",
-      update = viset.javascript [=[
+      update = viset.javascript([=[
         frame => {
           const range = window.blokeBotCaptureScroll;
           window.scrollTo(0, Math.round(range.start + (range.end - range.start) * frame.progress));
         }
-      ]=],
+      ]=]),
     })
   end)
   viset.page.evaluate(
-    viset.javascript [=[
+    viset.javascript([=[
       ({ value }) => {
         const input = document.querySelector("#leaderboardUsername");
         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
@@ -134,7 +132,7 @@ local succeeded, failure = pcall(function()
         input.dispatchEvent(new Event("input", { bubbles: true }));
         return true;
       }
-    ]=],
+    ]=]),
     { value = "nightowl" }
   )
   recording:during("467ms")
