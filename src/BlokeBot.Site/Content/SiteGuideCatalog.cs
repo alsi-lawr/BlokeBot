@@ -72,8 +72,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "The menu follows the selected channel and shows only the tools that channel has turned on.",
             Media = new SiteMedia(
-                "media/dashboard-home.png",
-                "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
+                DarkPhoneSource: "media/phone-dark-home.png",
+                LightPhoneSource: "media/phone-light-home.png",
+                DarkLaptopSource: "media/laptop-dark-home.png",
+                LightLaptopSource: "media/laptop-light-home.png",
+                PhoneAlt: "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
+                LaptopAlt: "BlokeBot dashboard showing the selected Sample Channel, channel setup and chat-tool navigation.",
                 "The selected channel appears in the top bar; its enabled tools appear in the menu."
             ),
             Sections =
@@ -118,9 +122,13 @@ internal static class SiteGuideCatalog
             Summary =
                 "Each Twitch channel keeps its own connection, tools, games, points and people who can help.",
             Media = new SiteMedia(
-                "media/channel-setup.png",
-                "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
-                "Channel setup keeps the selected channel's connection and tool controls together."
+                DarkPhoneSource: "media/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                PhoneAlt: "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
+                LaptopAlt: "Channel setup for Sample Channel showing Twitch chat, readiness and bot status panels.",
+                "The selected channel appears in the top bar; its enabled tools appear in the menu."
             ),
             Sections =
             [
@@ -158,8 +166,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "BlokeBot explains which Twitch account or permission is needed and keeps the bot stopped until the channel is ready.",
             Media = new SiteMedia(
-                "media/channel-setup.png",
-                "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
+                DarkPhoneSource: "media/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                PhoneAlt: "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
+                LaptopAlt: "Channel setup showing a Connect channel action beside Twitch chat and an offline bot status.",
                 "Connection actions and readiness messages appear beside the channel's bot controls."
             ),
             Sections =
@@ -249,8 +261,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Save reusable bot replies, connect them to chat words, keep counters and schedule reminders.",
             Media = new SiteMedia(
-                "media/custom-commands.png",
-                "Custom commands settings showing saved replies and a hydration reminder.",
+                DarkPhoneSource: "media/phone-dark-custom-commands.png",
+                LightPhoneSource: "media/phone-light-custom-commands.png",
+                DarkLaptopSource: "media/laptop-dark-custom-commands.png",
+                LightLaptopSource: "media/laptop-light-custom-commands.png",
+                PhoneAlt: "Custom commands settings showing saved replies and a hydration reminder.",
+                LaptopAlt: "Custom commands settings showing saved replies and a hydration reminder.",
                 "Replies are reusable messages that commands and scheduled messages can send."
             ),
             Sections =
@@ -295,8 +311,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Create reusable round types and answers, collect one guess per viewer, then record the winning answer.",
             Media = new SiteMedia(
-                "media/guessing-workflow.webp",
-                "Animated BlokeBot guessing dashboard moving through a live round workflow.",
+                DarkPhoneSource: "media/phone-dark-guessing-workflow.webp",
+                LightPhoneSource: "media/phone-light-guessing-workflow.webp",
+                DarkLaptopSource: "media/laptop-dark-guessing-workflow.webp",
+                LightLaptopSource: "media/laptop-light-guessing-workflow.webp",
+                PhoneAlt: "Animated BlokeBot guessing dashboard moving through a live round workflow.",
+                LaptopAlt: "Animated BlokeBot guessing dashboard moving through a live round workflow.",
                 "The live dashboard keeps round status, votes, answers and winner controls together."
             ),
             Sections =
@@ -337,8 +357,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Give each viewer a channel balance that can be checked, transferred, adjusted, gambled or awarded as a prize.",
             Media = new SiteMedia(
-                "media/points-settings.png",
-                "Points settings showing the point label, gambling chance, cooldown and chat command words.",
+                DarkPhoneSource: "media/phone-dark-points-settings.png",
+                LightPhoneSource: "media/phone-light-points-settings.png",
+                DarkLaptopSource: "media/laptop-dark-points-settings.png",
+                LightLaptopSource: "media/laptop-light-points-settings.png",
+                PhoneAlt: "Points settings showing the point label, gambling chance, cooldown and chat command words.",
+                LaptopAlt: "Points settings showing the point label, gambling chance, cooldown and chat command words.",
                 "Points settings define the channel's terminology, gambling rules and command words."
             ),
             Sections =
@@ -375,8 +399,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Open timed entry while the channel is live, choose eligibility and winner count, then award random point prizes.",
             Media = new SiteMedia(
-                "media/points-settings.png",
-                "Points settings page where channel point commands and giveaway rules are configured.",
+                DarkPhoneSource: "media/phone-dark-points-settings.png",
+                LightPhoneSource: "media/phone-light-points-settings.png",
+                DarkLaptopSource: "media/laptop-dark-points-settings.png",
+                LightLaptopSource: "media/laptop-light-points-settings.png",
+                PhoneAlt: "Points settings page where channel point commands and giveaway rules are configured.",
+                LaptopAlt: "Points settings page where channel point commands and giveaway rules are configured.",
                 "Giveaway rules live on the Points settings page alongside the channel's points configuration."
             ),
             Sections =
@@ -417,8 +445,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Viewers can open read-only guessing or points rankings without permission to manage the channel.",
             Media = new SiteMedia(
-                "media/guessing-leaderboard.png",
-                "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
+                DarkPhoneSource: "media/phone-dark-guessing-leaderboard.png",
+                LightPhoneSource: "media/phone-light-guessing-leaderboard.png",
+                DarkLaptopSource: "media/laptop-dark-guessing-leaderboard.png",
+                LightLaptopSource: "media/laptop-light-guessing-leaderboard.png",
+                PhoneAlt: "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
+                LaptopAlt: "Public guessing leaderboard showing players, correct guesses, rounds and accuracy.",
                 "Public leaderboards turn completed channel activity into a shareable read-only ranking."
             ),
             Sections =
@@ -503,8 +535,12 @@ internal static class SiteGuideCatalog
             Summary =
                 "Channel owners decide whether current Twitch moderators can use BlokeBot and whether access is open to all moderators or limited by lists.",
             Media = new SiteMedia(
-                "media/channel-setup.png",
-                "Channel setup containing readiness and access controls for the selected channel.",
+                DarkPhoneSource: "media/phone-dark-channel-setup.png",
+                LightPhoneSource: "media/phone-light-channel-setup.png",
+                DarkLaptopSource: "media/laptop-dark-channel-setup.png",
+                LightLaptopSource: "media/laptop-light-channel-setup.png",
+                PhoneAlt: "Channel setup containing readiness and access controls for the selected channel.",
+                LaptopAlt: "Channel setup containing readiness and access controls for the selected channel.",
                 "Moderator access is managed from Channel setup for the channel currently selected."
             ),
             Sections =
@@ -543,6 +579,15 @@ internal static class SiteGuideCatalog
             Title = "Install and operate BlokeBot",
             Summary =
                 "Create the Twitch application, provide public HTTPS, keep credentials out of source and operate the bot and help site as separate services.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-admin.png",
+                LightPhoneSource: "media/phone-light-admin.png",
+                DarkLaptopSource: "media/laptop-dark-admin.png",
+                LightLaptopSource: "media/laptop-light-admin.png",
+                PhoneAlt: "The BlokeBot admin page, showing you which controls are available to server owners.",
+                LaptopAlt: "The BlokeBot admin page, showing you which controls are available to server owners.",
+                "The admin page allows you to configure the server to suit your needs, including allow lists for channels and manual channel setup."
+            ),
             Sections =
             [
                 new SiteGuideSection

@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../assets/simulation"
-output = "animations/{device}-{theme}-home-scroll.webp"
+output = "animations/{device}-{theme}-guessing-workflow.webp"
 frame = "builtin:auto"
 frames_per_second = 50
 browser_arguments = [
@@ -36,6 +36,15 @@ device_scale = 1.0
 [devices.laptop.viewport]
 width = 1180
 height = 720
+
+[devices.phone]
+mobile = true
+touch = true
+device_scale = 1.0
+
+[devices.phone.viewport]
+width = 390
+height = 844
 
 [matrix]
 theme = ["light", "dark"]

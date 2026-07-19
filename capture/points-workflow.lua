@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../assets/simulation"
-output = "animations/{device}-{theme}-home-scroll.webp"
+output = "animations/{device}-{theme}-points-workflow.webp"
 frame = "builtin:auto"
 frames_per_second = 50
 browser_arguments = [
@@ -27,6 +27,15 @@ pipeline = "live"
 mode = "lossy"
 quality = 75
 method = 0
+
+[devices.laptop]
+mobile = false
+touch = false
+device_scale = 1.0
+
+[devices.laptop.viewport]
+width = 1180
+height = 720
 
 [devices.phone]
 mobile = true

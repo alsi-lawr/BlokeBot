@@ -3,25 +3,48 @@
         <span class="device-showcase__glow" aria-hidden="true"></span>
         <img class="device-showcase__laptop"
              data-theme-media
-             data-theme-light-source="media/dashboard-scroll-laptop-light.webp"
-             data-theme-dark-source="media/dashboard-scroll-laptop-dark.webp"
+             data-theme-light-source="@LightLaptopSource"
+             data-theme-dark-source="@DarkLaptopSource"
              width="1308"
              height="840"
-             alt="BlokeBot scrolling through the channel dashboard in a laptop frame." />
+             alt="@LaptopAlt" />
         <img class="device-showcase__phone"
              data-theme-media
-             data-theme-light-source="media/dashboard-scroll-phone-light.webp"
-             data-theme-dark-source="media/dashboard-scroll-phone-dark.webp"
+             data-theme-light-source="@LightPhoneSource"
+             data-theme-dark-source="@DarkPhoneSource"
              width="462"
              height="956"
-             alt="The same BlokeBot channel dashboard scrolling in its mobile layout." />
+             alt="@PhoneAlt" />
         <noscript>
             <img class="device-showcase__fallback"
-                 src="media/dashboard-scroll-laptop-light.webp"
+                 src="@LightLaptopSource"
                  width="1308"
                  height="840"
-                 alt="BlokeBot scrolling through the channel dashboard in a laptop frame." />
+                 alt="@LaptopAlt" />
         </noscript>
     </div>
-    <figcaption>One channel dashboard, shaped for the screen in front of you.</figcaption>
+    <figcaption>@Caption</figcaption>
 </figure>
+
+@code {
+    [Parameter, EditorRequired]
+    public required string DarkLaptopSource { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string LightLaptopSource { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string LaptopAlt { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string DarkPhoneSource { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string LightPhoneSource { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string PhoneAlt { get; set; }
+
+    [Parameter, EditorRequired]
+    public required string Caption { get; set; }
+}

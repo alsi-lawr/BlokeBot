@@ -2,7 +2,7 @@
 # viset
 version = 1
 output_root = "../assets/simulation"
-output = "screenshots/{device}-{theme}-home-scroll.webp"
+output = "screenshots/{device}-{theme}-{view}.png"
 frame = "builtin:auto"
 browser_arguments = [
   "--disable-background-networking",

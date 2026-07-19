@@ -29,7 +29,14 @@
 
     @if (_page.Media is { } media)
     {
-        <MediaFigure Source="@media.Source" Alt="@media.Alt" Caption="@media.Caption" />
+        <DeviceShowcase
+            DarkPhoneSource="@media.DarkPhoneSource"
+            LightPhoneSource="@media.LightPhoneSource"
+            PhoneAlt="@media.PhoneAlt"
+            DarkLaptopSource="@media.DarkLaptopSource"
+            LightLaptopSource="@media.LightLaptopSource"
+            LaptopAlt="@media.LaptopAlt"
+            Caption="@media.Caption" />
     }
 
     @foreach (var section in _page.Sections)
