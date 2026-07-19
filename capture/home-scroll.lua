@@ -117,27 +117,27 @@ local succeeded, failure = pcall(function()
   )
 
   local function gesture(start_ratio, end_ratio)
-    local update = string.format(
-      [=[
-        frame => {
-          const root = document.documentElement;
-          const maximum = Math.max(0, root.scrollHeight - window.innerHeight);
-          const ratio = %s + (%s - %s) * frame.progress;
-          window.scrollTo(0, Math.round(maximum * ratio));
-          const indicator = document.querySelector("#blokebot-simulation-touch");
-          if (indicator) {
-            indicator.style.left = Math.round(window.innerWidth * 0.78) + "px";
-            indicator.style.top = Math.round(
-              window.innerHeight * (0.78 + (0.42 - 0.78) * frame.progress)
-            ) + "px";
-            indicator.style.opacity = "1";
-          }
+    local update = viset
+      .javascript([=[
+      frame => {
+        const root = document.documentElement;
+        const maximum = Math.max(0, root.scrollHeight - window.innerHeight);
+        const ratio = %.17g + %.17g * frame.progress;
+
+        window.scrollTo(0, Math.round(maximum * ratio));
+
+        const indicator = document.querySelector("#blokebot-simulation-touch");
+        if (indicator) {
+          indicator.style.left = Math.round(window.innerWidth * 0.78) + "px";
+          indicator.style.top = Math.round(
+            window.innerHeight * (0.78 + (0.42 - 0.78) * frame.progress)
+          ) + "px";
+          indicator.style.opacity = "1";
         }
-      ]=],
-      tostring(start_ratio),
-      tostring(end_ratio),
-      tostring(start_ratio)
-    )
+      }
+    ]=])
+      :format(start_ratio, end_ratio - start_ratio)
+
     viset.page.animate({
       duration = "700ms",
       easing = "in_out_sine",
