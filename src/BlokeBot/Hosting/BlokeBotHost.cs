@@ -1,6 +1,7 @@
 using BlokeBot.Cli;
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Serilog;
@@ -21,7 +22,7 @@ internal static class BlokeBotHost
         try
         {
             await using var composition = Create(options);
-            await composition.App.InitializeBlokeBotCoreAsync(cancellationToken);
+            await composition.App.InitializeBlokeBotPersistenceAsync(cancellationToken);
             await composition.App.StartAsync(cancellationToken);
 
             if (composition.Twitch.Mode == BlokeBotRuntimeMode.Offline)
@@ -96,6 +97,7 @@ internal static class BlokeBotHost
                 )
         );
         builder.Services.AddBlokeBotPersistence(statePaths.DatabasePath);
+        ConfigureDataProtection(builder.Services, statePaths);
         var twitch = BlokeBotTwitchModeSelection.FromConfiguration(builder.Configuration);
         builder.AddBlokeBotCore(twitch.Mode);
 
@@ -184,6 +186,21 @@ internal static class BlokeBotHost
                 throw new BlokeBotHostStartupException(preparationFailure.Message),
             _ => throw new InvalidOperationException("Unknown state-path preparation result."),
         };
+    }
+
+    private static void ConfigureDataProtection(
+        IServiceCollection services,
+        BlokeBotStatePaths statePaths
+    )
+    {
+        var dataProtection = services
+            .AddDataProtection()
+            .SetApplicationName("BlokeBot")
+            .PersistKeysToFileSystem(new DirectoryInfo(statePaths.DataProtectionKeysDirectory));
+        if (OperatingSystem.IsWindows())
+        {
+            dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+        }
     }
 }
 

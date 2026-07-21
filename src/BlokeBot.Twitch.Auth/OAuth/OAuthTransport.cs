@@ -67,6 +67,27 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
+        var refreshed = await RefreshCompleteTokenSetAsync(
+            clientId,
+            clientSecret,
+            refreshToken,
+            cancellationToken
+        );
+        return string.IsNullOrWhiteSpace(refreshed.RefreshToken)
+            ? refreshed with
+            {
+                RefreshToken = refreshToken,
+            }
+            : refreshed;
+    }
+
+    public async Task<OAuthTokenResponse> RefreshCompleteTokenSetAsync(
+        string clientId,
+        string clientSecret,
+        string refreshToken,
+        CancellationToken cancellationToken
+    )
+    {
         var form = new Dictionary<string, string>
         {
             ["client_id"] = clientId,
@@ -82,15 +103,9 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         );
         response.EnsureSuccessStatusCode();
 
-        var refreshed = ToTokenResponse(
+        return ToTokenResponse(
             await response.Content.ReadFromJsonAsync<TokenPayload>(_jsonOptions, cancellationToken)
         );
-        return string.IsNullOrWhiteSpace(refreshed.RefreshToken)
-            ? refreshed with
-            {
-                RefreshToken = refreshToken,
-            }
-            : refreshed;
     }
 
     public async Task<TokenValidationOutcome> ValidateTokenAsync(

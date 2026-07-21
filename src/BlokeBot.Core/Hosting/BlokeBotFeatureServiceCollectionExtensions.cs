@@ -36,6 +36,7 @@ using BlokeBot.Core.Features.PublicLeaderboards;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -360,6 +361,12 @@ public static class BlokeBotFeatureServiceCollectionExtensions
 
         services.AddSingleton<ChannelBotAuthorizationService>();
         services.AddSingleton<HostBotAccountOAuthService>();
+        services.AddSingleton<HostBotOAuthStateStore>();
+        services.AddDataProtection();
+        services.TryAddSingleton<
+            IHostBotAccountTokenProtector,
+            DataProtectionHostBotAccountTokenProtector
+        >();
         services.AddSingleton<HostBotAccountAuthorizationService>();
         services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()

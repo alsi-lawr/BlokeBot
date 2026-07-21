@@ -52,7 +52,9 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     TwitchBot__Identity__TokenCachePath=/data/twitch.tokens.json \
     HOME=/data
 
-RUN mkdir /data && chown app:app /data
+RUN mkdir /data \
+    && chown app:app /data \
+    && chmod 0700 /data
 
 COPY --from=build --chown=app:app /app/publish ./
 

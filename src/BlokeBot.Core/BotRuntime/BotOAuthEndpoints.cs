@@ -62,12 +62,13 @@ internal static class BotOAuthEndpoints
                     IOAuthFlow oauth,
                     HostBotAccountOAuthService hostBotOAuth,
                     HostBotAccountAuthorizationService hostBotAuthorization,
+                    HostBotOAuthStateStore hostBotStates,
                     HostedChannelChangeNotifier changes,
                     ILogger<BotOAuthEndpointLog> logger,
                     CancellationToken ct
                 ) =>
                 {
-                    if (context.Request.Cookies["BlokeBot.HostBotState"] is { Length: > 0 })
+                    if (HostBotOAuthStateStore.IsHostBotState(state))
                     {
                         return await CompleteHostBotAuthorizationAsync(
                             context,
@@ -76,6 +77,7 @@ internal static class BotOAuthEndpoints
                             error,
                             hostBotOAuth,
                             hostBotAuthorization,
+                            hostBotStates,
                             logger,
                             ct
                         );
@@ -330,6 +332,7 @@ internal static class BotOAuthEndpoints
                     HttpContext context,
                     HostBotAccountOAuthService oauth,
                     HostBotAccountAuthorizationService hostBotAuthorization,
+                    HostBotOAuthStateStore hostBotStates,
                     CancellationToken ct
                 ) =>
                 {
@@ -354,7 +357,8 @@ internal static class BotOAuthEndpoints
                         );
                     }
 
-                    if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, ct))
+                    var actor = new HostBotAccountActor(session.UserId, session.Login);
+                    if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, actor, ct))
                     {
                         return Result(
                             BlokeBotAuthOutcome.CustomBotDisabled,
@@ -364,8 +368,7 @@ internal static class BotOAuthEndpoints
                         );
                     }
 
-                    var state = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                    DeleteHostBotStateCookie(context);
+                    var state = hostBotStates.Issue(session.UserId, selectedHost.Id);
                     var requiredScopes = await hostBotAuthorization.GetRequiredScopesAsync(
                         selectedHost.Id,
                         ct
@@ -376,18 +379,7 @@ internal static class BotOAuthEndpoints
                             OAuthAuthorizationScopeSet.Create(requiredScopes)
                         )
                         .Match<IResult>(
-                            ready =>
-                            {
-                                context.Response.Cookies.Append(
-                                    "BlokeBot.HostBotState",
-                                    state,
-                                    HostBotStateCookieOptions(
-                                        context.Request,
-                                        TimeSpan.FromMinutes(10)
-                                    )
-                                );
-                                return Results.Redirect(ready.AuthorizationUri.ToString());
-                            },
+                            ready => Results.Redirect(ready.AuthorizationUri.ToString()),
                             static _ =>
                                 Result(
                                     BlokeBotAuthOutcome.Unavailable,
@@ -408,18 +400,32 @@ internal static class BotOAuthEndpoints
         string? error,
         HostBotAccountOAuthService oauth,
         HostBotAccountAuthorizationService hostBotAuthorization,
+        HostBotOAuthStateStore hostBotStates,
         ILogger<BotOAuthEndpointLog> logger,
         CancellationToken ct
     )
     {
         var session = AuthenticatedSession.FromPrincipal(context.User);
-        if (!session.CanAuthorizeSelectedHost)
+        var stateConsumption = hostBotStates.Consume(state, session.UserId);
+        if (stateConsumption is not HostBotOAuthStateConsumption.Consumed consumed)
+        {
+            return Result(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
+        }
+
+        var selectedHost = session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (selectedHost?.Id != consumed.HostId || !session.CanAuthorizeSelectedHost)
         {
             return ConnectionAccessResult(session);
         }
-
-        var storedState = context.Request.Cookies["BlokeBot.HostBotState"];
-        DeleteHostBotStateCookie(context);
 
         if (!string.IsNullOrWhiteSpace(error))
         {
@@ -436,43 +442,15 @@ internal static class BotOAuthEndpoints
             );
         }
 
-        if (
-            string.IsNullOrWhiteSpace(state)
-            || string.IsNullOrWhiteSpace(storedState)
-            || !string.Equals(state, storedState, StringComparison.Ordinal)
-        )
-        {
-            return Result(
-                BlokeBotAuthOutcome.InvalidOrExpired,
-                BlokeBotAuthStatus.BadRequest,
-                BlokeBotAuthRetryAction.HostBot,
-                BlokeBotAuthReturnAction.ChannelSetup
-            );
-        }
-
-        var selectedHost = session.State.Match<BotHostChoice?>(
-            _ => null,
-            selected => selected.Selection.Current,
-            _ => null
-        );
-        if (selectedHost is null)
-        {
-            return Result(
-                BlokeBotAuthOutcome.NoChannelSelected,
-                BlokeBotAuthStatus.Forbidden,
-                BlokeBotAuthRetryAction.None,
-                BlokeBotAuthReturnAction.ChannelSetup
-            );
-        }
-
         try
         {
             var completion = await oauth.CompleteAsync(code, ct);
             return await completion.Match<Task<IResult>>(
                 async completed =>
                 {
+                    var actor = new HostBotAccountActor(session.UserId, session.Login);
                     var authorization = await hostBotAuthorization
-                        .Authorize(selectedHost.Id, completed.Grant)
+                        .Authorize(consumed.HostId, actor, completed.Grant)
                         .ExecuteAsync(ct);
                     return authorization.Match(
                         outcome => MapHostBotAuthorization(outcome),
@@ -577,10 +555,22 @@ internal static class BotOAuthEndpoints
                 BlokeBotAuthRetryAction.None,
                 BlokeBotAuthReturnAction.ChannelSetup
             ),
+            HostBotAccountAuthorizationOutcome.AuthorityDenied => Result(
+                BlokeBotAuthOutcome.AccessRequired,
+                BlokeBotAuthStatus.Forbidden,
+                BlokeBotAuthRetryAction.None,
+                BlokeBotAuthReturnAction.ChannelSetup
+            ),
             HostBotAccountAuthorizationOutcome.MissingScopes => Result(
                 BlokeBotAuthOutcome.PermissionOrAccount,
                 BlokeBotAuthStatus.BadRequest,
                 BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            ),
+            HostBotAccountAuthorizationOutcome.ProtectionUnavailable => Result(
+                BlokeBotAuthOutcome.Unavailable,
+                BlokeBotAuthStatus.ServiceUnavailable,
+                BlokeBotAuthRetryAction.None,
                 BlokeBotAuthReturnAction.ChannelSetup
             ),
             _ => throw new UnreachableException(),
@@ -742,35 +732,6 @@ internal static class BotOAuthEndpoints
         context.Response.Cookies.Delete(
             "BlokeBot.ChannelBotState",
             new CookieOptions { Path = "/", Secure = context.Request.IsHttps }
-        );
-    }
-
-    private static CookieOptions HostBotStateCookieOptions(HttpRequest request, TimeSpan? maxAge)
-    {
-        return new()
-        {
-            HttpOnly = true,
-            IsEssential = true,
-            MaxAge = maxAge,
-            Path = "/oauth",
-            SameSite = SameSiteMode.Lax,
-            Secure = request.IsHttps,
-        };
-    }
-
-    private static void DeleteHostBotStateCookie(HttpContext context)
-    {
-        context.Response.Cookies.Delete(
-            "BlokeBot.HostBotState",
-            HostBotStateCookieOptions(context.Request, null)
-        );
-        context.Response.Cookies.Delete(
-            "BlokeBot.HostBotState",
-            new CookieOptions { Path = "/", Secure = context.Request.IsHttps }
-        );
-        context.Response.Cookies.Delete(
-            "BlokeBot.HostBotState",
-            new CookieOptions { Path = "/oauth/host-bot", Secure = context.Request.IsHttps }
         );
     }
 

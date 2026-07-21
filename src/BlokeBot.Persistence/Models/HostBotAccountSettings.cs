@@ -18,11 +18,7 @@ public sealed class HostBotAccountSettings
 
     public string? ProfileImageUrl { get; set; }
 
-    public string? AccessToken { get; set; }
-
-    public string? RefreshToken { get; set; }
-
-    public DateTimeOffset? ExpiresAtUtc { get; set; }
+    public byte[]? ProtectedTokenPayload { get; set; }
 
     public DateTime? AuthorizedAtUtc { get; set; }
 

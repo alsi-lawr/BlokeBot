@@ -41,9 +41,10 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
             endpointScenario: EndpointScenario.HostMissingPermission
         );
 
-        using var request = CallbackRequest(
-            "/oauth/callback?code=code&state=state",
-            "BlokeBot.HostBotState"
+        var state = host.IssueHostBotState();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/oauth/callback?code=code&state={state}"
         );
         using var response = await host.Client.SendAsync(request);
 

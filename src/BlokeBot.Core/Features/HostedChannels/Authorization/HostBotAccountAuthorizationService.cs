@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -13,12 +14,14 @@ public sealed class HostBotAccountAuthorizationService(
     HostBotAccountOAuthService hostBotOAuth,
     OAuthTransport transport,
     HelixClient helix,
+    IHostBotAccountTokenProtector tokenProtector,
     ITokenStatusSource globalTokenStatus,
     HostedChannelChangeNotifier changes,
     BotSettings botSettings
 ) : IBotAccountProvider, IHostBotAccountTokenStatusProvider
 {
     private static readonly TimeSpan _refreshSkew = TimeSpan.FromMinutes(1);
+    private readonly ConcurrentDictionary<int, SemaphoreSlim> _credentialMutationGates = new();
 
     public async Task<BotAccountAuthorizationStatus> GetStatusAsync(
         int hostId,
@@ -158,9 +161,19 @@ public sealed class HostBotAccountAuthorizationService(
         });
     }
 
-    public async Task<bool> CanAuthorizeAsync(int hostId, CancellationToken ct)
+    public async Task<bool> CanAuthorizeAsync(
+        int hostId,
+        HostBotAccountActor actor,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
+        if (host is null || !HasOwnershipAuthority(host, actor))
+        {
+            return false;
+        }
+
         var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
             x => x.HostId == hostId,
             ct
@@ -295,64 +308,152 @@ public sealed class HostBotAccountAuthorizationService(
 
     public IO<HostBotAccountAuthorizationOutcome, Never> Authorize(
         int hostId,
+        HostBotAccountActor actor,
         HostBotAccountAuthorizationGrant grant
     )
     {
         return IO<HostBotAccountAuthorizationOutcome, Never>.Create(async ct =>
         {
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var settings = await EnsureSettingsAsync(db, hostId, ct);
-            if (settings is null)
+            var mutationGate = CredentialMutationGate(hostId);
+            HostBotAccountAuthorizationOutcome.Authorized? committed = null;
+            await mutationGate.WaitAsync(ct);
+            try
             {
-                return Success(new HostBotAccountAuthorizationOutcome.HostNotFound());
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var host = await db
+                    .Hosts.AsNoTracking()
+                    .SingleOrDefaultAsync(x => x.Id == hostId, ct);
+                if (host is null)
+                {
+                    return Success(new HostBotAccountAuthorizationOutcome.HostNotFound());
+                }
+
+                if (!HasOwnershipAuthority(host, actor))
+                {
+                    return Success(new HostBotAccountAuthorizationOutcome.AuthorityDenied());
+                }
+
+                var settings = await EnsureSettingsAsync(db, hostId, ct);
+                Debug.Assert(settings is not null, "The authorized host must have settings.");
+
+                if (!settings.OverrideEnabled)
+                {
+                    return Success(new HostBotAccountAuthorizationOutcome.OverrideDisabled());
+                }
+
+                var missingScopes = ScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
+                if (missingScopes.Length > 0)
+                {
+                    return Success(
+                        new HostBotAccountAuthorizationOutcome.MissingScopes(missingScopes)
+                    );
+                }
+
+                var protectedToken = tokenProtector.Protect(hostId, grant.Token);
+                var outcome = await protectedToken.Match<Task<HostBotAccountAuthorizationOutcome>>(
+                    async protectedPayload =>
+                    {
+                        settings.ProtectedTokenPayload = protectedPayload;
+                        settings.AuthorizedAtUtc = DateTime.UtcNow;
+                        settings.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
+                        settings.DisplayName = grant.DisplayName.Trim();
+                        settings.Login = grant.Login.Value;
+                        settings.ProfileImageUrl = string.IsNullOrWhiteSpace(grant.ProfileImageUrl)
+                            ? null
+                            : grant.ProfileImageUrl.Trim();
+                        settings.TwitchUserId = grant.UserId;
+                        settings.UpdatedAtUtc = DateTime.UtcNow;
+                        await db.SaveChangesAsync(ct);
+
+                        return new HostBotAccountAuthorizationOutcome.Authorized();
+                    },
+                    failure =>
+                        Task.FromResult<HostBotAccountAuthorizationOutcome>(
+                            new HostBotAccountAuthorizationOutcome.ProtectionUnavailable(failure)
+                        )
+                );
+                if (outcome is not HostBotAccountAuthorizationOutcome.Authorized authorized)
+                {
+                    return Success(outcome);
+                }
+
+                committed = authorized;
+            }
+            finally
+            {
+                mutationGate.Release();
             }
 
-            if (!settings.OverrideEnabled)
-            {
-                return Success(new HostBotAccountAuthorizationOutcome.OverrideDisabled());
-            }
-
-            var missingScopes = ScopeSet.Missing(grant.Scopes, RequiredScopes(settings));
-            if (missingScopes.Length > 0)
-            {
-                return Success(new HostBotAccountAuthorizationOutcome.MissingScopes(missingScopes));
-            }
-
-            settings.AccessToken = grant.Token.AccessToken;
-            settings.AuthorizedAtUtc = DateTime.UtcNow;
-            settings.AuthorizedScopes = ScopeSet.Format(grant.Scopes);
-            settings.DisplayName = grant.DisplayName.Trim();
-            settings.ExpiresAtUtc = grant.Token.ExpiresAtUtc;
-            settings.Login = grant.Login.Value;
-            settings.ProfileImageUrl = string.IsNullOrWhiteSpace(grant.ProfileImageUrl)
-                ? null
-                : grant.ProfileImageUrl.Trim();
-            settings.RefreshToken = grant.Token.RefreshToken;
-            settings.TwitchUserId = grant.UserId;
-            settings.UpdatedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
+            Debug.Assert(committed is not null, "The custom-bot grant must be committed.");
             await changes.NotifyChangedAsync(ct);
-
-            return Success(new HostBotAccountAuthorizationOutcome.Authorized());
+            return Success(committed);
         });
     }
 
-    public async Task ClearAsync(int hostId, CancellationToken ct)
+    public async Task<HostBotAccountClearOutcome> ClearAsync(
+        int hostId,
+        HostBotAccountActor actor,
+        CancellationToken ct
+    )
     {
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
-            x => x.HostId == hostId,
-            ct
-        );
-        if (settings is null)
+        var mutationGate = CredentialMutationGate(hostId);
+        var committed = false;
+        await mutationGate.WaitAsync(ct);
+        try
         {
-            return;
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
+            if (host is null)
+            {
+                return new HostBotAccountClearOutcome.HostNotFound();
+            }
+
+            if (!HasOwnershipAuthority(host, actor))
+            {
+                return new HostBotAccountClearOutcome.AuthorityDenied();
+            }
+
+            var settings = await db.HostBotAccountSettings.SingleOrDefaultAsync(
+                x => x.HostId == hostId,
+                ct
+            );
+            if (settings is null)
+            {
+                return new HostBotAccountClearOutcome.Cleared();
+            }
+
+            ClearAuthorization(settings);
+            settings.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            committed = true;
+        }
+        finally
+        {
+            mutationGate.Release();
         }
 
-        ClearAuthorization(settings);
-        settings.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
+        Debug.Assert(committed, "The custom-bot grant clear must be committed.");
         await changes.NotifyChangedAsync(ct);
+        return new HostBotAccountClearOutcome.Cleared();
+    }
+
+    private static bool HasOwnershipAuthority(BotHost host, HostBotAccountActor actor)
+    {
+        if (
+            string.IsNullOrWhiteSpace(actor.AuthenticatedUserId)
+            || string.IsNullOrWhiteSpace(actor.Login)
+            || !string.Equals(host.Login, Login.Normalize(actor.Login), StringComparison.Ordinal)
+        )
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(host.TwitchUserId)
+            || string.Equals(
+                host.TwitchUserId,
+                actor.AuthenticatedUserId,
+                StringComparison.Ordinal
+            );
     }
 
     private async Task<HostBotAccountSettings?> EnsureSettingsAsync(
@@ -395,7 +496,8 @@ public sealed class HostBotAccountAuthorizationService(
     )
     {
         var required = ImmutableArray.CreateRange(ScopeSet.NormalizeMany(requiredScopes));
-        if (string.IsNullOrWhiteSpace(settings.RefreshToken))
+        var protectedPayload = settings.ProtectedTokenPayload?.ToArray();
+        if (protectedPayload is null)
         {
             return new TokenStatus.Unavailable(
                 AccessTokenUnavailableReason.MissingRefreshToken,
@@ -403,38 +505,72 @@ public sealed class HostBotAccountAuthorizationService(
             );
         }
 
-        var accessToken = settings.AccessToken;
-        if (string.IsNullOrWhiteSpace(accessToken) || TokenExpiresSoon(settings))
-        {
-            if (!await RefreshTokenAsync(db, settings, ct))
+        var unprotectedToken = tokenProtector.Unprotect(settings.HostId, protectedPayload);
+        return await unprotectedToken.Match(
+            payload => GetPlaintextTokenStatusAsync(db, settings, payload, required, ct),
+            async _ =>
             {
-                return new TokenStatus.Invalid(required);
+                var disabled = await DisableUnusableCredentialsIfCurrentAsync(
+                    db,
+                    settings,
+                    protectedPayload,
+                    ct
+                );
+                return disabled
+                    ? ProtectionUnavailable(required)
+                    : await GetStoredTokenStatusAsync(db, settings, required, ct);
+            }
+        );
+    }
+
+    private async Task<TokenStatus> GetPlaintextTokenStatusAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        HostBotAccountTokenPayload payload,
+        ImmutableArray<string> required,
+        CancellationToken ct
+    )
+    {
+        if (TokenExpiresSoon(payload))
+        {
+            var refresh = await RefreshTokenAsync(db, settings, payload, ct);
+            var refreshedPayload = refresh.Match<HostBotAccountTokenPayload?>(
+                refreshed => refreshed.Payload,
+                _ => null,
+                _ => null
+            );
+            if (refreshedPayload is null)
+            {
+                return refresh.Match<TokenStatus>(
+                    _ => throw new UnreachableException(),
+                    _ => new TokenStatus.Invalid(required),
+                    _ => ProtectionUnavailable(required)
+                );
             }
 
-            accessToken = settings.AccessToken;
+            payload = refreshedPayload;
         }
 
-        if (string.IsNullOrWhiteSpace(accessToken))
-        {
-            return new TokenStatus.Unavailable(
-                AccessTokenUnavailableReason.MissingRefreshToken,
-                required
-            );
-        }
-
-        var validation = await transport.ValidateTokenAsync(accessToken, ct);
+        var validation = await transport.ValidateTokenAsync(payload.AccessToken, ct);
         if (validation.Match(static _ => false, static _ => true))
         {
-            if (
-                !await RefreshTokenAsync(db, settings, ct)
-                || string.IsNullOrWhiteSpace(settings.AccessToken)
-            )
+            var refresh = await RefreshTokenAsync(db, settings, payload, ct);
+            var refreshedPayload = refresh.Match<HostBotAccountTokenPayload?>(
+                refreshed => refreshed.Payload,
+                _ => null,
+                _ => null
+            );
+            if (refreshedPayload is null)
             {
-                return new TokenStatus.Invalid(required);
+                return refresh.Match<TokenStatus>(
+                    _ => throw new UnreachableException(),
+                    _ => new TokenStatus.Invalid(required),
+                    _ => ProtectionUnavailable(required)
+                );
             }
 
-            accessToken = settings.AccessToken;
-            validation = await transport.ValidateTokenAsync(accessToken, ct);
+            payload = refreshedPayload;
+            validation = await transport.ValidateTokenAsync(payload.AccessToken, ct);
         }
 
         return await validation.Match(
@@ -442,7 +578,7 @@ public sealed class HostBotAccountAuthorizationService(
                 PersistValidatedStatusAsync(
                     db,
                     settings,
-                    accessToken,
+                    payload.AccessToken,
                     validated.Validation,
                     required,
                     ct
@@ -481,37 +617,210 @@ public sealed class HostBotAccountAuthorizationService(
             );
     }
 
-    private async Task<bool> RefreshTokenAsync(
+    private async Task<HostBotAccountTokenRefreshOutcome> RefreshTokenAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        HostBotAccountTokenPayload current,
+        CancellationToken ct
+    )
+    {
+        var originalProtectedPayload = settings.ProtectedTokenPayload?.ToArray();
+        var mutationGate = CredentialMutationGate(settings.HostId);
+        await mutationGate.WaitAsync(ct);
+        var mutationGateHeld = true;
+        try
+        {
+            await db.Entry(settings).ReloadAsync(ct);
+            var persistedProtectedPayload = settings.ProtectedTokenPayload;
+            if (persistedProtectedPayload is null)
+            {
+                return new HostBotAccountTokenRefreshOutcome.Rejected();
+            }
+
+            if (originalProtectedPayload is null)
+            {
+                return new HostBotAccountTokenRefreshOutcome.Rejected();
+            }
+
+            if (!ProtectedPayloadEquals(originalProtectedPayload, persistedProtectedPayload))
+            {
+                var latest = tokenProtector.Unprotect(settings.HostId, persistedProtectedPayload);
+                return await latest.Match<Task<HostBotAccountTokenRefreshOutcome>>(
+                    payload =>
+                        Task.FromResult<HostBotAccountTokenRefreshOutcome>(
+                            new HostBotAccountTokenRefreshOutcome.Refreshed(payload)
+                        ),
+                    async failure =>
+                    {
+                        await DisableUnusableCredentialsAsync(db, settings, ct);
+                        mutationGate.Release();
+                        mutationGateHeld = false;
+                        await changes.NotifyChangedAsync(ct);
+                        return new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure);
+                    }
+                );
+            }
+
+            var refreshed = await transport.RefreshCompleteTokenSetAsync(
+                botSettings.Identity.ClientId,
+                botSettings.Identity.ClientSecret,
+                current.RefreshToken,
+                ct
+            );
+            if (string.IsNullOrWhiteSpace(refreshed.RefreshToken))
+            {
+                return new HostBotAccountTokenRefreshOutcome.Rejected();
+            }
+
+            var refreshedPayload = new HostBotAccountTokenPayload(
+                refreshed.AccessToken,
+                refreshed.RefreshToken,
+                DateTimeOffset.UtcNow.AddSeconds(refreshed.ExpiresIn)
+            );
+            var validation = await transport.ValidateTokenAsync(refreshed.AccessToken, ct);
+            if (
+                validation is not TokenValidationOutcome.Validated validated
+                || !RefreshedIdentityMatches(settings, validated.Validation)
+                || ScopeSet.Missing(validated.Validation.Scopes, RequiredScopes(settings)).Length
+                    > 0
+            )
+            {
+                return new HostBotAccountTokenRefreshOutcome.Rejected();
+            }
+
+            var protectedToken = tokenProtector.Protect(settings.HostId, refreshedPayload);
+            return await protectedToken.Match<Task<HostBotAccountTokenRefreshOutcome>>(
+                async protectedPayload =>
+                {
+                    settings.ProtectedTokenPayload = protectedPayload;
+                    settings.UpdatedAtUtc = DateTime.UtcNow;
+                    await db.SaveChangesAsync(ct);
+                    return new HostBotAccountTokenRefreshOutcome.Refreshed(refreshedPayload);
+                },
+                failure =>
+                    Task.FromResult<HostBotAccountTokenRefreshOutcome>(
+                        new HostBotAccountTokenRefreshOutcome.ProtectionUnavailable(failure)
+                    )
+            );
+        }
+        catch (HttpRequestException exception)
+            when (exception.StatusCode
+                    is System.Net.HttpStatusCode.BadRequest
+                        or System.Net.HttpStatusCode.Unauthorized
+            )
+        {
+            return new HostBotAccountTokenRefreshOutcome.Rejected();
+        }
+        finally
+        {
+            if (mutationGateHeld)
+            {
+                mutationGate.Release();
+            }
+        }
+    }
+
+    private SemaphoreSlim CredentialMutationGate(int hostId)
+    {
+        return _credentialMutationGates.GetOrAdd(hostId, static _ => new SemaphoreSlim(1, 1));
+    }
+
+    private static bool RefreshedIdentityMatches(
+        HostBotAccountSettings settings,
+        TokenValidation validation
+    )
+    {
+        return (
+                string.IsNullOrWhiteSpace(settings.TwitchUserId)
+                || string.Equals(settings.TwitchUserId, validation.UserId, StringComparison.Ordinal)
+            )
+            && (
+                string.IsNullOrWhiteSpace(settings.Login)
+                || string.Equals(settings.Login, validation.Login, StringComparison.Ordinal)
+            );
+    }
+
+    private static bool ProtectedPayloadEquals(byte[] left, byte[] right)
+    {
+        return left.AsSpan().SequenceEqual(right);
+    }
+
+    private async Task<bool> DisableUnusableCredentialsIfCurrentAsync(
+        BlokeBotDbContext db,
+        HostBotAccountSettings settings,
+        byte[] failedProtectedPayload,
+        CancellationToken ct
+    )
+    {
+        var mutationGate = CredentialMutationGate(settings.HostId);
+        var disabled = false;
+        await mutationGate.WaitAsync(ct);
+        try
+        {
+            await db.Entry(settings).ReloadAsync(ct);
+            if (
+                settings.ProtectedTokenPayload is null
+                || !ProtectedPayloadEquals(failedProtectedPayload, settings.ProtectedTokenPayload)
+            )
+            {
+                return false;
+            }
+
+            await DisableUnusableCredentialsAsync(db, settings, ct);
+            disabled = true;
+        }
+        finally
+        {
+            mutationGate.Release();
+        }
+
+        Debug.Assert(disabled, "The unusable custom-bot credentials must be disabled.");
+        await changes.NotifyChangedAsync(ct);
+        return true;
+    }
+
+    private static async Task DisableUnusableCredentialsAsync(
         BlokeBotDbContext db,
         HostBotAccountSettings settings,
         CancellationToken ct
     )
     {
-        if (string.IsNullOrWhiteSpace(settings.RefreshToken))
+        var now = DateTime.UtcNow;
+        settings.OverrideEnabled = false;
+        settings.WhisperResponsesEnabled = false;
+        ClearAuthorization(settings);
+        settings.UpdatedAtUtc = now;
+
+        var host = await db.Hosts.SingleAsync(value => value.Id == settings.HostId, ct);
+        host.BotRuntimeState = BotChannelRuntimeState.Stopped;
+        host.BotRuntimeStateChangedAtUtc = now;
+
+        var alertExists = await db.DurableAlerts.AnyAsync(
+            value =>
+                value.HostId == settings.HostId
+                && value.Source == CustomBotCredentialAlert.Source
+                && value.SourceKey == CustomBotCredentialAlert.SourceKey
+                && value.AcknowledgedAtUtc == null,
+            ct
+        );
+        if (!alertExists)
         {
-            return false;
+            db.DurableAlerts.Add(
+                new DurableAlert
+                {
+                    HostId = settings.HostId,
+                    Severity = DurableAlertSeverity.Warning,
+                    Source = CustomBotCredentialAlert.Source,
+                    SourceKey = CustomBotCredentialAlert.SourceKey,
+                    Title = CustomBotCredentialAlert.Title,
+                    Message = CustomBotCredentialAlert.Message,
+                    LinkPath = CustomBotCredentialAlert.LinkPath,
+                    CreatedAtUtc = now,
+                }
+            );
         }
 
-        try
-        {
-            var refreshed = await transport.RefreshAsync(
-                botSettings.Identity.ClientId,
-                botSettings.Identity.ClientSecret,
-                settings.RefreshToken,
-                ct
-            );
-            settings.AccessToken = refreshed.AccessToken;
-            settings.RefreshToken = refreshed.RefreshToken;
-            settings.ExpiresAtUtc = DateTimeOffset.UtcNow.AddSeconds(refreshed.ExpiresIn);
-            settings.UpdatedAtUtc = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-            return true;
-        }
-        catch (HttpRequestException exception)
-            when (exception.StatusCode is System.Net.HttpStatusCode.BadRequest)
-        {
-            return false;
-        }
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task RefreshProfileMetadataAsync(
@@ -604,7 +913,10 @@ public sealed class HostBotAccountAuthorizationService(
                     unavailable.RequiredScopes,
                     [],
                     unavailable.RequiredScopes,
-                    "No custom bot account is connected yet."
+                    unavailable.Reason
+                    is AccessTokenUnavailableReason.CredentialProtectionUnavailable
+                        ? "The custom bot credentials could not be used and were removed. Connect the custom bot again."
+                        : "No custom bot account is connected yet."
                 ),
             invalid =>
                 new(
@@ -642,23 +954,28 @@ public sealed class HostBotAccountAuthorizationService(
         );
     }
 
-    private static bool TokenExpiresSoon(HostBotAccountSettings settings)
+    private static bool TokenExpiresSoon(HostBotAccountTokenPayload payload)
     {
-        return settings.ExpiresAtUtc is null
-            || settings.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
+        return payload.ExpiresAtUtc <= DateTimeOffset.UtcNow.Add(_refreshSkew);
     }
 
     private static void ClearAuthorization(HostBotAccountSettings settings)
     {
-        settings.AccessToken = null;
         settings.AuthorizedAtUtc = null;
         settings.AuthorizedScopes = null;
         settings.DisplayName = null;
-        settings.ExpiresAtUtc = null;
         settings.Login = null;
         settings.ProfileImageUrl = null;
-        settings.RefreshToken = null;
+        settings.ProtectedTokenPayload = null;
         settings.TwitchUserId = null;
+    }
+
+    private static TokenStatus ProtectionUnavailable(ImmutableArray<string> required)
+    {
+        return new TokenStatus.Unavailable(
+            AccessTokenUnavailableReason.CredentialProtectionUnavailable,
+            required
+        );
     }
 
     private static IEnumerable<string> SplitStoredScopes(string? scopes)
@@ -708,6 +1025,34 @@ public sealed class HostBotAccountAuthorizationService(
         Disabled,
         Enabled,
     }
+
+    private abstract record HostBotAccountTokenRefreshOutcome
+    {
+        private HostBotAccountTokenRefreshOutcome() { }
+
+        public sealed record Refreshed(HostBotAccountTokenPayload Payload)
+            : HostBotAccountTokenRefreshOutcome;
+
+        public sealed record Rejected : HostBotAccountTokenRefreshOutcome;
+
+        public sealed record ProtectionUnavailable(HostBotAccountTokenProtectionFailure Failure)
+            : HostBotAccountTokenRefreshOutcome;
+
+        public TResult Match<TResult>(
+            Func<Refreshed, TResult> refreshed,
+            Func<Rejected, TResult> rejected,
+            Func<ProtectionUnavailable, TResult> protectionUnavailable
+        )
+        {
+            return this switch
+            {
+                Refreshed outcome => refreshed(outcome),
+                Rejected outcome => rejected(outcome),
+                ProtectionUnavailable outcome => protectionUnavailable(outcome),
+                _ => throw new UnreachableException(),
+            };
+        }
+    }
 }
 
 public abstract record HostBotAccountAuthorizationOutcome
@@ -720,6 +1065,24 @@ public abstract record HostBotAccountAuthorizationOutcome
 
     public sealed record OverrideDisabled : HostBotAccountAuthorizationOutcome;
 
+    public sealed record AuthorityDenied : HostBotAccountAuthorizationOutcome;
+
     public sealed record MissingScopes(IReadOnlyList<string> Scopes)
         : HostBotAccountAuthorizationOutcome;
+
+    public sealed record ProtectionUnavailable(HostBotAccountTokenProtectionFailure Failure)
+        : HostBotAccountAuthorizationOutcome;
+}
+
+public sealed record HostBotAccountActor(string AuthenticatedUserId, string Login);
+
+public abstract record HostBotAccountClearOutcome
+{
+    private HostBotAccountClearOutcome() { }
+
+    public sealed record Cleared : HostBotAccountClearOutcome;
+
+    public sealed record HostNotFound : HostBotAccountClearOutcome;
+
+    public sealed record AuthorityDenied : HostBotAccountClearOutcome;
 }

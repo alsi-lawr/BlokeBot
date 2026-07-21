@@ -5,6 +5,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Identity;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
+using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,6 +16,8 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostBotAccountAuthorizationTests
 {
+    private static readonly HostBotAccountActor _owner = new("streamer-id", "streamer");
+
     [Test]
     public void ConfiguredBotRedirectUri_CreatingAuthorizationUri_UsesConfiguredValue()
     {
@@ -189,8 +192,9 @@ public sealed class HostBotAccountAuthorizationTests
         var result = await service
             .Authorize(
                 hostId,
+                _owner,
                 new HostBotAccountAuthorizationGrant(
-                    new TokenSet(
+                    new HostBotAccountTokenPayload(
                         "override-token",
                         "override-refresh",
                         DateTimeOffset.UtcNow.AddHours(1)
@@ -219,6 +223,57 @@ public sealed class HostBotAccountAuthorizationTests
         status.State.ShouldBe(BotAccountAuthorizationState.Ready);
         status.AuthorizedLogin.ShouldBe("custombot");
         status.AuthorizedProfileImageUrl.ShouldBe("https://static-cdn.jtvnw.net/custombot.png");
+    }
+
+    [Test]
+    public async Task AuthorizedCustomBot_Persisting_DoesNotStorePlaintextCredentials()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+
+        await AuthorizeCustomBotAsync(service, hostId);
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var stored = await db.HostBotAccountSettings.SingleAsync(x => x.HostId == hostId);
+        var protectedPayload = stored.ProtectedTokenPayload.ShouldNotBeNull();
+        protectedPayload.AsSpan().IndexOf(Encoding.UTF8.GetBytes("override-token")).ShouldBe(-1);
+        protectedPayload.AsSpan().IndexOf(Encoding.UTF8.GetBytes("override-refresh")).ShouldBe(-1);
+    }
+
+    [Test]
+    public async Task UnprotectFailure_LoadingCustomBot_DisablesCredentialsAndRaisesAlert()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+        await AuthorizeCustomBotAsync(service, hostId);
+        await SetRuntimeStateAsync(dbFactory, hostId, BotChannelRuntimeState.Started);
+        await using (var tamper = await dbFactory.CreateDbContextAsync())
+        {
+            var stored = await tamper.HostBotAccountSettings.SingleAsync();
+            var tamperedPayload = stored.ProtectedTokenPayload!.ToArray();
+            tamperedPayload[^1] ^= 0x01;
+            stored.ProtectedTokenPayload = tamperedPayload;
+            await tamper.SaveChangesAsync();
+        }
+
+        var reason = Error(
+            await service.GetBotAccount("streamer").ExecuteAsync(CancellationToken.None)
+        );
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var settings = await db.HostBotAccountSettings.SingleAsync(x => x.HostId == hostId);
+        var host = await db.Hosts.SingleAsync(x => x.Id == hostId);
+        var alert = await db.DurableAlerts.SingleAsync();
+        reason.ShouldBe(AccessTokenUnavailableReason.CredentialProtectionUnavailable);
+        settings.OverrideEnabled.ShouldBeFalse();
+        settings.ProtectedTokenPayload.ShouldBeNull();
+        host.BotRuntimeState.ShouldBe(BotChannelRuntimeState.Stopped);
+        alert.Source.ShouldBe(CustomBotCredentialAlert.Source);
+        alert.SourceKey.ShouldBe(CustomBotCredentialAlert.SourceKey);
     }
 
     [Test]
@@ -271,7 +326,11 @@ public sealed class HostBotAccountAuthorizationTests
         await SeedHostAsync(dbFactory, "global-channel");
         var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
         await service.UseCustomBotAsync(customHostId, CancellationToken.None);
-        await AuthorizeCustomBotAsync(service, customHostId);
+        await AuthorizeCustomBotAsync(
+            service,
+            customHostId,
+            new HostBotAccountActor("custom-owner-id", "custom-channel")
+        );
 
         var lookups = Enumerable
             .Range(0, 8)
@@ -369,6 +428,7 @@ public sealed class HostBotAccountAuthorizationTests
         var missing = await service
             .Authorize(
                 hostId,
+                _owner,
                 CreateCustomBotGrant(
                     "override-token",
                     [
@@ -383,6 +443,7 @@ public sealed class HostBotAccountAuthorizationTests
         var authorized = await service
             .Authorize(
                 hostId,
+                _owner,
                 CreateCustomBotGrant(
                     "override-whisper-token",
                     [
@@ -420,6 +481,7 @@ public sealed class HostBotAccountAuthorizationTests
         var outcome = await service
             .Authorize(
                 hostId,
+                _owner,
                 CreateCustomBotGrant(
                     "override-token",
                     ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
@@ -448,6 +510,7 @@ public sealed class HostBotAccountAuthorizationTests
         var outcome = await service
             .Authorize(
                 hostId,
+                _owner,
                 CreateCustomBotGrant(
                     "override-token",
                     [
@@ -554,6 +617,7 @@ public sealed class HostBotAccountAuthorizationTests
             new HostBotAccountOAuthService(options, oauth, helix),
             oauth,
             helix,
+            HostBotAccountTokenProtectionTestSupport.CreateProtector(),
             tokenProvider is null
                 ? new UnavailableTokenStatusSource()
                 : new TokenStatusService(
@@ -603,12 +667,14 @@ public sealed class HostBotAccountAuthorizationTests
 
     private static async Task AuthorizeCustomBotAsync(
         HostBotAccountAuthorizationService service,
-        int hostId
+        int hostId,
+        HostBotAccountActor? actor = null
     )
     {
         var result = await service
             .Authorize(
                 hostId,
+                actor ?? _owner,
                 CreateCustomBotGrant(
                     "override-token",
                     [
@@ -632,6 +698,7 @@ public sealed class HostBotAccountAuthorizationTests
         var result = await service
             .Authorize(
                 hostId,
+                _owner,
                 CreateCustomBotGrant(
                     "expired-token",
                     [
@@ -655,7 +722,7 @@ public sealed class HostBotAccountAuthorizationTests
     )
     {
         return new(
-            new TokenSet(
+            new HostBotAccountTokenPayload(
                 accessToken,
                 "override-refresh",
                 expiresAtUtc ?? DateTimeOffset.UtcNow.AddHours(1)

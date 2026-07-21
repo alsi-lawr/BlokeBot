@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
 
@@ -135,8 +136,24 @@ public partial class HostConfigPage
 
     private async Task ClearBotOverrideAuthorizationCoreAsync(int hostId)
     {
-        await _hostBotAccounts.ClearAsync(hostId, CancellationToken.None);
+        var session = PageContext.Session;
+        var outcome = await _hostBotAccounts.ClearAsync(
+            hostId,
+            new HostBotAccountActor(session.UserId, session.Login),
+            CancellationToken.None
+        );
         await LoadCoreAsync();
+        if (outcome is not HostBotAccountClearOutcome.Cleared)
+        {
+            _toasts.Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(
+                    "BlokeBot could not confirm that you own this channel. Sign in again and retry.",
+                    "Custom bot not disconnected"
+                )
+            );
+            return;
+        }
+
         _toasts.Publish(
             ToastRequest<CautionStatusToastStrategy>.WithTitle(
                 "The custom bot account has been disconnected.",
