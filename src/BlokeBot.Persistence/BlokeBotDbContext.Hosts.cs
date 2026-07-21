@@ -30,12 +30,10 @@ public sealed partial class BlokeBotDbContext
         {
             b.ToTable("host_bot_account_settings");
             b.HasKey(x => x.Id);
-            b.Property(x => x.AccessToken).HasMaxLength(4096);
             b.Property(x => x.AuthorizedScopes).HasMaxLength(512);
             b.Property(x => x.DisplayName).HasMaxLength(128);
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.ProfileImageUrl).HasMaxLength(512);
-            b.Property(x => x.RefreshToken).HasMaxLength(4096);
             b.Property(x => x.TwitchUserId).HasMaxLength(64);
             b.HasIndex(x => x.HostId).IsUnique();
             b.HasOne<BotHost>()

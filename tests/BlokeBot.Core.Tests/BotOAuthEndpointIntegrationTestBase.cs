@@ -76,6 +76,14 @@ public abstract class BotOAuthEndpointIntegrationTestBase
     {
         public HttpClient Client { get; } = client;
 
+        public string IssueHostBotState()
+        {
+            var authentication = app.Services.GetRequiredService<TestAuthenticationSettings>();
+            return app
+                .Services.GetRequiredService<HostBotOAuthStateStore>()
+                .Issue(authentication.UserId, authentication.SelectedHostId);
+        }
+
         public static async Task<EndpointHost> StartAsync(
             bool configured,
             StubOAuthFlow? flow = null,
@@ -175,6 +183,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             services.AddSingleton(changes);
             services.AddSingleton(Uninitialized<ChannelBotOAuthService>());
             services.AddSingleton(Uninitialized<ChannelBotAuthorizationService>());
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<HostBotOAuthStateStore>();
         }
 
         private static async Task<ConfiguredEndpointServices?> ConfigureEndpointScenarioAsync(
@@ -276,6 +286,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     oauth,
                     transport,
                     helix,
+                    HostBotAccountTokenProtectionTestSupport.CreateProtector(),
                     new UnavailableTokenStatusSource(),
                     changes,
                     settings
@@ -432,7 +443,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         {
             var claims = new List<Claim>
             {
-                new(ClaimTypes.NameIdentifier, $"{settings.Login}-id"),
+                new(ClaimTypes.NameIdentifier, settings.UserId),
                 new(ClaimTypes.Name, settings.Login),
                 new(AuthClaims.Login, settings.Login),
                 new(AuthClaims.IsBotAdmin, settings.IsBotAdmin.ToString()),
@@ -460,7 +471,13 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         AuthRole? SelectedRole,
         string Login,
         int SelectedHostId
-    );
+    )
+    {
+        public string UserId =>
+            string.Equals(Login, "streamer", StringComparison.OrdinalIgnoreCase)
+                ? "123"
+                : $"{Login}-id";
+    }
 
     private protected enum EndpointScenario
     {

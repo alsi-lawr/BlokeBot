@@ -191,6 +191,7 @@ public sealed class ChannelBotAuthorizationTests
             new HostBotAccountOAuthService(options, oauth, helix),
             oauth,
             helix,
+            HostBotAccountTokenProtectionTestSupport.CreateProtector(),
             new UnavailableTokenStatusSource(),
             ChangeNotifier(),
             options

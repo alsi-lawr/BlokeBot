@@ -80,21 +80,25 @@ public abstract class WhisperResponseTestBase
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.HostBotAccountSettings.Add(
-            new HostBotAccountSettings
-            {
-                HostId = hostId,
-                OverrideEnabled = true,
-                WhisperResponsesEnabled = whisperResponsesEnabled,
-                TwitchUserId = "custom-id",
-                Login = "custombot",
-                AccessToken = "override-whisper-token",
-                RefreshToken = "override-refresh",
-                ExpiresAtUtc = DateTimeOffset.UtcNow.AddHours(1),
-                AuthorizedScopes = ScopeSet.Format([Scopes.UserManageWhispers]),
-                UpdatedAtUtc = DateTime.UtcNow,
-            }
+        var settings = new HostBotAccountSettings
+        {
+            HostId = hostId,
+            OverrideEnabled = true,
+            WhisperResponsesEnabled = whisperResponsesEnabled,
+            TwitchUserId = "custom-id",
+            Login = "custombot",
+            AuthorizedScopes = ScopeSet.Format([Scopes.UserManageWhispers]),
+            UpdatedAtUtc = DateTime.UtcNow,
+        };
+        HostBotAccountTokenProtectionTestSupport.SetProtectedPayload(
+            settings,
+            new HostBotAccountTokenPayload(
+                "override-whisper-token",
+                "override-refresh",
+                DateTimeOffset.UtcNow.AddHours(1)
+            )
         );
+        db.HostBotAccountSettings.Add(settings);
         await db.SaveChangesAsync();
     }
 
@@ -173,6 +177,7 @@ public abstract class WhisperResponseTestBase
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
                 oauth,
                 helixUsers,
+                HostBotAccountTokenProtectionTestSupport.CreateProtector(),
                 new UnavailableTokenStatusSource(),
                 new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
                 options

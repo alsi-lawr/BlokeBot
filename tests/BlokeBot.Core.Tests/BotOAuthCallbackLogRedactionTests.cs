@@ -25,8 +25,9 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
         using var channel = await host.Client.SendAsync(
             CallbackRequest($"/oauth/channel-bot/callback{Query}", "BlokeBot.ChannelBotState")
         );
-        using var hostBot = await host.Client.SendAsync(
-            CallbackRequest($"/oauth/callback{Query}", "BlokeBot.HostBotState")
+        var hostState = host.IssueHostBotState();
+        using var hostBot = await host.Client.GetAsync(
+            $"/oauth/callback?error={Error}&code={Code}&state={hostState}"
         );
 
         global.StatusCode.ShouldBe(System.Net.HttpStatusCode.BadGateway);
@@ -38,6 +39,7 @@ public sealed class BotOAuthCallbackLogRedactionTests : BotOAuthEndpointIntegrat
             entry.Message.ShouldNotContain(Error);
             entry.Message.ShouldNotContain(Code);
             entry.Message.ShouldNotContain(State);
+            entry.Message.ShouldNotContain(hostState);
             entry
                 .Properties.Values.Any(value =>
                     value is not null

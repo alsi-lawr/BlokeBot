@@ -62,6 +62,9 @@ internal sealed record BlokeBotStatePaths(string DatabasePath, string TokenCache
     internal string StateDirectory =>
         Path.GetDirectoryName(DatabasePath)
         ?? throw new InvalidOperationException("The database path has no parent directory.");
+
+    internal string DataProtectionKeysDirectory =>
+        Path.Combine(StateDirectory, "data-protection-keys");
 }
 
 internal abstract record BlokeBotStatePathResolution
@@ -249,11 +252,14 @@ internal static class BlokeBotStatePathPreparer
             {
                 ParentDirectory(prepared.DatabasePath),
                 ParentDirectory(prepared.TokenCachePath),
+                prepared.DataProtectionKeysDirectory,
             };
             foreach (var directory in directories)
             {
                 EnsureDirectoryWritable(directory);
             }
+
+            EnsurePrivateDataProtectionDirectory(prepared.DataProtectionKeysDirectory);
 
             EnsureExistingFileWritable(prepared.DatabasePath);
             EnsureExistingFileWritable(prepared.TokenCachePath);
@@ -300,6 +306,17 @@ internal static class BlokeBotStatePathPreparer
         }
 
         using var file = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+    }
+
+    private static void EnsurePrivateDataProtectionDirectory(string directory)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(
+                directory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            );
+        }
     }
 
     private static bool IsPathFailure(Exception exception)

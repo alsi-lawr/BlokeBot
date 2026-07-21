@@ -137,7 +137,7 @@ public static class BlokeBotApplication
         return builder;
     }
 
-    public static async Task InitializeBlokeBotCoreAsync(
+    public static async Task InitializeBlokeBotPersistenceAsync(
         this WebApplication app,
         CancellationToken cancellationToken
     )

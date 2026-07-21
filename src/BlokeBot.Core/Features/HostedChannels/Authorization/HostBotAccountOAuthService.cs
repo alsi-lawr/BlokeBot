@@ -86,18 +86,30 @@ public sealed class HostBotAccountOAuthService(
             new HelixRequestContext(identity.ClientId, token.AccessToken),
             ct
         );
+        if (
+            user is null
+            || !string.Equals(user.Id, validation.UserId, StringComparison.Ordinal)
+            || !string.Equals(
+                Login.Normalize(user.Login),
+                validation.Login,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.ProviderNotValidated();
+        }
 
         return new OAuthAuthorizationCompletionOutcome<HostBotAccountAuthorizationGrant>.Completed(
             new HostBotAccountAuthorizationGrant(
-                new TokenSet(
+                new HostBotAccountTokenPayload(
                     token.AccessToken,
                     token.RefreshToken,
                     DateTimeOffset.UtcNow.AddSeconds(token.ExpiresIn)
                 ),
                 validation.UserId,
                 LoginName.Parse(validation.Login),
-                string.IsNullOrWhiteSpace(user?.DisplayName) ? validation.Login : user.DisplayName,
-                string.IsNullOrWhiteSpace(user?.ProfileImageUrl) ? null : user.ProfileImageUrl,
+                string.IsNullOrWhiteSpace(user.DisplayName) ? validation.Login : user.DisplayName,
+                string.IsNullOrWhiteSpace(user.ProfileImageUrl) ? null : user.ProfileImageUrl,
                 validation.Scopes
             )
         );

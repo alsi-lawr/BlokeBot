@@ -1,5 +1,6 @@
 using BlokeBot.Core.Hosting;
 using BlokeBot.Persistence;
+using Microsoft.AspNetCore.DataProtection;
 using Serilog;
 
 namespace BlokeBot.Simulation;
@@ -46,6 +47,7 @@ internal static class SimulationApplication
         builder.Services.AddBlokeBotPersistence(services =>
             services.GetRequiredService<SimulationDatabaseKeeper>().ConnectionString
         );
+        builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
         var runtime = BlokeBotRuntimeMode.Offline;
         builder.AddBlokeBotCore(runtime);
         builder.Services.AddBlokeBotSimulation();
@@ -62,7 +64,7 @@ internal static class SimulationApplication
         CancellationToken cancellationToken
     )
     {
-        await app.InitializeBlokeBotCoreAsync(cancellationToken);
+        await app.InitializeBlokeBotPersistenceAsync(cancellationToken);
         await app
             .Services.GetRequiredService<SimulationFixtureSeeder>()
             .SeedAsync(cancellationToken);
