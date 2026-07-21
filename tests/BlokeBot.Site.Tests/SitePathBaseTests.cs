@@ -37,13 +37,13 @@ public sealed class SitePathBaseTests
             home.ShouldContain("<base href=\"/blokebot/\" />");
             home.ShouldContain("href=\"guide\"");
             home.ShouldContain(
-                "data-theme-light-source=\"media/dashboard-scroll-laptop-light.webp\""
+                "data-theme-light-source=\"media/laptop-light-home-scroll.webp\""
             );
             home.ShouldContain(
-                "data-theme-dark-source=\"media/dashboard-scroll-laptop-dark.webp\""
+                "data-theme-dark-source=\"media/laptop-dark-home-scroll.webp\""
             );
             home.ShouldContain(
-                "data-theme-light-source=\"media/dashboard-scroll-phone-light.webp\""
+                "data-theme-light-source=\"media/phone-light-home-scroll.webp\""
             );
             home.ShouldContain("<span><strong>BlokeBot</strong><small>Help &amp; guides</small>");
             home.ShouldContain("href=\"/blokebot/#main-content\"");
@@ -60,7 +60,7 @@ public sealed class SitePathBaseTests
             (await stylesheet.Content.ReadAsByteArrayAsync()).ShouldNotBeEmpty();
 
             var showcase = await client.GetAsync(
-                "/blokebot/media/dashboard-scroll-laptop-light.webp"
+                "/blokebot/media/laptop-light-home-scroll.webp"
             );
             showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
