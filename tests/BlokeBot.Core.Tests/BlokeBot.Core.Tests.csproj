@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="AngleSharp" />
     <PackageReference Include="bunit" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="TUnit" />
