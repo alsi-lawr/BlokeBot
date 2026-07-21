@@ -9,9 +9,9 @@
 
 **A self-hosted Twitch bot and dashboard for running channel tools on your own terms.**
 
+[Help site](src/BlokeBot.Site) |
 [User guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide) |
-[Channel tools](https://github.com/alsi-lawr/BlokeBot/wiki/Channel-Tools) |
-[Server setup](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide)
+[Server owner guide](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide)
 
 </div>
 
@@ -50,7 +50,7 @@ docker run --rm --init --publish 8080:8080 --volume blokebot-data:/data blokebot
 nix run github:alsi-lawr/BlokeBot#blokebot -- serve
 ```
 
-Open the dashboard, then follow the [server owner guide](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide)
-to finish setup.
+Run the separate [BlokeBot.Site help site](src/BlokeBot.Site) for approachable setup guidance, and use
+the [server owner wiki](https://github.com/alsi-lawr/BlokeBot/wiki/Server-Owner-Guide) for technical detail.
 
 For everyday help, start with the **[BlokeBot User Guide](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide)**.

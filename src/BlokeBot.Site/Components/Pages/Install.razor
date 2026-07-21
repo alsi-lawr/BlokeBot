@@ -50,7 +50,7 @@ docker run --rm --init \
   --volume blokebot-data:/data \
   --env-file /etc/blokebot/blokebot.env \
   blokebot:local</code></pre>
-        <p>Back up the named volume before replacing or removing it. The image already starts <code>blokebot serve</code> on port 8080 and keeps the database and token cache under <code>/data</code>.</p>
+        <p>Back up the named volume before replacing or removing it. The image already starts <code>blokebot serve</code> on port 8080 and keeps the database, token cache and automatically managed Data Protection keys under <code>/data</code>.</p>
     </section>
 
     <section id="source" aria-labelledby="source-title">

@@ -36,15 +36,9 @@ public sealed class SitePathBaseTests
             var home = await client.GetStringAsync("/blokebot/");
             home.ShouldContain("<base href=\"/blokebot/\" />");
             home.ShouldContain("href=\"guide\"");
-            home.ShouldContain(
-                "data-theme-light-source=\"media/laptop-light-home-scroll.webp\""
-            );
-            home.ShouldContain(
-                "data-theme-dark-source=\"media/laptop-dark-home-scroll.webp\""
-            );
-            home.ShouldContain(
-                "data-theme-light-source=\"media/phone-light-home-scroll.webp\""
-            );
+            home.ShouldContain("data-theme-light-source=\"media/laptop-light-home-scroll.webp\"");
+            home.ShouldContain("data-theme-dark-source=\"media/laptop-dark-home-scroll.webp\"");
+            home.ShouldContain("data-theme-light-source=\"media/phone-light-home-scroll.webp\"");
             home.ShouldContain("<span><strong>BlokeBot</strong><small>Help &amp; guides</small>");
             home.ShouldContain("href=\"/blokebot/#main-content\"");
             home.ShouldContain(
@@ -54,14 +48,26 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+            var serverOwners = await client.GetStringAsync("/blokebot/server-owners");
+            serverOwners.ShouldContain("1. Install and run");
+            serverOwners.ShouldContain("5. Custom-bot credentials");
+            serverOwners.ShouldContain("ASP.NET Core manages Data Protection keys automatically");
+            serverOwners.ShouldContain("DPAPI LocalMachine");
+            serverOwners.ShouldContain(
+                "https://github.com/alsi-lawr/BlokeBot/wiki/HTTPS-and-Reverse-Proxy"
+            );
+            serverOwners.ShouldContain(
+                "https://github.com/alsi-lawr/BlokeBot/wiki/State-and-Secrets#custom-bot-credentials"
+            );
+            serverOwners.ShouldNotContain("keyring");
+            serverOwners.ShouldNotContain("rotation");
+
             var stylesheet = await client.GetAsync("/blokebot/site.css");
             stylesheet.StatusCode.ShouldBe(HttpStatusCode.OK);
             stylesheet.Content.Headers.ContentType!.MediaType.ShouldBe("text/css");
             (await stylesheet.Content.ReadAsByteArrayAsync()).ShouldNotBeEmpty();
 
-            var showcase = await client.GetAsync(
-                "/blokebot/media/laptop-light-home-scroll.webp"
-            );
+            var showcase = await client.GetAsync("/blokebot/media/laptop-light-home-scroll.webp");
             showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var favicon = await client.GetAsync("/blokebot/favicon.ico");

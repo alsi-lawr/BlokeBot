@@ -69,10 +69,6 @@ assemble:
           output: .
           includes:
             - LICENSE
-        - input: packaging/archives
-          output: .
-          includes:
-            - SERVER_SETUP.md
     blokebot-zip:
       active: ALWAYS
       exported: false
@@ -102,10 +98,6 @@ assemble:
           output: .
           includes:
             - LICENSE
-        - input: packaging/archives
-          output: .
-          includes:
-            - SERVER_SETUP.md
 
 distributions:
   blokebot:
