@@ -576,9 +576,9 @@ internal static class SiteGuideCatalog
         {
             Route = "/server-owners",
             Eyebrow = "Technical operations",
-            Title = "Install and operate BlokeBot",
+            Title = "Run a BlokeBot server",
             Summary =
-                "Create the Twitch application, provide public HTTPS, keep credentials out of source and operate the bot and help site as separate services.",
+                "Install the service, connect one Twitch application, provide trusted HTTPS and keep its private state backed up.",
             Media = new SiteMedia(
                 DarkPhoneSource: "media/phone-dark-admin.png",
                 LightPhoneSource: "media/phone-light-admin.png",
@@ -592,13 +592,26 @@ internal static class SiteGuideCatalog
             [
                 new SiteGuideSection
                 {
-                    Heading = "1. Create the Twitch developer application",
-                    Steps =
+                    Heading = "1. Install and run",
+                    Paragraphs =
                     [
-                        "Open the Twitch Developer Console and sign in with the account that will own the application.",
-                        "Create an application with a recognisable name and choose Website Integration as its category.",
-                        "Add both HTTPS OAuth redirect URLs shown below, replacing bot.example.com with the public dashboard host.",
-                        "Copy the Client ID and generate a Client Secret. Treat the secret as a password and rotate it after accidental disclosure.",
+                        "Choose Nix, Docker or a source checkout, give BlokeBot a persistent data directory, and start the dashboard on a private address while you finish setup.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink("Choose an installation route", "install"),
+                        new SiteLink(
+                            "Installation technical details on the wiki",
+                            "https://github.com/alsi-lawr/BlokeBot/wiki/Installation"
+                        ),
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "2. Create the Twitch application",
+                    Paragraphs =
+                    [
+                        "Create one Website Integration application in the Twitch Developer Console. Register both public HTTPS callbacks, then provide its Client ID and Client Secret to BlokeBot without checking the secret into source.",
                     ],
                     Code =
                         "https://bot.example.com/auth/twitch/callback\nhttps://bot.example.com/oauth/callback",
@@ -608,106 +621,60 @@ internal static class SiteGuideCatalog
                             "Open the Twitch Developer Console",
                             "https://dev.twitch.tv/console/apps"
                         ),
+                        new SiteLink(
+                            "Twitch application and callback details on the wiki",
+                            "https://github.com/alsi-lawr/BlokeBot/wiki/Twitch-Identity-and-OAuth"
+                        ),
                     ],
                     Note =
-                        "The registered callback text must match exactly, including scheme, host, port and path. The first callback signs dashboard users in; the second connects the bot account.",
+                        "The callback text must match exactly, including scheme, host, port and path.",
                 },
                 new SiteGuideSection
                 {
-                    Heading = "2. Configure the bot identity",
+                    Heading = "3. Add HTTPS",
                     Paragraphs =
                     [
-                        "The same Twitch application credentials are used for dashboard sign-in and bot authorization. Configure a dedicated bot account login and the public bot callback URI.",
-                    ],
-                    Code = """
-                        TwitchBot__Identity__BotUsername=your_bot_login
-                        TwitchBot__Identity__ClientId=your_application_client_id
-                        TwitchBot__Identity__ClientSecret=keep_this_out_of_source
-                        TwitchBot__Identity__RedirectUri=https://bot.example.com/oauth/callback
-                        BlokeBot__BotAdmins__0=your_twitch_login
-                        """,
-                    Note =
-                        "Environment variables use double underscores for configuration nesting. With NixOS, put ClientSecret in services.blokebot.environmentFile; do not put it in the ordinary environment attribute because Nix store paths are world-readable.",
-                },
-                new SiteGuideSection
-                {
-                    Heading = "3. Put trusted HTTPS in front",
-                    Paragraphs =
-                    [
-                        "For a public service, bind BlokeBot to loopback and terminate HTTPS in Caddy, nginx or another reverse proxy. Forward the original scheme and host so OAuth builds the public callback correctly.",
-                    ],
-                    Code =
-                        "blokebot serve --host 127.0.0.1 --port 8080 --data-dir /var/lib/blokebot",
-                    Note =
-                        "Twitch callbacks must use the public HTTPS origin. Do not register the reverse proxy's internal HTTP address.",
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Local Kestrel HTTPS configuration",
-                    Paragraphs =
-                    [
-                        "For local setup, export a development certificate and point a separate JSON configuration file at it. This example serves https://localhost:8080 and keeps the certificate password in local-only configuration.",
-                    ],
-                    Code = """
-                        {
-                          "Kestrel": {
-                            "Endpoints": {
-                              "Https": {
-                                "Url": "https://localhost:8080",
-                                "Certificate": {
-                                  "Path": "/home/you/.aspnet/https/blokebot.pfx",
-                                  "Password": "change-me"
-                                }
-                              }
-                            }
-                          }
-                        }
-                        """,
-                    Note =
-                        "Keep this file outside source control and replace /home/you with the real absolute path. The browser, Kestrel configuration and Twitch callbacks must all use localhost consistently.",
-                },
-                new SiteGuideSection
-                {
-                    Heading = "Create the local certificate and serve",
-                    Paragraphs =
-                    [
-                        "Export and trust the standard .NET development certificate, then pass the JSON file to BlokeBot. When Kestrel endpoints are configured, do not add conflicting --host or --port flags.",
-                    ],
-                    Code = """
-                        dotnet dev-certs https --trust
-                        dotnet dev-certs https -ep "$HOME/.aspnet/https/blokebot.pfx" -p change-me
-                        blokebot serve --config ./blokebot.local.json --data-dir ./.local/blokebot
-                        """,
-                    Note =
-                        "The browser must trust the certificate. A certificate for 127.0.0.1 does not automatically cover localhost, and vice versa; open the same host name configured in the certificate and Twitch callback.",
-                },
-                new SiteGuideSection
-                {
-                    Heading = "4. Protect and back up state",
-                    Bullets =
-                    [
-                        "Give only the service account access to the data directory.",
-                        "Back up blokebot.db and twitch.tokens.json together while the service is stopped or from one consistent filesystem snapshot.",
-                        "Keep the help site stateless and run it separately from the bot service.",
-                        "Review active alerts and service logs after every update before promoting the new generation.",
-                    ],
-                },
-                new SiteGuideSection
-                {
-                    Heading = "5. Verify the service",
-                    Steps =
-                    [
-                        "Run blokebot version and record the deployed revision.",
-                        "Open the public HTTPS dashboard and confirm the Blazor client connects without script or stylesheet errors.",
-                        "Sign in, select a test channel, connect the channel and bot identities, then start and stop the bot.",
-                        "Open the help site independently and verify its media and internal links under the configured path base.",
+                        "Give the public dashboard a trusted HTTPS address. A typical deployment keeps BlokeBot on loopback behind Caddy, nginx or another reverse proxy that forwards the original scheme and host.",
                     ],
                     Links =
                     [
-                        new SiteLink("Choose an installation route", "install"),
                         new SiteLink(
-                            "Review the source repository",
-                            "https://github.com/alsi-lawr/BlokeBot"
+                            "HTTPS and reverse-proxy details on the wiki",
+                            "https://github.com/alsi-lawr/BlokeBot/wiki/HTTPS-and-Reverse-Proxy"
+                        ),
+                    ],
+                    Note =
+                        "Register the public HTTPS callbacks with Twitch, not the proxy's private HTTP address.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "4. Keep state private and backed up",
+                    Paragraphs =
+                    [
+                        "BlokeBot keeps its SQLite database, OAuth token cache and automatically managed Data Protection keys in private persistent application state. Restrict that state to the service account and back it up from a stopped service or one consistent snapshot.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink(
+                            "State locations and backup details on the wiki",
+                            "https://github.com/alsi-lawr/BlokeBot/wiki/State-and-Secrets#state-and-backups"
+                        ),
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "5. Custom-bot credentials",
+                    Paragraphs =
+                    [
+                        "Custom-bot encryption needs no operator configuration. ASP.NET Core manages Data Protection keys automatically in private persistent application state; Windows protects those keys with DPAPI LocalMachine.",
+                        "A copied SQLite database or SQL backup does not expose reusable custom-bot tokens. Theft or compromise of the full state directory or the running host is outside that boundary.",
+                        "When an upgrade finds old plaintext custom-bot credentials, it deletes them, disables that custom bot and alerts the channel owner to reconnect it.",
+                    ],
+                    Links =
+                    [
+                        new SiteLink(
+                            "Custom-bot security details on the wiki",
+                            "https://github.com/alsi-lawr/BlokeBot/wiki/State-and-Secrets#custom-bot-credentials"
                         ),
                     ],
                 },
