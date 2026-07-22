@@ -59,7 +59,7 @@ public sealed class GuessingVoteService(
             );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
-        var normalizedName = GuessName.Parse(name).Value;
+        var submittedName = GuessName.Parse(name);
 
         if (round is null)
         {
@@ -77,20 +77,23 @@ public sealed class GuessingVoteService(
             );
         }
 
-        var option = await db
+        var options = await db
             .GuessOptions.AsNoTracking()
-            .FirstOrDefaultAsync(
-                x => x.GuessRoundProfileId == round.ProfileId && x.Name == normalizedName,
-                ct
-            );
+            .Where(option => option.GuessRoundProfileId == round.ProfileId)
+            .ToListAsync(ct);
+        var option = options
+            .Select(option => new { Option = option, Names = GuessAnswerNames.Parse(option.Name) })
+            .FirstOrDefault(candidate => candidate.Names.Contains(submittedName));
 
         if (option is null)
         {
             return new GuessingOperationOutcome.Rejected(
-                Format(settings.InvalidGuessReply, normalizedName, login),
+                Format(settings.InvalidGuessReply, submittedName.Value, login),
                 delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
             );
         }
+
+        var canonicalName = option.Names.Canonical.Value;
 
         var vote = await db.Votes.SingleOrDefaultAsync(
             x => x.GuessRoundId == round.Id && x.Login == login,
@@ -107,7 +110,7 @@ public sealed class GuessingVoteService(
             {
                 GuessRoundId = round.Id,
                 Login = login,
-                GuessName = normalizedName,
+                GuessName = canonicalName,
                 GuessedAtUtc = DateTime.UtcNow,
             }
         );
@@ -116,7 +119,7 @@ public sealed class GuessingVoteService(
         await changes.NotifyChangedAsync(ct);
         var answerReplyTarget = await AnswerReplyTargetAsync(db, round.ProfileId, ct);
         return new GuessingOperationOutcome.Succeeded(
-            Format(option.ReplyText, normalizedName, login),
+            Format(option.Option.ReplyText, canonicalName, login),
             answerReplyTarget
         );
     }

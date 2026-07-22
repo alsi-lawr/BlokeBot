@@ -196,25 +196,30 @@ public static class GuessingConfigurationValidator
         var values = new List<GuessOptionValue>(profile.Options.Count);
         foreach (var option in profile.Options)
         {
-            var name = RequiredName(option.Name, profile: false, errors);
-            if (name.Length > _nameMaxLength)
+            var names = GuessAnswerNames.Parse(option.Name);
+            if (names.IsEmpty)
+            {
+                errors.Add(new GuessingConfigurationValidationError.OptionNameRequired());
+            }
+            if (names.Value.Length > _nameMaxLength)
             {
                 errors.Add(new GuessingConfigurationValidationError.OptionNameTooLong());
             }
 
-            var normalizedName = GuessName.Parse(name).Value;
             values.Add(
                 new GuessOptionValue(
-                    normalizedName,
-                    string.IsNullOrWhiteSpace(option.ReplyText) ? name : option.ReplyText.Trim(),
+                    names.Value,
+                    string.IsNullOrWhiteSpace(option.ReplyText)
+                        ? names.CanonicalDisplayName
+                        : option.ReplyText.Trim(),
                     target
                 )
             );
         }
 
         var duplicate = values
-            .Where(option => !string.IsNullOrWhiteSpace(option.Name))
-            .GroupBy(option => option.Name, StringComparer.Ordinal)
+            .SelectMany(option => GuessAnswerNames.Parse(option.Name).Values)
+            .GroupBy(name => name.Value, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1)
             ?.Key;
         if (duplicate is not null)
@@ -334,12 +339,13 @@ public abstract record GuessingConfigurationValidationError
 
     public sealed record OptionNameTooLong : GuessingConfigurationValidationError
     {
-        public override string Message => "Answer names cannot exceed 128 characters.";
+        public override string Message =>
+            "An answer and its comma-separated aliases cannot exceed 128 characters.";
     }
 
     public sealed record DuplicateOption(string Name) : GuessingConfigurationValidationError
     {
-        public override string Message => $"Answer '{Name}' is entered more than once.";
+        public override string Message => $"Answer or alias '{Name}' is entered more than once.";
     }
 
     public sealed record DuplicateAlias(string Alias) : GuessingConfigurationValidationError

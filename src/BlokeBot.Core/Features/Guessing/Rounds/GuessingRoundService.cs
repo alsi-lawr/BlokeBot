@@ -47,7 +47,7 @@ public sealed class GuessingRoundService(
             );
         var settings = resolution.Settings;
         var delivery = resolution.ReplyDelivery;
-        var normalizedName = GuessName.Parse(name).Value;
+        var submittedName = GuessName.Parse(name);
 
         if (round is null)
         {
@@ -59,23 +59,29 @@ public sealed class GuessingRoundService(
             );
         }
 
-        var optionExists = await db.GuessOptions.AnyAsync(
-            x => x.GuessRoundProfileId == round.GuessRoundProfileId && x.Name == normalizedName,
-            ct
-        );
-        if (!optionExists)
+        var optionNames = await db
+            .GuessOptions.AsNoTracking()
+            .Where(option => option.GuessRoundProfileId == round.GuessRoundProfileId)
+            .Select(option => option.Name)
+            .ToListAsync(ct);
+        var matchingAnswer = optionNames
+            .Select(GuessAnswerNames.Parse)
+            .FirstOrDefault(answer => answer.Contains(submittedName));
+        if (matchingAnswer is null)
         {
             return Completed(
                 new GuessingOperationOutcome.Rejected(
-                    Format(settings.InvalidGuessReply, normalizedName, string.Empty),
+                    Format(settings.InvalidGuessReply, submittedName.Value, string.Empty),
                     delivery.TargetFor(GuessingReplyKeys.InvalidGuess)
                 )
             );
         }
 
+        var canonicalName = matchingAnswer.Canonical.Value;
+
         var winners = await db
             .Votes.AsNoTracking()
-            .Where(x => x.GuessRoundId == round.Id && x.GuessName == normalizedName)
+            .Where(x => x.GuessRoundId == round.Id && x.GuessName == canonicalName)
             .OrderBy(x => x.GuessedAtUtc)
             .Select(x => x.Login)
             .ToListAsync(ct);
@@ -97,7 +103,7 @@ public sealed class GuessingRoundService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         round.Status = GuessRoundStatus.Completed;
         round.ClosedAtUtc ??= now;
-        round.WinningName = normalizedName;
+        round.WinningName = canonicalName;
         Result<List<PointBalanceMutation>, PointBalanceMutationFailure> payoutAttempt = Result<
             List<PointBalanceMutation>,
             PointBalanceMutationFailure
@@ -152,7 +158,7 @@ public sealed class GuessingRoundService(
                 winners.Count == 0 ? settings.NoWinnersReply : settings.WinnerReply,
                 new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["name"] = normalizedName,
+                    ["name"] = canonicalName,
                     ["winners"] = winners.Count == 0 ? "none" : string.Join(", ", winners),
                     ["count"] = winners.Count.ToString(),
                     ["reward"] = rewardAmount.ToDisplayString(),
