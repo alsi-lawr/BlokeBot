@@ -71,24 +71,14 @@ internal sealed class HelixPublicChatPinProvider(
                 ids.BotUserId,
                 cancellationToken
             );
-            if (current is not ChatPinnedMessageResult.Found found)
+            var read = PublicChatPinProviderDecision.ClassifyUnpinRead(
+                item,
+                current,
+                static () => null
+            );
+            if (read is not null)
             {
-                return current switch
-                {
-                    ChatPinnedMessageResult.Absent => new PublicChatPinExecutionOutcome.NoOp(
-                        "already-absent"
-                    ),
-                    ChatPinnedMessageResult.PermissionDenied =>
-                        new PublicChatPinExecutionOutcome.Terminal("permission-denied"),
-                    ChatPinnedMessageResult.RateLimited =>
-                        new PublicChatPinExecutionOutcome.Terminal("rate-limited"),
-                    _ => new PublicChatPinExecutionOutcome.Terminal("read-unavailable"),
-                };
-            }
-
-            if (found.MessageId != item.TwitchMessageId || found.PinnedByUserId != ids.BotUserId)
-            {
-                return new PublicChatPinExecutionOutcome.NoOp("replaced-or-not-bot-owned");
+                return read;
             }
 
             var unpin = await pins.UnpinAsync(
@@ -166,20 +156,19 @@ internal sealed class HelixPublicChatPinProvider(
         );
         if (!item.IsUnpin)
         {
-            return
-                current is ChatPinnedMessageResult.Found found
-                && found.MessageId == item.TwitchMessageId
-                && found.PinnedByUserId == ids.BotUserId
-                ? new PublicChatPinExecutionOutcome.Pinned(ids.BotUserId)
-                : new PublicChatPinExecutionOutcome.Terminal("ambiguous-after-restart");
+            return PublicChatPinProviderDecision.ClassifyPinRead(
+                item,
+                current,
+                ids.BotUserId,
+                "ambiguous-after-restart"
+            );
         }
 
-        return
-            current is ChatPinnedMessageResult.Found foundPin
-            && foundPin.MessageId == item.TwitchMessageId
-            && foundPin.PinnedByUserId == ids.BotUserId
-            ? new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
-            : new PublicChatPinExecutionOutcome.NoOp("unpin-reconciled");
+        return PublicChatPinProviderDecision.ClassifyUnpinRead(
+            item,
+            current,
+            static () => new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
+        )!;
     }
 
     private async ValueTask<PublicChatPinExecutionOutcome> ReconcileCurrentPinAsync(
@@ -195,12 +184,12 @@ internal sealed class HelixPublicChatPinProvider(
             ids.BotUserId,
             cancellationToken
         );
-        return
-            current is ChatPinnedMessageResult.Found found
-            && found.MessageId == item.TwitchMessageId
-            && found.PinnedByUserId == ids.BotUserId
-            ? new PublicChatPinExecutionOutcome.Pinned(ids.BotUserId)
-            : new PublicChatPinExecutionOutcome.Terminal("not-exact-bot-pin");
+        return PublicChatPinProviderDecision.ClassifyPinRead(
+            item,
+            current,
+            ids.BotUserId,
+            "not-exact-bot-pin"
+        );
     }
 
     private async ValueTask<PublicChatPinExecutionOutcome> ClassifyUnpinAsync(
@@ -229,14 +218,11 @@ internal sealed class HelixPublicChatPinProvider(
                 ids.BotUserId,
                 cancellationToken
             );
-            if (
-                current is not ChatPinnedMessageResult.Found found
-                || found.MessageId != item.TwitchMessageId
-                || found.PinnedByUserId != ids.BotUserId
-            )
-            {
-                return new PublicChatPinExecutionOutcome.NoOp("unpin-reconciled");
-            }
+            return PublicChatPinProviderDecision.ClassifyUnpinRead(
+                item,
+                current,
+                static () => new PublicChatPinExecutionOutcome.Terminal("ambiguous")
+            )!;
         }
 
         return new PublicChatPinExecutionOutcome.Terminal(
@@ -249,5 +235,72 @@ internal sealed class HelixPublicChatPinProvider(
                 _ => "ambiguous",
             }
         );
+    }
+}
+
+internal static class PublicChatPinProviderDecision
+{
+    internal static PublicChatPinExecutionOutcome ClassifyPinRead(
+        PublicChatPinWorkItem item,
+        ChatPinnedMessageResult current,
+        string attemptedPinnerTwitchUserId,
+        string unresolvedReason
+    )
+    {
+        return current switch
+        {
+            ChatPinnedMessageResult.Found found
+                when found.MessageId == item.TwitchMessageId
+                    && found.PinnedByUserId == attemptedPinnerTwitchUserId =>
+                new PublicChatPinExecutionOutcome.Pinned(attemptedPinnerTwitchUserId),
+            ChatPinnedMessageResult.PermissionDenied => new PublicChatPinExecutionOutcome.Terminal(
+                "permission-denied"
+            ),
+            ChatPinnedMessageResult.RateLimited => new PublicChatPinExecutionOutcome.Terminal(
+                "rate-limited"
+            ),
+            ChatPinnedMessageResult.Unavailable => new PublicChatPinExecutionOutcome.Terminal(
+                "read-unavailable"
+            ),
+            _ => new PublicChatPinExecutionOutcome.Terminal(unresolvedReason),
+        };
+    }
+
+    internal static PublicChatPinExecutionOutcome? ClassifyUnpinRead(
+        PublicChatPinWorkItem item,
+        ChatPinnedMessageResult current,
+        Func<PublicChatPinExecutionOutcome?> exactOwnership
+    )
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(exactOwnership);
+        return current switch
+        {
+            ChatPinnedMessageResult.Found found
+                when found.MessageId == item.TwitchMessageId
+                    && !string.IsNullOrWhiteSpace(item.RecordedPinnerTwitchUserId)
+                    && found.PinnedByUserId == item.RecordedPinnerTwitchUserId => exactOwnership(),
+            ChatPinnedMessageResult.Found found
+                when found.MessageId == item.TwitchMessageId
+                    && string.IsNullOrWhiteSpace(item.RecordedPinnerTwitchUserId) =>
+                new PublicChatPinExecutionOutcome.Terminal("missing-recorded-pinner"),
+            ChatPinnedMessageResult.Found => new PublicChatPinExecutionOutcome.NoOp(
+                "replaced-or-not-recorded-owner"
+            ),
+            ChatPinnedMessageResult.Absent => new PublicChatPinExecutionOutcome.NoOp(
+                "already-absent"
+            ),
+            ChatPinnedMessageResult.PermissionDenied => new PublicChatPinExecutionOutcome.Terminal(
+                "permission-denied"
+            ),
+            ChatPinnedMessageResult.RateLimited => new PublicChatPinExecutionOutcome.Terminal(
+                "rate-limited"
+            ),
+            ChatPinnedMessageResult.Unavailable => new PublicChatPinExecutionOutcome.Terminal(
+                "read-unavailable"
+            ),
+            _ => throw new InvalidOperationException("Unknown current chat pin result."),
+        };
     }
 }

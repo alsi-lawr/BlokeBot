@@ -1,6 +1,7 @@
 using BlokeBot.Core.Features.PublicChat;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Testing;
+using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -11,140 +12,67 @@ namespace BlokeBot.Core.Tests;
 public sealed class PublicChatPinStoreTests
 {
     [Test]
-    public async Task ReplacementPin_SameHostChannel_ReplacesRecordedOwnership()
+    [Arguments(false, 0)]
+    [Arguments(true, 1)]
+    public async Task PinAcceptedAfterRoundStopped_QueuesOnlyConfiguredCompensation(
+        bool unpinOnCompletion,
+        int expectedResetCount
+    )
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAndOperationAsync(
+        await SeedPinOperationAsync(
             dbFactory,
-            3,
             PublicChatPinOperationStatus.Attempting,
-            GuessRoundStatus.Open
+            GuessRoundStatus.Closed,
+            unpinOnCompletion
         );
         var store = Store(dbFactory);
-        var original = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
-        await store.CompleteAsync(
-            original,
-            new PublicChatPinExecutionOutcome.Pinned("bot-user-id"),
-            CancellationToken.None
-        );
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            db.PublicChatPinOperations.Add(
-                new PublicChatPinOperation
-                {
-                    Kind = PublicChatPinOperationKind.Pin,
-                    Status = PublicChatPinOperationStatus.Attempting,
-                    HostId = 3,
-                    Channel = "streamer3",
-                    Feature = "guessing",
-                    ReplyKey = "round_started",
-                    OwnerId = original.OwnerId,
-                    TwitchMessageId = "replacement-message",
-                    CreatedAtUtc = DateTime.UtcNow,
-                    AttemptStartedAtUtc = DateTime.UtcNow,
-                }
-            );
-            await db.SaveChangesAsync();
-        }
+        var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
+        var accepted = new PublicChatPinExecutionOutcome.Pinned("recorded-pinner");
 
-        var replacement = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
-        await store.CompleteAsync(
-            replacement,
-            new PublicChatPinExecutionOutcome.Pinned("bot-user-id"),
-            CancellationToken.None
-        );
+        await store.CompleteAsync(item, accepted, CancellationToken.None);
+        await store.CompleteAsync(item, accepted, CancellationToken.None);
 
         await using var verify = await dbFactory.CreateDbContextAsync();
+        (
+            await verify.PublicChatPinOperations.CountAsync(operation =>
+                operation.Kind == PublicChatPinOperationKind.Unpin
+            )
+        ).ShouldBe(expectedResetCount);
         var active = await verify.ActivePublicChatPins.SingleAsync();
-        active.HostId.ShouldBe(3);
-        active.TwitchMessageId.ShouldBe("replacement-message");
+        active.UnpinOnOwnerCompletion.ShouldBe(unpinOnCompletion);
+        active.PinnerTwitchUserId.ShouldBe("recorded-pinner");
     }
 
     [Test]
-    public async Task ExactUnpin_ForOneHost_PreservesOtherHostOwnership()
+    [Arguments(PublicChatPinOperationStatus.Ready, false)]
+    [Arguments(PublicChatPinOperationStatus.Attempting, true)]
+    public async Task Restart_ReadyRemainsAttemptable_WhileAttemptingIsReconcileOnly(
+        PublicChatPinOperationStatus status,
+        bool expectedReconcileOnly
+    )
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAndOperationAsync(
-            dbFactory,
-            4,
-            PublicChatPinOperationStatus.Attempting,
-            GuessRoundStatus.Open
-        );
-        await SeedHostAndOperationAsync(
-            dbFactory,
-            5,
-            PublicChatPinOperationStatus.Attempting,
-            GuessRoundStatus.Open
-        );
+        await SeedPinOperationAsync(dbFactory, status, GuessRoundStatus.Open, true);
         var store = Store(dbFactory);
-        for (var index = 0; index < 2; index++)
+
+        var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
+
+        item.ReconcileOnly.ShouldBe(expectedReconcileOnly);
+        if (status == PublicChatPinOperationStatus.Ready)
         {
-            var pin = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
-            await store.CompleteAsync(
-                pin,
-                new PublicChatPinExecutionOutcome.Pinned("bot-user-id"),
-                CancellationToken.None
-            );
+            var afterClaimRestart = (
+                await Store(dbFactory).TryClaimAsync(CancellationToken.None)
+            ).ShouldNotBeNull();
+            afterClaimRestart.ReconcileOnly.ShouldBeFalse();
+            (await store.BeginAttemptAsync(item, CancellationToken.None)).ShouldBeTrue();
+            (await store.BeginAttemptAsync(item, CancellationToken.None)).ShouldBeFalse();
+        }
+        else
+        {
+            (await store.BeginAttemptAsync(item, CancellationToken.None)).ShouldBeFalse();
         }
 
-        long ownerId;
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var owned = await db.ActivePublicChatPins.SingleAsync(pin => pin.HostId == 5);
-            ownerId = owned.OwnerId;
-            db.PublicChatPinOperations.Add(
-                new PublicChatPinOperation
-                {
-                    Kind = PublicChatPinOperationKind.Unpin,
-                    Status = PublicChatPinOperationStatus.Attempting,
-                    HostId = 5,
-                    Channel = owned.Channel,
-                    Feature = owned.Feature,
-                    ReplyKey = owned.ReplyKey,
-                    OwnerId = owned.OwnerId,
-                    TwitchMessageId = owned.TwitchMessageId,
-                    PinnerTwitchUserId = owned.PinnerTwitchUserId,
-                    CreatedAtUtc = DateTime.UtcNow,
-                    AttemptStartedAtUtc = DateTime.UtcNow,
-                }
-            );
-            await db.SaveChangesAsync();
-        }
-        var unpin = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
-        unpin.HostId.ShouldBe(5);
-        unpin.OwnerId.ShouldBe(ownerId);
-        await store.CompleteAsync(
-            unpin,
-            new PublicChatPinExecutionOutcome.Unpinned(),
-            CancellationToken.None
-        );
-
-        await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.ActivePublicChatPins.SingleAsync()).HostId.ShouldBe(4);
-    }
-
-    [Test]
-    public async Task AttemptingPin_AfterRestart_IsClaimedForReadOnlyReconciliation()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAndOperationAsync(
-            dbFactory,
-            1,
-            PublicChatPinOperationStatus.Attempting,
-            GuessRoundStatus.Open
-        );
-        var now = new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero);
-        var store = new EfPublicChatPinStore(
-            dbFactory,
-            new ManualTestTimeProvider(now),
-            TestEventBus.Create<AppEventKind>()
-        );
-
-        var item = await store.TryClaimAsync(CancellationToken.None);
-
-        item.ShouldNotBeNull();
-        item.ReconcileOnly.ShouldBeTrue();
-        item.TwitchMessageId.ShouldBe("message-1");
         await using var verify = await dbFactory.CreateDbContextAsync();
         (await verify.PublicChatPinOperations.SingleAsync()).Status.ShouldBe(
             PublicChatPinOperationStatus.Attempting
@@ -152,62 +80,221 @@ public sealed class PublicChatPinStoreTests
     }
 
     [Test]
-    public async Task PinAcceptedAfterRoundStopped_QueuesCompensatingExactUnpin()
+    [Arguments("exact", typeof(PublicChatPinExecutionOutcome.Pinned))]
+    [Arguments("different-pinner", typeof(PublicChatPinExecutionOutcome.Terminal))]
+    public void AttemptingPin_ReconciliationRequiresExactMessageAndAttemptedPinner(
+        string scenario,
+        Type expectedType
+    )
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAndOperationAsync(
-            dbFactory,
-            2,
-            PublicChatPinOperationStatus.Attempting,
-            GuessRoundStatus.Closed
-        );
-        var now = new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero);
-        var store = new EfPublicChatPinStore(
-            dbFactory,
-            new ManualTestTimeProvider(now),
-            TestEventBus.Create<AppEventKind>()
-        );
-        var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
-
-        await store.CompleteAsync(
+        var item = WorkItem(isUnpin: false, recordedPinner: null);
+        var outcome = PublicChatPinProviderDecision.ClassifyPinRead(
             item,
-            new PublicChatPinExecutionOutcome.Pinned("bot-user-id"),
-            CancellationToken.None
+            CurrentPin(scenario),
+            "recorded-pinner",
+            "ambiguous"
         );
 
-        await using var verify = await dbFactory.CreateDbContextAsync();
-        var active = await verify.ActivePublicChatPins.SingleAsync();
-        active.HostId.ShouldBe(2);
-        active.TwitchMessageId.ShouldBe("message-2");
-        active.PinnerTwitchUserId.ShouldBe("bot-user-id");
-        var reset = await verify.PublicChatPinOperations.SingleAsync(operation =>
-            operation.Kind == PublicChatPinOperationKind.Unpin
-        );
-        reset.Status.ShouldBe(PublicChatPinOperationStatus.Ready);
-        reset.OwnerId.ShouldBe(item.OwnerId);
-        reset.TwitchMessageId.ShouldBe(item.TwitchMessageId);
+        outcome.GetType().ShouldBe(expectedType);
+        if (outcome is PublicChatPinExecutionOutcome.Pinned pinned)
+        {
+            pinned.PinnerTwitchUserId.ShouldBe("recorded-pinner");
+        }
+        else
+        {
+            outcome
+                .ShouldBeOfType<PublicChatPinExecutionOutcome.Terminal>()
+                .Reason.ShouldBe("ambiguous");
+        }
     }
 
-    private static async Task SeedHostAndOperationAsync(
+    [Test]
+    [Arguments("different-message", false, "replaced-or-not-recorded-owner")]
+    [Arguments("different-pinner", true, "replaced-or-not-recorded-owner")]
+    [Arguments("unavailable", true, "read-unavailable")]
+    public async Task RecoveringUnpin_FailuresRetainButVerifiedReplacementClearsOwnership(
+        string scenario,
+        bool ownershipRetained,
+        string expectedReason
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedUnpinOperationAndOwnershipAsync(dbFactory);
+        var store = Store(dbFactory);
+        var item = (await store.TryClaimAsync(CancellationToken.None)).ShouldNotBeNull();
+        item.RecordedPinnerTwitchUserId.ShouldBe("recorded-pinner");
+        if (scenario == "different-pinner")
+        {
+            await using var replace = await dbFactory.CreateDbContextAsync();
+            var newerOwnership = await replace.ActivePublicChatPins.SingleAsync();
+            newerOwnership.PinnerTwitchUserId = "other-pinner";
+            await replace.SaveChangesAsync();
+        }
+        AssertUnpinTerminal(item, "exact", "unpin-ambiguous-after-restart");
+        AssertUnpinTerminal(item, "permission", "permission-denied");
+        AssertUnpinTerminal(item, "rate", "rate-limited");
+        AssertUnpinTerminal(
+            item with
+            {
+                RecordedPinnerTwitchUserId = null,
+            },
+            "exact",
+            "missing-recorded-pinner"
+        );
+        PublicChatPinProviderDecision
+            .ClassifyUnpinRead(
+                item,
+                CurrentPin("absent"),
+                static () =>
+                    new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
+            )
+            .ShouldBeOfType<PublicChatPinExecutionOutcome.NoOp>();
+        var outcome = PublicChatPinProviderDecision
+            .ClassifyUnpinRead(
+                item,
+                CurrentPin(scenario),
+                static () =>
+                    new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
+            )
+            .ShouldNotBeNull();
+
+        await store.CompleteAsync(item, outcome, CancellationToken.None);
+
+        (
+            outcome switch
+            {
+                PublicChatPinExecutionOutcome.NoOp noOp => noOp.Reason,
+                PublicChatPinExecutionOutcome.Terminal terminal => terminal.Reason,
+                _ => throw new InvalidOperationException("Unexpected reconciliation outcome."),
+            }
+        ).ShouldBe(expectedReason);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.ActivePublicChatPins.AnyAsync()).ShouldBe(ownershipRetained);
+        if (outcome is PublicChatPinExecutionOutcome.Terminal)
+        {
+            (await verify.DurableAlerts.AnyAsync()).ShouldBeTrue();
+        }
+    }
+
+    private static void AssertUnpinTerminal(
+        PublicChatPinWorkItem item,
+        string scenario,
+        string expectedReason
+    )
+    {
+        PublicChatPinProviderDecision
+            .ClassifyUnpinRead(
+                item,
+                CurrentPin(scenario),
+                static () =>
+                    new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
+            )
+            .ShouldBeOfType<PublicChatPinExecutionOutcome.Terminal>()
+            .Reason.ShouldBe(expectedReason);
+    }
+
+    private static ChatPinnedMessageResult CurrentPin(string scenario)
+    {
+        return scenario switch
+        {
+            "exact" => new ChatPinnedMessageResult.Found("message-id", "recorded-pinner"),
+            "different-message" => new ChatPinnedMessageResult.Found(
+                "replacement",
+                "recorded-pinner"
+            ),
+            "different-pinner" => new ChatPinnedMessageResult.Found("message-id", "other-pinner"),
+            "absent" => new ChatPinnedMessageResult.Absent(),
+            "permission" => new ChatPinnedMessageResult.PermissionDenied(),
+            "rate" => new ChatPinnedMessageResult.RateLimited(),
+            "unavailable" => new ChatPinnedMessageResult.Unavailable(),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario)),
+        };
+    }
+
+    private static async Task SeedPinOperationAsync(
         SqliteBlokeBotDbFactory dbFactory,
-        int hostId,
-        PublicChatPinOperationStatus operationStatus,
+        PublicChatPinOperationStatus status,
+        GuessRoundStatus roundStatus,
+        bool unpinOnCompletion
+    )
+    {
+        var (hostId, roundId) = await SeedHostAndRoundAsync(dbFactory, roundStatus);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.PublicChatPinOperations.Add(
+            new PublicChatPinOperation
+            {
+                Kind = PublicChatPinOperationKind.Pin,
+                Status = status,
+                HostId = hostId,
+                Channel = "streamer",
+                Feature = "guessing",
+                ReplyKey = "round_started",
+                OwnerId = roundId,
+                TwitchMessageId = "message-id",
+                DurationSeconds = 300,
+                UnpinOnOwnerCompletion = unpinOnCompletion,
+                CreatedAtUtc = DateTime.UtcNow,
+                AttemptStartedAtUtc =
+                    status == PublicChatPinOperationStatus.Attempting ? DateTime.UtcNow : null,
+            }
+        );
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedUnpinOperationAndOwnershipAsync(SqliteBlokeBotDbFactory dbFactory)
+    {
+        var (hostId, roundId) = await SeedHostAndRoundAsync(dbFactory, GuessRoundStatus.Closed);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        db.ActivePublicChatPins.Add(
+            new ActivePublicChatPin
+            {
+                HostId = hostId,
+                Channel = "streamer",
+                TwitchMessageId = "message-id",
+                PinnerTwitchUserId = "recorded-pinner",
+                Feature = "guessing",
+                ReplyKey = "round_started",
+                OwnerId = roundId,
+                UnpinOnOwnerCompletion = true,
+                PinnedAtUtc = DateTime.UtcNow,
+            }
+        );
+        db.PublicChatPinOperations.Add(
+            new PublicChatPinOperation
+            {
+                Kind = PublicChatPinOperationKind.Unpin,
+                Status = PublicChatPinOperationStatus.Attempting,
+                HostId = hostId,
+                Channel = "streamer",
+                Feature = "guessing",
+                ReplyKey = "round_started",
+                OwnerId = roundId,
+                TwitchMessageId = "message-id",
+                PinnerTwitchUserId = "recorded-pinner",
+                CreatedAtUtc = DateTime.UtcNow,
+                AttemptStartedAtUtc = DateTime.UtcNow,
+            }
+        );
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<(int HostId, int RoundId)> SeedHostAndRoundAsync(
+        SqliteBlokeBotDbFactory dbFactory,
         GuessRoundStatus roundStatus
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
-        db.Hosts.Add(
-            new BotHost
-            {
-                Id = hostId,
-                Login = $"streamer{hostId}",
-                DisplayName = $"Streamer {hostId}",
-                CreatedAtUtc = DateTime.UtcNow,
-            }
-        );
+        var host = new BotHost
+        {
+            Login = "streamer",
+            DisplayName = "Streamer",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
         var profile = new GuessRoundProfile
         {
-            HostId = hostId,
+            HostId = host.Id,
             Name = "default",
             Slug = "default",
             IsDefault = true,
@@ -216,7 +303,7 @@ public sealed class PublicChatPinStoreTests
         await db.SaveChangesAsync();
         var round = new GuessRound
         {
-            HostId = hostId,
+            HostId = host.Id,
             GuessRoundProfileId = profile.Id,
             Status = roundStatus,
             StartedAtUtc = DateTime.UtcNow,
@@ -224,24 +311,25 @@ public sealed class PublicChatPinStoreTests
         };
         db.Rounds.Add(round);
         await db.SaveChangesAsync();
-        db.PublicChatPinOperations.Add(
-            new PublicChatPinOperation
-            {
-                Kind = PublicChatPinOperationKind.Pin,
-                Status = operationStatus,
-                HostId = hostId,
-                Channel = $"streamer{hostId}",
-                Feature = "guessing",
-                ReplyKey = "round_started",
-                OwnerId = round.Id,
-                TwitchMessageId = $"message-{hostId}",
-                DurationSeconds = 300,
-                UnpinOnOwnerCompletion = true,
-                CreatedAtUtc = DateTime.UtcNow,
-                AttemptStartedAtUtc = DateTime.UtcNow,
-            }
+        return (host.Id, round.Id);
+    }
+
+    private static PublicChatPinWorkItem WorkItem(bool isUnpin, string? recordedPinner)
+    {
+        return new(
+            1,
+            true,
+            isUnpin,
+            1,
+            "streamer",
+            "guessing",
+            "round_started",
+            1,
+            "message-id",
+            recordedPinner,
+            300,
+            true
         );
-        await db.SaveChangesAsync();
     }
 
     private static EfPublicChatPinStore Store(SqliteBlokeBotDbFactory dbFactory)

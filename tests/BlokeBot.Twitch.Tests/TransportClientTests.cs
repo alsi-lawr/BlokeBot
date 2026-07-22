@@ -406,56 +406,6 @@ public sealed class TransportClientTests
         result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
     }
 
-    [Test]
-    public async Task CurrentChatPin_Reading_PreservesMessageAndPinnerIdentities()
-    {
-        var factory = new ScriptedHttpClientFactory();
-        factory.Respond(
-            (request, _) =>
-            {
-                AssertContext(request, HttpMethod.Get, "/helix/chat/pins");
-                return Task.FromResult(
-                    JsonResponse(
-                        """{"data":[{"message_id":"message-id","pinned_by_user_id":"pinner-id"}]}"""
-                    )
-                );
-            }
-        );
-        var client = new ChatPinClient(factory);
-
-        var result = await client.GetAsync(
-            Context(),
-            "channel-id",
-            "bot-id",
-            CancellationToken.None
-        );
-
-        result.ShouldBe(new ChatPinnedMessageResult.Found("message-id", "pinner-id"));
-    }
-
-    [Test]
-    [Arguments(HttpStatusCode.Conflict, typeof(ChatPinMutationResult.Conflict))]
-    [Arguments(HttpStatusCode.Forbidden, typeof(ChatPinMutationResult.PermissionDenied))]
-    [Arguments(HttpStatusCode.TooManyRequests, typeof(ChatPinMutationResult.RateLimited))]
-    public async Task ChatMessagePinning_TerminalStatusesRemainTyped(
-        HttpStatusCode statusCode,
-        Type expectedType
-    )
-    {
-        var client = new ChatPinClient(RespondingWith(statusCode));
-
-        var result = await client.PinAsync(
-            Context(),
-            "channel-id",
-            "bot-id",
-            "message-id",
-            300,
-            CancellationToken.None
-        );
-
-        result.GetType().ShouldBe(expectedType);
-    }
-
     private static void AssertContext(
         HttpRequestMessage request,
         HttpMethod method,

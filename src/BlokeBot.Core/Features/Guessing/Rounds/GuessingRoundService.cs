@@ -401,37 +401,6 @@ public sealed class GuessingRoundService(
                 }
             );
         }
-        else
-        {
-            var attemptingPin = await db
-                .PublicChatPinOperations.AsNoTracking()
-                .FirstOrDefaultAsync(
-                    operation =>
-                        operation.HostId == hostId
-                        && operation.Feature == "guessing"
-                        && operation.OwnerId == round.Id
-                        && operation.Kind == PublicChatPinOperationKind.Pin
-                        && operation.Status == PublicChatPinOperationStatus.Attempting,
-                    ct
-                );
-            if (attemptingPin is not null)
-            {
-                db.PublicChatPinOperations.Add(
-                    new PublicChatPinOperation
-                    {
-                        Kind = PublicChatPinOperationKind.Unpin,
-                        Status = PublicChatPinOperationStatus.Ready,
-                        HostId = hostId,
-                        Channel = attemptingPin.Channel,
-                        Feature = attemptingPin.Feature,
-                        ReplyKey = attemptingPin.ReplyKey,
-                        OwnerId = round.Id,
-                        TwitchMessageId = attemptingPin.TwitchMessageId,
-                        CreatedAtUtc = DateTime.UtcNow,
-                    }
-                );
-            }
-        }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);

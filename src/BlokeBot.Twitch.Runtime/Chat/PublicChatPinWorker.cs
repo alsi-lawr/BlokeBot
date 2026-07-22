@@ -14,6 +14,7 @@ internal sealed record PublicChatPinWorkItem(
     string ReplyKey,
     long OwnerId,
     string TwitchMessageId,
+    string? RecordedPinnerTwitchUserId,
     int? DurationSeconds,
     bool UnpinOnOwnerCompletion
 );
@@ -34,6 +35,10 @@ internal abstract record PublicChatPinExecutionOutcome
 internal interface IPublicChatPinStore
 {
     ValueTask<PublicChatPinWorkItem?> TryClaimAsync(CancellationToken cancellationToken);
+    ValueTask<bool> BeginAttemptAsync(
+        PublicChatPinWorkItem item,
+        CancellationToken cancellationToken
+    );
     ValueTask CompleteAsync(
         PublicChatPinWorkItem item,
         PublicChatPinExecutionOutcome outcome,
@@ -55,6 +60,14 @@ internal sealed class UnavailablePublicChatPinStore : IPublicChatPinStore
     )
     {
         return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<bool> BeginAttemptAsync(
+        PublicChatPinWorkItem item,
+        CancellationToken cancellationToken
+    )
+    {
+        return ValueTask.FromResult(false);
     }
 }
 
@@ -97,6 +110,30 @@ internal sealed class PublicChatPinWorker(
             {
                 await Task.Delay(TimeSpan.FromMilliseconds(500), timeProvider, stoppingToken);
                 continue;
+            }
+
+            if (!item.ReconcileOnly)
+            {
+                try
+                {
+                    if (!await store.BeginAttemptAsync(item, stoppingToken))
+                    {
+                        continue;
+                    }
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    log.LogWarning(
+                        exception,
+                        "Could not begin public chat pin operation {OperationId}.",
+                        item.Id
+                    );
+                    continue;
+                }
             }
 
             PublicChatPinExecutionOutcome outcome;

@@ -28,42 +28,36 @@ internal sealed class EfPublicChatPinStore(
             return ToWorkItem(recovering, true);
         }
 
-        var readyId = await db
+        var ready = await db
             .PublicChatPinOperations.AsNoTracking()
             .Where(operation => operation.Status == PublicChatPinOperationStatus.Ready)
             .OrderBy(operation => operation.CreatedAtUtc)
             .ThenBy(operation => operation.Id)
-            .Select(operation => (long?)operation.Id)
             .FirstOrDefaultAsync(cancellationToken);
-        if (readyId is null)
-        {
-            return null;
-        }
+        return ready is null ? null : ToWorkItem(ready, false);
+    }
 
-        var claimed = await db
-            .PublicChatPinOperations.Where(operation =>
-                operation.Id == readyId && operation.Status == PublicChatPinOperationStatus.Ready
-            )
-            .ExecuteUpdateAsync(
-                update =>
-                    update
-                        .SetProperty(
-                            operation => operation.Status,
-                            PublicChatPinOperationStatus.Attempting
-                        )
-                        .SetProperty(operation => operation.AttemptStartedAtUtc, UtcNow()),
-                cancellationToken
-            );
-        if (claimed == 0)
-        {
-            return null;
-        }
-
-        var claimedOperation = await db
-            .PublicChatPinOperations.AsNoTracking()
-            .Where(operation => operation.Id == readyId)
-            .SingleAsync(cancellationToken);
-        return ToWorkItem(claimedOperation, false);
+    public async ValueTask<bool> BeginAttemptAsync(
+        PublicChatPinWorkItem item,
+        CancellationToken cancellationToken
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db
+                .PublicChatPinOperations.Where(operation =>
+                    operation.Id == item.Id
+                    && operation.Status == PublicChatPinOperationStatus.Ready
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(
+                                operation => operation.Status,
+                                PublicChatPinOperationStatus.Attempting
+                            )
+                            .SetProperty(operation => operation.AttemptStartedAtUtc, UtcNow()),
+                    cancellationToken
+                ) == 1;
     }
 
     public async ValueTask CompleteAsync(
@@ -169,7 +163,7 @@ internal sealed class EfPublicChatPinStore(
                     && round.Status == GuessRoundStatus.Open,
                 cancellationToken
             );
-        if (!ownerStillOpen)
+        if (!ownerStillOpen && item.UnpinOnOwnerCompletion)
         {
             db.PublicChatPinOperations.Add(
                 new PublicChatPinOperation
@@ -202,6 +196,7 @@ internal sealed class EfPublicChatPinStore(
                 && pin.Feature == item.Feature
                 && pin.OwnerId == item.OwnerId
                 && pin.TwitchMessageId == item.TwitchMessageId
+                && pin.PinnerTwitchUserId == item.RecordedPinnerTwitchUserId
             )
             .ExecuteDeleteAsync(cancellationToken);
     }
@@ -259,6 +254,7 @@ internal sealed class EfPublicChatPinStore(
             operation.ReplyKey,
             operation.OwnerId,
             operation.TwitchMessageId,
+            operation.PinnerTwitchUserId,
             operation.DurationSeconds,
             operation.UnpinOnOwnerCompletion
         );
