@@ -52,10 +52,11 @@ def _read_http_body(url: str, accepted_statuses: frozenset[int]) -> str:
 
 def _wait_for_page(
     port: str,
+    path: str,
     markers: tuple[str, ...],
     accepted_statuses: frozenset[int],
 ) -> None:
-    url = f"http://127.0.0.1:{port}/"
+    url = f"http://127.0.0.1:{port}{path}"
     deadline = time.monotonic() + 30
     last_error: Exception | None = None
     while time.monotonic() < deadline:
@@ -137,15 +138,21 @@ def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) 
         if actual_version != f"blokebot {cli_version}":
             raise ContainerSmokeError(f"Unexpected container version output: {actual_version!r}")
         internal_port = "8080"
-        markers = ("Sign in to BlokeBot", "Continue with Twitch", "Public leaderboard")
-        accepted_statuses = frozenset({200, 503})
+        path = "/auth/login"
+        markers = (
+            "Twitch connection unavailable",
+            "This Twitch connection is not available yet.",
+            "An administrator needs to check the connection settings.",
+        )
+        accepted_statuses = frozenset({503})
     else:
         if entrypoint[1:] or not executable.endswith("/bin/blokebot-site"):
             raise ContainerSmokeError(f"Unexpected site entrypoint: {entrypoint}")
         if config.get("Volumes") not in (None, {}):
             raise ContainerSmokeError("Stateless site image declares a volume")
         internal_port = "8081"
-        markers = ("Own your channel tools.",)
+        path = "/"
+        markers = ("Your channel. Your bot. Your rules.",)
         accepted_statuses = frozenset({200})
 
     container = _docker(
@@ -159,7 +166,7 @@ def smoke(image: str, kind: str, version: str, cli_version: str, revision: str) 
     try:
         mapping = _docker("port", container, f"{internal_port}/tcp")
         port = mapping.rsplit(":", 1)[-1]
-        _wait_for_page(port, markers, accepted_statuses)
+        _wait_for_page(port, path, markers, accepted_statuses)
         if kind == "bot":
             _assert_bot_framework_script(port)
     finally:
