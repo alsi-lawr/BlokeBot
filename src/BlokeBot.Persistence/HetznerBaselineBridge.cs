@@ -85,7 +85,7 @@ internal static class HetznerBaselineBridge
                 SELECT 1
                 FROM sqlite_schema
                 WHERE name NOT LIKE 'sqlite_%'
-                    AND name <> '__EFMigrationsHistory'
+                    AND NOT (type = 'table' AND name = '__EFMigrationsHistory')
             );
             """;
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) != 0;
@@ -103,7 +103,7 @@ internal static class HetznerBaselineBridge
             SELECT type, name, sql
             FROM sqlite_schema
             WHERE name NOT LIKE 'sqlite_%'
-                AND name <> '__EFMigrationsHistory'
+                AND NOT (type = 'table' AND name = '__EFMigrationsHistory')
             ORDER BY type, name;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
