@@ -47,6 +47,15 @@ internal static class SiteApplication
                 }
             }
         );
+        builder
+            .Services.AddOptions<BlokeBotSiteOptions>()
+            .BindConfiguration("BlokeBotSite")
+            .Validate(
+                BlokeBotSiteOptionsValidation.HasValidLiveAppUrl,
+                BlokeBotSiteOptionsValidation.LiveAppUrlFailure
+            )
+            .ValidateOnStart();
+        builder.Services.AddSingleton(SiteProductVersion.Current);
         builder.Services.AddRazorComponents();
 
         var app = builder.Build();

@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Navigation
+@inject SiteProductVersion ProductVersion
 
 <a class="skip-link" href="@($"{new Uri(Navigation.Uri).AbsolutePath}#main-content")">Skip to main content</a>
 <header class="site-header">
@@ -30,6 +31,7 @@
         <div>
             <p class="footer-title"><strong>BlokeBot</strong> keeps your Twitch channel tools under your control.</p>
             <p class="footer-meta">Free and open source · Local durable state · Built for channel owners and moderators</p>
+            <p class="footer-meta">Site @ProductVersion.Value</p>
         </div>
         <nav aria-label="Footer navigation">
             <a href="guide"><SiteIcon Name="book" />User guide</a>
