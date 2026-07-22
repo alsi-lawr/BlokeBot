@@ -112,7 +112,8 @@ public sealed class PublicChatPinStoreTests
     [Arguments("different-message", false, "replaced-or-not-recorded-owner")]
     [Arguments("different-pinner", true, "replaced-or-not-recorded-owner")]
     [Arguments("unavailable", true, "read-unavailable")]
-    public async Task RecoveringUnpin_FailuresRetainButVerifiedReplacementClearsOwnership(
+    [Arguments("exact-unpinned", false, "unpinned")]
+    public async Task UnpinCompletion_IsHostScoped_WhileRecoveryFailuresRetainOwnership(
         string scenario,
         bool ownershipRetained,
         string expectedReason
@@ -126,7 +127,9 @@ public sealed class PublicChatPinStoreTests
         if (scenario == "different-pinner")
         {
             await using var replace = await dbFactory.CreateDbContextAsync();
-            var newerOwnership = await replace.ActivePublicChatPins.SingleAsync();
+            var newerOwnership = await replace.ActivePublicChatPins.SingleAsync(pin =>
+                pin.HostId == item.HostId
+            );
             newerOwnership.PinnerTwitchUserId = "other-pinner";
             await replace.SaveChangesAsync();
         }
@@ -149,14 +152,19 @@ public sealed class PublicChatPinStoreTests
                     new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
             )
             .ShouldBeOfType<PublicChatPinExecutionOutcome.NoOp>();
-        var outcome = PublicChatPinProviderDecision
-            .ClassifyUnpinRead(
-                item,
-                CurrentPin(scenario),
-                static () =>
-                    new PublicChatPinExecutionOutcome.Terminal("unpin-ambiguous-after-restart")
-            )
-            .ShouldNotBeNull();
+        PublicChatPinExecutionOutcome outcome =
+            scenario == "exact-unpinned"
+                ? new PublicChatPinExecutionOutcome.Unpinned()
+                : PublicChatPinProviderDecision
+                    .ClassifyUnpinRead(
+                        item,
+                        CurrentPin(scenario),
+                        static () =>
+                            new PublicChatPinExecutionOutcome.Terminal(
+                                "unpin-ambiguous-after-restart"
+                            )
+                    )
+                    .ShouldNotBeNull();
 
         await store.CompleteAsync(item, outcome, CancellationToken.None);
 
@@ -165,11 +173,17 @@ public sealed class PublicChatPinStoreTests
             {
                 PublicChatPinExecutionOutcome.NoOp noOp => noOp.Reason,
                 PublicChatPinExecutionOutcome.Terminal terminal => terminal.Reason,
+                PublicChatPinExecutionOutcome.Unpinned => "unpinned",
                 _ => throw new InvalidOperationException("Unexpected reconciliation outcome."),
             }
         ).ShouldBe(expectedReason);
         await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.ActivePublicChatPins.AnyAsync()).ShouldBe(ownershipRetained);
+        (await verify.ActivePublicChatPins.AnyAsync(pin => pin.HostId == item.HostId)).ShouldBe(
+            ownershipRetained
+        );
+        (
+            await verify.ActivePublicChatPins.AnyAsync(pin => pin.HostId != item.HostId)
+        ).ShouldBeTrue();
         if (outcome is PublicChatPinExecutionOutcome.Terminal)
         {
             (await verify.DurableAlerts.AnyAsync()).ShouldBeTrue();
@@ -245,10 +259,32 @@ public sealed class PublicChatPinStoreTests
     {
         var (hostId, roundId) = await SeedHostAndRoundAsync(dbFactory, GuessRoundStatus.Closed);
         await using var db = await dbFactory.CreateDbContextAsync();
+        var otherHost = new BotHost
+        {
+            Login = "other-streamer",
+            DisplayName = "Other Streamer",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(otherHost);
+        await db.SaveChangesAsync();
         db.ActivePublicChatPins.Add(
             new ActivePublicChatPin
             {
                 HostId = hostId,
+                Channel = "streamer",
+                TwitchMessageId = "message-id",
+                PinnerTwitchUserId = "recorded-pinner",
+                Feature = "guessing",
+                ReplyKey = "round_started",
+                OwnerId = roundId,
+                UnpinOnOwnerCompletion = true,
+                PinnedAtUtc = DateTime.UtcNow,
+            }
+        );
+        db.ActivePublicChatPins.Add(
+            new ActivePublicChatPin
+            {
+                HostId = otherHost.Id,
                 Channel = "streamer",
                 TwitchMessageId = "message-id",
                 PinnerTwitchUserId = "recorded-pinner",

@@ -406,6 +406,29 @@ public sealed class TransportClientTests
         result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
     }
 
+    [Test]
+    [Arguments(HttpStatusCode.Conflict, typeof(ChatPinMutationResult.Conflict))]
+    [Arguments(HttpStatusCode.Forbidden, typeof(ChatPinMutationResult.PermissionDenied))]
+    [Arguments(HttpStatusCode.TooManyRequests, typeof(ChatPinMutationResult.RateLimited))]
+    public async Task ChatMessagePinning_RequiredFailuresRemainTyped(
+        HttpStatusCode statusCode,
+        Type expectedType
+    )
+    {
+        var client = new ChatPinClient(RespondingWith(statusCode));
+
+        var result = await client.PinAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            "message-id",
+            300,
+            CancellationToken.None
+        );
+
+        result.GetType().ShouldBe(expectedType);
+    }
+
     private static void AssertContext(
         HttpRequestMessage request,
         HttpMethod method,
