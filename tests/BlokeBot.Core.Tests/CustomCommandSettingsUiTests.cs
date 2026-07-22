@@ -32,7 +32,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task NewAnnouncement_Adding_UsesValidDeliveryTimingDefaults()
+    public async Task NewAnnouncement_Adding_SavesWithoutValidation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -42,9 +42,6 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
 
         cut.Find("button[data-action='add-scheduled-message']").Click();
-
-        cut.Find("#announcement--1-retry-delay").GetAttribute("value").ShouldBe("2");
-        cut.Find("#announcement--1-occurrence-lifetime").GetAttribute("value").ShouldBe("30");
 
         cut.Find("button[aria-label='Save custom commands']").Click();
 

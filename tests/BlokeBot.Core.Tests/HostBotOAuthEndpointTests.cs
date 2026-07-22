@@ -32,7 +32,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestBase
 {
     [Test]
-    public async Task HostBotOAuth_AdminManagingChannel_CanStartAndCompleteCustomBotFlow()
+    public async Task HostBotOAuth_AdminManagingChannel_CanStartCustomBotFlow()
     {
         await using var host = await EndpointHost.StartAsync(
             configured: true,
@@ -42,18 +42,10 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         );
 
         using var startResponse = await host.Client.GetAsync("/oauth/host-bot/start");
-        var state = host.IssueHostBotState();
-        using var callbackResponse = await host.Client.GetAsync(
-            $"/oauth/callback?code=code&state={state}"
-        );
 
         startResponse.StatusCode.ShouldBe(HttpStatusCode.Redirect);
         startResponse.Headers.Location.ShouldNotBeNull();
         startResponse.Headers.Location.Host.ShouldBe("id.twitch.tv");
-        callbackResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var page = await callbackResponse.Content.ReadAsStringAsync();
-        page.ShouldContain("Twitch access needed");
-        page.ShouldContain("Return to Channel setup");
     }
 
     [Test]

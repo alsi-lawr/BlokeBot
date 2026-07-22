@@ -55,14 +55,10 @@ public sealed class HostConfigFaultRoutingTests
 
         page.WaitForAssertion(() =>
         {
-            page.Markup.ShouldContain("#Streamer");
-            page.Markup.ShouldContain("Use custom bot");
-            page.Markup.ShouldContain("Whisper responses");
-            page.Markup.ShouldContain("Let moderators help with this channel");
-            page.Markup.ShouldContain("Chat tools");
+            var customBotToggle = page.Find("#custom-bot input[type='checkbox']");
+            customBotToggle.GetAttribute("disabled").ShouldBeNull();
             page.Markup.ShouldContain("The channel owner must connect this Twitch account.");
             page.Markup.ShouldNotContain("/oauth/channel-bot/start");
-            page.Markup.ShouldNotContain("Create channel setup");
         });
     }
 

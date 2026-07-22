@@ -20,7 +20,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -35,31 +34,6 @@ public abstract class BotOAuthEndpointIntegrationTestBase
     private protected static readonly Uri AuthorizationUri = new(
         "https://id.twitch.tv/oauth2/authorize?state=test"
     );
-
-    private protected static async Task AssertResultPageAsync(
-        IResult result,
-        HttpStatusCode expectedStatus,
-        string expectedCopy,
-        string expectedAction
-    )
-    {
-        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
-        var context = new DefaultHttpContext();
-        context.Response.Body = new MemoryStream();
-        context.RequestServices = services;
-
-        await result.ExecuteAsync(context);
-
-        context.Response.StatusCode.ShouldBe((int)expectedStatus);
-        context.Response.ContentType.ShouldStartWith("text/html");
-        context.Response.Body.Position = 0;
-        var page = await new StreamReader(context.Response.Body, Encoding.UTF8).ReadToEndAsync();
-        page.ShouldContain("BlokeBot");
-        page.ShouldContain(expectedCopy);
-        page.ShouldContain("No changes were made.");
-        page.ShouldContain(expectedAction);
-        page.ShouldContain("Close window");
-    }
 
     private protected static HttpRequestMessage CallbackRequest(string path, string stateCookieName)
     {
