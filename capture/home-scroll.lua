@@ -1,8 +1,8 @@
 --[[
 # viset
 version = 1
-output_root = "../assets/simulation"
-output = "animations/{device}-{theme}-home-scroll.webp"
+output_root = "../src/BlokeBot.Site/wwwroot/media"
+output = "{device}-{theme}-home-scroll.webp"
 frame = "builtin:auto"
 frames_per_second = 50
 browser_arguments = [
