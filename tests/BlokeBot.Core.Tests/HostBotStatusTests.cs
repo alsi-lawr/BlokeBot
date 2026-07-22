@@ -162,7 +162,7 @@ public sealed class HostBotStatusTests
 
         var outcome = await service.GetStreamLiveness("streamer").RunAsync(CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostStreamLivenessOutcome.Live>();
+        outcome.ShouldBeOfType<HostStreamLivenessOutcome.Live>().StreamId.ShouldBe("stream-id");
         httpClientFactory.TokenRequestCount.ShouldBe(1);
         httpClientFactory.StreamRequestCount.ShouldBe(1);
         httpClientFactory.StreamRequestClientId.ShouldBe("client");

@@ -19,6 +19,10 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<CustomCommand> CustomCommands => Set<CustomCommand>();
     public DbSet<CustomCommandAction> CustomCommandActions => Set<CustomCommandAction>();
     public DbSet<CustomCommandAlias> CustomCommandAliases => Set<CustomCommandAlias>();
+    public DbSet<CustomCommandInvocationClaim> CustomCommandInvocationClaims =>
+        Set<CustomCommandInvocationClaim>();
+    public DbSet<CustomCommandInvocationResetAudit> CustomCommandInvocationResetAudits =>
+        Set<CustomCommandInvocationResetAudit>();
     public DbSet<CustomCounter> CustomCounters => Set<CustomCounter>();
     public DbSet<CustomAnnouncement> CustomAnnouncements => Set<CustomAnnouncement>();
     public DbSet<CustomAnnouncementSchedule> CustomAnnouncementSchedules =>

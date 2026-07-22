@@ -10,7 +10,7 @@ public sealed class HostBotStatusService(
     IHostBotAccountTokenStatusProvider botAccounts,
     HelixClient helix,
     BotSettings settings
-)
+) : IHostStreamLivenessProvider
 {
     public IO<HostBotChannelStatus, Never> GetStatus(string channelLogin)
     {
@@ -180,8 +180,8 @@ public sealed class HostBotStatusService(
         try
         {
             var token = await appTokens.GetAccessTokenAsync(ct);
-            return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct)
-                ? new HostStreamLivenessOutcome.Live()
+            return await helix.GetStreamAsync(HelixContext(token), channelLogin, ct) is { } stream
+                ? new HostStreamLivenessOutcome.Live(stream.Id)
                 : new HostStreamLivenessOutcome.Offline();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

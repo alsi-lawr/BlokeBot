@@ -82,6 +82,26 @@ public sealed class PersistenceInvariantTests
             )
         );
 
+        var command = Command(hostId, "command");
+        db.CustomCommands.Add(command);
+        await db.SaveChangesAsync();
+        await Should.ThrowAsync<SqliteException>(async () =>
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE custom_commands SET InvocationLimit = 'Bogus' WHERE Id = {command.Id}"
+            )
+        );
+
+        await Should.ThrowAsync<SqliteException>(async () =>
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                INSERT INTO custom_command_invocation_claims
+                    (HostId, CustomCommandId, TwitchUserId, TwitchStreamId, ClaimedAtUtc)
+                VALUES
+                    ({hostId}, {command.Id}, NULL, NULL, {DateTime.UtcNow})
+                """
+            )
+        );
+
         await Should.ThrowAsync<SqliteException>(async () =>
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
@@ -342,6 +362,16 @@ public sealed class PersistenceInvariantTests
         AssertTokens<CustomCommandCooldownScope>([
             (CustomCommandCooldownScope.Global, "Global"),
             (CustomCommandCooldownScope.User, "User"),
+        ]);
+        AssertTokens<CustomCommandInvocationLimit>([
+            (CustomCommandInvocationLimit.OncePerStream, "OncePerStream"),
+            (CustomCommandInvocationLimit.OncePerStreamPerUser, "OncePerStreamPerUser"),
+            (CustomCommandInvocationLimit.OncePerUser, "OncePerUser"),
+            (CustomCommandInvocationLimit.Unlimited, "Unlimited"),
+        ]);
+        AssertTokens<CustomCommandInvocationResetScope>([
+            (CustomCommandInvocationResetScope.AllViewers, "AllViewers"),
+            (CustomCommandInvocationResetScope.OneViewer, "OneViewer"),
         ]);
         AssertTokens<CustomMessageSelectionMode>([
             (CustomMessageSelectionMode.First, "First"),

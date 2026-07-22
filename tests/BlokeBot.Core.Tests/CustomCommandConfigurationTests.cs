@@ -66,6 +66,7 @@ public sealed class CustomCommandConfigurationTests
                         ModeratorOnly = true,
                         CooldownSeconds = 12,
                         CooldownScope = CustomCommandCooldownScope.User,
+                        InvocationLimit = CustomCommandInvocationLimit.OncePerStreamPerUser,
                         Action = new CounterCustomCommandActionEditor
                         {
                             MessageLibraryEntryId = -1,
@@ -119,6 +120,7 @@ public sealed class CustomCommandConfigurationTests
         command.ModeratorOnly.ShouldBeTrue();
         command.CooldownSeconds.ShouldBe(12);
         command.CooldownScope.ShouldBe(CustomCommandCooldownScope.User);
+        command.InvocationLimit.ShouldBe(CustomCommandInvocationLimit.OncePerStreamPerUser);
         var action = command.Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
         action.MessageLibraryEntryId.ShouldBe(entry.Id);
         action.CounterId.ShouldBe(counter.Id);
@@ -462,6 +464,7 @@ public sealed class CustomCommandConfigurationTests
         };
         command.CooldownSeconds = -1;
         command.CooldownScope = (CustomCommandCooldownScope)99;
+        command.InvocationLimit = (CustomCommandInvocationLimit)99;
         draft.Commands.Add(
             new CustomCommandEditor
             {
@@ -479,6 +482,9 @@ public sealed class CustomCommandConfigurationTests
         targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown));
         targets.ShouldContain(
             CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)
+        );
+        targets.ShouldContain(
+            CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)
         );
         targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter));
         targets.ShouldContain(CommandTarget(-3, CustomCommandValidationFieldKind.Action));

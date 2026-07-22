@@ -17,6 +17,12 @@ public sealed partial class BlokeBotDbContext
     private static readonly string[] _customCommandCooldownScopes =
         PersistedEnumTokens<CustomCommandCooldownScope>.Values.ToArray();
 
+    private static readonly string[] _customCommandInvocationLimits =
+        PersistedEnumTokens<CustomCommandInvocationLimit>.Values.ToArray();
+
+    private static readonly string[] _customCommandInvocationResetScopes =
+        PersistedEnumTokens<CustomCommandInvocationResetScope>.Values.ToArray();
+
     private static readonly string[] _customMessageSelectionModes =
         PersistedEnumTokens<CustomMessageSelectionMode>.Values.ToArray();
 
@@ -119,10 +125,16 @@ public sealed partial class BlokeBotDbContext
             b.ToTable(
                 "custom_commands",
                 t =>
+                {
                     t.HasCheckConstraint(
                         "CK_custom_commands_CooldownScope",
                         KindIn("CooldownScope", _customCommandCooldownScopes)
-                    )
+                    );
+                    t.HasCheckConstraint(
+                        "CK_custom_commands_InvocationLimit",
+                        KindIn("InvocationLimit", _customCommandInvocationLimits)
+                    );
+                }
             );
             b.HasKey(x => x.Id);
             b.HasAlternateKey(x => new { x.HostId, x.Id });
@@ -133,6 +145,13 @@ public sealed partial class BlokeBotDbContext
                     value => PersistedEnumTokens<CustomCommandCooldownScope>.Parse(value)
                 )
                 .HasMaxLength(32);
+            b.Property(x => x.InvocationLimit)
+                .HasConversion(
+                    limit => PersistedEnumTokens<CustomCommandInvocationLimit>.Format(limit),
+                    value => PersistedEnumTokens<CustomCommandInvocationLimit>.Parse(value)
+                )
+                .HasMaxLength(32)
+                .HasDefaultValue(CustomCommandInvocationLimit.Unlimited);
             b.HasIndex(x => new { x.HostId, x.Name }).IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()
@@ -192,6 +211,86 @@ public sealed partial class BlokeBotDbContext
                 .WithMany(x => x.Aliases)
                 .HasForeignKey(x => new { x.HostId, x.CustomCommandId })
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomCommandInvocationClaim>(b =>
+        {
+            b.ToTable(
+                "custom_command_invocation_claims",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_custom_command_invocation_claims_Scope",
+                        "(TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL) OR "
+                            + "(TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL) OR "
+                            + "(TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL)"
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.TwitchUserId).HasMaxLength(64);
+            b.Property(x => x.TwitchStreamId).HasMaxLength(64);
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.CustomCommandId,
+                    x.TwitchStreamId,
+                })
+                .IsUnique()
+                .HasFilter("TwitchUserId IS NULL AND TwitchStreamId IS NOT NULL");
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.CustomCommandId,
+                    x.TwitchUserId,
+                })
+                .IsUnique()
+                .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NULL");
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.CustomCommandId,
+                    x.TwitchUserId,
+                    x.TwitchStreamId,
+                })
+                .IsUnique()
+                .HasFilter("TwitchUserId IS NOT NULL AND TwitchStreamId IS NOT NULL");
+            b.HasOne(x => x.Command)
+                .WithMany()
+                .HasForeignKey(x => new { x.HostId, x.CustomCommandId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CustomCommandInvocationResetAudit>(b =>
+        {
+            b.ToTable(
+                "custom_command_invocation_reset_audits",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_custom_command_invocation_reset_audits_Scope",
+                        KindIn("Scope", _customCommandInvocationResetScopes)
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.CommandName).HasMaxLength(128);
+            b.Property(x => x.ActorTwitchUserId).HasMaxLength(64);
+            b.Property(x => x.ActorLogin).HasMaxLength(64);
+            b.Property(x => x.TargetTwitchUserId).HasMaxLength(64);
+            b.Property(x => x.TargetLogin).HasMaxLength(64);
+            b.Property(x => x.Scope)
+                .HasConversion(
+                    scope => PersistedEnumTokens<CustomCommandInvocationResetScope>.Format(scope),
+                    value => PersistedEnumTokens<CustomCommandInvocationResetScope>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.HasIndex(x => new { x.HostId, x.ResetAtUtc });
+            b.HasOne(x => x.Command)
+                .WithMany()
+                .HasForeignKey(x => x.CustomCommandId)
+                .OnDelete(DeleteBehavior.SetNull);
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

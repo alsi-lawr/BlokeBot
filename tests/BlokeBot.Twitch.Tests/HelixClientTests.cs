@@ -10,7 +10,7 @@ namespace BlokeBot.Twitch.Tests;
 public sealed class HelixClientTests
 {
     [Test]
-    public async Task LiveStreamPayload_CheckingStreamStatus_ReturnsLive()
+    public async Task LiveStreamPayload_LoadingStream_ReturnsTwitchStreamId()
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(request =>
@@ -45,9 +45,9 @@ public sealed class HelixClientTests
         });
         var client = new HelixClient(factory);
 
-        var isLive = await client.IsStreamLiveAsync(Context(), "Streamer", CancellationToken.None);
+        var stream = await client.GetStreamAsync(Context(), "Streamer", CancellationToken.None);
 
-        isLive.ShouldBeTrue();
+        stream.ShouldNotBeNull().Id.ShouldBe("stream-id");
     }
 
     [Test]

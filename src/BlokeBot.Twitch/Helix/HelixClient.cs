@@ -153,6 +153,15 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
+        return await GetStreamAsync(context, channelLogin, cancellationToken) is not null;
+    }
+
+    public async Task<HelixStream?> GetStreamAsync(
+        HelixRequestContext context,
+        string channelLogin,
+        CancellationToken cancellationToken
+    )
+    {
         var uri =
             $"{_streamsEndpoint}?"
             + QueryString.Create([
@@ -166,7 +175,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.Length > 0;
+        return payload?.Data.FirstOrDefault() is { } stream ? new HelixStream(stream.Id) : null;
     }
 
     public async Task<ChatSettings> GetChatSettingsAsync(

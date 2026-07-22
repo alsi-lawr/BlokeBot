@@ -14,6 +14,7 @@ public sealed class BlokeBotDatabaseInitializer(IDbContextFactory<BlokeBotDbCont
         await db.Database.EnsureCreatedAsync(cancellationToken);
         await StartupMessageSchemaUpgrade.ApplyAsync(db, cancellationToken);
         await CustomAnnouncementSchemaUpgrade.ApplyAsync(db, cancellationToken);
+        await CustomCommandInvocationSchemaUpgrade.ApplyAsync(db, cancellationToken);
         await _customBotCredentialSchemaUpgrade.ApplyAsync(cancellationToken);
     }
 }

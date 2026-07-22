@@ -43,6 +43,7 @@ internal static class CustomCommandConfigurationMapper
             ModeratorOnly = command.ModeratorOnly,
             CooldownSeconds = command.CooldownSeconds,
             CooldownScope = command.CooldownScope,
+            InvocationLimit = command.InvocationLimit,
             Action = command.Action switch
             {
                 MessageCustomCommandAction action => new MessageCustomCommandActionEditor

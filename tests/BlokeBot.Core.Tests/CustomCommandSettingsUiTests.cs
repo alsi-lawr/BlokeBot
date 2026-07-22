@@ -219,6 +219,68 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("#custom-command-message-library-panel").ShouldNotBeNull();
     }
 
+    [Test]
+    public async Task InvocationLimit_Editing_RoundTripsAndShowsResetControlsOnlyForPersistedCommand()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
+            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (
+            await db
+                .CustomCommands.Where(command => command.Id == seeded.CommandId)
+                .Select(command => command.InvocationLimit)
+                .SingleAsync()
+        ).ShouldBe(CustomCommandInvocationLimit.OncePerUser);
+        cut.FindAll("button[data-action='reset-viewer-use']").Count.ShouldBe(1);
+        cut.FindAll("button[data-action='reset-all-viewer-uses']").Count.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ResetAllLifetimeUses_AsSelectedHostManager_RequiresConfirmationAndWritesAudit()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.CustomCommandInvocationClaims.Add(
+                new CustomCommandInvocationClaim
+                {
+                    HostId = seeded.HostId,
+                    CustomCommandId = seeded.CommandId,
+                    TwitchUserId = "viewer-id",
+                    ClaimedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find("button[data-action='reset-all-viewer-uses']").Click();
+        await using (var unchanged = await dbFactory.CreateDbContextAsync())
+        {
+            (await unchanged.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+            (await unchanged.CustomCommandInvocationResetAudits.CountAsync()).ShouldBe(0);
+        }
+        cut.Find("button[data-action='confirm-reset-all-viewer-uses']").Click();
+
+        await using var reset = await dbFactory.CreateDbContextAsync();
+        (await reset.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
+        var audit = await reset.CustomCommandInvocationResetAudits.SingleAsync();
+        audit.ActorTwitchUserId.ShouldBe("streamer-id");
+        audit.ActorLogin.ShouldBe("streamer");
+        audit.Scope.ShouldBe(CustomCommandInvocationResetScope.AllViewers);
+        audit.AffectedClaimCount.ShouldBe(1);
+    }
+
     private static string[] ValidationMessages(IRenderedComponent<CustomCommandSettingsPage> page)
     {
         var summary = page.Find("[data-validation-summary]");

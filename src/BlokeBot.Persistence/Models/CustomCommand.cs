@@ -17,6 +17,9 @@ public sealed class CustomCommand
     public CustomCommandCooldownScope CooldownScope { get; set; } =
         CustomCommandCooldownScope.Global;
 
+    public CustomCommandInvocationLimit InvocationLimit { get; set; } =
+        CustomCommandInvocationLimit.Unlimited;
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }

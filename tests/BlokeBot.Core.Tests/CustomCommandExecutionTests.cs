@@ -1,5 +1,7 @@
 using BlokeBot.Core.Features.CustomCommands;
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Hosting;
+using BlokeBot.Functional;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
@@ -220,10 +222,297 @@ public sealed class CustomCommandExecutionTests
         replies.ShouldBe(["global alice", "global bob", "user alice", "user bob", "user alice"]);
     }
 
+    [Test]
+    public async Task InvocationLimits_Dispatching_EnforceViewerAndTwitchStreamBoundaries()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "stream",
+            ["stream {user}"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerStream
+        );
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "user",
+            ["user {user}"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "both",
+            ["both {user}"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerStreamPerUser
+        );
+        var streams = new MutableStreamLivenessProvider("stream-a");
+        await using var services = BuildServices(dbFactory, streams: streams);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!stream", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!stream", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!user", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!user", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!user", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!both", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!both", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!both", replies);
+        streams.StreamId = "stream-b";
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!stream", replies);
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!both", replies);
+
+        replies.ShouldBe([
+            "stream alice",
+            "user alice",
+            "user bob",
+            "both alice",
+            "both bob",
+            "stream bob",
+            "both alice",
+        ]);
+    }
+
+    [Test]
+    public async Task HistoricalClaim_SwitchingToUnlimited_BypassesWithoutDeletingHistory()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var seed = await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["used"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+        var context = Context("alice", "!limited");
+
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
+        await SetLimitAsync(dbFactory, seed.CommandId, CustomCommandInvocationLimit.Unlimited);
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
+        await SetLimitAsync(dbFactory, seed.CommandId, CustomCommandInvocationLimit.OncePerUser);
+
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.AlreadyUsed>();
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task GlobalCooldownRejectingSecondViewer_DoesNotCreateInvocationClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero)
+        );
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["{user}"],
+            cooldownSeconds: 10,
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory, clock: clock);
+        var dispatcher = services.GetRequiredService<ChatCommandDispatcher>();
+        List<string> replies = [];
+
+        await DispatchMessageAsync(dispatcher, "alice", "streamer", "!limited", replies);
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!limited", replies);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+            (
+                await db.CustomCommandInvocationClaims.AnyAsync(claim =>
+                    claim.TwitchUserId == "bob-id"
+                )
+            ).ShouldBeFalse();
+        }
+
+        clock.Advance(TimeSpan.FromSeconds(10));
+        await DispatchMessageAsync(dispatcher, "bob", "streamer", "!limited", replies);
+
+        replies.ShouldBe(["alice", "bob"]);
+    }
+
+    [Test]
+    public async Task AcceptedClaim_WhenReplyDeliveryFails_RemainsConsumed()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["reply"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+        var context = Context(
+            "alice",
+            "!limited",
+            (_, _) => ValueTask.FromException(new IOException("delivery failed"))
+        );
+
+        await Should.ThrowAsync<IOException>(() =>
+            execution.ExecuteAsync(context, [], CancellationToken.None).AsTask()
+        );
+
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.AlreadyUsed>();
+    }
+
+    [Test]
+    public async Task StreamScopedLimit_WhenOfflineOrUnavailable_ReturnsExplicitOutcomeWithoutClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["reply"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerStream
+        );
+        var streams = new MutableStreamLivenessProvider(null);
+        await using var services = BuildServices(dbFactory, streams: streams);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+        var context = Context("alice", "!limited");
+
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.StreamOffline>();
+        streams.Unavailable = true;
+        (
+            await execution.ExecuteAsync(context, [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.StreamUnavailable>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task Moderator_RetryingLimitedCommand_DoesNotBypassClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["reply"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+
+        (
+            await execution.ExecuteAsync(Context("mod", "!limited"), [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
+        (
+            await execution.ExecuteAsync(
+                Context(
+                    "mod",
+                    "!limited",
+                    tags: new Dictionary<string, string> { ["user-id"] = "mod-id", ["mod"] = "1" }
+                ),
+                [],
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.AlreadyUsed>();
+    }
+
+    [Test]
+    public async Task AccessRejection_PrecedesCooldownAndInvocationClaim()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["reply"],
+            moderatorOnly: true,
+            cooldownSeconds: 30,
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+
+        (
+            await execution.ExecuteAsync(Context("alice", "!limited"), [], CancellationToken.None)
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
+        (
+            await execution.ExecuteAsync(
+                Context(
+                    "alice",
+                    "!limited",
+                    tags: new Dictionary<string, string> { ["user-id"] = "alice-id", ["mod"] = "1" }
+                ),
+                [],
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<CustomCommandExecutionOutcome.Handled>();
+
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task SimultaneousDatabaseBackedAttempts_ClaimExactlyOnce()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        await SeedCommandAsync(
+            dbFactory,
+            hostId,
+            "limited",
+            ["reply"],
+            invocationLimit: CustomCommandInvocationLimit.OncePerUser
+        );
+        await using var services = BuildServices(dbFactory);
+        var execution = services.GetRequiredService<CustomCommandExecutionService>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var first = ExecuteAfterGateAsync();
+        var second = ExecuteAfterGateAsync();
+        gate.SetResult();
+
+        var outcomes = await Task.WhenAll(first, second);
+
+        outcomes.Count(outcome => outcome is CustomCommandExecutionOutcome.Handled).ShouldBe(1);
+        outcomes.Count(outcome => outcome is CustomCommandExecutionOutcome.AlreadyUsed).ShouldBe(1);
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(1);
+
+        async Task<CustomCommandExecutionOutcome> ExecuteAfterGateAsync()
+        {
+            await gate.Task;
+            return await execution.ExecuteAsync(
+                Context("alice", "!limited"),
+                [],
+                CancellationToken.None
+            );
+        }
+    }
+
     private static ServiceProvider BuildServices(
         SqliteBlokeBotDbFactory dbFactory,
         int minimumCooldownSeconds = 0,
-        TimeProvider? clock = null
+        TimeProvider? clock = null,
+        IHostStreamLivenessProvider? streams = null
     )
     {
         var services = new ServiceCollection();
@@ -242,6 +531,11 @@ public sealed class CustomCommandExecutionTests
         if (clock is not null)
         {
             services.AddSingleton(clock);
+        }
+
+        if (streams is not null)
+        {
+            services.AddSingleton(streams);
         }
 
         services.AddBlokeBotCustomCommands(CustomAnnouncementDeliveryMode.Disabled);
@@ -278,7 +572,8 @@ public sealed class CustomCommandExecutionTests
         int cooldownSeconds = 0,
         CustomCommandCooldownScope cooldownScope = CustomCommandCooldownScope.Global,
         bool counterCommand = false,
-        long? counterValue = null
+        long? counterValue = null,
+        CustomCommandInvocationLimit invocationLimit = CustomCommandInvocationLimit.Unlimited
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -321,6 +616,7 @@ public sealed class CustomCommandExecutionTests
             ModeratorOnly = moderatorOnly,
             CooldownSeconds = cooldownSeconds,
             CooldownScope = cooldownScope,
+            InvocationLimit = invocationLimit,
             Action = counter is null
                 ? new MessageCustomCommandAction
                 {
@@ -362,8 +658,36 @@ public sealed class CustomCommandExecutionTests
             channel,
             text,
             $":{login}!u@h PRIVMSG #{channel} :{text}",
-            tags ?? new Dictionary<string, string>()
+            tags
+                ?? new Dictionary<string, string> { ["user-id"] = $"{login.ToLowerInvariant()}-id" }
         );
+    }
+
+    private static ChatCommandContext Context(
+        string login,
+        string text,
+        CommandResponder? responder = null,
+        IReadOnlyDictionary<string, string>? tags = null
+    )
+    {
+        return new()
+        {
+            Message = Message(login, "streamer", text, tags),
+            CommandName = text.TrimStart('!'),
+            Responder = responder ?? ((_, _) => ValueTask.CompletedTask),
+        };
+    }
+
+    private static async Task SetLimitAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int commandId,
+        CustomCommandInvocationLimit limit
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var command = await db.CustomCommands.SingleAsync(stored => stored.Id == commandId);
+        command.InvocationLimit = limit;
+        await db.SaveChangesAsync();
     }
 
     private static async Task DispatchMessageAsync(
@@ -404,6 +728,29 @@ public sealed class CustomCommandExecutionTests
         public void Advance(TimeSpan interval)
         {
             _current += interval;
+        }
+    }
+
+    private sealed class MutableStreamLivenessProvider(string? streamId)
+        : IHostStreamLivenessProvider
+    {
+        public string? StreamId { get; set; } = streamId;
+
+        public bool Unavailable { get; set; }
+
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
+        {
+            HostStreamLivenessOutcome outcome =
+                Unavailable
+                    ? new HostStreamLivenessOutcome.Unavailable(
+                        HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                        new HttpRequestException("unavailable")
+                    )
+                : StreamId is { } current ? new HostStreamLivenessOutcome.Live(current)
+                : new HostStreamLivenessOutcome.Offline();
+            return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
+            );
         }
     }
 }

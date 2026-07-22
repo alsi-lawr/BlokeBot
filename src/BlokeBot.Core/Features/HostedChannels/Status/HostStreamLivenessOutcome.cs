@@ -1,3 +1,5 @@
+using BlokeBot.Functional;
+
 namespace BlokeBot.Core.Features.HostedChannels.Status;
 
 public enum HostStreamLivenessUnavailableReason
@@ -8,11 +10,16 @@ public enum HostStreamLivenessUnavailableReason
     ProviderTimedOut,
 }
 
+public interface IHostStreamLivenessProvider
+{
+    IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin);
+}
+
 public abstract record HostStreamLivenessOutcome
 {
     private HostStreamLivenessOutcome() { }
 
-    public sealed record Live : HostStreamLivenessOutcome;
+    public sealed record Live(string StreamId) : HostStreamLivenessOutcome;
 
     public sealed record Offline : HostStreamLivenessOutcome;
 

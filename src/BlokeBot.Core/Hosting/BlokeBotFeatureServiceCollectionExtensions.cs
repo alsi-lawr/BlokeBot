@@ -62,6 +62,16 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<CustomCommandAliasRegistry>();
         services.AddSingleton<CustomCommandCooldownStore>();
         services.AddSingleton<CustomCommandExecutionService>();
+        services.AddSingleton<CustomCommandInvocationClaimStore>();
+        services.AddSingleton<CustomCommandInvocationResetService>();
+        services.TryAddSingleton<
+            ICustomCommandViewerResolver,
+            UnavailableCustomCommandViewerResolver
+        >();
+        services.TryAddSingleton<
+            IHostStreamLivenessProvider,
+            UnavailableCustomCommandStreamLivenessProvider
+        >();
         services.AddSingleton<CustomMessageSelector>();
         services.AddSingleton<CustomCommandTemplateRenderer>();
         services.AddSingleton<CustomCommandConfigurationGraphWriter>();
@@ -399,6 +409,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostedChannelRuntimeStatusService>();
         services.AddSingleton<HostFeatureService>();
         services.AddSingleton<HostBotStatusService>();
+        services.AddSingleton<IHostStreamLivenessProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<HostBotStatusService>()
+        );
+        services.AddSingleton<ICustomCommandViewerResolver, CustomCommandViewerResolver>();
         services.AddSingleton<FollowerOnlyChatReadinessService>();
         services.AddSingleton<WhisperQuotaService>();
         services.AddSingleton<StartupMessageConfigurationService>();

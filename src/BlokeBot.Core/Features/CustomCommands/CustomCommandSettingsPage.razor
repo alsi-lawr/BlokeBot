@@ -9,6 +9,7 @@
 @inject HostFeatureService _features
 @inject EventBus<AppEventKind> _events
 @inject ToastService _toasts
+@inject CustomCommandInvocationResetService _invocationResets
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
@@ -271,6 +272,20 @@
                                         @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
                                     </div>
                                     <div class="space-y-2">
+                                        <label class="label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
+                                        <select id="@CommandInvocationLimitFieldId(command)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
+                                                @ref="_controls[CommandInvocationLimitFieldId(command)]"
+                                                @bind="command.InvocationLimit">
+                                            @foreach (var limit in _invocationLimits)
+                                            {
+                                                <option value="@limit">@InvocationLimitLabel(limit)</option>
+                                            }
+                                        </select>
+                                        @(ValidationMessageFor(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
+                                    </div>
+                                    <div class="space-y-2">
                                         <label class="label" for="@CommandActionFieldId(command)">What happens?</label>
                                         <select id="@CommandActionFieldId(command)"
                                                 class="input"
@@ -320,6 +335,32 @@
                                         </div>
                                     }
                                 </div>
+                                <p class="text-xs text-muted-foreground">The wait is checked first. A use is only claimed after the wait passes; moderators follow the same use limit.</p>
+                                @if (command.Id > 0)
+                                {
+                                    <div class="grid gap-2 border-t border-slate-200 pt-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
+                                        <Field Id="@CommandResetViewerFieldId(command)"
+                                               Label="Reset lifetime use for viewer"
+                                               @bind-Value="command.ResetViewerLogin"
+                                               Placeholder="viewer login" />
+                                        <button class="btn-secondary"
+                                                data-action="reset-viewer-use"
+                                                @onclick="() => ResetViewerAsync(command)">Reset viewer</button>
+                                        <button class="btn-secondary"
+                                                data-action="reset-all-viewer-uses"
+                                                @onclick="() => RequestResetAllViewers(command)">Reset all viewers</button>
+                                    </div>
+                                    @if (_pendingResetAllCommandId == command.Id)
+                                    {
+                                        <div class="flex flex-wrap items-center justify-end gap-2 text-sm" role="alert">
+                                            <span>Reset every lifetime viewer use for @command.Name?</span>
+                                            <button class="btn-secondary"
+                                                    data-action="confirm-reset-all-viewer-uses"
+                                                    @onclick="() => ResetAllViewersAsync(command)">Confirm reset all</button>
+                                            <button class="btn-secondary" @onclick="CancelResetAllViewers">Cancel</button>
+                                        </div>
+                                    }
+                                }
                             </div>
                         }
                     </div>
