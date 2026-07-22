@@ -16,6 +16,9 @@ internal sealed class GuessingConfigurationDraftSnapshot
     private readonly string _winningGuessPointReward;
     private readonly bool _whisperAnswerReplies;
     private readonly string[] _whisperReplyKeys;
+    private readonly bool _pinEnabled;
+    private readonly int? _pinDurationSeconds;
+    private readonly bool _unpinWhenRoundStops;
 
     private GuessingConfigurationDraftSnapshot(GuessingConfiguration configuration)
     {
@@ -30,6 +33,9 @@ internal sealed class GuessingConfigurationDraftSnapshot
         _replies = CaptureReplies(profile.Replies);
         _options = CaptureOptions(profile.Options);
         _whisperReplyKeys = CaptureWhisperReplyKeys(configuration);
+        _pinEnabled = configuration.Pin.Enabled;
+        _pinDurationSeconds = configuration.Pin.DurationSeconds;
+        _unpinWhenRoundStops = configuration.Pin.UnpinWhenRoundStops;
     }
 
     internal static GuessingConfigurationDraftSnapshot Capture(GuessingConfiguration configuration)
@@ -53,7 +59,10 @@ internal sealed class GuessingConfigurationDraftSnapshot
             && _aliases == current._aliases
             && _replies == current._replies
             && _options.SequenceEqual(current._options)
-            && _whisperReplyKeys.SequenceEqual(current._whisperReplyKeys);
+            && _whisperReplyKeys.SequenceEqual(current._whisperReplyKeys)
+            && _pinEnabled == current._pinEnabled
+            && _pinDurationSeconds == current._pinDurationSeconds
+            && _unpinWhenRoundStops == current._unpinWhenRoundStops;
     }
 
     private static GuessingCommandAliases CaptureAliases(CommandAliasEditor aliases)

@@ -44,7 +44,7 @@ public abstract class GuessingCommandStrategy(GuessingCommandService commands)
         if (!string.IsNullOrWhiteSpace(result.Message))
         {
             await context.Command.RespondAsync(
-                new CommandResponse(result.Target, result.Message),
+                new CommandResponse(result.Target, result.Message, result.Pin),
                 cancellationToken
             );
         }

@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<EventSubClient>();
         services.TryAddSingleton<ChatClient>();
         services.TryAddSingleton<ChatAnnouncementClient>();
+        services.TryAddSingleton<ChatPinClient>();
         services.TryAddSingleton<WhisperClient>();
 
         return services;

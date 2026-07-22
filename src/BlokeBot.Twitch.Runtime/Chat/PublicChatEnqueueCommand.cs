@@ -16,4 +16,6 @@ internal sealed record PublicChatEnqueueCommand
     public required string Message { get; init; }
 
     public required PublicChatDeliveryDeadline Deadline { get; init; }
+
+    public PublicChatPinIntent? PinIntent { get; init; }
 }

@@ -227,6 +227,15 @@ public sealed class GuessingConfigurationService(
             ct
         );
         var whisperResponsesEnabled = await WhisperResponsesEnabledAsync(db, hostId, ct);
+        var pinPolicy = await db
+            .ReplyPinPolicies.AsNoTracking()
+            .SingleOrDefaultAsync(
+                policy =>
+                    policy.HostId == hostId
+                    && policy.Feature == "guessing"
+                    && policy.ReplyKey == GuessingReplyKeys.RoundStarted,
+                ct
+            );
         var draft = new GuessingConfiguration(
             new CommandAliasEditor
             {
@@ -237,6 +246,12 @@ public sealed class GuessingConfigurationService(
                 GuessesAliases = JoinAliases(aliases, GuessCommandKind.Guesses, profileId),
             },
             ReplyDeliveryEditor.From(replyDelivery),
+            new GuessingPinEditor
+            {
+                Enabled = pinPolicy is not null,
+                DurationSeconds = pinPolicy?.DurationSeconds,
+                UnpinWhenRoundStops = pinPolicy?.UnpinOnOwnerCompletion ?? false,
+            },
             whisperResponsesEnabled,
             profiles,
             profile
@@ -345,6 +360,32 @@ public sealed class GuessingConfigurationService(
             command.ReplyDelivery.Only(GuessingReplyKeys.WhisperableKeys),
             ct
         );
+        var pinPolicy = await db.ReplyPinPolicies.SingleOrDefaultAsync(
+            policy =>
+                policy.HostId == hostId
+                && policy.Feature == "guessing"
+                && policy.ReplyKey == GuessingReplyKeys.RoundStarted,
+            ct
+        );
+        if (!command.Pin.Enabled && pinPolicy is not null)
+        {
+            db.ReplyPinPolicies.Remove(pinPolicy);
+        }
+        else if (command.Pin.Enabled)
+        {
+            pinPolicy ??= new ReplyPinPolicy
+            {
+                HostId = hostId,
+                Feature = "guessing",
+                ReplyKey = GuessingReplyKeys.RoundStarted,
+            };
+            pinPolicy.DurationSeconds = command.Pin.DurationSeconds;
+            pinPolicy.UnpinOnOwnerCompletion = command.Pin.UnpinWhenRoundStops;
+            if (pinPolicy.Id == 0)
+            {
+                db.ReplyPinPolicies.Add(pinPolicy);
+            }
+        }
 
         db.GuessOptions.RemoveRange(profile.Options);
         for (var index = 0; index < command.Options.Count; index++)

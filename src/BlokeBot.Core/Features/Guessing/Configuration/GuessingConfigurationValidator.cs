@@ -38,6 +38,14 @@ public static class GuessingConfigurationValidator
         }
 
         var reward = ParseReward(draft.Profile.WinningGuessPointReward, errors);
+        if (
+            draft.Pin.Enabled
+            && draft.Pin.DurationSeconds is { } duration
+            && duration is < 30 or > 1800
+        )
+        {
+            errors.Add(new GuessingConfigurationValidationError.InvalidPinDuration());
+        }
         var aliases = SnapshotAliases(draft.Aliases);
         var duplicateAlias = CommandAliasPolicy.FindDuplicateAlias(
             aliases
@@ -77,6 +85,7 @@ public static class GuessingConfigurationValidator
                 aliases,
                 SnapshotReplies(draft.Profile.Replies),
                 draft.ReplyDelivery.ToMap(),
+                draft.Pin,
                 options
             )
         );
@@ -336,5 +345,10 @@ public abstract record GuessingConfigurationValidationError
     public sealed record DuplicateAlias(string Alias) : GuessingConfigurationValidationError
     {
         public override string Message => $"!{Alias} is entered more than once.";
+    }
+
+    public sealed record InvalidPinDuration : GuessingConfigurationValidationError
+    {
+        public override string Message => "Pin duration must be between 30 and 1800 seconds.";
     }
 }

@@ -17,6 +17,57 @@ namespace BlokeBot.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ActivePublicChatPin", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("PinnedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PinnerTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReplyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TwitchMessageId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UnpinOnOwnerCompletion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("active_public_chat_pins", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BotHost", b =>
                 {
                     b.Property<int>("Id")
@@ -1438,6 +1489,94 @@ namespace BlokeBot.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PublicChatPinOperation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("AttemptStartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("OutboxMessageId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PinnerTwitchUserId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReplyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TwitchMessageId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UnpinOnOwnerCompletion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.HasIndex("OutboxMessageId")
+                        .IsUnique()
+                        .HasFilter("\"OutboxMessageId\" IS NOT NULL");
+
+                    b.HasIndex("Status", "CreatedAtUtc", "Id");
+
+                    b.ToTable("public_chat_pin_operations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_DurationSeconds", "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800");
+
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_Kind", "Kind IN ('Pin', 'Unpin')");
+
+                            t.HasCheckConstraint("CK_public_chat_pin_operations_Status", "Status IN ('Attempting', 'AwaitingDelivery', 'NoOp', 'Ready', 'Succeeded', 'Terminal')");
+                        });
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.PublicChatSendReceipt", b =>
                 {
                     b.Property<long>("OutboxMessageId")
@@ -1454,6 +1593,10 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.Property<string>("DeliveredDeduplicationKey")
                         .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TwitchMessageId")
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.HasKey("OutboxMessageId");
@@ -1505,6 +1648,42 @@ namespace BlokeBot.Persistence.Migrations
                             t.HasCheckConstraint("CK_reply_delivery_settings_Feature", "Feature IN ('guessing', 'points')");
 
                             t.HasCheckConstraint("CK_reply_delivery_settings_Target", "Target IN ('chat', 'whisper')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyPinPolicy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ReplyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("UnpinOnOwnerCompletion")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "Feature", "ReplyKey")
+                        .IsUnique();
+
+                    b.ToTable("reply_pin_policies", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_reply_pin_policies_DurationSeconds", "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800");
                         });
                 });
 
@@ -1733,6 +1912,15 @@ namespace BlokeBot.Persistence.Migrations
                         });
 
                     b.HasDiscriminator().HasValue("Message");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ActivePublicChatPin", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.BotReplySettings", b =>
@@ -2052,7 +2240,30 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.PublicChatPinOperation", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BlokeBot.Persistence.Models.PublicChatOutboxMessage", null)
+                        .WithOne()
+                        .HasForeignKey("BlokeBot.Persistence.Models.PublicChatPinOperation", "OutboxMessageId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyDeliverySetting", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.ReplyPinPolicy", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()

@@ -18,6 +18,100 @@ namespace BlokeBot.Core.Tests;
 public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIntegrationTestBase
 {
     [Test]
+    public async Task PinIntent_DeliveredMessage_PromotesExactProviderIdentityWithoutResend()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var seed = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            var profile = new GuessRoundProfile
+            {
+                HostId = 0,
+                Name = "default",
+                Slug = "default",
+                IsDefault = true,
+            };
+            host.Id = 41;
+            profile.HostId = host.Id;
+            seed.Hosts.Add(host);
+            seed.Profiles.Add(profile);
+            await seed.SaveChangesAsync();
+            seed.Rounds.Add(
+                new GuessRound
+                {
+                    Id = 73,
+                    HostId = host.Id,
+                    GuessRoundProfileId = profile.Id,
+                    Status = GuessRoundStatus.Open,
+                    StartedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await seed.SaveChangesAsync();
+        }
+
+        var now = Utc(12, 0, 0);
+        var outbox = new EfPublicChatOutbox(
+            dbFactory,
+            StandardRetryPolicy,
+            StandardLifetimePolicy,
+            StandardRetentionPolicy
+        );
+        var batch = Batch("streamer", now, "round started") with
+        {
+            Items =
+            [
+                new PublicChatOutboxItem
+                {
+                    Message = "round started",
+                    DeduplicationKey = PublicChatMessageDeduplication.Key(
+                        "streamer",
+                        "round started"
+                    ),
+                    PinIntent = new PublicChatPinIntent(
+                        41,
+                        73,
+                        "guessing",
+                        "round_started",
+                        300,
+                        true
+                    ),
+                },
+            ],
+        };
+        var accepted = (
+            await outbox.EnqueueAsync(batch, CancellationToken.None)
+        ).ShouldBeOfType<PublicChatEnqueueOutcome.Accepted>();
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+        (
+            await outbox.BeginSendAsync(claimed, now, now.AddMinutes(5), CancellationToken.None)
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        (
+            await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                new PublicChatDeliveryOutcome.Sent("exact-twitch-message-id"),
+                now.AddSeconds(1),
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.PublicChatOutboxMessages.CountAsync()).ShouldBe(0);
+        var receipt = await verify.PublicChatSendReceipts.SingleAsync();
+        receipt.OutboxMessageId.ShouldBe(accepted.Receipt.MessageIds.Single());
+        receipt.TwitchMessageId.ShouldBe("exact-twitch-message-id");
+        var operation = await verify.PublicChatPinOperations.SingleAsync();
+        operation.Status.ShouldBe(PublicChatPinOperationStatus.Ready);
+        operation.TwitchMessageId.ShouldBe("exact-twitch-message-id");
+        operation.OwnerId.ShouldBe(73);
+    }
+
+    [Test]
     public async Task SplitMessage_Enqueueing_PersistsWholeBatchBeforeAcknowledgement()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

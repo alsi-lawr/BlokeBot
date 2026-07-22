@@ -18,6 +18,8 @@ internal sealed record PublicChatOutboxItem
     public required string Message { get; init; }
 
     public required PublicChatDeduplicationKey DeduplicationKey { get; init; }
+
+    public PublicChatPinIntent? PinIntent { get; init; }
 }
 
 internal readonly record struct PublicChatOutboxReceipt(ImmutableArray<long> MessageIds)

@@ -11,6 +11,11 @@ public interface IOAuthFlow
     /// <returns>The authorization URI.</returns>
     Uri CreateAuthorizationUri();
 
+    Uri CreateAuthorizationUri(IEnumerable<string?> additionalScopes)
+    {
+        return CreateAuthorizationUri();
+    }
+
     /// <summary>
     /// Completes an authorization callback and persists the resulting token set.
     /// </summary>

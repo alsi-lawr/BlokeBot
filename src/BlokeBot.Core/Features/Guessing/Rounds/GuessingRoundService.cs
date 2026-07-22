@@ -240,23 +240,41 @@ public sealed class GuessingRoundService(
             );
         }
 
-        db.Rounds.Add(
-            new GuessRound
-            {
-                HostId = hostId,
-                GuessRoundProfileId = profile.Id,
-                Status = GuessRoundStatus.Open,
-                StartedAtUtc = DateTime.UtcNow,
-            }
-        );
+        var round = new GuessRound
+        {
+            HostId = hostId,
+            GuessRoundProfileId = profile.Id,
+            Status = GuessRoundStatus.Open,
+            StartedAtUtc = DateTime.UtcNow,
+        };
+        db.Rounds.Add(round);
         await db.SaveChangesAsync(ct);
+        var pinPolicy = await db
+            .ReplyPinPolicies.AsNoTracking()
+            .SingleOrDefaultAsync(
+                policy =>
+                    policy.HostId == hostId
+                    && policy.Feature == "guessing"
+                    && policy.ReplyKey == GuessingReplyKeys.RoundStarted,
+                ct
+            );
         await changes.NotifyChangedAsync(ct);
         return new GuessingOperationOutcome.Succeeded(
             FormatRoundStarted(
                 settings.RoundStartedReply,
                 profile.Name,
                 FormatOptions(profile.OptionNames)
-            )
+            ),
+            PublicChatPin: pinPolicy is null
+                ? null
+                : new PublicChatPinIntent(
+                    hostId,
+                    round.Id,
+                    "guessing",
+                    GuessingReplyKeys.RoundStarted,
+                    pinPolicy.DurationSeconds,
+                    pinPolicy.UnpinOnOwnerCompletion
+                )
         );
     }
 
@@ -310,6 +328,7 @@ public sealed class GuessingRoundService(
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var round = await GuessingRoundQueries.LoadTrackedOpenAsync(db, hostId, ct);
         var settingsRound =
             round ?? await GuessingRoundQueries.LoadTrackedUnresolvedAsync(db, hostId, ct);
@@ -334,7 +353,87 @@ public sealed class GuessingRoundService(
 
         round.Status = GuessRoundStatus.Closed;
         round.ClosedAtUtc = DateTime.UtcNow;
+        await db
+            .PublicChatPinOperations.Where(operation =>
+                operation.HostId == hostId
+                && operation.Feature == "guessing"
+                && operation.OwnerId == round.Id
+                && (
+                    operation.Status == PublicChatPinOperationStatus.AwaitingDelivery
+                    || operation.Status == PublicChatPinOperationStatus.Ready
+                )
+            )
+            .ExecuteUpdateAsync(
+                update =>
+                    update
+                        .SetProperty(
+                            operation => operation.Status,
+                            PublicChatPinOperationStatus.Terminal
+                        )
+                        .SetProperty(operation => operation.OutboxMessageId, (long?)null)
+                        .SetProperty(operation => operation.CompletedAtUtc, DateTime.UtcNow)
+                        .SetProperty(operation => operation.Outcome, "owner-completed-before-pin"),
+                ct
+            );
+        var activePin = await db.ActivePublicChatPins.SingleOrDefaultAsync(
+            pin =>
+                pin.HostId == hostId
+                && pin.Feature == "guessing"
+                && pin.OwnerId == round.Id
+                && pin.UnpinOnOwnerCompletion,
+            ct
+        );
+        if (activePin is not null)
+        {
+            db.PublicChatPinOperations.Add(
+                new PublicChatPinOperation
+                {
+                    Kind = PublicChatPinOperationKind.Unpin,
+                    Status = PublicChatPinOperationStatus.Ready,
+                    HostId = hostId,
+                    Channel = activePin.Channel,
+                    Feature = activePin.Feature,
+                    ReplyKey = activePin.ReplyKey,
+                    OwnerId = round.Id,
+                    TwitchMessageId = activePin.TwitchMessageId,
+                    PinnerTwitchUserId = activePin.PinnerTwitchUserId,
+                    CreatedAtUtc = DateTime.UtcNow,
+                }
+            );
+        }
+        else
+        {
+            var attemptingPin = await db
+                .PublicChatPinOperations.AsNoTracking()
+                .FirstOrDefaultAsync(
+                    operation =>
+                        operation.HostId == hostId
+                        && operation.Feature == "guessing"
+                        && operation.OwnerId == round.Id
+                        && operation.Kind == PublicChatPinOperationKind.Pin
+                        && operation.Status == PublicChatPinOperationStatus.Attempting,
+                    ct
+                );
+            if (attemptingPin is not null)
+            {
+                db.PublicChatPinOperations.Add(
+                    new PublicChatPinOperation
+                    {
+                        Kind = PublicChatPinOperationKind.Unpin,
+                        Status = PublicChatPinOperationStatus.Ready,
+                        HostId = hostId,
+                        Channel = attemptingPin.Channel,
+                        Feature = attemptingPin.Feature,
+                        ReplyKey = attemptingPin.ReplyKey,
+                        OwnerId = round.Id,
+                        TwitchMessageId = attemptingPin.TwitchMessageId,
+                        CreatedAtUtc = DateTime.UtcNow,
+                    }
+                );
+            }
+        }
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await changes.NotifyChangedAsync(ct);
         return new GuessingOperationOutcome.Succeeded(settings.GuessingStoppedReply);
     }

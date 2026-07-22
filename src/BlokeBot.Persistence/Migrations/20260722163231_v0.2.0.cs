@@ -11,6 +11,14 @@ namespace BlokeBot.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddColumn<string>(
+                name: "TwitchMessageId",
+                table: "public_chat_send_receipts",
+                type: "TEXT",
+                maxLength: 128,
+                nullable: true
+            );
+
             migrationBuilder.AddColumn<bool>(
                 name: "StartupMessageEnabled",
                 table: "hosts",
@@ -33,6 +41,44 @@ namespace BlokeBot.Persistence.Migrations
                 maxLength: 32,
                 nullable: false,
                 defaultValue: "Unlimited"
+            );
+
+            migrationBuilder.CreateTable(
+                name: "active_public_chat_pins",
+                columns: table => new
+                {
+                    Id = table
+                        .Column<long>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Channel = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    TwitchMessageId = table.Column<string>(
+                        type: "TEXT",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    PinnerTwitchUserId = table.Column<string>(
+                        type: "TEXT",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    Feature = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    ReplyKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    OwnerId = table.Column<long>(type: "INTEGER", nullable: false),
+                    UnpinOnOwnerCompletion = table.Column<bool>(type: "INTEGER", nullable: false),
+                    PinnedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_active_public_chat_pins", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_active_public_chat_pins_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
             );
 
             migrationBuilder.CreateTable(
@@ -127,6 +173,100 @@ namespace BlokeBot.Persistence.Migrations
                 }
             );
 
+            migrationBuilder.CreateTable(
+                name: "public_chat_pin_operations",
+                columns: table => new
+                {
+                    Id = table
+                        .Column<long>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    OutboxMessageId = table.Column<long>(type: "INTEGER", nullable: true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Channel = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Feature = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    ReplyKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    OwnerId = table.Column<long>(type: "INTEGER", nullable: false),
+                    DurationSeconds = table.Column<int>(type: "INTEGER", nullable: true),
+                    UnpinOnOwnerCompletion = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TwitchMessageId = table.Column<string>(
+                        type: "TEXT",
+                        maxLength: 128,
+                        nullable: false
+                    ),
+                    PinnerTwitchUserId = table.Column<string>(
+                        type: "TEXT",
+                        maxLength: 128,
+                        nullable: true
+                    ),
+                    CreatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    AttemptStartedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    CompletedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    Outcome = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_public_chat_pin_operations", x => x.Id);
+                    table.CheckConstraint(
+                        "CK_public_chat_pin_operations_DurationSeconds",
+                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                    );
+                    table.CheckConstraint(
+                        "CK_public_chat_pin_operations_Kind",
+                        "Kind IN ('Pin', 'Unpin')"
+                    );
+                    table.CheckConstraint(
+                        "CK_public_chat_pin_operations_Status",
+                        "Status IN ('Attempting', 'AwaitingDelivery', 'NoOp', 'Ready', 'Succeeded', 'Terminal')"
+                    );
+                    table.ForeignKey(
+                        name: "FK_public_chat_pin_operations_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade
+                    );
+                    table.ForeignKey(
+                        name: "FK_public_chat_pin_operations_public_chat_outbox_OutboxMessageId",
+                        column: x => x.OutboxMessageId,
+                        principalTable: "public_chat_outbox",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
+
+            migrationBuilder.CreateTable(
+                name: "reply_pin_policies",
+                columns: table => new
+                {
+                    Id = table
+                        .Column<long>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Feature = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    ReplyKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    DurationSeconds = table.Column<int>(type: "INTEGER", nullable: true),
+                    UnpinOnOwnerCompletion = table.Column<bool>(type: "INTEGER", nullable: false),
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_reply_pin_policies", x => x.Id);
+                    table.CheckConstraint(
+                        "CK_reply_pin_policies_DurationSeconds",
+                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                    );
+                    table.ForeignKey(
+                        name: "FK_reply_pin_policies_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
+
             migrationBuilder.AddCheckConstraint(
                 name: "CK_custom_commands_InvocationLimit",
                 table: "custom_commands",
@@ -149,6 +289,13 @@ namespace BlokeBot.Persistence.Migrations
                 name: "CK_custom_announcements_LatestDeliveryResult",
                 table: "custom_announcements",
                 sql: "LatestDeliveryResult IN ('Ambiguous', 'Invalid', 'None', 'Permission', 'RateLimitRetry', 'Success', 'Unexpected')"
+            );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_active_public_chat_pins_HostId_Channel",
+                table: "active_public_chat_pins",
+                columns: new[] { "HostId", "Channel" },
+                unique: true
             );
 
             migrationBuilder.CreateIndex(
@@ -186,14 +333,47 @@ namespace BlokeBot.Persistence.Migrations
                 table: "custom_command_invocation_reset_audits",
                 columns: new[] { "HostId", "ResetAtUtc" }
             );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_public_chat_pin_operations_HostId",
+                table: "public_chat_pin_operations",
+                column: "HostId"
+            );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_public_chat_pin_operations_OutboxMessageId",
+                table: "public_chat_pin_operations",
+                column: "OutboxMessageId",
+                unique: true,
+                filter: "\"OutboxMessageId\" IS NOT NULL"
+            );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_public_chat_pin_operations_Status_CreatedAtUtc_Id",
+                table: "public_chat_pin_operations",
+                columns: new[] { "Status", "CreatedAtUtc", "Id" }
+            );
+
+            migrationBuilder.CreateIndex(
+                name: "IX_reply_pin_policies_HostId_Feature_ReplyKey",
+                table: "reply_pin_policies",
+                columns: new[] { "HostId", "Feature", "ReplyKey" },
+                unique: true
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(name: "active_public_chat_pins");
+
             migrationBuilder.DropTable(name: "custom_command_invocation_claims");
 
             migrationBuilder.DropTable(name: "custom_command_invocation_reset_audits");
+
+            migrationBuilder.DropTable(name: "public_chat_pin_operations");
+
+            migrationBuilder.DropTable(name: "reply_pin_policies");
 
             migrationBuilder.DropCheckConstraint(
                 name: "CK_custom_commands_InvocationLimit",
@@ -213,6 +393,11 @@ namespace BlokeBot.Persistence.Migrations
             migrationBuilder.DropCheckConstraint(
                 name: "CK_custom_announcements_LatestDeliveryResult",
                 table: "custom_announcements"
+            );
+
+            migrationBuilder.DropColumn(
+                name: "TwitchMessageId",
+                table: "public_chat_send_receipts"
             );
 
             migrationBuilder.DropColumn(name: "StartupMessageEnabled", table: "hosts");

@@ -53,11 +53,18 @@ internal sealed class PublicChatMessageQueue(
         }
 
         var items = parts
-            .Select(part => new PublicChatOutboxItem
-            {
-                Message = part,
-                DeduplicationKey = PublicChatMessageDeduplication.Key(command.Channel, part),
-            })
+            .Select(
+                (part, index) =>
+                    new PublicChatOutboxItem
+                    {
+                        Message = part,
+                        DeduplicationKey = PublicChatMessageDeduplication.Key(
+                            command.Channel,
+                            part
+                        ),
+                        PinIntent = index == 0 ? command.PinIntent : null,
+                    }
+            )
             .ToImmutableArray();
         var outcome = await outbox.EnqueueAsync(
             new PublicChatOutboxBatch

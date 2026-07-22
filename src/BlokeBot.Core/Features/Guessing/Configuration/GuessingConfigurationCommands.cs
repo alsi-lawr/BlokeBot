@@ -59,6 +59,7 @@ public sealed record GuessingConfigurationSaveCommand
         GuessingCommandAliases aliases,
         GuessingReplySettings replies,
         ReplyDeliveryMap replyDelivery,
+        GuessingPinEditor pin,
         IEnumerable<GuessOptionValue> options
     )
     {
@@ -70,6 +71,12 @@ public sealed record GuessingConfigurationSaveCommand
         Aliases = aliases;
         Replies = replies;
         ReplyDelivery = ReplyDeliveryMap.FromWhisperKeys(replyDelivery.WhisperKeys);
+        Pin = new GuessingPinEditor
+        {
+            Enabled = pin.Enabled,
+            DurationSeconds = pin.DurationSeconds,
+            UnpinWhenRoundStops = pin.UnpinWhenRoundStops,
+        };
         Options = Array.AsReadOnly(options.ToArray());
     }
 
@@ -88,6 +95,8 @@ public sealed record GuessingConfigurationSaveCommand
     public GuessingReplySettings Replies { get; }
 
     public ReplyDeliveryMap ReplyDelivery { get; }
+
+    public GuessingPinEditor Pin { get; }
 
     public IReadOnlyList<GuessOptionValue> Options { get; }
 }

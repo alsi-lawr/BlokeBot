@@ -33,6 +33,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
         Set<PublicChatOutboxMessage>();
     public DbSet<PublicChatSendReceipt> PublicChatSendReceipts => Set<PublicChatSendReceipt>();
+    public DbSet<ReplyPinPolicy> ReplyPinPolicies => Set<ReplyPinPolicy>();
+    public DbSet<PublicChatPinOperation> PublicChatPinOperations => Set<PublicChatPinOperation>();
+    public DbSet<ActivePublicChatPin> ActivePublicChatPins => Set<ActivePublicChatPin>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();

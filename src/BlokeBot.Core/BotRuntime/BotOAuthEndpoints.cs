@@ -39,15 +39,36 @@ internal static class BotOAuthEndpoints
         botOAuth
             .MapGet(
                 "/start",
-                (HttpContext context, IOAuthFlow oauth) =>
-                    AuthenticatedSession.FromPrincipal(context.User).IsBotAdmin
-                        ? Results.Redirect(oauth.CreateAuthorizationUri().ToString())
-                        : Result(
+                async (
+                    HttpContext context,
+                    IOAuthFlow oauth,
+                    HostBotAccountAuthorizationService hostBotAuthorization,
+                    CancellationToken ct
+                ) =>
+                {
+                    var session = AuthenticatedSession.FromPrincipal(context.User);
+                    if (!session.IsBotAdmin)
+                    {
+                        return Result(
                             BlokeBotAuthOutcome.AccessRequired,
                             BlokeBotAuthStatus.Forbidden,
                             BlokeBotAuthRetryAction.None,
                             BlokeBotAuthReturnAction.Admin
-                        )
+                        );
+                    }
+
+                    var selectedHost = session.State.Match<BotHostChoice?>(
+                        _ => null,
+                        selected => selected.Selection.Current,
+                        _ => null
+                    );
+                    var authorizationUri = selectedHost is null
+                        ? oauth.CreateAuthorizationUri()
+                        : oauth.CreateAuthorizationUri(
+                            await hostBotAuthorization.GetRequiredScopesAsync(selectedHost.Id, ct)
+                        );
+                    return Results.Redirect(authorizationUri.ToString());
+                }
             )
             .RequireAuthorization();
 

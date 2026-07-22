@@ -17,7 +17,7 @@ internal sealed partial class EfPublicChatOutbox
     {
         ArgumentNullException.ThrowIfNull(outcome);
         return outcome.Match(
-            _ => RecordSentAsync(message, recordedAt, cancellationToken),
+            sent => RecordSentAsync(message, sent.TwitchMessageId, recordedAt, cancellationToken),
             _ =>
                 RecordMissingIdentityAsync(
                     message,
@@ -72,6 +72,7 @@ internal sealed partial class EfPublicChatOutbox
 
     private async ValueTask<PublicChatClaimUpdate> RecordSentAsync(
         PublicChatClaimedMessage message,
+        string twitchMessageId,
         DateTimeOffset completedAt,
         CancellationToken cancellationToken
     )
@@ -88,8 +89,8 @@ internal sealed partial class EfPublicChatOutbox
                     && row.Status == PublicChatOutboxStatus.Sending
                     && row.ClaimToken == message.ClaimToken.Value
                 )
-                .ExecuteDeleteAsync(cancellationToken);
-            if (deleted == 0)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (deleted is null)
             {
                 return new PublicChatClaimUpdate.OwnershipLost();
             }
@@ -104,10 +105,8 @@ internal sealed partial class EfPublicChatOutbox
                                 message.DeduplicationKey.Value
                             )
                             .SetProperty(receipt => receipt.CompletedAtUtc, completedAt.UtcDateTime)
-                            .SetProperty(
-                                receipt => receipt.DeliveredAtUtc,
-                                completedAt.UtcDateTime
-                            ),
+                            .SetProperty(receipt => receipt.DeliveredAtUtc, completedAt.UtcDateTime)
+                            .SetProperty(receipt => receipt.TwitchMessageId, twitchMessageId),
                     cancellationToken
                 );
             if (receiptUpdated != 1)
@@ -116,6 +115,26 @@ internal sealed partial class EfPublicChatOutbox
                     $"A confirmed public chat send updated {receiptUpdated} send receipts."
                 );
             }
+
+            await db
+                .PublicChatPinOperations.Where(operation =>
+                    operation.OutboxMessageId == message.Id
+                    && operation.Status == PublicChatPinOperationStatus.AwaitingDelivery
+                )
+                .ExecuteUpdateAsync(
+                    update =>
+                        update
+                            .SetProperty(
+                                operation => operation.Status,
+                                PublicChatPinOperationStatus.Ready
+                            )
+                            .SetProperty(operation => operation.OutboxMessageId, (long?)null)
+                            .SetProperty(operation => operation.TwitchMessageId, twitchMessageId),
+                    cancellationToken
+                );
+
+            db.PublicChatOutboxMessages.Remove(deleted);
+            await db.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return new PublicChatClaimUpdate.Applied();

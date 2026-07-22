@@ -6,10 +6,32 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
     : IPublicChatMessageSender
 {
-    public async ValueTask<PublicChatSendOutcome> SendAsync(
+    public ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
         string message,
         PublicChatDeliveryDeadline deadline,
+        CancellationToken cancellationToken
+    )
+    {
+        return SendCoreAsync(channel, message, deadline, null, cancellationToken);
+    }
+
+    public ValueTask<PublicChatSendOutcome> SendAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatPinIntent pinIntent,
+        CancellationToken cancellationToken
+    )
+    {
+        return SendCoreAsync(channel, message, deadline, pinIntent.Validate(), cancellationToken);
+    }
+
+    private async ValueTask<PublicChatSendOutcome> SendCoreAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatPinIntent? pinIntent,
         CancellationToken cancellationToken
     )
     {
@@ -19,6 +41,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
                 Channel = channel,
                 Message = message,
                 Deadline = deadline,
+                PinIntent = pinIntent,
             },
             cancellationToken
         );

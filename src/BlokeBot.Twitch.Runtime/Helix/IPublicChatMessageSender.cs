@@ -19,6 +19,17 @@ public interface IPublicChatMessageSender
         PublicChatDeliveryDeadline deadline,
         CancellationToken cancellationToken
     );
+
+    ValueTask<PublicChatSendOutcome> SendAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatPinIntent pinIntent,
+        CancellationToken cancellationToken
+    )
+    {
+        return SendAsync(channel, message, deadline, cancellationToken);
+    }
 }
 
 /// <summary>

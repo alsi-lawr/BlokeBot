@@ -29,7 +29,7 @@ internal static class PublicChatDeliveryClassifier
         ArgumentNullException.ThrowIfNull(result);
         if (result.IsSent)
         {
-            return new PublicChatTransportSendResult.Sent();
+            return new PublicChatTransportSendResult.Sent(result.MessageId);
         }
 
         var code = result.DropReason?.Code;
@@ -88,7 +88,7 @@ internal static class PublicChatDeliveryClassifier
     internal static PublicChatDeliveryOutcome MapSendResult(PublicChatTransportSendResult result)
     {
         return result.Match<PublicChatDeliveryOutcome>(
-            _ => new PublicChatDeliveryOutcome.Sent(),
+            sent => new PublicChatDeliveryOutcome.Sent(sent.TwitchMessageId),
             rejected => new PublicChatDeliveryOutcome.Rejection { Reason = rejected.Reason }
         );
     }

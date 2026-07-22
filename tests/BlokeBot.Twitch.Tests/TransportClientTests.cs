@@ -366,6 +366,96 @@ public sealed class TransportClientTests
         result.ShouldBeOfType<ChatAnnouncementSendResult.Ambiguous>();
     }
 
+    [Test]
+    [Arguments(null)]
+    [Arguments(30)]
+    [Arguments(1800)]
+    public async Task ChatMessagePinning_UsesExactMessageAndNativeDuration(int? durationSeconds)
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Put, "/helix/chat/pins");
+                request.RequestUri!.Query.ShouldContain("broadcaster_id=channel-id");
+                request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
+                request.RequestUri.Query.ShouldContain("message_id=exact-message-id");
+                if (durationSeconds is { } seconds)
+                {
+                    request.RequestUri.Query.ShouldContain($"duration_seconds={seconds}");
+                }
+                else
+                {
+                    request.RequestUri.Query.ShouldNotContain("duration_seconds");
+                }
+
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
+            }
+        );
+        var client = new ChatPinClient(factory);
+
+        var result = await client.PinAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            "exact-message-id",
+            durationSeconds,
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ChatPinMutationResult.Succeeded>();
+    }
+
+    [Test]
+    public async Task CurrentChatPin_Reading_PreservesMessageAndPinnerIdentities()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            (request, _) =>
+            {
+                AssertContext(request, HttpMethod.Get, "/helix/chat/pins");
+                return Task.FromResult(
+                    JsonResponse(
+                        """{"data":[{"message_id":"message-id","pinned_by_user_id":"pinner-id"}]}"""
+                    )
+                );
+            }
+        );
+        var client = new ChatPinClient(factory);
+
+        var result = await client.GetAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            CancellationToken.None
+        );
+
+        result.ShouldBe(new ChatPinnedMessageResult.Found("message-id", "pinner-id"));
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.Conflict, typeof(ChatPinMutationResult.Conflict))]
+    [Arguments(HttpStatusCode.Forbidden, typeof(ChatPinMutationResult.PermissionDenied))]
+    [Arguments(HttpStatusCode.TooManyRequests, typeof(ChatPinMutationResult.RateLimited))]
+    public async Task ChatMessagePinning_TerminalStatusesRemainTyped(
+        HttpStatusCode statusCode,
+        Type expectedType
+    )
+    {
+        var client = new ChatPinClient(RespondingWith(statusCode));
+
+        var result = await client.PinAsync(
+            Context(),
+            "channel-id",
+            "bot-id",
+            "message-id",
+            300,
+            CancellationToken.None
+        );
+
+        result.GetType().ShouldBe(expectedType);
+    }
+
     private static void AssertContext(
         HttpRequestMessage request,
         HttpMethod method,

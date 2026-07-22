@@ -33,7 +33,7 @@ public sealed class HostBotAccountAuthorizationService(
             x => x.HostId == hostId,
             ct
         );
-        var required = RequiredScopes(settings);
+        var required = RequiredScopes(settings, await PinEnabledAsync(db, hostId, ct));
 
         if (settings is null || !settings.OverrideEnabled)
         {
@@ -68,7 +68,7 @@ public sealed class HostBotAccountAuthorizationService(
         var settings = await db
             .HostBotAccountSettings.AsNoTracking()
             .SingleOrDefaultAsync(x => x.HostId == hostId, ct);
-        return RequiredScopes(settings);
+        return RequiredScopes(settings, await PinEnabledAsync(db, hostId, ct));
     }
 
     public async Task<ActiveBotAccountTokenStatus> GetActiveTokenStatusAsync(
@@ -890,12 +890,29 @@ public sealed class HostBotAccountAuthorizationService(
         throw new UnreachableException("Unknown bot account selection.");
     }
 
-    private string[] RequiredScopes(HostBotAccountSettings? settings)
+    private string[] RequiredScopes(HostBotAccountSettings? settings, bool pinEnabled = false)
     {
-        var scopes = hostBotOAuth.RequestedScopes();
-        return settings?.WhisperResponsesEnabled == true
-            ? ScopeSet.NormalizeMany(scopes.Append(Scopes.UserManageWhispers))
-            : scopes.ToArray();
+        IEnumerable<string?> scopes = hostBotOAuth.RequestedScopes();
+        if (settings?.WhisperResponsesEnabled == true)
+        {
+            scopes = scopes.Append(Scopes.UserManageWhispers);
+        }
+
+        if (pinEnabled)
+        {
+            scopes = scopes.Append(Scopes.ModeratorManageChatMessages);
+        }
+
+        return ScopeSet.NormalizeMany(scopes);
+    }
+
+    private static Task<bool> PinEnabledAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        return db.ReplyPinPolicies.AsNoTracking().AnyAsync(policy => policy.HostId == hostId, ct);
     }
 
     private static BotAccountAuthorizationStatus ToAuthorizationStatus(

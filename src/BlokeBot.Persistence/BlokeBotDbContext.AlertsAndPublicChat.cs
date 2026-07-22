@@ -14,6 +14,12 @@ public sealed partial class BlokeBotDbContext
     private static readonly string[] _publicChatOutboxFailurePhases =
         PersistedEnumTokens<PublicChatOutboxFailurePhase>.Values.ToArray();
 
+    private static readonly string[] _publicChatPinOperationKinds =
+        PersistedEnumTokens<PublicChatPinOperationKind>.Values.ToArray();
+
+    private static readonly string[] _publicChatPinOperationStatuses =
+        PersistedEnumTokens<PublicChatPinOperationStatus>.Values.ToArray();
+
     private static void ConfigureAlertsAndPublicChat(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<DurableAlert>(b =>
@@ -221,8 +227,109 @@ public sealed partial class BlokeBotDbContext
             b.HasKey(x => x.OutboxMessageId);
             b.Property(x => x.OutboxMessageId).ValueGeneratedNever();
             b.Property(x => x.DeliveredDeduplicationKey).HasMaxLength(64);
+            b.Property(x => x.TwitchMessageId).HasMaxLength(128);
             b.HasIndex(x => x.AttemptedAtUtc);
             b.HasIndex(x => x.DeliveredAtUtc);
+        });
+
+        modelBuilder.Entity<ReplyPinPolicy>(b =>
+        {
+            b.ToTable(
+                "reply_pin_policies",
+                t =>
+                    t.HasCheckConstraint(
+                        "CK_reply_pin_policies_DurationSeconds",
+                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                    )
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Feature).HasMaxLength(64);
+            b.Property(x => x.ReplyKey).HasMaxLength(128);
+            b.HasIndex(x => new
+                {
+                    x.HostId,
+                    x.Feature,
+                    x.ReplyKey,
+                })
+                .IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PublicChatPinOperation>(b =>
+        {
+            b.ToTable(
+                "public_chat_pin_operations",
+                t =>
+                {
+                    t.HasCheckConstraint(
+                        "CK_public_chat_pin_operations_Kind",
+                        KindIn("Kind", _publicChatPinOperationKinds)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_pin_operations_Status",
+                        KindIn("Status", _publicChatPinOperationStatuses)
+                    );
+                    t.HasCheckConstraint(
+                        "CK_public_chat_pin_operations_DurationSeconds",
+                        "DurationSeconds IS NULL OR DurationSeconds BETWEEN 30 AND 1800"
+                    );
+                }
+            );
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Kind)
+                .HasConversion(
+                    value => PersistedEnumTokens<PublicChatPinOperationKind>.Format(value),
+                    value => PersistedEnumTokens<PublicChatPinOperationKind>.Parse(value)
+                )
+                .HasMaxLength(16);
+            b.Property(x => x.Status)
+                .HasConversion(
+                    value => PersistedEnumTokens<PublicChatPinOperationStatus>.Format(value),
+                    value => PersistedEnumTokens<PublicChatPinOperationStatus>.Parse(value)
+                )
+                .HasMaxLength(32);
+            b.Property(x => x.Channel).HasMaxLength(128);
+            b.Property(x => x.Feature).HasMaxLength(64);
+            b.Property(x => x.ReplyKey).HasMaxLength(128);
+            b.Property(x => x.TwitchMessageId).HasMaxLength(128);
+            b.Property(x => x.PinnerTwitchUserId).HasMaxLength(128);
+            b.Property(x => x.Outcome).HasMaxLength(512);
+            b.HasIndex(x => new
+            {
+                x.Status,
+                x.CreatedAtUtc,
+                x.Id,
+            });
+            b.HasIndex(x => x.OutboxMessageId)
+                .IsUnique()
+                .HasFilter("\"OutboxMessageId\" IS NOT NULL");
+            b.HasOne<PublicChatOutboxMessage>()
+                .WithOne()
+                .HasForeignKey<PublicChatPinOperation>(x => x.OutboxMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ActivePublicChatPin>(b =>
+        {
+            b.ToTable("active_public_chat_pins");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Channel).HasMaxLength(128);
+            b.Property(x => x.TwitchMessageId).HasMaxLength(128);
+            b.Property(x => x.PinnerTwitchUserId).HasMaxLength(128);
+            b.Property(x => x.Feature).HasMaxLength(64);
+            b.Property(x => x.ReplyKey).HasMaxLength(128);
+            b.HasIndex(x => new { x.HostId, x.Channel }).IsUnique();
+            b.HasOne<BotHost>()
+                .WithMany()
+                .HasForeignKey(x => x.HostId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
