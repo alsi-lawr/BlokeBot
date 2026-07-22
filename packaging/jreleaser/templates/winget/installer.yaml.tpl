@@ -10,6 +10,7 @@ Installers:
     InstallerSha256: {{distributionChecksumSha256}}
     InstallerType: zip
     NestedInstallerType: portable
+    ArchiveBinariesDependOnPath: true
     NestedInstallerFiles:
       - RelativeFilePath: {{distributionArtifactRootEntryName}}\bin\{{distributionExecutableWindows}}
         PortableCommandAlias: {{distributionExecutableName}}
