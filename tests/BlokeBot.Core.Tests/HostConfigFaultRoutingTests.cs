@@ -52,7 +52,7 @@ public sealed class HostConfigFaultRoutingTests
         var page = RenderHostConfigPage(context);
         SetModeratorClaims(testContext.Authorization, hostId);
 
-        ClickAccessMode(page, "Allowed list only");
+        await ClickAccessModeAsync(page, "Allowed list only");
 
         page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
@@ -60,7 +60,7 @@ public sealed class HostConfigFaultRoutingTests
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
         tokens.RequestCount.ShouldBe(1);
 
-        ClickAccessMode(page, "Allowed list only");
+        await ClickAccessModeAsync(page, "Allowed list only");
         page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: false));
         clock.Advance(TimeSpan.FromMilliseconds(180));
         page.WaitForAssertion(() =>
@@ -87,10 +87,10 @@ public sealed class HostConfigFaultRoutingTests
         SetModeratorClaims(testContext.Authorization, hostId);
 
         var firstClick = ClickAccessModeAsync(page, "Allowed list only");
-        tokens.RequestCount.ShouldBe(1);
+        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(1));
         var secondClick = ClickAccessModeAsync(page, "Allowed list only");
-        tokens.RequestCount.ShouldBe(2);
-        ClickAccessMode(page, "All mods");
+        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(2));
+        await ClickAccessModeAsync(page, "All mods");
 
         second.SetResult("app-token");
         await secondClick;
@@ -121,7 +121,7 @@ public sealed class HostConfigFaultRoutingTests
         var boundary = context.Render<CapturingErrorBoundary>(parameters =>
             parameters.Add(x => x.ChildContent, content)
         );
-        ClickAccessMode(boundary, "Allowed list only");
+        await ClickAccessModeAsync(boundary, "Allowed list only");
         const string SensitiveMessage = "secret-host-config-failure";
         var exception = new InvalidOperationException(SensitiveMessage);
         faultingDbFactory.Failure = exception;
@@ -234,7 +234,7 @@ public sealed class HostConfigFaultRoutingTests
         var toastPublished = Channel.CreateUnbounded<bool>();
         toasts.Changed += () => toastPublished.Writer.TryWrite(true);
 
-        ClickAccessMode(page, "Allowed list only");
+        await ClickAccessModeAsync(page, "Allowed list only");
         clock.Advance(TimeSpan.FromMilliseconds(180));
         _ = await toastPublished.Reader.ReadAsync();
 
@@ -272,24 +272,17 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
-    private static void ClickAccessMode<TComponent>(
-        IRenderedComponent<TComponent> page,
-        string text
-    )
-        where TComponent : IComponent
-    {
-        page.FindAll("button").Single(button => button.TextContent.Trim() == text).Click();
-    }
-
     private static Task ClickAccessModeAsync<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
     )
         where TComponent : IComponent
     {
-        return page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == text)
-            .ClickAsync(new());
+        return page.InvokeAsync(() =>
+            page.FindAll("button")
+                .Single(button => button.TextContent.Trim() == text)
+                .ClickAsync(new())
+        );
     }
 
     private static void AssertAccessMode<TComponent>(
