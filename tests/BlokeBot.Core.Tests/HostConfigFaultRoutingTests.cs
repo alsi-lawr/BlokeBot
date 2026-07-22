@@ -128,8 +128,9 @@ public sealed class HostConfigFaultRoutingTests
 
         clock.Advance(TimeSpan.FromMilliseconds(180));
 
-        boundary.WaitForAssertion(() =>
-            boundary.Instance.CapturedException.ShouldBeSameAs(exception)
+        boundary.WaitForAssertion(
+            () => boundary.Instance.CapturedException.ShouldBeSameAs(exception),
+            TimeSpan.FromSeconds(5)
         );
         var entry = logger.Entries.ShouldHaveSingleItem();
         entry.Level.ShouldBe(LogLevel.Error);

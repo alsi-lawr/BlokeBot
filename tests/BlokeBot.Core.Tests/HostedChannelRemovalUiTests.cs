@@ -53,7 +53,7 @@ public sealed class HostedChannelRemovalUiTests
     }
 
     [Test]
-    public void NormalizedMatchingConfirmation_Removing_InvokesExistingCallbackOnce()
+    public async Task NormalizedMatchingConfirmation_Removing_InvokesExistingCallbackOnce()
     {
         using var context = new BunitContext();
         var removedHostIds = new List<int>();
@@ -76,7 +76,7 @@ public sealed class HostedChannelRemovalUiTests
         var confirm = row.Find("button[aria-label='Permanently remove channel']");
         confirm.HasAttribute("disabled").ShouldBeFalse();
 
-        confirm.Click();
+        await confirm.ClickAsync(new());
 
         row.WaitForAssertion(() =>
         {
