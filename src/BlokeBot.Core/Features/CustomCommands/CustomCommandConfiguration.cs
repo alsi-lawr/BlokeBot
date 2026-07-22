@@ -58,6 +58,11 @@ public sealed class CustomCommandEditor
     public CustomCommandCooldownScope CooldownScope { get; set; } =
         CustomCommandCooldownScope.Global;
 
+    public CustomCommandInvocationLimit InvocationLimit { get; set; } =
+        CustomCommandInvocationLimit.Unlimited;
+
+    public string ResetViewerLogin { get; set; } = string.Empty;
+
     public ICustomCommandActionEditor Action
     {
         get;

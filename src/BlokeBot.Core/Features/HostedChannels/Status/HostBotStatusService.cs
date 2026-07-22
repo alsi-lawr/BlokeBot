@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Functional;
+using BlokeBot.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.HostedChannels.Status;
 
@@ -9,8 +11,9 @@ public sealed class HostBotStatusService(
     IHostBotAppAccessTokenSource appTokens,
     IHostBotAccountTokenStatusProvider botAccounts,
     HelixClient helix,
-    BotSettings settings
-)
+    BotSettings settings,
+    IDbContextFactory<BlokeBotDbContext>? dbFactory = null
+) : IHostStreamLivenessProvider
 {
     public IO<HostBotChannelStatus, Never> GetStatus(string channelLogin)
     {
@@ -31,6 +34,7 @@ public sealed class HostBotStatusService(
         CancellationToken ct
     )
     {
+        var pinEnabled = await PinEnabledAsync(channelLogin, ct);
         var configured = ConfiguredCapabilities();
         if (!configured.ModeratorCheckConfigured)
         {
@@ -39,7 +43,7 @@ public sealed class HostBotStatusService(
 
         try
         {
-            return await EvaluateReadinessAsync(channelLogin, configured, ct);
+            return await EvaluateReadinessAsync(channelLogin, pinEnabled, configured, ct);
         }
         catch (HttpRequestException)
         {
@@ -55,13 +59,17 @@ public sealed class HostBotStatusService(
 
     private async Task<HostBotReadinessOutcome> EvaluateReadinessAsync(
         string channelLogin,
+        bool pinEnabled,
         HostBotReadinessCapabilities configured,
         CancellationToken ct
     )
     {
+        var requiredScopes = pinEnabled
+            ? settings.Identity.Scopes.Append(Scopes.ModeratorManageChatMessages)
+            : settings.Identity.Scopes;
         var tokenStatus = await botAccounts.GetActiveTokenStatusAsync(
             channelLogin,
-            settings.Identity.Scopes,
+            requiredScopes,
             ct
         );
         return await tokenStatus.Status.Match(
@@ -78,15 +86,22 @@ public sealed class HostBotStatusService(
                     new HostBotReadinessOutcome.InvalidToken(configured)
                 ),
             missingScopes =>
-                EvaluateAuthorizedReadinessAsync(
-                    channelLogin,
-                    tokenStatus.BotLogin,
-                    missingScopes.AccessToken,
-                    missingScopes.Validation,
-                    missingScopes.GrantedScopes,
-                    configured,
-                    ct
-                ),
+                pinEnabled
+                && ScopeSet
+                    .Missing(missingScopes.GrantedScopes, [Scopes.ModeratorManageChatMessages])
+                    .Length > 0
+                    ? Task.FromResult<HostBotReadinessOutcome>(
+                        new HostBotReadinessOutcome.NeedsAuthorization(configured)
+                    )
+                    : EvaluateAuthorizedReadinessAsync(
+                        channelLogin,
+                        tokenStatus.BotLogin,
+                        missingScopes.AccessToken,
+                        missingScopes.Validation,
+                        missingScopes.GrantedScopes,
+                        configured,
+                        ct
+                    ),
             ready =>
                 EvaluateAuthorizedReadinessAsync(
                     channelLogin,
@@ -180,8 +195,8 @@ public sealed class HostBotStatusService(
         try
         {
             var token = await appTokens.GetAccessTokenAsync(ct);
-            return await helix.IsStreamLiveAsync(HelixContext(token), channelLogin, ct)
-                ? new HostStreamLivenessOutcome.Live()
+            return await helix.GetStreamAsync(HelixContext(token), channelLogin, ct) is { } stream
+                ? new HostStreamLivenessOutcome.Live(stream.Id)
                 : new HostStreamLivenessOutcome.Offline();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -295,6 +310,24 @@ public sealed class HostBotStatusService(
             scopes.Contains(Scopes.ModeratorReadFollowers),
             false
         );
+    }
+
+    private async Task<bool> PinEnabledAsync(string channelLogin, CancellationToken ct)
+    {
+        if (dbFactory is null)
+        {
+            return false;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var normalized = Login.Normalize(channelLogin);
+        return await db
+            .ReplyPinPolicies.AsNoTracking()
+            .AnyAsync(
+                policy =>
+                    db.Hosts.Any(host => host.Id == policy.HostId && host.Login == normalized),
+                ct
+            );
     }
 
     private static HostBotReadinessCapabilities GrantedCapabilities(

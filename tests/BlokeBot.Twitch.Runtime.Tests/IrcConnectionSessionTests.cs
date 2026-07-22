@@ -8,6 +8,50 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class IrcConnectionSessionTests
 {
     [Test]
+    public async Task StartupMessageDisabled_FreshSessionsJoinWithoutChatAttempt()
+    {
+        var channels = new StaticChannelProvider(["Channel"]);
+        var lifecycle = new RecordingLifecycleNotifier();
+        var chat = new RejectingChatSender();
+        var session = new IrcConnectionSession(
+            BotSettings.FromOptions(new BotOptions()),
+            channels,
+            null!,
+            null!,
+            lifecycle,
+            new StaticStartupMessageProvider(new StartupChatMessage.Disabled()),
+            chat,
+            null!,
+            new BotRuntimeStatusStore(),
+            [],
+            null!,
+            new RecordingLogger<IrcConnectionSession>()
+        );
+        var joinedChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var stream = new MemoryStream();
+        await using var writer = new StreamWriter(
+            stream,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 1024,
+            leaveOpen: true
+        )
+        {
+            NewLine = "\r\n",
+            AutoFlush = true,
+        };
+
+        await session.SyncJoinedChannelsAsync(writer, joinedChannels, CancellationToken.None);
+
+        var reconnectChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await session.SyncJoinedChannelsAsync(writer, reconnectChannels, CancellationToken.None);
+
+        chat.Messages.ShouldBeEmpty();
+        joinedChannels.ShouldBe(["channel"]);
+        reconnectChannels.ShouldBe(["channel"]);
+        lifecycle.StartedChannels.ShouldBe(["channel", "channel"]);
+    }
+
+    [Test]
     public async Task StartupMessageRejected_SynchronizingChannel_JoinsAndStartsLifecycleOnce()
     {
         const string PrivateStartupMessage = "private startup payload";
@@ -22,6 +66,7 @@ public sealed class IrcConnectionSessionTests
             null!,
             null!,
             lifecycle,
+            new StaticStartupMessageProvider(new StartupChatMessage.Enabled(PrivateStartupMessage)),
             chat,
             null!,
             status,
@@ -66,6 +111,67 @@ public sealed class IrcConnectionSessionTests
         logger.Entries.ShouldNotContain(entry => entry.Message.Contains("accepted"));
     }
 
+    [Test]
+    public async Task EnabledStartupMessage_FreshSessionsDeliverOnceAndDuplicateSyncDoesNotResend()
+    {
+        var channels = new StaticChannelProvider(["Channel"]);
+        var lifecycle = new RecordingLifecycleNotifier();
+        var chat = new AcceptingChatSender();
+        var session = new IrcConnectionSession(
+            BotSettings.FromOptions(new BotOptions()),
+            channels,
+            null!,
+            null!,
+            lifecycle,
+            new StaticStartupMessageProvider(new StartupChatMessage.Enabled("Hello")),
+            chat,
+            null!,
+            new BotRuntimeStatusStore(),
+            [],
+            null!,
+            new RecordingLogger<IrcConnectionSession>()
+        );
+        await using var stream = new MemoryStream();
+        await using var writer = new StreamWriter(
+            stream,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 1024,
+            leaveOpen: true
+        )
+        {
+            NewLine = "\r\n",
+            AutoFlush = true,
+        };
+        var initialSessionChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        await session.SyncJoinedChannelsAsync(
+            writer,
+            initialSessionChannels,
+            CancellationToken.None
+        );
+        await session.SyncJoinedChannelsAsync(
+            writer,
+            initialSessionChannels,
+            CancellationToken.None
+        );
+
+        chat.Messages.ShouldBe([new SentMessage("channel", "Hello")]);
+        lifecycle.StartedChannels.ShouldBe(["channel"]);
+
+        var reconnectSessionChannels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await session.SyncJoinedChannelsAsync(
+            writer,
+            reconnectSessionChannels,
+            CancellationToken.None
+        );
+
+        chat.Messages.ShouldBe([
+            new SentMessage("channel", "Hello"),
+            new SentMessage("channel", "Hello"),
+        ]);
+        lifecycle.StartedChannels.ShouldBe(["channel", "channel"]);
+    }
+
     private sealed class StaticChannelProvider(IReadOnlyList<string> channels) : IBotChannelProvider
     {
         public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
@@ -74,6 +180,19 @@ public sealed class IrcConnectionSessionTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(channels);
+        }
+    }
+
+    private sealed class StaticStartupMessageProvider(StartupChatMessage message)
+        : IStartupChatMessageProvider
+    {
+        public ValueTask<StartupChatMessage> GetAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(message);
         }
     }
 
@@ -116,6 +235,25 @@ public sealed class IrcConnectionSessionTests
             Deadlines.Add(deadline);
             return ValueTask.FromResult<PublicChatSendOutcome>(
                 new PublicChatSendOutcome.Rejected()
+            );
+        }
+    }
+
+    private sealed class AcceptingChatSender : IPublicChatMessageSender
+    {
+        internal List<SentMessage> Messages { get; } = [];
+
+        public ValueTask<PublicChatSendOutcome> SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Messages.Add(new SentMessage(channel, message));
+            return ValueTask.FromResult<PublicChatSendOutcome>(
+                new PublicChatSendOutcome.Accepted()
             );
         }
     }

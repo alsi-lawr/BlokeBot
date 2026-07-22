@@ -19,6 +19,10 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<CustomCommand> CustomCommands => Set<CustomCommand>();
     public DbSet<CustomCommandAction> CustomCommandActions => Set<CustomCommandAction>();
     public DbSet<CustomCommandAlias> CustomCommandAliases => Set<CustomCommandAlias>();
+    public DbSet<CustomCommandInvocationClaim> CustomCommandInvocationClaims =>
+        Set<CustomCommandInvocationClaim>();
+    public DbSet<CustomCommandInvocationResetAudit> CustomCommandInvocationResetAudits =>
+        Set<CustomCommandInvocationResetAudit>();
     public DbSet<CustomCounter> CustomCounters => Set<CustomCounter>();
     public DbSet<CustomAnnouncement> CustomAnnouncements => Set<CustomAnnouncement>();
     public DbSet<CustomAnnouncementSchedule> CustomAnnouncementSchedules =>
@@ -29,6 +33,9 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<PublicChatOutboxMessage> PublicChatOutboxMessages =>
         Set<PublicChatOutboxMessage>();
     public DbSet<PublicChatSendReceipt> PublicChatSendReceipts => Set<PublicChatSendReceipt>();
+    public DbSet<ReplyPinPolicy> ReplyPinPolicies => Set<ReplyPinPolicy>();
+    public DbSet<PublicChatPinOperation> PublicChatPinOperations => Set<PublicChatPinOperation>();
+    public DbSet<ActivePublicChatPin> ActivePublicChatPins => Set<ActivePublicChatPin>();
     public DbSet<PointBalance> PointBalances => Set<PointBalance>();
     public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
     public DbSet<PointsGiveaway> PointsGiveaways => Set<PointsGiveaway>();

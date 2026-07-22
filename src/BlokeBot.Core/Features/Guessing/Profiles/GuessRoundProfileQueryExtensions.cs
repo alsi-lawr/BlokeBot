@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using BlokeBot.Core.Features.Guessing.Guesses;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -107,8 +108,10 @@ internal static class GuessRoundProfileQueryExtensions
                     profile.Name,
                     GuessingReplySettingsMapper.FromPersistence(profile.ReplySettings),
                     profile
-                        .Options.OrderBy(option => option.Name)
-                        .Select(option => option.Name)
+                        .Options.Select(option =>
+                            GuessAnswerNames.Parse(option.Name).Canonical.Value
+                        )
+                        .Order(StringComparer.OrdinalIgnoreCase)
                         .ToImmutableArray()
                 );
         }

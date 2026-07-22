@@ -16,6 +16,13 @@ internal sealed class OAuthFlow(
         return oauth.BuildAuthorizeUri(state);
     }
 
+    public Uri CreateAuthorizationUri(IEnumerable<string?> additionalScopes)
+    {
+        ArgumentNullException.ThrowIfNull(additionalScopes);
+        var state = states.Issue();
+        return oauth.BuildAuthorizeUri(state, additionalScopes);
+    }
+
     public Task<OAuthFlowCompletionOutcome> CompleteAuthorizationAsync(
         string code,
         string state,

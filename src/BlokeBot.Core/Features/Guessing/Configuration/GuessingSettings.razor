@@ -57,6 +57,27 @@
             <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                           WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                           Options="_whisperReplyOptions" />
+            <section class="card mt-6 space-y-4 p-6" aria-labelledby="round-start-pin-title">
+                <div>
+                    <h2 id="round-start-pin-title" class="text-lg font-bold">Round start pin</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Pin the confirmed round-start reply in Twitch chat.</p>
+                </div>
+                <label class="flex items-center gap-3 text-sm font-medium">
+                    <input type="checkbox" @bind="_config.Pin.Enabled" />
+                    Pin round-start replies
+                </label>
+                @if (_config.Pin.Enabled)
+                {
+                    <label class="block text-sm font-medium">
+                        Duration in seconds (leave blank for until stream end)
+                        <input class="input mt-2" type="number" min="30" max="1800" @bind="_config.Pin.DurationSeconds" />
+                    </label>
+                    <label class="flex items-center gap-3 text-sm font-medium">
+                        <input type="checkbox" @bind="_config.Pin.UnpinWhenRoundStops" />
+                        Remove this pin when the round stops
+                    </label>
+                }
+            </section>
         </div>
     }
 </div>

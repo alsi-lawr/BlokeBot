@@ -195,6 +195,7 @@ public sealed class CustomCommandConfigurationGraphWriter(
             command.ModeratorOnly = editor.ModeratorOnly;
             command.CooldownSeconds = editor.CooldownSeconds;
             command.CooldownScope = editor.CooldownScope;
+            command.InvocationLimit = editor.InvocationLimit;
             command.Action = CustomCommandConfigurationMapper.ActionMatches(
                 command.Action,
                 editor.Action

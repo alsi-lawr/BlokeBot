@@ -171,7 +171,9 @@ public partial class PageHelpButton
             new(
                 "Round types",
                 "Create one or more kinds of guessing game. Each one can have its own answer list and chat replies.",
-                []
+                [
+                    "For each answer, enter its canonical name first and any accepted aliases after it, separated by commas.",
+                ]
             ),
             new(
                 "Commands",

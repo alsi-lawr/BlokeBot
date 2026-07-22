@@ -15,6 +15,22 @@ internal sealed class OAuthClient(BotIdentity identity, OAuthTransport transport
         );
     }
 
+    public Uri BuildAuthorizeUri(string state, IEnumerable<string?> additionalScopes)
+    {
+        ArgumentNullException.ThrowIfNull(additionalScopes);
+        return transport.CreateAuthorizationUri(
+            new AuthorizationUriRequest(
+                identity.ClientId,
+                identity.RedirectUri,
+                OAuthAuthorizationScopeSet.Create(
+                    ScopeSet.NormalizeMany(identity.Scopes.Concat(additionalScopes))
+                ),
+                state,
+                AuthorizationVerificationPolicy.ForceAccountVerification
+            )
+        );
+    }
+
     public async Task<TokenSet> ExchangeCodeAsync(string code, CancellationToken cancellationToken)
     {
         var response = await transport.ExchangeCodeAsync(

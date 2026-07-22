@@ -14,6 +14,8 @@ public partial class CustomCommandSettingsPage
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
         Enum.GetValues<CustomCommandCooldownScope>();
+    private static readonly IReadOnlyList<CustomCommandInvocationLimit> _invocationLimits =
+        Enum.GetValues<CustomCommandInvocationLimit>();
     private static readonly IReadOnlyList<CustomCommandActionKind> _actionKinds =
         Enum.GetValues<CustomCommandActionKind>();
     private static readonly IReadOnlyList<CustomAnnouncementScheduleKind> _announcementScheduleKinds =
@@ -43,6 +45,7 @@ public partial class CustomCommandSettingsPage
     private readonly Dictionary<string, ElementReference> _controls = [];
     private ElementReference _commandsTab;
     private ElementReference _messageLibraryTab;
+    private int? _pendingResetAllCommandId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -79,6 +82,7 @@ public partial class CustomCommandSettingsPage
         _validationErrors = [];
         _activeTab = CustomCommandSettingsTab.Commands;
         _focusTarget = null;
+        _pendingResetAllCommandId = null;
     }
 
     private Task SaveAsync()
@@ -427,6 +431,16 @@ public partial class CustomCommandSettingsPage
         return $"command-{command.Id}-cooldown-scope";
     }
 
+    private static string CommandInvocationLimitFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-invocation-limit";
+    }
+
+    private static string CommandResetViewerFieldId(CustomCommandEditor command)
+    {
+        return $"command-{command.Id}-reset-viewer";
+    }
+
     private static string CommandActionFieldId(CustomCommandEditor command)
     {
         return $"command-{command.Id}-action-kind";
@@ -591,6 +605,10 @@ public partial class CustomCommandSettingsPage
                 EntityKind: CustomCommandValidationEntityKind.Command,
                 FieldKind: CustomCommandValidationFieldKind.CooldownScope
             } => $"command-{target.EntityId}-cooldown-scope",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.InvocationLimit
+            } => $"command-{target.EntityId}-invocation-limit",
             {
                 EntityKind: CustomCommandValidationEntityKind.Command,
                 FieldKind: CustomCommandValidationFieldKind.Action
@@ -771,6 +789,118 @@ public partial class CustomCommandSettingsPage
         _config?.Commands.Remove(command);
     }
 
+    private Task ResetViewerAsync(CustomCommandEditor command)
+    {
+        return ObserveUiOperationAsync(
+            nameof(ResetViewerAsync),
+            () => ResetViewerCoreAsync(command)
+        );
+    }
+
+    private async Task ResetViewerCoreAsync(CustomCommandEditor command)
+    {
+        if (HostId == 0 || command.Id <= 0)
+        {
+            return;
+        }
+
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var outcome = await _invocationResets.ResetViewerAsync(
+                    HostId,
+                    command.Id,
+                    new CustomCommandResetActor(PageContext.Session.UserId, ActorLogin),
+                    command.ResetViewerLogin,
+                    CancellationToken.None
+                );
+                switch (outcome)
+                {
+                    case CustomCommandInvocationResetOutcome.Reset reset:
+                        _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>(
+                                $"Reset {reset.AffectedClaimCount} lifetime viewer use{(reset.AffectedClaimCount == 1 ? string.Empty : "s")}."
+                            )
+                        );
+                        break;
+                    case CustomCommandInvocationResetOutcome.ViewerNotFound:
+                        _toasts.Publish(
+                            new ToastRequest<WarningToastStrategy>(
+                                "That Twitch viewer could not be found."
+                            )
+                        );
+                        break;
+                    case CustomCommandInvocationResetOutcome.CommandNotFound:
+                        _toasts.Publish(
+                            new ToastRequest<ErrorToastStrategy>(
+                                "That command is no longer available. Reload and try again."
+                            )
+                        );
+                        break;
+                }
+            }
+        );
+    }
+
+    private Task ResetAllViewersAsync(CustomCommandEditor command)
+    {
+        return ObserveUiOperationAsync(
+            nameof(ResetAllViewersAsync),
+            () => ResetAllViewersCoreAsync(command)
+        );
+    }
+
+    private void RequestResetAllViewers(CustomCommandEditor command)
+    {
+        _pendingResetAllCommandId = command.Id > 0 ? command.Id : null;
+    }
+
+    private void CancelResetAllViewers()
+    {
+        _pendingResetAllCommandId = null;
+    }
+
+    private async Task ResetAllViewersCoreAsync(CustomCommandEditor command)
+    {
+        if (HostId == 0 || command.Id <= 0 || _pendingResetAllCommandId != command.Id)
+        {
+            return;
+        }
+
+        _pendingResetAllCommandId = null;
+
+        await RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var outcome = await _invocationResets.ResetAllViewersAsync(
+                    HostId,
+                    command.Id,
+                    new CustomCommandResetActor(PageContext.Session.UserId, ActorLogin),
+                    CancellationToken.None
+                );
+                switch (outcome)
+                {
+                    case CustomCommandInvocationResetOutcome.Reset reset:
+                        _toasts.Publish(
+                            new ToastRequest<SuccessToastStrategy>(
+                                $"Reset {reset.AffectedClaimCount} lifetime viewer use{(reset.AffectedClaimCount == 1 ? string.Empty : "s")}."
+                            )
+                        );
+                        break;
+                    case CustomCommandInvocationResetOutcome.CommandNotFound:
+                        _toasts.Publish(
+                            new ToastRequest<ErrorToastStrategy>(
+                                "That command is no longer available. Reload and try again."
+                            )
+                        );
+                        break;
+                }
+            }
+        );
+    }
+
     private void AddCounter()
     {
         if (_config is null)
@@ -865,6 +995,18 @@ public partial class CustomCommandSettingsPage
             CustomCommandCooldownScope.Global => "Everyone shares the wait",
             CustomCommandCooldownScope.User => "Each viewer has their own wait",
             _ => "Choose who waits",
+        };
+    }
+
+    private static string InvocationLimitLabel(CustomCommandInvocationLimit limit)
+    {
+        return limit switch
+        {
+            CustomCommandInvocationLimit.Unlimited => "No use limit",
+            CustomCommandInvocationLimit.OncePerStream => "Once each stream",
+            CustomCommandInvocationLimit.OncePerUser => "Once per viewer (until reset)",
+            CustomCommandInvocationLimit.OncePerStreamPerUser => "Once per viewer each stream",
+            _ => "Choose a use limit",
         };
     }
 

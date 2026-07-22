@@ -26,12 +26,19 @@ public sealed class GuessingDashboardService(IDbContextFactory<BlokeBotDbContext
         }
 
         var profileId = round?.ProfileId ?? await db.Profiles.LoadDefaultProfileIdAsync(hostId, ct);
-        var options = await db
+        var optionRows = await db
             .GuessOptions.AsNoTracking()
             .Where(x => x.GuessRoundProfileId == profileId)
-            .OrderBy(x => x.Name)
-            .Select(x => new GuessOptionEditor { Name = x.Name, ReplyText = x.ReplyText })
+            .Select(x => new { x.Name, x.ReplyText })
             .ToListAsync(ct);
+        var options = optionRows
+            .Select(option => new GuessOptionEditor
+            {
+                Name = GuessAnswerNames.Parse(option.Name).Canonical.Value,
+                ReplyText = option.ReplyText,
+            })
+            .OrderBy(option => option.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return new GuessingDashboardState
         {

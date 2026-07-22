@@ -327,7 +327,7 @@ internal static class SiteGuideCatalog
                     Steps =
                     [
                         "Turn on Guessing game and open its Settings page.",
-                        "Create a round type, add every accepted answer and choose any winner point reward.",
+                        "Create a round type, add every accepted answer, put comma-separated aliases after its canonical name, and choose any winner point reward.",
                         "Review the chat commands and bot replies, then save.",
                     ],
                 },
@@ -338,7 +338,7 @@ internal static class SiteGuideCatalog
                     [
                         "Open the Guessing game Dashboard and choose the round type.",
                         "Start the round, let viewers guess, then stop guessing.",
-                        "Enter the winning answer exactly as configured and declare the winner.",
+                        "Enter the winning answer or one of its aliases and declare the winner.",
                     ],
                     Paragraphs =
                     [

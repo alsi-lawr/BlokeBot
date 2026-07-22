@@ -96,6 +96,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRuntimeIdleWait, RuntimeIdleWait>();
         RegisterPolicies(services, policies);
         services.AddSingleton<IBotAccountProvider, DefaultBotAccountProvider>();
+        services.TryAddSingleton<
+            IStartupChatMessageProvider,
+            ConfiguredStartupChatMessageProvider
+        >();
         services.AddSingleton<ICommandResponseSender, PublicChatCommandResponseSender>();
         services.AddSingleton<IBotChannelLifecycleNotifier, NoOpBotChannelLifecycleNotifier>();
         services.AddAuth();
@@ -127,6 +131,9 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<ChatIdentityResolver>();
         services.TryAddSingleton<PublicChatMessageQueue>();
         services.AddHostedService<PublicChatOutboxWorker>();
+        services.TryAddSingleton<IPublicChatPinStore, UnavailablePublicChatPinStore>();
+        services.TryAddSingleton<IPublicChatPinProvider, HelixPublicChatPinProvider>();
+        services.AddHostedService<PublicChatPinWorker>();
         services.TryAddSingleton<IPublicChatMessageSender, PublicChatMessageSender>();
         services.AddSingleton<BotRuntimeStatusStore>();
         services.AddSingleton<IBotRuntimeStatusAccessor>(sp =>

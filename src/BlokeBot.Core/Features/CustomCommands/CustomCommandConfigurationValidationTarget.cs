@@ -27,6 +27,7 @@ public enum CustomCommandValidationFieldKind
     Counter,
     Cooldown,
     CooldownScope,
+    InvocationLimit,
     Delivery,
     Color,
     RetryDelay,

@@ -81,6 +81,7 @@ public sealed record CustomCommandValue
         bool moderatorOnly,
         int cooldownSeconds,
         CustomCommandCooldownScope cooldownScope,
+        CustomCommandInvocationLimit invocationLimit,
         CustomCommandActionValue action
     )
     {
@@ -91,6 +92,7 @@ public sealed record CustomCommandValue
         ModeratorOnly = moderatorOnly;
         CooldownSeconds = cooldownSeconds;
         CooldownScope = cooldownScope;
+        InvocationLimit = invocationLimit;
         Action = action;
     }
 
@@ -107,6 +109,8 @@ public sealed record CustomCommandValue
     public int CooldownSeconds { get; }
 
     public CustomCommandCooldownScope CooldownScope { get; }
+
+    public CustomCommandInvocationLimit InvocationLimit { get; }
 
     public CustomCommandActionValue Action { get; }
 }

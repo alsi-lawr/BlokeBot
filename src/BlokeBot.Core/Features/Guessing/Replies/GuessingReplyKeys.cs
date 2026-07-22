@@ -2,6 +2,7 @@ namespace BlokeBot.Core.Features.Guessing.Replies;
 
 public static class GuessingReplyKeys
 {
+    public const string RoundStarted = "round_started";
     public const string RoundAlreadyOpen = "round_already_open";
     public const string NoOpenRound = "no_open_round";
     public const string GuessingAlreadyStopped = "guessing_already_stopped";

@@ -16,7 +16,11 @@ public enum CommandResponseTarget
     Whisper,
 }
 
-public sealed record CommandResponse(CommandResponseTarget Target, string Message)
+public sealed record CommandResponse(
+    CommandResponseTarget Target,
+    string Message,
+    PublicChatPinIntent? Pin = null
+)
 {
     public static CommandResponse Chat(string message)
     {
@@ -26,5 +30,32 @@ public sealed record CommandResponse(CommandResponseTarget Target, string Messag
     public static CommandResponse Whisper(string message)
     {
         return new(CommandResponseTarget.Whisper, message);
+    }
+}
+
+public sealed record PublicChatPinIntent(
+    int HostId,
+    long OwnerId,
+    string Feature,
+    string ReplyKey,
+    int? DurationSeconds,
+    bool UnpinOnOwnerCompletion
+)
+{
+    public PublicChatPinIntent Validate()
+    {
+        if (HostId <= 0 || OwnerId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(HostId));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(Feature);
+        ArgumentException.ThrowIfNullOrWhiteSpace(ReplyKey);
+        if (DurationSeconds is { } seconds && seconds is < 30 or > 1800)
+        {
+            throw new ArgumentOutOfRangeException(nameof(DurationSeconds));
+        }
+
+        return this;
     }
 }

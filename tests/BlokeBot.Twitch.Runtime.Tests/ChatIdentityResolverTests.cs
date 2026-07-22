@@ -85,6 +85,7 @@ public sealed class ChatIdentityResolverTests
             new UnusedAccountProvider(),
             CreateResolver(factory),
             new EventSubClient(factory),
+            null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier()
         );
@@ -113,6 +114,7 @@ public sealed class ChatIdentityResolverTests
             new UnusedAccountProvider(),
             CreateResolver(factory),
             new EventSubClient(factory),
+            null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier()
         );
@@ -214,6 +216,26 @@ public sealed class ChatIdentityResolverTests
     }
 
     [Test]
+    public async Task DisabledStartupMessage_InitialAndReconnectDelivery_CompleteWithoutChatAttempt()
+    {
+        var chat = new ScriptedChatSender(new PublicChatSendOutcome.Accepted());
+        var operations = StartupOperations(chat, new StartupChatMessage.Disabled());
+
+        var outcome = await operations.DeliverStartupMessageAsync(
+            "private-channel-login",
+            CancellationToken.None
+        );
+        var reconnectOutcome = await operations.DeliverStartupMessageAsync(
+            "private-channel-login",
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
+        reconnectOutcome.ShouldBeOfType<EventSubStartupDeliveryOutcome.Completed>();
+        chat.Messages.ShouldBeEmpty();
+    }
+
+    [Test]
     public async Task RejectedStartupMessage_Delivering_ReturnsTypedRejection()
     {
         var chat = new ScriptedChatSender(new PublicChatSendOutcome.Rejected());
@@ -253,7 +275,10 @@ public sealed class ChatIdentityResolverTests
         return new(Identity(), new HelixClient(factory));
     }
 
-    private static EventSubChannelOperations StartupOperations(IPublicChatMessageSender sender)
+    private static EventSubChannelOperations StartupOperations(
+        IPublicChatMessageSender sender,
+        StartupChatMessage? startupMessage = null
+    )
     {
         var factory = new IdentityHttpClientFactory("""{"data":[]}""");
         return new(
@@ -261,9 +286,25 @@ public sealed class ChatIdentityResolverTests
             new UnusedAccountProvider(),
             CreateResolver(factory),
             new EventSubClient(factory),
+            new StaticStartupMessageProvider(
+                startupMessage ?? new StartupChatMessage.Enabled("private startup payload")
+            ),
             sender,
             new UnusedLifecycleNotifier()
         );
+    }
+
+    private sealed class StaticStartupMessageProvider(StartupChatMessage message)
+        : IStartupChatMessageProvider
+    {
+        public ValueTask<StartupChatMessage> GetAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(message);
+        }
     }
 
     private static BotSettings Settings(string startupMessage = "")

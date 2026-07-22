@@ -24,5 +24,9 @@ public sealed class BotHost
 
     public string TimeZoneId { get; set; } = "UTC";
 
+    public bool? StartupMessageEnabled { get; set; }
+
+    public string? StartupMessageText { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }

@@ -88,6 +88,8 @@ public sealed class PublicChatSendReceipt
     public string? DeliveredDeduplicationKey { get; set; }
 
     public DateTime? DeliveredAtUtc { get; set; }
+
+    public string? TwitchMessageId { get; set; }
 }
 
 public enum PublicChatOutboxFailurePhase

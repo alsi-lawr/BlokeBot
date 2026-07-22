@@ -152,7 +152,8 @@ internal abstract record PublicChatDeliveryOutcome
         Action<Unexpected> unexpected
     );
 
-    internal sealed record Sent : PublicChatDeliveryOutcome
+    internal sealed record Sent(string TwitchMessageId = "test-message-id")
+        : PublicChatDeliveryOutcome
     {
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,
@@ -562,7 +563,8 @@ internal abstract record PublicChatTransportSendResult
 
     internal abstract void Match(Action<Sent> sent, Action<Rejected> rejected);
 
-    internal sealed record Sent : PublicChatTransportSendResult
+    internal sealed record Sent(string TwitchMessageId = "test-message-id")
+        : PublicChatTransportSendResult
     {
         internal override TResult Match<TResult>(
             Func<Sent, TResult> sent,

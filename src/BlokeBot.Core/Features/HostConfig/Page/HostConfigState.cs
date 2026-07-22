@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.HostConfig.Access;
+using BlokeBot.Core.Features.HostConfig.StartupMessage;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -15,6 +16,7 @@ public sealed record HostConfigState(
     bool IsHostCreated,
     bool IsChannelBotAuthorized,
     HostedChannelRuntimeSummary? RuntimeStatus,
+    StartupMessageConfiguration StartupMessage,
     HostBotAccountOverrideState BotOverride,
     IReadOnlyList<HostFeatureCardState> Features,
     HostModAccessState ModAccess

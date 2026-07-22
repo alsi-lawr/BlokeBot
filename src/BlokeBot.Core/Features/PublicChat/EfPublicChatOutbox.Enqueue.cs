@@ -69,8 +69,61 @@ internal sealed partial class EfPublicChatOutbox(
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
             db.PublicChatOutboxMessages.AddRange(rows);
             await db.SaveChangesAsync(cancellationToken);
+            foreach (var pair in rows.Zip(batch.Items))
+            {
+                if (pair.Second.PinIntent is not { } intent)
+                {
+                    continue;
+                }
+
+                var normalizedChannel = Login.Normalize(batch.Channel);
+                var hostMatchesChannel = await db.Hosts.AnyAsync(
+                    host => host.Id == intent.HostId && host.Login == normalizedChannel,
+                    cancellationToken
+                );
+                var ownerIsActive =
+                    hostMatchesChannel
+                    && (
+                        intent.Feature != "guessing"
+                        || await db.Rounds.AnyAsync(
+                            round =>
+                                round.Id == intent.OwnerId
+                                && round.HostId == intent.HostId
+                                && round.Status == GuessRoundStatus.Open,
+                            cancellationToken
+                        )
+                    );
+                if (!ownerIsActive)
+                {
+                    continue;
+                }
+
+                db.PublicChatPinOperations.Add(
+                    new PublicChatPinOperation
+                    {
+                        Kind = PublicChatPinOperationKind.Pin,
+                        Status = PublicChatPinOperationStatus.AwaitingDelivery,
+                        OutboxMessageId = pair.First.Id,
+                        HostId = intent.HostId,
+                        Channel = normalizedChannel,
+                        Feature = intent.Feature,
+                        ReplyKey = intent.ReplyKey,
+                        OwnerId = intent.OwnerId,
+                        DurationSeconds = intent.DurationSeconds,
+                        UnpinOnOwnerCompletion = intent.UnpinOnOwnerCompletion,
+                        TwitchMessageId = string.Empty,
+                        CreatedAtUtc = createdAtUtc,
+                    }
+                );
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return new PublicChatEnqueueOutcome.Accepted(
                 new PublicChatOutboxReceipt([.. rows.Select(row => row.Id)])
             );

@@ -236,7 +236,11 @@ public abstract class WhisperResponseTestBase
         }
     }
 
-    private protected sealed record SentChatMessage(string Channel, string Message);
+    private protected sealed record SentChatMessage(
+        string Channel,
+        string Message,
+        PublicChatPinIntent? Pin = null
+    );
 
     private protected sealed record HandledPrivateDeliveryFailure(
         PrivateDeliveryError Error,
@@ -281,6 +285,18 @@ public abstract class WhisperResponseTestBase
         )
         {
             Messages.Add(new SentChatMessage(channel, message));
+            return ValueTask.FromResult(outcome);
+        }
+
+        public ValueTask<PublicChatSendOutcome> SendAsync(
+            string channel,
+            string message,
+            PublicChatDeliveryDeadline deadline,
+            PublicChatPinIntent pinIntent,
+            CancellationToken cancellationToken
+        )
+        {
+            Messages.Add(new SentChatMessage(channel, message, pinIntent));
             return ValueTask.FromResult(outcome);
         }
     }

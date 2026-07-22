@@ -287,6 +287,15 @@ public static class CustomCommandConfigurationValidator
                 );
             }
 
+            if (!Enum.IsDefined(editor.InvocationLimit))
+            {
+                AddError(
+                    errors,
+                    $"Choose how often command '{names[index]}' can be used.",
+                    CommandTarget(editor.Id, CustomCommandValidationFieldKind.InvocationLimit)
+                );
+            }
+
             var action = editor.Action switch
             {
                 MessageCustomCommandActionEditor message => new CustomCommandActionValue.Message(
@@ -344,6 +353,7 @@ public static class CustomCommandConfigurationValidator
                     editor.ModeratorOnly,
                     editor.CooldownSeconds,
                     editor.CooldownScope,
+                    editor.InvocationLimit,
                     action
                 )
             );

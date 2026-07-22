@@ -67,6 +67,7 @@ public partial class HostConfigPage
 
         if (_state is { IsHostCreated: true } loadedState)
         {
+            LoadStartupMessageDraft(loadedState.StartupMessage);
             await LoadAccessEntriesAsync(loadedState.ModAccess);
         }
         else

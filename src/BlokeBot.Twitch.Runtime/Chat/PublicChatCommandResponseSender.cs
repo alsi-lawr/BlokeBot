@@ -22,12 +22,21 @@ internal sealed class PublicChatCommandResponseSender(
             return;
         }
 
-        var outcome = await sender.SendAsync(
-            sourceMessage.Channel,
-            response.Message,
-            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-            cancellationToken
-        );
+        var deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum();
+        var outcome = response.Pin is { } pin
+            ? await sender.SendAsync(
+                sourceMessage.Channel,
+                response.Message,
+                deadline,
+                pin,
+                cancellationToken
+            )
+            : await sender.SendAsync(
+                sourceMessage.Channel,
+                response.Message,
+                deadline,
+                cancellationToken
+            );
         outcome
             .Match<Action>(
                 static _ => static () => { },

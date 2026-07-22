@@ -16,6 +16,14 @@ public sealed class CustomCommandModule(CustomCommandExecutionService execution)
         CancellationToken cancellationToken
     )
     {
-        return await execution.ExecuteAsync(context, args, cancellationToken);
+        var outcome = await execution.ExecuteAsync(context, args, cancellationToken);
+        return outcome.Match<CommandHandlingOutcome>(
+            _ => new CommandHandlingOutcome.Unhandled(),
+            _ => new CommandHandlingOutcome.Handled(),
+            _ => new CommandHandlingOutcome.Handled(),
+            _ => new CommandHandlingOutcome.Handled(),
+            _ => new CommandHandlingOutcome.Handled(),
+            _ => new CommandHandlingOutcome.Handled()
+        );
     }
 }
