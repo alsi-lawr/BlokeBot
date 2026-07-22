@@ -1,8 +1,8 @@
 --[[
 # viset
 version = 1
-output_root = "../assets/simulation"
-output = "screenshots/{device}-{theme}-{view}.png"
+output_root = "../src/BlokeBot.Site/wwwroot/media"
+output = "{device}-{theme}-{view}.png"
 frame = "builtin:auto"
 browser_arguments = [
   "--disable-background-networking",
@@ -41,15 +41,10 @@ theme = ["light", "dark"]
 view = [
   "home",
   "channel-setup",
-  "alerts",
-  "guessing",
-  "guessing-settings",
-  "points",
-  "points-settings",
   "custom-commands",
-  "admin",
   "guessing-leaderboard",
-  "points-leaderboard",
+  "points-settings",
+  "admin",
 ]
 ]]
 
