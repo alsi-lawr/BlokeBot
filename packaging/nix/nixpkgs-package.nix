@@ -21,6 +21,8 @@ buildDotnetModule {
   pname = "blokebot";
   inherit version src;
 
+  postPatch = "rm dotnet-tools.json";
+
   projectFile = "src/BlokeBot/BlokeBot.csproj";
   nugetDeps = ./deps.json;
   dotnet-sdk = dotnetCorePackages.sdk_10_0;
