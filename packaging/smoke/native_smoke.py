@@ -14,8 +14,12 @@ import urllib.error
 import urllib.request
 
 
-LOGIN_MARKERS = ("Sign in to BlokeBot", "Continue with Twitch", "Public leaderboard")
-ACCEPTED_LOGIN_STATUSES = frozenset({200, 503})
+OFFLINE_AUTH_MARKERS = (
+    "Twitch connection unavailable",
+    "This Twitch connection is not available yet.",
+    "An administrator needs to check the connection settings.",
+)
+OFFLINE_AUTH_STATUS = 503
 
 
 class NativeSmokeError(RuntimeError):
@@ -62,29 +66,29 @@ def _read_http_body(url: str) -> str:
         with response:
             status = response.status
             body = response.read()
-    if status not in ACCEPTED_LOGIN_STATUSES:
+    if status != OFFLINE_AUTH_STATUS:
         raise NativeSmokeError(f"Unexpected HTTP status {status} from {url}")
     return body.decode("utf-8")
 
 
-def _wait_for_login_surface(process: subprocess.Popen[bytes], url: str) -> None:
+def _wait_for_offline_auth_surface(process: subprocess.Popen[bytes], url: str) -> None:
     deadline = time.monotonic() + 30
     last_error: Exception | None = None
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise NativeSmokeError(
-                f"serve exited with {process.returncode} before the login surface was ready"
+                f"serve exited with {process.returncode} before the offline auth surface was ready"
             )
         try:
             body = _read_http_body(url)
-            missing = [marker for marker in LOGIN_MARKERS if marker not in body]
+            missing = [marker for marker in OFFLINE_AUTH_MARKERS if marker not in body]
             if missing:
-                raise NativeSmokeError(f"Login surface is missing: {', '.join(missing)}")
+                raise NativeSmokeError(f"Offline auth surface is missing: {', '.join(missing)}")
             return
         except (OSError, urllib.error.URLError, NativeSmokeError) as error:
             last_error = error
             time.sleep(0.25)
-    raise NativeSmokeError(f"Login surface did not become ready: {last_error}")
+    raise NativeSmokeError(f"Offline auth surface did not become ready: {last_error}")
 
 
 def smoke(executable: Path, version: str) -> None:
@@ -119,7 +123,7 @@ def smoke(executable: Path, version: str) -> None:
             env=_offline_environment(),
         )
         try:
-            _wait_for_login_surface(process, f"http://127.0.0.1:{port}/")
+            _wait_for_offline_auth_surface(process, f"http://127.0.0.1:{port}/auth/login")
         finally:
             process.terminate()
             try:
