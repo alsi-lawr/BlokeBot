@@ -9,6 +9,22 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class StartupMessageSchemaUpgradeTests
 {
     [Test]
+    public async Task HostsTableAbsent_Upgrading_IsNoOp()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
+        await using var db = await dbFactory.CreateDbContextAsync();
+
+        await StartupMessageSchemaUpgrade.ApplyAsync(db, CancellationToken.None);
+        await StartupMessageSchemaUpgrade.ApplyAsync(db, CancellationToken.None);
+
+        var connection = (SqliteConnection)db.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'hosts';";
+        Convert.ToInt32(await command.ExecuteScalarAsync()).ShouldBe(0);
+    }
+
+    [Test]
     public async Task LegacyHostSchema_Initializing_AddsNullableOverrideWithoutChangingHost()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

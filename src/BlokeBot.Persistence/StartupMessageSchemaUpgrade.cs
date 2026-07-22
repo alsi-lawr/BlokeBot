@@ -10,6 +10,11 @@ internal static class StartupMessageSchemaUpgrade
     internal static async Task ApplyAsync(BlokeBotDbContext db, CancellationToken cancellationToken)
     {
         var columns = await ExistingColumnsAsync(db, cancellationToken);
+        if (columns.Count == 0)
+        {
+            return;
+        }
+
         if (columns.Add("StartupMessageEnabled"))
         {
             await db.Database.ExecuteSqlRawAsync(
