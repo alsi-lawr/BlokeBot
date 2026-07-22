@@ -76,7 +76,7 @@ public sealed class WhisperResponseRoutingTests : WhisperResponseTestBase
     }
 
     [Test]
-    public async Task PublicTarget_SendingCommandResponse_ForwardsPinIntent()
+    public async Task PublicTarget_SendingCommandResponse_UsesExistingPublicDeliveryPath()
     {
         await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
         var pin = new PublicChatPinIntent(1, 2, "guessing", "round_started", 300, true);
