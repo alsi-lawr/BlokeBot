@@ -2,6 +2,13 @@
 
 Keep changes focused and do not commit credentials, local configuration, databases, or generated output.
 
+## Tickets and pull requests
+
+Deliver each tracked implementation ticket through its own pull request and merge. Keep unrelated
+tickets out of that pull request, and include `Closes #<issue-number>` in its description so the
+merge closes the ticket. For an issue in another repository, use
+`Closes <owner>/<repository>#<issue-number>`.
+
 Enter the supported development environment with `nix develop`, or install the .NET SDK selected by `global.json` plus Node.js and npm.
 
 ```console
