@@ -1,0 +1,27 @@
+name: Submit upstream package PRs
+on:
+  workflow_dispatch:
+    inputs:
+      version: { description: Existing non-draft release version in strict X.Y.Z form., required: true, type: string }
+      submit_winget: { description: Submit the prepared WinGet fork branch., required: true, default: true, type: boolean }
+      submit_nixpkgs: { description: Submit the prepared nixpkgs fork branch., required: true, default: true, type: boolean }
+permissions: { contents: read }
+jobs:
+  submit:
+    uses: alsi-lawr/package-release-workflows/.github/workflows/submit-upstream-prs.yml@main
+    with:
+      version: ${{ inputs.version }}
+      release_name: BlokeBot
+      submit_winget: ${{ inputs.submit_winget }}
+      submit_nixpkgs: ${{ inputs.submit_nixpkgs }}
+      winget_upstream_repo: microsoft/winget-pkgs
+      winget_fork_owner: ${{ github.repository_owner }}
+      winget_fork_repo: winget-pkgs
+      winget_branch_prefix: winget-blokebot-v
+      nix_upstream_repo: NixOS/nixpkgs
+      nix_fork_owner: ${{ github.repository_owner }}
+      nix_fork_repo: nixpkgs
+      nix_branch_prefix: blokebot-v
+      nix_package_name: blokebot
+    secrets:
+      PACKAGE_REPOSITORY_TOKEN: ${{ secrets.PACKAGE_REPOSITORY_TOKEN }}
