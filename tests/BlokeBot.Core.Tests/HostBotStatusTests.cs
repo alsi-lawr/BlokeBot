@@ -76,15 +76,17 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task FullyAuthorizedBot_CheckingReadiness_ReportsReadyAndFollowerAccess()
+    public async Task FullyAuthorizedBot_CheckingStatus_ReportsReadyAndFollowerAccess()
     {
-        var service = CreateService(AuthorizedTokenStatus(RequiredScopes()));
+        var httpClientFactory = new HostBotStatusHttpClientFactory();
+        var service = CreateService(AuthorizedTokenStatus(RequiredScopes()), httpClientFactory);
 
-        var outcome = await ReadinessAsync(service);
         var status = await service.GetStatus("streamer").RunAsync(CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
+        status.IsModerator.ShouldBeTrue();
+        status.ModeratorCheckCompleted.ShouldBeTrue();
         status.CanReadFollowers.ShouldBeTrue();
+        httpClientFactory.LastModerationUserId.ShouldBe("bot-id");
     }
 
     [Test]
@@ -109,7 +111,7 @@ public sealed class HostBotStatusTests
     }
 
     [Test]
-    public async Task CustomBotIsBroadcaster_CheckingReadiness_TreatsAccountAsChannelAuthority()
+    public async Task CustomBotIsBroadcaster_CheckingStatus_TreatsAccountAsChannelAuthority()
     {
         var httpClientFactory = new HostBotStatusHttpClientFactory { BotIsModerator = false };
         var service = CreateService(
@@ -123,10 +125,10 @@ public sealed class HostBotStatusTests
             httpClientFactory
         );
 
-        var outcome = await ReadinessAsync(service);
         var status = await service.GetStatus("streamer").RunAsync(CancellationToken.None);
 
-        outcome.ShouldBeOfType<HostBotReadinessOutcome.Ready>();
+        status.IsModerator.ShouldBeTrue();
+        status.ModeratorCheckCompleted.ShouldBeTrue();
         status.CanReadFollowers.ShouldBeTrue();
         httpClientFactory.LastModerationUserId.ShouldBeNull();
     }
