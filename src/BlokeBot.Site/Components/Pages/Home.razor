@@ -1,4 +1,5 @@
 @page "/"
+@inject IOptions<BlokeBotSiteOptions> SiteOptions
 
 <PageTitle>BlokeBot — Twitch channel tools you control</PageTitle>
 
@@ -27,6 +28,20 @@
         Caption="One channel dashboard, shaped for the screen in front of you."
         />
 </section>
+
+@if (SiteOptions.Value.LiveAppUri is { } liveAppUri)
+{
+    <section class="docs-callout section-shell" aria-labelledby="live-app-heading">
+        <div>
+            <p class="eyebrow">BlokeBot live</p>
+            <h2 id="live-app-heading">Ready to check it out?</h2>
+            <p>Open the live BlokeBot dashboard and see what is available for your channel.</p>
+        </div>
+        <div class="docs-callout__actions">
+            <a class="button button-primary" href="@liveAppUri"><SiteIcon Name="arrow" />Check it out</a>
+        </div>
+    </section>
+}
 
 <section class="role-strip section-shell" aria-labelledby="choose-path-heading">
     <div class="section-intro">
