@@ -76,17 +76,21 @@ public sealed class WhisperResponseRoutingTests : WhisperResponseTestBase
     }
 
     [Test]
-    public async Task PublicTarget_SendingCommandResponse_UsesExistingPublicDeliveryPath()
+    public async Task PublicTarget_SendingCommandResponse_ForwardsPinIntent()
     {
         await using var harness = await WhisperHarness.CreateAsync(HttpStatusCode.NoContent);
+        var pin = new PublicChatPinIntent(1, 2, "guessing", "round_started", 300, true);
 
         await harness.Sender.SendAsync(
             harness.Source(),
-            CommandResponse.Chat("public response"),
+            new CommandResponse(CommandResponseTarget.Chat, "public response", pin),
             CancellationToken.None
         );
 
-        harness.Chat.Messages.ShouldBe([new SentChatMessage("streamer", "public response")]);
+        var sent = harness.Chat.Messages.ShouldHaveSingleItem();
+        sent.Channel.ShouldBe("streamer");
+        sent.Message.ShouldBe("public response");
+        sent.Pin.ShouldBeSameAs(pin);
         harness.FailureHandler.Failures.ShouldBeEmpty();
         harness.Http.ValidationRequestCount.ShouldBe(0);
         harness.Http.WhisperRequestCount.ShouldBe(0);

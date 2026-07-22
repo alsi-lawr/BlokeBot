@@ -29,7 +29,12 @@ public sealed class WhisperCommandResponseSender(
     {
         if (response.Target != CommandResponseTarget.Whisper)
         {
-            await SendPublicChatAsync(sourceMessage.Channel, response.Message, cancellationToken);
+            await SendPublicChatAsync(
+                sourceMessage.Channel,
+                response.Message,
+                response.Pin,
+                cancellationToken
+            );
             return;
         }
 
@@ -315,15 +320,14 @@ public sealed class WhisperCommandResponseSender(
     private async Task SendPublicChatAsync(
         string channel,
         string message,
+        PublicChatPinIntent? pinIntent,
         CancellationToken cancellationToken
     )
     {
-        var outcome = await chat.SendAsync(
-            channel,
-            message,
-            new PublicChatDeliveryDeadline.ConfiguredMaximum(),
-            cancellationToken
-        );
+        var deadline = new PublicChatDeliveryDeadline.ConfiguredMaximum();
+        var outcome = pinIntent is { } pin
+            ? await chat.SendAsync(channel, message, deadline, pin, cancellationToken)
+            : await chat.SendAsync(channel, message, deadline, cancellationToken);
         outcome
             .Match<Action>(
                 static _ => static () => { },
