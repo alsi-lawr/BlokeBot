@@ -56,7 +56,7 @@ public partial class HostConfigPage
 
         _blockedByMode =
             selection is not null
-            && !session.CurrentHostRoleIs(AuthRole.Streamer)
+            && !session.CanManageSelectedHostConfig
             && _state?.IsHostCreated == true;
         if (_blockedByMode)
         {

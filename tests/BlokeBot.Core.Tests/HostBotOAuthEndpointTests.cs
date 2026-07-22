@@ -32,6 +32,31 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestBase
 {
     [Test]
+    public async Task HostBotOAuth_AdminManagingChannel_CanStartAndCompleteCustomBotFlow()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Admin,
+            login: "administrator",
+            endpointScenario: EndpointScenario.HostMissingPermission
+        );
+
+        using var startResponse = await host.Client.GetAsync("/oauth/host-bot/start");
+        var state = host.IssueHostBotState();
+        using var callbackResponse = await host.Client.GetAsync(
+            $"/oauth/callback?code=code&state={state}"
+        );
+
+        startResponse.StatusCode.ShouldBe(HttpStatusCode.Redirect);
+        startResponse.Headers.Location.ShouldNotBeNull();
+        startResponse.Headers.Location.Host.ShouldBe("id.twitch.tv");
+        callbackResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var page = await callbackResponse.Content.ReadAsStringAsync();
+        page.ShouldContain("Twitch access needed");
+        page.ShouldContain("Return to Channel setup");
+    }
+
+    [Test]
     public async Task HostBotOAuth_MissingPermissionCompleting_ReturnsPermissionGuidance()
     {
         await using var host = await EndpointHost.StartAsync(

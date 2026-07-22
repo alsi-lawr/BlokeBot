@@ -169,7 +169,7 @@ public sealed class HostBotAccountAuthorizationService(
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == hostId, ct);
-        if (host is null || !HasOwnershipAuthority(host, actor))
+        if (host is null || !HasAuthorizationAuthority(host, actor))
         {
             return false;
         }
@@ -328,7 +328,7 @@ public sealed class HostBotAccountAuthorizationService(
                     return Success(new HostBotAccountAuthorizationOutcome.HostNotFound());
                 }
 
-                if (!HasOwnershipAuthority(host, actor))
+                if (!HasAuthorizationAuthority(host, actor))
                 {
                     return Success(new HostBotAccountAuthorizationOutcome.AuthorityDenied());
                 }
@@ -408,7 +408,7 @@ public sealed class HostBotAccountAuthorizationService(
                 return new HostBotAccountClearOutcome.HostNotFound();
             }
 
-            if (!HasOwnershipAuthority(host, actor))
+            if (!HasAuthorizationAuthority(host, actor))
             {
                 return new HostBotAccountClearOutcome.AuthorityDenied();
             }
@@ -437,12 +437,23 @@ public sealed class HostBotAccountAuthorizationService(
         return new HostBotAccountClearOutcome.Cleared();
     }
 
-    private static bool HasOwnershipAuthority(BotHost host, HostBotAccountActor actor)
+    private static bool HasAuthorizationAuthority(BotHost host, HostBotAccountActor actor)
     {
+        if (actor is HostBotAccountActor.BotAdministrator administrator)
+        {
+            return !string.IsNullOrWhiteSpace(administrator.AuthenticatedUserId)
+                && !string.IsNullOrWhiteSpace(administrator.Login);
+        }
+
+        if (actor is not HostBotAccountActor.ChannelOwner owner)
+        {
+            throw new UnreachableException("Unknown custom-bot account actor.");
+        }
+
         if (
-            string.IsNullOrWhiteSpace(actor.AuthenticatedUserId)
-            || string.IsNullOrWhiteSpace(actor.Login)
-            || !string.Equals(host.Login, Login.Normalize(actor.Login), StringComparison.Ordinal)
+            string.IsNullOrWhiteSpace(owner.AuthenticatedUserId)
+            || string.IsNullOrWhiteSpace(owner.Login)
+            || !string.Equals(host.Login, Login.Normalize(owner.Login), StringComparison.Ordinal)
         )
         {
             return false;
@@ -451,7 +462,7 @@ public sealed class HostBotAccountAuthorizationService(
         return string.IsNullOrWhiteSpace(host.TwitchUserId)
             || string.Equals(
                 host.TwitchUserId,
-                actor.AuthenticatedUserId,
+                owner.AuthenticatedUserId,
                 StringComparison.Ordinal
             );
     }
@@ -1074,7 +1085,30 @@ public abstract record HostBotAccountAuthorizationOutcome
         : HostBotAccountAuthorizationOutcome;
 }
 
-public sealed record HostBotAccountActor(string AuthenticatedUserId, string Login);
+public abstract record HostBotAccountActor
+{
+    private HostBotAccountActor(string authenticatedUserId, string login)
+    {
+        AuthenticatedUserId = authenticatedUserId;
+        Login = login;
+    }
+
+    public string AuthenticatedUserId { get; }
+
+    public string Login { get; }
+
+    public sealed record ChannelOwner : HostBotAccountActor
+    {
+        public ChannelOwner(string authenticatedUserId, string login)
+            : base(authenticatedUserId, login) { }
+    }
+
+    public sealed record BotAdministrator : HostBotAccountActor
+    {
+        public BotAdministrator(string authenticatedUserId, string login)
+            : base(authenticatedUserId, login) { }
+    }
+}
 
 public abstract record HostBotAccountClearOutcome
 {

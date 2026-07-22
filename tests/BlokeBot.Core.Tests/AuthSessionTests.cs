@@ -145,6 +145,25 @@ public sealed class AuthSessionTests
     }
 
     [Test]
+    public void AdminSelectedHost_CheckingSetupAuthority_AllowsConfigurationButNotChannelOAuth()
+    {
+        var selectedHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Admin);
+        var session = AuthenticatedSession.FromPrincipal(
+            TestPrincipals.BlokeBotUser(
+                login: "administrator",
+                isBotAdmin: true,
+                availableHosts: [selectedHost],
+                selectedHost: selectedHost
+            )
+        );
+
+        session.CanOpenHostConfig(new HashSet<int> { selectedHost.Id }).ShouldBeTrue();
+        session.CanManageSelectedHostConfig.ShouldBeTrue();
+        session.CanAuthorizeSelectedHostBotAccount.ShouldBeTrue();
+        session.CanAuthorizeSelectedHost.ShouldBeFalse();
+    }
+
+    [Test]
     public void CreateAllowedUserWithoutSelection_CreatingSession_PreservesHostsWithoutBotAccess()
     {
         var alternateHost = new BotHostChoice(7, "managed", "Managed", AuthRole.Moderator);
