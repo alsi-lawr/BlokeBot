@@ -107,33 +107,4 @@ public partial class TopBarControls : IDisposable
     {
         return !session.IsAdminEditing && !session.IsBotAccount;
     }
-
-    private static string ControlsGridClass(
-        BotHostSelection? selection,
-        bool isAdminEditing,
-        bool isBotAccount,
-        bool showHostSelector,
-        bool showAlertIndicator
-    )
-    {
-        var alertClass = showAlertIndicator ? " topbar-controls--with-alert" : string.Empty;
-        if (isBotAccount)
-        {
-            return $"topbar-controls topbar-controls--account-only{alertClass}";
-        }
-
-        if (selection is null)
-        {
-            return showHostSelector
-                ? $"topbar-controls topbar-controls--selector-account{alertClass}"
-                : $"topbar-controls topbar-controls--account-only{alertClass}";
-        }
-
-        if (isAdminEditing || !showHostSelector)
-        {
-            return $"topbar-controls topbar-controls--status-account{alertClass}";
-        }
-
-        return $"topbar-controls topbar-controls--status-selector-account{alertClass}";
-    }
 }

@@ -25,14 +25,14 @@ public partial class HostConfigPage
     private string _authorizationBadgeClass =>
         _state?.IsChannelBotAuthorized == true
         && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
-            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-            : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
+            ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+            : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
 
     private string _authorizationDotClass =>
         _state?.IsChannelBotAuthorized == true
         && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true
-            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-            : "h-1.5 w-1.5 rounded-full bg-amber-500";
+            ? "status-pill__dot bg-emerald-500"
+            : "status-pill__dot bg-amber-500";
 
     private string _authorizationText =>
         _state?.IsChannelBotAuthorized == true
@@ -43,24 +43,19 @@ public partial class HostConfigPage
 
     private string _runtimeBadgeClass =>
         _runtimeLifecycle?.Match(
-            static _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
-            static _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-orange-50 px-2.5 text-xs font-bold text-orange-700 ring-1 ring-orange-200",
-            static _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
-            static _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-purple-50 px-2.5 text-xs font-bold text-purple-700 ring-1 ring-purple-200"
-        )
-        ?? "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200";
+            static _ => "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
+            static _ => "status-pill bg-orange-50 text-orange-700 ring-1 ring-orange-200",
+            static _ => "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+            static _ => "status-pill bg-purple-50 text-purple-700 ring-1 ring-purple-200"
+        ) ?? "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200";
 
     private string _runtimeDotClass =>
         _runtimeLifecycle?.Match(
-            static _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
-            static _ => "h-1.5 w-1.5 rounded-full bg-orange-500",
-            static _ => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            static _ => "h-1.5 w-1.5 rounded-full bg-purple-500"
-        ) ?? "h-1.5 w-1.5 rounded-full bg-slate-400";
+            static _ => "status-pill__dot bg-slate-400",
+            static _ => "status-pill__dot bg-orange-500",
+            static _ => "status-pill__dot bg-emerald-500",
+            static _ => "status-pill__dot bg-purple-500"
+        ) ?? "status-pill__dot bg-slate-400";
 
     private string _runtimeText =>
         _runtimeLifecycle?.Match(

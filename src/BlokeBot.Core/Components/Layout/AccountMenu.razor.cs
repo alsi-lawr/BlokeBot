@@ -96,6 +96,6 @@ public partial class AccountMenu
             _ => "bg-sky-50 text-sky-700 ring-sky-200",
         };
 
-        return $"account-menu__role-badge inline-flex h-6 w-[5.75rem] items-center justify-center rounded-full px-2 text-center text-xs font-semibold ring-1 {color}";
+        return $"account-menu__role-badge inline-flex h-6 shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2 text-center text-xs font-semibold ring-1 {color}";
     }
 }

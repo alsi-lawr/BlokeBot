@@ -54,13 +54,12 @@ public partial class FollowerOnlyChatStatusPanel
             FollowerOnlyChatSetupState.NotRequired
             or FollowerOnlyChatSetupState.Exempt
             or FollowerOnlyChatSetupState.Eligible =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
+                "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
             FollowerOnlyChatSetupState.Waiting
             or FollowerOnlyChatSetupState.NotFollowing
             or FollowerOnlyChatSetupState.ReconnectRequired =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
-            _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
+                "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+            _ => "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
         };
 
     private string _dotClass =>
@@ -68,12 +67,11 @@ public partial class FollowerOnlyChatStatusPanel
         {
             FollowerOnlyChatSetupState.NotRequired
             or FollowerOnlyChatSetupState.Exempt
-            or FollowerOnlyChatSetupState.Eligible => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            or FollowerOnlyChatSetupState.Eligible => "status-pill__dot bg-emerald-500",
             FollowerOnlyChatSetupState.Waiting
             or FollowerOnlyChatSetupState.NotFollowing
-            or FollowerOnlyChatSetupState.ReconnectRequired =>
-                "h-1.5 w-1.5 rounded-full bg-amber-500",
-            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+            or FollowerOnlyChatSetupState.ReconnectRequired => "status-pill__dot bg-amber-500",
+            _ => "status-pill__dot bg-slate-400",
         };
 
     private string _badgeText =>

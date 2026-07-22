@@ -68,11 +68,11 @@
         <CollapsibleSection Title="@($"#{_state.DisplayName}")" Description="Connect the bot and start or stop it for your channel." InitiallyOpen="true">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Twitch chat</p>
                         <span class="@_authorizationBadgeClass">
                             <span class="@_authorizationDotClass"></span>
-                            @_authorizationText
+                            <span class="status-pill__label">@_authorizationText</span>
                         </span>
                     </div>
                     @if (_state.IsChannelBotAuthorized && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
@@ -120,11 +120,11 @@
                                              ReconnectUrl="@_activeBotReconnectUrl"
                                              ReloadKey="@_botAccountStatusReloadKey" />
                 <div class="runtime-control-card surface-muted rounded-lg px-3 py-2.5">
-                    <div class="flex items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Bot status</p>
                         <span class="@_runtimeBadgeClass">
                             <span class="@_runtimeDotClass"></span>
-                            @_runtimeText
+                            <span class="status-pill__label">@_runtimeText</span>
                         </span>
                     </div>
                     <div class="runtime-control-actions mt-3">

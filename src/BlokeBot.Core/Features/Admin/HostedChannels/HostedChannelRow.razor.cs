@@ -96,16 +96,16 @@ public partial class HostedChannelRow
                 static _ => "bg-purple-50 text-purple-700 ring-purple-200"
             );
 
-            return $"inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-bold ring-1 {color}";
+            return $"status-pill ring-1 {color}";
         }
     }
 
     private string _botStartedDotClass =>
         Host.Lifecycle.Match(
-            static _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
-            static _ => "h-1.5 w-1.5 rounded-full bg-orange-500",
-            static _ => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            static _ => "h-1.5 w-1.5 rounded-full bg-purple-500"
+            static _ => "status-pill__dot bg-slate-400",
+            static _ => "status-pill__dot bg-orange-500",
+            static _ => "status-pill__dot bg-emerald-500",
+            static _ => "status-pill__dot bg-purple-500"
         );
 
     private string _botStartedText =>
@@ -132,15 +132,13 @@ public partial class HostedChannelRow
     private static string StatusBadgeClass(bool active)
     {
         return active
-            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
-            : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
+            ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+            : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
     }
 
     private static string StatusDotClass(bool active)
     {
-        return active
-            ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
-            : "h-1.5 w-1.5 rounded-full bg-amber-500";
+        return active ? "status-pill__dot bg-emerald-500" : "status-pill__dot bg-amber-500";
     }
 
     private async Task RemoveHostAsync()

@@ -1,0 +1,27 @@
+@layer components {
+    .status-pill {
+        align-items: center;
+        border-radius: 9999px;
+        display: inline-flex;
+        font-size: 0.75rem;
+        font-weight: 700;
+        gap: 0.375rem;
+        line-height: 1rem;
+        max-width: 100%;
+        min-height: 1.5rem;
+        min-width: 0;
+        padding: 0.25rem 0.625rem;
+    }
+
+    .status-pill__dot {
+        border-radius: 9999px;
+        flex: 0 0 0.375rem;
+        height: 0.375rem;
+        width: 0.375rem;
+    }
+
+    .status-pill__label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+}

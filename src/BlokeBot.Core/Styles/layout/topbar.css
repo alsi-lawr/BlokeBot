@@ -49,100 +49,64 @@
     }
 
     .topbar-controls {
-        align-items: stretch;
-        display: grid;
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
         gap: 0.5rem;
+        justify-content: end;
         min-width: 0;
         width: 100%;
     }
 
     .topbar-controls > * {
+        max-width: 100%;
         min-width: 0;
     }
 
     .topbar-alert-button {
-        grid-area: alert;
+        flex: 0 0 auto;
     }
 
     .selected-channel-bot-status {
-        grid-area: status;
+        flex: 0 1 auto;
     }
 
     .host-selector {
         align-items: center;
-        display: grid;
+        display: flex;
+        flex: 1 1 18rem;
+        flex-wrap: wrap;
         gap: 0.5rem;
-        grid-area: selector;
-        grid-template-columns: minmax(0, 1fr) 2.25rem;
+        max-width: 100%;
         min-width: 0;
         width: 100%;
     }
 
-    .host-selector--with-my-channel .host-selector__my-channel {
-        grid-column: 1 / -1;
+    .host-selector__my-channel {
+        flex: 1 1 100%;
+        white-space: nowrap;
     }
 
     .host-selector__dropdown {
+        flex: 1 1 12rem;
+        max-width: 100%;
+        min-width: min(100%, 12rem);
         width: 100%;
     }
 
     .host-selector__refresh {
-        justify-self: end;
+        flex: 0 0 2.25rem;
+    }
+
+    .host-selector__menu-name {
+        overflow-wrap: anywhere;
     }
 
     .account-menu {
-        grid-area: account;
+        flex: 1 1 15rem;
+        max-width: 100%;
+        min-width: 0;
         width: 100%;
-    }
-
-    .topbar-controls--account-only {
-        grid-template-areas: "account";
-    }
-
-    .topbar-controls--account-only.topbar-controls--with-alert {
-        grid-template-areas: "alert account";
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .topbar-controls--selector-account {
-        grid-template-areas:
-            "selector"
-            "account";
-    }
-
-    .topbar-controls--selector-account.topbar-controls--with-alert {
-        grid-template-areas:
-            "alert selector"
-            "account account";
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .topbar-controls--status-account {
-        grid-template-areas:
-            "status"
-            "account";
-    }
-
-    .topbar-controls--status-account.topbar-controls--with-alert {
-        grid-template-areas:
-            "alert status"
-            "account account";
-        grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .topbar-controls--status-selector-account {
-        grid-template-areas:
-            "status"
-            "selector"
-            "account";
-    }
-
-    .topbar-controls--status-selector-account.topbar-controls--with-alert {
-        grid-template-areas:
-            "alert status"
-            "selector selector"
-            "account account";
-        grid-template-columns: auto minmax(0, 1fr);
     }
 
     .account-menu__summary {
@@ -169,50 +133,15 @@
 
     @media (min-width: 40rem) {
         .topbar-controls {
-            align-items: center;
             gap: 0.75rem;
         }
 
-        .topbar-controls--account-only {
-            grid-template-areas: "account";
-            grid-template-columns: 19rem;
-            justify-content: end;
+        .host-selector__my-channel {
+            flex: 0 1 auto;
         }
 
-        .topbar-controls--account-only.topbar-controls--with-alert {
-            grid-template-areas: "alert account";
-            grid-template-columns: auto 19rem;
-        }
-
-        .topbar-controls--selector-account {
-            grid-template-areas: "selector account";
-            grid-template-columns: minmax(0, 1fr) 19rem;
-        }
-
-        .topbar-controls--selector-account.topbar-controls--with-alert {
-            grid-template-areas: "alert selector account";
-            grid-template-columns: auto minmax(0, 1fr) 19rem;
-        }
-
-        .topbar-controls--status-account {
-            grid-template-areas: "status account";
-            grid-template-columns: auto 19rem;
-            justify-content: end;
-        }
-
-        .topbar-controls--status-account.topbar-controls--with-alert {
-            grid-template-areas: "alert status account";
-            grid-template-columns: auto auto 19rem;
-        }
-
-        .topbar-controls--status-selector-account {
-            grid-template-areas: "status selector account";
-            grid-template-columns: auto minmax(0, 1fr) 19rem;
-        }
-
-        .topbar-controls--status-selector-account.topbar-controls--with-alert {
-            grid-template-areas: "alert status selector account";
-            grid-template-columns: auto auto minmax(0, 1fr) 19rem;
+        .account-menu {
+            max-width: 22rem;
         }
     }
 
@@ -220,68 +149,14 @@
         .app-topbar__inner {
             gap: 0.75rem;
             grid-template-areas: "identity controls utility";
-            grid-template-columns: minmax(12rem, 1fr) auto auto;
+            grid-template-columns: minmax(10rem, 1fr) minmax(0, 3fr) auto;
             min-height: 4rem;
             padding-bottom: 0;
             padding-top: 0;
         }
 
         .app-topbar__controls {
-            justify-self: end;
-            width: auto;
-        }
-
-        .topbar-controls {
-            width: auto;
-        }
-
-        .topbar-controls--account-only {
-            grid-template-columns: 19rem;
-        }
-
-        .topbar-controls--account-only.topbar-controls--with-alert {
-            grid-template-columns: auto 19rem;
-        }
-
-        .topbar-controls--selector-account {
-            grid-template-columns: auto 19rem;
-        }
-
-        .topbar-controls--selector-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto 19rem;
-        }
-
-        .topbar-controls--status-account {
-            grid-template-columns: auto 19rem;
-        }
-
-        .topbar-controls--status-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto 19rem;
-        }
-
-        .topbar-controls--status-selector-account {
-            grid-template-columns: auto auto 19rem;
-        }
-
-        .topbar-controls--status-selector-account.topbar-controls--with-alert {
-            grid-template-columns: auto auto auto 19rem;
-        }
-
-        .host-selector {
-            grid-template-columns: 18rem 2.25rem;
-            width: auto;
-        }
-
-        .host-selector--with-my-channel {
-            grid-template-columns: 7.5rem 18rem 2.25rem;
-        }
-
-        .host-selector--with-my-channel .host-selector__my-channel {
-            grid-column: auto;
-        }
-
-        .account-menu {
-            width: auto;
+            justify-self: stretch;
         }
     }
 }

@@ -152,11 +152,6 @@ public partial class HostSelector
 
     private string _myChannelHref => $"/auth/select-own-host?returnUrl={_currentReturnUrl}";
 
-    private static string SelectorShellClass(bool showMyChannel)
-    {
-        return showMyChannel ? "host-selector host-selector--with-my-channel" : "host-selector";
-    }
-
     private bool ShowMyChannelControl()
     {
         if (_selection is null)
@@ -199,7 +194,7 @@ public partial class HostSelector
                 builder.AddAttribute(
                     1,
                     "class",
-                    "h-7 w-7 rounded-full border border-slate-200 object-cover"
+                    "h-7 w-7 shrink-0 rounded-full border border-slate-200 object-cover"
                 );
                 builder.AddAttribute(2, "src", host.ProfileImageUrl);
                 builder.AddAttribute(3, "alt", string.Empty);
@@ -211,7 +206,7 @@ public partial class HostSelector
             builder.AddAttribute(
                 5,
                 "class",
-                "grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200"
+                "grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 ring-1 ring-slate-200"
             );
             builder.AddContent(6, ChannelInitial(host));
             builder.CloseElement();
