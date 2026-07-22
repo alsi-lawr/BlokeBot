@@ -12,12 +12,12 @@
         @if (_selectedHostBotAuthorized)
         {
             <span class="@_selectedBotStatusDotClass"></span>
-            <span>@_selectedBotStatusText</span>
+            <span class="status-pill__label">@_selectedBotStatusText</span>
         }
         else if (CanAuthorizeSelectedHost())
         {
             <span class="@_selectedBotStatusDotClass"></span>
-            <AuthPopupButton Class="font-bold text-[#9146ff] transition hover:text-[#7c3aed] disabled:opacity-70"
+            <AuthPopupButton Class="status-pill__label font-bold text-[#9146ff] transition hover:text-[#7c3aed] disabled:opacity-70"
                              Url="/oauth/channel-bot/start"
                              PopupName="blokebot-channel-oauth"
                              OpeningText="Opening..."
@@ -28,7 +28,7 @@
         else
         {
             <span class="@_selectedBotStatusDotClass"></span>
-            <span>@_selectedBotStatusText</span>
+            <span class="status-pill__label">@_selectedBotStatusText</span>
         }
     </div>
 }

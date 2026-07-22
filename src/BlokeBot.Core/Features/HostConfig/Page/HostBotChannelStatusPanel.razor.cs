@@ -70,19 +70,18 @@ public partial class HostBotChannelStatusPanel
         _status switch
         {
             { IsModerator: true } =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
+                "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
             { ModeratorCheckCompleted: true } =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
-            _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
+                "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+            _ => "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
         };
 
     private string _moderatorStatusDotClass =>
         _status switch
         {
-            { IsModerator: true } => "h-1.5 w-1.5 rounded-full bg-emerald-500",
-            { ModeratorCheckCompleted: true } => "h-1.5 w-1.5 rounded-full bg-amber-500",
-            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+            { IsModerator: true } => "status-pill__dot bg-emerald-500",
+            { ModeratorCheckCompleted: true } => "status-pill__dot bg-amber-500",
+            _ => "status-pill__dot bg-slate-400",
         };
 
     private string _moderatorStatusText =>
@@ -102,16 +101,16 @@ public partial class HostBotChannelStatusPanel
 
     private string _followerReadStatusBadgeClass =>
         _status?.CanReadFollowers == true
-            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200"
+            ? "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
         : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
-            ? "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200"
-        : "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200";
+            ? "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200"
+        : "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200";
 
     private string _followerReadStatusDotClass =>
-        _status?.CanReadFollowers == true ? "h-1.5 w-1.5 rounded-full bg-emerald-500"
+        _status?.CanReadFollowers == true ? "status-pill__dot bg-emerald-500"
         : _status?.ModeratorCheckCompleted != true || IsBackgroundLoading
-            ? "h-1.5 w-1.5 rounded-full bg-slate-400"
-        : "h-1.5 w-1.5 rounded-full bg-amber-500";
+            ? "status-pill__dot bg-slate-400"
+        : "status-pill__dot bg-amber-500";
 
     private string _followerReadStatusText =>
         IsBackgroundLoading ? "checking"

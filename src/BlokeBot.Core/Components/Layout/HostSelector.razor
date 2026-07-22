@@ -11,7 +11,7 @@
     var showMyChannel = ShowMyChannelControl();
     var hasAlternateHosts = _visibleHosts.Count > 0;
 
-    <div class="@SelectorShellClass(showMyChannel)">
+    <div class="host-selector">
         @if (showMyChannel)
         {
             <a class="host-selector__my-channel control-surface inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -21,17 +21,17 @@
                     <path d="M4 10.5 12 4l8 6.5V20H4Z" />
                     <path d="M9 20v-6h6v6" />
                 </svg>
-                <span class="truncate">My channel</span>
+                <span>My channel</span>
             </a>
         }
         @if (hasAlternateHosts)
         {
             <details class="host-selector__dropdown group relative min-w-0">
-                <summary class="control-surface grid h-9 min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
+                <summary class="control-surface grid h-9 w-full min-w-0 cursor-pointer list-none grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 marker:hidden">
                     @if (SelectedVisibleHost() is { } selected)
                     {
                         @ChannelImage(selected)
-                        <span class="truncate text-sm font-semibold text-slate-900">#@selected.DisplayName</span>
+                        <span class="truncate text-sm font-semibold text-slate-900" title="#@selected.DisplayName">#@selected.DisplayName</span>
                     }
                     else
                     {
@@ -43,7 +43,7 @@
                                 <path d="m9 13-3 3 3 3" />
                             </svg>
                         </span>
-                        <span class="truncate text-sm font-semibold text-slate-900">Other channels</span>
+                        <span class="whitespace-nowrap text-sm font-semibold text-slate-900">Other channels</span>
                     }
                     <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-500 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="m6 9 6 6 6-6" />
@@ -56,7 +56,7 @@
                            href="@SelectHostHref(host.Id)"
                            data-enhance-nav="false">
                             @ChannelImage(host)
-                            <span class="min-w-0 truncate">#@host.DisplayName</span>
+                            <span class="host-selector__menu-name min-w-0" title="#@host.DisplayName">#@host.DisplayName</span>
                             @if (host.Id == _selectedHostId)
                             {
                                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-[#6f2bdc] [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2.25]" viewBox="0 0 24 24" aria-hidden="true">
@@ -70,7 +70,7 @@
         }
         else
         {
-            <button class="host-selector__dropdown surface-muted grid h-9 min-w-0 cursor-not-allowed grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 text-slate-500 opacity-75"
+            <button class="host-selector__dropdown surface-muted grid h-9 w-full min-w-0 cursor-not-allowed grid-cols-[1.75rem_minmax(0,1fr)_1.25rem] items-center gap-2 rounded-md pl-2 pr-3 text-slate-500 opacity-75"
                     type="button"
                     disabled
                     aria-label="No alternate channels available">
@@ -82,7 +82,7 @@
                         <path d="m9 13-3 3 3 3" />
                     </svg>
                 </span>
-                <span class="truncate text-sm font-semibold">No other channels</span>
+                <span class="whitespace-nowrap text-sm font-semibold">No other channels</span>
                 <svg class="h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m6 9 6 6 6-6" />
                 </svg>

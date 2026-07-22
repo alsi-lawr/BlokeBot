@@ -3,11 +3,11 @@
 @inject FollowerOnlyChatReadinessService _followerOnlyChat
 
 <div class="surface-muted rounded-lg px-3 py-2.5">
-    <div class="flex items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Follower-only chat</p>
         <span class="@_badgeClass">
             <span class="@_dotClass"></span>
-            @_badgeText
+            <span class="status-pill__label">@_badgeText</span>
         </span>
     </div>
     <div class="mt-2 text-xs font-medium leading-5 text-slate-500">

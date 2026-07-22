@@ -2,6 +2,7 @@
 @import "./themeing/tailwind-theme.css";
 @import "./base/document.css";
 @import "./components/surfaces.css";
+@import "./components/status-pills.css";
 @import "./layout/topbar.css";
 @import "./components/page-context.css";
 @import "./components/segmented-controls.css";

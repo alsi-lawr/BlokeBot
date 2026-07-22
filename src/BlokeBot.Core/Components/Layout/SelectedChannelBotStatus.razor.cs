@@ -80,7 +80,7 @@ public partial class SelectedChannelBotStatus
                 null => "border-slate-200 bg-slate-100 text-slate-600",
             };
 
-            return $"selected-channel-bot-status flex h-8 w-full min-w-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-xs font-bold shadow-sm sm:w-auto sm:justify-start {color}";
+            return $"selected-channel-bot-status status-pill border shadow-sm {color}";
         }
     }
 
@@ -101,7 +101,7 @@ public partial class SelectedChannelBotStatus
                 null => "bg-slate-400",
             };
 
-            return $"h-1.5 w-1.5 rounded-full {color}";
+            return $"status-pill__dot {color}";
         }
     }
 

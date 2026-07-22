@@ -115,25 +115,23 @@ public partial class BotAccountAuthorizationSection
         Status?.State switch
         {
             BotAccountAuthorizationState.Disabled =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
+                "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
             BotAccountAuthorizationState.Ready =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200",
+                "status-pill bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
             BotAccountAuthorizationState.WrongAccount
             or BotAccountAuthorizationState.MissingScopes =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-amber-50 px-2.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200",
-            _ =>
-                "inline-flex h-6 items-center gap-1.5 rounded-full bg-slate-100 px-2.5 text-xs font-bold text-slate-600 ring-1 ring-slate-200",
+                "status-pill bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+            _ => "status-pill bg-slate-100 text-slate-600 ring-1 ring-slate-200",
         };
 
     private string _statusDotClass =>
         Status?.State switch
         {
-            BotAccountAuthorizationState.Disabled => "h-1.5 w-1.5 rounded-full bg-slate-400",
-            BotAccountAuthorizationState.Ready => "h-1.5 w-1.5 rounded-full bg-emerald-500",
+            BotAccountAuthorizationState.Disabled => "status-pill__dot bg-slate-400",
+            BotAccountAuthorizationState.Ready => "status-pill__dot bg-emerald-500",
             BotAccountAuthorizationState.WrongAccount
-            or BotAccountAuthorizationState.MissingScopes =>
-                "h-1.5 w-1.5 rounded-full bg-amber-500",
-            _ => "h-1.5 w-1.5 rounded-full bg-slate-400",
+            or BotAccountAuthorizationState.MissingScopes => "status-pill__dot bg-amber-500",
+            _ => "status-pill__dot bg-slate-400",
         };
 
     private string _statusText =>
