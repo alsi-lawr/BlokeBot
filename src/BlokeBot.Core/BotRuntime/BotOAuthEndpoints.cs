@@ -337,7 +337,7 @@ internal static class BotOAuthEndpoints
                 ) =>
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
-                    if (!session.CanAuthorizeSelectedHost)
+                    if (!session.CanAuthorizeSelectedHostBotAccount)
                     {
                         return ConnectionAccessResult(session);
                     }
@@ -357,7 +357,7 @@ internal static class BotOAuthEndpoints
                         );
                     }
 
-                    var actor = new HostBotAccountActor(session.UserId, session.Login);
+                    var actor = HostBotAccountActorFor(session);
                     if (!await hostBotAuthorization.CanAuthorizeAsync(selectedHost.Id, actor, ct))
                     {
                         return Result(
@@ -422,7 +422,7 @@ internal static class BotOAuthEndpoints
             selected => selected.Selection.Current,
             _ => null
         );
-        if (selectedHost?.Id != consumed.HostId || !session.CanAuthorizeSelectedHost)
+        if (selectedHost?.Id != consumed.HostId || !session.CanAuthorizeSelectedHostBotAccount)
         {
             return ConnectionAccessResult(session);
         }
@@ -448,7 +448,7 @@ internal static class BotOAuthEndpoints
             return await completion.Match<Task<IResult>>(
                 async completed =>
                 {
-                    var actor = new HostBotAccountActor(session.UserId, session.Login);
+                    var actor = HostBotAccountActorFor(session);
                     var authorization = await hostBotAuthorization
                         .Authorize(consumed.HostId, actor, completed.Grant)
                         .ExecuteAsync(ct);
@@ -625,6 +625,13 @@ internal static class BotOAuthEndpoints
                 "OAuthErrorQuery",
                 "OAuthErrorQuery"
             );
+    }
+
+    private static HostBotAccountActor HostBotAccountActorFor(AuthenticatedSession session)
+    {
+        return session.CurrentHostRoleIs(AuthRole.Admin)
+            ? new HostBotAccountActor.BotAdministrator(session.UserId, session.Login)
+            : new HostBotAccountActor.ChannelOwner(session.UserId, session.Login);
     }
 
     private static IResult BotAccountProviderErrorResult(

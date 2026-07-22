@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
@@ -98,11 +99,27 @@ public partial class HostConfigPage
     {
         return ObserveUiOperationAsync(
             nameof(ClearChannelAuthorizationAsync),
-            () =>
-                RunSelectedHostMutationAsync(
-                    hostId,
-                    () => ClearChannelAuthorizationCoreAsync(hostId)
+            () => ClearChannelAuthorizationWithOwnerAuthorityAsync(hostId)
+        );
+    }
+
+    private async Task ClearChannelAuthorizationWithOwnerAuthorityAsync(int hostId)
+    {
+        var pageContext = await LoadPageContextAsync();
+        if (!pageContext.Session.CanAuthorizeSelectedHost)
+        {
+            _toasts.Publish(
+                ToastRequest<ErrorToastStrategy>.WithTitle(
+                    "Only the channel owner can change the Twitch chat connection.",
+                    "Channel connection not changed"
                 )
+            );
+            return;
+        }
+
+        await RunSelectedHostMutationAsync(
+            hostId,
+            () => ClearChannelAuthorizationCoreAsync(hostId)
         );
     }
 
@@ -134,7 +151,9 @@ public partial class HostConfigPage
         var session = PageContext.Session;
         var outcome = await _hostBotAccounts.ClearAsync(
             hostId,
-            new HostBotAccountActor(session.UserId, session.Login),
+            session.CurrentHostRoleIs(AuthRole.Admin)
+                ? new HostBotAccountActor.BotAdministrator(session.UserId, session.Login)
+                : new HostBotAccountActor.ChannelOwner(session.UserId, session.Login),
             CancellationToken.None
         );
         await LoadCoreAsync();
@@ -142,7 +161,7 @@ public partial class HostConfigPage
         {
             _toasts.Publish(
                 ToastRequest<ErrorToastStrategy>.WithTitle(
-                    "BlokeBot could not confirm that you own this channel. Sign in again and retry.",
+                    "BlokeBot could not confirm that you can manage this channel. Sign in again and retry.",
                     "Custom bot not disconnected"
                 )
             );

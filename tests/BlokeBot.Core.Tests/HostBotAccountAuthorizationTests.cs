@@ -16,7 +16,10 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostBotAccountAuthorizationTests
 {
-    private static readonly HostBotAccountActor _owner = new("streamer-id", "streamer");
+    private static readonly HostBotAccountActor _owner = new HostBotAccountActor.ChannelOwner(
+        "streamer-id",
+        "streamer"
+    );
 
     [Test]
     public void ConfiguredBotRedirectUri_CreatingAuthorizationUri_UsesConfiguredValue()
@@ -329,7 +332,7 @@ public sealed class HostBotAccountAuthorizationTests
         await AuthorizeCustomBotAsync(
             service,
             customHostId,
-            new HostBotAccountActor("custom-owner-id", "custom-channel")
+            new HostBotAccountActor.ChannelOwner("custom-owner-id", "custom-channel")
         );
 
         var lookups = Enumerable
@@ -526,6 +529,39 @@ public sealed class HostBotAccountAuthorizationTests
         outcome
             .ShouldBeOfType<HostBotAccountAuthorizationOutcome.MissingScopes>()
             .Scopes.ShouldBe([Scopes.ModeratorManageAnnouncements]);
+    }
+
+    [Test]
+    public async Task BotAdministrator_AuthorizingThenClearingCustomBot_SucceedsForManagedHost()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var service = CreateService(dbFactory, new StaticTokenProvider("global-token"));
+        var administrator = new HostBotAccountActor.BotAdministrator("admin-id", "administrator");
+        await service.UseCustomBotAsync(hostId, CancellationToken.None);
+
+        var canAuthorize = await service.CanAuthorizeAsync(
+            hostId,
+            administrator,
+            CancellationToken.None
+        );
+        var authorization = await service
+            .Authorize(
+                hostId,
+                administrator,
+                CreateCustomBotGrant(
+                    "override-token",
+                    ["chat:read", "chat:edit", Scopes.UserReadModeratedChannels]
+                )
+            )
+            .RunAsync(CancellationToken.None);
+        var clearing = await service.ClearAsync(hostId, administrator, CancellationToken.None);
+        var status = await service.GetStatusAsync(hostId, CancellationToken.None);
+
+        canAuthorize.ShouldBeTrue();
+        authorization.ShouldBeOfType<HostBotAccountAuthorizationOutcome.Authorized>();
+        clearing.ShouldBeOfType<HostBotAccountClearOutcome.Cleared>();
+        status.State.ShouldBe(BotAccountAuthorizationState.NotAuthorized);
     }
 
     [Test]

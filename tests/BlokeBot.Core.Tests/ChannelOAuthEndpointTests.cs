@@ -61,6 +61,22 @@ public sealed class ChannelOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
     }
 
     [Test]
+    public async Task ChannelOAuth_AdminManagingChannelStarting_RemainsOwnerOnly()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Admin,
+            login: "administrator"
+        );
+
+        using var response = await host.Client.GetAsync("/oauth/channel-bot/start");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        var page = await response.Content.ReadAsStringAsync();
+        page.ShouldContain("You do not have access to complete this Twitch connection.");
+    }
+
+    [Test]
     public async Task ChannelOAuth_WrongAccountCompleting_IdentifiesRequiredChannelAccount()
     {
         await using var host = await EndpointHost.StartAsync(
