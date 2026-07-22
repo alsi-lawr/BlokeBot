@@ -78,40 +78,57 @@
                     @if (_state.IsChannelBotAuthorized && _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent == true)
                     {
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat access is connected. Check follower-only chat below for the active bot account.</p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                             Url="/oauth/channel-bot/start"
-                                             PopupName="blokebot-channel-oauth"
-                                             OpeningText="Opening..."
-                                             OnClosed="LoadAsync">
-                                Reconnect bot
-                            </AuthPopupButton>
-                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
-                        </div>
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/channel-bot/start"
+                                                 PopupName="blokebot-channel-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="LoadAsync">
+                                    Reconnect bot
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
+                            </div>
+                        }
                     }
                     else if (_state.IsChannelBotAuthorized)
                     {
                         <p class="mt-2 text-xs font-medium text-slate-500">The bot needs a fresh Twitch connection for this channel.</p>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
+                                                 Url="/oauth/channel-bot/start"
+                                                 PopupName="blokebot-channel-oauth"
+                                                 OpeningText="Opening..."
+                                                 OnClosed="LoadAsync">
+                                    Reconnect bot
+                                </AuthPopupButton>
+                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect this Twitch account.</p>
+                        }
+                    }
+                    else
+                    {
+                        @if (PageContext.Session.CanAuthorizeSelectedHost)
+                        {
+                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
                                              Url="/oauth/channel-bot/start"
                                              PopupName="blokebot-channel-oauth"
                                              OpeningText="Opening..."
                                              OnClosed="LoadAsync">
-                                Reconnect bot
+                                Connect channel
                             </AuthPopupButton>
-                            <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
-                        </div>
-                    }
-                    else
-                    {
-                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                         Url="/oauth/channel-bot/start"
-                                         PopupName="blokebot-channel-oauth"
-                                         OpeningText="Opening..."
-                                         OnClosed="LoadAsync">
-                            Connect channel
-                        </AuthPopupButton>
+                        }
+                        else
+                        {
+                            <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this Twitch account.</p>
+                        }
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@_state.Login" ReloadKey="@_botAccountStatusReloadKey" />

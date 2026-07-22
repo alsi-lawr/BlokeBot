@@ -96,6 +96,13 @@ in
       example = "/blokebot";
       description = "Optional URL path prefix under which the public site is served.";
     };
+
+    liveAppUrl = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "https://bot.example.com";
+      description = "Optional BlokeBot dashboard URL shown by the public site.";
+    };
   };
 
   config = lib.mkMerge [
@@ -167,6 +174,9 @@ in
         }
         // lib.optionalAttrs (siteCfg.pathBase != null) {
           BlokeBotSite__PathBase = siteCfg.pathBase;
+        }
+        // lib.optionalAttrs (siteCfg.liveAppUrl != null) {
+          BlokeBotSite__LiveAppUrl = siteCfg.liveAppUrl;
         };
 
         serviceConfig = {

@@ -70,7 +70,7 @@ public sealed record AuthenticatedSession
                     _ => false,
                     selected =>
                         existingHostIds.Contains(selected.Selection.Current.Id)
-                        && selected.Selection.Current.Role == AuthRole.Streamer,
+                        && CanManageSelectedHostConfig,
                     _ => false
                 )
             );
@@ -98,6 +98,12 @@ public sealed record AuthenticatedSession
                 ),
             _ => false
         );
+
+    public bool CanManageSelectedHostConfig =>
+        CanAuthorizeSelectedHost
+        || (IsBotAdmin && !IsBotAccount && CurrentHostRoleIs(AuthRole.Admin));
+
+    public bool CanAuthorizeSelectedHostBotAccount => CanManageSelectedHostConfig;
 
     public bool CurrentHostRoleIs(AuthRole role)
     {

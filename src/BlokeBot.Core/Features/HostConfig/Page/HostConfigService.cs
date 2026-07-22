@@ -9,6 +9,7 @@ using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
@@ -34,6 +35,24 @@ public sealed class HostConfigService(
         CancellationToken ct
     )
     {
+        var selectedHost = session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (selectedHost is not null && session.CanManageSelectedHostConfig)
+        {
+            await using var selectedHostDb = await dbFactory.CreateDbContextAsync(ct);
+            var selected = await selectedHostDb
+                .Hosts.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == selectedHost.Id, ct);
+            return selected is null
+                ? Option<HostConfigState>.None
+                : Option<HostConfigState>.Some(
+                    await LoadCreatedHostStateAsync(selectedHostDb, selected, false, ct)
+                );
+        }
+
         var login = session.Login;
         if (string.IsNullOrWhiteSpace(login))
         {
@@ -67,6 +86,18 @@ public sealed class HostConfigService(
             );
         }
 
+        return Option<HostConfigState>.Some(
+            await LoadCreatedHostStateAsync(db, host, canCreateHost, ct)
+        );
+    }
+
+    private async Task<HostConfigState> LoadCreatedHostStateAsync(
+        BlokeBotDbContext db,
+        BotHost host,
+        bool canCreateHost,
+        CancellationToken ct
+    )
+    {
         var statusResult = await runtimeStatus.LoadHostRuntimeSummary(host.Id).ExecuteAsync(ct);
         var status = statusResult.Match(
             option => option.Match<HostedChannelRuntimeSummary?>(value => value, () => null),
@@ -88,26 +119,24 @@ public sealed class HostConfigService(
             botOverrideSettings?.TwitchUserId,
             ct
         );
-        return Option<HostConfigState>.Some(
-            new HostConfigState(
-                host.Id,
-                host.Login,
-                host.DisplayName,
-                host.ProfileImageUrl,
-                canCreateHost,
-                true,
-                host.ChannelBotAuthorizedAtUtc is not null,
-                status,
-                new HostBotAccountOverrideState(
-                    botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
-                    botOverrideStatus,
-                    botOverrideSettings?.OverrideEnabled == true
-                        && botOverrideSettings.WhisperResponsesEnabled,
-                    whisperQuotaStatus
-                ),
-                HostFeatureCatalog.Cards(host.EnabledFeatures),
-                await modAccess.LoadAsync(host.Id, ct)
-            )
+        return new HostConfigState(
+            host.Id,
+            host.Login,
+            host.DisplayName,
+            host.ProfileImageUrl,
+            canCreateHost,
+            true,
+            host.ChannelBotAuthorizedAtUtc is not null,
+            status,
+            new HostBotAccountOverrideState(
+                botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
+                botOverrideStatus,
+                botOverrideSettings?.OverrideEnabled == true
+                    && botOverrideSettings.WhisperResponsesEnabled,
+                whisperQuotaStatus
+            ),
+            HostFeatureCatalog.Cards(host.EnabledFeatures),
+            await modAccess.LoadAsync(host.Id, ct)
         );
     }
 

@@ -60,7 +60,7 @@ for rid in win-x64 win-arm64; do
   expected_entry="$root/bin/blokebot.exe"
   test -f "$path" || { echo "Required Windows archive does not exist: $path" >&2; exit 2; }
 
-  if ! unzip -Z1 "$path" | grep -Fxq "$expected_entry"; then
+  if ! unzip -Z1 "$path" | grep -Fx "$expected_entry" >/dev/null; then
     echo "$path does not contain $expected_entry" >&2
     exit 2
   fi
@@ -155,6 +155,7 @@ EOF
     InstallerSha256: ${archive_hash[$rid]}
     InstallerType: zip
     NestedInstallerType: portable
+    ArchiveBinariesDependOnPath: true
     NestedInstallerFiles:
       - RelativeFilePath: ${archive_root[$rid]}\\bin\\blokebot.exe
         PortableCommandAlias: blokebot

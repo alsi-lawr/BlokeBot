@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Channels;
 using BlokeBot.Core.Auth.Moderation;
@@ -35,6 +36,32 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostConfigFaultRoutingTests
 {
+    [Test]
+    public async Task AdminImpersonation_RenderingHostConfig_ShowsManagementWithoutOwnerOAuth()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        SetAdminClaims(testContext.Authorization, hostId);
+
+        var page = RenderHostConfigPage(context);
+
+        page.WaitForAssertion(() =>
+        {
+            var customBotToggle = page.Find("#custom-bot input[type='checkbox']");
+            customBotToggle.GetAttribute("disabled").ShouldBeNull();
+            page.Markup.ShouldContain("The channel owner must connect this Twitch account.");
+            page.Markup.ShouldNotContain("/oauth/channel-bot/start");
+        });
+    }
+
     [Test]
     public async Task UnavailableAuthority_PolicyModeRemainsUnchangedUntilSameChoiceCanBeSaved()
     {
@@ -202,6 +229,22 @@ public sealed class HostConfigFaultRoutingTests
                     selectedHost: host
                 )
                 .Claims.ToArray()
+        );
+    }
+
+    private static void SetAdminClaims(BunitAuthorizationContext authorization, int hostId)
+    {
+        var host = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Admin);
+        authorization.SetClaims(
+            TestPrincipals
+                .BlokeBotUser(
+                    "administrator",
+                    isBotAdmin: true,
+                    availableHosts: [host],
+                    selectedHost: host
+                )
+                .Claims.Append(new Claim(BotHostClaims.AdminEditingLogin, "administrator"))
+                .ToArray()
         );
     }
 
