@@ -31,7 +31,7 @@ public sealed class StartupMessageConfigurationService(
         }
 
         if (
-            normalizedText.Length > 0
+            command.Enabled
             && botSettings.MaxChatMessageLength > 0
             && normalizedText.Length > botSettings.MaxChatMessageLength
         )

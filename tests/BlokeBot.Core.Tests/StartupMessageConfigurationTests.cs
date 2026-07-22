@@ -137,6 +137,32 @@ public sealed class StartupMessageConfigurationTests
     }
 
     [Test]
+    public async Task RetainedOverLimitText_Disabling_PersistsSuppressionAndNormalizedText()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer", true, "12345678901");
+        var service = Service(dbFactory, maximumLength: 10);
+
+        var outcome = await service.SaveAsync(
+            Session(hostId, AuthRole.Streamer),
+            hostId,
+            new StartupMessageSaveCommand(false, "  12345678901  "),
+            CancellationToken.None
+        );
+
+        outcome
+            .ShouldBeOfType<StartupMessageSaveOutcome.Saved>()
+            .Configuration.ShouldBe(new StartupMessageConfiguration(false, "12345678901"));
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var stored = await db.Hosts.SingleAsync(x => x.Id == hostId);
+        stored.StartupMessageEnabled.ShouldBe(false);
+        stored.StartupMessageText.ShouldBe("12345678901");
+        (
+            await service.GetAsync("streamer", CancellationToken.None)
+        ).ShouldBeOfType<StartupChatMessage.Disabled>();
+    }
+
+    [Test]
     [Arguments(null)]
     [Arguments("")]
     [Arguments("   ")]
