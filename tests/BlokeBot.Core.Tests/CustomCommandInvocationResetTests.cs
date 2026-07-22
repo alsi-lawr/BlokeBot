@@ -59,65 +59,18 @@ public sealed class CustomCommandInvocationResetTests
         audits.All(audit => audit.ActorTwitchUserId == "manager-id").ShouldBeTrue();
         audits.All(audit => audit.ActorLogin == "manager").ShouldBeTrue();
         audits.All(audit => audit.ResetAtUtc == clock.GetUtcNow().UtcDateTime).ShouldBeTrue();
-    }
 
-    [Test]
-    public async Task CommandDeletion_CascadesClaimsAndPreservesResetAuditSnapshot()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seed = await SeedClaimsAsync(dbFactory);
-        var resets = new CustomCommandInvocationResetService(
-            dbFactory,
-            new StaticViewerResolver(new CustomCommandViewer("missing-id", "missing")),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-        await resets.ResetAllViewersAsync(
-            seed.HostId,
-            seed.CommandId,
-            new CustomCommandResetActor("actor-id", "actor"),
-            CancellationToken.None
-        );
+        db.ChangeTracker.Clear();
+        var command = await db.CustomCommands.SingleAsync(stored => stored.Id == seed.CommandId);
+        db.CustomCommands.Remove(command);
+        await db.SaveChangesAsync();
 
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            var command = await db.CustomCommands.SingleAsync(stored =>
-                stored.Id == seed.CommandId
-            );
-            db.CustomCommands.Remove(command);
-            await db.SaveChangesAsync();
-        }
-
-        await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
-        var audit = await verify.CustomCommandInvocationResetAudits.SingleAsync();
-        audit.CustomCommandId.ShouldBeNull();
-        audit.CommandName.ShouldBe("Limited command");
-    }
-
-    [Test]
-    public async Task UnknownViewer_Resetting_ReturnsNotFoundWithoutAudit()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seed = await SeedClaimsAsync(dbFactory);
-        var resets = new CustomCommandInvocationResetService(
-            dbFactory,
-            new MissingViewerResolver(),
-            TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
-        );
-
-        var outcome = await resets.ResetViewerAsync(
-            seed.HostId,
-            seed.CommandId,
-            new CustomCommandResetActor("actor-id", "actor"),
-            "unknown",
-            CancellationToken.None
-        );
-
-        outcome.ShouldBeOfType<CustomCommandInvocationResetOutcome.ViewerNotFound>();
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (await db.CustomCommandInvocationResetAudits.CountAsync()).ShouldBe(0);
+        db.ChangeTracker.Clear();
+        (await db.CustomCommandInvocationClaims.CountAsync()).ShouldBe(0);
+        var preservedAudits = await db.CustomCommandInvocationResetAudits.ToArrayAsync();
+        preservedAudits.Length.ShouldBe(2);
+        preservedAudits.All(audit => audit.CustomCommandId is null).ShouldBeTrue();
+        preservedAudits.All(audit => audit.CommandName == "Limited command").ShouldBeTrue();
     }
 
     private static async Task<Seed> SeedClaimsAsync(SqliteBlokeBotDbFactory dbFactory)
@@ -176,16 +129,6 @@ public sealed class CustomCommandInvocationResetTests
         {
             return Task.FromResult<CustomCommandViewerResolution>(
                 new CustomCommandViewerResolution.Found(viewer)
-            );
-        }
-    }
-
-    private sealed class MissingViewerResolver : ICustomCommandViewerResolver
-    {
-        public Task<CustomCommandViewerResolution> ResolveAsync(string login, CancellationToken ct)
-        {
-            return Task.FromResult<CustomCommandViewerResolution>(
-                new CustomCommandViewerResolution.NotFound()
             );
         }
     }

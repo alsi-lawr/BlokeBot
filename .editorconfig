@@ -135,3 +135,7 @@ indent_size = 4
 
 [src/BlokeBot.Persistence/Migrations/*.cs]
 charset = utf-8-bom
+# EF migration source is generated from migration identifiers and provider templates.
+dotnet_diagnostic.IDE0053.severity = none
+dotnet_diagnostic.IDE0161.severity = none
+dotnet_diagnostic.IDE1006.severity = none

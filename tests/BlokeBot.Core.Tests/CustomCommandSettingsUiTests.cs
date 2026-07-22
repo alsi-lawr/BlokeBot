@@ -220,30 +220,7 @@ public sealed class CustomCommandSettingsUiTests
     }
 
     [Test]
-    public async Task InvocationLimit_Editing_RoundTripsAndShowsResetControlsOnlyForPersistedCommand()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var seeded = await SeedConfigurationAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
-        var cut = context.Render<CustomCommandSettingsPage>();
-
-        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
-            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
-        cut.Find("button[aria-label='Save custom commands']").Click();
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        (
-            await db
-                .CustomCommands.Where(command => command.Id == seeded.CommandId)
-                .Select(command => command.InvocationLimit)
-                .SingleAsync()
-        ).ShouldBe(CustomCommandInvocationLimit.OncePerUser);
-        cut.FindAll("button[data-action='reset-viewer-use']").Count.ShouldBe(1);
-        cut.FindAll("button[data-action='reset-all-viewer-uses']").Count.ShouldBe(1);
-    }
-
-    [Test]
-    public async Task ResetAllLifetimeUses_AsSelectedHostManager_RequiresConfirmationAndWritesAudit()
+    public async Task InvocationLimit_EditingAndResettingAsSelectedHostManager_RoundTripsAndAudits()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
@@ -263,6 +240,20 @@ public sealed class CustomCommandSettingsUiTests
 
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-invocation-limit")
+            .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        await using var savedDb = await dbFactory.CreateDbContextAsync();
+        (
+            await savedDb
+                .CustomCommands.Where(command => command.Id == seeded.CommandId)
+                .Select(command => command.InvocationLimit)
+                .SingleAsync()
+        ).ShouldBe(CustomCommandInvocationLimit.OncePerUser);
+        cut.FindAll("button[data-action='reset-viewer-use']").Count.ShouldBe(1);
+        cut.FindAll("button[data-action='reset-all-viewer-uses']").Count.ShouldBe(1);
 
         cut.Find("button[data-action='reset-all-viewer-uses']").Click();
         await using (var unchanged = await dbFactory.CreateDbContextAsync())
