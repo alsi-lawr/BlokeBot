@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 using BlokeBot.Site;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
@@ -44,6 +45,11 @@ public sealed class SitePathBaseTests
             home.ShouldContain(
                 "<link rel=\"icon\" type=\"image/svg+xml\" href=\"blokebot-mark.svg\""
             );
+            var stylesheetPath = Regex
+                .Match(home, """<link rel="stylesheet" href="(?<path>site\.[^"]+\.css)" />""")
+                .Groups["path"]
+                .Value;
+            stylesheetPath.ShouldNotBeEmpty();
 
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -62,7 +68,7 @@ public sealed class SitePathBaseTests
             serverOwners.ShouldNotContain("keyring");
             serverOwners.ShouldNotContain("rotation");
 
-            var stylesheet = await client.GetAsync("/blokebot/site.css");
+            var stylesheet = await client.GetAsync($"/blokebot/{stylesheetPath}");
             stylesheet.StatusCode.ShouldBe(HttpStatusCode.OK);
             stylesheet.Content.Headers.ContentType!.MediaType.ShouldBe("text/css");
             (await stylesheet.Content.ReadAsByteArrayAsync()).ShouldNotBeEmpty();

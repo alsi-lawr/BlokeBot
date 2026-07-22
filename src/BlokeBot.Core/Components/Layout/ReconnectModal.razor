@@ -1,3 +1,5 @@
+@inject NavigationManager Navigation
+
 <script type="module" src="@Assets["Components/Layout/ReconnectModal.razor.js"]"></script>
 
 <dialog id="components-reconnect-modal" data-nosnippet>
@@ -13,19 +15,29 @@
             Still reconnecting. Trying again in <span id="components-seconds-to-next-attempt"></span> seconds.
         </p>
         <p class="components-reconnect-failed-visible">
-            We could not reconnect.<br />Try again or reload the page.
+            BlokeBot could not reconnect to the server.<br />Try again, or reload to start a new session.
         </p>
-        <button id="components-reconnect-button" class="components-reconnect-failed-visible">
+        <button id="components-reconnect-button" class="components-reconnect-failed-visible" type="button">
             Try again
         </button>
+        <a class="components-reconnect-failed-visible components-reload-link"
+           href="@Navigation.Uri"
+           data-enhance-nav="false">
+            Reload page
+        </a>
         <p class="components-pause-visible">
             Your connection has been paused.
         </p>
         <p class="components-resume-failed-visible">
-            We could not restore your connection.<br />Try again or reload the page.
+            BlokeBot could not restore this session.<br />Reconnect, or reload to start a new session.
         </p>
-        <button id="components-resume-button" class="components-pause-visible components-resume-failed-visible">
+        <button id="components-resume-button" class="components-pause-visible components-resume-failed-visible" type="button">
             Reconnect
         </button>
+        <a class="components-resume-failed-visible components-reload-link"
+           href="@Navigation.Uri"
+           data-enhance-nav="false">
+            Reload page
+        </a>
     </div>
 </dialog>
