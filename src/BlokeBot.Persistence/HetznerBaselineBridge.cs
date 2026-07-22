@@ -84,8 +84,7 @@ internal static class HetznerBaselineBridge
             SELECT EXISTS (
                 SELECT 1
                 FROM sqlite_schema
-                WHERE type IN ('table', 'index')
-                    AND name NOT LIKE 'sqlite_%'
+                WHERE name NOT LIKE 'sqlite_%'
                     AND name <> '__EFMigrationsHistory'
             );
             """;
@@ -103,10 +102,8 @@ internal static class HetznerBaselineBridge
         command.CommandText = """
             SELECT type, name, sql
             FROM sqlite_schema
-            WHERE type IN ('table', 'index')
-                AND name NOT LIKE 'sqlite_%'
+            WHERE name NOT LIKE 'sqlite_%'
                 AND name <> '__EFMigrationsHistory'
-                AND sql IS NOT NULL
             ORDER BY type, name;
             """;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -120,10 +117,16 @@ internal static class HetznerBaselineBridge
 
             var type = reader.GetString(0).ToLowerInvariant();
             var name = reader.GetString(1).ToLowerInvariant();
+            if (type is not ("table" or "index") || reader.IsDBNull(2))
+            {
+                throw new UnsupportedDatabaseBaselineException();
+            }
+
             var sql = reader.GetString(2);
             schema.Append(type).Append(':').Append(name).Append(':');
             if (type == "table")
             {
+                EnsureTableHasNoSuffix(sql);
                 var definitions = SplitTableDefinitions(sql)
                     .Select(NormalizeSql)
                     .Order(StringComparer.Ordinal);
@@ -193,6 +196,14 @@ internal static class HetznerBaselineBridge
         }
 
         yield return definition[segmentStart..].ToString();
+    }
+
+    private static void EnsureTableHasNoSuffix(string sql)
+    {
+        if (!string.IsNullOrWhiteSpace(sql[(sql.LastIndexOf(')') + 1)..]))
+        {
+            throw new UnsupportedDatabaseBaselineException();
+        }
     }
 
     private static string NormalizeSql(string sql)
