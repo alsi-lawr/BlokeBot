@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.CustomCommands;
 using BlokeBot.Core.Features.HostedChannels;
@@ -44,6 +45,7 @@ internal static class UiTestContextFactory
             new FixedTimeProvider(new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero))
         );
         context.Services.AddSingleton(new BlokeBotPageContextAccessor());
+        context.Services.AddSingleton(BlokeBotBuildIdentity.Current);
         context.Services.AddSingleton<UiFaultTelemetry>();
         context.Services.AddSingleton<HostedChannelChangeNotifier>();
         context.Services.AddSingleton<HostFeatureService>();

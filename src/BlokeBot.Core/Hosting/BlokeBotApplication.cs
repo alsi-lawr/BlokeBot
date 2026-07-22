@@ -6,6 +6,7 @@ using BlokeBot.Core.Auth.Web;
 using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.BotStatus;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Components.Layout;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
 using BlokeBot.Core.Features.Admin.HostedChannels;
@@ -54,6 +55,7 @@ public static class BlokeBotApplication
         builder.Services.AddRazorComponents().AddInteractiveServerComponents();
         builder.Services.AddCascadingAuthenticationState();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton(BlokeBotBuildIdentity.Current);
         builder.Services.AddSingleton<UiFaultTelemetry>();
 
         builder
