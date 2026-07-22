@@ -16,7 +16,6 @@
 @import "./layout/navigation.css";
 @import "./themeing/dark-utilities.css";
 @import "./utilities/animations.css";
-@import "./base/blazor.css";
 
 @source "../*.razor";
 @source "../Auth/**/*.cs";
