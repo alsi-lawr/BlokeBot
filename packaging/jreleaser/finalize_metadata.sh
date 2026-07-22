@@ -155,6 +155,7 @@ EOF
     InstallerSha256: ${archive_hash[$rid]}
     InstallerType: zip
     NestedInstallerType: portable
+    ArchiveBinariesDependOnPath: true
     NestedInstallerFiles:
       - RelativeFilePath: ${archive_root[$rid]}\\bin\\blokebot.exe
         PortableCommandAlias: blokebot
