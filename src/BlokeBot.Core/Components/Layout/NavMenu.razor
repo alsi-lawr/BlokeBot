@@ -6,10 +6,11 @@
 @inject HostFeatureService _features
 @inject IJSRuntime _js
 @inject BlokeBotPageContextAccessor _pageContext
+@inject BlokeBotBuildIdentity _buildIdentity
 @implements IAsyncDisposable
 
-<div class="nav-menu flex h-full flex-col">
-    <div class="nav-menu__brand flex items-center gap-3 border-b px-5 py-5">
+<div class="nav-menu flex h-full min-h-0 flex-col">
+    <div class="nav-menu__brand flex shrink-0 items-center gap-3 border-b px-5 py-5">
         <img class="h-11 w-11 rounded-xl border shadow-soft" src="/blokebot-mark.svg" alt="" />
         <div>
             <a class="block text-base font-bold text-slate-950" href="">BlokeBot</a>
@@ -17,7 +18,7 @@
         </div>
     </div>
 
-    <nav class="flex flex-1 flex-col gap-3 px-3 py-4">
+    <nav class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 py-4">
         <AuthorizeView>
             <Authorized Context="navAuth">
                 @{
@@ -221,4 +222,9 @@
             </Authorized>
         </AuthorizeView>
     </nav>
+
+    <footer class="nav-menu__build shrink-0 border-t px-5 py-3">
+        <p class="text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Build</p>
+        <p class="mt-1 break-all font-mono text-[0.68rem] leading-4 text-slate-500">@_buildIdentity.InformationalVersion</p>
+    </footer>
 </div>

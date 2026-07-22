@@ -7,6 +7,11 @@
     border-color: var(--app-border);
 }
 
+.nav-menu__build {
+    background: var(--app-nav-brand-bg);
+    border-color: var(--app-border);
+}
+
 .nav-menu__panel {
     background: var(--app-nav-panel-bg);
     border: 1px solid var(--app-border);
