@@ -186,9 +186,19 @@ public sealed partial class BlokeBotDbContext
             b.HasDiscriminator<string>("ActionType")
                 .HasValue<MessageCustomCommandAction>(MessageCustomCommandAction.Discriminator)
                 .HasValue<CounterCustomCommandAction>(CounterCustomCommandAction.Discriminator);
-            b.HasOne(x => x.MessageLibraryEntry)
+            b.HasOne(x => x.ZeroArgumentMessageLibraryEntry)
                 .WithMany()
-                .HasForeignKey(x => new { x.HostId, x.MessageLibraryEntryId })
+                .HasForeignKey(x => new { x.HostId, x.ZeroArgumentMessageLibraryEntryId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(x => x.OneArgumentMessageLibraryEntry)
+                .WithMany()
+                .HasForeignKey(x => new { x.HostId, x.OneArgumentMessageLibraryEntryId })
+                .HasPrincipalKey(x => new { x.HostId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne(x => x.TwoArgumentMessageLibraryEntry)
+                .WithMany()
+                .HasForeignKey(x => new { x.HostId, x.TwoArgumentMessageLibraryEntryId })
                 .HasPrincipalKey(x => new { x.HostId, x.Id })
                 .OnDelete(DeleteBehavior.Restrict);
         });

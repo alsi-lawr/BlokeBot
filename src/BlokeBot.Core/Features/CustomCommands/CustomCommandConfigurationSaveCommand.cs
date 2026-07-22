@@ -44,11 +44,17 @@ public sealed record CustomMessageLibraryEntryValue
     public IReadOnlyList<CustomMessageVariantValue> Variants { get; }
 }
 
+public sealed record CustomCommandReplyRoutes(
+    int? ZeroArgumentMessageLibraryEntryId,
+    int? OneArgumentMessageLibraryEntryId,
+    int? TwoArgumentMessageLibraryEntryId
+);
+
 public abstract record CustomCommandActionValue
 {
     private CustomCommandActionValue() { }
 
-    public abstract int MessageLibraryEntryId { get; }
+    public abstract CustomCommandReplyRoutes ReplyRoutes { get; }
 
     public TResult Match<TResult>(Func<Message, TResult> message, Func<Counter, TResult> counter)
     {
@@ -60,14 +66,15 @@ public abstract record CustomCommandActionValue
         };
     }
 
-    public sealed record Message(int MessageEntryId) : CustomCommandActionValue
+    public sealed record Message(CustomCommandReplyRoutes Routes) : CustomCommandActionValue
     {
-        public override int MessageLibraryEntryId => MessageEntryId;
+        public override CustomCommandReplyRoutes ReplyRoutes => Routes;
     }
 
-    public sealed record Counter(int MessageEntryId, int CounterId) : CustomCommandActionValue
+    public sealed record Counter(CustomCommandReplyRoutes Routes, int CounterId)
+        : CustomCommandActionValue
     {
-        public override int MessageLibraryEntryId => MessageEntryId;
+        public override CustomCommandReplyRoutes ReplyRoutes => Routes;
     }
 }
 

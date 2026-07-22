@@ -69,7 +69,7 @@ public sealed class CustomCommandConfigurationTests
                         InvocationLimit = CustomCommandInvocationLimit.OncePerStreamPerUser,
                         Action = new CounterCustomCommandActionEditor
                         {
-                            MessageLibraryEntryId = -1,
+                            ReplyRoutes = ReplyRoutes(-1),
                             CounterId = -4,
                         },
                     },
@@ -122,7 +122,7 @@ public sealed class CustomCommandConfigurationTests
         command.CooldownScope.ShouldBe(CustomCommandCooldownScope.User);
         command.InvocationLimit.ShouldBe(CustomCommandInvocationLimit.OncePerStreamPerUser);
         var action = command.Action.ShouldBeOfType<CounterCustomCommandActionEditor>();
-        action.MessageLibraryEntryId.ShouldBe(entry.Id);
+        action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId.ShouldBe(entry.Id);
         action.CounterId.ShouldBe(counter.Id);
 
         var announcement = loaded.Announcements.Single();
@@ -368,14 +368,15 @@ public sealed class CustomCommandConfigurationTests
         missingError.ShouldBeOfType<CustomCommandConfigurationSaveFailure.StaleEntity>();
 
         var invalidMessage = ConfigurationWithCommands(("Invalid", "invalid"));
-        invalidMessage.Commands.Single().Action.MessageLibraryEntryId = -999;
+        invalidMessage.Commands.Single().Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId =
+            -999;
         var messageErrors = ValidationErrors(invalidMessage);
         messageErrors.ShouldContain(error => error.Message.Contains("Choose a saved reply"));
 
         var invalidCounter = ConfigurationWithCommands(("Counter", "counter"));
         invalidCounter.Commands.Single().Action = new CounterCustomCommandActionEditor
         {
-            MessageLibraryEntryId = -1,
+            ReplyRoutes = ReplyRoutes(-1),
             CounterId = -999,
         };
         var counterErrors = ValidationErrors(invalidCounter);
@@ -459,7 +460,7 @@ public sealed class CustomCommandConfigurationTests
         var command = draft.Commands.Single();
         command.Action = new CounterCustomCommandActionEditor
         {
-            MessageLibraryEntryId = 0,
+            ReplyRoutes = ReplyRoutes(0),
             CounterId = 0,
         };
         command.CooldownSeconds = -1;
@@ -471,14 +472,16 @@ public sealed class CustomCommandConfigurationTests
                 Id = -3,
                 Name = "Unsupported action",
                 Aliases = "unsupported",
-                Action = new UnsupportedCustomCommandActionEditor { MessageLibraryEntryId = -1 },
+                Action = new UnsupportedCustomCommandActionEditor { ReplyRoutes = ReplyRoutes(-1) },
             }
         );
 
         var targets = ValidationErrors(draft).Select(error => error.Target);
 
         targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Aliases));
-        targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply));
+        targets.ShouldContain(
+            CommandTarget(command.Id, CustomCommandValidationFieldKind.ZeroArgumentReply)
+        );
         targets.ShouldContain(CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown));
         targets.ShouldContain(
             CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)
@@ -677,7 +680,7 @@ public sealed class CustomCommandConfigurationTests
                     Id = nextId--,
                     Name = command.Name,
                     Aliases = command.Aliases,
-                    Action = new MessageCustomCommandActionEditor { MessageLibraryEntryId = -1 },
+                    Action = new MessageCustomCommandActionEditor { ReplyRoutes = ReplyRoutes(-1) },
                 }
             );
         }
@@ -737,7 +740,12 @@ public sealed class CustomCommandConfigurationTests
     {
         public CustomCommandActionKind Kind => (CustomCommandActionKind)99;
 
-        public int MessageLibraryEntryId { get; set; }
+        public CustomCommandReplyRoutesEditor ReplyRoutes { get; set; } = new();
+    }
+
+    private static CustomCommandReplyRoutesEditor ReplyRoutes(int? zeroArgumentReplyId)
+    {
+        return new() { ZeroArgumentMessageLibraryEntryId = zeroArgumentReplyId };
     }
 
     private static CustomCommandConfigurationSaveCommand ValidCommand(

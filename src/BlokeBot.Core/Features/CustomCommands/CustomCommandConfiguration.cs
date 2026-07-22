@@ -83,11 +83,11 @@ public sealed class CustomCommandEditor
             {
                 CustomCommandActionKind.Message => new MessageCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = Action.MessageLibraryEntryId,
+                    ReplyRoutes = Action.ReplyRoutes,
                 },
                 CustomCommandActionKind.Counter => new CounterCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = Action.MessageLibraryEntryId,
+                    ReplyRoutes = Action.ReplyRoutes,
                 },
                 _ => throw new ArgumentOutOfRangeException(nameof(value), value, null),
             };
@@ -105,21 +105,38 @@ public interface ICustomCommandActionEditor
 {
     CustomCommandActionKind Kind { get; }
 
-    int MessageLibraryEntryId { get; set; }
+    CustomCommandReplyRoutesEditor ReplyRoutes { get; set; }
+}
+
+public sealed class CustomCommandReplyRoutesEditor
+{
+    public int? ZeroArgumentMessageLibraryEntryId { get; set; }
+
+    public int? OneArgumentMessageLibraryEntryId { get; set; }
+
+    public int? TwoArgumentMessageLibraryEntryId { get; set; }
 }
 
 public sealed class MessageCustomCommandActionEditor : ICustomCommandActionEditor
 {
     public CustomCommandActionKind Kind => CustomCommandActionKind.Message;
 
-    public int MessageLibraryEntryId { get; set; }
+    public CustomCommandReplyRoutesEditor ReplyRoutes
+    {
+        get;
+        set => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = new();
 }
 
 public sealed class CounterCustomCommandActionEditor : ICustomCommandActionEditor
 {
     public CustomCommandActionKind Kind => CustomCommandActionKind.Counter;
 
-    public int MessageLibraryEntryId { get; set; }
+    public CustomCommandReplyRoutesEditor ReplyRoutes
+    {
+        get;
+        set => field = value ?? throw new ArgumentNullException(nameof(value));
+    } = new();
 
     public int CounterId { get; set; }
 }

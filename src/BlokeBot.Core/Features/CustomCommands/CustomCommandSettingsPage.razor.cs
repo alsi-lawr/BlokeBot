@@ -446,9 +446,9 @@ public partial class CustomCommandSettingsPage
         return $"command-{command.Id}-action-kind";
     }
 
-    private static string CommandReplyFieldId(CustomCommandEditor command)
+    private static string CommandReplyFieldId(CustomCommandEditor command, int argumentCount)
     {
-        return $"command-{command.Id}-reply";
+        return $"command-{command.Id}-{argumentCount}-argument-reply";
     }
 
     private static string CommandCounterFieldId(CustomCommandEditor command)
@@ -615,8 +615,16 @@ public partial class CustomCommandSettingsPage
             } => $"command-{target.EntityId}-action-kind",
             {
                 EntityKind: CustomCommandValidationEntityKind.Command,
-                FieldKind: CustomCommandValidationFieldKind.Reply
-            } => $"command-{target.EntityId}-reply",
+                FieldKind: CustomCommandValidationFieldKind.ZeroArgumentReply
+            } => $"command-{target.EntityId}-0-argument-reply",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.OneArgumentReply
+            } => $"command-{target.EntityId}-1-argument-reply",
+            {
+                EntityKind: CustomCommandValidationEntityKind.Command,
+                FieldKind: CustomCommandValidationFieldKind.TwoArgumentReply
+            } => $"command-{target.EntityId}-2-argument-reply",
             {
                 EntityKind: CustomCommandValidationEntityKind.Command,
                 FieldKind: CustomCommandValidationFieldKind.Counter
@@ -705,7 +713,7 @@ public partial class CustomCommandSettingsPage
         }
 
         if (
-            _config.Commands.Any(x => x.Action.MessageLibraryEntryId == entry.Id)
+            _config.Commands.Any(x => CommandUsesReply(x, entry.Id))
             || _config.Announcements.Any(x => x.MessageLibraryEntryId == entry.Id)
         )
         {
@@ -718,6 +726,14 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.MessageEntries.Remove(entry);
+    }
+
+    private static bool CommandUsesReply(CustomCommandEditor command, int messageEntryId)
+    {
+        var routes = command.Action.ReplyRoutes;
+        return routes.ZeroArgumentMessageLibraryEntryId == messageEntryId
+            || routes.OneArgumentMessageLibraryEntryId == messageEntryId
+            || routes.TwoArgumentMessageLibraryEntryId == messageEntryId;
     }
 
     private void AddVariant(CustomMessageLibraryEntryEditor entry)
@@ -778,7 +794,10 @@ public partial class CustomCommandSettingsPage
                 Aliases = "newcommand",
                 Action = new MessageCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = _config.MessageEntries[0].Id,
+                    ReplyRoutes = new CustomCommandReplyRoutesEditor
+                    {
+                        ZeroArgumentMessageLibraryEntryId = _config.MessageEntries[0].Id,
+                    },
                 },
             }
         );

@@ -23,7 +23,7 @@ public sealed class CustomCommandSettingsUiTests
         var cut = context.Render<CustomCommandSettingsPage>();
 
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
-        var reply = cut.Find($"#command-{seeded.CommandId}-reply");
+        var reply = cut.Find($"#command-{seeded.CommandId}-0-argument-reply");
         reply.GetAttribute("aria-invalid").ShouldBeNull();
         reply.GetAttribute("aria-describedby").ShouldBeNull();
         actionSelect.Change(CustomCommandActionKind.Message.ToString());
@@ -365,7 +365,7 @@ public sealed class CustomCommandSettingsUiTests
             Action = new CounterCustomCommandAction
             {
                 HostId = host.Id,
-                MessageLibraryEntryId = entry.Id,
+                ZeroArgumentMessageLibraryEntryId = entry.Id,
                 CounterId = counter.Id,
             },
             Aliases = [new CustomCommandAlias { HostId = host.Id, Alias = "command" }],

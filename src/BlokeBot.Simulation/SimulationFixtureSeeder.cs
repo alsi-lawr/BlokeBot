@@ -300,7 +300,7 @@ internal sealed class SimulationFixtureSeeder(
                 Action = new MessageCustomCommandAction
                 {
                     HostId = hostId,
-                    MessageLibraryEntryId = welcome.Id,
+                    ZeroArgumentMessageLibraryEntryId = welcome.Id,
                 },
                 Aliases = [new CustomCommandAlias { HostId = hostId, Alias = "welcome" }],
                 CreatedAtUtc = now,
@@ -314,7 +314,7 @@ internal sealed class SimulationFixtureSeeder(
                 Action = new CounterCustomCommandAction
                 {
                     HostId = hostId,
-                    MessageLibraryEntryId = hydrationReply.Id,
+                    ZeroArgumentMessageLibraryEntryId = hydrationReply.Id,
                     CounterId = counter.Id,
                 },
                 Aliases = [new CustomCommandAlias { HostId = hostId, Alias = "hydrate" }],

@@ -93,14 +93,12 @@ public sealed class CustomCommandExecutionTests
         List<string> replies = [];
 
         await dispatcher.DispatchResponsesAsync(
-            Message("Viewer", "Streamer", "!echo one two three four five six seven eight nine ten"),
+            Message("Viewer", "Streamer", "!echo one two"),
             RecordMessages(replies),
             CancellationToken.None
         );
 
-        replies.ShouldBe([
-            "viewer|streamer|echo|one two three four five six seven eight nine ten|one|two|three|four|five|six|seven|eight|nine|{missing}",
-        ]);
+        replies.ShouldBe(["viewer|streamer|echo|one two|one|two||||||||{missing}"]);
     }
 
     [Test]
@@ -596,12 +594,16 @@ public sealed class CustomCommandExecutionTests
                 ? new MessageCustomCommandAction
                 {
                     HostId = hostId,
-                    MessageLibraryEntryId = entry.Id,
+                    ZeroArgumentMessageLibraryEntryId = entry.Id,
+                    OneArgumentMessageLibraryEntryId = entry.Id,
+                    TwoArgumentMessageLibraryEntryId = entry.Id,
                 }
                 : new CounterCustomCommandAction
                 {
                     HostId = hostId,
-                    MessageLibraryEntryId = entry.Id,
+                    ZeroArgumentMessageLibraryEntryId = entry.Id,
+                    OneArgumentMessageLibraryEntryId = entry.Id,
+                    TwoArgumentMessageLibraryEntryId = entry.Id,
                     CounterId = counter.Id,
                 },
             CreatedAtUtc = now,

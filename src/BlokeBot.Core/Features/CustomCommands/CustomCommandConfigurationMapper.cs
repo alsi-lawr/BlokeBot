@@ -48,11 +48,11 @@ internal static class CustomCommandConfigurationMapper
             {
                 MessageCustomCommandAction action => new MessageCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = action.MessageLibraryEntryId,
+                    ReplyRoutes = ToReplyRoutesEditor(action),
                 },
                 CounterCustomCommandAction action => new CounterCustomCommandActionEditor
                 {
-                    MessageLibraryEntryId = action.MessageLibraryEntryId,
+                    ReplyRoutes = ToReplyRoutesEditor(action),
                     CounterId = action.CounterId,
                 },
                 _ => throw new InvalidOperationException("Unsupported custom command action."),
@@ -137,21 +137,18 @@ internal static class CustomCommandConfigurationMapper
         IReadOnlyDictionary<int, CustomCounter> counters
     )
     {
-        return action switch
+        CustomCommandAction created = action switch
         {
-            CustomCommandActionValue.Message message => new MessageCustomCommandAction
-            {
-                HostId = hostId,
-                MessageLibraryEntryId = messageEntries[message.MessageLibraryEntryId].Id,
-            },
+            CustomCommandActionValue.Message => new MessageCustomCommandAction { HostId = hostId },
             CustomCommandActionValue.Counter counter => new CounterCustomCommandAction
             {
                 HostId = hostId,
-                MessageLibraryEntryId = messageEntries[counter.MessageLibraryEntryId].Id,
                 CounterId = counters[counter.CounterId].Id,
             },
             _ => throw new InvalidOperationException("Unsupported custom command action."),
         };
+        ApplyReplyRoutes(created, action.ReplyRoutes, messageEntries);
+        return created;
     }
 
     public static void ApplyAction(
@@ -161,7 +158,7 @@ internal static class CustomCommandConfigurationMapper
         IReadOnlyDictionary<int, CustomCounter> counters
     )
     {
-        action.MessageLibraryEntryId = messageEntries[value.MessageLibraryEntryId].Id;
+        ApplyReplyRoutes(action, value.ReplyRoutes, messageEntries);
         if (
             action is CounterCustomCommandAction counterAction
             && value is CustomCommandActionValue.Counter counterValue
@@ -169,6 +166,44 @@ internal static class CustomCommandConfigurationMapper
         {
             counterAction.CounterId = counters[counterValue.CounterId].Id;
         }
+    }
+
+    private static CustomCommandReplyRoutesEditor ToReplyRoutesEditor(CustomCommandAction action)
+    {
+        return new()
+        {
+            ZeroArgumentMessageLibraryEntryId = action.ZeroArgumentMessageLibraryEntryId,
+            OneArgumentMessageLibraryEntryId = action.OneArgumentMessageLibraryEntryId,
+            TwoArgumentMessageLibraryEntryId = action.TwoArgumentMessageLibraryEntryId,
+        };
+    }
+
+    private static void ApplyReplyRoutes(
+        CustomCommandAction action,
+        CustomCommandReplyRoutes routes,
+        IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries
+    )
+    {
+        action.ZeroArgumentMessageLibraryEntryId = StoredMessageEntryId(
+            routes.ZeroArgumentMessageLibraryEntryId,
+            messageEntries
+        );
+        action.OneArgumentMessageLibraryEntryId = StoredMessageEntryId(
+            routes.OneArgumentMessageLibraryEntryId,
+            messageEntries
+        );
+        action.TwoArgumentMessageLibraryEntryId = StoredMessageEntryId(
+            routes.TwoArgumentMessageLibraryEntryId,
+            messageEntries
+        );
+    }
+
+    private static int? StoredMessageEntryId(
+        int? editorId,
+        IReadOnlyDictionary<int, CustomMessageLibraryEntry> messageEntries
+    )
+    {
+        return editorId is { } id ? messageEntries[id].Id : null;
     }
 
     public static CustomAnnouncementSchedule CreateSchedule(
