@@ -14,6 +14,31 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBase
 {
     [Test]
+    public async Task FreshReconnectSession_DeliversOnceAndDuplicateReconciliationDoesNotResend()
+    {
+        var operations = new ScriptedChannelOperations();
+        await using (var initial = CreateHarness(operations, attemptLimit: 1))
+        {
+            initial.Session.Start(["channel"], CancellationToken.None);
+            await initial.Session.DrainAsync();
+            initial.Session.TriggerReconciliation(
+                ["channel"],
+                EventSubChannelRecoveryTrigger.Keepalive
+            );
+            await initial.Session.DrainAsync();
+        }
+
+        operations.StartupDeliveryCount("channel").ShouldBe(1);
+        await using (var reconnect = CreateHarness(operations, attemptLimit: 1))
+        {
+            reconnect.Session.Start(["channel"], CancellationToken.None);
+            await reconnect.Session.DrainAsync();
+        }
+
+        operations.StartupDeliveryCount("channel").ShouldBe(2);
+    }
+
+    [Test]
     public async Task Startup_AccountFailureInOneChannel_DoesNotSeriallyBlockHealthySetup()
     {
         var releaseFailure = Channel.CreateUnbounded<bool>();

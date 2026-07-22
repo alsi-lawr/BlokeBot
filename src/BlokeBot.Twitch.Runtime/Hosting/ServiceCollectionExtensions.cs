@@ -96,6 +96,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRuntimeIdleWait, RuntimeIdleWait>();
         RegisterPolicies(services, policies);
         services.AddSingleton<IBotAccountProvider, DefaultBotAccountProvider>();
+        services.TryAddSingleton<
+            IStartupChatMessageProvider,
+            ConfiguredStartupChatMessageProvider
+        >();
         services.AddSingleton<ICommandResponseSender, PublicChatCommandResponseSender>();
         services.AddSingleton<IBotChannelLifecycleNotifier, NoOpBotChannelLifecycleNotifier>();
         services.AddAuth();

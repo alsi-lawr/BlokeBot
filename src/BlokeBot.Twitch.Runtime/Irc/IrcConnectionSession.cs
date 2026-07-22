@@ -22,6 +22,7 @@ internal sealed class IrcConnectionSession(
     IAccessTokenProvider tokens,
     ChatCommandDispatcher dispatcher,
     IBotChannelLifecycleNotifier lifecycleNotifier,
+    IStartupChatMessageProvider startupMessages,
     IPublicChatMessageSender sender,
     ICommandResponseSender responses,
     BotRuntimeStatusStore status,
@@ -246,15 +247,16 @@ internal sealed class IrcConnectionSession(
     )
     {
         await writer.WriteLineAsync($"JOIN #{channel}");
-        var startupMessage = _opts.StartupMessage;
-        if (string.IsNullOrWhiteSpace(startupMessage))
+        var startupMessage = await startupMessages.GetAsync(channel, cancellationToken);
+        if (startupMessage is StartupChatMessage.Disabled)
         {
             return;
         }
 
+        var enabled = (StartupChatMessage.Enabled)startupMessage;
         var outcome = await sender.SendAsync(
             channel,
-            startupMessage,
+            enabled.Text,
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );

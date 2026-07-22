@@ -4,6 +4,7 @@
 @using BlokeBot.Core.Features.AccessLists
 @using BlokeBot.Core.Features.Admin.Authorization
 @using BlokeBot.Core.Features.HostConfig.Access
+@using BlokeBot.Core.Features.HostConfig.StartupMessage
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.HostedChannels.Authorization
 @using BlokeBot.Core.Features.HostedChannels.Runtime
@@ -13,6 +14,7 @@
 @attribute [Authorize]
 @inherits AuthenticatedPageComponent
 @inject HostConfigService _hostConfig
+@inject StartupMessageConfigurationService _startupMessages
 @inject HostFeatureService _features
 @inject HostModAccessService _modAccess
 @inject AccessListProfileResolver _accessListProfiles
@@ -181,6 +183,35 @@
                         </span>
                     </div>
                 </div>
+            </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="true">
+            <div class="space-y-4 p-5">
+                <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
+                    <input class="h-4 w-4"
+                           type="checkbox"
+                           checked="@_startupMessageEnabled"
+                           @onchange="args => _startupMessageEnabled = args.Value is true" />
+                    Send a message when the bot joins or reconnects
+                </label>
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-foreground" for="startup-chat-message">Message</label>
+                    <textarea id="startup-chat-message"
+                              class="input min-h-24 w-full"
+                              maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
+                              disabled="@(!_startupMessageEnabled)"
+                              @bind="_startupMessageText"></textarea>
+                    <p class="text-xs font-medium text-slate-500">
+                        This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
+                    </p>
+                </div>
+                <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        disabled="@_startupMessageSaving"
+                        @onclick="() => SaveStartupMessageAsync(hostId)">
+                    @(_startupMessageSaving ? "Saving..." : "Save startup message")
+                </button>
             </div>
         </CollapsibleSection>
 

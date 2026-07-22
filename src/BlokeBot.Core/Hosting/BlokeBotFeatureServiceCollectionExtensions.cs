@@ -19,6 +19,7 @@ using BlokeBot.Core.Features.Guessing.HostSetup;
 using BlokeBot.Core.Features.Guessing.Rounds;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
+using BlokeBot.Core.Features.HostConfig.StartupMessage;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
@@ -400,6 +401,10 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<HostBotStatusService>();
         services.AddSingleton<FollowerOnlyChatReadinessService>();
         services.AddSingleton<WhisperQuotaService>();
+        services.AddSingleton<StartupMessageConfigurationService>();
+        services.AddSingleton<IStartupChatMessageProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<StartupMessageConfigurationService>()
+        );
         services.AddSingleton<
             IPrivateDeliveryFailureHandler,
             PrivateDeliveryFailureTelemetryHandler

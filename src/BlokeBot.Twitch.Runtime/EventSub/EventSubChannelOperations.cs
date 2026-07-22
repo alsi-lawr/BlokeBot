@@ -7,6 +7,7 @@ internal sealed class EventSubChannelOperations(
     IBotAccountProvider accounts,
     ChatIdentityResolver identities,
     EventSubClient eventSub,
+    IStartupChatMessageProvider startupMessages,
     IPublicChatMessageSender sender,
     IBotChannelLifecycleNotifier lifecycle
 ) : IEventSubChannelOperations
@@ -80,14 +81,16 @@ internal sealed class EventSubChannelOperations(
         CancellationToken cancellationToken
     )
     {
-        if (string.IsNullOrWhiteSpace(settings.StartupMessage))
+        var startupMessage = await startupMessages.GetAsync(channel, cancellationToken);
+        if (startupMessage is StartupChatMessage.Disabled)
         {
             return new EventSubStartupDeliveryOutcome.Completed();
         }
 
+        var enabled = (StartupChatMessage.Enabled)startupMessage;
         var outcome = await sender.SendAsync(
             channel,
-            settings.StartupMessage,
+            enabled.Text,
             new PublicChatDeliveryDeadline.ConfiguredMaximum(),
             cancellationToken
         );

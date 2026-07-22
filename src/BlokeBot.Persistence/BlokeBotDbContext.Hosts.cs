@@ -21,6 +21,7 @@ public sealed partial class BlokeBotDbContext
             b.Property(x => x.Login).HasMaxLength(128);
             b.Property(x => x.DisplayName).HasMaxLength(128);
             b.Property(x => x.ProfileImageUrl).HasMaxLength(512);
+            b.Property(x => x.StartupMessageText).HasMaxLength(500);
             b.Property(x => x.TimeZoneId).HasMaxLength(128).HasDefaultValue("UTC");
             b.Property(x => x.TwitchUserId).HasMaxLength(64);
             b.HasIndex(x => x.Login).IsUnique();
