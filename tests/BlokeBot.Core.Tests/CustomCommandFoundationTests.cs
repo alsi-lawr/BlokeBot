@@ -34,7 +34,7 @@ public sealed class CustomCommandFoundationTests
                 Action = new MessageCustomCommandAction
                 {
                     HostId = hostId,
-                    MessageLibraryEntryId = entry.Id,
+                    ZeroArgumentMessageLibraryEntryId = entry.Id,
                 },
                 CreatedAtUtc = DateTime.UtcNow,
                 UpdatedAtUtc = DateTime.UtcNow,

@@ -299,19 +299,56 @@
                                         </select>
                                         @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@CommandReplyFieldId(command)">Reply</label>
-                                        <select id="@CommandReplyFieldId(command)"
-                                                class="input"
-                                                @attributes="ValidationAttributes(CommandReplyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply))"
-                                                @ref="_controls[CommandReplyFieldId(command)]"
-                                                @bind="command.Action.MessageLibraryEntryId">
-                                            @foreach (var entry in _config.MessageEntries)
-                                            {
-                                                <option value="@entry.Id">@entry.Name</option>
-                                            }
-                                        </select>
-                                        @(ValidationMessageFor(CommandReplyFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Reply)))
+                                    <div class="space-y-2 md:col-span-2 xl:col-span-4">
+                                        <span class="label">Replies by argument count</span>
+                                        <div class="grid gap-3 md:grid-cols-3">
+                                            <div class="space-y-2">
+                                                <label class="label" for="@CommandReplyFieldId(command, 0)">No arguments</label>
+                                                <select id="@CommandReplyFieldId(command, 0)"
+                                                        class="input"
+                                                        @attributes="ValidationAttributes(CommandReplyFieldId(command, 0), CommandTarget(command.Id, CustomCommandValidationFieldKind.ZeroArgumentReply))"
+                                                        @ref="_controls[CommandReplyFieldId(command, 0)]"
+                                                        @bind="command.Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId">
+                                                    <option value="">Ignore</option>
+                                                    @foreach (var entry in _config.MessageEntries)
+                                                    {
+                                                        <option value="@entry.Id">@entry.Name</option>
+                                                    }
+                                                </select>
+                                                @(ValidationMessageFor(CommandReplyFieldId(command, 0), CommandTarget(command.Id, CustomCommandValidationFieldKind.ZeroArgumentReply)))
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="label" for="@CommandReplyFieldId(command, 1)">One argument</label>
+                                                <select id="@CommandReplyFieldId(command, 1)"
+                                                        class="input"
+                                                        @attributes="ValidationAttributes(CommandReplyFieldId(command, 1), CommandTarget(command.Id, CustomCommandValidationFieldKind.OneArgumentReply))"
+                                                        @ref="_controls[CommandReplyFieldId(command, 1)]"
+                                                        @bind="command.Action.ReplyRoutes.OneArgumentMessageLibraryEntryId">
+                                                    <option value="">Ignore</option>
+                                                    @foreach (var entry in _config.MessageEntries)
+                                                    {
+                                                        <option value="@entry.Id">@entry.Name</option>
+                                                    }
+                                                </select>
+                                                @(ValidationMessageFor(CommandReplyFieldId(command, 1), CommandTarget(command.Id, CustomCommandValidationFieldKind.OneArgumentReply)))
+                                            </div>
+                                            <div class="space-y-2">
+                                                <label class="label" for="@CommandReplyFieldId(command, 2)">Two arguments</label>
+                                                <select id="@CommandReplyFieldId(command, 2)"
+                                                        class="input"
+                                                        @attributes="ValidationAttributes(CommandReplyFieldId(command, 2), CommandTarget(command.Id, CustomCommandValidationFieldKind.TwoArgumentReply))"
+                                                        @ref="_controls[CommandReplyFieldId(command, 2)]"
+                                                        @bind="command.Action.ReplyRoutes.TwoArgumentMessageLibraryEntryId">
+                                                    <option value="">Ignore</option>
+                                                    @foreach (var entry in _config.MessageEntries)
+                                                    {
+                                                        <option value="@entry.Id">@entry.Name</option>
+                                                    }
+                                                </select>
+                                                @(ValidationMessageFor(CommandReplyFieldId(command, 2), CommandTarget(command.Id, CustomCommandValidationFieldKind.TwoArgumentReply)))
+                                            </div>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground">Choose at least one reply. Unmapped counts and commands with more than two arguments are ignored without a response.</p>
                                     </div>
                                     @if (command.Action is CounterCustomCommandActionEditor counterAction)
                                     {

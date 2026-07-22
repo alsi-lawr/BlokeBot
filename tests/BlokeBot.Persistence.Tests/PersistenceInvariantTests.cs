@@ -160,7 +160,7 @@ public sealed class PersistenceInvariantTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
-                    (CustomCommandId, HostId, MessageLibraryEntryId, ActionType, CounterId)
+                    (CustomCommandId, HostId, ZeroArgumentMessageLibraryEntryId, ActionType, CounterId)
                 VALUES
                     ({messageCommand.Id}, {hostId}, {entry.Id}, 'Message', {counter.Id})
                 """
@@ -170,7 +170,7 @@ public sealed class PersistenceInvariantTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
-                    (CustomCommandId, HostId, MessageLibraryEntryId, ActionType, CounterId)
+                    (CustomCommandId, HostId, ZeroArgumentMessageLibraryEntryId, ActionType, CounterId)
                 VALUES
                     ({counterCommand.Id}, {hostId}, {entry.Id}, 'Counter', NULL)
                 """
@@ -226,7 +226,7 @@ public sealed class PersistenceInvariantTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
-                    (CustomCommandId, HostId, MessageLibraryEntryId, ActionType, CounterId)
+                    (CustomCommandId, HostId, ZeroArgumentMessageLibraryEntryId, ActionType, CounterId)
                 VALUES
                     ({firstCommand.Id}, {firstHostId}, {secondEntry.Id}, 'Message', NULL)
                 """
@@ -236,7 +236,7 @@ public sealed class PersistenceInvariantTests
             db.Database.ExecuteSqlInterpolatedAsync(
                 $"""
                 INSERT INTO custom_command_actions
-                    (CustomCommandId, HostId, MessageLibraryEntryId, ActionType, CounterId)
+                    (CustomCommandId, HostId, ZeroArgumentMessageLibraryEntryId, ActionType, CounterId)
                 VALUES
                     ({secondCommand.Id}, {firstHostId}, {firstEntry.Id}, 'Counter', {secondCounter.Id})
                 """
@@ -297,7 +297,7 @@ public sealed class PersistenceInvariantTests
         command.Action = new MessageCustomCommandAction
         {
             HostId = hostId,
-            MessageLibraryEntryId = entry.Id,
+            ZeroArgumentMessageLibraryEntryId = entry.Id,
         };
         command.Aliases.Add(new CustomCommandAlias { HostId = hostId, Alias = "command" });
         var announcement = Announcement(hostId, "announcement", entry);

@@ -255,19 +255,13 @@ public static class CustomCommandConfigurationValidator
         for (var index = 0; index < editors.Count; index++)
         {
             var editor = editors[index];
-            if (!messageIds.Contains(editor.Action.MessageLibraryEntryId))
-            {
-                AddError(
-                    errors,
-                    $"Choose a saved reply for command '{names[index]}'.",
-                    new(
-                        CustomCommandSettingsTab.Commands,
-                        CustomCommandValidationEntityKind.Command,
-                        editor.Id,
-                        CustomCommandValidationFieldKind.Reply
-                    )
-                );
-            }
+            var replyRoutes = SnapshotReplyRoutes(
+                editor.Id,
+                names[index],
+                editor.Action.ReplyRoutes,
+                messageIds,
+                errors
+            );
 
             if (editor.CooldownSeconds < 0)
             {
@@ -298,22 +292,20 @@ public static class CustomCommandConfigurationValidator
 
             var action = editor.Action switch
             {
-                MessageCustomCommandActionEditor message => new CustomCommandActionValue.Message(
-                    message.MessageLibraryEntryId
+                MessageCustomCommandActionEditor => new CustomCommandActionValue.Message(
+                    replyRoutes
                 ),
                 CounterCustomCommandActionEditor counter
                     when counterIds.Contains(counter.CounterId) =>
-                    new CustomCommandActionValue.Counter(
-                        counter.MessageLibraryEntryId,
-                        counter.CounterId
-                    ),
+                    new CustomCommandActionValue.Counter(replyRoutes, counter.CounterId),
                 CounterCustomCommandActionEditor counter => MissingCounterAction(
                     editor.Id,
                     names[index],
                     counter,
+                    replyRoutes,
                     errors
                 ),
-                _ => InvalidAction(editor.Id, names[index], editor.Action, errors),
+                _ => InvalidAction(editor.Id, names[index], replyRoutes, errors),
             };
             var aliases = CommandAliasNormalizer.Split(editor.Aliases).ToArray();
             if (aliases.Length == 0)
@@ -366,6 +358,7 @@ public static class CustomCommandConfigurationValidator
         int commandId,
         string commandName,
         CounterCustomCommandActionEditor editor,
+        CustomCommandReplyRoutes replyRoutes,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
@@ -374,13 +367,13 @@ public static class CustomCommandConfigurationValidator
             $"Choose a counter for command '{commandName}'.",
             CommandTarget(commandId, CustomCommandValidationFieldKind.Counter)
         );
-        return new CustomCommandActionValue.Counter(editor.MessageLibraryEntryId, editor.CounterId);
+        return new CustomCommandActionValue.Counter(replyRoutes, editor.CounterId);
     }
 
     private static CustomCommandActionValue InvalidAction(
         int commandId,
         string commandName,
-        ICustomCommandActionEditor editor,
+        CustomCommandReplyRoutes replyRoutes,
         ICollection<CustomCommandConfigurationValidationError> errors
     )
     {
@@ -389,7 +382,60 @@ public static class CustomCommandConfigurationValidator
             $"Choose what command '{commandName}' should do.",
             CommandTarget(commandId, CustomCommandValidationFieldKind.Action)
         );
-        return new CustomCommandActionValue.Message(editor.MessageLibraryEntryId);
+        return new CustomCommandActionValue.Message(replyRoutes);
+    }
+
+    private static CustomCommandReplyRoutes SnapshotReplyRoutes(
+        int commandId,
+        string commandName,
+        CustomCommandReplyRoutesEditor editor,
+        IReadOnlySet<int> messageIds,
+        ICollection<CustomCommandConfigurationValidationError> errors
+    )
+    {
+        var routes = new (int ArgumentCount, int? MessageEntryId)[]
+        {
+            (0, editor.ZeroArgumentMessageLibraryEntryId),
+            (1, editor.OneArgumentMessageLibraryEntryId),
+            (2, editor.TwoArgumentMessageLibraryEntryId),
+        };
+        if (routes.All(route => route.MessageEntryId is null))
+        {
+            AddError(
+                errors,
+                $"Choose at least one reply for command '{commandName}'.",
+                CommandTarget(commandId, CustomCommandValidationFieldKind.ZeroArgumentReply)
+            );
+        }
+
+        foreach (var route in routes)
+        {
+            if (route.MessageEntryId is { } messageEntryId && !messageIds.Contains(messageEntryId))
+            {
+                AddError(
+                    errors,
+                    $"Choose a saved reply for the {route.ArgumentCount}-argument route on command '{commandName}'.",
+                    CommandTarget(commandId, ReplyField(route.ArgumentCount))
+                );
+            }
+        }
+
+        return new(
+            editor.ZeroArgumentMessageLibraryEntryId,
+            editor.OneArgumentMessageLibraryEntryId,
+            editor.TwoArgumentMessageLibraryEntryId
+        );
+    }
+
+    private static CustomCommandValidationFieldKind ReplyField(int argumentCount)
+    {
+        return argumentCount switch
+        {
+            0 => CustomCommandValidationFieldKind.ZeroArgumentReply,
+            1 => CustomCommandValidationFieldKind.OneArgumentReply,
+            2 => CustomCommandValidationFieldKind.TwoArgumentReply,
+            _ => throw new ArgumentOutOfRangeException(nameof(argumentCount), argumentCount, null),
+        };
     }
 
     private static IReadOnlyList<CustomAnnouncementValue> SnapshotAnnouncements(

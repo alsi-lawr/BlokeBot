@@ -57,8 +57,6 @@ public sealed class CustomCommandExecutionService(
 
         var command = await db
             .CustomCommands.Include(x => x.Action)
-                .ThenInclude(x => x.MessageLibraryEntry)
-                    .ThenInclude(x => x!.Variants)
             .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == commandId.Value, ct);
         if (command is null || !command.Enabled)
         {
@@ -66,6 +64,20 @@ public sealed class CustomCommandExecutionService(
         }
 
         if (command.ModeratorOnly && !ChatModeratorPolicy.IsModerator(context.Message))
+        {
+            return new CustomCommandExecutionOutcome.Handled();
+        }
+
+        var replyId = command.Action.ReplyIdForArgumentCount(args.Count);
+        if (replyId is null)
+        {
+            return new CustomCommandExecutionOutcome.Handled();
+        }
+
+        var messageEntry = await db
+            .CustomMessageLibraryEntries.Include(x => x.Variants)
+            .SingleOrDefaultAsync(x => x.HostId == host.Id && x.Id == replyId.Value, ct);
+        if (messageEntry is null)
         {
             return new CustomCommandExecutionOutcome.Handled();
         }
@@ -118,7 +130,7 @@ public sealed class CustomCommandExecutionService(
             }
         }
 
-        var selectedMessage = SelectMessage(command.Action.MessageLibraryEntry);
+        var selectedMessage = SelectMessage(messageEntry);
         if (selectedMessage is null)
         {
             return new CustomCommandExecutionOutcome.Handled();

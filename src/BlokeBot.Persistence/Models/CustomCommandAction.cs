@@ -6,11 +6,30 @@ public abstract class CustomCommandAction
 
     public int HostId { get; set; }
 
-    public int MessageLibraryEntryId { get; set; }
+    public int? ZeroArgumentMessageLibraryEntryId { get; set; }
+
+    public int? OneArgumentMessageLibraryEntryId { get; set; }
+
+    public int? TwoArgumentMessageLibraryEntryId { get; set; }
 
     public CustomCommand? Command { get; set; }
 
-    public CustomMessageLibraryEntry? MessageLibraryEntry { get; set; }
+    public CustomMessageLibraryEntry? ZeroArgumentMessageLibraryEntry { get; set; }
+
+    public CustomMessageLibraryEntry? OneArgumentMessageLibraryEntry { get; set; }
+
+    public CustomMessageLibraryEntry? TwoArgumentMessageLibraryEntry { get; set; }
+
+    public int? ReplyIdForArgumentCount(int argumentCount)
+    {
+        return argumentCount switch
+        {
+            0 => ZeroArgumentMessageLibraryEntryId,
+            1 => OneArgumentMessageLibraryEntryId,
+            2 => TwoArgumentMessageLibraryEntryId,
+            _ => null,
+        };
+    }
 }
 
 public sealed class MessageCustomCommandAction : CustomCommandAction
