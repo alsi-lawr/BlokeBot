@@ -19,8 +19,9 @@ project:
   license: MIT
   inceptionYear: "2026"
   links:
-    homepage: https://github.com/alsi-lawr/BlokeBot
-    documentation: https://github.com/alsi-lawr/BlokeBot/wiki
+    homepage: https://blokegeezington.com/blokebot/
+    documentation: https://github.com/alsi-lawr/BlokeBot/blob/v{{projectVersion}}/README.md
+    license: https://github.com/alsi-lawr/BlokeBot/blob/v{{projectVersion}}/LICENSE
     bugTracker: https://github.com/alsi-lawr/BlokeBot/issues
   tags:
     - twitch
@@ -159,10 +160,15 @@ packagers:
       name: scoop-bucket
   chocolatey:
     active: ALWAYS
+    skipPublishing: true
     downloadUrl: https://github.com/alsi-lawr/BlokeBot/releases/download/v{{projectVersion}}/{{artifactFile}}
     remoteBuild: true
     packageName: blokebot
     title: BlokeBot
+    iconUrl: https://cdn.jsdelivr.net/gh/alsi-lawr/BlokeBot@v{{projectVersion}}/assets/blokebot-mark.png
+    repository:
+      owner: alsi-lawr
+      name: BlokeBot
   winget:
     active: ALWAYS
     repository:
