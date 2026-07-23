@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="assets/blokebot-banner.svg" alt="BlokeBot - Own your channel tools" width="100%" />
+<img src="assets/blokebot-mark.svg" alt="BlokeBot logo" width="128" height="128" />
 
-[![Status: pre-release](https://img.shields.io/badge/status-pre--release-F59E0B?style=flat-square)](https://github.com/alsi-lawr/BlokeBot/wiki)
-[![Twitch](https://img.shields.io/badge/Twitch-channel%20tools-9146FF?style=flat-square&logo=twitch&logoColor=white)](https://github.com/alsi-lawr/BlokeBot/wiki/User-Guide)
-[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://github.com/alsi-lawr/BlokeBot/wiki/Installation)
-[![Nix](https://img.shields.io/badge/Nix-x86__64%20%7C%20ARM64-5277C3?style=flat-square&logo=nixos&logoColor=white)](https://github.com/alsi-lawr/BlokeBot/wiki/Install-with-Nix)
+# BlokeBot
+
+[![Build and test](https://github.com/alsi-lawr/BlokeBot/actions/workflows/build-test.yml/badge.svg)](https://github.com/alsi-lawr/BlokeBot/actions/workflows/build-test.yml)
+[![Release](https://img.shields.io/github/v/release/alsi-lawr/BlokeBot?display_name=tag&sort=semver)](https://github.com/alsi-lawr/BlokeBot/releases/latest)
 
 **A self-hosted Twitch bot and dashboard for running channel tools on your own terms.**
 
