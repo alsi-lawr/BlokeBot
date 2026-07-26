@@ -28,7 +28,6 @@ jobs:
       package_name: blokebot
       command_name: blokebot
       release_name: BlokeBot
-      state_directory_name: BlokeBot
       smoke_script: packaging/smoke/native_smoke.py
       container_smoke_script: packaging/smoke/container_smoke.py
       release_title_prefix: BlokeBot
