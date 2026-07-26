@@ -54,6 +54,16 @@ public sealed record HelixStreamMarker(
     string? VideoId
 );
 
+public abstract record HelixStreamMarkerLookupOutcome
+{
+    private HelixStreamMarkerLookupOutcome() { }
+
+    public sealed record Found(IReadOnlyList<HelixStreamMarker> Markers)
+        : HelixStreamMarkerLookupOutcome;
+
+    public sealed record Unavailable : HelixStreamMarkerLookupOutcome;
+}
+
 public abstract record HelixStreamMarkerCreateOutcome
 {
     private HelixStreamMarkerCreateOutcome() { }

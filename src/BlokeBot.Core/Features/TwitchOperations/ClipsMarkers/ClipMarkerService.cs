@@ -392,23 +392,26 @@ public sealed class ClipMarkerService(
                 broadcasterId,
                 ct
             );
-            foreach (var marker in markers)
+            if (providerMarkers is HelixStreamMarkerLookupOutcome.Found found)
             {
-                var provider = providerMarkers.FirstOrDefault(item =>
-                    item.Id == marker.ProviderMarkerId
-                );
-                if (
-                    provider is null
-                    || (marker.VideoId == provider.VideoId && marker.MarkerUrl == provider.Url)
-                )
+                foreach (var marker in markers)
                 {
-                    continue;
-                }
+                    var provider = found.Markers.FirstOrDefault(item =>
+                        item.Id == marker.ProviderMarkerId
+                    );
+                    if (
+                        provider is null
+                        || (marker.VideoId == provider.VideoId && marker.MarkerUrl == provider.Url)
+                    )
+                    {
+                        continue;
+                    }
 
-                marker.VideoId = provider.VideoId;
-                marker.MarkerUrl = provider.Url;
-                marker.EnrichedAtUtc = now;
-                changed = true;
+                    marker.VideoId = provider.VideoId;
+                    marker.MarkerUrl = provider.Url;
+                    marker.EnrichedAtUtc = now;
+                    changed = true;
+                }
             }
         }
 

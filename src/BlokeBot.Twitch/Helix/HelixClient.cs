@@ -320,7 +320,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<IReadOnlyList<HelixStreamMarker>> GetStreamMarkersAsync(
+    public async Task<HelixStreamMarkerLookupOutcome> GetStreamMarkersAsync(
         HelixRequestContext context,
         string broadcasterId,
         CancellationToken cancellationToken
@@ -334,19 +334,21 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            return [];
+            return new HelixStreamMarkerLookupOutcome.Unavailable();
         }
 
         var payload = await response.Content.ReadFromJsonAsync<HelixStreamMarkersResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return payload
+        var markers =
+            payload
                 ?.Data.SelectMany(user => user.Videos)
                 .SelectMany(video => video.Markers)
                 .Select(marker => marker.ToDomain())
                 .ToArray()
             ?? [];
+        return new HelixStreamMarkerLookupOutcome.Found(markers);
     }
 
     private static HelixClipCreateOutcome ClassifyClipFailure(string error)
