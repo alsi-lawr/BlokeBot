@@ -27,22 +27,24 @@
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Title="Admin"
-                Description="Connect the bot and manage who can use BlokeBot." />
+<DashboardPage Kicker="Administration"
+               Title="Manage BlokeBot"
+               Description="Connect the bot account, manage access, and look after hosted channels.">
 
     @if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
+        <PageState Kind="DashboardPageState.Loading" Title="Loading admin settings" Description="Preparing account, access, and hosted-channel management." />
     }
     else
     {
-        <BotAccountAuthorizationSection Status="@_botAccountStatus"
-                                        Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
-                                        Clear="@ClearBotAccountAuthorizationAsync"
-                                        Refresh="@RefreshBotAccountAuthorizationAsync"
-                                        Collapsible="true"
-                                        InitiallyOpen="true" />
+        <TaskPanel Title="Connect the bot account" Description="Start here before adding or managing hosted channels.">
+            <BotAccountAuthorizationSection Status="@_botAccountStatus"
+                                            Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
+                                            Clear="@ClearBotAccountAuthorizationAsync"
+                                            Refresh="@RefreshBotAccountAuthorizationAsync"
+                                            Collapsible="true"
+                                            InitiallyOpen="true" />
+        </TaskPanel>
 
         <SiteAccessSection State="@_state"
                            WhitelistEntries="@_siteWhitelistEntries"
@@ -63,4 +65,4 @@
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
     }
-</div>
+</DashboardPage>
