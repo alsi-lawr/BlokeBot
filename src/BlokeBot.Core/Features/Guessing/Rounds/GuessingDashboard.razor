@@ -103,7 +103,7 @@
                 </div>
                 @if (_recentRounds is null)
                 {
-                    <div class="p-8 text-sm text-muted-foreground">Loading recent rounds...</div>
+                    <PageState Kind="DashboardPageState.Loading" Title="Loading recent rounds" Description="Getting completed rounds for this channel ready." />
                 }
                 else if (_recentRounds.Count == 0)
                 {
@@ -175,7 +175,7 @@
 
                 @if (_leaderboard is null)
                 {
-                    <div class="p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
+                    <PageState Kind="DashboardPageState.Loading" Title="Loading leaderboard" Description="Calculating viewer results for these filters." />
                 }
                 else
                 {
