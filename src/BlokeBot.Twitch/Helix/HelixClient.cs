@@ -37,7 +37,8 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     {
         using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+            return null;
 
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
@@ -200,24 +201,56 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        var uri =
-            _predictionsEndpoint
-            + "?"
-            + QueryString.Create([
-                new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
-                new KeyValuePair<string, string?>("first", "1"),
-            ]);
-        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
-        using var response = await _http.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            return new HelixPredictionLookupOutcome.Unavailable();
-        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
-            _jsonOptions,
-            cancellationToken
-        );
-        return payload?.Data.FirstOrDefault()?.ToDomain() is { } prediction
-            ? new HelixPredictionLookupOutcome.Found(prediction)
-            : new HelixPredictionLookupOutcome.NoPrediction();
+        const int pageSize = 25;
+        const int maximumPredictions = 101;
+        var predictions = new List<HelixPrediction>();
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        while (predictions.Count < maximumPredictions)
+        {
+            var parameters = new List<KeyValuePair<string, string?>>
+            {
+                new("broadcaster_id", broadcasterId),
+                new("first", pageSize.ToString()),
+            };
+            if (cursor is not null)
+                parameters.Add(new("after", cursor));
+            var uri = _predictionsEndpoint + "?" + QueryString.Create(parameters);
+            using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized)
+                return new HelixPredictionLookupOutcome.Unauthorized();
+            if (response.StatusCode is HttpStatusCode.Forbidden)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                return
+                    body.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                    || body.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                    ? new HelixPredictionLookupOutcome.Ineligible()
+                    : new HelixPredictionLookupOutcome.Unauthorized();
+            }
+            if (!response.IsSuccessStatusCode)
+                return new HelixPredictionLookupOutcome.Unavailable();
+            var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+                _jsonOptions,
+                cancellationToken
+            );
+            foreach (var prediction in payload?.Data.Select(x => x.ToDomain()) ?? [])
+            {
+                if (seenIds.Add(prediction.Id))
+                    predictions.Add(prediction);
+                if (predictions.Count == maximumPredictions)
+                    break;
+            }
+            var next = payload?.Pagination?.Cursor;
+            if (string.IsNullOrWhiteSpace(next) || !seenCursors.Add(next) || next == cursor)
+                break;
+            cursor = next;
+        }
+        return predictions.Count == 0
+            ? new HelixPredictionLookupOutcome.NoPrediction()
+            : new HelixPredictionLookupOutcome.Found(predictions);
     }
 
     public async Task<HelixPredictionCreateOutcome> CreatePredictionAsync(
@@ -242,7 +275,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
-            return error.Contains("active prediction", StringComparison.OrdinalIgnoreCase)
+            return (
+                error.Contains("active prediction", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("prediction that\'s running", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("prediction that is running", StringComparison.OrdinalIgnoreCase)
+            )
                 ? new HelixPredictionCreateOutcome.ActivePredictionExists()
                 : new HelixPredictionCreateOutcome.ProviderRejected();
         }
@@ -257,7 +294,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             : new HelixPredictionCreateOutcome.ProviderRejected();
     }
 
-    public async Task<HelixPrediction?> EndPredictionAsync(
+    public async Task<HelixPredictionEndOutcome> EndPredictionAsync(
         HelixRequestContext context,
         string broadcasterId,
         string predictionId,
@@ -285,20 +322,28 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             options: _jsonOptions
         );
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (
-            response.StatusCode
-            is HttpStatusCode.NotFound
-                or HttpStatusCode.Forbidden
-                or HttpStatusCode.Unauthorized
-                or HttpStatusCode.BadRequest
-        )
-            return null;
-        response.EnsureSuccessStatusCode();
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+            return new HelixPredictionEndOutcome.Unauthorized();
+        if (response.StatusCode is HttpStatusCode.Forbidden)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return
+                body.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                ? new HelixPredictionEndOutcome.Ineligible()
+                : new HelixPredictionEndOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+            return new HelixPredictionEndOutcome.InvalidRequest();
+        if (!response.IsSuccessStatusCode)
+            return new HelixPredictionEndOutcome.Unavailable();
         var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.FirstOrDefault()?.ToDomain();
+        return payload?.Data.FirstOrDefault()?.ToDomain() is { } prediction
+            ? new HelixPredictionEndOutcome.Updated(prediction)
+            : new HelixPredictionEndOutcome.Unavailable();
     }
 
     public async Task<HelixClipCreateOutcome> CreateClipAsync(

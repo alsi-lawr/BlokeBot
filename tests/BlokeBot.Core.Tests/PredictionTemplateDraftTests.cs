@@ -18,7 +18,16 @@ public sealed class PredictionTemplateDraftTests
         new PredictionTemplateDraft("Title", ["Yes"], 30)
             .Validate()
             .ShouldBeOfType<PredictionTemplateValidationOutcome.Invalid>();
+        new PredictionTemplateDraft("Title", Enumerable.Repeat("Yes", 11).ToArray(), 30)
+            .Validate()
+            .ShouldBeOfType<PredictionTemplateValidationOutcome.Invalid>();
+        new PredictionTemplateDraft("Title", [new string('x', 26), "No"], 30)
+            .Validate()
+            .ShouldBeOfType<PredictionTemplateValidationOutcome.Invalid>();
         new PredictionTemplateDraft("Title", ["Yes", "No"], 29)
+            .Validate()
+            .ShouldBeOfType<PredictionTemplateValidationOutcome.Invalid>();
+        new PredictionTemplateDraft("Title", ["Yes", "No"], 1801)
             .Validate()
             .ShouldBeOfType<PredictionTemplateValidationOutcome.Invalid>();
     }

@@ -15,11 +15,17 @@ public abstract record PredictionOperationOutcome
 
     public sealed record TemplateNotFound : PredictionOperationOutcome;
 
+    public sealed record TemplateDeleted : PredictionOperationOutcome;
+
     public sealed record ConfirmationRequired : PredictionOperationOutcome;
 
     public sealed record InvalidOutcome : PredictionOperationOutcome;
 
     public sealed record NotReady(string Message) : PredictionOperationOutcome;
+
+    public sealed record Ineligible(string Message) : PredictionOperationOutcome;
+
+    public sealed record Unavailable(string Message) : PredictionOperationOutcome;
 
     public sealed record InvalidTemplate(string Message) : PredictionOperationOutcome;
 

@@ -47,6 +47,8 @@ public abstract record PredictionAuthorizationReadiness
 
     public sealed record Ready : PredictionAuthorizationReadiness;
 
+    public sealed record Ineligible(string Message) : PredictionAuthorizationReadiness;
+
     public sealed record NeedsBroadcasterAuthorization(string Message)
         : PredictionAuthorizationReadiness
     {

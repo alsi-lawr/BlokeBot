@@ -52,11 +52,31 @@ public abstract record HelixPredictionLookupOutcome
 {
     private HelixPredictionLookupOutcome() { }
 
-    public sealed record Found(HelixPrediction Prediction) : HelixPredictionLookupOutcome;
+    public sealed record Found(IReadOnlyList<HelixPrediction> Predictions)
+        : HelixPredictionLookupOutcome;
 
     public sealed record NoPrediction : HelixPredictionLookupOutcome;
 
+    public sealed record Unauthorized : HelixPredictionLookupOutcome;
+
+    public sealed record Ineligible : HelixPredictionLookupOutcome;
+
     public sealed record Unavailable : HelixPredictionLookupOutcome;
+}
+
+public abstract record HelixPredictionEndOutcome
+{
+    private HelixPredictionEndOutcome() { }
+
+    public sealed record Updated(HelixPrediction Prediction) : HelixPredictionEndOutcome;
+
+    public sealed record InvalidRequest : HelixPredictionEndOutcome;
+
+    public sealed record Unauthorized : HelixPredictionEndOutcome;
+
+    public sealed record Ineligible : HelixPredictionEndOutcome;
+
+    public sealed record Unavailable : HelixPredictionEndOutcome;
 }
 
 public enum HelixPredictionEndStatus
@@ -79,6 +99,15 @@ internal sealed record HelixPredictionsResponse
 {
     [JsonPropertyName("data")]
     public IReadOnlyList<HelixPredictionWire> Data { get; init; } = [];
+
+    [JsonPropertyName("pagination")]
+    public HelixPagination? Pagination { get; init; }
+}
+
+internal sealed record HelixPagination
+{
+    [JsonPropertyName("cursor")]
+    public string? Cursor { get; init; }
 }
 
 internal sealed record HelixPredictionWire

@@ -169,6 +169,7 @@ public partial class ShoutoutsPage
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
         await LoadChannelPointsAsync();
+        await LoadPredictionsAsync();
     }
 
     private async Task LoadClipsMarkersAsync()
@@ -605,6 +606,24 @@ public partial class ShoutoutsPage
         );
     }
 
+    private async Task DeletePredictionTemplateAsync(int templateId)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _predictions.DeleteTemplateAsync(
+                    hostId,
+                    templateId,
+                    CancellationToken.None
+                );
+                PublishPredictionOutcome(outcome);
+                await LoadPredictionsAsync();
+            }
+        );
+    }
+
     private async Task StartPredictionAsync(int templateId)
     {
         var hostId = HostId;
@@ -671,12 +690,15 @@ public partial class ShoutoutsPage
             PredictionOperationOutcome.Started => "Prediction started.",
             PredictionOperationOutcome.Updated => "Prediction updated.",
             PredictionOperationOutcome.TemplateSaved => "Prediction template saved.",
+            PredictionOperationOutcome.TemplateDeleted => "Prediction template deleted.",
             PredictionOperationOutcome.ActivePredictionExists =>
                 "Twitch already has an active prediction.",
             PredictionOperationOutcome.InvalidTemplate invalid => invalid.Message,
             PredictionOperationOutcome.InvalidOutcome =>
                 "Select an outcome from the active prediction.",
             PredictionOperationOutcome.NotReady notReady => notReady.Message,
+            PredictionOperationOutcome.Ineligible ineligible => ineligible.Message,
+            PredictionOperationOutcome.Unavailable unavailable => unavailable.Message,
             PredictionOperationOutcome.ProviderRejected rejected => rejected.Message,
             PredictionOperationOutcome.ConfirmationRequired => "Confirm the prediction update.",
             PredictionOperationOutcome.TemplateNotFound => "Prediction template was not found.",
@@ -687,6 +709,7 @@ public partial class ShoutoutsPage
             is PredictionOperationOutcome.Started
                 or PredictionOperationOutcome.Updated
                 or PredictionOperationOutcome.TemplateSaved
+                or PredictionOperationOutcome.TemplateDeleted
         )
         {
             _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
