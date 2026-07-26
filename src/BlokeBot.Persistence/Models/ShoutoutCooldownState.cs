@@ -10,6 +10,8 @@ public sealed class ShoutoutCooldownState
 
     public string? TargetTwitchUserId { get; set; }
 
+    public string? TargetLogin { get; set; }
+
     public DateTime? TargetEligibleAtUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }

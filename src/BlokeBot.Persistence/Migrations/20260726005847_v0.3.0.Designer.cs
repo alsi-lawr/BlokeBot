@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260726002255_v0.3.0")]
+    [Migration("20260726005847_v0.3.0")]
     partial class v030
     {
         /// <inheritdoc />
@@ -1713,6 +1713,10 @@ namespace BlokeBot.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("TargetEligibleAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetLogin")
+                        .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TargetTwitchUserId")

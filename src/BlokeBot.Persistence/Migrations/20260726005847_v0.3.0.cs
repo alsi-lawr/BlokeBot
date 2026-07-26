@@ -20,6 +20,7 @@ namespace BlokeBot.Persistence.Migrations
                     HostId = table.Column<int>(type: "INTEGER", nullable: false),
                     GlobalEligibleAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
                     TargetTwitchUserId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    TargetLogin = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
                     TargetEligibleAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
                     UpdatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false)
                 },

@@ -29,6 +29,7 @@ public sealed partial class BlokeBotDbContext
             b.ToTable("shoutout_cooldowns");
             b.HasKey(x => x.Id);
             b.Property(x => x.TargetTwitchUserId).HasMaxLength(64);
+            b.Property(x => x.TargetLogin).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.TargetTwitchUserId }).IsUnique();
             b.HasOne<BotHost>()
                 .WithMany()

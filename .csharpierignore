@@ -1,3 +1,5 @@
-# EF emits migration source and the model snapshot from provider templates. They are checked by
+# EF emits v0.3.0 migration source and the model snapshot from provider templates. They are checked by
 # the migration topology/schema-equivalence gate, not rewritten by the general formatter.
-src/BlokeBot.Persistence/Migrations/**
+src/BlokeBot.Persistence/Migrations/*_v0.3.0.cs
+src/BlokeBot.Persistence/Migrations/*_v0.3.0.Designer.cs
+src/BlokeBot.Persistence/Migrations/BlokeBotDbContextModelSnapshot.cs

@@ -81,6 +81,98 @@ public sealed class ShoutoutServiceTests
     }
 
     [Test]
+    public async Task TargetCooldown_AfterHistoryTrimming_LoadingByTarget_ReturnsDurableEligibility()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var service = new ShoutoutService(
+            dbFactory,
+            null!,
+            null!,
+            null!,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        var targetEligibility = DateTimeOffset.Parse("2026-07-26T02:00:00Z");
+        await service.ShoutoutReceivedAsync(
+            new(
+                "host-id",
+                "host",
+                "source-id",
+                "source",
+                "target-id",
+                "target",
+                42,
+                DateTimeOffset.Parse("2026-07-26T00:00:00Z"),
+                DateTimeOffset.Parse("2026-07-26T01:00:00Z"),
+                targetEligibility,
+                EventSubShoutoutDirection.Sent,
+                "target-delivery"
+            ),
+            CancellationToken.None
+        );
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.ShoutoutHistory.AddRange(
+                Enumerable
+                    .Range(0, 100)
+                    .Select(index => new ShoutoutHistoryEntry
+                    {
+                        HostId = 1,
+                        Direction = ShoutoutHistoryDirection.Received,
+                        ProviderMessageId = $"ordinary-{index}",
+                        SourceTwitchUserId = "source-id",
+                        SourceLogin = "source",
+                        TargetTwitchUserId = $"ordinary-id-{index}",
+                        TargetLogin = $"ordinary-{index}",
+                        ViewerCount = 1,
+                        OccurredAtUtc = DateTime
+                            .Parse("2026-07-26T00:01:00Z")
+                            .ToUniversalTime()
+                            .AddMinutes(index),
+                    })
+            );
+            await db.SaveChangesAsync();
+        }
+
+        await service.ShoutoutReceivedAsync(
+            new(
+                "host-id",
+                "host",
+                "source-id",
+                "source",
+                "ordinary-id-latest",
+                "ordinary-latest",
+                1,
+                DateTimeOffset.Parse("2026-07-26T04:00:00Z"),
+                null,
+                null,
+                EventSubShoutoutDirection.Received,
+                "ordinary-latest-delivery"
+            ),
+            CancellationToken.None
+        );
+
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.ShoutoutHistory.AnyAsync(x => x.TargetLogin == "target")).ShouldBeFalse();
+        var dashboard = await service.LoadAsync(1, "target", CancellationToken.None);
+        dashboard
+            .TargetCooldown.ShouldBeOfType<ShoutoutTargetCooldownReadiness.EligibleAt>()
+            .Value.ShouldBe(targetEligibility.UtcDateTime);
+    }
+
+    [Test]
     [Arguments(ShoutoutScenario.Self)]
     [Arguments(ShoutoutScenario.Offline)]
     [Arguments(ShoutoutScenario.NotModerator)]

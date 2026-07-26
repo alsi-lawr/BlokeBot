@@ -1712,6 +1712,10 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<DateTime?>("TargetEligibleAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("TargetLogin")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("TargetTwitchUserId")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");

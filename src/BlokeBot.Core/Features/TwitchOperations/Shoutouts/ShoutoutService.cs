@@ -37,19 +37,12 @@ public sealed class ShoutoutService(
             .Select(x => x.GlobalEligibleAtUtc)
             .SingleOrDefaultAsync(ct);
         var normalizedTarget = Login.Normalize(targetLogin);
-        var targetId = string.IsNullOrWhiteSpace(normalizedTarget)
-            ? null
-            : await db
-                .ShoutoutHistory.AsNoTracking()
-                .Where(x => x.HostId == hostId && x.TargetLogin == normalizedTarget)
-                .OrderByDescending(x => x.OccurredAtUtc)
-                .Select(x => x.TargetTwitchUserId)
-                .FirstOrDefaultAsync(ct);
         ShoutoutTargetCooldownReadiness targetCooldown =
-            string.IsNullOrWhiteSpace(targetId) ? new ShoutoutTargetCooldownReadiness.Unknown()
+            string.IsNullOrWhiteSpace(normalizedTarget)
+                ? new ShoutoutTargetCooldownReadiness.Unknown()
             : await db
                 .ShoutoutCooldowns.AsNoTracking()
-                .Where(x => x.HostId == hostId && x.TargetTwitchUserId == targetId)
+                .Where(x => x.HostId == hostId && x.TargetLogin == normalizedTarget)
                 .Select(x => x.TargetEligibleAtUtc)
                 .SingleOrDefaultAsync(ct)
                 is { } eligibleAt
@@ -190,11 +183,19 @@ public sealed class ShoutoutService(
         );
         if (direction == ShoutoutHistoryDirection.Sent)
         {
-            await StoreCooldownAsync(db, host.Id, null, shoutout.CooldownEndsAt?.UtcDateTime, ct);
+            await StoreCooldownAsync(
+                db,
+                host.Id,
+                null,
+                null,
+                shoutout.CooldownEndsAt?.UtcDateTime,
+                ct
+            );
             await StoreCooldownAsync(
                 db,
                 host.Id,
                 shoutout.ToBroadcasterUserId,
+                Login.Normalize(shoutout.ToBroadcasterUserLogin),
                 shoutout.TargetCooldownEndsAt?.UtcDateTime,
                 ct
             );
@@ -290,6 +291,7 @@ public sealed class ShoutoutService(
         BlokeBotDbContext db,
         int hostId,
         string? targetId,
+        string? targetLogin,
         DateTime? eligibleAtUtc,
         CancellationToken ct
     )
@@ -304,6 +306,7 @@ public sealed class ShoutoutService(
             db.ShoutoutCooldowns.Add(state);
         }
         state.GlobalEligibleAtUtc = targetId is null ? eligibleAtUtc : null;
+        state.TargetLogin = targetId is null ? null : targetLogin;
         state.TargetEligibleAtUtc = targetId is null ? null : eligibleAtUtc;
         state.UpdatedAtUtc = DateTime.UtcNow;
     }
