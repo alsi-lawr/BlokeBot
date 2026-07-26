@@ -28,8 +28,9 @@ internal sealed record EventSubPollWireEvent
     [JsonPropertyName("ends_at")]
     public DateTimeOffset? EndsAt { get; init; }
 
-    internal EventSubPollEvent ToDomain(string messageId) =>
-        new(
+    internal EventSubPollEvent ToDomain(string messageId)
+    {
+        return new(
             BroadcasterUserId,
             BroadcasterUserLogin,
             Id,
@@ -42,6 +43,7 @@ internal sealed record EventSubPollWireEvent
             EndsAt,
             messageId
         );
+    }
 
     internal sealed record Choice
     {
