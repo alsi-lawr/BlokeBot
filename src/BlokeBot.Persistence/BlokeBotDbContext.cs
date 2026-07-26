@@ -58,6 +58,8 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<TwitchPollTemplateChoice> TwitchPollTemplateChoices =>
         Set<TwitchPollTemplateChoice>();
     public DbSet<TwitchPoll> TwitchPolls => Set<TwitchPoll>();
+    public DbSet<TwitchClip> TwitchClips => Set<TwitchClip>();
+    public DbSet<TwitchStreamMarker> TwitchStreamMarkers => Set<TwitchStreamMarker>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +73,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
         ConfigurePolls(modelBuilder);
+        ConfigureClipsMarkers(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

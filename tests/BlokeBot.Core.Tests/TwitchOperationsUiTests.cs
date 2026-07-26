@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Hosts;
@@ -46,6 +47,7 @@ public sealed class TwitchOperationsUiTests
                 .Any(button => button.TextContent.Trim() == "Save template")
                 .ShouldBeTrue()
         );
+        page.Markup.ShouldContain("Clips &amp; Markers");
 
         page.Find("#poll-title").Input("Channel Points question");
         page.Find("#poll-choices").Input("Yes\nNo");
@@ -133,6 +135,17 @@ public sealed class TwitchOperationsUiTests
                 settings,
                 events,
                 alerts
+            )
+        );
+        context.Services.AddSingleton(
+            new ClipMarkerService(
+                dbFactory,
+                new ReadyBroadcasterProvider(),
+                new HelixClient(new RejectingHttpClientFactory()),
+                settings,
+                events,
+                alerts,
+                TimeProvider.System
             )
         );
         context.Services.AddSingleton(

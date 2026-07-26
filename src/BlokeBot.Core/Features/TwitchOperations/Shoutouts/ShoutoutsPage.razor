@@ -2,6 +2,7 @@
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
 @using BlokeBot.Core.Features.TwitchOperations.Polls
 @using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
@@ -10,6 +11,7 @@
 @inject ShoutoutService _shoutouts
 @inject ToastService _toasts
 @inject PollService _polls
+@inject ClipMarkerService _clipsMarkers
 @inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
 
@@ -146,6 +148,56 @@
                             }
                         </div>
                     </div>
+                }
+            </div>
+        }
+    </section>
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Clips &amp; Markers</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Request a Twitch clip or place a stream marker for the selected live channel.</p>
+        </div>
+        @if (_clipMarkerState is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading clips and markers...</p>
+        }
+        else
+        {
+            <div class="space-y-4 p-5">
+                @if (_clipMarkerState.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+                {
+                    <div class="text-sm text-amber-700">
+                        <p>@readiness.Message</p>
+                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70"
+                                         Url="@readiness.ReauthorizationUrl"
+                                         PopupName="blokebot-broadcaster-oauth"
+                                         OpeningText="Opening..."
+                                         OnClosed="LoadClipsMarkersAsync">
+                            Reconnect broadcaster
+                        </AuthPopupButton>
+                    </div>
+                }
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="clip-request-key" Label="Clip request key" @bind-Value="_clipRequestKey" Placeholder="stable request key" />
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="clip-has-delay"><input id="clip-has-delay" type="checkbox" @bind="_clipHasDelay" />Include delay</label>
+                    <button class="btn-primary self-end" @onclick="CreateClipAsync">Create clip</button>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="marker-request-key" Label="Marker request key" @bind-Value="_markerRequestKey" Placeholder="stable request key" />
+                    <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
+                    <button class="btn-secondary self-end" @onclick="CreateMarkerAsync">Create marker</button>
+                </div>
+                @foreach (var clip in _clipMarkerState.PendingClips)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3" @key="clip.Id"><strong>Clip pending</strong><span class="ml-2 text-sm text-muted-foreground">@clip.EditUrl</span></div>
+                }
+                @foreach (var clip in _clipMarkerState.Results)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3" @key="clip.Id"><strong>@clip.Status</strong><span class="ml-2 text-sm text-muted-foreground">@(clip.FinalUrl ?? clip.FailureReason)</span></div>
+                }
+                @foreach (var marker in _clipMarkerState.Markers)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3" @key="marker.Id"><strong>@marker.Description</strong><span class="ml-2 text-sm text-muted-foreground">@marker.Status at @marker.PositionSeconds seconds</span></div>
                 }
             </div>
         }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using Microsoft.JSInterop;
 
@@ -16,6 +17,11 @@ public partial class ShoutoutsPage
     private string _pollDuration = "60";
     private bool _channelPointsVotingEnabled;
     private string _channelPointsPerVote = string.Empty;
+    private ClipMarkerDashboardState? _clipMarkerState;
+    private string _clipRequestKey = Guid.NewGuid().ToString("N");
+    private bool _clipHasDelay;
+    private string _markerRequestKey = Guid.NewGuid().ToString("N");
+    private string _markerDescription = string.Empty;
 
     private string _cooldownText =>
         _state switch
@@ -45,6 +51,7 @@ public partial class ShoutoutsPage
         await LoadPageContextAsync();
         await LoadAsync();
         await LoadPollsAsync();
+        await LoadClipsMarkersAsync();
     }
 
     private async Task LoadAsync()
@@ -136,6 +143,90 @@ public partial class ShoutoutsPage
     {
         await LoadPageContextAsync();
         await LoadPollsAsync();
+        await LoadClipsMarkersAsync();
+    }
+
+    private async Task LoadClipsMarkersAsync()
+    {
+        if (HostId != 0)
+        {
+            _clipMarkerState = await _clipsMarkers.LoadAsync(HostId, CancellationToken.None);
+        }
+    }
+
+    private async Task CreateClipAsync()
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _clipsMarkers.CreateClipAsync(
+                    hostId,
+                    _clipRequestKey,
+                    _clipHasDelay,
+                    CancellationToken.None
+                );
+                PublishClipMarkerOutcome(outcome);
+                await LoadClipsMarkersAsync();
+            }
+        );
+    }
+
+    private async Task CreateMarkerAsync()
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _clipsMarkers.CreateMarkerAsync(
+                    hostId,
+                    _markerRequestKey,
+                    _markerDescription,
+                    CancellationToken.None
+                );
+                PublishClipMarkerOutcome(outcome);
+                await LoadClipsMarkersAsync();
+            }
+        );
+    }
+
+    private void PublishClipMarkerOutcome(ClipMarkerOperationOutcome outcome)
+    {
+        var message = outcome switch
+        {
+            ClipMarkerOperationOutcome.ClipPending => "Clip requested; Twitch is preparing it.",
+            ClipMarkerOperationOutcome.ClipAvailable => "Clip is available.",
+            ClipMarkerOperationOutcome.MarkerCreated => "Stream marker created.",
+            ClipMarkerOperationOutcome.NotReady notReady => notReady.Message,
+            ClipMarkerOperationOutcome.InvalidRequest invalid => invalid.Message,
+            ClipMarkerOperationOutcome.Offline => "Twitch reports that the channel is offline.",
+            ClipMarkerOperationOutcome.VodsDisabled =>
+                "Twitch reports that VOD or clip creation is disabled.",
+            ClipMarkerOperationOutcome.RerunOrPremiere =>
+                "Twitch reports that this stream cannot create clips or markers.",
+            ClipMarkerOperationOutcome.Ambiguous =>
+                "Twitch did not confirm whether the request completed. Reuse the same request key to view its outcome.",
+            ClipMarkerOperationOutcome.ProviderRejected rejected => rejected.Message,
+            ClipMarkerOperationOutcome.ClipFailed failed => failed.Clip.FailureReason
+                ?? "Twitch did not create the clip.",
+            ClipMarkerOperationOutcome.MarkerFailed failed => failed.Marker.FailureReason
+                ?? "Twitch did not create the marker.",
+            _ => throw new UnreachableException(),
+        };
+        if (
+            outcome
+            is ClipMarkerOperationOutcome.ClipPending
+                or ClipMarkerOperationOutcome.ClipAvailable
+                or ClipMarkerOperationOutcome.MarkerCreated
+        )
+        {
+            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
+            return;
+        }
+
+        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
     }
 
     private async Task SavePollTemplateAsync()

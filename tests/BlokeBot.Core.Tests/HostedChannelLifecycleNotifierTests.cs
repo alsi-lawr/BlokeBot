@@ -5,6 +5,7 @@ using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
@@ -44,7 +45,8 @@ public sealed class HostedChannelLifecycleNotifierTests
                 dbFactory,
                 new HostedChannelChangeNotifier(events)
             ),
-            CreatePollService(dbFactory, http, events)
+            CreatePollService(dbFactory, http, events),
+            CreateClipMarkerService(dbFactory, events)
         );
 
         await notifier.ChannelStartedAsync("Streamer", CancellationToken.None);
@@ -119,6 +121,24 @@ public sealed class HostedChannelLifecycleNotifierTests
             ),
             events,
             new DurableAlertService(dbFactory, TimeProvider.System, events)
+        );
+    }
+
+    private static ClipMarkerService CreateClipMarkerService(
+        SqliteBlokeBotDbFactory dbFactory,
+        EventBus<AppEventKind> events
+    )
+    {
+        return new(
+            dbFactory,
+            new ReadyBroadcasterProvider(),
+            new HelixClient(new PollHttpClientFactory()),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+            ),
+            events,
+            new DurableAlertService(dbFactory, TimeProvider.System, events),
+            TimeProvider.System
         );
     }
 
