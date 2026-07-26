@@ -8,4 +8,5 @@ public enum AppEventKind
     PointsChanged,
     CustomCommandsChanged,
     AlertsChanged,
+    TwitchOperationsChanged,
 }

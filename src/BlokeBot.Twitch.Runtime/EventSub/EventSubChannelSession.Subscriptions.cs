@@ -51,9 +51,16 @@ internal sealed partial class EventSubChannelSession
         }
 
         await CompletePendingStopAsync(channel, context, cancellationToken);
+        ActiveEventSubSubscription? current;
+        lock (_gate)
+        {
+            _subscriptions.TryGetValue(channel, out current);
+        }
+        var authorization =
+            current?.Authorization ?? EventSubAuthorizationContext.ConfiguredBotAuthority;
         context.Phase = EventSubChannelPhase.AccountResolution;
         var accountResolution = await operations
-            .ResolveAccount(channel)
+            .ResolveAccount(channel, authorization)
             .ExecuteAsync(cancellationToken);
         return await accountResolution.Match<ValueTask<EventSubChannelReconciliationOutcome>>(
             async account =>
@@ -101,7 +108,13 @@ internal sealed partial class EventSubChannelSession
                         context,
                         EventSubChannelPhase.SubscriptionSetup,
                         token =>
-                            operations.CreateSubscriptionAsync(channel, account, sessionId, token),
+                            operations.CreateSubscriptionAsync(
+                                channel,
+                                authorization,
+                                account,
+                                sessionId,
+                                token
+                            ),
                         cancellationToken
                     );
                     switch (setup)
@@ -113,6 +126,22 @@ internal sealed partial class EventSubChannelSession
                             return new EventSubChannelReconciliationOutcome.MissingChannel();
                         case EventSubSubscriptionSetupOutcome.MissingBot:
                             return new EventSubChannelReconciliationOutcome.MissingBot();
+                        case EventSubSubscriptionSetupOutcome.PartiallyCreated partial:
+                            lock (_gate)
+                            {
+                                _subscriptions[channel] = partial.Subscription;
+                            }
+                            var cleanup = await ReconcileSubscriptionDeletionAsync(
+                                partial.Subscription,
+                                context,
+                                cancellationToken
+                            );
+                            if (cleanup is EventSubChannelReconciliationOutcome.UnresolvedDeletion)
+                            {
+                                return cleanup;
+                            }
+                            context.Phase = EventSubChannelPhase.SubscriptionSetup;
+                            throw partial.Failure;
                         default:
                             throw new UnreachableException(
                                 "Unknown EventSub subscription setup outcome."

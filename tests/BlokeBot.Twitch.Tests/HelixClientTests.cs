@@ -253,6 +253,32 @@ public sealed class HelixClientTests
     }
 
     [Test]
+    public async Task AcceptedShoutout_SendingThroughHelix_MapsToSent()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Post);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/chat/shoutouts");
+            request.RequestUri.Query.ShouldContain("from_broadcaster_id=source-id");
+            request.RequestUri.Query.ShouldContain("to_broadcaster_id=target-id");
+            request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        var client = new HelixClient(factory);
+
+        var result = await client.SendShoutoutAsync(
+            Context(),
+            "source-id",
+            "bot-id",
+            "target-id",
+            CancellationToken.None
+        );
+
+        result.ShouldBeOfType<ShoutoutSendResult.Sent>();
+    }
+
+    [Test]
     public async Task PaginatedModeratedChannels_LoadingThroughHelix_ReturnsAllPagesWithAuth()
     {
         var factory = new ScriptedHttpClientFactory();

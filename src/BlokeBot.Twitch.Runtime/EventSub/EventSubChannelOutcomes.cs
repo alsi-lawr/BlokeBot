@@ -12,6 +12,11 @@ internal abstract record EventSubSubscriptionSetupOutcome
     internal sealed record MissingChannel : EventSubSubscriptionSetupOutcome;
 
     internal sealed record MissingBot : EventSubSubscriptionSetupOutcome;
+
+    internal sealed record PartiallyCreated(
+        ActiveEventSubSubscription Subscription,
+        Exception Failure
+    ) : EventSubSubscriptionSetupOutcome;
 }
 
 internal abstract record EventSubChannelReconciliationOutcome

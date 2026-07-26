@@ -16,6 +16,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         "https://api.twitch.tv/helix/channels/followed";
     private const string _moderatedChannelsEndpoint =
         "https://api.twitch.tv/helix/moderation/channels";
+    private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -62,6 +63,51 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             cancellationToken
         );
         return payload?.Data ?? [];
+    }
+
+    public async Task<HelixShoutoutTarget?> GetShoutoutTargetAsync(
+        HelixRequestContext context,
+        string login,
+        CancellationToken cancellationToken
+    )
+    {
+        var users = await GetUsersByLoginAsync(context, [login], cancellationToken);
+        return users.FirstOrDefault() is { } user
+            ? new HelixShoutoutTarget(user.Id, user.Login, user.DisplayName)
+            : null;
+    }
+
+    public async Task<ShoutoutSendResult> SendShoutoutAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string moderatorId,
+        string targetId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _shoutoutsEndpoint
+            + "?"
+            + QueryString.Create(
+                new Dictionary<string, string?>
+                {
+                    ["from_broadcaster_id"] = broadcasterId,
+                    ["to_broadcaster_id"] = targetId,
+                    ["moderator_id"] = moderatorId,
+                }
+            );
+        using var request = HelixRequest.Create(HttpMethod.Post, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        return response.StatusCode switch
+        {
+            HttpStatusCode.NoContent => new ShoutoutSendResult.Sent(),
+            HttpStatusCode.BadRequest => new ShoutoutSendResult.InvalidTarget(),
+            HttpStatusCode.Conflict or HttpStatusCode.TooManyRequests =>
+                new ShoutoutSendResult.Cooldown(),
+            HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
+                new ShoutoutSendResult.Unauthorized(),
+            _ => new ShoutoutSendResult.Unavailable(),
+        };
     }
 
     public async Task<IReadOnlyList<ModeratedChannel>> GetModeratedChannelsAsync(
@@ -175,7 +221,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.FirstOrDefault() is { } stream ? new HelixStream(stream.Id) : null;
+        return payload?.Data.FirstOrDefault() is { } stream
+            ? new HelixStream(stream.Id, stream.UserId, stream.UserLogin, stream.ViewerCount)
+            : null;
     }
 
     public async Task<ChatSettings> GetChatSettingsAsync(

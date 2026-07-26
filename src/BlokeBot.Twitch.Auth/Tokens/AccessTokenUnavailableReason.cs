@@ -4,4 +4,5 @@ public enum AccessTokenUnavailableReason
 {
     MissingRefreshToken,
     CredentialProtectionUnavailable,
+    BroadcasterAuthorizationUnavailable,
 }

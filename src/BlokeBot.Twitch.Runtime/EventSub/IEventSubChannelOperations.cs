@@ -4,10 +4,14 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal interface IEventSubChannelOperations
 {
-    IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel);
+    IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
+        string channel,
+        EventSubAuthorizationContext authorization
+    );
 
     ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
+        EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
         CancellationToken cancellationToken

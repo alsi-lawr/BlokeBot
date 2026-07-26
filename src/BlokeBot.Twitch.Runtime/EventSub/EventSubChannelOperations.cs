@@ -12,13 +12,27 @@ internal sealed class EventSubChannelOperations(
     IBotChannelLifecycleNotifier lifecycle
 ) : IEventSubChannelOperations
 {
-    public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel)
+    public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
+        string channel,
+        EventSubAuthorizationContext authorization
+    )
     {
-        return accounts.GetBotAccount(channel);
+        return authorization.Match(
+            _ => accounts.GetBotAccount(channel),
+            _ =>
+                IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+                    ValueTask.FromResult(
+                        Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                            AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                        )
+                    )
+                )
+        );
     }
 
     public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
         string channel,
+        EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
         CancellationToken cancellationToken
@@ -34,6 +48,7 @@ internal sealed class EventSubChannelOperations(
             resolved =>
                 CreateResolvedSubscriptionAsync(
                     channel,
+                    authorization,
                     account,
                     sessionId,
                     resolved,
@@ -52,28 +67,66 @@ internal sealed class EventSubChannelOperations(
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateResolvedSubscriptionAsync(
         string channel,
+        EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
         ChatIdentityResolution.Resolved resolved,
         CancellationToken cancellationToken
     )
     {
-        return new EventSubSubscriptionSetupOutcome.Created(
-            new ActiveEventSubSubscription
-            {
-                Channel = channel,
-                SubscriptionId = await eventSub.CreateChatMessageSubscriptionAsync(
-                    new HelixRequestContext(settings.Identity.ClientId, account.AccessToken),
+        var created = new List<string>();
+        try
+        {
+            var context = new HelixRequestContext(settings.Identity.ClientId, account.AccessToken);
+            var chat = await eventSub.CreateChatMessageSubscriptionAsync(
+                context,
+                resolved.BroadcasterId,
+                resolved.BotUserId,
+                sessionId,
+                cancellationToken
+            );
+            created.Add(chat);
+            created.Add(
+                await eventSub.CreateShoutoutCreateSubscriptionAsync(
+                    context,
                     resolved.BroadcasterId,
                     resolved.BotUserId,
                     sessionId,
                     cancellationToken
-                ),
+                )
+            );
+            created.Add(
+                await eventSub.CreateShoutoutReceiveSubscriptionAsync(
+                    context,
+                    resolved.BroadcasterId,
+                    resolved.BotUserId,
+                    sessionId,
+                    cancellationToken
+                )
+            );
+            return new EventSubSubscriptionSetupOutcome.Created(CreateActive(created));
+        }
+        catch (Exception exception) when (created.Count > 0)
+        {
+            return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
+                CreateActive(created),
+                exception
+            );
+        }
+
+        ActiveEventSubSubscription CreateActive(IReadOnlyList<string> ids)
+        {
+            return new()
+            {
+                Channel = channel,
+                SubscriptionId = ids[0],
+                AdditionalSubscriptionIds = ids.Skip(1).ToArray(),
                 BotLogin = account.Login,
+                Authorization = authorization,
                 AccessToken = account.AccessToken,
                 Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
-            }
-        );
+            };
+        }
     }
 
     public async ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
@@ -112,11 +165,19 @@ internal sealed class EventSubChannelOperations(
     {
         try
         {
+            var context = new HelixRequestContext(
+                settings.Identity.ClientId,
+                subscription.AccessToken
+            );
             await eventSub.DeleteSubscriptionAsync(
-                new HelixRequestContext(settings.Identity.ClientId, subscription.AccessToken),
+                context,
                 subscription.SubscriptionId,
                 cancellationToken
             );
+            foreach (var subscriptionId in subscription.AdditionalSubscriptionIds)
+            {
+                await eventSub.DeleteSubscriptionAsync(context, subscriptionId, cancellationToken);
+            }
             return new EventSubSubscriptionDeletionOutcome.Deleted();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

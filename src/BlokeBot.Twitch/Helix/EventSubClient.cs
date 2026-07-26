@@ -14,7 +14,7 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
-    public async Task<string> CreateChatMessageSubscriptionAsync(
+    public Task<string> CreateChatMessageSubscriptionAsync(
         HelixRequestContext context,
         string broadcasterId,
         string botUserId,
@@ -22,22 +22,91 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
+        return CreateSubscriptionAsync(
+            context,
+            new(
+                "channel.chat.message",
+                "1",
+                new Dictionary<string, string>
+                {
+                    ["broadcaster_user_id"] = broadcasterId,
+                    ["user_id"] = botUserId,
+                },
+                sessionId
+            ),
+            cancellationToken
+        );
+    }
+
+    public Task<string> CreateShoutoutCreateSubscriptionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string moderatorId,
+        string sessionId,
+        CancellationToken cancellationToken
+    )
+    {
+        return CreateSubscriptionAsync(
+            context,
+            new(
+                "channel.shoutout.create",
+                "1",
+                new Dictionary<string, string>
+                {
+                    ["broadcaster_user_id"] = broadcasterId,
+                    ["moderator_user_id"] = moderatorId,
+                },
+                sessionId
+            ),
+            cancellationToken
+        );
+    }
+
+    public Task<string> CreateShoutoutReceiveSubscriptionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string moderatorId,
+        string sessionId,
+        CancellationToken cancellationToken
+    )
+    {
+        return CreateSubscriptionAsync(
+            context,
+            new(
+                "channel.shoutout.receive",
+                "1",
+                new Dictionary<string, string>
+                {
+                    ["broadcaster_user_id"] = broadcasterId,
+                    ["moderator_user_id"] = moderatorId,
+                },
+                sessionId
+            ),
+            cancellationToken
+        );
+    }
+
+    public async Task<string> CreateSubscriptionAsync(
+        HelixRequestContext context,
+        EventSubSubscriptionRequest subscription,
+        CancellationToken cancellationToken
+    )
+    {
         var payload = new CreateSubscriptionRequest
         {
-            Type = "channel.chat.message",
-            Version = "1",
-            Condition = new SubscriptionCondition
+            Type = subscription.Type,
+            Version = subscription.Version,
+            Condition = subscription.Condition,
+            Transport = new SubscriptionTransport
             {
-                BroadcasterUserId = broadcasterId,
-                UserId = botUserId,
+                Method = "websocket",
+                SessionId = subscription.SessionId,
             },
-            Transport = new SubscriptionTransport { Method = "websocket", SessionId = sessionId },
         };
         using var request = HelixRequest.Create(HttpMethod.Post, _subscriptionsEndpoint, context);
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
-
         var result = await response.Content.ReadFromJsonAsync<SubscriptionResponse>(
             _jsonOptions,
             cancellationToken
@@ -74,19 +143,10 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
         public required string Version { get; init; }
 
         [JsonPropertyName("condition")]
-        public required SubscriptionCondition Condition { get; init; }
+        public required IReadOnlyDictionary<string, string> Condition { get; init; }
 
         [JsonPropertyName("transport")]
         public required SubscriptionTransport Transport { get; init; }
-    }
-
-    private sealed record SubscriptionCondition
-    {
-        [JsonPropertyName("broadcaster_user_id")]
-        public required string BroadcasterUserId { get; init; }
-
-        [JsonPropertyName("user_id")]
-        public required string UserId { get; init; }
     }
 
     private sealed record SubscriptionTransport

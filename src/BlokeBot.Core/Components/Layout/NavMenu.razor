@@ -112,6 +112,19 @@
                     </div>
                 }
 
+                @if (selection is not null && session.CanUseBotFunctions(_existingHostIds))
+                {
+                    <div class="nav-menu__panel rounded-xl p-1">
+                        <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="twitch-operations"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-700">✦</span>
+                            Native Twitch operations
+                        </NavLink>
+                    </div>
+                }
+
                 @if (showBotFunctions)
                 {
         <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>

@@ -92,6 +92,7 @@ public sealed class ChatIdentityResolverTests
 
         var outcome = await operations.CreateSubscriptionAsync(
             "private-channel-login",
+            EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("bot", "access-token"),
             "session-id",
             CancellationToken.None
@@ -121,6 +122,7 @@ public sealed class ChatIdentityResolverTests
 
         var outcome = await operations.CreateSubscriptionAsync(
             "private-channel-login",
+            EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("private-bot-login", "access-token"),
             "session-id",
             CancellationToken.None

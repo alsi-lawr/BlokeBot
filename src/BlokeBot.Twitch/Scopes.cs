@@ -11,4 +11,6 @@ public static class Scopes
     public const string UserManageWhispers = "user:manage:whispers";
     public const string UserReadFollows = "user:read:follows";
     public const string UserReadModeratedChannels = "user:read:moderated_channels";
+    public const string ModeratorReadShoutouts = "moderator:read:shoutouts";
+    public const string ModeratorManageShoutouts = "moderator:manage:shoutouts";
 }
