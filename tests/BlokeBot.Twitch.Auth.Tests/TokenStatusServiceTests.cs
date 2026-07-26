@@ -202,8 +202,10 @@ public sealed class TokenStatusServiceTests
         var provider = new RecordingTokenProvider("saved-token");
         var service = Service(
             provider,
-            new OAuthTransport(new CancellingValidationHttpClientFactory(cancellation),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                new CancellingValidationHttpClientFactory(cancellation),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(async () =>

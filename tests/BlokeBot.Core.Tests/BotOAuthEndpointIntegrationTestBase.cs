@@ -227,9 +227,9 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         )
         {
             var transport = new OAuthTransport(
-                new EndpointOAuthHttpClientFactory(grantUserId, grantLogin, grantedScopes)
-            ,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+                new EndpointOAuthHttpClientFactory(grantUserId, grantLogin, grantedScopes),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            );
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(
                     new Dictionary<string, string?>
@@ -252,10 +252,11 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         )
         {
             var http = new EndpointOAuthHttpClientFactory("custom-id", "custombot", ["chat:read"]);
-            var transport = new OAuthTransport(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
-            var helix = new HelixClient(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+            var transport = new OAuthTransport(
+                http,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            );
+            var helix = new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
             var settings = BotSettings.FromOptions(
                 new BotOptions
                 {
@@ -296,8 +297,10 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 "streamer",
                 HostBroadcasterAuthorizationService.MilestoneScopes
             );
-            var transport = new OAuthTransport(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+            var transport = new OAuthTransport(
+                http,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            );
             var settings = BotSettings.FromOptions(
                 new BotOptions
                 {
@@ -311,8 +314,11 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     },
                 }
             );
-            var oauth = new HostBotAccountOAuthService(settings, transport, new HelixClient(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default));
+            var oauth = new HostBotAccountOAuthService(
+                settings,
+                transport,
+                new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            );
             services.AddSingleton(oauth);
             services.AddSingleton(
                 new HostBroadcasterAuthorizationService(

@@ -201,8 +201,10 @@ public sealed class ShoutoutServiceTests
         var service = new ShoutoutService(
             dbFactory,
             new StaticAccountProvider(TokenStatus(scopes)),
-            new HelixClient(new ScenarioHttpClientFactory(scenario),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(
+                new ScenarioHttpClientFactory(scenario),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             Settings(),
             TestEventBus.Create<AppEventKind>(),
             TimeProvider.System

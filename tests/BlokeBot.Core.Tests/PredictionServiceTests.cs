@@ -84,8 +84,10 @@ public sealed class PredictionServiceTests
         return new PredictionService(
             database,
             new ReadyBroadcaster(),
-            new HelixClient(new SingleHandlerFactory(handler),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(
+                new SingleHandlerFactory(handler),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             ),

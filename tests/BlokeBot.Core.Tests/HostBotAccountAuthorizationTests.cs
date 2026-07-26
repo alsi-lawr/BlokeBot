@@ -36,10 +36,11 @@ public sealed class HostBotAccountAuthorizationTests
                     },
                 }
             ),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
+            new HelixClient(httpClientFactory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var uri = oauth
@@ -66,10 +67,11 @@ public sealed class HostBotAccountAuthorizationTests
                     },
                 }
             ),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
+            new HelixClient(httpClientFactory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var uri = oauth
@@ -90,10 +92,11 @@ public sealed class HostBotAccountAuthorizationTests
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
             BotSettings.FromOptions(new BotOptions()),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
+            new HelixClient(httpClientFactory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var outcome = oauth.CreateAuthorizationUriForDefaultScopes("state");
@@ -107,10 +110,11 @@ public sealed class HostBotAccountAuthorizationTests
         var httpClientFactory = new HostBotAccountHttpClientFactory();
         var oauth = new HostBotAccountOAuthService(
             BotSettings.FromOptions(new BotOptions()),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
+            new HelixClient(httpClientFactory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
@@ -134,10 +138,11 @@ public sealed class HostBotAccountAuthorizationTests
                     },
                 }
             ),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
+            new HelixClient(httpClientFactory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var outcome = await oauth.CompleteAsync("code", CancellationToken.None);
@@ -656,10 +661,14 @@ public sealed class HostBotAccountAuthorizationTests
                 },
             }
         );
-        var oauth = new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
-        var helix = new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var oauth = new OAuthTransport(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+        var helix = new HelixClient(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),

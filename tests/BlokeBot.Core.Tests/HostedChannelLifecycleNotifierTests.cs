@@ -115,8 +115,7 @@ public sealed class HostedChannelLifecycleNotifierTests
         return new PollService(
             dbFactory,
             new ReadyBroadcasterProvider(),
-            new HelixClient(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
@@ -133,8 +132,10 @@ public sealed class HostedChannelLifecycleNotifierTests
         return new(
             dbFactory,
             new ReadyBroadcasterProvider(),
-            new HelixClient(new PollHttpClientFactory(),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(
+                new PollHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),

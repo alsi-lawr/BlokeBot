@@ -153,12 +153,17 @@ public sealed class HostBotStatusTests
         var settings = Settings();
         var service = new HostBotStatusService(
             new OAuthHostBotAppAccessTokenSource(
-                new AppAccessTokenProvider(httpClientFactory, settings.Identity,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+                new AppAccessTokenProvider(
+                    httpClientFactory,
+                    settings.Identity,
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                )
             ),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             settings
         );
 
@@ -253,8 +258,7 @@ public sealed class HostBotStatusTests
         return new(
             new UnavailableHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(tokenStatus),
-            new HelixClient(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             Settings()
         );
     }
@@ -272,8 +276,10 @@ public sealed class HostBotStatusTests
         return new(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new StaticHostBotAccountTokenStatusProvider(UnavailableTokenStatus()),
-            new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             Settings()
         );
     }

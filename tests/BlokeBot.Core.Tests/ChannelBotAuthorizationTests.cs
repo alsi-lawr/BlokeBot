@@ -24,8 +24,10 @@ public sealed class ChannelBotAuthorizationTests
         var httpClientFactory = new RecordingOAuthHttpClientFactory();
         var service = new ChannelBotOAuthService(
             ConfigurationWithScopes("channel:bot"),
-            new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
 
         var grant = (await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None))
@@ -43,8 +45,10 @@ public sealed class ChannelBotAuthorizationTests
     {
         var service = new ChannelBotOAuthService(
             new ConfigurationBuilder().Build(),
-            new OAuthTransport(new EmptyHttpClientFactory(),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                new EmptyHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
 
         var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
@@ -57,8 +61,10 @@ public sealed class ChannelBotAuthorizationTests
     {
         var service = new ChannelBotOAuthService(
             ConfigurationWithScopes("channel:bot"),
-            new OAuthTransport(new RecordingOAuthHttpClientFactory(HttpStatusCode.Unauthorized),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+            new OAuthTransport(
+                new RecordingOAuthHttpClientFactory(HttpStatusCode.Unauthorized),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
 
         var outcome = await service.CompleteAsync(TwitchRequest(), "code", CancellationToken.None);
@@ -168,8 +174,13 @@ public sealed class ChannelBotAuthorizationTests
     private static ChannelBotOAuthService ChannelOAuthService(params string[] scopes)
     {
         var httpClientFactory = new EmptyHttpClientFactory();
-        return new(ConfigurationWithScopes(scopes), new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default));
+        return new(
+            ConfigurationWithScopes(scopes),
+            new OAuthTransport(
+                httpClientFactory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
+        );
     }
 
     private static HostBotAccountAuthorizationService HostBotAccounts(
@@ -188,10 +199,14 @@ public sealed class ChannelBotAuthorizationTests
                 },
             }
         );
-        var oauth = new OAuthTransport(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
-        var helix = new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var oauth = new OAuthTransport(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+        var helix = new HelixClient(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         return new HostBotAccountAuthorizationService(
             dbFactory,
             new HostBotAccountOAuthService(options, oauth, helix),

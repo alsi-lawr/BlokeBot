@@ -65,9 +65,9 @@ public sealed class AuthorizedHostSelectionServiceTests
                           "pagination": {}
                         }
                         """
-                    )
-                ,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+                    ),
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                )
             )
         );
 

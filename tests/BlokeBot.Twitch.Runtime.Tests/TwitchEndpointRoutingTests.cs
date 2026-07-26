@@ -14,9 +14,7 @@ public sealed class TwitchEndpointRoutingTests
     [Test]
     [Arguments(false)]
     [Arguments(true)]
-    public async Task ProductionAndLoopbackPolicies_RouteEveryProviderBoundary(
-        bool useLoopback
-    )
+    public async Task ProductionAndLoopbackPolicies_RouteEveryProviderBoundary(bool useLoopback)
     {
         var policy = useLoopback
             ? new TwitchEndpointPolicy
@@ -173,9 +171,7 @@ public sealed class TwitchEndpointRoutingTests
             {
                 endpoint.Scheme.ShouldBe(route.Origin.Scheme, route.Name);
                 endpoint.Authority.ShouldBe(route.Origin.Authority, route.Name);
-                endpoint.AbsolutePath.ShouldBe(
-path, route.Name
-                );
+                endpoint.AbsolutePath.ShouldBe(path, route.Name);
             }
         }
     }
@@ -247,12 +243,11 @@ path, route.Name
                     var value when value.EndsWith("/users", StringComparison.Ordinal) => Json(
                         """{"data":[]}"""
                     ),
-                    var value when value.EndsWith("/chat/messages", StringComparison.Ordinal) => Json(
-                        """{"data":[{"message_id":"id","is_sent":true}]}"""
-                    ),
-                    var value when value.EndsWith("/eventsub/subscriptions", StringComparison.Ordinal) => Json(
-                        """{"data":[{"id":"id"}]}"""
-                    ),
+                    var value when value.EndsWith("/chat/messages", StringComparison.Ordinal) =>
+                        Json("""{"data":[{"message_id":"id","is_sent":true}]}"""),
+                    var value
+                        when value.EndsWith("/eventsub/subscriptions", StringComparison.Ordinal) =>
+                        Json("""{"data":[{"id":"id"}]}"""),
                     _ => new HttpResponseMessage(HttpStatusCode.NoContent),
                 };
             }

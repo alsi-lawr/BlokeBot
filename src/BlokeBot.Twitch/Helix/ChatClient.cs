@@ -27,7 +27,11 @@ public sealed class ChatClient(
             SenderId = senderId,
             Message = message,
         };
-        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("chat/messages").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("chat/messages").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();

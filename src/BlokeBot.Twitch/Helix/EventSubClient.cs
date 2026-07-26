@@ -123,7 +123,11 @@ public sealed class EventSubClient(
                 SessionId = subscription.SessionId,
             },
         };
-        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -143,7 +147,9 @@ public sealed class EventSubClient(
         CancellationToken cancellationToken
     )
     {
-        var uri = endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri + $"?id={Uri.EscapeDataString(subscriptionId)}";
+        var uri =
+            endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri
+            + $"?id={Uri.EscapeDataString(subscriptionId)}";
         using var request = HelixRequest.Create(HttpMethod.Delete, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.NotFound)

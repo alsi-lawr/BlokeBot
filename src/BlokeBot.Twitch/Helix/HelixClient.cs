@@ -21,7 +21,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Get, endpointPolicy.HelixEndpoint("users").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            endpointPolicy.HelixEndpoint("users").AbsoluteUri,
+            context
+        );
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -40,7 +44,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Get, endpointPolicy.HelixEndpoint("users").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            endpointPolicy.HelixEndpoint("users").AbsoluteUri,
+            context
+        );
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
@@ -168,7 +176,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("polls").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("polls").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -229,7 +241,10 @@ public sealed class HelixClient(
             {
                 parameters.Add(new("after", cursor));
             }
-            var uri = endpointPolicy.HelixEndpoint("predictions").AbsoluteUri + "?" + QueryString.Create(parameters);
+            var uri =
+                endpointPolicy.HelixEndpoint("predictions").AbsoluteUri
+                + "?"
+                + QueryString.Create(parameters);
             using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.StatusCode is HttpStatusCode.Unauthorized)
@@ -298,7 +313,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("predictions").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("predictions").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -356,7 +375,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Patch, endpointPolicy.HelixEndpoint("predictions").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Patch,
+            endpointPolicy.HelixEndpoint("predictions").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -569,7 +592,10 @@ public sealed class HelixClient(
                 query.Add(new("after", cursor));
             }
 
-            var uri = endpointPolicy.HelixEndpoint("streams/markers").AbsoluteUri + "?" + QueryString.Create(query);
+            var uri =
+                endpointPolicy.HelixEndpoint("streams/markers").AbsoluteUri
+                + "?"
+                + QueryString.Create(query);
             using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
             using var response = await _http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -668,7 +694,11 @@ public sealed class HelixClient(
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Patch, endpointPolicy.HelixEndpoint("polls").AbsoluteUri, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Patch,
+            endpointPolicy.HelixEndpoint("polls").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {

@@ -93,8 +93,10 @@ public abstract partial class PointsGiveawaySchedulerTestBase
     {
         var httpClientFactory = new FakeHttpClientFactory(streamIsLive);
         var options = BotSettings.FromOptions(new BotOptions());
-        var helix = new HelixClient(httpClientFactory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var helix = new HelixClient(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var status = new HostBotStatusService(
             appTokens ?? new StaticHostBotAppAccessTokenSource(),
             new UnavailableHostBotAccountTokenStatusProvider(),

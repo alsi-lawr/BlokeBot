@@ -34,8 +34,10 @@ public sealed class TransportClientTests
                 return JsonResponse("""{"data":[{"id":"subscription-id"}]}""");
             }
         );
-        var client = new EventSubClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var subscriptionId = await client.CreateChatMessageSubscriptionAsync(
             Context(),
@@ -60,8 +62,10 @@ public sealed class TransportClientTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             }
         );
-        var client = new EventSubClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         await client.DeleteSubscriptionAsync(Context(), "subscription/id", CancellationToken.None);
 
@@ -72,8 +76,10 @@ public sealed class TransportClientTests
     public async Task MissingSubscription_Deleting_TreatsNotFoundAsDeleted()
     {
         var factory = RespondingWith(HttpStatusCode.NotFound);
-        var client = new EventSubClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new EventSubClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         await client.DeleteSubscriptionAsync(Context(), "missing", CancellationToken.None);
 
@@ -112,8 +118,7 @@ public sealed class TransportClientTests
                 );
             }
         );
-        var client = new ChatClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var result = await client.SendMessageAsync(
             Context(),
@@ -148,8 +153,10 @@ public sealed class TransportClientTests
                 return new HttpResponseMessage(HttpStatusCode.NoContent);
             }
         );
-        var client = new WhisperClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new WhisperClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -182,8 +189,10 @@ public sealed class TransportClientTests
                     }
                 )
         );
-        var client = new WhisperClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new WhisperClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -216,8 +225,10 @@ public sealed class TransportClientTests
                     }
                 )
         );
-        var client = new WhisperClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new WhisperClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -242,8 +253,10 @@ public sealed class TransportClientTests
         factory.Respond(
             (_, cancellationToken) => Task.FromCanceled<HttpResponseMessage>(cancellationToken)
         );
-        var client = new WhisperClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new WhisperClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         await Should.ThrowAsync<OperationCanceledException>(() =>
             client.SendAsync(
@@ -277,8 +290,10 @@ public sealed class TransportClientTests
                 return new HttpResponseMessage(HttpStatusCode.NoContent);
             }
         );
-        var client = new ChatAnnouncementClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatAnnouncementClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -304,8 +319,10 @@ public sealed class TransportClientTests
         Type expectedResultType
     )
     {
-        var client = new ChatAnnouncementClient(RespondingWith(statusCode),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatAnnouncementClient(
+            RespondingWith(statusCode),
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -323,8 +340,10 @@ public sealed class TransportClientTests
     public async Task NativeAnnouncement_InvalidLength_DoesNotSend()
     {
         var factory = new ScriptedHttpClientFactory();
-        var client = new ChatAnnouncementClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatAnnouncementClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -343,8 +362,10 @@ public sealed class TransportClientTests
     public async Task NativeAnnouncement_UnsupportedColor_DoesNotSend()
     {
         var factory = new ScriptedHttpClientFactory();
-        var client = new ChatAnnouncementClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatAnnouncementClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -364,8 +385,10 @@ public sealed class TransportClientTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond((_, _) => throw new HttpRequestException("connection lost"));
-        var client = new ChatAnnouncementClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatAnnouncementClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.SendAsync(
             Context(),
@@ -405,8 +428,10 @@ public sealed class TransportClientTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
             }
         );
-        var client = new ChatPinClient(factory,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatPinClient(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.PinAsync(
             Context(),
@@ -429,8 +454,10 @@ public sealed class TransportClientTests
         Type expectedType
     )
     {
-        var client = new ChatPinClient(RespondingWith(statusCode),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
+        var client = new ChatPinClient(
+            RespondingWith(statusCode),
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var result = await client.PinAsync(
             Context(),

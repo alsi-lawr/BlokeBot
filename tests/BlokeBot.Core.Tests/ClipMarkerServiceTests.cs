@@ -130,8 +130,7 @@ public sealed class ClipMarkerServiceTests
         return new(
             dbFactory,
             new ReadyBroadcasterProvider(),
-            new HelixClient(http,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),

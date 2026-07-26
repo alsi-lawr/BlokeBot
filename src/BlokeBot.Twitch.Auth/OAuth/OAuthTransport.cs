@@ -112,7 +112,10 @@ public sealed class OAuthTransport(
         CancellationToken cancellationToken
     )
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, endpointPolicy.OAuthValidationEndpoint);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            endpointPolicy.OAuthValidationEndpoint
+        );
         request.Headers.Authorization = new AuthenticationHeaderValue("OAuth", accessToken);
 
         using var response = await _http.SendAsync(request, cancellationToken);

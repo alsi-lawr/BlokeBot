@@ -401,8 +401,7 @@ public sealed class ModeratorAuthorityServiceTests
             );
             var service = new ModeratorAuthorityService(
                 tokens,
-                new HelixClient(helix,
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+                new HelixClient(helix, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 BotSettings.FromOptions(
                     new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
                 ),

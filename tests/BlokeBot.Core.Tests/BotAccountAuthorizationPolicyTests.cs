@@ -152,8 +152,10 @@ public sealed class BotAccountAuthorizationPolicyTests
                 new ConfiguredBotAccountAuthorizationPolicy(
                     Settings(tokenCachePath),
                     cache,
-                    new HelixClient(new RejectingHttpClientFactory(),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+                    new HelixClient(
+                        new RejectingHttpClientFactory(),
+                        global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                    ),
                     new UnavailableTokenStatusSource(),
                     new HostedChannelChangeNotifier(events)
                 )
@@ -235,8 +237,10 @@ public sealed class BotAccountAuthorizationPolicyTests
             new ConfiguredBotAccountAuthorizationPolicy(
                 Settings("tokens.json"),
                 new RecordingAccessTokenCache(),
-                new HelixClient(new CurrentUserHttpClientFactory(),
-                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+                new HelixClient(
+                    new CurrentUserHttpClientFactory(),
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                ),
                 tokenStatus,
                 new HostedChannelChangeNotifier(events)
             )
