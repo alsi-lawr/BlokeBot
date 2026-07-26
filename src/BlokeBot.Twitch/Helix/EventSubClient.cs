@@ -6,11 +6,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
+public sealed class EventSubClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _subscriptionsEndpoint =
-        "https://api.twitch.tv/helix/eventsub/subscriptions";
-
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
@@ -123,7 +123,7 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
                 SessionId = subscription.SessionId,
             },
         };
-        using var request = HelixRequest.Create(HttpMethod.Post, _subscriptionsEndpoint, context);
+        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri, context);
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -143,7 +143,7 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        var uri = _subscriptionsEndpoint + $"?id={Uri.EscapeDataString(subscriptionId)}";
+        var uri = endpointPolicy.HelixEndpoint("eventsub/subscriptions").AbsoluteUri + $"?id={Uri.EscapeDataString(subscriptionId)}";
         using var request = HelixRequest.Create(HttpMethod.Delete, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.NotFound)

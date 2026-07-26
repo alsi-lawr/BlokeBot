@@ -5,9 +5,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class ChatPinClient(IHttpClientFactory httpClientFactory)
+public sealed class ChatPinClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _endpoint = "https://api.twitch.tv/helix/chat/pins";
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
     public Task<ChatPinMutationResult> PinAsync(
@@ -127,14 +129,14 @@ public sealed class ChatPinClient(IHttpClientFactory httpClientFactory)
         }
     }
 
-    private static string Uri(
+    private string Uri(
         string broadcasterId,
         string moderatorId,
         string? messageId,
         int? durationSeconds
     )
     {
-        return $"{_endpoint}?"
+        return $"{endpointPolicy.HelixEndpoint("chat/pins").AbsoluteUri}?"
             + QueryString.Create(
                 new Dictionary<string, string?>
                 {

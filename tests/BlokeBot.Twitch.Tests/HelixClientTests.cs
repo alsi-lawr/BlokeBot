@@ -43,7 +43,8 @@ public sealed class HelixClientTests
                 """
             );
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var stream = await client.GetStreamAsync(Context(), "Streamer", CancellationToken.None);
 
@@ -54,7 +55,8 @@ public sealed class HelixClientTests
     public async Task EmptyStreamPayload_CheckingStreamStatus_ReturnsOffline()
     {
         var factory = RespondingWith("""{"data":[],"pagination":{}}""");
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var isLive = await client.IsStreamLiveAsync(Context(), "streamer", CancellationToken.None);
 
@@ -88,7 +90,8 @@ public sealed class HelixClientTests
                 """
             );
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var status = await client.GetFollowerStatusAsync(
             Context(),
@@ -105,7 +108,8 @@ public sealed class HelixClientTests
     public async Task EmptyFollowerPayload_CheckingFollowerStatus_ReturnsDoesNotFollow()
     {
         var factory = RespondingWith("""{"total":8,"data":[],"pagination":{}}""");
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var status = await client.GetFollowerStatusAsync(
             Context(),
@@ -138,7 +142,8 @@ public sealed class HelixClientTests
                 """
             );
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var settings = await client.GetChatSettingsAsync(
             new HelixRequestContext("client", "app-token"),
@@ -176,7 +181,8 @@ public sealed class HelixClientTests
                 """
             );
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var status = await client.GetFollowedChannelStatusAsync(
             new HelixRequestContext("client", "bot-token"),
@@ -216,7 +222,8 @@ public sealed class HelixClientTests
             }
             """
         );
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         await Should.ThrowAsync<JsonException>(() =>
             client.IsStreamLiveAsync(Context(), "streamer", CancellationToken.None)
@@ -239,7 +246,8 @@ public sealed class HelixClientTests
             }
             """
         );
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         await Should.ThrowAsync<JsonException>(() =>
             client.GetFollowerStatusAsync(
@@ -265,7 +273,8 @@ public sealed class HelixClientTests
             request.RequestUri.Query.ShouldContain("moderator_id=bot-id");
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var result = await client.SendShoutoutAsync(
             Context(),
@@ -314,7 +323,8 @@ public sealed class HelixClientTests
                 """
             );
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var channels = await client.GetModeratedChannelsAsync(
             new HelixRequestContext("client", "token"),
@@ -366,7 +376,8 @@ public sealed class HelixClientTests
                 );
             return JsonResponse(ActivePoll.Replace("ACTIVE", "TERMINATED"));
         });
-        var client = new HelixClient(factory);
+        var client = new HelixClient(factory,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         var active = await client.GetLatestPollAsync(
             Context(),

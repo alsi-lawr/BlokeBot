@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddHttpClient("twitch-helix");
+        services.TryAddSingleton(TwitchEndpointPolicy.Default);
         services.TryAddSingleton<HelixClient>();
         services.TryAddSingleton<EventSubClient>();
         services.TryAddSingleton<ChatClient>();

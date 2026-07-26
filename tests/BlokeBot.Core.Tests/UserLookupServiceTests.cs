@@ -198,7 +198,8 @@ public sealed class UserLookupServiceTests
         return new UserLookupService(
             configuration,
             new StaticAccessTokenProvider("access-token"),
-            new HelixClient(new JsonHttpClientFactory(response, statusCode))
+            new HelixClient(new JsonHttpClientFactory(response, statusCode),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
     }
 

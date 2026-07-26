@@ -4,9 +4,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class WhisperClient(IHttpClientFactory httpClientFactory)
+public sealed class WhisperClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _whispersEndpoint = "https://api.twitch.tv/helix/whispers";
     private const int _maximumResponseBodyLength = 1000;
 
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -20,7 +22,7 @@ public sealed class WhisperClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            $"{_whispersEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("whispers").AbsoluteUri}?"
             + QueryString.Create(
                 new Dictionary<string, string?>
                 {

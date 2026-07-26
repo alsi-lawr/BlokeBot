@@ -202,7 +202,8 @@ public sealed class TokenStatusServiceTests
         var provider = new RecordingTokenProvider("saved-token");
         var service = Service(
             provider,
-            new OAuthTransport(new CancellingValidationHttpClientFactory(cancellation))
+            new OAuthTransport(new CancellingValidationHttpClientFactory(cancellation),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
         );
 
         var thrown = await Should.ThrowAsync<OperationCanceledException>(async () =>
@@ -284,7 +285,10 @@ public sealed class TokenStatusServiceTests
         HttpStatusCode rejectionStatus = HttpStatusCode.Unauthorized
     )
     {
-        return new(new StatusHttpClientFactory(validationJson, exception, rejectionStatus));
+        return new(
+            new StatusHttpClientFactory(validationJson, exception, rejectionStatus),
+            TwitchEndpointPolicy.Default
+        );
     }
 
     private static TokenStatus Success(

@@ -134,7 +134,8 @@ public sealed class TwitchOperationsUiTests
             new PollService(
                 dbFactory,
                 new ReadyBroadcasterProvider(),
-                new HelixClient(new RejectingHttpClientFactory()),
+                new HelixClient(new RejectingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 settings,
                 events,
                 alerts
@@ -144,7 +145,8 @@ public sealed class TwitchOperationsUiTests
             new ChannelPointsService(
                 dbFactory,
                 new ReadyBroadcasterProvider(),
-                new HelixClient(new RejectingHttpClientFactory()),
+                new HelixClient(new RejectingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 settings,
                 events,
                 alerts,
@@ -155,7 +157,8 @@ public sealed class TwitchOperationsUiTests
             new PredictionService(
                 dbFactory,
                 new ReadyBroadcasterProvider(),
-                new HelixClient(new RejectingHttpClientFactory()),
+                new HelixClient(new RejectingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 settings,
                 events,
                 alerts,
@@ -166,7 +169,8 @@ public sealed class TwitchOperationsUiTests
             new ClipMarkerService(
                 dbFactory,
                 new ReadyBroadcasterProvider(),
-                new HelixClient(new RejectingHttpClientFactory()),
+                new HelixClient(new RejectingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 settings,
                 events,
                 alerts,
@@ -176,7 +180,8 @@ public sealed class TwitchOperationsUiTests
         context.Services.AddSingleton(
             new ModeratorAuthorityService(
                 null!,
-                new HelixClient(new RejectingHttpClientFactory()),
+                new HelixClient(new RejectingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 settings,
                 new HostModAccessService(dbFactory, changes),
                 TimeProvider.System

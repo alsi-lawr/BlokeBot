@@ -2,7 +2,11 @@ using System.Net.Http.Json;
 
 namespace BlokeBot.Twitch.Auth;
 
-public sealed class AppAccessTokenProvider(IHttpClientFactory factory, BotIdentity identity)
+public sealed class AppAccessTokenProvider(
+    IHttpClientFactory factory,
+    BotIdentity identity,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HttpClient _http = factory.CreateClient("twitch-oauth");
@@ -30,7 +34,7 @@ public sealed class AppAccessTokenProvider(IHttpClientFactory factory, BotIdenti
             };
 
             using var response = await _http.PostAsync(
-                "https://id.twitch.tv/oauth2/token",
+                endpointPolicy.OAuthTokenEndpoint,
                 new FormUrlEncodedContent(form),
                 cancellationToken
             );

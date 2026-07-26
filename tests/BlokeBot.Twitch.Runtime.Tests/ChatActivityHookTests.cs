@@ -66,7 +66,8 @@ public sealed class ChatActivityHookTests
                 ChatObserverDeadLetter
             >(BotObserverBoundaries.EventSubMessages),
             NullLogger<EventSubConnectionSession>.Instance
-        );
+        ,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default);
 
         await session.DispatchChatMessageAsync(
             new EventSubChatMessageEvent

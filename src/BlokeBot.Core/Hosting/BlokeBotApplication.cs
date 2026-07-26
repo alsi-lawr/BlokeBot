@@ -38,6 +38,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
+using BlokeBot.Twitch;
 using BlokeBot.Persistence;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -69,6 +70,13 @@ public static class BlokeBotApplication
             .BindConfiguration("TwitchWebAuth")
             .ValidateOnStart();
         builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+
+        var twitchEndpoints =
+            builder.Configuration.GetSection(TwitchEndpointPolicy.ConfigurationSectionName)
+                .Get<TwitchEndpointPolicy>()
+            ?? new TwitchEndpointPolicy();
+        twitchEndpoints.Validate();
+        builder.Services.AddSingleton(twitchEndpoints);
 
         var online = runtime == BlokeBotRuntimeMode.Online;
         builder.Services.AddEventBus<AppEventKind>(

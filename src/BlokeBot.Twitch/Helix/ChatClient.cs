@@ -5,10 +5,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class ChatClient(IHttpClientFactory httpClientFactory)
+public sealed class ChatClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _messagesEndpoint = "https://api.twitch.tv/helix/chat/messages";
-
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
 
@@ -26,7 +27,7 @@ public sealed class ChatClient(IHttpClientFactory httpClientFactory)
             SenderId = senderId,
             Message = message,
         };
-        using var request = HelixRequest.Create(HttpMethod.Post, _messagesEndpoint, context);
+        using var request = HelixRequest.Create(HttpMethod.Post, endpointPolicy.HelixEndpoint("chat/messages").AbsoluteUri, context);
         request.Content = JsonContent.Create(payload, options: _jsonOptions);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
