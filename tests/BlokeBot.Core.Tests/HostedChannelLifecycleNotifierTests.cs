@@ -63,6 +63,22 @@ public sealed class HostedChannelLifecycleNotifierTests
                     UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-1),
                 }
             );
+            for (var index = 0; index < 99; index++)
+            {
+                db.TwitchPolls.Add(
+                    new TwitchPoll
+                    {
+                        HostId = 1,
+                        ProviderPollId = $"history-{index:D3}",
+                        Title = "Retained result",
+                        ChoicesJson = "[]",
+                        Status = TwitchPollStatus.Completed,
+                        StartedAtUtc = DateTime.UtcNow.AddDays(-2),
+                        EndedAtUtc = DateTime.UtcNow.AddDays(-1).AddSeconds(index),
+                        UpdatedAtUtc = DateTime.UtcNow.AddDays(-1).AddSeconds(index),
+                    }
+                );
+            }
             await db.SaveChangesAsync();
         }
 
@@ -74,13 +90,16 @@ public sealed class HostedChannelLifecycleNotifierTests
             BotChannelRuntimeState.Started
         );
         var polls = await verify.TwitchPolls.OrderBy(poll => poll.ProviderPollId).ToArrayAsync();
-        polls.Length.ShouldBe(2);
-        polls[0].ProviderPollId.ShouldBe("external-poll");
-        polls[0].Status.ShouldBe(TwitchPollStatus.Terminated);
-        polls[0].EndedAtUtc.ShouldNotBeNull();
-        polls[1].ProviderPollId.ShouldBe("missing-poll");
-        polls[1].Status.ShouldBe(TwitchPollStatus.Archived);
-        polls[1].EndedAtUtc.ShouldNotBeNull();
+        polls.Length.ShouldBe(100);
+        var external = polls.Single(poll => poll.ProviderPollId == "external-poll");
+        external.Status.ShouldBe(TwitchPollStatus.Terminated);
+        external.EndedAtUtc.ShouldNotBeNull();
+        var missing = polls.Single(poll => poll.ProviderPollId == "missing-poll");
+        missing.Status.ShouldBe(TwitchPollStatus.Archived);
+        missing.EndedAtUtc.ShouldNotBeNull();
+        polls
+            .Count(poll => poll.ProviderPollId.StartsWith("history-", StringComparison.Ordinal))
+            .ShouldBe(98);
         operationsChanges.ShouldBe(3);
         http.Requests.ShouldBe(4);
     }

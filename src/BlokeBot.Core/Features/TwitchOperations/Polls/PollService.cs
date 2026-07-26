@@ -244,6 +244,11 @@ public sealed class PollService(
         }
 
         await db.SaveChangesAsync(ct);
+        if (provider is HelixPollLookupOutcome.NoPoll)
+        {
+            await TrimResultsAsync(db, hostId, ct);
+            await db.SaveChangesAsync(ct);
+        }
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
     }
 
