@@ -35,6 +35,7 @@ using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.HostSetup;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -102,6 +103,7 @@ public static class BlokeBotApplication
                     : PointsGiveawayNotificationMode.ReplyOnly
             )
             .AddBlokeBotToasts()
+            .AddBlokeBotTwitchOperations()
             .AddBlokeBotAuth();
         builder.Services.AddOAuthTransport();
         builder.Services.AddHelix();

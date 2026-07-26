@@ -28,7 +28,8 @@ internal sealed class EventSubConnectionSession(
         ChatMessage,
         ChatObserverDeadLetter
     > messageObserverFanOut,
-    ILogger<EventSubConnectionSession> log
+    ILogger<EventSubConnectionSession> log,
+    IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null
 ) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -37,6 +38,10 @@ internal sealed class EventSubConnectionSession(
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Uri _defaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
+    private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
+    private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
+    private readonly Queue<string> _deliveredMessageIdOrder = new();
+    private const int _deliveredMessageCapacity = 512;
     private ILogger<EventSubConnectionSession> _log { get; } = log;
 
     public async Task<RuntimeSessionEstablishment> EstablishAsync(
@@ -146,6 +151,38 @@ internal sealed class EventSubConnectionSession(
             async (response, ct) => await responses.SendAsync(message, response, ct),
             cancellationToken
         );
+    }
+
+    private async Task DispatchShoutoutAsync(
+        EventSubShoutoutEvent shoutout,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _shoutoutObservers)
+        {
+            await observer.ShoutoutReceivedAsync(shoutout, cancellationToken);
+        }
+    }
+
+    private bool ShouldDispatch(string messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return true;
+        }
+        lock (_deliveredMessageIds)
+        {
+            if (!_deliveredMessageIds.Add(messageId))
+            {
+                return false;
+            }
+            _deliveredMessageIdOrder.Enqueue(messageId);
+            if (_deliveredMessageIdOrder.Count > _deliveredMessageCapacity)
+            {
+                _deliveredMessageIds.Remove(_deliveredMessageIdOrder.Dequeue());
+            }
+            return true;
+        }
     }
 
     private async ValueTask NotifyMessageObserversAsync(
@@ -321,15 +358,25 @@ internal sealed class EventSubConnectionSession(
                         };
 
                     case EventSubMessageType.Notification:
-                        if (envelope?.Payload.Event is { } chatEvent)
+                        if (
+                            envelope is not null
+                            && owner.ShouldDispatch(envelope.Metadata.MessageId)
+                        )
                         {
-                            await owner.DispatchChatMessageAsync(
-                                chatEvent,
-                                json,
-                                cancellationToken
-                            );
+                            switch (EventSubNotification.Parse(envelope, _jsonOptions))
+                            {
+                                case EventSubNotification.Chat { Event: var chatEvent }:
+                                    await owner.DispatchChatMessageAsync(
+                                        chatEvent,
+                                        json,
+                                        cancellationToken
+                                    );
+                                    break;
+                                case EventSubNotification.Shoutout { Event: var shoutout }:
+                                    await owner.DispatchShoutoutAsync(shoutout, cancellationToken);
+                                    break;
+                            }
                         }
-
                         break;
 
                     case EventSubMessageType.Revocation:

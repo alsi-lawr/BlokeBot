@@ -50,6 +50,8 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<SiteAccessEntry> SiteAccessEntries => Set<SiteAccessEntry>();
     public DbSet<SiteAccessSettings> SiteAccessSettings => Set<SiteAccessSettings>();
     public DbSet<GuessVote> Votes => Set<GuessVote>();
+    public DbSet<ShoutoutHistoryEntry> ShoutoutHistory => Set<ShoutoutHistoryEntry>();
+    public DbSet<ShoutoutCooldownState> ShoutoutCooldowns => Set<ShoutoutCooldownState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -61,6 +63,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureAlertsAndPublicChat(modelBuilder);
         ConfigurePoints(modelBuilder);
         ConfigureGuessing(modelBuilder);
+        ConfigureShoutouts(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

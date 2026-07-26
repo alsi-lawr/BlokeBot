@@ -69,11 +69,47 @@ internal sealed class EventSubChannelOperations(
                     sessionId,
                     cancellationToken
                 ),
+                AdditionalSubscriptionIds = await CreateShoutoutSubscriptionsAsync(
+                    account.AccessToken,
+                    resolved.BroadcasterId,
+                    resolved.BotUserId,
+                    sessionId,
+                    cancellationToken
+                ),
                 BotLogin = account.Login,
+                Authorization = EventSubAuthorizationContext.ConfiguredBot,
                 AccessToken = account.AccessToken,
                 Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
             }
         );
+    }
+
+    private async Task<IReadOnlyList<string>> CreateShoutoutSubscriptionsAsync(
+        string accessToken,
+        string broadcasterId,
+        string moderatorId,
+        string sessionId,
+        CancellationToken cancellationToken
+    )
+    {
+        var context = new HelixRequestContext(settings.Identity.ClientId, accessToken);
+        return
+        [
+            await eventSub.CreateShoutoutCreateSubscriptionAsync(
+                context,
+                broadcasterId,
+                moderatorId,
+                sessionId,
+                cancellationToken
+            ),
+            await eventSub.CreateShoutoutReceiveSubscriptionAsync(
+                context,
+                broadcasterId,
+                moderatorId,
+                sessionId,
+                cancellationToken
+            ),
+        ];
     }
 
     public async ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
@@ -112,11 +148,19 @@ internal sealed class EventSubChannelOperations(
     {
         try
         {
+            var context = new HelixRequestContext(
+                settings.Identity.ClientId,
+                subscription.AccessToken
+            );
             await eventSub.DeleteSubscriptionAsync(
-                new HelixRequestContext(settings.Identity.ClientId, subscription.AccessToken),
+                context,
                 subscription.SubscriptionId,
                 cancellationToken
             );
+            foreach (var subscriptionId in subscription.AdditionalSubscriptionIds)
+            {
+                await eventSub.DeleteSubscriptionAsync(context, subscriptionId, cancellationToken);
+            }
             return new EventSubSubscriptionDeletionOutcome.Deleted();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

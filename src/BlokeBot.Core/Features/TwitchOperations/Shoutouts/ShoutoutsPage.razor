@@ -1,0 +1,46 @@
+@page "/twitch-operations"
+@using BlokeBot.Core.Auth.Sessions
+@using BlokeBot.Core.Features.HostedChannels
+@using BlokeBot.Core.Features.Toasts
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject ShoutoutService _shoutouts
+@inject ToastService _toasts
+
+<PageTitle>BlokeBot | Native Twitch operations</PageTitle>
+
+<div class="mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Native Twitch operations" Title="Native Twitch operations" Description="Manage Twitch operations for the selected channel." />
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Shoutouts</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Send a native Twitch shoutout and see Twitch-provided cooldowns.</p>
+        </div>
+        @if (_state is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading shoutouts...</p>
+        }
+        else
+        {
+            <div class="space-y-5 p-5">
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
+                    <button class="btn-primary self-end" @onclick="SendAsync">Send shoutout</button>
+                </div>
+                <p class="text-sm text-muted-foreground">@_cooldownText</p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground"><tr><th class="px-3 py-2">Direction</th><th class="px-3 py-2">Channel</th><th class="px-3 py-2">Viewers</th><th class="px-3 py-2">Time</th></tr></thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var item in _state.History)
+                            {
+                                <tr @key="item"><td class="px-3 py-2">@item.Direction</td><td class="px-3 py-2">@item.TargetLogin</td><td class="px-3 py-2">@item.ViewerCount</td><td class="px-3 py-2">@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </section>
+</div>
