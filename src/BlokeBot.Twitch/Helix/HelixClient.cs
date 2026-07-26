@@ -18,6 +18,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         "https://api.twitch.tv/helix/moderation/channels";
     private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
     private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
+    private const string _clipsEndpoint = "https://api.twitch.tv/helix/clips";
+    private const string _streamMarkersEndpoint = "https://api.twitch.tv/helix/streams/markers";
+    private const int _streamMarkerLookupPageLimit = 3;
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -184,6 +187,243 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return created is null
             ? new HelixPollCreateOutcome.ProviderRejected()
             : new HelixPollCreateOutcome.Created(created);
+    }
+
+    public async Task<HelixClipCreateOutcome> CreateClipAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        bool hasDelay,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _clipsEndpoint
+            + "?"
+            + QueryString.Create([
+                new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
+                new KeyValuePair<string, string?>("has_delay", hasDelay ? "true" : "false"),
+            ]);
+        try
+        {
+            using var request = HelixRequest.Create(HttpMethod.Post, uri, context);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var payload = await response.Content.ReadFromJsonAsync<HelixClipCreateResponse>(
+                    _jsonOptions,
+                    cancellationToken
+                );
+                var created = payload?.Data.FirstOrDefault();
+                return created is not { Id.Length: > 0, EditUrl.Length: > 0 }
+                    ? new HelixClipCreateOutcome.Ambiguous()
+                    : new HelixClipCreateOutcome.Created(created.ToDomain());
+            }
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                return new HelixClipCreateOutcome.Unauthorized();
+            }
+            if ((int)response.StatusCode >= 500)
+            {
+                return new HelixClipCreateOutcome.Ambiguous();
+            }
+
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return ClassifyClipFailure(error);
+        }
+        catch (HttpRequestException)
+        {
+            return new HelixClipCreateOutcome.Ambiguous();
+        }
+        catch (JsonException)
+        {
+            return new HelixClipCreateOutcome.Ambiguous();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new HelixClipCreateOutcome.Ambiguous();
+        }
+    }
+
+    public async Task<HelixClipLookupOutcome> GetClipAsync(
+        HelixRequestContext context,
+        string clipId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _clipsEndpoint
+            + "?"
+            + QueryString.Create([new KeyValuePair<string, string?>("id", clipId)]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixClipLookupOutcome.Unavailable();
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<HelixClipsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        var clip = payload?.Data.FirstOrDefault()?.ToDomain();
+        return clip is null
+            ? new HelixClipLookupOutcome.NotFound()
+            : new HelixClipLookupOutcome.Found(clip);
+    }
+
+    public async Task<HelixStreamMarkerCreateOutcome> CreateStreamMarkerAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string description,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            using var request = HelixRequest.Create(
+                HttpMethod.Post,
+                _streamMarkersEndpoint,
+                context
+            );
+            request.Content = JsonContent.Create(
+                new { user_id = broadcasterId, description },
+                options: _jsonOptions
+            );
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var payload = await response.Content.ReadFromJsonAsync<HelixStreamMarkerResponse>(
+                    _jsonOptions,
+                    cancellationToken
+                );
+                var marker = payload?.Data.FirstOrDefault();
+                return
+                    marker is not { Id.Length: > 0, Description.Length: > 0 }
+                    || marker.CreatedAt == default
+                    ? new HelixStreamMarkerCreateOutcome.Ambiguous()
+                    : new HelixStreamMarkerCreateOutcome.Created(marker.ToDomain(null));
+            }
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                return new HelixStreamMarkerCreateOutcome.Unauthorized();
+            }
+            if ((int)response.StatusCode >= 500)
+            {
+                return new HelixStreamMarkerCreateOutcome.Ambiguous();
+            }
+
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return ClassifyMarkerFailure(error);
+        }
+        catch (HttpRequestException)
+        {
+            return new HelixStreamMarkerCreateOutcome.Ambiguous();
+        }
+        catch (JsonException)
+        {
+            return new HelixStreamMarkerCreateOutcome.Ambiguous();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new HelixStreamMarkerCreateOutcome.Ambiguous();
+        }
+    }
+
+    public async Task<HelixStreamMarkerLookupOutcome> GetStreamMarkersAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        IReadOnlySet<string> retainedProviderMarkerIds,
+        CancellationToken cancellationToken
+    )
+    {
+        var unmatched = retainedProviderMarkerIds.ToHashSet(StringComparer.Ordinal);
+        var markers = new List<HelixStreamMarker>();
+        string? cursor = null;
+        for (var page = 0; page < _streamMarkerLookupPageLimit && unmatched.Count > 0; page++)
+        {
+            var query = new List<KeyValuePair<string, string?>>
+            {
+                new("user_id", broadcasterId),
+                new("first", "100"),
+            };
+            if (cursor is not null)
+            {
+                query.Add(new("after", cursor));
+            }
+
+            var uri = _streamMarkersEndpoint + "?" + QueryString.Create(query);
+            using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new HelixStreamMarkerLookupOutcome.Unavailable();
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<HelixStreamMarkersResponse>(
+                _jsonOptions,
+                cancellationToken
+            );
+            foreach (
+                var marker in (payload?.Data ?? [])
+                    .SelectMany(user => user.Videos)
+                    .SelectMany(video =>
+                        video.Markers.Select(marker => marker.ToDomain(video.VideoId))
+                    )
+            )
+            {
+                markers.Add(marker);
+                unmatched.Remove(marker.Id);
+            }
+
+            cursor = payload?.Pagination?.Cursor;
+            if (string.IsNullOrEmpty(cursor))
+            {
+                break;
+            }
+        }
+
+        return new HelixStreamMarkerLookupOutcome.Found(markers);
+    }
+
+    private static HelixClipCreateOutcome ClassifyClipFailure(string error)
+    {
+        if (Contains(error, "rerun") || Contains(error, "premiere"))
+        {
+            return new HelixClipCreateOutcome.RerunOrPremiere();
+        }
+        if (Contains(error, "vod") || Contains(error, "clip"))
+        {
+            return new HelixClipCreateOutcome.VodsDisabled();
+        }
+        if (Contains(error, "live") || Contains(error, "streaming"))
+        {
+            return new HelixClipCreateOutcome.Offline();
+        }
+        return new HelixClipCreateOutcome.ProviderRejected();
+    }
+
+    private static HelixStreamMarkerCreateOutcome ClassifyMarkerFailure(string error)
+    {
+        if (Contains(error, "rerun") || Contains(error, "premiere"))
+        {
+            return new HelixStreamMarkerCreateOutcome.RerunOrPremiere();
+        }
+        if (Contains(error, "vod"))
+        {
+            return new HelixStreamMarkerCreateOutcome.VodsDisabled();
+        }
+        if (Contains(error, "live") || Contains(error, "streaming"))
+        {
+            return new HelixStreamMarkerCreateOutcome.Offline();
+        }
+        return new HelixStreamMarkerCreateOutcome.ProviderRejected();
+    }
+
+    private static bool Contains(string text, string value)
+    {
+        return text.Contains(value, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsActivePollConflict(string error)

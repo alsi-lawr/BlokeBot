@@ -90,6 +90,40 @@ namespace BlokeBot.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "twitch_clips",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    IdempotencyKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    ProviderClipId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    EditUrl = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: true),
+                    FinalUrl = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: true),
+                    BroadcasterTwitchUserId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    BroadcasterLogin = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    CreatorTwitchUserId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    CreatorLogin = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    VideoId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    FailureReason = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    RequestedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ResolvedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    LastCheckedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_twitch_clips", x => x.Id);
+                    table.CheckConstraint("CK_twitch_clips_Status", "Status IN ('Ambiguous', 'Available', 'Expired', 'Failed', 'Pending')");
+                    table.ForeignKey(
+                        name: "FK_twitch_clips_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "twitch_poll_templates",
                 columns: table => new
                 {
@@ -143,6 +177,37 @@ namespace BlokeBot.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "twitch_stream_markers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    IdempotencyKey = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    ProviderMarkerId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 140, nullable: false),
+                    PositionSeconds = table.Column<int>(type: "INTEGER", nullable: false),
+                    MarkerUrl = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: true),
+                    VideoId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    FailureReason = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
+                    CreatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ResolvedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    EnrichedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_twitch_stream_markers", x => x.Id);
+                    table.CheckConstraint("CK_twitch_stream_markers_Status", "Status IN ('Ambiguous', 'Failed', 'Succeeded')");
+                    table.ForeignKey(
+                        name: "FK_twitch_stream_markers_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "twitch_poll_template_choices",
                 columns: table => new
                 {
@@ -187,6 +252,17 @@ namespace BlokeBot.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_twitch_clips_HostId_IdempotencyKey",
+                table: "twitch_clips",
+                columns: new[] { "HostId", "IdempotencyKey" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_twitch_clips_HostId_Status_ResolvedAtUtc",
+                table: "twitch_clips",
+                columns: new[] { "HostId", "Status", "ResolvedAtUtc" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_twitch_poll_template_choices_TwitchPollTemplateId_Position",
                 table: "twitch_poll_template_choices",
                 columns: new[] { "TwitchPollTemplateId", "Position" },
@@ -214,6 +290,17 @@ namespace BlokeBot.Persistence.Migrations
                 table: "twitch_polls",
                 columns: new[] { "HostId", "ProviderPollId" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_twitch_stream_markers_HostId_CreatedAtUtc",
+                table: "twitch_stream_markers",
+                columns: new[] { "HostId", "CreatedAtUtc" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_twitch_stream_markers_HostId_IdempotencyKey",
+                table: "twitch_stream_markers",
+                columns: new[] { "HostId", "IdempotencyKey" },
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -229,10 +316,16 @@ namespace BlokeBot.Persistence.Migrations
                 name: "shoutout_history");
 
             migrationBuilder.DropTable(
+                name: "twitch_clips");
+
+            migrationBuilder.DropTable(
                 name: "twitch_poll_template_choices");
 
             migrationBuilder.DropTable(
                 name: "twitch_polls");
+
+            migrationBuilder.DropTable(
+                name: "twitch_stream_markers");
 
             migrationBuilder.DropTable(
                 name: "twitch_poll_templates");
