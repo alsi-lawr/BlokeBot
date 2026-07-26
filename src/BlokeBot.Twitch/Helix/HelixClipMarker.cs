@@ -72,6 +72,8 @@ public abstract record HelixStreamMarkerCreateOutcome
 
     public sealed record Offline : HelixStreamMarkerCreateOutcome;
 
+    public sealed record VodsDisabled : HelixStreamMarkerCreateOutcome;
+
     public sealed record RerunOrPremiere : HelixStreamMarkerCreateOutcome;
 
     public sealed record Unauthorized : HelixStreamMarkerCreateOutcome;
@@ -171,12 +173,9 @@ internal sealed record HelixStreamMarkerWire
     [JsonPropertyName("URL")]
     public string? Url { get; init; }
 
-    [JsonPropertyName("video_id")]
-    public string? VideoId { get; init; }
-
-    public HelixStreamMarker ToDomain()
+    public HelixStreamMarker ToDomain(string? videoId)
     {
-        return new(Id, Description, PositionSeconds, CreatedAt, Url, VideoId);
+        return new(Id, Description, PositionSeconds, CreatedAt, Url, videoId);
     }
 }
 
@@ -184,6 +183,15 @@ internal sealed record HelixStreamMarkersResponse
 {
     [JsonPropertyName("data")]
     public IReadOnlyList<HelixStreamMarkersUserWire> Data { get; init; } = [];
+
+    [JsonPropertyName("pagination")]
+    public HelixPaginationWire? Pagination { get; init; }
+}
+
+internal sealed record HelixPaginationWire
+{
+    [JsonPropertyName("cursor")]
+    public string? Cursor { get; init; }
 }
 
 internal sealed record HelixStreamMarkersUserWire
@@ -194,6 +202,9 @@ internal sealed record HelixStreamMarkersUserWire
 
 internal sealed record HelixStreamMarkersVideoWire
 {
+    [JsonPropertyName("video_id")]
+    public string? VideoId { get; init; }
+
     [JsonPropertyName("markers")]
     public IReadOnlyList<HelixStreamMarkerWire> Markers { get; init; } = [];
 }

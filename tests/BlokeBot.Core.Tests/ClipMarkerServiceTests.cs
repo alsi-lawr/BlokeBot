@@ -53,15 +53,31 @@ public sealed class ClipMarkerServiceTests
             CancellationToken.None
         );
         var otherHost = await service.CreateClipAsync(2, "same-key", false, CancellationToken.None);
-        var repeatedPending = await service.CreateClipAsync(
+        var repeatedAvailable = await service.CreateClipAsync(
             2,
             "same-key",
             false,
             CancellationToken.None
         );
-        await service.ReconcileAsync(2, CancellationToken.None);
-        var expiring = await service.CreateClipAsync(2, "expires", false, CancellationToken.None);
+        var concurrent = await Task.WhenAll(
+            service.CreateClipAsync(2, "concurrent-key", false, CancellationToken.None),
+            service.CreateClipAsync(2, "concurrent-key", false, CancellationToken.None)
+        );
         now.Advance(TimeSpan.FromSeconds(61));
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.TwitchClips.Add(
+                new TwitchClip
+                {
+                    HostId = 2,
+                    IdempotencyKey = "expires",
+                    ProviderClipId = "unavailable-clip",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
+                }
+            );
+            await db.SaveChangesAsync();
+        }
         await service.ReconcileAsync(2, CancellationToken.None);
         var marker = await service.CreateMarkerAsync(
             2,
@@ -73,9 +89,12 @@ public sealed class ClipMarkerServiceTests
 
         ambiguous.ShouldBeOfType<ClipMarkerOperationOutcome.Ambiguous>();
         repeatedAmbiguous.ShouldBeOfType<ClipMarkerOperationOutcome.Ambiguous>();
-        otherHost.ShouldBeOfType<ClipMarkerOperationOutcome.ClipPending>();
-        repeatedPending.ShouldBeOfType<ClipMarkerOperationOutcome.ClipPending>();
-        expiring.ShouldBeOfType<ClipMarkerOperationOutcome.ClipPending>();
+        otherHost.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
+        repeatedAvailable.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
+        foreach (var outcome in concurrent)
+        {
+            outcome.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAvailable>();
+        }
         marker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerCreated>();
         http.ClipPosts.ShouldBe(3);
         http.MarkerPosts.ShouldBe(1);
@@ -85,7 +104,7 @@ public sealed class ClipMarkerServiceTests
             .TwitchClips.OrderBy(clip => clip.HostId)
             .ThenBy(clip => clip.Id)
             .ToArrayAsync();
-        clips.Length.ShouldBe(3);
+        clips.Length.ShouldBe(4);
         clips.Single(clip => clip.HostId == 1).Status.ShouldBe(TwitchClipStatus.Ambiguous);
         clips
             .Single(clip => clip.IdempotencyKey == "same-key" && clip.HostId == 2)
@@ -212,13 +231,14 @@ public sealed class ClipMarkerServiceTests
                         );
                         return Json(
                             """
-                            {"data":[{"id":"marker-id","description":"Important moment","position_seconds":12,"created_at":"2026-07-26T10:01:01Z","URL":"https://twitch.test/marker","video_id":null}]}
+                            {"data":[{"id":"marker-id","description":"Important moment","position_seconds":12,"created_at":"2026-07-26T10:01:01Z","URL":"https://twitch.test/marker"}]}
                             """
                         );
                     case ("/helix/streams/markers", "GET"):
+                        request.RequestUri.Query.ShouldContain("first=100");
                         return Json(
                             """
-                            {"data":[{"videos":[{"markers":[{"id":"marker-id","description":"Important moment","position_seconds":12,"created_at":"2026-07-26T10:01:01Z","URL":"https://twitch.test/marker","video_id":"video-id"}]}]}]}
+                            {"data":[{"videos":[{"video_id":"video-id","markers":[{"id":"marker-id","description":"Important moment","position_seconds":12,"created_at":"2026-07-26T10:01:01Z","URL":"https://twitch.test/marker"}]}]}]}
                             """
                         );
                     default:

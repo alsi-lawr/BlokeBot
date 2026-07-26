@@ -20,6 +20,7 @@ public sealed class ClipMarkerService(
 {
     private const int _resultsToKeep = 100;
     private static readonly TimeSpan _clipAvailabilityBound = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan _clipPollCadence = TimeSpan.FromSeconds(1);
 
     public async Task<ClipMarkerDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
@@ -99,7 +100,24 @@ public sealed class ClipMarkerService(
             RequestedAtUtc = now,
         };
         db.TwitchClips.Add(clip);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(clip).State = EntityState.Detached;
+            var claimed = await db.TwitchClips.SingleOrDefaultAsync(
+                candidate => candidate.HostId == hostId && candidate.IdempotencyKey == key,
+                ct
+            );
+            if (claimed is not null)
+            {
+                return Outcome(claimed);
+            }
+
+            throw;
+        }
 
         var provider = await helix.CreateClipAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
@@ -114,7 +132,9 @@ public sealed class ClipMarkerService(
                 clip.EditUrl = created.Clip.EditUrl;
                 await db.SaveChangesAsync(ct);
                 await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
-                return new ClipMarkerOperationOutcome.ClipPending(View(clip));
+                await ReconcileAsync(hostId, ct);
+                await db.Entry(clip).ReloadAsync(ct);
+                return Outcome(clip);
             case HelixClipCreateOutcome.Offline:
                 return await CompleteClipAsync(
                     db,
@@ -233,7 +253,24 @@ public sealed class ClipMarkerService(
             CreatedAtUtc = now,
         };
         db.TwitchStreamMarkers.Add(marker);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(marker).State = EntityState.Detached;
+            var claimed = await db.TwitchStreamMarkers.SingleOrDefaultAsync(
+                candidate => candidate.HostId == hostId && candidate.IdempotencyKey == key,
+                ct
+            );
+            if (claimed is not null)
+            {
+                return MarkerOutcome(claimed);
+            }
+
+            throw;
+        }
 
         var provider = await helix.CreateStreamMarkerAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
@@ -265,6 +302,15 @@ public sealed class ClipMarkerService(
                     "Twitch reports that the channel is offline.",
                     ct,
                     new ClipMarkerOperationOutcome.Offline()
+                );
+            case HelixStreamMarkerCreateOutcome.VodsDisabled:
+                return await CompleteMarkerAsync(
+                    db,
+                    marker,
+                    TwitchStreamMarkerStatus.Failed,
+                    "Twitch reports that VODs are disabled for stream markers.",
+                    ct,
+                    new ClipMarkerOperationOutcome.VodsDisabled()
                 );
             case HelixStreamMarkerCreateOutcome.RerunOrPremiere:
                 return await CompleteMarkerAsync(
@@ -334,51 +380,31 @@ public sealed class ClipMarkerService(
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
-        var token = await ReadyTokenAsync(hostId, ct);
-        if (token is null)
-        {
-            return;
-        }
-
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
-        if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
-        {
-            return;
-        }
-
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var pending = await db
             .TwitchClips.Where(clip =>
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        var changed = false;
-        foreach (var clip in pending)
+        if (ExpireClips(pending, now))
         {
-            if (clip.ProviderClipId is null || now - clip.RequestedAtUtc >= _clipAvailabilityBound)
-            {
-                clip.Status = TwitchClipStatus.Expired;
-                clip.FailureReason = "Twitch did not make the clip available within 60 seconds.";
-                clip.ResolvedAtUtc = now;
-                changed = true;
-                continue;
-            }
-
-            var provider = await helix.GetClipAsync(
-                new HelixRequestContext(settings.Identity.ClientId, token),
-                clip.ProviderClipId,
-                ct
-            );
-            clip.LastCheckedAtUtc = now;
-            if (provider is HelixClipLookupOutcome.Found found)
-            {
-                Apply(clip, found.Clip);
-                clip.Status = TwitchClipStatus.Available;
-                clip.ResolvedAtUtc = now;
-                changed = true;
-            }
+            await SaveReconciliationChangesAsync(db, hostId, ct);
         }
+
+        var token = await ReadyTokenAsync(hostId, ct);
+        if (token is null)
+        {
+            return;
+        }
+
+        var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
+        if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
+        {
+            return;
+        }
+
+        await PollPendingClipsAsync(db, hostId, token, ct);
 
         var markers = await db
             .TwitchStreamMarkers.Where(marker =>
@@ -390,8 +416,13 @@ public sealed class ClipMarkerService(
             var providerMarkers = await helix.GetStreamMarkersAsync(
                 new HelixRequestContext(settings.Identity.ClientId, token),
                 broadcasterId,
+                markers
+                    .Select(marker => marker.ProviderMarkerId)
+                    .OfType<string>()
+                    .ToHashSet(StringComparer.Ordinal),
                 ct
             );
+            var changed = false;
             if (providerMarkers is HelixStreamMarkerLookupOutcome.Found found)
             {
                 foreach (var marker in markers)
@@ -413,13 +444,132 @@ public sealed class ClipMarkerService(
                     changed = true;
                 }
             }
+            if (changed)
+            {
+                await SaveReconciliationChangesAsync(db, hostId, ct);
+            }
         }
+    }
 
-        if (!changed)
+    private async Task PollPendingClipsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string token,
+        CancellationToken ct
+    )
+    {
+        var pending = await db
+            .TwitchClips.Where(clip =>
+                clip.HostId == hostId
+                && clip.Status == TwitchClipStatus.Pending
+                && clip.ProviderClipId != null
+            )
+            .ToArrayAsync(ct);
+        if (pending.Length == 0)
         {
             return;
         }
 
+        var deadline = pending.Max(clip => clip.RequestedAtUtc + _clipAvailabilityBound);
+        var remainingToDeadline = deadline - timeProvider.GetUtcNow().UtcDateTime;
+        if (remainingToDeadline <= TimeSpan.Zero)
+        {
+            if (ExpireClips(pending, deadline))
+            {
+                await SaveReconciliationChangesAsync(db, hostId, ct);
+            }
+            return;
+        }
+
+        using var deadlineCancellation = new CancellationTokenSource(remainingToDeadline);
+        using var pollingCancellation = CancellationTokenSource.CreateLinkedTokenSource(
+            ct,
+            deadlineCancellation.Token
+        );
+        try
+        {
+            while (pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+            {
+                var now = timeProvider.GetUtcNow().UtcDateTime;
+                var changed = ExpireClips(pending, now);
+                foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
+                {
+                    var provider = await helix.GetClipAsync(
+                        new HelixRequestContext(settings.Identity.ClientId, token),
+                        clip.ProviderClipId!,
+                        pollingCancellation.Token
+                    );
+                    clip.LastCheckedAtUtc = now;
+                    if (provider is HelixClipLookupOutcome.Found found)
+                    {
+                        Apply(clip, found.Clip);
+                        clip.Status = TwitchClipStatus.Available;
+                        clip.ResolvedAtUtc = now;
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    await SaveReconciliationChangesAsync(db, hostId, ct);
+                }
+
+                if (!pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+                {
+                    return;
+                }
+
+                var remaining = deadline - timeProvider.GetUtcNow().UtcDateTime;
+                if (remaining <= TimeSpan.Zero)
+                {
+                    continue;
+                }
+
+                await Task.Delay(
+                    remaining < _clipPollCadence ? remaining : _clipPollCadence,
+                    timeProvider,
+                    pollingCancellation.Token
+                );
+            }
+        }
+        catch (OperationCanceledException)
+            when (!ct.IsCancellationRequested && deadlineCancellation.IsCancellationRequested)
+        {
+            if (ExpireClips(pending, deadline))
+            {
+                await SaveReconciliationChangesAsync(db, hostId, ct);
+            }
+        }
+    }
+
+    private static bool ExpireClips(IEnumerable<TwitchClip> clips, DateTime now)
+    {
+        var changed = false;
+        foreach (var clip in clips)
+        {
+            if (
+                clip.Status != TwitchClipStatus.Pending
+                || now - clip.RequestedAtUtc < _clipAvailabilityBound
+            )
+            {
+                continue;
+            }
+
+            clip.Status = TwitchClipStatus.Expired;
+            clip.FailureReason = "Twitch did not make the clip available within 60 seconds.";
+            clip.ResolvedAtUtc = now;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    private async Task SaveReconciliationChangesAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
+    {
         await db.SaveChangesAsync(ct);
         await TrimClipsAsync(db, hostId, ct);
         await TrimMarkersAsync(db, hostId, ct);
