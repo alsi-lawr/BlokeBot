@@ -1,39 +1,28 @@
-using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Hosts;
-
 namespace BlokeBot.Simulation;
 
 internal static class SimulationEndpoints
 {
     public static void MapSimulationEndpoints(this WebApplication app)
     {
-        app.MapGet("/simulation/ready", () => Results.Ok()).AllowAnonymous();
+        app.MapGet(
+                "/simulation/ready",
+                (SimulationReadiness readiness) =>
+                {
+                    var projection = readiness.Project();
+                    return Results.Json(
+                        projection,
+                        statusCode: projection.Ready
+                            ? StatusCodes.Status200OK
+                            : StatusCodes.Status503ServiceUnavailable
+                    );
+                }
+            )
+            .AllowAnonymous();
 
         app.MapGet(
                 "/simulation/login",
-                async (
-                    HttpContext context,
-                    SimulationFixtureSeeder fixtures,
-                    AuthSessionService sessions,
-                    string? view,
-                    string? theme,
-                    CancellationToken cancellationToken
-                ) =>
+                (string? view, string? theme) =>
                 {
-                    var host = await fixtures.SeedAsync(cancellationToken);
-                    await sessions.SignInAsync(
-                        context,
-                        new AuthenticatedUser(
-                            SimulationMode.UserId,
-                            SimulationMode.Login,
-                            SimulationMode.DisplayName,
-                            null,
-                            [host],
-                            true
-                        ),
-                        host.Id
-                    );
-
                     var selectedTheme = string.Equals(
                         theme,
                         "dark",
@@ -41,9 +30,10 @@ internal static class SimulationEndpoints
                     )
                         ? "dark"
                         : "light";
-
+                    var returnUrl =
+                        $"{SimulationViewCatalog.PathFor(view)}?simulationTheme={selectedTheme}";
                     return Results.Redirect(
-                        $"{SimulationViewCatalog.PathFor(view)}?simulationTheme={selectedTheme}"
+                        $"/auth/login?start=true&returnUrl={Uri.EscapeDataString(returnUrl)}"
                     );
                 }
             )

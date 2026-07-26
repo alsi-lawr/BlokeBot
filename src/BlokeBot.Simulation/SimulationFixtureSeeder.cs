@@ -9,24 +9,27 @@ namespace BlokeBot.Simulation;
 
 internal sealed class SimulationFixtureSeeder(
     BotHostProvisioningService provisioning,
-    IDbContextFactory<BlokeBotDbContext> dbFactory,
-    TimeProvider timeProvider
+    IDbContextFactory<BlokeBotDbContext> dbFactory
 )
 {
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
         var hostId = await provisioning.EnsureHostAsync(
-            SimulationMode.Login,
-            SimulationMode.UserId,
-            SimulationMode.DisplayName,
+            FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login,
+            FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Id,
+            FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             null,
             cancellationToken
         );
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = SimulationMode.Now.UtcDateTime;
 
         await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
         var host = await db.Hosts.SingleAsync(x => x.Id == hostId, cancellationToken);
-        host.DisplayName = SimulationMode.DisplayName;
+        host.DisplayName = FakeTwitch
+            .FakeTwitchScenarioDefinition
+            .ReadyDashboard
+            .AuthorizedUser
+            .DisplayName;
         host.EnabledFeatures = HostFeatureFlags.All;
         host.TimeZoneId = "UTC";
 
@@ -38,8 +41,8 @@ internal sealed class SimulationFixtureSeeder(
 
         return new BotHostChoice(
             hostId,
-            SimulationMode.Login,
-            SimulationMode.DisplayName,
+            FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login,
+            FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             AuthRole.Streamer
         );
     }
@@ -175,7 +178,11 @@ internal sealed class SimulationFixtureSeeder(
                             Login = balance.Login,
                             Delta = balance.Amount,
                             BalanceAfter = balance.Amount,
-                            ActorLogin = SimulationMode.Login,
+                            ActorLogin = FakeTwitch
+                                .FakeTwitchScenarioDefinition
+                                .ReadyDashboard
+                                .AuthorizedUser
+                                .Login,
                             Note = "Stream reward",
                             CreatedAtUtc = now.AddMinutes(-32 + index * 6),
                         }
@@ -362,18 +369,7 @@ internal sealed class SimulationFixtureSeeder(
             return;
         }
 
-        db.DurableAlerts.AddRange(
-            new DurableAlert
-            {
-                HostId = hostId,
-                Severity = DurableAlertSeverity.Warning,
-                Source = "twitch-outbound-queue",
-                SourceKey = "simulation-pending-chat",
-                Title = "Chat delivery is taking longer than usual",
-                Message = "BlokeBot is keeping messages queued while chat recovers.",
-                LinkPath = "/host",
-                CreatedAtUtc = now.AddMinutes(-14),
-            },
+        db.DurableAlerts.Add(
             new DurableAlert
             {
                 HostId = hostId,
@@ -384,7 +380,11 @@ internal sealed class SimulationFixtureSeeder(
                 Message = "Queued messages resumed after the connection recovered.",
                 CreatedAtUtc = now.AddHours(-2),
                 AcknowledgedAtUtc = now.AddHours(-1).AddMinutes(-45),
-                AcknowledgedByLogin = SimulationMode.Login,
+                AcknowledgedByLogin = FakeTwitch
+                    .FakeTwitchScenarioDefinition
+                    .ReadyDashboard
+                    .AuthorizedUser
+                    .Login,
             }
         );
     }

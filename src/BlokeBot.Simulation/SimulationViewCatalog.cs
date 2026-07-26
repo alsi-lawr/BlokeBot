@@ -16,8 +16,10 @@ internal static class SimulationViewCatalog
         ["points-settings"] = "/points/settings",
         ["custom-commands"] = "/custom-commands/settings",
         ["admin"] = "/admin",
-        ["guessing-leaderboard"] = $"/guessing/leaderboard/{SimulationMode.Login}",
-        ["points-leaderboard"] = $"/points/leaderboard/{SimulationMode.Login}",
+        ["guessing-leaderboard"] =
+            $"/guessing/leaderboard/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
+        ["points-leaderboard"] =
+            $"/points/leaderboard/{FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login}",
     };
 
     public static string PathFor(string? view)

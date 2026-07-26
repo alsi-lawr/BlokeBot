@@ -35,6 +35,7 @@ public sealed record FakeTwitchScenarioDefinition
             GrantedScopes = ImmutableHashSet.Create(
                 StringComparer.Ordinal,
                 "channel:bot",
+                "user:bot",
                 "chat:edit",
                 "chat:read",
                 "user:read:chat",
@@ -46,7 +47,15 @@ public sealed record FakeTwitchScenarioDefinition
                 "moderator:read:shoutouts",
                 "moderator:manage:shoutouts",
                 "user:manage:whispers",
-                "user:read:follows"
+                "user:read:follows",
+                "channel:read:polls",
+                "channel:manage:polls",
+                "clips:edit",
+                "channel:manage:broadcast",
+                "channel:read:redemptions",
+                "channel:manage:redemptions",
+                "channel:read:predictions",
+                "channel:manage:predictions"
             ),
         };
 }
@@ -129,8 +138,9 @@ public sealed class FakeTwitchAuthority
         lock (_gate)
         {
             var code = NextId("code");
-            _codes.Add(code, new AuthorizationCode(clientId, redirectUri, scopes));
-            Record("oauth.authorize", Definition.AuthorizedUser.Login);
+            var user = scopes.Contains("user:bot") ? Definition.BotUser : Definition.AuthorizedUser;
+            _codes.Add(code, new AuthorizationCode(clientId, redirectUri, scopes, user));
+            Record("oauth.authorize", user.Login);
             return code;
         }
     }
@@ -222,19 +232,38 @@ public sealed class FakeTwitchAuthority
         string sessionId
     )
     {
-        var subscriber = RequireUserToken(request, "user:read:chat");
+        var subscriber = RequireUserToken(request);
+        var botSubscription =
+            type
+            is "channel.chat.message"
+                or "channel.shoutout.create"
+                or "channel.shoutout.receive";
+        var broadcasterSubscription =
+            type
+            is "channel.poll.begin"
+                or "channel.poll.progress"
+                or "channel.poll.end"
+                or "channel.prediction.begin"
+                or "channel.prediction.progress"
+                or "channel.prediction.lock"
+                or "channel.prediction.end"
+                or "channel.channel_points_custom_reward_redemption.add"
+                or "channel.channel_points_custom_reward_redemption.update";
         if (
             version != "1"
-            || type is not "channel.chat.message" and not "channel.poll.begin"
+            || !botSubscription && !broadcasterSubscription
             || !condition.TryGetValue("broadcaster_user_id", out var broadcasterId)
             || broadcasterId != Definition.AuthorizedUser.Id
-            || type == "channel.chat.message"
+            || botSubscription
                 && (
                     subscriber.Id != Definition.BotUser.Id
-                    || !condition.TryGetValue("user_id", out var botId)
+                    || !condition.TryGetValue(
+                        type == "channel.chat.message" ? "user_id" : "moderator_user_id",
+                        out var botId
+                    )
                     || botId != Definition.BotUser.Id
                 )
-            || type == "channel.poll.begin" && subscriber.Id != Definition.AuthorizedUser.Id
+            || broadcasterSubscription && subscriber.Id != Definition.AuthorizedUser.Id
         )
         {
             throw new FakeTwitchProtocolException(
@@ -263,7 +292,7 @@ public sealed class FakeTwitchAuthority
                     type,
                     sessionId,
                     broadcasterId,
-                    type == "channel.chat.message" ? Definition.BotUser.Id : null,
+                    botSubscription ? Definition.BotUser.Id : null,
                     subscriber.Id
                 )
             );
@@ -276,7 +305,7 @@ public sealed class FakeTwitchAuthority
 
     public void Unsubscribe(HttpRequest request, string id)
     {
-        _ = RequireUserToken(request, "user:read:chat");
+        _ = RequireUserToken(request);
         lock (_gate)
         {
             if (!_subscriptions.Remove(id))
@@ -371,7 +400,7 @@ public sealed class FakeTwitchAuthority
             throw new FakeTwitchProtocolException(HttpStatusCode.BadRequest, "invalid_code");
         }
 
-        return UserToken(authorization.Scopes, "oauth.exchange");
+        return UserToken(authorization.User, authorization.Scopes, "oauth.exchange");
     }
 
     private FakeTwitchToken Refresh(string? refreshToken)
@@ -387,17 +416,21 @@ public sealed class FakeTwitchAuthority
             );
         }
 
-        return UserToken(grant.Scopes, "oauth.refresh");
+        return UserToken(grant.User!, grant.Scopes, "oauth.refresh");
     }
 
-    private FakeTwitchToken UserToken(IReadOnlySet<string> scopes, string transcriptKind)
+    private FakeTwitchToken UserToken(
+        FakeTwitchUser user,
+        IReadOnlySet<string> scopes,
+        string transcriptKind
+    )
     {
         var access = NextId("access");
         var refresh = NextId("refresh");
-        var grant = new AccessGrant(Definition.AuthorizedUser, scopes);
+        var grant = new AccessGrant(user, scopes);
         _accessTokens.Add(access, grant);
         _refreshTokens.Add(refresh, grant);
-        Record(transcriptKind, Definition.AuthorizedUser.Login);
+        Record(transcriptKind, user.Login);
         return new(access, refresh, 3600);
     }
 
@@ -430,7 +463,14 @@ public sealed class FakeTwitchAuthority
     {
         try
         {
-            foreach (var payload in type == "channel.chat.message" ? ChatEvents() : PollEvents())
+            foreach (
+                var payload in type switch
+                {
+                    "channel.chat.message" => ChatEvents(),
+                    "channel.poll.begin" => PollEvents(),
+                    _ => [],
+                }
+            )
             {
                 await session.SendAsync(payload);
                 lock (_gate)
@@ -481,6 +521,20 @@ public sealed class FakeTwitchAuthority
                         info = "",
                     },
                 },
+            }
+        );
+        yield return Notification(
+            "chat-custom-command-0003",
+            "channel.chat.message",
+            new
+            {
+                broadcaster_user_id = Definition.AuthorizedUser.Id,
+                broadcaster_user_login = Definition.AuthorizedUser.Login,
+                chatter_user_id = "3000",
+                chatter_user_login = "nightowl",
+                message_id = "chat-message-0003",
+                message = new { text = "!welcome" },
+                badges = Array.Empty<object>(),
             }
         );
     }
@@ -542,7 +596,8 @@ public sealed class FakeTwitchAuthority
     private sealed record AuthorizationCode(
         string ClientId,
         string RedirectUri,
-        IReadOnlySet<string> Scopes
+        IReadOnlySet<string> Scopes,
+        FakeTwitchUser User
     );
 
     private sealed record AccessGrant(FakeTwitchUser? User, IReadOnlySet<string> Scopes);
@@ -558,6 +613,17 @@ public static class FakeTwitchHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         services.AddSingleton(new FakeTwitchAuthority(scenario));
+        return services;
+    }
+
+    public static IServiceCollection AddFakeTwitch(
+        this IServiceCollection services,
+        FakeTwitchAuthority authority
+    )
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(authority);
+        services.AddSingleton(authority);
         return services;
     }
 

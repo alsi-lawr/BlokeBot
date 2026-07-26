@@ -109,13 +109,15 @@ public sealed class FakeTwitchIntegrationTests
         var listeningTask = listening.ListenAsync(listeningCancellation.Token);
 
         await WaitUntilAsync(() =>
-            observedChat.Messages.Count == 2
+            observedChat.Messages.Count == 3
             && observedPolls.Events.Count == 1
             && host.Authority.Transcript.Any(entry =>
                 entry.Kind == "helix.chat.message" && entry.Detail == "normal command response"
             )
         );
-        observedChat.Messages.Select(message => message.Text).ShouldBe(["!hello", "!mod"]);
+        observedChat
+            .Messages.Select(message => message.Text)
+            .ShouldBe(["!hello", "!mod", "!welcome"]);
         observedChat.Messages[0].Tags.ShouldNotContainKey("mod");
         observedChat.Messages[1].Tags["mod"].ShouldBe("1");
         observedPolls.Events.ShouldHaveSingleItem().PollId.ShouldBe("poll-0001");
@@ -169,7 +171,7 @@ public sealed class FakeTwitchIntegrationTests
         using var client = new HttpClient();
 
         using var denied = await client.GetAsync(
-            $"{host.HttpAddress}oauth2/authorize?response_type=code&client_id=fake-twitch-client&redirect_uri=https%3A%2F%2Fcallback.invalid%2F&state=s&scope=channel%3Amanage%3Abroadcast"
+            $"{host.HttpAddress}oauth2/authorize?response_type=code&client_id=fake-twitch-client&redirect_uri=https%3A%2F%2Fcallback.invalid%2F&state=s&scope=channel%3Amanage%3Aads"
         );
         denied.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
 

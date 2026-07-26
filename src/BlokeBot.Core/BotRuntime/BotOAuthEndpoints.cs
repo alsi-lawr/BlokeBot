@@ -530,7 +530,10 @@ internal static class BotOAuthEndpoints
                             BlokeBotAuthOutcome.Success,
                             BlokeBotAuthStatus.Ok,
                             BlokeBotAuthRetryAction.None,
-                            BlokeBotAuthReturnAction.ChannelSetup
+                            BlokeBotAuthReturnAction.ChannelSetup,
+                            resultContext: new BlokeBotAuthContext.Success(
+                                BlokeBotAuthSuccessKind.ChannelConnection
+                            )
                         )
                         : Result(
                             BlokeBotAuthOutcome.PermissionOrAccount,

@@ -1,5 +1,3 @@
-using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Simulation;
@@ -9,42 +7,29 @@ internal static class SimulationServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotSimulation(this IServiceCollection services)
     {
         services.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider()));
-        services.Replace(
-            ServiceDescriptor.Singleton<IPointTargetUserLookup, SimulationPointTargetUserLookup>()
-        );
-        services.AddSingleton<IPublicChatMessageSender, SimulationPublicChatMessageSender>();
         services.AddSingleton<SimulationFixtureSeeder>();
+        services.AddSingleton<SimulationReadiness>();
+        services.AddSingleton<SimulationStartupCoordinator>();
         return services;
     }
 
     private sealed class SimulationTimeProvider : TimeProvider
     {
+        private readonly long _startedAtTimestamp = TimeProvider.System.GetTimestamp();
+
         public override DateTimeOffset GetUtcNow()
         {
-            return SimulationMode.Now;
+            return SimulationMode.Now + TimeProvider.System.GetElapsedTime(_startedAtTimestamp);
         }
-    }
 
-    private sealed class SimulationPointTargetUserLookup : IPointTargetUserLookup
-    {
-        public Task<bool> ExistsAsync(string login, CancellationToken ct)
-        {
-            return Task.FromResult(!string.IsNullOrWhiteSpace(login));
-        }
-    }
-
-    private sealed class SimulationPublicChatMessageSender : IPublicChatMessageSender
-    {
-        public ValueTask<PublicChatSendOutcome> SendAsync(
-            string channel,
-            string message,
-            PublicChatDeliveryDeadline deadline,
-            CancellationToken cancellationToken
+        public override ITimer CreateTimer(
+            TimerCallback callback,
+            object? state,
+            TimeSpan dueTime,
+            TimeSpan period
         )
         {
-            return ValueTask.FromResult<PublicChatSendOutcome>(
-                new PublicChatSendOutcome.Accepted()
-            );
+            return TimeProvider.System.CreateTimer(callback, state, dueTime, period);
         }
     }
 }
