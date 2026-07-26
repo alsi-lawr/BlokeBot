@@ -325,6 +325,73 @@ public sealed class HelixClientTests
         channels.Select(channel => channel.BroadcasterLogin).ShouldBe(["one", "two"]);
     }
 
+    [Test]
+    public async Task PollRequests_HelixGetCreateAndEnd_MapRequestsAndResponses()
+    {
+        const string ActivePoll = """
+            {"data":[{"id":"poll-id","broadcaster_id":"broadcaster-id","title":"Question","choices":[{"id":"one","title":"Yes","votes":2,"channel_points_votes":1},{"id":"two","title":"No","votes":1,"channel_points_votes":0}],"status":"ACTIVE","started_at":"2026-07-26T10:00:00Z","ends_at":"2026-07-26T10:02:00Z"}]}
+            """;
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Get);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
+            request.RequestUri.Query.ShouldContain("broadcaster_id=broadcaster-id");
+            request.RequestUri.Query.ShouldContain("first=1");
+            return JsonResponse(ActivePoll);
+        });
+        factory.Respond(request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Post);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
+            request
+                .Content!.ReadAsStringAsync()
+                .GetAwaiter()
+                .GetResult()
+                .ShouldBe(
+                    "{\"broadcaster_id\":\"broadcaster-id\",\"title\":\"Question\",\"choices\":[{\"title\":\"Yes\"},{\"title\":\"No\"}],\"duration\":120,\"channel_points_voting_enabled\":true,\"channel_points_per_vote\":10}"
+                );
+            return JsonResponse(ActivePoll);
+        });
+        factory.Respond(request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Patch);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
+            request
+                .Content!.ReadAsStringAsync()
+                .GetAwaiter()
+                .GetResult()
+                .ShouldBe(
+                    "{\"broadcaster_id\":\"broadcaster-id\",\"id\":\"poll-id\",\"status\":\"TERMINATED\"}"
+                );
+            return JsonResponse(ActivePoll.Replace("ACTIVE", "TERMINATED"));
+        });
+        var client = new HelixClient(factory);
+
+        var active = await client.GetActivePollAsync(
+            Context(),
+            "broadcaster-id",
+            CancellationToken.None
+        );
+        var created = await client.CreatePollAsync(
+            Context(),
+            "broadcaster-id",
+            new HelixPollCreateRequest("Question", ["Yes", "No"], 120, true, 10),
+            CancellationToken.None
+        );
+        var ended = await client.EndPollAsync(
+            Context(),
+            "broadcaster-id",
+            "poll-id",
+            HelixPollEndStatus.Terminated,
+            CancellationToken.None
+        );
+
+        active.ShouldNotBeNull().Choices[0].ChannelPointsVotes.ShouldBe(1);
+        created.ShouldNotBeNull().Status.ShouldBe(HelixPollStatus.Active);
+        ended.ShouldNotBeNull().Status.ShouldBe(HelixPollStatus.Terminated);
+    }
+
     private static HttpResponseMessage JsonResponse(string json)
     {
         return new(HttpStatusCode.OK)
