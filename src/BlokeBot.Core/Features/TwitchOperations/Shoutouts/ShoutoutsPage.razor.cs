@@ -130,48 +130,73 @@ public partial class ShoutoutsPage
             );
             return;
         }
-        var outcome = await _polls.SaveTemplateAsync(
-            HostId,
-            new(_pollTitle, _pollChoices.Split('\n'), duration, false, null),
-            CancellationToken.None
+
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _polls.SaveTemplateAsync(
+                    hostId,
+                    new(_pollTitle, _pollChoices.Split('\n'), duration, false, null),
+                    CancellationToken.None
+                );
+                if (outcome is PollOperationOutcome.InvalidTemplate invalid)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(invalid.Message));
+                }
+                await LoadPollsAsync();
+            }
         );
-        if (outcome is PollOperationOutcome.InvalidTemplate invalid)
-        {
-            _toasts.Publish(new ToastRequest<WarningToastStrategy>(invalid.Message));
-        }
-        await LoadPollsAsync();
     }
 
     private async Task StartPollAsync(int templateId)
     {
-        var outcome = await _polls.StartAsync(HostId, templateId, CancellationToken.None);
-        if (outcome is PollOperationOutcome.NotReady notReady)
-        {
-            _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
-        }
-        else if (outcome is PollOperationOutcome.ActivePollExists)
-        {
-            _toasts.Publish(
-                new ToastRequest<WarningToastStrategy>("Twitch already has an active poll.")
-            );
-        }
-        await LoadPollsAsync();
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _polls.StartAsync(hostId, templateId, CancellationToken.None);
+                if (outcome is PollOperationOutcome.NotReady notReady)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
+                }
+                else if (outcome is PollOperationOutcome.ActivePollExists)
+                {
+                    _toasts.Publish(
+                        new ToastRequest<WarningToastStrategy>("Twitch already has an active poll.")
+                    );
+                }
+                await LoadPollsAsync();
+            }
+        );
     }
 
     private async Task EndPollAsync()
     {
-        var confirmed =
-            _pollState?.ActivePoll?.IsExternallyStarted != true
-            || await _js.InvokeAsync<bool>("confirm", "End the externally started Twitch poll?");
-        var outcome = await _polls.EndAsync(HostId, confirmed, CancellationToken.None);
-        if (outcome is PollOperationOutcome.NotReady notReady)
-        {
-            _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
-        }
-        else if (outcome is PollOperationOutcome.ProviderRejected rejected)
-        {
-            _toasts.Publish(new ToastRequest<WarningToastStrategy>(rejected.Message));
-        }
-        await LoadPollsAsync();
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var confirmed =
+                    _pollState?.ActivePoll?.IsExternallyStarted != true
+                    || await _js.InvokeAsync<bool>(
+                        "confirm",
+                        "End the externally started Twitch poll?"
+                    );
+                var outcome = await _polls.EndAsync(hostId, confirmed, CancellationToken.None);
+                if (outcome is PollOperationOutcome.NotReady notReady)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
+                }
+                else if (outcome is PollOperationOutcome.ProviderRejected rejected)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(rejected.Message));
+                }
+                await LoadPollsAsync();
+            }
+        );
     }
 }

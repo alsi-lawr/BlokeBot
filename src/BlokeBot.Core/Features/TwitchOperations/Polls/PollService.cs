@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -13,7 +14,8 @@ public sealed class PollService(
     IHostBroadcasterTokenStatusProvider broadcasters,
     HelixClient helix,
     BotSettings settings,
-    EventBus<AppEventKind> events
+    EventBus<AppEventKind> events,
+    DurableAlertService alerts
 ) : IPollEventObserver
 {
     private const int _resultsToKeep = 100;
@@ -276,11 +278,15 @@ public sealed class PollService(
             HostBroadcasterAuthorizationService.MilestoneScopes,
             ct
         );
-        return status is TokenStatus.Ready
-            ? new PollAuthorizationReadiness.Ready()
-            : new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
-                "Connect the selected broadcaster with Twitch operations permissions."
-            );
+        if (status is TokenStatus.Ready)
+        {
+            return new PollAuthorizationReadiness.Ready();
+        }
+
+        await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
+        return new PollAuthorizationReadiness.NeedsBroadcasterAuthorization(
+            "Reconnect the selected broadcaster with Twitch operations permissions."
+        );
     }
 
     private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct)
@@ -290,7 +296,28 @@ public sealed class PollService(
             HostBroadcasterAuthorizationService.MilestoneScopes,
             ct
         );
-        return status is TokenStatus.Ready ready ? ready.AccessToken : null;
+        if (status is TokenStatus.Ready ready)
+        {
+            return ready.AccessToken;
+        }
+
+        await EnsureBroadcasterAuthorizationAlertAsync(hostId, ct);
+        return null;
+    }
+
+    private async Task EnsureBroadcasterAuthorizationAlertAsync(int hostId, CancellationToken ct)
+    {
+        await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "twitch-broadcaster-authorization",
+                "reauthorize-v1",
+                "Reconnect broadcaster for Twitch operations",
+                "Twitch operations needs the selected broadcaster to reconnect and approve all requested permissions.",
+                "/twitch-operations"
+            )
+            .ExecuteAsync(ct);
     }
 
     private static TwitchPoll Upsert(

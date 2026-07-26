@@ -35,5 +35,8 @@ public abstract record PollAuthorizationReadiness
 
     public sealed record Ready : PollAuthorizationReadiness;
 
-    public sealed record NeedsBroadcasterAuthorization(string Message) : PollAuthorizationReadiness;
+    public sealed record NeedsBroadcasterAuthorization(string Message) : PollAuthorizationReadiness
+    {
+        public string ReauthorizationUrl => "/oauth/broadcaster/start";
+    }
 }

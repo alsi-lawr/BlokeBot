@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Eventing;
@@ -75,6 +76,50 @@ public sealed class PollServiceTests
     }
 
     [Test]
+    public async Task MissingBroadcasterAuthority_LoadingPolls_ProvidesReauthorizationAndDurableAlert()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var events = TestEventBus.Create<AppEventKind>();
+        var service = new PollService(
+            dbFactory,
+            new StaticBroadcasterProvider(
+                new TokenStatus.Unavailable(
+                    AccessTokenUnavailableReason.MissingRefreshToken,
+                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                )
+            ),
+            new HelixClient(new PollHttpClientFactory()),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+            ),
+            events,
+            new DurableAlertService(dbFactory, TimeProvider.System, events)
+        );
+
+        var state = await service.LoadAsync(1, CancellationToken.None);
+
+        state
+            .Authorization.ShouldBeOfType<PollAuthorizationReadiness.NeedsBroadcasterAuthorization>()
+            .ReauthorizationUrl.ShouldBe("/oauth/broadcaster/start");
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var alert = await verify.DurableAlerts.SingleAsync();
+        alert.Source.ShouldBe("twitch-broadcaster-authorization");
+        alert.LinkPath.ShouldBe("/twitch-operations");
+    }
+
+    [Test]
     public async Task ReconciledExternalPoll_EndingRequiresConfirmationBeforeProviderMutation()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -110,6 +155,7 @@ public sealed class PollServiceTests
         PollHttpClientFactory http
     )
     {
+        var events = TestEventBus.Create<AppEventKind>();
         return new(
             dbFactory,
             new ReadyBroadcasterProvider(),
@@ -117,7 +163,8 @@ public sealed class PollServiceTests
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
-            TestEventBus.Create<AppEventKind>()
+            events,
+            new DurableAlertService(dbFactory, TimeProvider.System, events)
         );
     }
 
@@ -156,7 +203,25 @@ public sealed class PollServiceTests
         };
     }
 
-    private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
+    private sealed class ReadyBroadcasterProvider : StaticBroadcasterProvider
+    {
+        public ReadyBroadcasterProvider()
+            : base(
+                new TokenStatus.Ready(
+                    "broadcaster-token",
+                    new TokenValidation(
+                        "host-id",
+                        "host",
+                        OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    ),
+                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
+                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
+                )
+            ) { }
+    }
+
+    private class StaticBroadcasterProvider(TokenStatus status)
+        : IHostBroadcasterTokenStatusProvider
     {
         public Task<TokenStatus> GetTokenStatusAsync(
             int hostId,
@@ -164,15 +229,7 @@ public sealed class PollServiceTests
             CancellationToken ct
         )
         {
-            var scopes = ImmutableArray.CreateRange(requiredScopes.Select(x => x!));
-            return Task.FromResult<TokenStatus>(
-                new TokenStatus.Ready(
-                    "broadcaster-token",
-                    new TokenValidation("host-id", "host", OAuthScopeSet.Create(scopes)),
-                    scopes,
-                    scopes
-                )
-            );
+            return Task.FromResult(status);
         }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(

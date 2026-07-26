@@ -490,12 +490,27 @@ internal static class BotOAuthEndpoints
     )
     {
         var session = AuthenticatedSession.FromPrincipal(context.User);
-        if (
-            !states.TryConsume(state, session.UserId, out var hostId)
-            || !session.CanAuthorizeSelectedHost
-            || !string.IsNullOrWhiteSpace(error)
-            || string.IsNullOrWhiteSpace(code)
-        )
+        if (!states.TryConsume(state, session.UserId, out var hostId))
+        {
+            return Result(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
+        }
+
+        var selectedHost = session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (selectedHost?.Id != hostId || !session.CanAuthorizeSelectedHost)
+        {
+            return ConnectionAccessResult(session);
+        }
+
+        if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(code))
         {
             return Result(
                 BlokeBotAuthOutcome.InvalidOrExpired,

@@ -60,7 +60,16 @@
             <div class="space-y-4 p-5">
                 @if (_pollState.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
                 {
-                    <p class="text-sm text-amber-700">@readiness.Message</p>
+                    <div class="text-sm text-amber-700">
+                        <p>@readiness.Message</p>
+                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70"
+                                         Url="@readiness.ReauthorizationUrl"
+                                         PopupName="blokebot-broadcaster-oauth"
+                                         OpeningText="Opening..."
+                                         OnClosed="LoadPollsAsync">
+                            Reconnect broadcaster
+                        </AuthPopupButton>
+                    </div>
                 }
                 @if (_pollState.ActivePoll is { } poll)
                 {
