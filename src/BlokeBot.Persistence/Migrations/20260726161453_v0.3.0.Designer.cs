@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260726154359_v0.3.0")]
+    [Migration("20260726161453_v0.3.0")]
     partial class v030
     {
         /// <inheritdoc />
