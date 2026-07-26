@@ -31,6 +31,17 @@ public sealed record HelixPollCreateRequest(
     int? ChannelPointsPerVote
 );
 
+public abstract record HelixPollCreateOutcome
+{
+    private HelixPollCreateOutcome() { }
+
+    public sealed record Created(HelixPoll Poll) : HelixPollCreateOutcome;
+
+    public sealed record ActivePollExists : HelixPollCreateOutcome;
+
+    public sealed record ProviderRejected : HelixPollCreateOutcome;
+}
+
 public enum HelixPollEndStatus
 {
     Terminated,

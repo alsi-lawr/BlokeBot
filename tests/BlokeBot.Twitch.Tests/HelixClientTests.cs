@@ -388,7 +388,9 @@ public sealed class HelixClientTests
         );
 
         active.ShouldNotBeNull().Choices[0].ChannelPointsVotes.ShouldBe(1);
-        created.ShouldNotBeNull().Status.ShouldBe(HelixPollStatus.Active);
+        created
+            .ShouldBeOfType<HelixPollCreateOutcome.Created>()
+            .Poll.Status.ShouldBe(HelixPollStatus.Active);
         ended.ShouldNotBeNull().Status.ShouldBe(HelixPollStatus.Terminated);
     }
 

@@ -140,7 +140,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             .FirstOrDefault(x => x.Status is HelixPollStatus.Active);
     }
 
-    public async Task<HelixPoll?> CreatePollAsync(
+    public async Task<HelixPollCreateOutcome> CreatePollAsync(
         HelixRequestContext context,
         string broadcasterId,
         HelixPollCreateRequest poll,
@@ -163,16 +163,44 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             options: _jsonOptions
         );
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (response.StatusCode is HttpStatusCode.Conflict)
+        if (response.StatusCode == HttpStatusCode.BadRequest)
         {
-            return null;
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return IsActivePollConflict(error)
+                ? new HelixPollCreateOutcome.ActivePollExists()
+                : new HelixPollCreateOutcome.ProviderRejected();
         }
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixPollCreateOutcome.ProviderRejected();
+        }
+
         var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return payload?.Data.FirstOrDefault()?.ToDomain();
+        var created = payload?.Data.FirstOrDefault()?.ToDomain();
+        return created is null
+            ? new HelixPollCreateOutcome.ProviderRejected()
+            : new HelixPollCreateOutcome.Created(created);
+    }
+
+    private static bool IsActivePollConflict(string error)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(error);
+            return document.RootElement.TryGetProperty("message", out var message)
+                && message.GetString() is { } text
+                && (
+                    text.Contains("active poll", StringComparison.OrdinalIgnoreCase)
+                    || text.Contains("poll is already active", StringComparison.OrdinalIgnoreCase)
+                );
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     public async Task<HelixPoll?> EndPollAsync(

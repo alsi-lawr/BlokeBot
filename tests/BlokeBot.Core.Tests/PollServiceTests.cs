@@ -76,6 +76,104 @@ public sealed class PollServiceTests
     }
 
     [Test]
+    public async Task PollCreation_MapsActiveConflictAndRejectsVotingCostsAboveOneMillionBeforePersistence()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var http = new PollHttpClientFactory();
+        http.Enqueue(
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    """{"error":"Bad Request","status":400,"message":"A poll is already active"}""",
+                    Encoding.UTF8,
+                    "application/json"
+                ),
+            }
+        );
+        var service = CreateService(dbFactory, http);
+
+        var accepted = await service.SaveTemplateAsync(
+            1,
+            new PollTemplateDraft("Question", ["Yes", "No"], 60, true, 1_000_000),
+            CancellationToken.None
+        );
+        var rejected = await service.SaveTemplateAsync(
+            1,
+            new PollTemplateDraft("Too expensive", ["Yes", "No"], 60, true, 1_000_001),
+            CancellationToken.None
+        );
+        var started = await service.StartAsync(
+            1,
+            accepted.ShouldBeOfType<PollOperationOutcome.TemplateSaved>().Template.Id,
+            CancellationToken.None
+        );
+
+        rejected.ShouldBeOfType<PollOperationOutcome.InvalidTemplate>();
+        started.ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var template = (await verify.TwitchPollTemplates.ToArrayAsync()).ShouldHaveSingleItem();
+        template.ChannelPointsPerVote.ShouldBe(1_000_000);
+        http.CreateRequests.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PollEvents_DuplicateAndDelayedProgressAfterEnd_LeaveTheTerminalResultIntact()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var service = CreateService(dbFactory, new PollHttpClientFactory());
+        await service.PollReceivedAsync(
+            ProviderPollEvent("ACTIVE", 1, "progress-1"),
+            CancellationToken.None
+        );
+        await service.PollReceivedAsync(
+            ProviderPollEvent("ACTIVE", 1, "progress-1"),
+            CancellationToken.None
+        );
+        await service.PollReceivedAsync(
+            ProviderPollEvent("COMPLETED", 2, "end"),
+            CancellationToken.None
+        );
+        await service.PollReceivedAsync(
+            ProviderPollEvent("ACTIVE", 99, "delayed-progress"),
+            CancellationToken.None
+        );
+
+        var state = await service.LoadAsync(1, CancellationToken.None);
+
+        state.ActivePoll.ShouldBeNull();
+        var result = state.Results.ShouldHaveSingleItem();
+        result.Status.ShouldBe("Completed");
+        result.Choices.ShouldHaveSingleItem().Votes.ShouldBe(2);
+        result.EndedAtUtc.ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task MissingBroadcasterAuthority_LoadingPolls_ProvidesReauthorizationAndDurableAlert()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -182,6 +280,21 @@ public sealed class PollServiceTests
                 new TwitchPollTemplateChoice { Position = 1, Title = "No" },
             ],
         };
+    }
+
+    private static EventSubPollEvent ProviderPollEvent(string status, int votes, string messageId)
+    {
+        return new(
+            "host-id",
+            "host",
+            "poll-id",
+            "Question",
+            [new EventSubPollChoice("yes", "Yes", votes, 0)],
+            status,
+            new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 7, 26, 10, 1, 0, TimeSpan.Zero),
+            messageId
+        );
     }
 
     private static HttpResponseMessage CreateResponse(

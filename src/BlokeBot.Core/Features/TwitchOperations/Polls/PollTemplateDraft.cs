@@ -30,10 +30,10 @@ public sealed record PollTemplateDraft(
                 "Poll duration must be 15–1800 seconds."
             );
         }
-        if (ChannelPointsVotingEnabled && ChannelPointsPerVote is not > 0)
+        if (ChannelPointsVotingEnabled && ChannelPointsPerVote is not (>= 1 and <= 1_000_000))
         {
             return new PollTemplateValidationOutcome.Invalid(
-                "Channel Points voting needs a positive cost per vote."
+                "Channel Points voting needs a cost from 1 to 1,000,000 per vote."
             );
         }
         return new PollTemplateValidationOutcome.Valid(

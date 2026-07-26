@@ -127,11 +127,18 @@ public sealed class PollService(
             ),
             ct
         );
-        if (provider is null)
+        if (provider is HelixPollCreateOutcome.ActivePollExists)
         {
             return new PollOperationOutcome.ActivePollExists();
         }
-        var poll = Upsert(db, hostId, provider, false);
+        if (provider is not HelixPollCreateOutcome.Created created)
+        {
+            return new PollOperationOutcome.ProviderRejected(
+                "Twitch did not permit creating this poll."
+            );
+        }
+
+        var poll = Upsert(db, hostId, created.Poll, false).Poll;
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return new PollOperationOutcome.Started(View(poll));
@@ -177,7 +184,7 @@ public sealed class PollService(
                 "Twitch did not permit ending this poll."
             );
         }
-        var poll = Upsert(db, hostId, provider, active.IsExternallyStarted);
+        var poll = Upsert(db, hostId, provider, active.IsExternallyStarted).Poll;
         await TrimResultsAsync(db, hostId, ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
@@ -206,7 +213,12 @@ public sealed class PollService(
         {
             return;
         }
-        Upsert(db, hostId, provider, true);
+        var upsert = Upsert(db, hostId, provider, true);
+        if (!upsert.Changed)
+        {
+            return;
+        }
+
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
     }
@@ -214,8 +226,13 @@ public sealed class PollService(
     public async Task RecordProviderUpdateAsync(int hostId, HelixPoll poll, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        Upsert(db, hostId, poll, true);
-        if (poll.Status is not HelixPollStatus.Active)
+        var upsert = Upsert(db, hostId, poll, true);
+        if (!upsert.Changed)
+        {
+            return;
+        }
+
+        if (upsert.Poll.Status is not TwitchPollStatus.Active)
         {
             await TrimResultsAsync(db, hostId, ct);
         }
@@ -243,7 +260,7 @@ public sealed class PollService(
             "TERMINATED" => HelixPollStatus.Terminated,
             _ => HelixPollStatus.Archived,
         };
-        Upsert(
+        var upsert = Upsert(
             db,
             host.Id,
             new(
@@ -263,7 +280,12 @@ public sealed class PollService(
             ),
             true
         );
-        if (status is not HelixPollStatus.Active)
+        if (!upsert.Changed)
+        {
+            return;
+        }
+
+        if (upsert.Poll.Status is not TwitchPollStatus.Active)
         {
             await TrimResultsAsync(db, host.Id, ct);
         }
@@ -320,7 +342,7 @@ public sealed class PollService(
             .ExecuteAsync(ct);
     }
 
-    private static TwitchPoll Upsert(
+    private static PollUpsertOutcome Upsert(
         BlokeBotDbContext db,
         int hostId,
         HelixPoll poll,
@@ -334,7 +356,20 @@ public sealed class PollService(
             ?? db.TwitchPolls.SingleOrDefault(x =>
                 x.HostId == hostId && x.ProviderPollId == poll.Id
             );
-        if (record is null)
+        var status = ToPersistedStatus(poll.Status);
+        if (record is not null)
+        {
+            if (record.Status is not TwitchPollStatus.Active)
+            {
+                return new PollUpsertOutcome(record, false);
+            }
+
+            if (status is TwitchPollStatus.Active && !HasAdvancedVotes(record, poll))
+            {
+                return new PollUpsertOutcome(record, false);
+            }
+        }
+        else
         {
             record = new TwitchPoll
             {
@@ -344,21 +379,45 @@ public sealed class PollService(
             };
             db.TwitchPolls.Add(record);
         }
+
         record.Title = poll.Title;
         record.ChoicesJson = JsonSerializer.Serialize(poll.Choices);
-        record.Status = poll.Status switch
+        record.Status = status;
+        record.StartedAtUtc = poll.StartedAt.UtcDateTime;
+        record.EndsAtUtc = poll.EndsAt?.UtcDateTime;
+        record.EndedAtUtc = status is TwitchPollStatus.Active ? null : DateTime.UtcNow;
+        record.UpdatedAtUtc = DateTime.UtcNow;
+        return new PollUpsertOutcome(record, true);
+    }
+
+    private static bool HasAdvancedVotes(TwitchPoll record, HelixPoll poll)
+    {
+        var current = (
+            JsonSerializer.Deserialize<HelixPollChoice[]>(record.ChoicesJson) ?? []
+        ).ToDictionary(choice => choice.Id, StringComparer.Ordinal);
+        return poll.Choices.All(choice =>
+                current.TryGetValue(choice.Id, out var existing)
+                && choice.Votes >= existing.Votes
+                && choice.ChannelPointsVotes >= existing.ChannelPointsVotes
+            )
+            && poll.Choices.Any(choice =>
+                choice.Votes > current[choice.Id].Votes
+                || choice.ChannelPointsVotes > current[choice.Id].ChannelPointsVotes
+            );
+    }
+
+    private static TwitchPollStatus ToPersistedStatus(HelixPollStatus status)
+    {
+        return status switch
         {
             HelixPollStatus.Active => TwitchPollStatus.Active,
             HelixPollStatus.Completed => TwitchPollStatus.Completed,
             HelixPollStatus.Terminated => TwitchPollStatus.Terminated,
             _ => TwitchPollStatus.Archived,
         };
-        record.StartedAtUtc = poll.StartedAt.UtcDateTime;
-        record.EndsAtUtc = poll.EndsAt?.UtcDateTime;
-        record.EndedAtUtc = record.Status is TwitchPollStatus.Active ? null : DateTime.UtcNow;
-        record.UpdatedAtUtc = DateTime.UtcNow;
-        return record;
     }
+
+    private sealed record PollUpsertOutcome(TwitchPoll Poll, bool Changed);
 
     private static async Task TrimResultsAsync(
         BlokeBotDbContext db,
