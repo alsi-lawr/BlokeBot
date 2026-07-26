@@ -1967,6 +1967,9 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<int>("HostId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsGlobalCooldownEnabled")
                         .HasColumnType("INTEGER");
 

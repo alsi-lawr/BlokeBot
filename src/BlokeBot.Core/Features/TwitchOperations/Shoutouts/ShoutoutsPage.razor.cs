@@ -36,6 +36,9 @@ public partial class ShoutoutsPage
     private bool _rewardCooldownEnabled;
     private string _rewardCooldownSeconds = string.Empty;
     private string _rewardBackgroundColor = string.Empty;
+    private string? _editingRewardId;
+    private bool _rewardEnabled = true;
+    private bool _rewardPaused;
 
     private string _cooldownText =>
         _state switch
@@ -367,33 +370,89 @@ public partial class ShoutoutsPage
             hostId,
             async () =>
             {
-                var outcome = await _channelPoints.CreateRewardAsync(
-                    hostId,
-                    new(
-                        _rewardTitle,
-                        _rewardPrompt,
-                        cost,
-                        _rewardUserInput,
-                        _rewardMaxPerStreamEnabled,
-                        ParseNullableInt(_rewardMaxPerStream),
-                        _rewardMaxPerUserPerStreamEnabled,
-                        ParseNullableInt(_rewardMaxPerUserPerStream),
-                        _rewardCooldownEnabled,
-                        ParseNullableInt(_rewardCooldownSeconds),
-                        _rewardQueueSkip,
-                        string.IsNullOrWhiteSpace(_rewardBackgroundColor)
-                            ? null
-                            : _rewardBackgroundColor
-                    ),
-                    CancellationToken.None
+                var draft = new ChannelPointsRewardDraft(
+                    _rewardTitle,
+                    _rewardPrompt,
+                    cost,
+                    _rewardUserInput,
+                    _rewardMaxPerStreamEnabled,
+                    ParseNullableInt(_rewardMaxPerStream),
+                    _rewardMaxPerUserPerStreamEnabled,
+                    ParseNullableInt(_rewardMaxPerUserPerStream),
+                    _rewardCooldownEnabled,
+                    ParseNullableInt(_rewardCooldownSeconds),
+                    _rewardQueueSkip,
+                    string.IsNullOrWhiteSpace(_rewardBackgroundColor)
+                        ? null
+                        : _rewardBackgroundColor
                 );
+                var outcome = _editingRewardId is { } rewardId
+                    ? await _channelPoints.UpdateRewardAsync(
+                        hostId,
+                        rewardId,
+                        draft,
+                        _rewardEnabled,
+                        _rewardPaused,
+                        CancellationToken.None
+                    )
+                    : await _channelPoints.CreateRewardAsync(hostId, draft, CancellationToken.None);
                 PublishChannelPointsOutcome(outcome);
+                if (
+                    outcome
+                    is ChannelPointsOperationOutcome.RewardCreated
+                        or ChannelPointsOperationOutcome.RewardUpdated
+                )
+                {
+                    ClearRewardEditor();
+                }
                 await LoadChannelPointsAsync();
             }
         );
     }
 
-    private async Task ToggleRewardAsync(ChannelPointsRewardView reward)
+    private void EditReward(ChannelPointsRewardView reward)
+    {
+        _editingRewardId = reward.ProviderRewardId;
+        _rewardTitle = reward.Title;
+        _rewardPrompt = reward.Prompt ?? string.Empty;
+        _rewardCost = reward.Cost.ToString();
+        _rewardUserInput = reward.IsUserInputRequired;
+        _rewardQueueSkip = reward.ShouldRedemptionsSkipRequestQueue;
+        _rewardMaxPerStreamEnabled = reward.IsMaxPerStreamEnabled;
+        _rewardMaxPerStream = reward.MaxPerStream?.ToString() ?? string.Empty;
+        _rewardMaxPerUserPerStreamEnabled = reward.IsMaxPerUserPerStreamEnabled;
+        _rewardMaxPerUserPerStream = reward.MaxPerUserPerStream?.ToString() ?? string.Empty;
+        _rewardCooldownEnabled = reward.IsGlobalCooldownEnabled;
+        _rewardCooldownSeconds = reward.GlobalCooldownSeconds?.ToString() ?? string.Empty;
+        _rewardBackgroundColor = reward.BackgroundColor ?? string.Empty;
+        _rewardEnabled = reward.IsEnabled;
+        _rewardPaused = reward.IsPaused;
+    }
+
+    private void ClearRewardEditor()
+    {
+        _editingRewardId = null;
+        _rewardTitle = string.Empty;
+        _rewardPrompt = string.Empty;
+        _rewardCost = "100";
+        _rewardUserInput = false;
+        _rewardQueueSkip = false;
+        _rewardMaxPerStreamEnabled = false;
+        _rewardMaxPerStream = string.Empty;
+        _rewardMaxPerUserPerStreamEnabled = false;
+        _rewardMaxPerUserPerStream = string.Empty;
+        _rewardCooldownEnabled = false;
+        _rewardCooldownSeconds = string.Empty;
+        _rewardBackgroundColor = string.Empty;
+        _rewardEnabled = true;
+        _rewardPaused = false;
+    }
+
+    private async Task UpdateRewardAvailabilityAsync(
+        ChannelPointsRewardView reward,
+        bool isEnabled,
+        bool isPaused
+    )
     {
         var hostId = HostId;
         await RunSelectedHostMutationAsync(
@@ -417,7 +476,8 @@ public partial class ShoutoutsPage
                         reward.ShouldRedemptionsSkipRequestQueue,
                         reward.BackgroundColor
                     ),
-                    !reward.IsPaused,
+                    isEnabled,
+                    isPaused,
                     CancellationToken.None
                 );
                 PublishChannelPointsOutcome(outcome);

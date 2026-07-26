@@ -234,13 +234,17 @@
                     <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Global cooldown</label>
                     @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
                     <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
-                    <button class="btn-primary self-end" @onclick="CreateRewardAsync">Create reward</button>
+                    <button class="btn-primary self-end" @onclick="CreateRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                    @if (_editingRewardId is not null)
+                    {
+                        <button class="btn-secondary self-end" @onclick="ClearRewardEditor">Cancel edit</button>
+                    }
                 </div>
                 @foreach (var reward in _channelPointsState.Rewards)
                 {
                     <div class="rounded-lg border border-slate-200 p-3" @key="reward.ProviderRewardId">
                         <div class="flex flex-wrap items-center gap-3"><strong>@reward.Title</strong><span class="text-sm text-muted-foreground">@reward.Cost Channel Points</span>
-                        @if (reward.IsManageable) { <button class="btn-secondary" @onclick="() => ToggleRewardAsync(reward)">@(reward.IsPaused ? "Enable" : "Pause")</button><button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button> }
+                        @if (reward.IsManageable) { <button class="btn-secondary" @onclick="() => EditReward(reward)">Edit</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, !reward.IsEnabled, reward.IsPaused)">@(reward.IsEnabled ? "Disable" : "Enable")</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, reward.IsEnabled, !reward.IsPaused)">@(reward.IsPaused ? "Resume" : "Pause")</button><button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button> }
                         else { <span class="text-sm text-muted-foreground">Managed outside BlokeBot — read-only</span> }</div>
                         @if (!string.IsNullOrWhiteSpace(reward.Prompt)) { <p class="mt-1 text-sm text-muted-foreground">@reward.Prompt</p> }
                     </div>

@@ -1,4 +1,3 @@
-#pragma warning disable IDE0011, IDE0022
 using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
@@ -8,7 +7,7 @@ public sealed record HelixCustomReward(
     string Title,
     string? Prompt,
     int Cost,
-    bool IsManageable,
+    bool IsEnabled,
     bool IsPaused,
     bool IsUserInputRequired,
     bool IsMaxPerStreamEnabled,
@@ -70,6 +69,39 @@ public abstract record HelixChannelPointsOutcome
     public sealed record Unavailable : HelixChannelPointsOutcome;
 }
 
+public abstract record HelixCustomRewardsLookupOutcome
+{
+    private HelixCustomRewardsLookupOutcome() { }
+
+    public sealed record Found(IReadOnlyList<HelixCustomReward> Rewards)
+        : HelixCustomRewardsLookupOutcome;
+
+    public sealed record Unavailable : HelixCustomRewardsLookupOutcome;
+
+    public sealed record Ineligible : HelixCustomRewardsLookupOutcome;
+
+    public sealed record Unauthorized : HelixCustomRewardsLookupOutcome;
+}
+
+public abstract record HelixRewardRedemptionsLookupOutcome
+{
+    private HelixRewardRedemptionsLookupOutcome() { }
+
+    public sealed record Found(HelixRewardRedemptionsPage Page)
+        : HelixRewardRedemptionsLookupOutcome;
+
+    public sealed record Unavailable : HelixRewardRedemptionsLookupOutcome;
+
+    public sealed record Ineligible : HelixRewardRedemptionsLookupOutcome;
+
+    public sealed record Unauthorized : HelixRewardRedemptionsLookupOutcome;
+}
+
+public sealed record HelixRewardRedemptionsPage(
+    IReadOnlyList<HelixRewardRedemption> Redemptions,
+    string? Cursor
+);
+
 internal sealed record HelixCustomRewardsResponse
 {
     [JsonPropertyName("data")]
@@ -90,8 +122,8 @@ internal sealed record HelixCustomRewardWire
     [JsonPropertyName("cost")]
     public int Cost { get; init; }
 
-    [JsonPropertyName("is_manageable")]
-    public bool IsManageable { get; init; }
+    [JsonPropertyName("is_enabled")]
+    public bool IsEnabled { get; init; }
 
     [JsonPropertyName("is_paused")]
     public bool IsPaused { get; init; }
@@ -114,13 +146,14 @@ internal sealed record HelixCustomRewardWire
     [JsonPropertyName("background_color")]
     public string? BackgroundColor { get; init; }
 
-    public HelixCustomReward ToDomain() =>
-        new(
+    public HelixCustomReward ToDomain()
+    {
+        return new(
             Id,
             Title,
             Prompt,
             Cost,
-            IsManageable,
+            IsEnabled,
             IsPaused,
             IsUserInputRequired,
             MaxPerStream.IsEnabled,
@@ -132,6 +165,7 @@ internal sealed record HelixCustomRewardWire
             ShouldRedemptionsSkipRequestQueue,
             BackgroundColor
         );
+    }
 }
 
 internal sealed record HelixRewardLimitWire
@@ -159,6 +193,15 @@ internal sealed record HelixRewardRedemptionsResponse
 {
     [JsonPropertyName("data")]
     public IReadOnlyList<HelixRewardRedemptionWire> Data { get; init; } = [];
+
+    [JsonPropertyName("pagination")]
+    public HelixRewardRedemptionsPaginationWire Pagination { get; init; } = new();
+}
+
+internal sealed record HelixRewardRedemptionsPaginationWire
+{
+    [JsonPropertyName("cursor")]
+    public string? Cursor { get; init; }
 }
 
 internal sealed record HelixRewardRedemptionWire
@@ -184,8 +227,9 @@ internal sealed record HelixRewardRedemptionWire
     [JsonPropertyName("redeemed_at")]
     public DateTimeOffset RedeemedAt { get; init; }
 
-    public HelixRewardRedemption ToDomain() =>
-        new(
+    public HelixRewardRedemption ToDomain()
+    {
+        return new(
             Id,
             Reward.Id,
             Reward.Title,
@@ -201,6 +245,7 @@ internal sealed record HelixRewardRedemptionWire
             },
             RedeemedAt
         );
+    }
 }
 
 internal sealed record HelixRedemptionRewardWire

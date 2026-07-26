@@ -1,4 +1,3 @@
-#pragma warning disable IDE0011, IDE0022
 using System.Collections.Immutable;
 using System.Net;
 using System.Net.Http.Json;
@@ -698,25 +697,34 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             : new ActiveBotFollowStatus.DoesNotFollow();
     }
 
-    public async Task<IReadOnlyList<HelixCustomReward>?> GetCustomRewardsAsync(
+    public async Task<HelixCustomRewardsLookupOutcome> GetCustomRewardsAsync(
         HelixRequestContext context,
         string broadcasterId,
+        bool onlyManageableRewards,
         CancellationToken cancellationToken
     )
     {
         var uri =
             _customRewardsEndpoint
             + "?"
-            + QueryString.Create([new("broadcaster_id", broadcasterId)]);
+            + QueryString.Create([
+                new("broadcaster_id", broadcasterId),
+                new("only_manageable_rewards", onlyManageableRewards ? "true" : null),
+            ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            return null;
+        var outcome = await ChannelPointsOutcomeAsync(response, cancellationToken);
+        if (outcome is not HelixChannelPointsOutcome.Success)
+        {
+            return ToCustomRewardsLookupOutcome(outcome);
+        }
         var payload = await response.Content.ReadFromJsonAsync<HelixCustomRewardsResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray();
+        return new HelixCustomRewardsLookupOutcome.Found(
+            (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray()
+        );
     }
 
     public async Task<(
@@ -729,11 +737,14 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Post, _customRewardsEndpoint, context);
+        var uri =
+            _customRewardsEndpoint
+            + "?"
+            + QueryString.Create([new("broadcaster_id", broadcasterId)]);
+        using var request = HelixRequest.Create(HttpMethod.Post, uri, context);
         request.Content = JsonContent.Create(
             new
             {
-                broadcaster_id = broadcasterId,
                 title = draft.Title,
                 prompt = draft.Prompt,
                 cost = draft.Cost,
@@ -756,7 +767,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var response = await _http.SendAsync(request, cancellationToken);
         var outcome = await ChannelPointsOutcomeAsync(response, cancellationToken);
         if (outcome is not HelixChannelPointsOutcome.Success)
+        {
             return (outcome, null);
+        }
         var payload = await response.Content.ReadFromJsonAsync<HelixCustomRewardsResponse>(
             _jsonOptions,
             cancellationToken
@@ -771,7 +784,8 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         string broadcasterId,
         string rewardId,
         HelixCustomRewardDraft draft,
-        bool? isPaused,
+        bool isEnabled,
+        bool isPaused,
         CancellationToken cancellationToken
     )
     {
@@ -799,6 +813,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                     : null,
                 should_redemptions_skip_request_queue = draft.ShouldRedemptionsSkipRequestQueue,
                 background_color = draft.BackgroundColor,
+                is_enabled = isEnabled,
                 is_paused = isPaused,
             },
             options: _jsonOptions
@@ -823,10 +838,12 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return await ChannelPointsOutcomeAsync(response, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<HelixRewardRedemption>?> GetRewardRedemptionsAsync(
+    public async Task<HelixRewardRedemptionsLookupOutcome> GetRewardRedemptionsAsync(
         HelixRequestContext context,
         string broadcasterId,
         string rewardId,
+        HelixRewardRedemptionStatus status,
+        string? cursor,
         CancellationToken cancellationToken
     )
     {
@@ -836,17 +853,27 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             + QueryString.Create([
                 new("broadcaster_id", broadcasterId),
                 new("reward_id", rewardId),
+                new("status", RedemptionStatusToken(status)),
                 new("first", "50"),
+                new("after", cursor),
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            return null;
+        var outcome = await ChannelPointsOutcomeAsync(response, cancellationToken);
+        if (outcome is not HelixChannelPointsOutcome.Success)
+        {
+            return ToRedemptionsLookupOutcome(outcome);
+        }
         var payload = await response.Content.ReadFromJsonAsync<HelixRewardRedemptionsResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray();
+        return new HelixRewardRedemptionsLookupOutcome.Found(
+            new(
+                (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray(),
+                payload?.Pagination.Cursor
+            )
+        );
     }
 
     public async Task<HelixChannelPointsOutcome> UpdateRedemptionStatusAsync(
@@ -864,14 +891,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             + QueryString.Create([
                 new("broadcaster_id", broadcasterId),
                 new("reward_id", rewardId),
+                new("id", redemptionId),
             ]);
         using var request = HelixRequest.Create(HttpMethod.Patch, uri, context);
         request.Content = JsonContent.Create(
-            new
-            {
-                redemption_ids = new[] { redemptionId },
-                status = status == HelixRewardRedemptionStatus.Fulfilled ? "FULFILLED" : "CANCELED",
-            },
+            new { status = RedemptionStatusToken(status) },
             options: _jsonOptions
         );
         using var response = await _http.SendAsync(request, cancellationToken);
@@ -884,9 +908,13 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         if (response.IsSuccessStatusCode)
+        {
             return new HelixChannelPointsOutcome.Success();
+        }
         if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
             return new HelixChannelPointsOutcome.Unauthorized();
+        }
         if (response.StatusCode is HttpStatusCode.Forbidden)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -897,6 +925,45 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 : new HelixChannelPointsOutcome.ExternalReward();
         }
         return new HelixChannelPointsOutcome.Unavailable();
+    }
+
+    private static HelixCustomRewardsLookupOutcome ToCustomRewardsLookupOutcome(
+        HelixChannelPointsOutcome outcome
+    )
+    {
+        return outcome switch
+        {
+            HelixChannelPointsOutcome.Unauthorized =>
+                new HelixCustomRewardsLookupOutcome.Unauthorized(),
+            HelixChannelPointsOutcome.Ineligible =>
+                new HelixCustomRewardsLookupOutcome.Ineligible(),
+            _ => new HelixCustomRewardsLookupOutcome.Unavailable(),
+        };
+    }
+
+    private static HelixRewardRedemptionsLookupOutcome ToRedemptionsLookupOutcome(
+        HelixChannelPointsOutcome outcome
+    )
+    {
+        return outcome switch
+        {
+            HelixChannelPointsOutcome.Unauthorized =>
+                new HelixRewardRedemptionsLookupOutcome.Unauthorized(),
+            HelixChannelPointsOutcome.Ineligible =>
+                new HelixRewardRedemptionsLookupOutcome.Ineligible(),
+            _ => new HelixRewardRedemptionsLookupOutcome.Unavailable(),
+        };
+    }
+
+    private static string RedemptionStatusToken(HelixRewardRedemptionStatus status)
+    {
+        return status switch
+        {
+            HelixRewardRedemptionStatus.Unfulfilled => "UNFULFILLED",
+            HelixRewardRedemptionStatus.Fulfilled => "FULFILLED",
+            HelixRewardRedemptionStatus.Canceled => "CANCELED",
+            _ => throw new ArgumentOutOfRangeException(nameof(status)),
+        };
     }
 
     private static string ModeratedChannelsUri(string userId, string? cursor)

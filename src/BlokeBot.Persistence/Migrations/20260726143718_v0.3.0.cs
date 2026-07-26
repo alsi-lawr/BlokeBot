@@ -135,6 +135,7 @@ namespace BlokeBot.Persistence.Migrations
                     Prompt = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
                     Cost = table.Column<int>(type: "INTEGER", nullable: false),
                     IsManageable = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsPaused = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsUserInputRequired = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsMaxPerStreamEnabled = table.Column<bool>(type: "INTEGER", nullable: false),

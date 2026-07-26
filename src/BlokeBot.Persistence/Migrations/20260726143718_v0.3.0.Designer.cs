@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260726045147_v0.3.0")]
+    [Migration("20260726143718_v0.3.0")]
     partial class v030
     {
         /// <inheritdoc />
@@ -1968,6 +1968,9 @@ namespace BlokeBot.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsEnabled")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsGlobalCooldownEnabled")

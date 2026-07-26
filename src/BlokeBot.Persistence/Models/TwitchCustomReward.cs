@@ -9,6 +9,7 @@ public sealed class TwitchCustomReward
     public string? Prompt { get; set; }
     public int Cost { get; set; }
     public bool IsManageable { get; set; }
+    public bool IsEnabled { get; set; }
     public bool IsPaused { get; set; }
     public bool IsUserInputRequired { get; set; }
     public bool IsMaxPerStreamEnabled { get; set; }

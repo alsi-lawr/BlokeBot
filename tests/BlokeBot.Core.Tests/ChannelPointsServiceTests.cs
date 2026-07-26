@@ -1,7 +1,7 @@
-#pragma warning disable IDE0011, IDE0022
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
@@ -72,6 +72,7 @@ public sealed class ChannelPointsServiceTests
             ),
             CancellationToken.None
         );
+        var dashboard = await service.LoadAsync(1, CancellationToken.None);
         await service.RedemptionReceivedAsync(
             new(
                 "one-id",
@@ -121,6 +122,10 @@ public sealed class ChannelPointsServiceTests
         fulfilled.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
         wrongHost.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionNotActionable>();
         http.RedemptionPatches.ShouldBe(1);
+        http.AllRewardsLists.ShouldBe(1);
+        http.ManageableRewardsLists.ShouldBe(1);
+        http.RedemptionStatusLists.ShouldBe(3);
+        dashboard.Rewards.ShouldHaveSingleItem().IsManageable.ShouldBeTrue();
         await using var verify = await dbFactory.CreateDbContextAsync();
         var redemption = (
             await verify.TwitchRewardRedemptions.ToArrayAsync()
@@ -135,8 +140,9 @@ public sealed class ChannelPointsServiceTests
             int hostId,
             IEnumerable<string?> requiredScopes,
             CancellationToken ct
-        ) =>
-            Task.FromResult<TokenStatus>(
+        )
+        {
+            return Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "token",
                     new TokenValidation(
@@ -148,53 +154,94 @@ public sealed class ChannelPointsServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
+        }
 
         public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
             string channelLogin
-        ) =>
-            IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+        )
+        {
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
                 ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Error(
                         AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
                     )
                 )
             );
+        }
     }
 
     private sealed class ChannelPointsHttpClientFactory : IHttpClientFactory
     {
         internal int RedemptionPatches { get; private set; }
+        internal int AllRewardsLists { get; private set; }
+        internal int ManageableRewardsLists { get; private set; }
+        internal int RedemptionStatusLists { get; private set; }
 
-        public HttpClient CreateClient(string name) => new(new Handler(this));
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler(this));
+        }
 
         private sealed class Handler(ChannelPointsHttpClientFactory owner) : HttpMessageHandler
         {
-            protected override Task<HttpResponseMessage> SendAsync(
+            protected override async Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,
                 CancellationToken cancellationToken
             )
             {
+                var uri = request.RequestUri?.ToString() ?? string.Empty;
                 if (request.Method == HttpMethod.Post)
-                    return Task.FromResult(
-                        Json(
-                            """{"data":[{"id":"managed","title":"Managed","prompt":"Prompt","cost":100,"is_manageable":true,"is_paused":false,"is_user_input_required":true,"max_per_stream_setting":{"is_enabled":false},"max_per_user_per_stream_setting":{"is_enabled":false},"global_cooldown_setting":{"is_enabled":false},"should_redemptions_skip_request_queue":false,"background_color":"#FFFFFF"}]}"""
-                        )
-                    );
+                {
+                    uri.ShouldContain("broadcaster_id=one-id");
+                    var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+                    body.ShouldNotContain("broadcaster_id");
+                    return Json(RewardResponse());
+                }
+                if (request.Method == HttpMethod.Get && uri.Contains("custom_rewards?"))
+                {
+                    if (uri.Contains("only_manageable_rewards=true"))
+                    {
+                        owner.ManageableRewardsLists++;
+                    }
+                    else
+                    {
+                        owner.AllRewardsLists++;
+                    }
+                    return Json(RewardResponse());
+                }
+                if (request.Method == HttpMethod.Get && uri.Contains("redemptions?"))
+                {
+                    uri.ShouldContain("status=");
+                    owner.RedemptionStatusLists++;
+                    return Json("""{"data":[],"pagination":{}}""");
+                }
                 if (request.Method == HttpMethod.Patch)
                 {
                     owner.RedemptionPatches++;
-                    return Task.FromResult(Json("""{"data":[]}"""));
+                    uri.ShouldContain("id=redemption");
+                    var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+                    using var document = JsonDocument.Parse(body);
+                    document.RootElement.EnumerateObject().Select(x => x.Name).ShouldBe(["status"]);
+                    document.RootElement.GetProperty("status").GetString().ShouldBe("FULFILLED");
+                    return Json("""{"data":[]}""");
                 }
                 throw new InvalidOperationException(
                     $"Unexpected request {request.Method} {request.RequestUri}"
                 );
             }
 
-            private static HttpResponseMessage Json(string value) =>
-                new(HttpStatusCode.OK)
+            private static HttpResponseMessage Json(string value)
+            {
+                return new(HttpStatusCode.OK)
                 {
                     Content = new StringContent(value, Encoding.UTF8, "application/json"),
                 };
+            }
+
+            private static string RewardResponse()
+            {
+                return """{"data":[{"id":"managed","title":"Managed","prompt":"Prompt","cost":100,"is_enabled":true,"is_paused":false,"is_user_input_required":true,"max_per_stream_setting":{"is_enabled":false},"max_per_user_per_stream_setting":{"is_enabled":false},"global_cooldown_setting":{"is_enabled":false},"should_redemptions_skip_request_queue":false,"background_color":"#FFFFFF"}]}""";
+            }
         }
     }
 }

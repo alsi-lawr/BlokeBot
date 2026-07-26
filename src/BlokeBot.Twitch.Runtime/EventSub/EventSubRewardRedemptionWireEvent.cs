@@ -1,4 +1,3 @@
-#pragma warning disable IDE0011, IDE0022
 using System.Text.Json.Serialization;
 using BlokeBot.Twitch;
 
@@ -33,8 +32,9 @@ internal sealed record EventSubRewardRedemptionWireEvent
     [JsonPropertyName("redeemed_at")]
     public DateTimeOffset RedeemedAt { get; init; }
 
-    public EventSubRewardRedemptionEvent ToDomain(string messageId) =>
-        new(
+    public EventSubRewardRedemptionEvent ToDomain(string messageId)
+    {
+        return new(
             BroadcasterUserId,
             BroadcasterUserLogin,
             Id,
@@ -45,13 +45,15 @@ internal sealed record EventSubRewardRedemptionWireEvent
             UserInput,
             Status switch
             {
-                "UNFULFILLED" => HelixRewardRedemptionStatus.Unfulfilled,
-                "FULFILLED" => HelixRewardRedemptionStatus.Fulfilled,
-                _ => HelixRewardRedemptionStatus.Canceled,
+                "unfulfilled" => HelixRewardRedemptionStatus.Unfulfilled,
+                "fulfilled" => HelixRewardRedemptionStatus.Fulfilled,
+                "canceled" => HelixRewardRedemptionStatus.Canceled,
+                _ => HelixRewardRedemptionStatus.Unknown,
             },
             RedeemedAt,
             messageId
         );
+    }
 
     internal sealed record RedemptionRewardWire
     {

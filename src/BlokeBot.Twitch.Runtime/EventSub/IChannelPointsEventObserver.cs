@@ -1,4 +1,3 @@
-#pragma warning disable IDE0011, IDE0022
 using BlokeBot.Twitch;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -25,6 +24,17 @@ public sealed record EventSubRewardRedemptionEvent(
     string MessageId
 )
 {
-    public HelixRewardRedemption ToHelix() =>
-        new(RedemptionId, RewardId, RewardTitle, UserId, UserLogin, UserInput, Status, RedeemedAt);
+    public HelixRewardRedemption ToHelix()
+    {
+        return new(
+            RedemptionId,
+            RewardId,
+            RewardTitle,
+            UserId,
+            UserLogin,
+            UserInput,
+            Status,
+            RedeemedAt
+        );
+    }
 }

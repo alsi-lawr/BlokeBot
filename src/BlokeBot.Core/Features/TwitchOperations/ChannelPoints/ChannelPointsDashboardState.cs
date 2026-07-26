@@ -13,6 +13,7 @@ public sealed record ChannelPointsRewardView(
     string? Prompt,
     int Cost,
     bool IsManageable,
+    bool IsEnabled,
     bool IsPaused,
     bool IsUserInputRequired,
     bool IsMaxPerStreamEnabled,

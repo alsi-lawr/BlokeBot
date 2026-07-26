@@ -1,4 +1,3 @@
-#pragma warning disable IDE0011, IDE0022
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
@@ -44,7 +43,7 @@ public sealed class ChannelPointsService(
             .Take(_terminalToKeep)
             .ToArrayAsync(ct);
         return new(
-            await ReadinessAsync(hostId, ct),
+            readiness,
             rewards.Select(View).ToArray(),
             active.Select(x => View(x, rewards)).ToArray(),
             history.Select(x => View(x, rewards)).ToArray()
@@ -59,10 +58,14 @@ public sealed class ChannelPointsService(
     {
         var validation = draft.Validate();
         if (validation is not null)
+        {
             return new ChannelPointsOperationOutcome.InvalidRequest(validation);
+        }
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
+        {
             return NotReady();
+        }
         var result = await helix.CreateCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -70,9 +73,17 @@ public sealed class ChannelPointsService(
             ct
         );
         if (result.Outcome is not HelixChannelPointsOutcome.Success || result.Reward is null)
+        {
             return Map(result.Outcome);
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var reward = UpsertReward(db, hostId, result.Reward, timeProvider.GetUtcNow().UtcDateTime);
+        var reward = UpsertReward(
+            db,
+            hostId,
+            result.Reward,
+            true,
+            timeProvider.GetUtcNow().UtcDateTime
+        ).Reward;
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return new ChannelPointsOperationOutcome.RewardCreated(View(reward));
@@ -82,33 +93,43 @@ public sealed class ChannelPointsService(
         int hostId,
         string rewardId,
         ChannelPointsRewardDraft draft,
-        bool? paused,
+        bool isEnabled,
+        bool paused,
         CancellationToken ct
     )
     {
         var validation = draft.Validate();
         if (validation is not null)
+        {
             return new ChannelPointsOperationOutcome.InvalidRequest(validation);
+        }
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
+        {
             return NotReady();
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var reward = await db.TwitchCustomRewards.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.ProviderRewardId == rewardId,
             ct
         );
         if (reward is null || !reward.IsManageable)
+        {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
+        }
         var result = await helix.UpdateCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
             rewardId,
             ToProvider(draft),
+            isEnabled,
             paused,
             ct
         );
         if (result is not HelixChannelPointsOutcome.Success)
+        {
             return Map(result);
+        }
         Apply(
             reward,
             new HelixCustomReward(
@@ -116,8 +137,8 @@ public sealed class ChannelPointsService(
                 draft.Title.Trim(),
                 draft.Prompt?.Trim(),
                 draft.Cost,
-                true,
-                paused ?? reward.IsPaused,
+                isEnabled,
+                paused,
                 draft.IsUserInputRequired,
                 draft.IsMaxPerStreamEnabled,
                 draft.MaxPerStream,
@@ -127,7 +148,8 @@ public sealed class ChannelPointsService(
                 draft.GlobalCooldownSeconds,
                 draft.ShouldRedemptionsSkipRequestQueue,
                 draft.BackgroundColor
-            )
+            ),
+            true
         );
         reward.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
@@ -143,19 +165,25 @@ public sealed class ChannelPointsService(
     )
     {
         if (!confirmed)
+        {
             return new ChannelPointsOperationOutcome.ConfirmationRequired(
                 "Deleting this reward makes Twitch fulfil all outstanding unfulfilled redemptions. Cancel redemptions first if viewers should receive a refund."
             );
+        }
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
+        {
             return NotReady();
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var reward = await db.TwitchCustomRewards.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.ProviderRewardId == rewardId,
             ct
         );
         if (reward is null || !reward.IsManageable)
+        {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
+        }
         var result = await helix.DeleteCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -163,7 +191,9 @@ public sealed class ChannelPointsService(
             ct
         );
         if (result is not HelixChannelPointsOutcome.Success)
+        {
             return Map(result);
+        }
         db.TwitchCustomRewards.Remove(reward);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
@@ -179,14 +209,18 @@ public sealed class ChannelPointsService(
     {
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
+        {
             return NotReady();
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var redemption = await db.TwitchRewardRedemptions.SingleOrDefaultAsync(
             x => x.HostId == hostId && x.ProviderRedemptionId == redemptionId,
             ct
         );
         if (redemption is null || redemption.Status != TwitchRewardRedemptionStatus.Unfulfilled)
+        {
             return new ChannelPointsOperationOutcome.RedemptionNotActionable();
+        }
         var manageable = await db.TwitchCustomRewards.AnyAsync(
             x =>
                 x.HostId == hostId
@@ -195,7 +229,9 @@ public sealed class ChannelPointsService(
             ct
         );
         if (!manageable)
+        {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
+        }
         var status = fulfill
             ? HelixRewardRedemptionStatus.Fulfilled
             : HelixRewardRedemptionStatus.Canceled;
@@ -208,11 +244,14 @@ public sealed class ChannelPointsService(
             ct
         );
         if (result is not HelixChannelPointsOutcome.Success)
+        {
             return Map(result);
+        }
         redemption.Status = fulfill
             ? TwitchRewardRedemptionStatus.Fulfilled
             : TwitchRewardRedemptionStatus.Canceled;
         redemption.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+        await db.SaveChangesAsync(ct);
         await TrimTerminalAsync(db, hostId, ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
@@ -228,40 +267,97 @@ public sealed class ChannelPointsService(
             .Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(ct);
         if (hostId is { } id)
+        {
             await ReconcileAsync(id, ct);
+        }
     }
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
+        {
             return;
-        var rewards = await helix.GetCustomRewardsAsync(
+        }
+        var allRewards = await helix.GetCustomRewardsAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
+            false,
             ct
         );
-        if (rewards is null)
-            return;
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        foreach (var reward in rewards)
-            UpsertReward(db, hostId, reward, now);
-        foreach (var reward in rewards.Where(x => x.IsManageable))
+        if (allRewards is not HelixCustomRewardsLookupOutcome.Found all)
         {
-            var redemptions = await helix.GetRewardRedemptionsAsync(
+            return;
+        }
+        var manageableRewards = await helix.GetCustomRewardsAsync(
+            context.Value.Context,
+            context.Value.BroadcasterId,
+            true,
+            ct
+        );
+        if (manageableRewards is not HelixCustomRewardsLookupOutcome.Found manageable)
+        {
+            return;
+        }
+        var redemptions = new Dictionary<string, IReadOnlyList<HelixRewardRedemption>>();
+        foreach (var reward in manageable.Rewards)
+        {
+            var recovered = await ReconcileRewardRedemptionsAsync(
                 context.Value.Context,
                 context.Value.BroadcasterId,
                 reward.Id,
                 ct
             );
-            if (redemptions is not null)
-                foreach (var redemption in redemptions)
-                    UpsertRedemption(db, hostId, redemption, now);
+            if (recovered is null)
+            {
+                return;
+            }
+            redemptions[reward.Id] = recovered;
         }
-        await TrimTerminalAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
-        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var manageableRewardIds = manageable.Rewards.Select(x => x.Id).ToHashSet();
+        var changed = false;
+        foreach (var reward in all.Rewards)
+        {
+            changed |= UpsertReward(
+                db,
+                hostId,
+                reward,
+                manageableRewardIds.Contains(reward.Id),
+                now
+            ).Changed;
+        }
+        var absentRewards = await db
+            .TwitchCustomRewards.Where(x =>
+                x.HostId == hostId && !all.Rewards.Select(y => y.Id).Contains(x.ProviderRewardId)
+            )
+            .ToArrayAsync(ct);
+        if (absentRewards.Length > 0)
+        {
+            db.TwitchCustomRewards.RemoveRange(absentRewards);
+            changed = true;
+        }
+        foreach (var pair in redemptions)
+        {
+            foreach (var redemption in pair.Value)
+            {
+                changed |= UpsertRedemption(db, hostId, redemption, now);
+            }
+        }
+        if (changed)
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        if (await TrimTerminalAsync(db, hostId, ct))
+        {
+            await db.SaveChangesAsync(ct);
+            changed = true;
+        }
+        if (changed)
+        {
+            await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
+        }
     }
 
     public async Task RedemptionReceivedAsync(
@@ -277,7 +373,9 @@ public sealed class ChannelPointsService(
             ct
         );
         if (host is null)
+        {
             return;
+        }
         var changed = UpsertRedemption(
             db,
             host.Id,
@@ -285,7 +383,10 @@ public sealed class ChannelPointsService(
             timeProvider.GetUtcNow().UtcDateTime
         );
         if (!changed)
+        {
             return;
+        }
+        await db.SaveChangesAsync(ct);
         await TrimTerminalAsync(db, host.Id, ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
@@ -298,7 +399,9 @@ public sealed class ChannelPointsService(
     {
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
+        {
             return null;
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var id = await db
             .Hosts.Where(x => x.Id == hostId)
@@ -312,12 +415,14 @@ public sealed class ChannelPointsService(
     private async Task<ChannelPointsAuthorizationReadiness> ReadinessAsync(
         int hostId,
         CancellationToken ct
-    ) =>
-        await ReadyTokenAsync(hostId, ct) is null
+    )
+    {
+        return await ReadyTokenAsync(hostId, ct) is null
             ? new ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization(
                 "Reconnect the selected broadcaster with Twitch Channel Points permissions."
             )
             : new ChannelPointsAuthorizationReadiness.Ready();
+    }
 
     private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct)
     {
@@ -327,7 +432,9 @@ public sealed class ChannelPointsService(
             ct
         );
         if (status is TokenStatus.Ready ready)
+        {
             return ready.AccessToken;
+        }
         await alerts
             .Create(
                 hostId,
@@ -342,13 +449,16 @@ public sealed class ChannelPointsService(
         return null;
     }
 
-    private static ChannelPointsOperationOutcome NotReady() =>
-        new ChannelPointsOperationOutcome.NotReady(
+    private static ChannelPointsOperationOutcome NotReady()
+    {
+        return new ChannelPointsOperationOutcome.NotReady(
             "Reconnect the selected broadcaster with Twitch Channel Points permissions."
         );
+    }
 
-    private static ChannelPointsOperationOutcome Map(HelixChannelPointsOutcome value) =>
-        value switch
+    private static ChannelPointsOperationOutcome Map(HelixChannelPointsOutcome value)
+    {
+        return value switch
         {
             HelixChannelPointsOutcome.Unauthorized => NotReady(),
             HelixChannelPointsOutcome.Ineligible => new ChannelPointsOperationOutcome.Ineligible(
@@ -360,9 +470,11 @@ public sealed class ChannelPointsService(
                 "Twitch did not permit this Channel Points operation."
             ),
         };
+    }
 
-    private static HelixCustomRewardDraft ToProvider(ChannelPointsRewardDraft x) =>
-        new(
+    private static HelixCustomRewardDraft ToProvider(ChannelPointsRewardDraft x)
+    {
+        return new(
             x.Title.Trim(),
             x.Prompt?.Trim(),
             x.Cost,
@@ -376,11 +488,52 @@ public sealed class ChannelPointsService(
             x.ShouldRedemptionsSkipRequestQueue,
             x.BackgroundColor
         );
+    }
 
-    private static TwitchCustomReward UpsertReward(
+    private async Task<IReadOnlyList<HelixRewardRedemption>?> ReconcileRewardRedemptionsAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string rewardId,
+        CancellationToken ct
+    )
+    {
+        var redemptions = new List<HelixRewardRedemption>();
+        foreach (
+            var status in new[]
+            {
+                HelixRewardRedemptionStatus.Unfulfilled,
+                HelixRewardRedemptionStatus.Fulfilled,
+                HelixRewardRedemptionStatus.Canceled,
+            }
+        )
+        {
+            string? cursor = null;
+            do
+            {
+                var result = await helix.GetRewardRedemptionsAsync(
+                    context,
+                    broadcasterId,
+                    rewardId,
+                    status,
+                    cursor,
+                    ct
+                );
+                if (result is not HelixRewardRedemptionsLookupOutcome.Found page)
+                {
+                    return null;
+                }
+                redemptions.AddRange(page.Page.Redemptions);
+                cursor = page.Page.Cursor;
+            } while (!string.IsNullOrEmpty(cursor));
+        }
+        return redemptions.OrderByDescending(x => x.RedeemedAt).ToArray();
+    }
+
+    private static (TwitchCustomReward Reward, bool Changed) UpsertReward(
         BlokeBotDbContext db,
         int hostId,
         HelixCustomReward value,
+        bool isManageable,
         DateTime now
     )
     {
@@ -395,18 +548,45 @@ public sealed class ChannelPointsService(
         {
             entity = new() { HostId = hostId, ProviderRewardId = value.Id };
             db.TwitchCustomRewards.Add(entity);
+            Apply(entity, value, isManageable);
+            entity.UpdatedAtUtc = now;
+            return (entity, true);
         }
-        Apply(entity, value);
+        if (!Apply(entity, value, isManageable))
+        {
+            return (entity, false);
+        }
         entity.UpdatedAtUtc = now;
-        return entity;
+        return (entity, true);
     }
 
-    private static void Apply(TwitchCustomReward x, HelixCustomReward y)
+    private static bool Apply(TwitchCustomReward x, HelixCustomReward y, bool isManageable)
     {
+        var changed =
+            x.Title != y.Title
+            || x.Prompt != y.Prompt
+            || x.Cost != y.Cost
+            || x.IsManageable != isManageable
+            || x.IsEnabled != y.IsEnabled
+            || x.IsPaused != y.IsPaused
+            || x.IsUserInputRequired != y.IsUserInputRequired
+            || x.IsMaxPerStreamEnabled != y.IsMaxPerStreamEnabled
+            || x.MaxPerStream != y.MaxPerStream
+            || x.IsMaxPerUserPerStreamEnabled != y.IsMaxPerUserPerStreamEnabled
+            || x.MaxPerUserPerStream != y.MaxPerUserPerStream
+            || x.IsGlobalCooldownEnabled != y.IsGlobalCooldownEnabled
+            || x.GlobalCooldownSeconds != y.GlobalCooldownSeconds
+            || x.ShouldRedemptionsSkipRequestQueue != y.ShouldRedemptionsSkipRequestQueue
+            || x.BackgroundColor != y.BackgroundColor;
+        if (!changed)
+        {
+            return false;
+        }
         x.Title = y.Title;
         x.Prompt = y.Prompt;
         x.Cost = y.Cost;
-        x.IsManageable = y.IsManageable;
+        x.IsManageable = isManageable;
+        x.IsEnabled = y.IsEnabled;
         x.IsPaused = y.IsPaused;
         x.IsUserInputRequired = y.IsUserInputRequired;
         x.IsMaxPerStreamEnabled = y.IsMaxPerStreamEnabled;
@@ -417,6 +597,7 @@ public sealed class ChannelPointsService(
         x.GlobalCooldownSeconds = y.GlobalCooldownSeconds;
         x.ShouldRedemptionsSkipRequestQueue = y.ShouldRedemptionsSkipRequestQueue;
         x.BackgroundColor = y.BackgroundColor;
+        return true;
     }
 
     private static bool UpsertRedemption(
@@ -427,7 +608,9 @@ public sealed class ChannelPointsService(
     )
     {
         if (x.Status == HelixRewardRedemptionStatus.Unknown)
+        {
             return false;
+        }
         var item =
             db.TwitchRewardRedemptions.Local.SingleOrDefault(y =>
                 y.HostId == hostId && y.ProviderRedemptionId == x.Id
@@ -441,8 +624,19 @@ public sealed class ChannelPointsService(
             HelixRewardRedemptionStatus.Fulfilled => TwitchRewardRedemptionStatus.Fulfilled,
             _ => TwitchRewardRedemptionStatus.Canceled,
         };
-        if (item is not null && item.Status == status && item.UpdatedAtUtc >= now)
+        if (
+            item is not null
+            && item.ProviderRewardId == x.RewardId
+            && item.RewardTitle == x.RewardTitle
+            && item.UserId == x.UserId
+            && item.UserLogin == x.UserLogin
+            && item.UserInput == x.UserInput
+            && item.Status == status
+            && item.RedeemedAtUtc == x.RedeemedAt.UtcDateTime
+        )
+        {
             return false;
+        }
         if (item is null)
         {
             item = new() { HostId = hostId, ProviderRedemptionId = x.Id };
@@ -459,7 +653,7 @@ public sealed class ChannelPointsService(
         return true;
     }
 
-    private static async Task TrimTerminalAsync(
+    private static async Task<bool> TrimTerminalAsync(
         BlokeBotDbContext db,
         int hostId,
         CancellationToken ct
@@ -473,15 +667,18 @@ public sealed class ChannelPointsService(
             .Skip(_terminalToKeep)
             .ToArrayAsync(ct);
         db.TwitchRewardRedemptions.RemoveRange(remove);
+        return remove.Length > 0;
     }
 
-    private static ChannelPointsRewardView View(TwitchCustomReward x) =>
-        new(
+    private static ChannelPointsRewardView View(TwitchCustomReward x)
+    {
+        return new(
             x.ProviderRewardId,
             x.Title,
             x.Prompt,
             x.Cost,
             x.IsManageable,
+            x.IsEnabled,
             x.IsPaused,
             x.IsUserInputRequired,
             x.IsMaxPerStreamEnabled,
@@ -493,12 +690,14 @@ public sealed class ChannelPointsService(
             x.ShouldRedemptionsSkipRequestQueue,
             x.BackgroundColor
         );
+    }
 
     private static ChannelPointsRedemptionView View(
         TwitchRewardRedemption x,
         IReadOnlyList<TwitchCustomReward> rewards
-    ) =>
-        new(
+    )
+    {
+        return new(
             x.ProviderRedemptionId,
             x.ProviderRewardId,
             x.RewardTitle,
@@ -509,4 +708,5 @@ public sealed class ChannelPointsService(
             x.UpdatedAtUtc,
             rewards.Any(y => y.ProviderRewardId == x.ProviderRewardId && y.IsManageable)
         );
+    }
 }
