@@ -431,11 +431,7 @@ internal static class BotOAuthEndpoints
         botOAuth
             .MapGet(
                 "/broadcaster/start",
-                async (
-                    HttpContext context,
-                    HostBotAccountOAuthService oauth,
-                    HostBroadcasterOAuthStateStore states
-                ) =>
+                (HttpContext context) =>
                 {
                     var session = AuthenticatedSession.FromPrincipal(context.User);
                     var selected = session.State.Match<BotHostChoice?>(
@@ -443,9 +439,21 @@ internal static class BotOAuthEndpoints
                         value => value.Selection.Current,
                         _ => null
                     );
+                    var oauth = context.RequestServices.GetService<HostBotAccountOAuthService>();
+                    var states =
+                        context.RequestServices.GetService<HostBroadcasterOAuthStateStore>();
                     if (!session.CanAuthorizeSelectedHost || selected is null)
                     {
                         return ConnectionAccessResult(session);
+                    }
+                    if (oauth is null || states is null)
+                    {
+                        return Result(
+                            BlokeBotAuthOutcome.Unavailable,
+                            BlokeBotAuthStatus.ServiceUnavailable,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
                     }
                     return oauth
                         .CreateAuthorizationUriForScopes(
