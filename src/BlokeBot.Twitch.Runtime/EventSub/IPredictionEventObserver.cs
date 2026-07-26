@@ -75,5 +75,5 @@ public sealed record EventSubPredictionTopPredictor(
     string UserLogin,
     string UserName,
     int ChannelPointsUsed,
-    int ChannelPointsWon
+    int? ChannelPointsWon
 );

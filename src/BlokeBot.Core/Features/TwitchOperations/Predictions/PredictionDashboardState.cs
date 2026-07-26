@@ -38,7 +38,7 @@ public sealed record PredictionTopPredictorView(
     string UserLogin,
     string UserName,
     int ChannelPointsUsed,
-    int ChannelPointsWon
+    int? ChannelPointsWon
 );
 
 public abstract record PredictionAuthorizationReadiness

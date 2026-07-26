@@ -369,8 +369,17 @@ public sealed class PredictionService(
             ?? db.TwitchPredictions.SingleOrDefault(x =>
                 x.HostId == hostId && x.ProviderPredictionId == prediction.Id
             );
+        if (prediction.Status is HelixPredictionStatus.Unknown)
+        {
+            return record is null
+                ? new PredictionUpsertOutcome(new TwitchPrediction(), false)
+                : new PredictionUpsertOutcome(record, false);
+        }
         var status = ToPersisted(prediction.Status);
-        if (record is not null && Terminal(record.Status))
+        if (
+            record is not null
+            && (Terminal(record.Status) || StateRank(status) < StateRank(record.Status))
+        )
             return new(record, false);
         if (record is null)
         {
@@ -424,6 +433,15 @@ public sealed class PredictionService(
             HelixPredictionStatus.Resolved => TwitchPredictionStatus.Resolved,
             HelixPredictionStatus.Canceled => TwitchPredictionStatus.Canceled,
             _ => TwitchPredictionStatus.Archived,
+        };
+
+    private static int StateRank(TwitchPredictionStatus value) =>
+        value switch
+        {
+            TwitchPredictionStatus.Active => 1,
+            TwitchPredictionStatus.Locked => 2,
+            TwitchPredictionStatus.Resolved or TwitchPredictionStatus.Canceled => 3,
+            _ => 4,
         };
 
     private static bool Terminal(TwitchPredictionStatus value) =>

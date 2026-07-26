@@ -28,7 +28,7 @@ public sealed record HelixPredictionTopPredictor(
     string UserLogin,
     string UserName,
     int ChannelPointsUsed,
-    int ChannelPointsWon
+    int? ChannelPointsWon
 );
 
 public sealed record HelixPredictionCreateRequest(
@@ -101,7 +101,7 @@ internal sealed record HelixPredictionWire
     [JsonPropertyName("created_at")]
     public DateTimeOffset CreatedAt { get; init; }
 
-    [JsonPropertyName("locks_at")]
+    [JsonPropertyName("locked_at")]
     public DateTimeOffset? LocksAt { get; init; }
 
     [JsonPropertyName("ended_at")]
@@ -177,7 +177,7 @@ internal sealed record HelixPredictionTopPredictorWire
     public int ChannelPointsUsed { get; init; }
 
     [JsonPropertyName("channel_points_won")]
-    public int ChannelPointsWon { get; init; }
+    public int? ChannelPointsWon { get; init; }
 
     public HelixPredictionTopPredictor ToDomain() =>
         new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);

@@ -58,7 +58,13 @@ internal abstract record EventSubNotification
             or "channel.prediction.lock"
             or "channel.prediction.end" => payload.Deserialize<EventSubPredictionWireEvent>(options)
                 is { } prediction
-                ? new Prediction(prediction.ToDomain(envelope.Metadata.MessageId))
+                ? prediction.ToDomain(
+                    envelope.Metadata.SubscriptionType,
+                    envelope.Metadata.MessageId
+                )
+                    is { } normalized
+                    ? new Prediction(normalized)
+                    : new Unknown()
                 : new Unknown(),
             "channel.channel_points_custom_reward_redemption.add"
             or "channel.channel_points_custom_reward_redemption.update" =>

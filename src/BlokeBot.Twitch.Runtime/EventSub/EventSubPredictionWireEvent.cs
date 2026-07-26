@@ -23,11 +23,14 @@ internal sealed record EventSubPredictionWireEvent
     [JsonPropertyName("status")]
     public string Status { get; init; } = string.Empty;
 
-    [JsonPropertyName("created_at")]
-    public DateTimeOffset CreatedAt { get; init; }
+    [JsonPropertyName("started_at")]
+    public DateTimeOffset StartedAt { get; init; }
 
     [JsonPropertyName("locks_at")]
     public DateTimeOffset? LocksAt { get; init; }
+
+    [JsonPropertyName("locked_at")]
+    public DateTimeOffset? LockedAt { get; init; }
 
     [JsonPropertyName("ended_at")]
     public DateTimeOffset? EndedAt { get; init; }
@@ -35,20 +38,31 @@ internal sealed record EventSubPredictionWireEvent
     [JsonPropertyName("winning_outcome_id")]
     public string? WinningOutcomeId { get; init; }
 
-    internal EventSubPredictionEvent ToDomain(string messageId) =>
-        new(
-            BroadcasterUserId,
-            BroadcasterUserLogin,
-            Id,
-            Title,
-            Outcomes.Select(x => x.ToDomain()).ToArray(),
-            Status,
-            CreatedAt,
-            LocksAt,
-            EndedAt,
-            WinningOutcomeId,
-            messageId
-        );
+    internal EventSubPredictionEvent? ToDomain(string subscriptionType, string messageId)
+    {
+        var status = subscriptionType switch
+        {
+            "channel.prediction.begin" or "channel.prediction.progress" => "active",
+            "channel.prediction.lock" => "locked",
+            "channel.prediction.end" when Status is "resolved" or "canceled" => Status,
+            _ => null,
+        };
+        return status is null
+            ? null
+            : new(
+                BroadcasterUserId,
+                BroadcasterUserLogin,
+                Id,
+                Title,
+                Outcomes.Select(x => x.ToDomain()).ToArray(),
+                status,
+                StartedAt,
+                LocksAt ?? LockedAt,
+                EndedAt,
+                WinningOutcomeId,
+                messageId
+            );
+    }
 
     internal sealed record Outcome
     {
@@ -96,7 +110,7 @@ internal sealed record EventSubPredictionWireEvent
         public int ChannelPointsUsed { get; init; }
 
         [JsonPropertyName("channel_points_won")]
-        public int ChannelPointsWon { get; init; }
+        public int? ChannelPointsWon { get; init; }
 
         internal EventSubPredictionTopPredictor ToDomain() =>
             new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);
