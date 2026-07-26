@@ -2,11 +2,14 @@
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations.Polls
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject ShoutoutService _shoutouts
 @inject ToastService _toasts
+@inject PollService _polls
+@inject IJSRuntime _js
 
 <PageTitle>BlokeBot | Native Twitch operations</PageTitle>
 
@@ -40,6 +43,39 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        }
+    </section>
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Polls</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Create reusable Twitch poll templates and monitor the active poll.</p>
+        </div>
+        @if (_pollState is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading polls...</p>
+        }
+        else
+        {
+            <div class="space-y-4 p-5">
+                @if (_pollState.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+                {
+                    <p class="text-sm text-amber-700">@readiness.Message</p>
+                }
+                @if (_pollState.ActivePoll is { } poll)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3"><strong>@poll.Title</strong><span class="ml-2 text-sm text-muted-foreground">@poll.Status</span><button class="btn-secondary ml-3" @onclick="EndPollAsync">End poll</button></div>
+                }
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="poll-title" Label="Template title" @bind-Value="_pollTitle" Placeholder="Question" />
+                    <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_pollChoices" Placeholder="Yes&#10;No" />
+                    <Field Id="poll-duration" Label="Seconds" @bind-Value="_pollDuration" Placeholder="60" />
+                    <button class="btn-primary self-end" @onclick="SavePollTemplateAsync">Save template</button>
+                </div>
+                @foreach (var template in _pollState.Templates)
+                {
+                    <div class="flex items-center justify-between rounded-lg border border-slate-200 p-3" @key="template.Id"><span>@template.Title (@string.Join(", ", template.Choices))</span><button class="btn-secondary" @onclick="() => StartPollAsync(template.Id)">Start poll</button></div>
+                }
             </div>
         }
     </section>

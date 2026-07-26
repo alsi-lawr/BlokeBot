@@ -17,6 +17,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     private const string _moderatedChannelsEndpoint =
         "https://api.twitch.tv/helix/moderation/channels";
     private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
+    private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -108,6 +109,106 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 new ShoutoutSendResult.Unauthorized(),
             _ => new ShoutoutSendResult.Unavailable(),
         };
+    }
+
+    public async Task<HelixPoll?> GetActivePollAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _pollsEndpoint
+            + "?"
+            + QueryString.Create([
+                new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
+                new KeyValuePair<string, string?>("first", "1"),
+            ]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload
+            ?.Data.Select(x => x.ToDomain())
+            .FirstOrDefault(x => x.Status is HelixPollStatus.Active);
+    }
+
+    public async Task<HelixPoll?> CreatePollAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        HelixPollCreateRequest poll,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Post, _pollsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                title = poll.Title,
+                choices = poll.Choices.Select(title => new { title }).ToArray(),
+                duration = poll.DurationSeconds,
+                channel_points_voting_enabled = poll.ChannelPointsVotingEnabled,
+                channel_points_per_vote = poll.ChannelPointsVotingEnabled
+                    ? poll.ChannelPointsPerVote
+                    : null,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Conflict)
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain();
+    }
+
+    public async Task<HelixPoll?> EndPollAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string pollId,
+        HelixPollEndStatus status,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Patch, _pollsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                id = pollId,
+                status = status is HelixPollEndStatus.Terminated ? "TERMINATED" : "ARCHIVED",
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (
+            response.StatusCode
+            is HttpStatusCode.NotFound
+                or HttpStatusCode.Forbidden
+                or HttpStatusCode.Unauthorized
+        )
+        {
+            return null;
+        }
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain();
     }
 
     public async Task<IReadOnlyList<ModeratedChannel>> GetModeratedChannelsAsync(
