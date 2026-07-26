@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
+using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -39,6 +40,10 @@ public partial class ShoutoutsPage
     private string? _editingRewardId;
     private bool _rewardEnabled = true;
     private bool _rewardPaused;
+    private PredictionDashboardState? _predictionState;
+    private string _predictionTitle = string.Empty;
+    private string _predictionOutcomes = string.Empty;
+    private string _predictionWindow = "60";
 
     private string _cooldownText =>
         _state switch
@@ -70,6 +75,7 @@ public partial class ShoutoutsPage
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
         await LoadChannelPointsAsync();
+        await LoadPredictionsAsync();
     }
 
     private async Task LoadAsync()
@@ -163,6 +169,7 @@ public partial class ShoutoutsPage
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
         await LoadChannelPointsAsync();
+        await LoadPredictionsAsync();
     }
 
     private async Task LoadClipsMarkersAsync()
@@ -178,6 +185,14 @@ public partial class ShoutoutsPage
         if (HostId != 0)
         {
             _channelPointsState = await _channelPoints.LoadAsync(HostId, CancellationToken.None);
+        }
+    }
+
+    private async Task LoadPredictionsAsync()
+    {
+        if (HostId != 0)
+        {
+            _predictionState = await _predictions.LoadAsync(HostId, CancellationToken.None);
         }
     }
 
@@ -558,6 +573,149 @@ public partial class ShoutoutsPage
                 or ChannelPointsOperationOutcome.RewardUpdated
                 or ChannelPointsOperationOutcome.RewardDeleted
                 or ChannelPointsOperationOutcome.RedemptionUpdated
+        )
+        {
+            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
+            return;
+        }
+        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
+    }
+
+    private async Task SavePredictionTemplateAsync()
+    {
+        if (!int.TryParse(_predictionWindow, out var window))
+        {
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>("Prediction window must be a number.")
+            );
+            return;
+        }
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _predictions.SaveTemplateAsync(
+                    hostId,
+                    new(_predictionTitle, _predictionOutcomes.Split('\n'), window),
+                    CancellationToken.None
+                );
+                PublishPredictionOutcome(outcome);
+                await LoadPredictionsAsync();
+            }
+        );
+    }
+
+    private async Task DeletePredictionTemplateAsync(int templateId)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _predictions.DeleteTemplateAsync(
+                    hostId,
+                    templateId,
+                    CancellationToken.None
+                );
+                PublishPredictionOutcome(outcome);
+                await LoadPredictionsAsync();
+            }
+        );
+    }
+
+    private async Task StartPredictionAsync(int templateId)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _predictions.StartAsync(
+                    hostId,
+                    templateId,
+                    CancellationToken.None
+                );
+                PublishPredictionOutcome(outcome);
+                await LoadPredictionsAsync();
+            }
+        );
+    }
+
+    private async Task LockPredictionAsync()
+    {
+        await UpdatePredictionAsync(
+            null,
+            "Lock this Twitch prediction?",
+            (id, confirmed) => _predictions.LockAsync(id, confirmed, CancellationToken.None)
+        );
+    }
+
+    private async Task CancelPredictionAsync()
+    {
+        await UpdatePredictionAsync(
+            null,
+            "Cancel this Twitch prediction? Twitch refunds viewers.",
+            (id, confirmed) => _predictions.CancelAsync(id, confirmed, CancellationToken.None)
+        );
+    }
+
+    private async Task ResolvePredictionAsync(string outcomeId)
+    {
+        await UpdatePredictionAsync(
+            outcomeId,
+            "Resolve this Twitch prediction and pay winners?",
+            (id, confirmed) =>
+                _predictions.ResolveAsync(id, outcomeId, confirmed, CancellationToken.None)
+        );
+    }
+
+    private async Task UpdatePredictionAsync(
+        string? _,
+        string prompt,
+        Func<int, bool, Task<PredictionOperationOutcome>> operation
+    )
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var confirmed = await _js.InvokeAsync<bool>("confirm", prompt);
+                var outcome = await operation(hostId, confirmed);
+                PublishPredictionOutcome(outcome);
+                await LoadPredictionsAsync();
+            }
+        );
+    }
+
+    private void PublishPredictionOutcome(PredictionOperationOutcome outcome)
+    {
+        var message = outcome switch
+        {
+            PredictionOperationOutcome.Started => "Prediction started.",
+            PredictionOperationOutcome.Updated => "Prediction updated.",
+            PredictionOperationOutcome.TemplateSaved => "Prediction template saved.",
+            PredictionOperationOutcome.TemplateDeleted => "Prediction template deleted.",
+            PredictionOperationOutcome.ActivePredictionExists =>
+                "Twitch already has an active prediction.",
+            PredictionOperationOutcome.InvalidTemplate invalid => invalid.Message,
+            PredictionOperationOutcome.InvalidOutcome =>
+                "Select an outcome from the active prediction.",
+            PredictionOperationOutcome.NotReady notReady => notReady.Message,
+            PredictionOperationOutcome.Ineligible ineligible => ineligible.Message,
+            PredictionOperationOutcome.Unavailable unavailable => unavailable.Message,
+            PredictionOperationOutcome.ProviderRejected rejected => rejected.Message,
+            PredictionOperationOutcome.ConfirmationRequired => "Confirm the prediction update.",
+            PredictionOperationOutcome.TemplateNotFound => "Prediction template was not found.",
+            _ => throw new UnreachableException(),
+        };
+        if (
+            outcome
+            is PredictionOperationOutcome.Started
+                or PredictionOperationOutcome.Updated
+                or PredictionOperationOutcome.TemplateSaved
+                or PredictionOperationOutcome.TemplateDeleted
         )
         {
             _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));

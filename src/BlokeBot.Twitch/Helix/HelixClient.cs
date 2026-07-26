@@ -18,6 +18,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         "https://api.twitch.tv/helix/moderation/channels";
     private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
     private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
+    private const string _predictionsEndpoint = "https://api.twitch.tv/helix/predictions";
     private const string _clipsEndpoint = "https://api.twitch.tv/helix/clips";
     private const string _streamMarkersEndpoint = "https://api.twitch.tv/helix/streams/markers";
     private const string _customRewardsEndpoint =
@@ -36,13 +37,39 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     {
         using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
 
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
             cancellationToken
         );
         return payload?.Data.FirstOrDefault();
+    }
+
+    public async Task<HelixPredictionEligibilityOutcome> GetPredictionEligibilityAsync(
+        HelixRequestContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return new HelixPredictionEligibilityOutcome.Unauthorized();
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixPredictionEligibilityOutcome.Unavailable();
+        }
+        var user = (
+            await response.Content.ReadFromJsonAsync<UsersResponse>(_jsonOptions, cancellationToken)
+        )?.Data.FirstOrDefault();
+        return user?.BroadcasterType is "affiliate" or "partner"
+            ? new HelixPredictionEligibilityOutcome.Eligible()
+            : new HelixPredictionEligibilityOutcome.Ineligible();
     }
 
     public async Task<IReadOnlyList<HelixUser>> GetUsersByLoginAsync(
@@ -191,6 +218,205 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return created is null
             ? new HelixPollCreateOutcome.ProviderRejected()
             : new HelixPollCreateOutcome.Created(created);
+    }
+
+    public async Task<HelixPredictionLookupOutcome> GetLatestPredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        const int PageSize = 25;
+        const int MaximumPredictions = 101;
+        var predictions = new List<HelixPrediction>();
+        var seenIds = new HashSet<string>(StringComparer.Ordinal);
+        var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        while (predictions.Count < MaximumPredictions)
+        {
+            var parameters = new List<KeyValuePair<string, string?>>
+            {
+                new("broadcaster_id", broadcasterId),
+                new("first", PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+            };
+            if (cursor is not null)
+            {
+                parameters.Add(new("after", cursor));
+            }
+            var uri = _predictionsEndpoint + "?" + QueryString.Create(parameters);
+            using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized)
+            {
+                return new HelixPredictionLookupOutcome.Unauthorized();
+            }
+            if (response.StatusCode is HttpStatusCode.Forbidden)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                return
+                    body.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                    || body.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                    ? new HelixPredictionLookupOutcome.Ineligible()
+                    : new HelixPredictionLookupOutcome.Unauthorized();
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                return new HelixPredictionLookupOutcome.Unavailable();
+            }
+            var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+                _jsonOptions,
+                cancellationToken
+            );
+            var pageAdded = 0;
+            var unknownStatus = false;
+            foreach (var prediction in payload?.Data.Select(x => x.ToDomain()) ?? [])
+            {
+                unknownStatus |= prediction.Status is HelixPredictionStatus.Unknown;
+                if (
+                    prediction.Status is not HelixPredictionStatus.Unknown
+                    && seenIds.Add(prediction.Id)
+                )
+                {
+                    predictions.Add(prediction);
+                    pageAdded++;
+                }
+                if (predictions.Count == MaximumPredictions)
+                {
+                    break;
+                }
+            }
+            if (unknownStatus)
+            {
+                return new HelixPredictionLookupOutcome.Unavailable();
+            }
+            var next = payload?.Pagination?.Cursor;
+            if (string.IsNullOrWhiteSpace(next) || !seenCursors.Add(next) || next == cursor)
+            {
+                break;
+            }
+            if (pageAdded == 0)
+            {
+                return new HelixPredictionLookupOutcome.Unavailable();
+            }
+            cursor = next;
+        }
+        return predictions.Count == 0
+            ? new HelixPredictionLookupOutcome.NoPrediction()
+            : new HelixPredictionLookupOutcome.Found(predictions);
+    }
+
+    public async Task<HelixPredictionCreateOutcome> CreatePredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        HelixPredictionCreateRequest prediction,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Post, _predictionsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                title = prediction.Title,
+                outcomes = prediction.Outcomes.Select(title => new { title }).ToArray(),
+                prediction_window = prediction.PredictionWindowSeconds,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
+            return new HelixPredictionCreateOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.Forbidden)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return
+                error.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                ? new HelixPredictionCreateOutcome.Ineligible()
+                : new HelixPredictionCreateOutcome.Unauthorized();
+        }
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return (
+                error.Contains("active prediction", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("prediction that\'s running", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("prediction that is running", StringComparison.OrdinalIgnoreCase)
+            )
+                ? new HelixPredictionCreateOutcome.ActivePredictionExists()
+                : new HelixPredictionCreateOutcome.InvalidRequest();
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixPredictionCreateOutcome.Unavailable();
+        }
+        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain() is { } created
+            ? new HelixPredictionCreateOutcome.Created(created)
+            : new HelixPredictionCreateOutcome.Unavailable();
+    }
+
+    public async Task<HelixPredictionEndOutcome> EndPredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string predictionId,
+        HelixPredictionEndStatus status,
+        string? winningOutcomeId,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Patch, _predictionsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                id = predictionId,
+                status = status switch
+                {
+                    HelixPredictionEndStatus.Locked => "LOCKED",
+                    HelixPredictionEndStatus.Resolved => "RESOLVED",
+                    _ => "CANCELED",
+                },
+                winning_outcome_id = status is HelixPredictionEndStatus.Resolved
+                    ? winningOutcomeId
+                    : null,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
+            return new HelixPredictionEndOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.Forbidden)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return
+                body.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                ? new HelixPredictionEndOutcome.Ineligible()
+                : new HelixPredictionEndOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
+            return new HelixPredictionEndOutcome.InvalidRequest();
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixPredictionEndOutcome.Unavailable();
+        }
+        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain() is { } prediction
+            ? new HelixPredictionEndOutcome.Updated(prediction)
+            : new HelixPredictionEndOutcome.Unavailable();
     }
 
     public async Task<HelixClipCreateOutcome> CreateClipAsync(

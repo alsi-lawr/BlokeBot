@@ -175,6 +175,10 @@ internal sealed class EventSubChannelOperations(
                     "channel.poll.begin",
                     "channel.poll.progress",
                     "channel.poll.end",
+                    "channel.prediction.begin",
+                    "channel.prediction.progress",
+                    "channel.prediction.lock",
+                    "channel.prediction.end",
                     "channel.channel_points_custom_reward_redemption.add",
                     "channel.channel_points_custom_reward_redemption.update",
                 }

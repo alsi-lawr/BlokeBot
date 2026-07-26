@@ -62,6 +62,11 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<TwitchStreamMarker> TwitchStreamMarkers => Set<TwitchStreamMarker>();
     public DbSet<TwitchCustomReward> TwitchCustomRewards => Set<TwitchCustomReward>();
     public DbSet<TwitchRewardRedemption> TwitchRewardRedemptions => Set<TwitchRewardRedemption>();
+    public DbSet<TwitchPredictionTemplate> TwitchPredictionTemplates =>
+        Set<TwitchPredictionTemplate>();
+    public DbSet<TwitchPredictionTemplateOutcome> TwitchPredictionTemplateOutcomes =>
+        Set<TwitchPredictionTemplateOutcome>();
+    public DbSet<TwitchPrediction> TwitchPredictions => Set<TwitchPrediction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -77,6 +82,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePolls(modelBuilder);
         ConfigureClipsMarkers(modelBuilder);
         ConfigureChannelPoints(modelBuilder);
+        ConfigurePredictions(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

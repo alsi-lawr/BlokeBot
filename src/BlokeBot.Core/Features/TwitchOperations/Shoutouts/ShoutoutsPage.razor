@@ -5,6 +5,7 @@
 @using BlokeBot.Core.Features.TwitchOperations.ChannelPoints
 @using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
 @using BlokeBot.Core.Features.TwitchOperations.Polls
+@using BlokeBot.Core.Features.TwitchOperations.Predictions
 @using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
@@ -14,6 +15,7 @@
 @inject PollService _polls
 @inject ClipMarkerService _clipsMarkers
 @inject ChannelPointsService _channelPoints
+@inject PredictionService _predictions
 @inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
 
@@ -257,6 +259,46 @@
                 }
                 @if (_channelPointsState.ActiveRedemptions.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Unfulfilled redemptions</h3>@foreach (var redemption in _channelPointsState.ActiveRedemptions) { <div class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3" @key="redemption.ProviderRedemptionId"><span><strong>@redemption.RewardTitle</strong> — @redemption.UserLogin: @redemption.UserInput</span>@if (redemption.IsManageable) { <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button><button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button> } else { <span class="text-sm text-muted-foreground">Read-only</span> }</div> }</div> }
                 @if (_channelPointsState.History.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Recent redemption history</h3>@foreach (var redemption in _channelPointsState.History) { <p class="mt-1 text-sm" @key="redemption.ProviderRedemptionId">@redemption.RewardTitle — @redemption.UserLogin — @redemption.Status — @redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p> }</div> }
+                }
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Twitch Channel Points Predictions</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Twitch runs all viewer wagers, refunds and payouts; these are distinct from BlokeBot internal points.</p>
+        </div>
+        @if (_predictionState is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading predictions...</p>
+        }
+        else
+        {
+            <div class="space-y-4 p-5">
+                @if (_predictionState.Authorization is PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+                {
+                    <div class="text-sm text-amber-700"><p>@readiness.Message</p><AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadPredictionsAsync">Reconnect broadcaster</AuthPopupButton></div>
+                }
+                else if (_predictionState.Authorization is PredictionAuthorizationReadiness.Ineligible ineligible)
+                {
+                    <p class="text-sm text-amber-700">@ineligible.Message</p>
+                }
+                else if (_predictionState.Authorization is PredictionAuthorizationReadiness.Unavailable unavailable)
+                {
+                    <p class="text-sm text-amber-700">@unavailable.Message</p>
+                }
+                else
+                {
+                    @if (_predictionState.ActivePrediction is { } prediction)
+                    {
+                        <div class="rounded-lg border border-violet-200 bg-violet-50 p-3"><div class="flex flex-wrap items-center gap-3"><strong>@prediction.Title</strong><span class="text-sm text-muted-foreground">@prediction.Status</span>@if (prediction.Status == "Active") { <button class="btn-secondary" @onclick="LockPredictionAsync">Lock prediction</button> }<button class="btn-secondary" @onclick="CancelPredictionAsync">Cancel &amp; refund</button></div>
+                        @if (prediction.IsExternallyStarted) { <p class="mt-2 text-sm text-amber-700">This prediction was started in Twitch. Confirm before changing it.</p> }
+                        <ul class="mt-3 space-y-2 text-sm">@foreach (var outcome in prediction.Outcomes) { <li @key="outcome.Id"><strong>@outcome.Title</strong>: @outcome.Users participants (@outcome.ChannelPoints Channel Points) @if (prediction.Status is "Active" or "Locked") { <button class="btn-secondary ml-2" @onclick="() => ResolvePredictionAsync(outcome.Id)">Resolve winner</button> } @if (outcome.TopPredictors.Count > 0) { <span class="text-muted-foreground"> — top: @string.Join(", ", outcome.TopPredictors.Select(x => x.UserLogin))</span> }</li> }</ul></div>
+                    }
+                    <div class="flex flex-wrap gap-3"><Field Id="prediction-title" Label="Template title" @bind-Value="_predictionTitle" Placeholder="What will happen?" /><Field Id="prediction-outcomes" Label="Outcomes (one per line)" @bind-Value="_predictionOutcomes" Placeholder="Yes&#10;No" /><Field Id="prediction-window" Label="Prediction window seconds" @bind-Value="_predictionWindow" Placeholder="60" /><button class="btn-primary self-end" @onclick="SavePredictionTemplateAsync">Save template</button></div>
+                    @foreach (var template in _predictionState.Templates) { <div class="flex items-center justify-between rounded-lg border border-slate-200 p-3" @key="template.Id"><span>@template.Title (@string.Join(", ", template.Outcomes)) — @template.PredictionWindowSeconds seconds</span><span class="flex gap-2"><button class="btn-secondary" @onclick="() => StartPredictionAsync(template.Id)">Start prediction</button><button class="btn-secondary" @onclick="() => DeletePredictionTemplateAsync(template.Id)">Delete</button></span></div> }
+                    @if (_predictionState.Results.Count > 0) { <div class="border-t border-slate-200 pt-4"><h3 class="text-base font-semibold text-slate-950">Recent predictions</h3>@foreach (var result in _predictionState.Results) { <p class="mt-2 text-sm" @key="result.ProviderPredictionId"><strong>@result.Title</strong> — @result.Status</p> }</div> }
                 }
             </div>
         }
