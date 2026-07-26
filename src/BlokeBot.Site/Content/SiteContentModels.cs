@@ -2,6 +2,8 @@ namespace BlokeBot.Site.Content;
 
 internal sealed record SiteLink(string Label, string Href);
 
+internal sealed record SiteGuideNavigationGroup(string Label, IReadOnlyList<SiteLink> Links);
+
 internal sealed record SiteMedia(
     string DarkPhoneSource,
     string LightPhoneSource,

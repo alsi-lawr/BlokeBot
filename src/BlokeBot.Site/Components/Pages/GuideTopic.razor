@@ -3,6 +3,12 @@
 @page "/channels"
 @page "/connect"
 @page "/tools"
+@page "/twitch-operations"
+@page "/twitch-operations/shoutouts"
+@page "/twitch-operations/polls"
+@page "/twitch-operations/clips-markers"
+@page "/twitch-operations/channel-points"
+@page "/twitch-operations/predictions"
 @page "/commands"
 @page "/guessing"
 @page "/points"
@@ -15,6 +21,8 @@
 
 <PageTitle>@_page.Title — BlokeBot guide</PageTitle>
 
+<div class="guide-layout">
+<GuideSidebar />
 <article class="article-shell guide-article">
     <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="guide">User guide</a>
@@ -104,6 +112,7 @@
         </nav>
     }
 </article>
+</div>
 
 @code {
     private SiteGuidePage _page = SiteGuideCatalog.Get("/guide/getting-started");
