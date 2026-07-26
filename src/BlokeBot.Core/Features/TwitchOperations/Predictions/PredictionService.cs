@@ -306,9 +306,12 @@ public sealed class PredictionService(
         ).Prediction;
         if (Terminal(prediction.Status))
         {
-            await TrimAsync(db, hostId, ct);
+            await SaveAndTrimAsync(db, hostId, ct);
         }
-        await db.SaveChangesAsync(ct);
+        else
+        {
+            await db.SaveChangesAsync(ct);
+        }
         await ChangedAsync(ct);
         return new PredictionOperationOutcome.Updated(View(prediction));
     }
@@ -373,8 +376,7 @@ public sealed class PredictionService(
         {
             return;
         }
-        await TrimAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
+        await SaveAndTrimAsync(db, hostId, ct);
         await ChangedAsync(ct);
     }
 
@@ -407,9 +409,12 @@ public sealed class PredictionService(
         }
         if (Terminal(upsert.Prediction.Status))
         {
-            await TrimAsync(db, host.Id, ct);
+            await SaveAndTrimAsync(db, host.Id, ct);
         }
-        await db.SaveChangesAsync(ct);
+        else
+        {
+            await db.SaveChangesAsync(ct);
+        }
         await ChangedAsync(ct);
     }
 
@@ -722,6 +727,17 @@ public sealed class PredictionService(
     private static bool Terminal(TwitchPredictionStatus value)
     {
         return value is not TwitchPredictionStatus.Active and not TwitchPredictionStatus.Locked;
+    }
+
+    private static async Task SaveAndTrimAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        await db.SaveChangesAsync(ct);
+        await TrimAsync(db, hostId, ct);
+        await db.SaveChangesAsync(ct);
     }
 
     private static async Task TrimAsync(BlokeBotDbContext db, int hostId, CancellationToken ct)
