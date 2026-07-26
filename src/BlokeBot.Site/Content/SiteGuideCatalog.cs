@@ -8,11 +8,60 @@ internal static class SiteGuideCatalog
     internal static IReadOnlyList<SiteGuidePage> All { get; } =
         SiteRoutes.GuideTopics.Select(route => _pages[route]).ToArray();
 
+    internal static IReadOnlyList<SiteGuideNavigationGroup> NavigationGroups { get; } =
+    [
+        new(
+            "Start and setup",
+            [
+                GuideLink("Getting started", "guide/getting-started"),
+                GuideLink("Dashboard", "dashboard"),
+                GuideLink("Channels", "channels"),
+                GuideLink("Twitch connections", "connect"),
+                GuideLink("Channel tools", "tools"),
+            ]
+        ),
+        new(
+            "Native Twitch operations",
+            [
+                GuideLink("Overview and permissions", "twitch-operations"),
+                GuideLink("Shoutouts", "twitch-operations/shoutouts"),
+                GuideLink("Polls", "twitch-operations/polls"),
+                GuideLink("Clips and markers", "twitch-operations/clips-markers"),
+                GuideLink("Rewards and redemptions", "twitch-operations/channel-points"),
+                GuideLink("Predictions", "twitch-operations/predictions"),
+            ]
+        ),
+        new(
+            "Chat, games and points",
+            [
+                GuideLink("Commands", "commands"),
+                GuideLink("Guessing games", "guessing"),
+                GuideLink("Viewer points", "points"),
+                GuideLink("Giveaways", "giveaways"),
+                GuideLink("Leaderboards", "leaderboards"),
+            ]
+        ),
+        new(
+            "Help and administration",
+            [
+                GuideLink("Troubleshooting", "troubleshooting"),
+                GuideLink("Moderator access", "moderators"),
+                GuideLink("Server owners", "server-owners"),
+            ]
+        ),
+    ];
+
     internal static SiteGuidePage Get(string route)
     {
         return _pages.TryGetValue(route, out var page)
             ? page
             : throw new InvalidOperationException($"No guide content is registered for '{route}'.");
+    }
+
+    private static SiteLink GuideLink(string label, string href)
+    {
+        _ = Get($"/{href}");
+        return new(label, href);
     }
 
     private static IEnumerable<SiteGuidePage> CreatePages()
@@ -250,7 +299,350 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Create a command", "commands")],
+            Next = [new SiteLink("Use Native Twitch operations", "twitch-operations")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations",
+            Eyebrow = "Native Twitch operations",
+            Title = "Use Twitch's own channel tools",
+            Summary =
+                "Send shoutouts, run polls, create clips and markers, manage rewards and operate Predictions from one selected-channel hub.",
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Open the right channel",
+                    Steps =
+                    [
+                        "Choose the channel in BlokeBot's top bar and confirm its name before making a change.",
+                        "Open Native Twitch operations from the channel navigation.",
+                        "Use the feature section you need. Each section keeps its current activity, saved setup and recent results together.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Channel owners and allowed current moderators can use the hub. Every record and action belongs only to the selected channel.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Connect the right Twitch identity",
+                    Bullets =
+                    [
+                        "Shoutouts use the active bot account. That account must still be a moderator and must be reconnected when its shoutout scopes are missing.",
+                        "Polls, clips, markers, rewards, redemptions and Predictions use the selected broadcaster's protected Twitch grant. Select Reconnect broadcaster in the affected section and complete Twitch as the channel owner.",
+                        "Rewards and Predictions are available only to Affiliate or Partner channels. Reconnecting cannot make an ineligible channel eligible.",
+                    ],
+                    Note =
+                        "Reconnect only through the action shown by BlokeBot. Never send a Twitch token, client secret, private callback URL or browser storage value to someone helping you.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Permissions by feature",
+                    Bullets =
+                    [
+                        "Shoutouts: user:read:moderated_channels, moderator:read:shoutouts and moderator:manage:shoutouts on the bot connection.",
+                        "Polls: channel:read:polls and channel:manage:polls on the broadcaster connection.",
+                        "Clips and markers: clips:edit and channel:manage:broadcast on the broadcaster connection.",
+                        "Rewards and redemptions: channel:read:redemptions and channel:manage:redemptions on the broadcaster connection.",
+                        "Predictions: channel:read:predictions and channel:manage:predictions on the broadcaster connection.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover from a stale or conflicting state",
+                    Steps =
+                    [
+                        "Read the message in the affected section before reconnecting or repeating the action.",
+                        "Reconnect the identity named by the message, then return to the same selected channel.",
+                        "Reload the hub. BlokeBot reconciles Twitch-owned active state, including polls and Predictions started outside BlokeBot.",
+                        "If the state still differs, check Alerts and send the page name, selected channel, approximate time and alert text to the server owner without including secrets.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Send a shoutout", "twitch-operations/shoutouts")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations/shoutouts",
+            Eyebrow = "Native Twitch shoutouts",
+            Title = "Send and track a shoutout",
+            Summary =
+                "Use the active bot account to send Twitch's native shoutout and follow Twitch-provided cooldowns for the selected channel.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-twitch-shoutouts.png",
+                LightPhoneSource: "media/phone-light-twitch-shoutouts.png",
+                DarkLaptopSource: "media/laptop-dark-twitch-shoutouts.png",
+                LightLaptopSource: "media/laptop-light-twitch-shoutouts.png",
+                PhoneAlt: "Native Twitch operations hub focused on its shoutout target, send action and recent history.",
+                LaptopAlt: "Native Twitch operations hub focused on its shoutout target, send action and recent history.",
+                "Shoutouts show the target field, current cooldown information and Twitch-reported history."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Before sending",
+                    Bullets =
+                    [
+                        "The active bot account must be connected, still moderate the selected channel and hold the shoutout scopes listed in the overview.",
+                        "The target must be another Twitch channel that is currently live.",
+                        "Twitch enforces a global wait after a shoutout and a longer wait before the same target can be shouted out again.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Send the shoutout",
+                    Steps =
+                    [
+                        "Confirm the selected channel and open Native Twitch operations.",
+                        "Under Shoutouts, enter the target channel login without an @ sign.",
+                        "Select Send shoutout once and wait for the result message.",
+                        "Check the cooldown text and history row to confirm Twitch accepted it.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "When Twitch refuses it",
+                    Bullets =
+                    [
+                        "Target not found or self target: correct the login and choose a different channel.",
+                        "Target offline: wait until the target is live.",
+                        "Cooldown active: use the time BlokeBot shows rather than repeatedly submitting.",
+                        "Missing permission or bot authority: restore the bot's moderator role and reconnect the bot account from Channel setup.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Create a poll", "twitch-operations/polls")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations/polls",
+            Eyebrow = "Twitch polls",
+            Title = "Create and monitor a poll",
+            Summary =
+                "Save reusable poll templates, start one Twitch poll at a time and keep its live totals and recent results visible.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-twitch-polls.png",
+                LightPhoneSource: "media/phone-light-twitch-polls.png",
+                DarkLaptopSource: "media/laptop-dark-twitch-polls.png",
+                LightLaptopSource: "media/laptop-light-twitch-polls.png",
+                PhoneAlt: "Native Twitch operations hub focused on poll templates, voting options and active results.",
+                LaptopAlt: "Native Twitch operations hub focused on poll templates, voting options and active results.",
+                "Poll templates keep the question, choices, duration and optional Channel Points voting together."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Authorise polls",
+                    Steps =
+                    [
+                        "Open Polls in Native Twitch operations and read the readiness message.",
+                        "If prompted, select Reconnect broadcaster and complete Twitch as the selected channel owner.",
+                        "Return to the same channel and confirm the reconnect message has cleared.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Save and start a template",
+                    Steps =
+                    [
+                        "Enter a 1–60 character question and put 2–5 choices on separate lines; each choice can be up to 25 characters.",
+                        "Choose a duration from 15 to 1,800 seconds. Optionally enable Channel Points voting and set a cost from 1 to 1,000,000 per vote.",
+                        "Select Save template, review the saved row, then select Start poll.",
+                        "Watch the active choices and vote totals. Select End poll when it should finish early.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Conflicts and recovery",
+                    Bullets =
+                    [
+                        "Twitch permits only one active poll. Finish the active poll before starting another.",
+                        "A poll started in Twitch appears after reconciliation. Confirm that it is the intended poll before ending it from BlokeBot.",
+                        "If totals appear stale, reload the page before taking another action; EventSub progress and Twitch reconciliation update the same active record.",
+                        "If Twitch rejects the operation, follow the displayed broadcaster reconnect action instead of reconnecting the bot account.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Create a clip or marker", "twitch-operations/clips-markers")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations/clips-markers",
+            Eyebrow = "Twitch clips and markers",
+            Title = "Capture a live moment",
+            Summary =
+                "Request a Twitch clip or place a stream marker for the selected live channel without creating duplicates when a request is retried.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-twitch-clips-markers.png",
+                LightPhoneSource: "media/phone-light-twitch-clips-markers.png",
+                DarkLaptopSource: "media/laptop-dark-twitch-clips-markers.png",
+                LightLaptopSource: "media/laptop-light-twitch-clips-markers.png",
+                PhoneAlt: "Native Twitch operations hub focused on clip and stream-marker request controls and results.",
+                LaptopAlt: "Native Twitch operations hub focused on clip and stream-marker request controls and results.",
+                "Clips and markers use stable request keys so a repeated request returns the same recorded outcome."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Before capturing",
+                    Bullets =
+                    [
+                        "Reconnect the selected broadcaster if the section requests Twitch operations permissions.",
+                        "The selected channel must be live for clips and markers.",
+                        "Stream markers also require VODs and are unavailable for some reruns or premieres.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create a clip",
+                    Steps =
+                    [
+                        "Enter a stable request key that identifies this action, such as the source event or a unique moment label.",
+                        "Enable Include delay only when Twitch should capture the delayed window.",
+                        "Select Create clip once. A pending row appears while Twitch prepares the clip.",
+                        "Wait up to about a minute for the final clip URL or failure reason. Reusing the same request key returns the existing request instead of creating another clip.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create a stream marker",
+                    Steps =
+                    [
+                        "Enter a stable marker request key and a useful description.",
+                        "Select Create marker and check the result for its stream position.",
+                        "If Twitch reports that VODs are disabled or the stream type is unsupported, correct that Twitch setting rather than retrying the same request.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Manage Channel Points", "twitch-operations/channel-points")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations/channel-points",
+            Eyebrow = "Channel Points",
+            Title = "Manage rewards and redemptions",
+            Summary =
+                "Create and operate BlokeBot-managed Twitch rewards while leaving Twitch in control of viewer balances, refunds and externally managed rewards.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-twitch-channel-points.png",
+                LightPhoneSource: "media/phone-light-twitch-channel-points.png",
+                DarkLaptopSource: "media/laptop-dark-twitch-channel-points.png",
+                LightLaptopSource: "media/laptop-light-twitch-channel-points.png",
+                PhoneAlt: "Native Twitch operations hub focused on Channel Points reward settings and redemption actions.",
+                LaptopAlt: "Native Twitch operations hub focused on Channel Points reward settings and redemption actions.",
+                "BlokeBot can edit rewards it created and shows Twitch-owned rewards as read-only."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Check eligibility and permission",
+                    Steps =
+                    [
+                        "Confirm that the selected channel is a Twitch Affiliate or Partner.",
+                        "Select Reconnect broadcaster when the section requests redemption scopes, then complete Twitch as the channel owner.",
+                        "Reload the hub. An eligibility message cannot be fixed by reconnecting until Twitch has made the channel eligible.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create and operate a reward",
+                    Steps =
+                    [
+                        "Enter a title, optional viewer prompt and a cost from 1 to 1,000,000 Channel Points.",
+                        "Choose whether viewer input is required and whether the redemption should skip the request queue. Add per-stream, per-viewer or cooldown limits only when needed.",
+                        "Select Create reward. Use Edit, Disable, Pause or Delete on rewards marked as manageable by BlokeBot.",
+                        "Treat rewards marked Managed outside BlokeBot as read-only; change those in Twitch rather than trying to take ownership here.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Finish a redemption",
+                    Bullets =
+                    [
+                        "Fulfil confirms the viewer received the reward and completes the redemption in Twitch.",
+                        "Cancel & refund rejects the redemption and asks Twitch to return the viewer's Channel Points.",
+                        "Read the viewer input and reward title before choosing either action. Recent redemption history confirms the terminal state.",
+                        "If a redemption is read-only, manage it through the owner of that reward rather than forcing an update.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Run a Prediction", "twitch-operations/predictions")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/twitch-operations/predictions",
+            Eyebrow = "Twitch Predictions",
+            Title = "Run a Channel Points Prediction",
+            Summary =
+                "Create, lock and resolve Twitch's native wagering experience while Twitch remains responsible for wagers, refunds and payouts.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-twitch-predictions.png",
+                LightPhoneSource: "media/phone-light-twitch-predictions.png",
+                DarkLaptopSource: "media/laptop-dark-twitch-predictions.png",
+                LightLaptopSource: "media/laptop-light-twitch-predictions.png",
+                PhoneAlt: "Native Twitch operations hub focused on Prediction templates, active outcomes and lifecycle controls.",
+                LaptopAlt: "Native Twitch operations hub focused on Prediction templates, active outcomes and lifecycle controls.",
+                "Predictions keep the Twitch-owned active state, outcome totals and lifecycle controls together."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Check eligibility and permission",
+                    Steps =
+                    [
+                        "Confirm that the selected broadcaster is a Twitch Affiliate or Partner.",
+                        "Select Reconnect broadcaster when the section requests Prediction scopes and complete Twitch as the channel owner.",
+                        "Return to the same channel and reload before creating a template.",
+                    ],
+                    Note =
+                        "Twitch Predictions use Twitch Channel Points. They do not read or change BlokeBot's separate viewer-points balances.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create and start a Prediction",
+                    Steps =
+                    [
+                        "Enter a 1–45 character title and put 2–10 outcomes on separate lines; each outcome can be up to 25 characters.",
+                        "Choose a prediction window from 30 to 1,800 seconds and select Save template.",
+                        "Select Start prediction on the intended template. Twitch permits only one active Prediction per channel.",
+                        "Watch participant and Channel Points totals while the window is open.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Lock, resolve or cancel",
+                    Bullets =
+                    [
+                        "Lock prediction closes wagering without choosing a winner.",
+                        "Resolve winner selects the matching outcome and asks Twitch to distribute payouts. Confirm the outcome before selecting it.",
+                        "Cancel & refund ends the Prediction without a winner and relies on Twitch to refund participants.",
+                        "A Prediction started in Twitch is reconciled into BlokeBot. Treat its external-start warning as a confirmation boundary before changing it.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "If the active state conflicts",
+                    Steps =
+                    [
+                        "Do not start another template while Twitch reports an active or locked Prediction.",
+                        "Reload the page so BlokeBot can reconcile Twitch's current state.",
+                        "If eligibility or permission is still reported, follow that message; do not retry lifecycle actions against stale state.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Troubleshoot an operation", "troubleshooting")],
         };
 
         yield return new SiteGuidePage
