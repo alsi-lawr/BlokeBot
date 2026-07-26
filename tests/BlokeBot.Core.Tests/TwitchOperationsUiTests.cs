@@ -1,8 +1,8 @@
 using System.Collections.Immutable;
 using System.Net;
-using System.Security.Claims;
+using System.Text.Json;
 using BlokeBot.Core.Auth.Moderation;
-using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
@@ -28,49 +28,94 @@ namespace BlokeBot.Core.Tests;
 public sealed class TwitchOperationsUiTests
 {
     [Test]
-    public async Task StaleSelectedHost_SavingPollTemplate_DoesNotMutateCachedHost()
+    public async Task PollHub_ChannelPointsAndProviderRefresh_RenderProgressFinalResultsAndExternalGuard()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var firstHost = await SeedHostAsync(dbFactory, "first", "first-id");
-        var secondHost = await SeedHostAsync(dbFactory, "second", "second-id");
+        var host = await SeedHostAsync(dbFactory, "streamer", "streamer-id");
         var testContext = UiTestContextFactory.CreateWithAuthorization(
             dbFactory,
-            firstHost.Id,
-            firstHost.Login
+            host.Id,
+            host.Login
         );
         await using var context = testContext.Context;
-        ConfigureServices(context, dbFactory);
+        var events = ConfigureServices(context, dbFactory);
+        context.Services.GetRequiredService<EventBus<AppEventKind>>().ShouldBeSameAs(events);
         var page = context.Render<ShoutoutsPage>();
         page.WaitForAssertion(() =>
             page.FindAll("button")
                 .Any(button => button.TextContent.Trim() == "Save template")
                 .ShouldBeTrue()
         );
-        SetSelectedHostClaims(testContext.Authorization, secondHost);
 
+        page.Find("#poll-title").Input("Channel Points question");
+        page.Find("#poll-choices").Input("Yes\nNo");
+        page.Find("#poll-duration").Input("60");
+        page.Find("#poll-channel-points-enabled").Change(true);
+        page.Find("#poll-channel-points-per-vote").Change("250");
         page.FindAll("button")
             .Single(button => button.TextContent.Trim() == "Save template")
             .Click();
 
-        page.WaitForAssertion(() =>
-            context
-                .Services.GetRequiredService<ToastService>()
-                .Current.ShouldHaveSingleItem()
-                .Title.ShouldBe("Channel not selected")
+        page.WaitForAssertion(() => page.Markup.ShouldContain("250 Channel Points per vote"));
+        await using (var verify = await dbFactory.CreateDbContextAsync())
+        {
+            var template = (await verify.TwitchPollTemplates.ToArrayAsync()).ShouldHaveSingleItem();
+            template.ChannelPointsVotingEnabled.ShouldBeTrue();
+            template.ChannelPointsPerVote.ShouldBe(250);
+        }
+
+        await SetPollAsync(
+            dbFactory,
+            host.Id,
+            TwitchPollStatus.Active,
+            votes: 7,
+            channelPointsVotes: 3,
+            externallyStarted: true
         );
-        await using var verify = await dbFactory.CreateDbContextAsync();
-        (await verify.TwitchPollTemplates.CountAsync()).ShouldBe(0);
+        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, CancellationToken.None);
+
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("7 votes (3 Channel Points)");
+            page.Markup.ShouldContain("This poll was started in Twitch. Confirm before ending it.");
+            page.FindAll("button")
+                .Any(button => button.TextContent.Trim() == "End poll")
+                .ShouldBeTrue();
+        });
+        page.FindAll("button").Single(button => button.TextContent.Trim() == "End poll").Click();
+        context
+            .JSInterop.Invocations.Any(invocation => invocation.Identifier == "confirm")
+            .ShouldBeTrue();
+
+        await SetPollAsync(
+            dbFactory,
+            host.Id,
+            TwitchPollStatus.Completed,
+            votes: 9,
+            channelPointsVotes: 4,
+            externallyStarted: true
+        );
+        await events.PublishAsync(AppEventKind.TwitchOperationsChanged, CancellationToken.None);
+
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("Recent results");
+            page.Markup.ShouldContain("Completed");
+            page.Markup.ShouldContain("9 votes (4 Channel Points)");
+            page.FindAll("button")
+                .Any(button => button.TextContent.Trim() == "End poll")
+                .ShouldBeFalse();
+        });
     }
 
-    private static void ConfigureServices(BunitContext context, SqliteBlokeBotDbFactory dbFactory)
+    private static EventBus<AppEventKind> ConfigureServices(
+        BunitContext context,
+        SqliteBlokeBotDbFactory dbFactory
+    )
     {
         var events = TestEventBus.Create<AppEventKind>();
         var changes = new HostedChannelChangeNotifier(events);
-        var alerts = new BlokeBot.Core.Features.Alerts.DurableAlertService(
-            dbFactory,
-            TimeProvider.System,
-            events
-        );
+        var alerts = new DurableAlertService(dbFactory, TimeProvider.System, events);
         var settings = BotSettings.FromOptions(
             new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
         );
@@ -83,7 +128,7 @@ public sealed class TwitchOperationsUiTests
         context.Services.AddSingleton(
             new PollService(
                 dbFactory,
-                new UnavailableBroadcasterProvider(),
+                new ReadyBroadcasterProvider(),
                 new HelixClient(new RejectingHttpClientFactory()),
                 settings,
                 events,
@@ -99,6 +144,7 @@ public sealed class TwitchOperationsUiTests
                 TimeProvider.System
             )
         );
+        return events;
     }
 
     private static async Task<BotHost> SeedHostAsync(
@@ -119,26 +165,37 @@ public sealed class TwitchOperationsUiTests
         return host;
     }
 
-    private static void SetSelectedHostClaims(
-        Bunit.TestDoubles.BunitAuthorizationContext authorization,
-        BotHost host
+    private static async Task SetPollAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        TwitchPollStatus status,
+        int votes,
+        int channelPointsVotes,
+        bool externallyStarted
     )
     {
-        var choice = new BotHostChoice(host.Id, host.Login, host.DisplayName, AuthRole.Streamer);
-        authorization.SetClaims(
-            new Claim(ClaimTypes.NameIdentifier, "first-id"),
-            new Claim(ClaimTypes.Name, "first"),
-            new Claim(AuthClaims.Login, "first"),
-            new Claim(AuthClaims.Role, AuthRoleCodec.Encode(AuthRole.Streamer)),
-            new Claim(AuthClaims.CanCreateHost, "false"),
-            new Claim(AuthClaims.IsBotAdmin, "false"),
-            new Claim(AuthClaims.IsBotAccount, "false"),
-            new Claim(BotHostClaims.AvailableHost, BotHostClaimCodec.Encode(choice)),
-            new Claim(BotHostClaims.SelectedHost, BotHostClaimCodec.Encode(choice))
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var poll = await db.TwitchPolls.SingleOrDefaultAsync(item => item.HostId == hostId);
+        if (poll is null)
+        {
+            poll = new TwitchPoll { HostId = hostId, ProviderPollId = "poll-id" };
+            db.TwitchPolls.Add(poll);
+        }
+
+        poll.Title = "Provider question";
+        poll.ChoicesJson = JsonSerializer.Serialize(
+            new[] { new PollChoiceView("yes", "Yes", votes, channelPointsVotes) }
         );
+        poll.Status = status;
+        poll.IsExternallyStarted = externallyStarted;
+        poll.StartedAtUtc = new DateTime(2026, 7, 26, 10, 0, 0, DateTimeKind.Utc);
+        poll.EndsAtUtc = new DateTime(2026, 7, 26, 10, 1, 0, DateTimeKind.Utc);
+        poll.EndedAtUtc = status is TwitchPollStatus.Active ? null : DateTime.UtcNow;
+        poll.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
     }
 
-    private sealed class UnavailableBroadcasterProvider : IHostBroadcasterTokenStatusProvider
+    private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
     {
         public Task<TokenStatus> GetTokenStatusAsync(
             int hostId,
@@ -147,9 +204,15 @@ public sealed class TwitchOperationsUiTests
         )
         {
             return Task.FromResult<TokenStatus>(
-                new TokenStatus.Unavailable(
-                    AccessTokenUnavailableReason.MissingRefreshToken,
-                    ImmutableArray.CreateRange(requiredScopes.Select(x => x!))
+                new TokenStatus.Ready(
+                    "broadcaster-token",
+                    new TokenValidation(
+                        "streamer-id",
+                        "streamer",
+                        OAuthScopeSet.Create(HostBroadcasterAuthorizationService.MilestoneScopes)
+                    ),
+                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes),
+                    ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
         }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using Microsoft.JSInterop;
@@ -13,6 +14,8 @@ public partial class ShoutoutsPage
     private string _pollTitle = string.Empty;
     private string _pollChoices = string.Empty;
     private string _pollDuration = "60";
+    private bool _channelPointsVotingEnabled;
+    private string _channelPointsPerVote = string.Empty;
 
     private string _cooldownText =>
         _state switch
@@ -31,6 +34,14 @@ public partial class ShoutoutsPage
 
     protected override async Task OnInitializedAsync()
     {
+        TrackSubscription(
+            _events.SubscribeForComponentRefresh(
+                AppEventKind.TwitchOperationsChanged,
+                InvokeAsync,
+                ReloadPollsForEventAsync,
+                StateHasChanged
+            )
+        );
         await LoadPageContextAsync();
         await LoadAsync();
         await LoadPollsAsync();
@@ -121,6 +132,12 @@ public partial class ShoutoutsPage
         }
     }
 
+    private async Task ReloadPollsForEventAsync()
+    {
+        await LoadPageContextAsync();
+        await LoadPollsAsync();
+    }
+
     private async Task SavePollTemplateAsync()
     {
         if (!int.TryParse(_pollDuration, out var duration))
@@ -130,6 +147,21 @@ public partial class ShoutoutsPage
             );
             return;
         }
+        int? pointsPerVote = null;
+        if (_channelPointsVotingEnabled)
+        {
+            if (!int.TryParse(_channelPointsPerVote, out var channelPointsPerVote))
+            {
+                _toasts.Publish(
+                    new ToastRequest<WarningToastStrategy>(
+                        "Channel Points cost must be a whole number from 1 to 1,000,000."
+                    )
+                );
+                return;
+            }
+
+            pointsPerVote = channelPointsPerVote;
+        }
 
         var hostId = HostId;
         await RunSelectedHostMutationAsync(
@@ -138,7 +170,13 @@ public partial class ShoutoutsPage
             {
                 var outcome = await _polls.SaveTemplateAsync(
                     hostId,
-                    new(_pollTitle, _pollChoices.Split('\n'), duration, false, null),
+                    new(
+                        _pollTitle,
+                        _pollChoices.Split('\n'),
+                        duration,
+                        _channelPointsVotingEnabled,
+                        pointsPerVote
+                    ),
                     CancellationToken.None
                 );
                 if (outcome is PollOperationOutcome.InvalidTemplate invalid)
