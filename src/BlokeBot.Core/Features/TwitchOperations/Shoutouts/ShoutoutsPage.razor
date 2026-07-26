@@ -2,11 +2,16 @@
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations.Polls
+@using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject ShoutoutService _shoutouts
 @inject ToastService _toasts
+@inject PollService _polls
+@inject IJSRuntime _js
+@inject EventBus<AppEventKind> _events
 
 <PageTitle>BlokeBot | Native Twitch operations</PageTitle>
 
@@ -40,6 +45,108 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        }
+    </section>
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Polls</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Create reusable Twitch poll templates and monitor the active poll.</p>
+        </div>
+        @if (_pollState is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading polls...</p>
+        }
+        else
+        {
+            <div class="space-y-4 p-5">
+                @if (_pollState.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+                {
+                    <div class="text-sm text-amber-700">
+                        <p>@readiness.Message</p>
+                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70"
+                                         Url="@readiness.ReauthorizationUrl"
+                                         PopupName="blokebot-broadcaster-oauth"
+                                         OpeningText="Opening..."
+                                         OnClosed="LoadPollsAsync">
+                            Reconnect broadcaster
+                        </AuthPopupButton>
+                    </div>
+                }
+                @if (_pollState.ActivePoll is { } poll)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <strong>@poll.Title</strong>
+                            <span class="text-sm text-muted-foreground">@poll.Status</span>
+                            <button class="btn-secondary" @onclick="EndPollAsync">End poll</button>
+                        </div>
+                        @if (poll.IsExternallyStarted)
+                        {
+                            <p class="mt-2 text-sm text-amber-700">This poll was started in Twitch. Confirm before ending it.</p>
+                        }
+                        <ul class="mt-3 space-y-1 text-sm">
+                            @foreach (var choice in poll.Choices)
+                            {
+                                <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="poll-title" Label="Template title" @bind-Value="_pollTitle" Placeholder="Question" />
+                    <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_pollChoices" Placeholder="Yes&#10;No" />
+                    <Field Id="poll-duration" Label="Seconds" @bind-Value="_pollDuration" Placeholder="60" />
+                    <div class="space-y-2 self-end">
+                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="poll-channel-points-enabled">
+                            <input id="poll-channel-points-enabled" type="checkbox" @bind="_channelPointsVotingEnabled" />
+                            Enable Channel Points voting
+                        </label>
+                        @if (_channelPointsVotingEnabled)
+                        {
+                            <div class="space-y-1">
+                                <label class="label" for="poll-channel-points-per-vote">Channel Points per vote</label>
+                                <input id="poll-channel-points-per-vote" class="input" type="number" min="1" max="1000000" step="1" @bind="_channelPointsPerVote" />
+                                <p class="text-xs text-muted-foreground">1–1,000,000. Twitch owns Channel Points balances and votes.</p>
+                            </div>
+                        }
+                    </div>
+                    <button class="btn-primary self-end" @onclick="SavePollTemplateAsync">Save template</button>
+                </div>
+                @foreach (var template in _pollState.Templates)
+                {
+                    <div class="flex items-center justify-between rounded-lg border border-slate-200 p-3" @key="template.Id">
+                        <span>
+                            @template.Title (@string.Join(", ", template.Choices))
+                            @if (template.ChannelPointsVotingEnabled)
+                            {
+                                <span class="text-sm text-muted-foreground">— @template.ChannelPointsPerVote Channel Points per vote</span>
+                            }
+                        </span>
+                        <button class="btn-secondary" @onclick="() => StartPollAsync(template.Id)">Start poll</button>
+                    </div>
+                }
+                @if (_pollState.Results.Count > 0)
+                {
+                    <div class="border-t border-slate-200 pt-4">
+                        <h3 class="text-base font-semibold text-slate-950">Recent results</h3>
+                        <div class="mt-2 space-y-3">
+                            @foreach (var result in _pollState.Results)
+                            {
+                                <div class="rounded-lg border border-slate-200 p-3" @key="result.ProviderPollId">
+                                    <strong>@result.Title</strong>
+                                    <span class="ml-2 text-sm text-muted-foreground">@result.Status</span>
+                                    <ul class="mt-2 space-y-1 text-sm">
+                                        @foreach (var choice in result.Choices)
+                                        {
+                                            <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
         }
     </section>

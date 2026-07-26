@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations.Polls;
+using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 
@@ -7,6 +10,12 @@ public partial class ShoutoutsPage
 {
     private ShoutoutDashboardState? _state;
     private string _targetLogin = string.Empty;
+    private PollDashboardState? _pollState;
+    private string _pollTitle = string.Empty;
+    private string _pollChoices = string.Empty;
+    private string _pollDuration = "60";
+    private bool _channelPointsVotingEnabled;
+    private string _channelPointsPerVote = string.Empty;
 
     private string _cooldownText =>
         _state switch
@@ -25,8 +34,17 @@ public partial class ShoutoutsPage
 
     protected override async Task OnInitializedAsync()
     {
+        TrackSubscription(
+            _events.SubscribeForComponentRefresh(
+                AppEventKind.TwitchOperationsChanged,
+                InvokeAsync,
+                ReloadPollsForEventAsync,
+                StateHasChanged
+            )
+        );
         await LoadPageContextAsync();
         await LoadAsync();
+        await LoadPollsAsync();
     }
 
     private async Task LoadAsync()
@@ -102,6 +120,120 @@ public partial class ShoutoutsPage
                         throw new UnreachableException();
                 }
                 await LoadAsync();
+            }
+        );
+    }
+
+    private async Task LoadPollsAsync()
+    {
+        if (HostId != 0)
+        {
+            _pollState = await _polls.LoadAsync(HostId, CancellationToken.None);
+        }
+    }
+
+    private async Task ReloadPollsForEventAsync()
+    {
+        await LoadPageContextAsync();
+        await LoadPollsAsync();
+    }
+
+    private async Task SavePollTemplateAsync()
+    {
+        if (!int.TryParse(_pollDuration, out var duration))
+        {
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>("Poll duration must be a number.")
+            );
+            return;
+        }
+        int? pointsPerVote = null;
+        if (_channelPointsVotingEnabled)
+        {
+            if (!int.TryParse(_channelPointsPerVote, out var channelPointsPerVote))
+            {
+                _toasts.Publish(
+                    new ToastRequest<WarningToastStrategy>(
+                        "Channel Points cost must be a whole number from 1 to 1,000,000."
+                    )
+                );
+                return;
+            }
+
+            pointsPerVote = channelPointsPerVote;
+        }
+
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _polls.SaveTemplateAsync(
+                    hostId,
+                    new(
+                        _pollTitle,
+                        _pollChoices.Split('\n'),
+                        duration,
+                        _channelPointsVotingEnabled,
+                        pointsPerVote
+                    ),
+                    CancellationToken.None
+                );
+                if (outcome is PollOperationOutcome.InvalidTemplate invalid)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(invalid.Message));
+                }
+                await LoadPollsAsync();
+            }
+        );
+    }
+
+    private async Task StartPollAsync(int templateId)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _polls.StartAsync(hostId, templateId, CancellationToken.None);
+                if (outcome is PollOperationOutcome.NotReady notReady)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
+                }
+                else if (outcome is PollOperationOutcome.ActivePollExists)
+                {
+                    _toasts.Publish(
+                        new ToastRequest<WarningToastStrategy>("Twitch already has an active poll.")
+                    );
+                }
+                await LoadPollsAsync();
+            }
+        );
+    }
+
+    private async Task EndPollAsync()
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var confirmed =
+                    _pollState?.ActivePoll?.IsExternallyStarted != true
+                    || await _js.InvokeAsync<bool>(
+                        "confirm",
+                        "End the externally started Twitch poll?"
+                    );
+                var outcome = await _polls.EndAsync(hostId, confirmed, CancellationToken.None);
+                if (outcome is PollOperationOutcome.NotReady notReady)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(notReady.Message));
+                }
+                else if (outcome is PollOperationOutcome.ProviderRejected rejected)
+                {
+                    _toasts.Publish(new ToastRequest<WarningToastStrategy>(rejected.Message));
+                }
+                await LoadPollsAsync();
             }
         );
     }

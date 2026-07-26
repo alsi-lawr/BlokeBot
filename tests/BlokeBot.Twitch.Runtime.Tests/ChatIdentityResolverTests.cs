@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using BlokeBot.Functional;
 using BlokeBot.Twitch.Auth;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -200,6 +201,146 @@ public sealed class ChatIdentityResolverTests
     }
 
     [Test]
+    [Arguments(1)]
+    [Arguments(2)]
+    public async Task PollSubscriptionFailure_AfterBeginOrProgress_CleansUpEveryCreatedSubscription(
+        int successfulPollSubscriptions
+    )
+    {
+        var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"channel-id","login":"channel"}]}"""
+        );
+        var operations = CreateEventSubOperations(
+            factory,
+            new ScriptedBroadcasterAccountProvider(
+                Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                    new BotAccount("channel", "broadcaster-token")
+                )
+            )
+        );
+        factory.FailNextEventSubPostAfter(successfulPollSubscriptions);
+
+        var outcome = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.BroadcasterAuthority,
+            new BotAccount("channel", "broadcaster-token"),
+            "session-id",
+            CancellationToken.None
+        );
+
+        var partial = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.PartiallyCreated>();
+        var subscriptionIds = new[] { partial.Subscription.SubscriptionId }
+            .Concat(partial.Subscription.AdditionalSubscriptionIds)
+            .ToArray();
+        subscriptionIds.Length.ShouldBe(successfulPollSubscriptions);
+
+        var deleted = await operations.DeleteSubscriptionAsync(
+            partial.Subscription,
+            CancellationToken.None
+        );
+
+        deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
+        factory
+            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
+            .Select(request => request.SubscriptionId)
+            .ShouldBe(subscriptionIds);
+        factory
+            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
+            .Select(request => request.Authorization)
+            .Distinct()
+            .ShouldBe(["Bearer broadcaster-token"]);
+    }
+
+    [Test]
+    public async Task PollSubscriptionGroup_NoGrantPreservesBotGroup_AndRecreateUsesBroadcasterAuthority()
+    {
+        var factory = new IdentityHttpClientFactory(
+            """
+            {"data":[{"id":"channel-id","login":"channel"},{"id":"bot-id","login":"bot"}]}
+            """
+        );
+        var broadcaster = new BotAccount("channel", "broadcaster-token");
+        var operations = CreateEventSubOperations(
+            factory,
+            new ScriptedBroadcasterAccountProvider(
+                Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                    AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                ),
+                Result<BotAccount, AccessTokenUnavailableReason>.Success(broadcaster),
+                Result<BotAccount, AccessTokenUnavailableReason>.Success(broadcaster),
+                Result<BotAccount, AccessTokenUnavailableReason>.Success(broadcaster)
+            )
+        );
+        var configuredBot = new BotAccount("bot", "configured-bot-token");
+
+        var botSetup = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.ConfiguredBotAuthority,
+            configuredBot,
+            "session-id",
+            CancellationToken.None
+        );
+        var botSubscription = botSetup
+            .ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>()
+            .Subscription;
+        var unavailable = await operations
+            .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
+            .ExecuteAsync(CancellationToken.None);
+
+        unavailable.ShouldBe(
+            Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+            )
+        );
+        botSubscription.PollSubscriptions.ShouldBeOfType<BroadcasterPollSubscriptionState.NotConfigured>();
+        factory.EventSubRequestCount.ShouldBe(3);
+
+        var created = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.BroadcasterAuthority,
+            await ResolveBroadcasterAsync(operations),
+            "session-id",
+            CancellationToken.None
+        );
+        var pollSubscription = created
+            .ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>()
+            .Subscription;
+        var deleted = await operations.DeleteSubscriptionAsync(
+            pollSubscription,
+            CancellationToken.None
+        );
+        var recreated = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.BroadcasterAuthority,
+            await ResolveBroadcasterAsync(operations),
+            "replacement-session-id",
+            CancellationToken.None
+        );
+
+        deleted.ShouldBeOfType<EventSubSubscriptionDeletionOutcome.Deleted>();
+        recreated.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
+        factory
+            .EventSubRequests.Where(request => request.Method == HttpMethod.Post)
+            .Take(3)
+            .Select(request => request.Type)
+            .ShouldBe([
+                "channel.chat.message",
+                "channel.shoutout.create",
+                "channel.shoutout.receive",
+            ]);
+        factory
+            .EventSubRequests.Where(request => request.Type?.StartsWith("channel.poll.") == true)
+            .Select(request => request.Authorization)
+            .Distinct()
+            .ShouldBe(["Bearer broadcaster-token"]);
+        factory
+            .EventSubRequests.Where(request => request.Method == HttpMethod.Delete)
+            .Select(request => request.Authorization)
+            .Distinct()
+            .ShouldBe(["Bearer broadcaster-token"]);
+    }
+
+    [Test]
     public async Task AcceptedStartupMessage_Delivering_ReturnsCompleted()
     {
         var chat = new ScriptedChatSender(new PublicChatSendOutcome.Accepted());
@@ -275,6 +416,37 @@ public sealed class ChatIdentityResolverTests
     private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory)
     {
         return new(Identity(), new HelixClient(factory));
+    }
+
+    private static EventSubChannelOperations CreateEventSubOperations(
+        IdentityHttpClientFactory factory,
+        IBroadcasterAccountProvider broadcasters
+    )
+    {
+        return new EventSubChannelOperations(
+            Settings(),
+            new UnusedAccountProvider(),
+            CreateResolver(factory),
+            new EventSubClient(factory),
+            null!,
+            new UnusedChatSender(),
+            new UnusedLifecycleNotifier(),
+            broadcasters
+        );
+    }
+
+    private static async Task<BotAccount> ResolveBroadcasterAsync(
+        EventSubChannelOperations operations
+    )
+    {
+        var result = await operations
+            .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
+            .ExecuteAsync(CancellationToken.None);
+        return result.Match(
+            account => account,
+            reason =>
+                throw new InvalidOperationException($"Expected broadcaster account: {reason}.")
+        );
     }
 
     private static EventSubChannelOperations StartupOperations(
@@ -368,6 +540,13 @@ public sealed class ChatIdentityResolverTests
 
         internal int EventSubRequestCount => _handler.EventSubRequestCount;
 
+        internal IReadOnlyList<EventSubRequest> EventSubRequests => _handler.EventSubRequests;
+
+        internal void FailNextEventSubPostAfter(int successfulPosts)
+        {
+            _handler.FailNextEventSubPostAfter(successfulPosts);
+        }
+
         internal int AppTokenRequestCount => _handler.AppTokenRequestCount;
 
         internal int ChatRequestCount => _handler.ChatRequestCount;
@@ -383,11 +562,30 @@ public sealed class ChatIdentityResolverTests
             return new(_handler, disposeHandler: false);
         }
 
+        internal sealed record EventSubRequest(
+            HttpMethod Method,
+            string? Type,
+            string? SubscriptionId,
+            string? Authorization
+        );
+
         private sealed class Handler(string usersJson) : HttpMessageHandler
         {
             internal int UserRequestCount { get; private set; }
 
             internal int EventSubRequestCount { get; private set; }
+
+            private int? _failEventSubPostAt;
+
+            internal List<EventSubRequest> EventSubRequests { get; } = [];
+
+            internal void FailNextEventSubPostAfter(int successfulPosts)
+            {
+                _failEventSubPostAt =
+                    EventSubRequests.Count(request => request.Method == HttpMethod.Post)
+                    + successfulPosts
+                    + 1;
+            }
 
             internal int AppTokenRequestCount { get; private set; }
 
@@ -408,7 +606,7 @@ public sealed class ChatIdentityResolverTests
                 return request.RequestUri!.AbsolutePath switch
                 {
                     "/helix/users" => Task.FromResult(UserResponse(request)),
-                    "/helix/eventsub/subscriptions" => Task.FromResult(EventSubResponse()),
+                    "/helix/eventsub/subscriptions" => Task.FromResult(EventSubResponse(request)),
                     "/helix/chat/messages" => Task.FromResult(ChatResponse()),
                     "/oauth2/token" => Task.FromResult(AppTokenResponse()),
                     _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)),
@@ -424,10 +622,45 @@ public sealed class ChatIdentityResolverTests
                 return JsonResponse(usersJson);
             }
 
-            private HttpResponseMessage EventSubResponse()
+            private HttpResponseMessage EventSubResponse(HttpRequestMessage request)
             {
                 EventSubRequestCount++;
-                return JsonResponse("""{"data":[{"id":"subscription-id"}]}""");
+                string? type = null;
+                if (request.Content is not null)
+                {
+                    using var document = JsonDocument.Parse(
+                        request.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                    );
+                    type = document.RootElement.GetProperty("type").GetString();
+                }
+                var subscriptionId = request
+                    .RequestUri?.Query.TrimStart('?')
+                    .Split('&', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(parameter => parameter.Split('=', 2))
+                    .FirstOrDefault(parameter => parameter[0] == "id")
+                    ?.ElementAtOrDefault(1);
+                EventSubRequests.Add(
+                    new EventSubRequest(
+                        request.Method,
+                        type,
+                        subscriptionId,
+                        request.Headers.Authorization?.ToString()
+                    )
+                );
+                if (request.Method == HttpMethod.Delete)
+                {
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                }
+
+                return
+                    _failEventSubPostAt
+                    == EventSubRequests.Count(eventSubRequest =>
+                        eventSubRequest.Method == HttpMethod.Post
+                    )
+                    ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                    : JsonResponse(
+                        $$"""{"data":[{"id":"subscription-{{EventSubRequestCount}}"}]}"""
+                    );
             }
 
             private HttpResponseMessage ChatResponse()
@@ -464,6 +697,26 @@ public sealed class ChatIdentityResolverTests
                 return ValueTask.FromResult(
                     Result<BotAccount, AccessTokenUnavailableReason>.Success(account)
                 );
+            });
+        }
+    }
+
+    private sealed class ScriptedBroadcasterAccountProvider(
+        params Result<BotAccount, AccessTokenUnavailableReason>[] results
+    ) : IBroadcasterAccountProvider
+    {
+        private readonly Queue<Result<BotAccount, AccessTokenUnavailableReason>> _results = new(
+            results
+        );
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ValueTask.FromResult(_results.Dequeue());
             });
         }
     }

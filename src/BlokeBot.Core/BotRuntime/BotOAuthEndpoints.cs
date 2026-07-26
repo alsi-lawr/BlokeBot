@@ -89,6 +89,21 @@ internal static class BotOAuthEndpoints
                     CancellationToken ct
                 ) =>
                 {
+                    if (HostBroadcasterOAuthStateStore.IsState(state))
+                    {
+                        return await CompleteBroadcasterAuthorizationAsync(
+                            context,
+                            code,
+                            state,
+                            error,
+                            hostBotOAuth,
+                            app.Services.GetRequiredService<HostBroadcasterAuthorizationService>(),
+                            app.Services.GetRequiredService<HostBroadcasterOAuthStateStore>(),
+                            logger,
+                            ct
+                        );
+                    }
+
                     if (HostBotOAuthStateStore.IsHostBotState(state))
                     {
                         return await CompleteHostBotAuthorizationAsync(
@@ -412,6 +427,147 @@ internal static class BotOAuthEndpoints
                 }
             )
             .RequireAuthorization();
+
+        botOAuth
+            .MapGet(
+                "/broadcaster/start",
+                (HttpContext context) =>
+                {
+                    var session = AuthenticatedSession.FromPrincipal(context.User);
+                    var selected = session.State.Match<BotHostChoice?>(
+                        _ => null,
+                        value => value.Selection.Current,
+                        _ => null
+                    );
+                    var oauth = context.RequestServices.GetService<HostBotAccountOAuthService>();
+                    var states =
+                        context.RequestServices.GetService<HostBroadcasterOAuthStateStore>();
+                    if (!session.CanAuthorizeSelectedHost || selected is null)
+                    {
+                        return ConnectionAccessResult(session);
+                    }
+                    if (oauth is null || states is null)
+                    {
+                        return Result(
+                            BlokeBotAuthOutcome.Unavailable,
+                            BlokeBotAuthStatus.ServiceUnavailable,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        );
+                    }
+                    return oauth
+                        .CreateAuthorizationUriForScopes(
+                            states.Issue(session.UserId, selected.Id),
+                            OAuthAuthorizationScopeSet.Create(
+                                HostBroadcasterAuthorizationService.MilestoneScopes
+                            )
+                        )
+                        .Match<IResult>(
+                            ready => Results.Redirect(ready.AuthorizationUri.ToString()),
+                            _ =>
+                                Result(
+                                    BlokeBotAuthOutcome.Unavailable,
+                                    BlokeBotAuthStatus.ServiceUnavailable,
+                                    BlokeBotAuthRetryAction.None,
+                                    BlokeBotAuthReturnAction.ChannelSetup
+                                )
+                        );
+                }
+            )
+            .RequireAuthorization();
+    }
+
+    private static async Task<IResult> CompleteBroadcasterAuthorizationAsync(
+        HttpContext context,
+        string? code,
+        string? state,
+        string? error,
+        HostBotAccountOAuthService oauth,
+        HostBroadcasterAuthorizationService authorization,
+        HostBroadcasterOAuthStateStore states,
+        ILogger<BotOAuthEndpointLog> logger,
+        CancellationToken ct
+    )
+    {
+        var session = AuthenticatedSession.FromPrincipal(context.User);
+        if (!states.TryConsume(state, session.UserId, out var hostId))
+        {
+            return Result(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
+        }
+
+        var selectedHost = session.State.Match<BotHostChoice?>(
+            _ => null,
+            selected => selected.Selection.Current,
+            _ => null
+        );
+        if (selectedHost?.Id != hostId || !session.CanAuthorizeSelectedHost)
+        {
+            return ConnectionAccessResult(session);
+        }
+
+        if (!string.IsNullOrWhiteSpace(error) || string.IsNullOrWhiteSpace(code))
+        {
+            return Result(
+                BlokeBotAuthOutcome.InvalidOrExpired,
+                BlokeBotAuthStatus.BadRequest,
+                BlokeBotAuthRetryAction.HostBot,
+                BlokeBotAuthReturnAction.ChannelSetup
+            );
+        }
+        try
+        {
+            var completion = await oauth.CompleteAsync(code, ct);
+            return await completion.Match<Task<IResult>>(
+                async completed =>
+                    (await authorization.AuthorizeAsync(hostId, completed.Grant, ct))
+                    is HostBroadcasterAuthorizationOutcome.Authorized
+                        ? Result(
+                            BlokeBotAuthOutcome.Success,
+                            BlokeBotAuthStatus.Ok,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        )
+                        : Result(
+                            BlokeBotAuthOutcome.PermissionOrAccount,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.HostBot,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        ),
+                _ =>
+                    Task.FromResult<IResult>(
+                        Result(
+                            BlokeBotAuthOutcome.Unavailable,
+                            BlokeBotAuthStatus.ServiceUnavailable,
+                            BlokeBotAuthRetryAction.None,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        )
+                    ),
+                _ =>
+                    Task.FromResult<IResult>(
+                        Result(
+                            BlokeBotAuthOutcome.PermissionOrAccount,
+                            BlokeBotAuthStatus.BadRequest,
+                            BlokeBotAuthRetryAction.HostBot,
+                            BlokeBotAuthReturnAction.ChannelSetup
+                        )
+                    )
+            );
+        }
+        catch (HttpRequestException exception)
+        {
+            return ProviderFailureResult(
+                BlokeBotAuthRetryAction.HostBot,
+                context,
+                logger,
+                "TransportFailure",
+                exception.GetType().Name
+            );
+        }
     }
 
     private static async Task<IResult> CompleteHostBotAuthorizationAsync(

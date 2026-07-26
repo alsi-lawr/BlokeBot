@@ -29,7 +29,8 @@ internal sealed class EventSubConnectionSession(
         ChatObserverDeadLetter
     > messageObserverFanOut,
     ILogger<EventSubConnectionSession> log,
-    IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null
+    IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null,
+    IEnumerable<IPollEventObserver>? pollObservers = null
 ) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -39,6 +40,7 @@ internal sealed class EventSubConnectionSession(
     private static readonly Uri _defaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
+    private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
     private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
     private readonly Queue<string> _deliveredMessageIdOrder = new();
     private const int _deliveredMessageCapacity = 512;
@@ -375,6 +377,9 @@ internal sealed class EventSubConnectionSession(
                                 case EventSubNotification.Shoutout { Event: var shoutout }:
                                     await owner.DispatchShoutoutAsync(shoutout, cancellationToken);
                                     break;
+                                case EventSubNotification.Poll { Event: var poll }:
+                                    await owner.DispatchPollAsync(poll, cancellationToken);
+                                    break;
                             }
                         }
                         break;
@@ -399,6 +404,17 @@ internal sealed class EventSubConnectionSession(
             {
                 ExceptionDispatchInfo.Capture(failure).Throw();
             }
+        }
+    }
+
+    private async Task DispatchPollAsync(
+        EventSubPollEvent poll,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _pollObservers)
+        {
+            await observer.PollReceivedAsync(poll, cancellationToken);
         }
     }
 }

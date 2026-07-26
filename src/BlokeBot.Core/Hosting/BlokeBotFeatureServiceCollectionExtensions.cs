@@ -373,12 +373,20 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<ChannelBotAuthorizationService>();
         services.AddSingleton<HostBotAccountOAuthService>();
         services.AddSingleton<HostBotOAuthStateStore>();
+        services.AddSingleton<HostBroadcasterOAuthStateStore>();
         services.AddDataProtection();
         services.TryAddSingleton<
             IHostBotAccountTokenProtector,
             DataProtectionHostBotAccountTokenProtector
         >();
         services.AddSingleton<HostBotAccountAuthorizationService>();
+        services.AddSingleton<HostBroadcasterAuthorizationService>();
+        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
+        );
+        services.AddSingleton<IBroadcasterAccountProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
+        );
         services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()
         );

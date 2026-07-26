@@ -118,6 +118,22 @@ internal sealed class EventSubSubscriptionReconciliationStore
         }
     }
 
+    internal void UpdateSubscription(ActiveEventSubSubscription subscription)
+    {
+        lock (_gate)
+        {
+            if (!_pending.TryGetValue(subscription.Channel, out var existing))
+            {
+                throw new UnreachableException(
+                    "An EventSub deletion update has no pending local evidence."
+                );
+            }
+
+            EnsureSameSubscription(existing.Subscription, subscription);
+            _pending[subscription.Channel] = existing with { Subscription = subscription };
+        }
+    }
+
     internal void RetainUnresolved(
         ActiveEventSubSubscription subscription,
         EventSubChannelFailureDetails failure

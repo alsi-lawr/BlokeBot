@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260726005847_v0.3.0")]
+    [Migration("20260726012026_v0.3.0")]
     partial class v030
     {
         /// <inheritdoc />
@@ -1001,6 +1001,44 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("host_bot_account_settings", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.HostBroadcasterAuthorization", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("AuthorizedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AuthorizedScopes")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Login")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("ProtectedTokenPayload")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("TwitchUserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId")
+                        .IsUnique();
+
+                    b.ToTable("host_broadcaster_authorizations", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.HostModAccessEntry", b =>
                 {
                     b.Property<int>("Id")
@@ -1836,6 +1874,125 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("site_access_settings", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPoll", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ChoicesJson")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EndedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("EndsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsExternallyStarted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProviderPollId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 'Active'");
+
+                    b.HasIndex("HostId", "EndedAtUtc");
+
+                    b.HasIndex("HostId", "ProviderPollId")
+                        .IsUnique();
+
+                    b.ToTable("twitch_polls", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_twitch_polls_Status", "Status IN ('Active', 'Archived', 'Completed', 'Terminated')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPollTemplate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ChannelPointsPerVote")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ChannelPointsVotingEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId");
+
+                    b.ToTable("twitch_poll_templates", (string)null);
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPollTemplateChoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(25)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TwitchPollTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TwitchPollTemplateId", "Position")
+                        .IsUnique();
+
+                    b.ToTable("twitch_poll_template_choices", (string)null);
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.WhisperQuotaBucket", b =>
                 {
                     b.Property<int>("Id")
@@ -2284,6 +2441,15 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.HostBroadcasterAuthorization", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.HostModAccessEntry", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -2410,6 +2576,35 @@ namespace BlokeBot.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPoll", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPollTemplate", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPollTemplateChoice", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.TwitchPollTemplate", "Template")
+                        .WithMany("Choices")
+                        .HasForeignKey("TwitchPollTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.WhisperQuotaBucket", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
@@ -2487,6 +2682,11 @@ namespace BlokeBot.Persistence.Migrations
                     b.Navigation("Entrants");
 
                     b.Navigation("Winners");
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.TwitchPollTemplate", b =>
+                {
+                    b.Navigation("Choices");
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.WhisperQuotaBucket", b =>

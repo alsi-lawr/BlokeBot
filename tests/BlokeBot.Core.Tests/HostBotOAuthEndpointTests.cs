@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -70,6 +71,25 @@ public sealed class HostBotOAuthEndpointTests : BotOAuthEndpointIntegrationTestB
         page.ShouldContain("Twitch access needed");
         page.ShouldContain("approve every requested permission");
         page.ShouldContain("Return to Channel setup");
+    }
+
+    [Test]
+    public async Task BroadcasterOAuth_SelectionChangedBeforeCallback_DoesNotPersistAuthorization()
+    {
+        await using var host = await EndpointHost.StartAsync(
+            configured: true,
+            selectedRole: AuthRole.Streamer,
+            login: "streamer",
+            endpointScenario: EndpointScenario.BroadcasterAuthorization,
+            selectedHostId: 2
+        );
+        var state = host.IssueBroadcasterState(1);
+
+        using var response = await host.Client.GetAsync($"/oauth/callback?code=code&state={state}");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        await using var db = await host.DbFactory!.CreateDbContextAsync();
+        (await db.HostBroadcasterAuthorizations.CountAsync()).ShouldBe(0);
     }
 
     [Test]

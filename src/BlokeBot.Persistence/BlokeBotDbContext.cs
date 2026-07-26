@@ -52,6 +52,12 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<GuessVote> Votes => Set<GuessVote>();
     public DbSet<ShoutoutHistoryEntry> ShoutoutHistory => Set<ShoutoutHistoryEntry>();
     public DbSet<ShoutoutCooldownState> ShoutoutCooldowns => Set<ShoutoutCooldownState>();
+    public DbSet<HostBroadcasterAuthorization> HostBroadcasterAuthorizations =>
+        Set<HostBroadcasterAuthorization>();
+    public DbSet<TwitchPollTemplate> TwitchPollTemplates => Set<TwitchPollTemplate>();
+    public DbSet<TwitchPollTemplateChoice> TwitchPollTemplateChoices =>
+        Set<TwitchPollTemplateChoice>();
+    public DbSet<TwitchPoll> TwitchPolls => Set<TwitchPoll>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +70,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePoints(modelBuilder);
         ConfigureGuessing(modelBuilder);
         ConfigureShoutouts(modelBuilder);
+        ConfigurePolls(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

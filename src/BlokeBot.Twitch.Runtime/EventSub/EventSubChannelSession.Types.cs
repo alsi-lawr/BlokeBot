@@ -16,6 +16,33 @@ internal enum EventSubSubscriptionReadiness
     Ready,
 }
 
+internal sealed record BroadcasterPollSubscriptionGroup(
+    string SubscriptionId,
+    IReadOnlyList<string> AdditionalSubscriptionIds
+)
+{
+    internal static BroadcasterPollSubscriptionGroup From(ActiveEventSubSubscription subscription)
+    {
+        return new(subscription.SubscriptionId, subscription.AdditionalSubscriptionIds);
+    }
+}
+
+internal abstract record BroadcasterPollSubscriptionState
+{
+    private BroadcasterPollSubscriptionState() { }
+
+    internal sealed record NotConfigured : BroadcasterPollSubscriptionState;
+
+    internal sealed record Unavailable(AccessTokenUnavailableReason Reason)
+        : BroadcasterPollSubscriptionState;
+
+    internal sealed record Active(BroadcasterPollSubscriptionGroup Group)
+        : BroadcasterPollSubscriptionState;
+
+    internal sealed record CleanupPending(BroadcasterPollSubscriptionGroup Group)
+        : BroadcasterPollSubscriptionState;
+}
+
 internal sealed record ActiveEventSubSubscription
 {
     internal required string Channel { get; init; }
@@ -32,4 +59,7 @@ internal sealed record ActiveEventSubSubscription
     internal required EventSubSubscriptionReadiness Readiness { get; init; }
 
     internal IReadOnlyList<string> AdditionalSubscriptionIds { get; init; } = [];
+
+    internal BroadcasterPollSubscriptionState PollSubscriptions { get; init; } =
+        new BroadcasterPollSubscriptionState.NotConfigured();
 }

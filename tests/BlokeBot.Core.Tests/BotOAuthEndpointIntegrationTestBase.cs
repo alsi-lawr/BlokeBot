@@ -50,12 +50,22 @@ public abstract class BotOAuthEndpointIntegrationTestBase
     {
         public HttpClient Client { get; } = client;
 
+        public SqliteBlokeBotDbFactory? DbFactory { get; } = dbFactory;
+
         public string IssueHostBotState()
         {
             var authentication = app.Services.GetRequiredService<TestAuthenticationSettings>();
             return app
                 .Services.GetRequiredService<HostBotOAuthStateStore>()
                 .Issue(authentication.UserId, authentication.SelectedHostId);
+        }
+
+        public string IssueBroadcasterState(int hostId)
+        {
+            var authentication = app.Services.GetRequiredService<TestAuthenticationSettings>();
+            return app
+                .Services.GetRequiredService<HostBroadcasterOAuthStateStore>()
+                .Issue(authentication.UserId, hostId);
         }
 
         public static async Task<EndpointHost> StartAsync(
@@ -65,7 +75,8 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             AuthRole? selectedRole = null,
             string login = "admin",
             EndpointScenario endpointScenario = EndpointScenario.None,
-            CallbackLogCapture? logs = null
+            CallbackLogCapture? logs = null,
+            int? selectedHostId = null
         )
         {
             var builder = WebApplication.CreateBuilder();
@@ -87,7 +98,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     isBotAdmin,
                     selectedRole,
                     login,
-                    configuredServices?.HostId ?? 1
+                    selectedHostId ?? configuredServices?.HostId ?? 1
                 )
             );
             builder
@@ -141,9 +152,9 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         {
             Client.Dispose();
             await app.DisposeAsync();
-            if (dbFactory is not null)
+            if (DbFactory is not null)
             {
-                await dbFactory.DisposeAsync();
+                await DbFactory.DisposeAsync();
             }
         }
 
@@ -195,6 +206,9 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                 case EndpointScenario.HostMissingPermission:
                 case EndpointScenario.HostCustomBotDisabled:
                     RegisterHostServices(services, dbFactory, changes);
+                    break;
+                case EndpointScenario.BroadcasterAuthorization:
+                    RegisterBroadcasterServices(services, dbFactory, changes);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null);
@@ -266,6 +280,45 @@ public abstract class BotOAuthEndpointIntegrationTestBase
                     settings
                 )
             );
+        }
+
+        private static void RegisterBroadcasterServices(
+            IServiceCollection services,
+            SqliteBlokeBotDbFactory dbFactory,
+            HostedChannelChangeNotifier changes
+        )
+        {
+            var http = new EndpointOAuthHttpClientFactory(
+                "123",
+                "streamer",
+                HostBroadcasterAuthorizationService.MilestoneScopes
+            );
+            var transport = new OAuthTransport(http);
+            var settings = BotSettings.FromOptions(
+                new BotOptions
+                {
+                    Identity = new BotIdentityOptions
+                    {
+                        BotUsername = "mainbot",
+                        ClientId = "client",
+                        ClientSecret = "secret",
+                        RedirectUri = "http://localhost/oauth/callback",
+                        Scopes = ["chat:read", "chat:edit"],
+                    },
+                }
+            );
+            var oauth = new HostBotAccountOAuthService(settings, transport, new HelixClient(http));
+            services.AddSingleton(oauth);
+            services.AddSingleton(
+                new HostBroadcasterAuthorizationService(
+                    dbFactory,
+                    HostBotAccountTokenProtectionTestSupport.CreateProtector(),
+                    transport,
+                    settings,
+                    changes
+                )
+            );
+            services.AddSingleton<HostBroadcasterOAuthStateStore>();
         }
 
         private static async Task<int> SeedEndpointHostAsync(
@@ -460,5 +513,6 @@ public abstract class BotOAuthEndpointIntegrationTestBase
         ChannelMissingPermission,
         HostMissingPermission,
         HostCustomBotDisabled,
+        BroadcasterAuthorization,
     }
 }
