@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlokeBot.Simulation\BlokeBot.Simulation.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Twitch.Auth\BlokeBot.Twitch.Auth.csproj" />
+    <ProjectReference Include="..\..\src\BlokeBot.Twitch\BlokeBot.Twitch.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Shouldly" />
+    <PackageReference Include="TUnit" />
+  </ItemGroup>
+</Project>
