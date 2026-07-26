@@ -2,6 +2,23 @@ namespace BlokeBot.Twitch.Runtime;
 
 internal sealed class ChatIdentityResolver(BotIdentity identity, HelixClient helix)
 {
+    internal async Task<string?> ResolveBroadcasterIdAsync(
+        string channelLogin,
+        string accessToken,
+        CancellationToken cancellationToken
+    )
+    {
+        var channel = Login.Normalize(channelLogin);
+        var users = await helix.GetUsersByLoginAsync(
+            new HelixRequestContext(identity.ClientId, accessToken),
+            [channel],
+            cancellationToken
+        );
+        return users
+            .FirstOrDefault(user => user.Login.Equals(channel, StringComparison.OrdinalIgnoreCase))
+            ?.Id;
+    }
+
     internal async Task<ChatIdentityResolution> ResolveAsync(
         string channelLogin,
         string botLogin,

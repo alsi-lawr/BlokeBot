@@ -437,39 +437,6 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
     }
 
     [Test]
-    public async Task BroadcasterSubscription_Reconciliation_ReportsUnavailableWithoutConfiguredBotFallback()
-    {
-        var operations = new ScriptedChannelOperations();
-        operations.EnqueueCreateOutcome(
-            "channel",
-            new EventSubSubscriptionSetupOutcome.Created(
-                new ActiveEventSubSubscription
-                {
-                    Channel = "channel",
-                    SubscriptionId = "broadcaster-subscription",
-                    BotLogin = "broadcaster",
-                    Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
-                    AccessToken = "broadcaster-token",
-                    Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
-                }
-            )
-        );
-        await using var harness = CreateHarness(operations, attemptLimit: 1);
-
-        harness.Session.Start(["channel"], CancellationToken.None);
-        await harness.Session.DrainAsync();
-        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
-        await harness.Session.DrainAsync();
-
-        operations
-            .Authorizations("channel")
-            .ShouldBe([
-                EventSubAuthorizationContext.ConfiguredBotAuthority,
-                EventSubAuthorizationContext.BroadcasterAuthority,
-            ]);
-    }
-
-    [Test]
     public async Task CompleteSubscriptionSet_ChannelRemoval_DeletesChatAndBothShoutoutSubscriptions()
     {
         var operations = new ScriptedChannelOperations();

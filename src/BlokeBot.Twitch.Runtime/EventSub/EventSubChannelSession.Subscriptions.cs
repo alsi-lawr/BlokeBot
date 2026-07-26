@@ -154,6 +154,17 @@ internal sealed partial class EventSubChannelSession
                     }
                 }
 
+                active = await EnsurePollSubscriptionsAsync(
+                    channel,
+                    active,
+                    context,
+                    cancellationToken
+                );
+                lock (_gate)
+                {
+                    _subscriptions[channel] = active;
+                }
+
                 switch (active.Readiness)
                 {
                     case EventSubSubscriptionReadiness.PendingStartupDelivery:
@@ -206,6 +217,138 @@ internal sealed partial class EventSubChannelSession
             reason =>
                 ValueTask.FromResult<EventSubChannelReconciliationOutcome>(
                     new EventSubChannelReconciliationOutcome.TokenUnavailable(reason)
+                )
+        );
+    }
+
+    private async Task<ActiveEventSubSubscription> EnsurePollSubscriptionsAsync(
+        string channel,
+        ActiveEventSubSubscription active,
+        EventSubChannelAttemptContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        if (active.PollSubscriptions is BroadcasterPollSubscriptionState.Active)
+        {
+            return active;
+        }
+
+        if (active.PollSubscriptions is BroadcasterPollSubscriptionState.CleanupPending pending)
+        {
+            var cleanup = await RunPhaseAsync(
+                context,
+                EventSubChannelPhase.SubscriptionDeletion,
+                token =>
+                    operations.DeleteSubscriptionAsync(
+                        new ActiveEventSubSubscription
+                        {
+                            Channel = channel,
+                            SubscriptionId = pending.Group.SubscriptionId,
+                            AdditionalSubscriptionIds = pending.Group.AdditionalSubscriptionIds,
+                            BotLogin = active.BotLogin,
+                            Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
+                            AccessToken = string.Empty,
+                            Readiness = EventSubSubscriptionReadiness.Ready,
+                        },
+                        token
+                    ),
+                cancellationToken
+            );
+            if (cleanup is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
+            {
+                throw new EventSubChannelOperationException(
+                    EventSubChannelPhase.SubscriptionDeletion,
+                    unresolved.Failure.Exception
+                        ?? new InvalidOperationException(unresolved.Failure.FailureType)
+                );
+            }
+            active = active with
+            {
+                PollSubscriptions = new BroadcasterPollSubscriptionState.NotConfigured(),
+            };
+        }
+
+        var account = await operations
+            .ResolveAccount(channel, EventSubAuthorizationContext.BroadcasterAuthority)
+            .ExecuteAsync(cancellationToken);
+        return await account.Match<Task<ActiveEventSubSubscription>>(
+            async broadcaster =>
+            {
+                var setup = await RunPhaseAsync(
+                    context,
+                    EventSubChannelPhase.SubscriptionSetup,
+                    token =>
+                        operations.CreateSubscriptionAsync(
+                            channel,
+                            EventSubAuthorizationContext.BroadcasterAuthority,
+                            broadcaster,
+                            sessionId,
+                            token
+                        ),
+                    cancellationToken
+                );
+                switch (setup)
+                {
+                    case EventSubSubscriptionSetupOutcome.Created created:
+                        return active with
+                        {
+                            PollSubscriptions = new BroadcasterPollSubscriptionState.Active(
+                                BroadcasterPollSubscriptionGroup.From(created.Subscription)
+                            ),
+                        };
+                    case EventSubSubscriptionSetupOutcome.PartiallyCreated partial:
+                        var group = BroadcasterPollSubscriptionGroup.From(partial.Subscription);
+                        var pending = active with
+                        {
+                            PollSubscriptions = new BroadcasterPollSubscriptionState.CleanupPending(
+                                group
+                            ),
+                        };
+                        lock (_gate)
+                        {
+                            _subscriptions[channel] = pending;
+                        }
+
+                        var cleanup = await RunPhaseAsync(
+                            context,
+                            EventSubChannelPhase.SubscriptionDeletion,
+                            token =>
+                                operations.DeleteSubscriptionAsync(partial.Subscription, token),
+                            cancellationToken
+                        );
+                        if (cleanup is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
+                        {
+                            throw new EventSubChannelOperationException(
+                                EventSubChannelPhase.SubscriptionDeletion,
+                                unresolved.Failure.Exception
+                                    ?? new InvalidOperationException(unresolved.Failure.FailureType)
+                            );
+                        }
+
+                        throw new EventSubChannelOperationException(
+                            EventSubChannelPhase.SubscriptionSetup,
+                            partial.Failure
+                        );
+                    case EventSubSubscriptionSetupOutcome.MissingChannel:
+                    case EventSubSubscriptionSetupOutcome.MissingBot:
+                        return active with
+                        {
+                            PollSubscriptions = new BroadcasterPollSubscriptionState.Unavailable(
+                                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                            ),
+                        };
+                    default:
+                        throw new UnreachableException("Unknown poll EventSub setup outcome.");
+                }
+            },
+            reason =>
+                Task.FromResult(
+                    active with
+                    {
+                        PollSubscriptions = new BroadcasterPollSubscriptionState.Unavailable(
+                            reason
+                        ),
+                    }
                 )
         );
     }
@@ -296,6 +439,20 @@ internal sealed partial class EventSubChannelSession
     )
     {
         pendingDeletions.Begin(subscription);
+        var pollDeletion = await ReconcilePollSubscriptionDeletionAsync(
+            subscription,
+            context,
+            cancellationToken
+        );
+        if (
+            pollDeletion.Outcome
+            is EventSubChannelReconciliationOutcome.UnresolvedDeletion unresolvedPoll
+        )
+        {
+            return unresolvedPoll;
+        }
+
+        subscription = pollDeletion.Subscription;
         var outcome = await RunPhaseAsync(
             context,
             EventSubChannelPhase.SubscriptionDeletion,
@@ -332,6 +489,88 @@ internal sealed partial class EventSubChannelSession
                 };
             default:
                 throw new UnreachableException("Unknown EventSub subscription-deletion outcome.");
+        }
+    }
+
+    private async Task<(
+        ActiveEventSubSubscription Subscription,
+        EventSubChannelReconciliationOutcome? Outcome
+    )> ReconcilePollSubscriptionDeletionAsync(
+        ActiveEventSubSubscription subscription,
+        EventSubChannelAttemptContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        var group = subscription.PollSubscriptions switch
+        {
+            BroadcasterPollSubscriptionState.Active active => active.Group,
+            BroadcasterPollSubscriptionState.CleanupPending pending => pending.Group,
+            _ => null,
+        };
+        if (group is null)
+        {
+            return (subscription, null);
+        }
+
+        var outcome = await RunPhaseAsync(
+            context,
+            EventSubChannelPhase.SubscriptionDeletion,
+            token =>
+                operations.DeleteSubscriptionAsync(
+                    new ActiveEventSubSubscription
+                    {
+                        Channel = subscription.Channel,
+                        SubscriptionId = group.SubscriptionId,
+                        AdditionalSubscriptionIds = group.AdditionalSubscriptionIds,
+                        BotLogin = subscription.BotLogin,
+                        Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
+                        AccessToken = string.Empty,
+                        Readiness = EventSubSubscriptionReadiness.Ready,
+                    },
+                    token
+                ),
+            cancellationToken
+        );
+        if (outcome is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
+        {
+            var pending = subscription with
+            {
+                PollSubscriptions = new BroadcasterPollSubscriptionState.CleanupPending(group),
+            };
+            pendingDeletions.RetainUnresolved(pending, unresolved.Failure);
+            ReplaceTrackedSubscription(pending);
+            return (
+                pending,
+                new EventSubChannelReconciliationOutcome.UnresolvedDeletion
+                {
+                    Failure = unresolved.Failure,
+                }
+            );
+        }
+
+        var cleared = subscription with
+        {
+            PollSubscriptions = new BroadcasterPollSubscriptionState.NotConfigured(),
+        };
+        pendingDeletions.UpdateSubscription(cleared);
+        ReplaceTrackedSubscription(cleared);
+        return (cleared, null);
+    }
+
+    private void ReplaceTrackedSubscription(ActiveEventSubSubscription subscription)
+    {
+        lock (_gate)
+        {
+            if (
+                _subscriptions.TryGetValue(subscription.Channel, out var active)
+                && active.SubscriptionId.Equals(
+                    subscription.SubscriptionId,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                _subscriptions[subscription.Channel] = subscription;
+            }
         }
     }
 
