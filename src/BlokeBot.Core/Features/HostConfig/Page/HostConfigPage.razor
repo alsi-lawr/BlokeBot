@@ -29,22 +29,21 @@
 
 <PageTitle>BlokeBot | Channel Setup</PageTitle>
 
-<div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Channel setup"
-                Title="Channel setup"
-                Description="Connect the bot, choose who can help, and turn chat tools on or off." />
+<DashboardPage Kicker="Channel setup"
+               Title="Set up your channel"
+               Description="Connect the bot, choose who can help, and turn chat tools on or off for this channel.">
 
     @if (_blockedByMode)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Switch back to your own channel to change these settings.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Switch to your own channel" Description="Only the channel owner can change these channel-wide settings. Use the top bar to switch channels." />
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading channel setup...</div>
+        <PageState Kind="DashboardPageState.Loading" Title="Loading channel setup" Description="Getting this channel’s connection, people, and chat-tool settings ready." />
     }
     else if (!_state.IsHostCreated)
     {
-        <section class="card p-6">
+        <TaskPanel Title="Create your channel setup" Description="Create this channel before connecting the bot or turning on chat tools.">
             <div class="flex items-center gap-4">
                 @if (!string.IsNullOrWhiteSpace(_state.ProfileImageUrl))
                 {
@@ -63,11 +62,11 @@
             {
                 <p class="mt-5 text-sm font-semibold text-slate-700">This Twitch account cannot create a BlokeBot channel setup yet.</p>
             }
-        </section>
+        </TaskPanel>
     }
     else if (_state.HostId is { } hostId)
     {
-        <CollapsibleSection Title="@($"#{_state.DisplayName}")" Description="Connect the bot and start or stop it for your channel." InitiallyOpen="true">
+        <TaskPanel Title="@($"Keep #{_state.DisplayName} ready")" Description="Connect the bot and start or stop it for this channel.">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -184,9 +183,9 @@
                     </div>
                 </div>
             </div>
-        </CollapsibleSection>
+        </TaskPanel>
 
-        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="true">
+        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
             <div class="space-y-4 p-5">
                 <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
                     <input class="h-4 w-4"
@@ -231,10 +230,10 @@
                                             Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
                                             Refresh="LoadAsync"
                                             Collapsible="true"
-                                            InitiallyOpen="true" />
+                                            InitiallyOpen="false" />
         </div>
 
-        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="true">
+        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
             <div class="p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
@@ -270,7 +269,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="true">
+        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -324,7 +323,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="true">
+        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in _state.Features)
                 {
@@ -350,4 +349,4 @@
             </div>
         </CollapsibleSection>
     }
-</div>
+</DashboardPage>

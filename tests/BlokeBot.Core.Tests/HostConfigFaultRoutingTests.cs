@@ -52,6 +52,7 @@ public sealed class HostConfigFaultRoutingTests
         SetAdminClaims(testContext.Authorization, hostId);
 
         var page = RenderHostConfigPage(context);
+        await OpenDisclosureAsync(page, "Use your own bot account");
 
         page.WaitForAssertion(() =>
         {
@@ -319,17 +320,42 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
-    private static Task ClickAccessModeAsync<TComponent>(
+    private static async Task ClickAccessModeAsync<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
     )
         where TComponent : IComponent
     {
-        return page.InvokeAsync(() =>
+        await OpenDisclosureAsync(page, "Moderator help");
+        await page.InvokeAsync(() =>
             page.FindAll("button")
                 .Single(button => button.TextContent.Trim() == text)
                 .ClickAsync(new())
         );
+    }
+
+    private static async Task OpenDisclosureAsync<TComponent>(
+        IRenderedComponent<TComponent> page,
+        string title
+    )
+        where TComponent : IComponent
+    {
+        page.WaitForAssertion(() =>
+            page.FindAll("button.disclosure-trigger")
+                .Count(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+                .ShouldBe(1)
+        );
+        var trigger = page.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal));
+        var contentId = trigger.GetAttribute("aria-controls");
+        contentId.ShouldNotBeNullOrWhiteSpace();
+        if (page.FindAll($"#{contentId}").Count > 0)
+        {
+            return;
+        }
+
+        await page.InvokeAsync(() => trigger.Click());
+        page.WaitForAssertion(() => page.FindAll($"#{contentId}").Count.ShouldBe(1));
     }
 
     private static void AssertAccessMode<TComponent>(

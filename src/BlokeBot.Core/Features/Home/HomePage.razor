@@ -2,12 +2,24 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
 
-<PageTitle>BlokeBot | Home</PageTitle>
+<PageTitle>BlokeBot | Overview</PageTitle>
 
-<div class="home-page app-motion-stack mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Home"
-                Title="BlokeBot"
-                Description="Run Twitch chat games and points from one place. Set up your channel, choose the tools you want, and let the bot handle chat during stream." />
+<DashboardPage Kicker="Overview"
+               Title="Run your channel with BlokeBot"
+               Description="Set up your channel, choose the chat tools you need, and keep the bot ready for stream.">
+    <Actions>
+        <a class="btn-primary" href="/host">Set up your channel</a>
+    </Actions>
+
+    <ChildContent>
+    <TaskPanel Title="Get your channel ready"
+               Description="Channel setup is where you connect the bot, choose your chat tools, and decide which moderators can help.">
+        <ol class="grid gap-4 text-sm leading-6 text-muted-foreground md:grid-cols-3">
+            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">1. Connect the bot</strong>Let BlokeBot join your Twitch chat when you are ready to stream.</li>
+            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">2. Choose chat tools</strong>Turn on the games, points, and commands that fit your channel.</li>
+            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">3. Invite trusted moderators</strong>Choose who can help run the tools for this channel.</li>
+        </ol>
+    </TaskPanel>
 
     <AuthorizeView>
         <Authorized Context="homeAuth">
@@ -23,26 +35,5 @@
             <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
         </Authorized>
     </AuthorizeView>
-
-    <section class="grid gap-4 md:grid-cols-2">
-        <HomeInfoCard Title="Set up your channel" Icon="@HomeInfoCardIcon.Channel">
-            Connect the bot to your Twitch channel and keep your stream tools separate from everyone else's.
-        </HomeInfoCard>
-
-        <HomeInfoCard Title="Choose your chat tools" Icon="@HomeInfoCardIcon.Points">
-            Turn on guessing rounds, points, giveaways, or only the features that make sense for your stream.
-        </HomeInfoCard>
-
-        <HomeInfoCard Title="Let trusted mods help" Icon="@HomeInfoCardIcon.Moderators">
-            Let the mods you trust help run your channel tools, then change who can help whenever you need.
-        </HomeInfoCard>
-
-        <HomeInfoCard Title="Keep the bot ready" Icon="@HomeInfoCardIcon.Bot">
-            Check whether the bot can chat in your stream, then start or stop it from your channel page.
-        </HomeInfoCard>
-    </section>
-
-    <section class="home-note rounded-lg p-5">
-        <p class="text-sm leading-6 text-muted-foreground">BlokeBot is built around your Twitch channel: connect the bot, pick the chat tools you want, and choose who can help manage them.</p>
-    </section>
-</div>
+    </ChildContent>
+</DashboardPage>

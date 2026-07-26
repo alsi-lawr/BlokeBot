@@ -8,32 +8,29 @@
 
 <PageTitle>BlokeBot | Alerts</PageTitle>
 
-<div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Channel health"
-                Title="Alerts"
-                Description="See problems that need attention and alerts you have already handled.">
+<DashboardPage Kicker="Channel health"
+               Title="Review alerts"
+               Description="See problems that need attention and the alerts that have already been handled.">
+    <Actions>
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
-    </PageHeader>
+    </Actions>
 
+    <ChildContent>
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose alerts you want to review from the top bar." />
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
+        <PageState Kind="DashboardPageState.Loading" Title="Loading alerts" Description="Checking this channel for alerts that need attention." />
     }
     else
     {
-        <section class="space-y-3">
-            <div>
-                <h2 class="text-lg font-semibold text-slate-950">Active</h2>
-                <p class="mt-1 text-sm text-muted-foreground">@_activeSummary</p>
-            </div>
+        <TaskPanel Title="Handle active alerts" Description="Review the problems that need attention for this channel.">
 
             @if (_state.Active.Count == 0)
             {
-                <div class="card p-8 text-sm text-muted-foreground">No active alerts.</div>
+                <PageState Kind="DashboardPageState.Empty" Title="No active alerts" Description="There is nothing that needs attention for this channel right now." />
             }
             else
             {
@@ -71,7 +68,7 @@
                     }
                 </div>
             }
-        </section>
+        </TaskPanel>
 
         <section class="card">
             <div class="border-b border-slate-200 p-5">
@@ -80,7 +77,7 @@
             </div>
             @if (_state.History.Count == 0)
             {
-                <div class="p-8 text-sm text-muted-foreground">No handled alerts yet.</div>
+                <PageState Kind="DashboardPageState.Empty" Title="No handled alerts yet" Description="Alerts you mark as handled will remain here." />
             }
             else
             {
@@ -113,4 +110,5 @@
             }
         </section>
     }
-</div>
+    </ChildContent>
+</DashboardPage>

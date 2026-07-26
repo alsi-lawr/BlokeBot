@@ -13,26 +13,30 @@
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Title="Custom commands"
-                Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
+<DashboardPage Kicker="Chat tools"
+               Title="Edit custom commands"
+               Description="Create commands, choose the bot’s replies, keep counters, and schedule messages.">
+    <Actions>
         <button class="btn-primary"
                 aria-label="Save custom commands"
                 disabled="@(!_featureEnabled || _config is null)"
                 @onclick="SaveAsync">Save changes</button>
-    </PageHeader>
+    </Actions>
 
+    <ChildContent>
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose custom commands you want to edit from the top bar." />
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Custom commands are off for this channel. Turn them on in Channel setup.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on custom commands" Description="Custom commands are off for this channel. Turn them on in Channel setup before editing commands.">
+            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
+        </PageState>
     }
     else if (_config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading custom commands...</div>
+        <PageState Kind="DashboardPageState.Loading" Title="Loading custom commands" Description="Getting this channel’s commands, replies, counters, and scheduled messages ready." />
     }
     else
     {
@@ -718,4 +722,5 @@
         </CollapsibleSection>
         </div>
     }
-</div>
+    </ChildContent>
+</DashboardPage>

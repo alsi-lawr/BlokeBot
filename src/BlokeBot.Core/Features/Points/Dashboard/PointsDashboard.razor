@@ -13,24 +13,27 @@
 
 <PageTitle>BlokeBot | Points</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6">
-    <PageHeader Kicker="Dashboard"
-                Title="Points"
-                Description="Check balances, adjust points, and run the current giveaway.">
-        <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
-    </PageHeader>
+<DashboardPage Kicker="Chat tools"
+               Title="Manage points"
+               Description="Check balances, adjust viewer points, and run the current giveaway.">
+    <Actions>
+        <button class="btn-secondary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
+    </Actions>
 
+    <ChildContent>
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose viewer points you want to manage from the top bar." />
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
+        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on points" Description="Points are off for this channel. Turn them on in Channel setup before managing balances or giveaways.">
+            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
+        </PageState>
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
+        <PageState Kind="DashboardPageState.Loading" Title="Loading points" Description="Getting balances, the current giveaway, and recent changes ready." />
     }
     else
     {
@@ -71,16 +74,12 @@
                     </table>
                     @if (_state.Leaderboard.Count == 0)
                     {
-                        <div class="p-8 text-sm text-muted-foreground">No balances yet.</div>
+                        <PageState Kind="DashboardPageState.Empty" Title="No balances yet" Description="Viewer balances will appear here after points are earned or adjusted." />
                     }
                 </div>
             </section>
 
-            <section class="card">
-                <div class="border-b border-slate-200 p-5">
-                    <h2 class="text-lg font-semibold text-slate-950">Viewer points</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
-                </div>
+            <TaskPanel Title="Manage viewer points" Description="Look up a viewer or change their points for this channel.">
                 <div class="grid gap-4 p-5 md:grid-cols-2">
                     <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
                     <div class="flex items-end">
@@ -115,7 +114,7 @@
                         <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
                     </div>
                 </div>
-            </section>
+            </TaskPanel>
         </div>
 
         <section class="card">
@@ -184,4 +183,5 @@
             </div>
         </section>
     }
-</div>
+    </ChildContent>
+</DashboardPage>
