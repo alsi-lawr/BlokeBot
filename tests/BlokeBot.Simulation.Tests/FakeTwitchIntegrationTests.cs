@@ -3,13 +3,19 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using BlokeBot.Commands;
+using BlokeBot.Eventing;
+using BlokeBot.Functional;
 using BlokeBot.Simulation.FakeTwitch;
 using BlokeBot.Twitch;
 using BlokeBot.Twitch.Auth;
+using BlokeBot.Twitch.Runtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Polly;
 using Shouldly;
 using TUnit.Core;
 
@@ -91,78 +97,47 @@ public sealed class FakeTwitchIntegrationTests
         stream.ShouldNotBeNull();
         stream.ViewerCount.ShouldBe(42);
 
-        using var socket = new ClientWebSocket();
-        await socket.ConnectAsync(
-            host.Endpoints.InitialEventSubWebSocketEndpoint,
+        var observedChat = new RecordingChatObserver();
+        var observedPolls = new RecordingPollObserver();
+        var commandSender = new ProductChatCommandResponseSender(CreatePublicChatTransport(host));
+        var session = CreateEventSubSession(host, observedChat, observedPolls, commandSender);
+        var established = await session.EstablishAsync(
+            new RuntimeConnectionTarget.Initial(),
             CancellationToken.None
         );
-        var welcome = JsonDocument.Parse(await ReceiveTextAsync(socket));
-        var sessionId = welcome
-            .RootElement.GetProperty("payload")
-            .GetProperty("session")
-            .GetProperty("id")
-            .GetString();
-        sessionId.ShouldNotBeNullOrWhiteSpace();
+        var listening = established
+            .ShouldBeOfType<RuntimeSessionEstablishment.Established>()
+            .Session;
+        using var listeningCancellation = new CancellationTokenSource();
+        var listeningTask = listening.ListenAsync(listeningCancellation.Token);
 
-        var eventSub = new EventSubClient(host.HttpClientFactory, host.Endpoints);
-        var chatSubscriptionId = await eventSub.CreateChatMessageSubscriptionAsync(
-            context,
-            "1000",
-            "2000",
-            sessionId,
-            CancellationToken.None
+        await WaitUntilAsync(() =>
+            observedChat.Messages.Count == 2
+            && observedPolls.Events.Count == 1
+            && host.Authority.Transcript.Any(entry =>
+                entry.Kind == "helix.chat.message" && entry.Detail == "normal command response"
+            )
         );
-        chatSubscriptionId.ShouldStartWith("ready-dashboard-subscription-");
+        observedChat.Messages.Select(message => message.Text).ShouldBe(["!hello", "!mod"]);
+        observedChat.Messages[0].Tags.ShouldNotContainKey("mod");
+        observedChat.Messages[1].Tags["mod"].ShouldBe("1");
+        observedPolls.Events.ShouldHaveSingleItem().PollId.ShouldBe("poll-0001");
+        var subscriptions = host.Authority.ActiveSubscriptions;
+        var chatSubscription = subscriptions
+            .Where(subscription => subscription.Type == "channel.chat.message")
+            .ShouldHaveSingleItem();
+        chatSubscription.BroadcasterId.ShouldBe("1000");
+        chatSubscription.BotUserId.ShouldBe("2000");
+        chatSubscription.SubscriberUserId.ShouldBe("2000");
+        subscriptions.ShouldContain(subscription =>
+            subscription.Type == "channel.poll.begin"
+            && subscription.BroadcasterId == "1000"
+            && subscription.SubscriberUserId == "1000"
+        );
 
-        var ordinary = JsonDocument.Parse(await ReceiveTextAsync(socket));
-        ordinary
-            .RootElement.GetProperty("metadata")
-            .GetProperty("subscription_type")
-            .GetString()
-            .ShouldBe("channel.chat.message");
-        ordinary
-            .RootElement.GetProperty("payload")
-            .GetProperty("event")
-            .GetProperty("message")
-            .GetProperty("text")
-            .GetString()
-            .ShouldBe("!hello");
-        var moderator = JsonDocument.Parse(await ReceiveTextAsync(socket));
-        moderator
-            .RootElement.GetProperty("payload")
-            .GetProperty("event")
-            .GetProperty("badges")[0]
-            .GetProperty("set_id")
-            .GetString()
-            .ShouldBe("moderator");
-
-        var pollSubscriptionId = await eventSub.CreatePollSubscriptionAsync(
-            context,
-            "channel.poll.begin",
-            "1000",
-            sessionId,
-            CancellationToken.None
-        );
-        pollSubscriptionId.ShouldStartWith("ready-dashboard-subscription-");
-        var poll = JsonDocument.Parse(await ReceiveTextAsync(socket));
-        poll.RootElement.GetProperty("metadata")
-            .GetProperty("subscription_type")
-            .GetString()
-            .ShouldBe("channel.poll.begin");
-
-        var chat = new ChatClient(host.HttpClientFactory, host.Endpoints);
-        var response = await chat.SendMessageAsync(
-            context,
-            "1000",
-            "1000",
-            "Hello from the normal chat client.",
-            CancellationToken.None
-        );
-        response.IsSent.ShouldBeTrue();
-        host.Authority.Transcript.ShouldContain(entry =>
-            entry.Kind == "helix.chat.message"
-            && entry.Detail == "Hello from the normal chat client."
-        );
+        listeningCancellation.Cancel();
+        await Should.ThrowAsync<OperationCanceledException>(() => listeningTask);
+        await listening.DisposeAsync();
 
         await Should.ThrowAsync<HttpRequestException>(() =>
             transport.ExchangeCodeAsync(
@@ -207,6 +182,117 @@ public sealed class FakeTwitchIntegrationTests
         using var unsupported = await client.GetAsync($"{host.HttpAddress}helix/not-implemented");
         unsupported.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await unsupported.Content.ReadAsStringAsync()).ShouldContain("unsupported_route");
+
+        using var invalidSubscription = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"{host.HttpAddress}helix/eventsub/subscriptions"
+        )
+        {
+            Content = new StringContent(
+                """
+                {
+                  "type":"channel.chat.message",
+                  "version":"1",
+                  "condition":{"broadcaster_user_id":"1000","user_id":"not-the-bot"},
+                  "transport":{"method":"websocket","session_id":"unused"}
+                }
+                """,
+                Encoding.UTF8,
+                "application/json"
+            ),
+        };
+        invalidSubscription.Headers.Add("Client-Id", "fake-twitch-client");
+        invalidSubscription.Headers.Authorization = new(
+            "Bearer",
+            FakeTwitchAuthority.BotAccessToken
+        );
+        using var invalidSubscriptionResponse = await client.SendAsync(invalidSubscription);
+        invalidSubscriptionResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    private static EventSubConnectionSession CreateEventSubSession(
+        FakeTwitchHost host,
+        RecordingChatObserver chatObserver,
+        RecordingPollObserver pollObserver,
+        ICommandResponseSender responseSender
+    )
+    {
+        var operations = new LoopbackEventSubOperations(host.HttpClientFactory, host.Endpoints);
+        var channelStatus = new EventSubChannelStatusStore();
+        var runtimeStatus = new BotRuntimeStatusStore();
+        var factory = new EventSubChannelSessionFactory(
+            operations,
+            new EventSubChannelRecoveryPipeline(
+                new ResiliencePipelineBuilder().Build(),
+                new ResiliencePipelineBuilder<EventSubChannelReconciliationOutcome>().Build()
+            ),
+            new EventSubSubscriptionReconciliationStore(),
+            channelStatus,
+            runtimeStatus,
+            new NoOpDiagnosticReporter(),
+            TimeProvider.System
+        );
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddContinueAndReportObserverFanOut<
+            EventSubMessageObserverBoundary,
+            ChatMessage,
+            ChatObserverDeadLetter
+        >(BotObserverBoundaries.EventSubMessages);
+        services.AddChatCommands().AddCommandModule<ReplyCommandModule>();
+        using var provider = services.BuildServiceProvider();
+        return new EventSubConnectionSession(
+            new StaticChannelProvider(),
+            factory,
+            provider.GetRequiredService<ChatCommandDispatcher>(),
+            responseSender,
+            runtimeStatus,
+            [chatObserver],
+            provider.GetRequiredService<
+                ObserverFanOut<EventSubMessageObserverBoundary, ChatMessage, ChatObserverDeadLetter>
+            >(),
+            NullLogger<EventSubConnectionSession>.Instance,
+            host.Endpoints,
+            pollObservers: [pollObserver]
+        );
+    }
+
+    private static HelixPublicChatTransport CreatePublicChatTransport(FakeTwitchHost host)
+    {
+        var identity = new BotIdentity
+        {
+            BotUsername = "blokebot",
+            ClientId = FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
+            ClientSecret = "fake-secret",
+            RedirectUri = "https://callback.invalid/bot/callback",
+            Scopes = OAuthAuthorizationScopeSet.Create(["user:read:chat"]),
+            TokenCachePath = "unused",
+        };
+        return new(
+            new AppAccessTokenProvider(host.HttpClientFactory, identity, host.Endpoints),
+            new StaticBotAccountProvider(),
+            identity,
+            new ChatIdentityResolver(
+                identity,
+                new HelixClient(host.HttpClientFactory, host.Endpoints)
+            ),
+            new ChatClient(host.HttpClientFactory, host.Endpoints),
+            NullLogger<HelixPublicChatTransport>.Instance
+        );
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(3);
+        while (!condition())
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new TimeoutException("The fake EventSub delivery did not complete.");
+            }
+
+            await Task.Delay(10);
+        }
     }
 
     private static string QueryValue(string uri, string key)
@@ -235,6 +321,210 @@ public sealed class FakeTwitchIntegrationTests
         } while (true);
 
         return Encoding.UTF8.GetString(payload.WrittenSpan);
+    }
+
+    private sealed class ReplyCommandModule : IChatCommandModule
+    {
+        public void AddCommands(IChatCommandBuilder commands)
+        {
+            commands.Map(
+                "hello",
+                async (context, _, cancellationToken) =>
+                    await context.ReplyAsync("normal command response", cancellationToken)
+            );
+        }
+    }
+
+    private sealed class RecordingChatObserver : IChatMessageObserver
+    {
+        public List<ChatMessage> Messages { get; } = [];
+
+        public ValueTask MessageReceivedAsync(
+            ChatMessage message,
+            CancellationToken cancellationToken
+        )
+        {
+            Messages.Add(message);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingPollObserver : IPollEventObserver
+    {
+        public List<EventSubPollEvent> Events { get; } = [];
+
+        public Task PollReceivedAsync(EventSubPollEvent poll, CancellationToken cancellationToken)
+        {
+            Events.Add(poll);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class ProductChatCommandResponseSender(HelixPublicChatTransport transport)
+        : ICommandResponseSender
+    {
+        public async ValueTask SendAsync(
+            ChatMessage sourceMessage,
+            CommandResponse response,
+            CancellationToken cancellationToken
+        )
+        {
+            var preparation = await transport.PrepareAsync(
+                new PublicChatClaimedMessage
+                {
+                    Id = 1,
+                    Channel = sourceMessage.Channel,
+                    Message = response.Message,
+                    EnqueuedAt = DateTimeOffset.UnixEpoch,
+                    ExpiresAt = DateTimeOffset.UnixEpoch.AddMinutes(1),
+                    Attempt = 1,
+                    ClaimToken = new PublicChatClaimToken(Guid.Empty),
+                    ClaimExpiresAt = DateTimeOffset.UnixEpoch.AddMinutes(1),
+                    DeduplicationKey = new PublicChatDeduplicationKey("fake-command-response"),
+                },
+                cancellationToken
+            );
+            var ready = preparation.ShouldBeOfType<PublicChatPreparationOutcome.Ready>();
+            _ = await transport.SendAsync(ready.Send, cancellationToken);
+        }
+    }
+
+    private sealed class StaticChannelProvider : IBotChannelProvider
+    {
+        public ValueTask<IReadOnlyList<string>> GetChannelsAsync(
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromResult<IReadOnlyList<string>>(["samplechannel"]);
+        }
+    }
+
+    private sealed class StaticBotAccountProvider : IBotAccountProvider
+    {
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBotAccount(string channelLogin)
+        {
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        new BotAccount("blokebot", FakeTwitchAuthority.BotAccessToken)
+                    )
+                )
+            );
+        }
+    }
+
+    private sealed class LoopbackEventSubOperations(
+        IHttpClientFactory clients,
+        TwitchEndpointPolicy endpoints
+    ) : IEventSubChannelOperations
+    {
+        private readonly EventSubClient _eventSub = new(clients, endpoints);
+
+        public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
+            string channel,
+            EventSubAuthorizationContext authorization
+        )
+        {
+            return authorization.Match(
+                _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
+                _ => Success("samplechannel", FakeTwitchAuthority.BroadcasterAccessToken)
+            );
+        }
+
+        public async ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
+            string channel,
+            EventSubAuthorizationContext authorization,
+            BotAccount account,
+            string sessionId,
+            CancellationToken cancellationToken
+        )
+        {
+            var context = new HelixRequestContext(
+                FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
+                account.AccessToken
+            );
+            var subscriptionId = authorization.Match(
+                _ =>
+                    _eventSub.CreateChatMessageSubscriptionAsync(
+                        context,
+                        "1000",
+                        "2000",
+                        sessionId,
+                        cancellationToken
+                    ),
+                _ =>
+                    _eventSub.CreatePollSubscriptionAsync(
+                        context,
+                        "channel.poll.begin",
+                        "1000",
+                        sessionId,
+                        cancellationToken
+                    )
+            );
+            return new EventSubSubscriptionSetupOutcome.Created(
+                new ActiveEventSubSubscription
+                {
+                    Channel = channel,
+                    SubscriptionId = await subscriptionId,
+                    BotLogin = account.Login,
+                    AccessToken = account.AccessToken,
+                    Authorization = authorization,
+                    Readiness = EventSubSubscriptionReadiness.Ready,
+                }
+            );
+        }
+
+        public ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromResult<EventSubStartupDeliveryOutcome>(
+                new EventSubStartupDeliveryOutcome.Completed()
+            );
+        }
+
+        public ValueTask NotifyChannelStartedAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<EventSubSubscriptionDeletionOutcome> DeleteSubscriptionAsync(
+            ActiveEventSubSubscription subscription,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
+                new EventSubSubscriptionDeletionOutcome.Deleted()
+            );
+        }
+
+        public ValueTask CompleteStopAsync(string channel, CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        private static IO<BotAccount, AccessTokenUnavailableReason> Success(
+            string login,
+            string accessToken
+        )
+        {
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                        new BotAccount(login, accessToken)
+                    )
+                )
+            );
+        }
+    }
+
+    private sealed class NoOpDiagnosticReporter : IEventSubChannelDiagnosticReporter
+    {
+        public void Report(EventSubChannelDiagnosticReport report) { }
     }
 
     private sealed class FakeTwitchHost(

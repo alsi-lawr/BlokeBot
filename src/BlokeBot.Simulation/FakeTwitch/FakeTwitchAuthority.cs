@@ -65,6 +65,9 @@ public sealed record FakeTwitchTranscriptEntry(string Id, string Kind, string De
 /// <summary>Owns one scenario's deterministic OAuth, Helix, and EventSub state.</summary>
 public sealed class FakeTwitchAuthority
 {
+    public const string BotAccessToken = "fake-bot-access-token";
+    public const string BroadcasterAccessToken = "fake-broadcaster-access-token";
+
     private readonly object _gate = new();
     private readonly Dictionary<string, AuthorizationCode> _codes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AccessGrant> _accessTokens = new(StringComparer.Ordinal);
@@ -79,6 +82,14 @@ public sealed class FakeTwitchAuthority
     public FakeTwitchAuthority(FakeTwitchScenarioDefinition definition)
     {
         Definition = definition ?? throw new ArgumentNullException(nameof(definition));
+        _accessTokens.Add(
+            BotAccessToken,
+            new AccessGrant(Definition.BotUser, Definition.GrantedScopes)
+        );
+        _accessTokens.Add(
+            BroadcasterAccessToken,
+            new AccessGrant(Definition.AuthorizedUser, Definition.GrantedScopes)
+        );
     }
 
     public FakeTwitchScenarioDefinition Definition { get; }
@@ -90,6 +101,17 @@ public sealed class FakeTwitchAuthority
             lock (_gate)
             {
                 return [.. _transcript];
+            }
+        }
+    }
+
+    public IReadOnlyList<FakeTwitchSubscription> ActiveSubscriptions
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return [.. _subscriptions.Values];
             }
         }
     }
@@ -200,12 +222,19 @@ public sealed class FakeTwitchAuthority
         string sessionId
     )
     {
-        _ = RequireUserToken(request, "user:read:chat");
+        var subscriber = RequireUserToken(request, "user:read:chat");
         if (
             version != "1"
             || type is not "channel.chat.message" and not "channel.poll.begin"
             || !condition.TryGetValue("broadcaster_user_id", out var broadcasterId)
             || broadcasterId != Definition.AuthorizedUser.Id
+            || type == "channel.chat.message"
+                && (
+                    subscriber.Id != Definition.BotUser.Id
+                    || !condition.TryGetValue("user_id", out var botId)
+                    || botId != Definition.BotUser.Id
+                )
+            || type == "channel.poll.begin" && subscriber.Id != Definition.AuthorizedUser.Id
         )
         {
             throw new FakeTwitchProtocolException(
@@ -227,7 +256,17 @@ public sealed class FakeTwitchAuthority
             }
 
             id = NextId("subscription");
-            _subscriptions.Add(id, new(id, type, sessionId));
+            _subscriptions.Add(
+                id,
+                new(
+                    id,
+                    type,
+                    sessionId,
+                    broadcasterId,
+                    type == "channel.chat.message" ? Definition.BotUser.Id : null,
+                    subscriber.Id
+                )
+            );
             Record("eventsub.subscribe", $"{type}:{id}");
         }
 
@@ -265,22 +304,41 @@ public sealed class FakeTwitchAuthority
                 .ToArray();
     }
 
-    public void RecordChatMessage(string broadcasterId, string senderId, string message)
+    public void RecordChatMessage(
+        HttpRequest request,
+        string broadcasterId,
+        string senderId,
+        string message
+    )
     {
-        if (
-            broadcasterId != Definition.AuthorizedUser.Id
-            || senderId != Definition.AuthorizedUser.Id
-            || string.IsNullOrWhiteSpace(message)
-        )
-        {
-            throw new FakeTwitchProtocolException(
-                HttpStatusCode.BadRequest,
-                "invalid_chat_message"
-            );
-        }
-
         lock (_gate)
         {
+            if (
+                !string.Equals(
+                    request.Headers["Client-Id"],
+                    Definition.ClientId,
+                    StringComparison.Ordinal
+                ) || !TryGetGrant(ReadBearerToken(request), out var grant)
+            )
+            {
+                throw new FakeTwitchProtocolException(HttpStatusCode.Unauthorized, "invalid_token");
+            }
+
+            var validSender = grant.User is null
+                ? senderId == Definition.BotUser.Id
+                : senderId == grant.User.Id && grant.Scopes.Contains("user:write:chat");
+            if (
+                broadcasterId != Definition.AuthorizedUser.Id
+                || !validSender
+                || string.IsNullOrWhiteSpace(message)
+            )
+            {
+                throw new FakeTwitchProtocolException(
+                    HttpStatusCode.BadRequest,
+                    "invalid_chat_message"
+                );
+            }
+
             Record("helix.chat.message", message);
         }
     }
@@ -438,6 +496,19 @@ public sealed class FakeTwitchAuthority
                 broadcaster_user_id = Definition.AuthorizedUser.Id,
                 broadcaster_user_login = Definition.AuthorizedUser.Login,
                 title = "Ready poll",
+                choices = new[]
+                {
+                    new
+                    {
+                        id = "choice-0001",
+                        title = "Ready",
+                        votes = 0,
+                        channel_points_votes = 0,
+                    },
+                },
+                status = "ACTIVE",
+                started_at = "2026-07-15T12:00:00Z",
+                ends_at = "2026-07-15T12:05:00Z",
             }
         );
     }
@@ -828,7 +899,6 @@ public static class FakeTwitchHostingExtensions
     {
         try
         {
-            _ = authority.RequireUserToken(request, "user:write:chat");
             var message = await request.ReadFromJsonAsync<ChatMessageRequest>();
             if (message is not { })
             {
@@ -838,7 +908,12 @@ public static class FakeTwitchHostingExtensions
                 );
             }
 
-            authority.RecordChatMessage(message.BroadcasterId, message.SenderId, message.Message);
+            authority.RecordChatMessage(
+                request,
+                message.BroadcasterId,
+                message.SenderId,
+                message.Message
+            );
             return Results.Json(
                 new
                 {
@@ -1032,7 +1107,14 @@ public sealed class FakeTwitchSession(string id, WebSocket socket)
 }
 
 /// <summary>Represents one fake EventSub subscription.</summary>
-public sealed record FakeTwitchSubscription(string Id, string Type, string SessionId);
+public sealed record FakeTwitchSubscription(
+    string Id,
+    string Type,
+    string SessionId,
+    string BroadcasterId,
+    string? BotUserId,
+    string SubscriberUserId
+);
 
 internal sealed class FakeTwitchProtocolException(HttpStatusCode statusCode, string error)
     : Exception(error)
