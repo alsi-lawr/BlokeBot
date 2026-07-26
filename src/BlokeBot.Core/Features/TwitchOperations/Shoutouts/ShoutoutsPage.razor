@@ -2,6 +2,7 @@
 @using BlokeBot.Core.Auth.Sessions
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations.ChannelPoints
 @using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
 @using BlokeBot.Core.Features.TwitchOperations.Polls
 @using BlokeBot.Eventing
@@ -12,6 +13,7 @@
 @inject ToastService _toasts
 @inject PollService _polls
 @inject ClipMarkerService _clipsMarkers
+@inject ChannelPointsService _channelPoints
 @inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
 
@@ -23,7 +25,8 @@
         <div class="border-b border-slate-200 p-5">
             <h2 class="text-lg font-semibold text-slate-950">Shoutouts</h2>
             <p class="mt-1 text-sm text-muted-foreground">Send a native Twitch shoutout and see Twitch-provided cooldowns.</p>
-        </div>
+
+</div>
         @if (_state is null)
         {
             <p class="p-5 text-sm text-muted-foreground">Loading shoutouts...</p>
@@ -198,6 +201,62 @@
                 @foreach (var marker in _clipMarkerState.Markers)
                 {
                     <div class="rounded-lg border border-slate-200 p-3" @key="marker.Id"><strong>@marker.Description</strong><span class="ml-2 text-sm text-muted-foreground">@marker.Status at @marker.PositionSeconds seconds</span></div>
+                }
+            </div>
+        }
+    </section>
+    <section class="card">
+        <div class="border-b border-slate-200 p-5">
+            <h2 class="text-lg font-semibold text-slate-950">Rewards &amp; Redemptions</h2>
+            <p class="mt-1 text-sm text-muted-foreground">Manage rewards created by BlokeBot. Twitch owns all Channel Points balances.</p>
+        </div>
+        @if (_channelPointsState is null)
+        {
+            <p class="p-5 text-sm text-muted-foreground">Loading Channel Points...</p>
+        }
+        else
+        {
+            <div class="space-y-4 p-5">
+                @if (_channelPointsState.Authorization is ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+                {
+                    <div class="text-sm text-amber-700"><p>@readiness.Message</p><AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadChannelPointsAsync">Reconnect broadcaster</AuthPopupButton></div>
+                }
+                @if (_channelPointsState.Authorization is ChannelPointsAuthorizationReadiness.Ineligible ineligible)
+                {
+                    <div class="text-sm text-amber-700"><p>@ineligible.Message</p></div>
+                }
+                else
+                {
+                <div class="flex flex-wrap gap-3">
+                    <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
+                    <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
+                    <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-user-input"><input id="reward-user-input" type="checkbox" @bind="_rewardUserInput" />Require viewer input</label>
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-queue-skip"><input id="reward-queue-skip" type="checkbox" @bind="_rewardQueueSkip" />Skip request queue</label>
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-stream-limit"><input id="reward-stream-limit" type="checkbox" @bind="_rewardMaxPerStreamEnabled" />Per-stream limit</label>
+                    @if (_rewardMaxPerStreamEnabled) { <Field Id="reward-stream-limit-value" Label="Max per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" /> }
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-user-stream-limit"><input id="reward-user-stream-limit" type="checkbox" @bind="_rewardMaxPerUserPerStreamEnabled" />Per-user limit</label>
+                    @if (_rewardMaxPerUserPerStreamEnabled) { <Field Id="reward-user-stream-limit-value" Label="Max per user" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" /> }
+                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Global cooldown</label>
+                    @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
+                    <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
+                    <button class="btn-primary self-end" @onclick="CreateRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                    @if (_editingRewardId is not null)
+                    {
+                        <button class="btn-secondary self-end" @onclick="ClearRewardEditor">Cancel edit</button>
+                    }
+                </div>
+                @foreach (var reward in _channelPointsState.Rewards)
+                {
+                    <div class="rounded-lg border border-slate-200 p-3" @key="reward.ProviderRewardId">
+                        <div class="flex flex-wrap items-center gap-3"><strong>@reward.Title</strong><span class="text-sm text-muted-foreground">@reward.Cost Channel Points</span>
+                        @if (reward.IsManageable) { <button class="btn-secondary" @onclick="() => EditReward(reward)">Edit</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, !reward.IsEnabled, reward.IsPaused)">@(reward.IsEnabled ? "Disable" : "Enable")</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, reward.IsEnabled, !reward.IsPaused)">@(reward.IsPaused ? "Resume" : "Pause")</button><button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button> }
+                        else { <span class="text-sm text-muted-foreground">Managed outside BlokeBot — read-only</span> }</div>
+                        @if (!string.IsNullOrWhiteSpace(reward.Prompt)) { <p class="mt-1 text-sm text-muted-foreground">@reward.Prompt</p> }
+                    </div>
+                }
+                @if (_channelPointsState.ActiveRedemptions.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Unfulfilled redemptions</h3>@foreach (var redemption in _channelPointsState.ActiveRedemptions) { <div class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3" @key="redemption.ProviderRedemptionId"><span><strong>@redemption.RewardTitle</strong> — @redemption.UserLogin: @redemption.UserInput</span>@if (redemption.IsManageable) { <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button><button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button> } else { <span class="text-sm text-muted-foreground">Read-only</span> }</div> }</div> }
+                @if (_channelPointsState.History.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Recent redemption history</h3>@foreach (var redemption in _channelPointsState.History) { <p class="mt-1 text-sm" @key="redemption.ProviderRedemptionId">@redemption.RewardTitle — @redemption.UserLogin — @redemption.Status — @redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p> }</div> }
                 }
             </div>
         }

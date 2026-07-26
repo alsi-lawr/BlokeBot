@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -135,6 +136,17 @@ public sealed class TwitchOperationsUiTests
                 settings,
                 events,
                 alerts
+            )
+        );
+        context.Services.AddSingleton(
+            new ChannelPointsService(
+                dbFactory,
+                new ReadyBroadcasterProvider(),
+                new HelixClient(new RejectingHttpClientFactory()),
+                settings,
+                events,
+                alerts,
+                TimeProvider.System
             )
         );
         context.Services.AddSingleton(

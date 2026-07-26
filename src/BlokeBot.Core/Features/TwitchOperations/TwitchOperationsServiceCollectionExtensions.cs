@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -13,11 +14,15 @@ public static class TwitchOperationsServiceCollectionExtensions
         services.AddSingleton<ShoutoutService>();
         services.AddSingleton<PollService>();
         services.AddSingleton<ClipMarkerService>();
+        services.AddSingleton<ChannelPointsService>();
         services.AddSingleton<IPollEventObserver>(provider =>
             provider.GetRequiredService<PollService>()
         );
         services.AddSingleton<IShoutoutEventObserver>(provider =>
             provider.GetRequiredService<ShoutoutService>()
+        );
+        services.AddSingleton<IChannelPointsEventObserver>(provider =>
+            provider.GetRequiredService<ChannelPointsService>()
         );
         return services;
     }
