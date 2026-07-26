@@ -158,7 +158,9 @@ public sealed class PredictionService(
                 ct
             )
         )
+        {
             return new PredictionOperationOutcome.ActivePredictionExists();
+        }
         var provider = await helix.CreatePredictionAsync(
             new(settings.Identity.ClientId, token),
             host.TwitchUserId,
@@ -204,20 +206,29 @@ public sealed class PredictionService(
         int hostId,
         bool confirmed,
         CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Locked, null, confirmed, ct);
+    )
+    {
+        return EndAsync(hostId, HelixPredictionEndStatus.Locked, null, confirmed, ct);
+    }
 
     public Task<PredictionOperationOutcome> CancelAsync(
         int hostId,
         bool confirmed,
         CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Canceled, null, confirmed, ct);
+    )
+    {
+        return EndAsync(hostId, HelixPredictionEndStatus.Canceled, null, confirmed, ct);
+    }
 
     public Task<PredictionOperationOutcome> ResolveAsync(
         int hostId,
         string winningOutcomeId,
         bool confirmed,
         CancellationToken ct
-    ) => EndAsync(hostId, HelixPredictionEndStatus.Resolved, winningOutcomeId, confirmed, ct);
+    )
+    {
+        return EndAsync(hostId, HelixPredictionEndStatus.Resolved, winningOutcomeId, confirmed, ct);
+    }
 
     private async Task<PredictionOperationOutcome> EndAsync(
         int hostId,
@@ -244,9 +255,11 @@ public sealed class PredictionService(
             ct
         );
         if (host?.TwitchUserId is not { Length: > 0 } || active is null)
+        {
             return new PredictionOperationOutcome.ProviderRejected(
                 "There is no active prediction."
             );
+        }
         if (!confirmed)
         {
             return new PredictionOperationOutcome.ConfirmationRequired();
@@ -274,13 +287,17 @@ public sealed class PredictionService(
             return new PredictionOperationOutcome.Ineligible(_ineligibleMessage);
         }
         if (provider is HelixPredictionEndOutcome.InvalidRequest)
+        {
             return new PredictionOperationOutcome.ProviderRejected(
                 "Twitch did not permit that prediction transition."
             );
+        }
         if (provider is not HelixPredictionEndOutcome.Updated updated)
+        {
             return new PredictionOperationOutcome.Unavailable(
                 "Twitch is temporarily unavailable; the prediction was not changed locally."
             );
+        }
         var prediction = Upsert(
             db,
             hostId,
@@ -344,10 +361,14 @@ public sealed class PredictionService(
                     x.Status is HelixPredictionStatus.Active or HelixPredictionStatus.Locked
                 )
             )
+            {
                 changed |= ArchiveMissingActive(db, hostId);
+            }
         }
         else if (provider is HelixPredictionLookupOutcome.NoPrediction)
+        {
             changed = ArchiveMissingActive(db, hostId);
+        }
         if (!changed)
         {
             return;
@@ -474,12 +495,19 @@ public sealed class PredictionService(
     private async Task<HelixPredictionEligibilityOutcome> EligibilityAsync(
         string token,
         CancellationToken ct
-    ) => await helix.GetPredictionEligibilityAsync(new(settings.Identity.ClientId, token), ct);
+    )
+    {
+        return await helix.GetPredictionEligibilityAsync(
+            new(settings.Identity.ClientId, token),
+            ct
+        );
+    }
 
     private static PredictionOperationOutcome EligibilityOutcome(
         HelixPredictionEligibilityOutcome outcome
-    ) =>
-        outcome switch
+    )
+    {
+        return outcome switch
         {
             HelixPredictionEligibilityOutcome.Ineligible =>
                 new PredictionOperationOutcome.Ineligible(_ineligibleMessage),
@@ -489,16 +517,20 @@ public sealed class PredictionService(
                 "Twitch eligibility could not be checked right now."
             ),
         };
+    }
 
-    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct) =>
-        await broadcasters.GetTokenStatusAsync(
-            hostId,
-            HostBroadcasterAuthorizationService.MilestoneScopes,
-            ct
-        )
-            is TokenStatus.Ready ready
+    private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct)
+    {
+        return
+            await broadcasters.GetTokenStatusAsync(
+                hostId,
+                HostBroadcasterAuthorizationService.MilestoneScopes,
+                ct
+            )
+                is TokenStatus.Ready ready
             ? ready.AccessToken
             : await MissingTokenAsync(hostId, ct);
+    }
 
     private async Task<string?> MissingTokenAsync(int hostId, CancellationToken ct)
     {
@@ -569,7 +601,9 @@ public sealed class PredictionService(
             record is not null
             && (Terminal(record.Status) || StateRank(status) < StateRank(record.Status))
         )
+        {
             return new(record, false);
+        }
         if (record is null)
         {
             record = new TwitchPrediction
@@ -592,7 +626,9 @@ public sealed class PredictionService(
             status is TwitchPredictionStatus.Active
             && HasParticipationRegression(previous, outcomes)
         )
+        {
             return new(record, false);
+        }
         record.Title = prediction.Title;
         record.OutcomesJson = outcomesJson;
         record.Status = status;
@@ -628,8 +664,9 @@ public sealed class PredictionService(
 
     private static PredictionOutcomeView[] ToProjection(
         IReadOnlyList<HelixPredictionOutcome> outcomes
-    ) =>
-        outcomes
+    )
+    {
+        return outcomes
             .Select(x => new PredictionOutcomeView(
                 x.Id,
                 x.Title,
@@ -645,19 +682,23 @@ public sealed class PredictionService(
                     .ToArray()
             ))
             .ToArray();
+    }
 
     private static bool HasParticipationRegression(
         IReadOnlyList<PredictionOutcomeView> previous,
         IReadOnlyList<PredictionOutcomeView> current
-    ) =>
-        previous.Any(old =>
+    )
+    {
+        return previous.Any(old =>
             current.FirstOrDefault(next => next.Id == old.Id) is not { } next
             || next.Users < old.Users
             || next.ChannelPoints < old.ChannelPoints
         );
+    }
 
-    private static TwitchPredictionStatus ToPersisted(HelixPredictionStatus value) =>
-        value switch
+    private static TwitchPredictionStatus ToPersisted(HelixPredictionStatus value)
+    {
+        return value switch
         {
             HelixPredictionStatus.Active => TwitchPredictionStatus.Active,
             HelixPredictionStatus.Locked => TwitchPredictionStatus.Locked,
@@ -665,18 +706,23 @@ public sealed class PredictionService(
             HelixPredictionStatus.Canceled => TwitchPredictionStatus.Canceled,
             _ => TwitchPredictionStatus.Archived,
         };
+    }
 
-    private static int StateRank(TwitchPredictionStatus value) =>
-        value switch
+    private static int StateRank(TwitchPredictionStatus value)
+    {
+        return value switch
         {
             TwitchPredictionStatus.Active => 1,
             TwitchPredictionStatus.Locked => 2,
             TwitchPredictionStatus.Resolved or TwitchPredictionStatus.Canceled => 3,
             _ => 4,
         };
+    }
 
-    private static bool Terminal(TwitchPredictionStatus value) =>
-        value is not TwitchPredictionStatus.Active and not TwitchPredictionStatus.Locked;
+    private static bool Terminal(TwitchPredictionStatus value)
+    {
+        return value is not TwitchPredictionStatus.Active and not TwitchPredictionStatus.Locked;
+    }
 
     private static async Task TrimAsync(BlokeBotDbContext db, int hostId, CancellationToken ct)
     {
@@ -692,16 +738,19 @@ public sealed class PredictionService(
         db.TwitchPredictions.RemoveRange(excess);
     }
 
-    private static PredictionTemplateView View(TwitchPredictionTemplate template) =>
-        new(
+    private static PredictionTemplateView View(TwitchPredictionTemplate template)
+    {
+        return new(
             template.Id,
             template.Title,
             template.Outcomes.OrderBy(x => x.Position).Select(x => x.Title).ToArray(),
             template.PredictionWindowSeconds
         );
+    }
 
-    private static PredictionView View(TwitchPrediction value) =>
-        new(
+    private static PredictionView View(TwitchPrediction value)
+    {
+        return new(
             value.ProviderPredictionId,
             value.Title,
             JsonSerializer.Deserialize<PredictionOutcomeView[]>(value.OutcomesJson) ?? [],
@@ -711,6 +760,7 @@ public sealed class PredictionService(
             value.LocksAtUtc,
             value.EndedAtUtc
         );
+    }
 
     private sealed record PredictionUpsertOutcome(TwitchPrediction Prediction, bool Changed);
 

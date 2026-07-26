@@ -112,8 +112,9 @@ public sealed class PredictionServiceTests
         return host;
     }
 
-    private static EventSubPredictionEvent Event(string status) =>
-        new(
+    private static EventSubPredictionEvent Event(string status)
+    {
+        return new(
             "first-id",
             "first",
             "prediction-id",
@@ -126,6 +127,7 @@ public sealed class PredictionServiceTests
             status is "resolved" ? "yes" : null,
             Guid.NewGuid().ToString("N")
         );
+    }
 
     private sealed class ReadyBroadcaster : IHostBroadcasterTokenStatusProvider
     {
@@ -133,8 +135,9 @@ public sealed class PredictionServiceTests
             int hostId,
             IEnumerable<string?> scopes,
             CancellationToken ct
-        ) =>
-            Task.FromResult<TokenStatus>(
+        )
+        {
+            return Task.FromResult<TokenStatus>(
                 new TokenStatus.Ready(
                     "token",
                     new TokenValidation(
@@ -146,16 +149,23 @@ public sealed class PredictionServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             );
+        }
 
         public BlokeBot.Functional.IO<
             BotAccount,
             AccessTokenUnavailableReason
-        > GetBroadcasterAccount(string channelLogin) => throw new NotSupportedException();
+        > GetBroadcasterAccount(string channelLogin)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class SingleHandlerFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
-        public HttpClient CreateClient(string name) => new(handler, false);
+        public HttpClient CreateClient(string name)
+        {
+            return new(handler, false);
+        }
     }
 
     private sealed class PredictionHandler : HttpMessageHandler
@@ -171,9 +181,11 @@ public sealed class PredictionServiceTests
         {
             Requests.Add((request.Method, request.RequestUri!.Query));
             if (request.RequestUri!.AbsolutePath.EndsWith("/users"))
+            {
                 return Json(
                     $"{{\"data\":[{{\"id\":\"first-id\",\"broadcaster_type\":\"{BroadcasterType}\"}}]}}"
                 );
+            }
             if (request.Method == HttpMethod.Patch)
             {
                 PatchBodies.Add(await request.Content!.ReadAsStringAsync(ct));
@@ -182,11 +194,13 @@ public sealed class PredictionServiceTests
             return Json(Prediction("ACTIVE"));
         }
 
-        private static HttpResponseMessage Json(string value) =>
-            new(HttpStatusCode.OK)
+        private static HttpResponseMessage Json(string value)
+        {
+            return new(HttpStatusCode.OK)
             {
                 Content = new StringContent(value, Encoding.UTF8, "application/json"),
             };
+        }
 
         private static string Prediction(string status)
         {

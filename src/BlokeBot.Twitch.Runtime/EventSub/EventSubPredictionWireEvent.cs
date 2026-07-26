@@ -84,8 +84,9 @@ internal sealed record EventSubPredictionWireEvent
         [JsonPropertyName("top_predictors")]
         public IReadOnlyList<TopPredictor>? TopPredictors { get; init; }
 
-        internal EventSubPredictionOutcome ToDomain() =>
-            new(
+        internal EventSubPredictionOutcome ToDomain()
+        {
+            return new(
                 Id,
                 Title,
                 Color,
@@ -93,6 +94,7 @@ internal sealed record EventSubPredictionWireEvent
                 ChannelPoints,
                 (TopPredictors ?? []).Select(x => x.ToDomain()).ToArray()
             );
+        }
     }
 
     internal sealed record TopPredictor
@@ -112,7 +114,9 @@ internal sealed record EventSubPredictionWireEvent
         [JsonPropertyName("channel_points_won")]
         public int? ChannelPointsWon { get; init; }
 
-        internal EventSubPredictionTopPredictor ToDomain() =>
-            new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);
+        internal EventSubPredictionTopPredictor ToDomain()
+        {
+            return new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);
+        }
     }
 }

@@ -24,8 +24,9 @@ public sealed record EventSubPredictionEvent(
     string MessageId
 )
 {
-    public HelixPrediction ToHelix() =>
-        new(
+    public HelixPrediction ToHelix()
+    {
+        return new(
             PredictionId,
             BroadcasterUserId,
             Title,
@@ -59,6 +60,7 @@ public sealed record EventSubPredictionEvent(
             EndedAt,
             WinningOutcomeId
         );
+    }
 }
 
 public sealed record EventSubPredictionOutcome(

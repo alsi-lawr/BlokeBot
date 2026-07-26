@@ -642,27 +642,33 @@ public partial class ShoutoutsPage
         );
     }
 
-    private async Task LockPredictionAsync() =>
+    private async Task LockPredictionAsync()
+    {
         await UpdatePredictionAsync(
             null,
             "Lock this Twitch prediction?",
             (id, confirmed) => _predictions.LockAsync(id, confirmed, CancellationToken.None)
         );
+    }
 
-    private async Task CancelPredictionAsync() =>
+    private async Task CancelPredictionAsync()
+    {
         await UpdatePredictionAsync(
             null,
             "Cancel this Twitch prediction? Twitch refunds viewers.",
             (id, confirmed) => _predictions.CancelAsync(id, confirmed, CancellationToken.None)
         );
+    }
 
-    private async Task ResolvePredictionAsync(string outcomeId) =>
+    private async Task ResolvePredictionAsync(string outcomeId)
+    {
         await UpdatePredictionAsync(
             outcomeId,
             "Resolve this Twitch prediction and pay winners?",
             (id, confirmed) =>
                 _predictions.ResolveAsync(id, outcomeId, confirmed, CancellationToken.None)
         );
+    }
 
     private async Task UpdatePredictionAsync(
         string? _,
