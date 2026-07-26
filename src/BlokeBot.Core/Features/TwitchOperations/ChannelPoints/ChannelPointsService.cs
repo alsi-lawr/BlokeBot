@@ -20,6 +20,7 @@ public sealed class ChannelPointsService(
 ) : IChannelPointsEventObserver
 {
     private const int _terminalToKeep = 100;
+    private const int _redemptionsPageSize = 50;
 
     public async Task<ChannelPointsDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
@@ -508,15 +509,22 @@ public sealed class ChannelPointsService(
         var redemptions = new List<HelixRewardRedemption>();
         foreach (var reward in rewards.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
+            var progress = new RedemptionPaginationProgress();
+            var seenRedemptionIds = new HashSet<string>(StringComparer.Ordinal);
             string? cursor = null;
             do
             {
+                if (!progress.TryRequest(cursor))
+                {
+                    return new ChannelPointsReconciliationOutcome.Incomplete();
+                }
                 var result = await helix.GetRewardRedemptionsAsync(
                     context,
                     broadcasterId,
                     reward.Id,
                     HelixRewardRedemptionStatus.Unfulfilled,
                     HelixRewardRedemptionSort.Newest,
+                    _redemptionsPageSize,
                     cursor,
                     ct
                 );
@@ -524,9 +532,16 @@ public sealed class ChannelPointsService(
                 {
                     return ReconciliationFailure(result);
                 }
-                redemptions.AddRange(page.Page.Redemptions);
+                var additions = page
+                    .Page.Redemptions.Where(x => seenRedemptionIds.Add(x.Id))
+                    .ToArray();
+                if (!progress.TryReceive(page.Page.Cursor, additions.Length))
+                {
+                    return new ChannelPointsReconciliationOutcome.Incomplete();
+                }
+                redemptions.AddRange(additions);
                 cursor = page.Page.Cursor;
-            } while (!string.IsNullOrEmpty(cursor));
+            } while (!string.IsNullOrWhiteSpace(cursor));
         }
 
         var terminalBuckets = rewards
@@ -541,12 +556,17 @@ public sealed class ChannelPointsService(
             .ToArray();
         foreach (var bucket in terminalBuckets)
         {
+            if (!bucket.TryRequest())
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
             var result = await helix.GetRewardRedemptionsAsync(
                 context,
                 broadcasterId,
                 bucket.RewardId,
                 bucket.Status,
                 HelixRewardRedemptionSort.Newest,
+                bucket.PageSize,
                 null,
                 ct
             );
@@ -554,8 +574,10 @@ public sealed class ChannelPointsService(
             {
                 return ReconciliationFailure(result);
             }
-            bucket.Redemptions.AddRange(page.Page.Redemptions);
-            bucket.Cursor = page.Page.Cursor;
+            if (!bucket.TryReceive(page.Page))
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
         }
 
         while (true)
@@ -569,13 +591,18 @@ public sealed class ChannelPointsService(
                         x.CanFetchMore
                         && (
                             x.Redemptions.Count == 0
+                            // Equal redeemed_at values are equivalent at the newest-100 boundary.
                             || x.Redemptions[^1].RedeemedAt
-                                >= ordered[_terminalToKeep - 1].RedeemedAt
+                                > ordered[_terminalToKeep - 1].RedeemedAt
                         )
                     );
             if (next is null)
             {
                 break;
+            }
+            if (!next.TryRequest())
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
             }
             var result = await helix.GetRewardRedemptionsAsync(
                 context,
@@ -583,6 +610,7 @@ public sealed class ChannelPointsService(
                 next.RewardId,
                 next.Status,
                 HelixRewardRedemptionSort.Newest,
+                next.PageSize,
                 next.Cursor,
                 ct
             );
@@ -590,8 +618,10 @@ public sealed class ChannelPointsService(
             {
                 return ReconciliationFailure(result);
             }
-            next.Redemptions.AddRange(page.Page.Redemptions);
-            next.Cursor = page.Page.Cursor;
+            if (!next.TryReceive(page.Page))
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
         }
 
         redemptions.AddRange(
@@ -653,8 +683,49 @@ public sealed class ChannelPointsService(
 
         public string? Cursor { get; set; }
 
+        private RedemptionPaginationProgress _progress { get; } = new();
+
+        private HashSet<string> _redemptionIds { get; } = new(StringComparer.Ordinal);
+
         public bool CanFetchMore =>
             Redemptions.Count < _terminalToKeep && !string.IsNullOrWhiteSpace(Cursor);
+
+        public int PageSize => Math.Min(_redemptionsPageSize, _terminalToKeep - Redemptions.Count);
+
+        public bool TryRequest()
+        {
+            return _progress.TryRequest(Cursor);
+        }
+
+        public bool TryReceive(HelixRewardRedemptionsPage page)
+        {
+            var additions = page.Redemptions.Where(x => _redemptionIds.Add(x.Id)).ToArray();
+            if (!_progress.TryReceive(page.Cursor, additions.Length))
+            {
+                return false;
+            }
+            Redemptions.AddRange(additions);
+            Cursor = page.Cursor;
+            return true;
+        }
+    }
+
+    private sealed class RedemptionPaginationProgress
+    {
+        private HashSet<string> _requestedCursors { get; } = new(StringComparer.Ordinal);
+
+        private HashSet<string> _returnedCursors { get; } = new(StringComparer.Ordinal);
+
+        public bool TryRequest(string? cursor)
+        {
+            return string.IsNullOrWhiteSpace(cursor) || _requestedCursors.Add(cursor);
+        }
+
+        public bool TryReceive(string? cursor, int additions)
+        {
+            return string.IsNullOrWhiteSpace(cursor)
+                || (additions > 0 && _returnedCursors.Add(cursor));
+        }
     }
 
     private static (TwitchCustomReward Reward, bool Changed) UpsertReward(

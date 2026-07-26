@@ -844,10 +844,13 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         string rewardId,
         HelixRewardRedemptionStatus status,
         HelixRewardRedemptionSort sort,
+        int pageSize,
         string? cursor,
         CancellationToken cancellationToken
     )
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(pageSize, 50);
         var uri =
             _redemptionsEndpoint
             + "?"
@@ -856,7 +859,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 new("reward_id", rewardId),
                 new("status", RedemptionStatusToken(status)),
                 new("sort", RedemptionSortToken(sort)),
-                new("first", "50"),
+                new("first", pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 new("after", cursor),
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
