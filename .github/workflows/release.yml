@@ -35,7 +35,6 @@ jobs:
       scoop_manifest_path: artifacts/package-metadata/blokebot/scoop/bucket/blokebot.json
       chocolatey_nuspec_path: artifacts/package-metadata/blokebot/chocolatey/blokebot/blokebot.nuspec
       winget_manifest_prefix: artifacts/package-metadata/blokebot/winget/manifests/a/alsi-lawr/BlokeBot
-      winget_identifier: alsi-lawr.BlokeBot
       publish_github_release: true
       publish_homebrew: true
       publish_scoop: true
