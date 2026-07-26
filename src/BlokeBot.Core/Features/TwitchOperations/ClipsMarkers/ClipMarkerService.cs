@@ -397,13 +397,17 @@ public sealed class ClipMarkerService(
             .Select(clip => clip.RequestedAtUtc + _clipAvailabilityBound)
             .DefaultIfEmpty()
             .Max();
-        using var deadlineCancellation =
-            deadline == default
-                ? null
-                : new CancellationTokenSource(
-                    deadline - timeProvider.GetUtcNow().UtcDateTime,
-                    timeProvider
-                );
+        var deadlineRemaining =
+            deadline == default ? (TimeSpan?)null : deadline - timeProvider.GetUtcNow().UtcDateTime;
+        if (deadlineRemaining is { } remaining && remaining <= TimeSpan.Zero)
+        {
+            await ExpirePendingClipsAsync(db, hostId, ct);
+            return;
+        }
+
+        using var deadlineCancellation = deadlineRemaining is { } remainingDuration
+            ? new CancellationTokenSource(remainingDuration, timeProvider)
+            : null;
         using var reconciliationCancellation = deadlineCancellation is null
             ? null
             : CancellationTokenSource.CreateLinkedTokenSource(ct, deadlineCancellation.Token);
