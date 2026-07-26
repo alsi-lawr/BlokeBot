@@ -1,0 +1,24 @@
+<div class="dashboard-page app-motion-stack mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description">
+        @Actions
+    </PageHeader>
+
+    @ChildContent
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Kicker { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+}

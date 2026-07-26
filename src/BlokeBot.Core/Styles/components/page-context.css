@@ -158,3 +158,73 @@
         }
     }
 }
+
+@layer components {
+    .dashboard-page {
+        padding-inline: 1rem;
+        padding-bottom: 1.5rem;
+        padding-top: 1.5rem;
+    }
+
+    .task-panel,
+    .page-state {
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        box-shadow: var(--app-shadow-sm);
+    }
+
+    .task-panel__header,
+    .page-state {
+        align-items: start;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1.25rem;
+    }
+
+    .task-panel__title,
+    .page-state__title {
+        color: var(--app-text-strong);
+        font-size: 1.125rem;
+        font-weight: 700;
+    }
+
+    .task-panel__description,
+    .page-state__description {
+        color: var(--app-text-muted);
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+
+    .task-panel__actions,
+    .page-state__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .task-panel__body {
+        border-top: 1px solid var(--app-border);
+        padding: 1.25rem;
+    }
+
+    .page-state--failure {
+        border-color: var(--app-warning-border);
+    }
+
+    @media (min-width: 40rem) {
+        .task-panel__header,
+        .page-state {
+            align-items: center;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+    }
+
+    @media (min-width: 64rem) {
+        .dashboard-page {
+            padding-inline: 0;
+        }
+    }
+}

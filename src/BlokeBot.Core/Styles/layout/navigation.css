@@ -56,6 +56,12 @@ html[data-nav-guessing-open="false"]
     .nav-menu__section-body,
 html[data-nav-points-open="false"]
     .nav-menu__section[data-nav-section="points"]
+    .nav-menu__section-body,
+html[data-nav-custom-commands-open="false"]
+    .nav-menu__section[data-nav-section="custom-commands"]
+    .nav-menu__section-body,
+html[data-nav-native-twitch-open="false"]
+    .nav-menu__section[data-nav-section="native-twitch"]
     .nav-menu__section-body {
     display: none !important;
 }
@@ -65,6 +71,12 @@ html[data-nav-guessing-open="false"]
     .nav-menu__section-chevron,
 html[data-nav-points-open="false"]
     .nav-menu__section[data-nav-section="points"]
+    .nav-menu__section-chevron,
+html[data-nav-custom-commands-open="false"]
+    .nav-menu__section[data-nav-section="custom-commands"]
+    .nav-menu__section-chevron,
+html[data-nav-native-twitch-open="false"]
+    .nav-menu__section[data-nav-section="native-twitch"]
     .nav-menu__section-chevron {
     rotate: 0deg !important;
 }
