@@ -221,6 +221,12 @@
                 {
                     <div class="text-sm text-amber-700"><p>@readiness.Message</p><AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadChannelPointsAsync">Reconnect broadcaster</AuthPopupButton></div>
                 }
+                @if (_channelPointsState.Authorization is ChannelPointsAuthorizationReadiness.Ineligible ineligible)
+                {
+                    <div class="text-sm text-amber-700"><p>@ineligible.Message</p></div>
+                }
+                else
+                {
                 <div class="flex flex-wrap gap-3">
                     <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
                     <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
@@ -251,6 +257,7 @@
                 }
                 @if (_channelPointsState.ActiveRedemptions.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Unfulfilled redemptions</h3>@foreach (var redemption in _channelPointsState.ActiveRedemptions) { <div class="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 p-3" @key="redemption.ProviderRedemptionId"><span><strong>@redemption.RewardTitle</strong> — @redemption.UserLogin: @redemption.UserInput</span>@if (redemption.IsManageable) { <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button><button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button> } else { <span class="text-sm text-muted-foreground">Read-only</span> }</div> }</div> }
                 @if (_channelPointsState.History.Count > 0) { <div><h3 class="text-base font-semibold text-slate-950">Recent redemption history</h3>@foreach (var redemption in _channelPointsState.History) { <p class="mt-1 text-sm" @key="redemption.ProviderRedemptionId">@redemption.RewardTitle — @redemption.UserLogin — @redemption.Status — @redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p> }</div> }
+                }
             </div>
         }
     </section>

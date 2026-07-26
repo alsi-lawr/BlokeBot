@@ -132,6 +132,9 @@ public sealed class ChannelPointsServiceTests
         ).ShouldHaveSingleItem();
         redemption.Status.ShouldBe(TwitchRewardRedemptionStatus.Fulfilled);
         (await verify.TwitchCustomRewards.SingleAsync()).IsManageable.ShouldBeTrue();
+        http.ReturnIneligibleCustomRewards = true;
+        var ineligible = await service.LoadAsync(1, CancellationToken.None);
+        ineligible.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ineligible>();
     }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
@@ -173,6 +176,7 @@ public sealed class ChannelPointsServiceTests
     private sealed class ChannelPointsHttpClientFactory : IHttpClientFactory
     {
         internal int RedemptionPatches { get; private set; }
+        internal bool ReturnIneligibleCustomRewards { get; set; }
         internal int AllRewardsLists { get; private set; }
         internal int ManageableRewardsLists { get; private set; }
         internal int RedemptionStatusLists { get; private set; }
@@ -199,6 +203,17 @@ public sealed class ChannelPointsServiceTests
                 }
                 if (request.Method == HttpMethod.Get && uri.Contains("custom_rewards?"))
                 {
+                    if (owner.ReturnIneligibleCustomRewards)
+                    {
+                        return new(HttpStatusCode.Forbidden)
+                        {
+                            Content = new StringContent(
+                                "Channel Points are available only to Affiliate or Partner channels.",
+                                Encoding.UTF8,
+                                "text/plain"
+                            ),
+                        };
+                    }
                     if (uri.Contains("only_manageable_rewards=true"))
                     {
                         owner.ManageableRewardsLists++;
@@ -212,6 +227,8 @@ public sealed class ChannelPointsServiceTests
                 if (request.Method == HttpMethod.Get && uri.Contains("redemptions?"))
                 {
                     uri.ShouldContain("status=");
+                    uri.ShouldContain("sort=NEWEST");
+                    uri.ShouldContain("first=50");
                     owner.RedemptionStatusLists++;
                     return Json("""{"data":[],"pagination":{}}""");
                 }

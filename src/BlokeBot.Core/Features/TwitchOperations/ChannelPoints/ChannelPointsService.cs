@@ -23,9 +23,14 @@ public sealed class ChannelPointsService(
 
     public async Task<ChannelPointsDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
-        await ReconcileAsync(hostId, ct);
+        var reconciliation = await ReconcileCoreAsync(hostId, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var readiness = await ReadinessAsync(hostId, ct);
+        var readiness =
+            reconciliation is ChannelPointsReconciliationOutcome.Ineligible
+                ? new ChannelPointsAuthorizationReadiness.Ineligible(
+                    "Twitch Channel Points reward management is available only to Affiliate or Partner channels. Join Twitch Affiliate or Partner, then reload this page."
+                )
+                : await ReadinessAsync(hostId, ct);
         var rewards = await db
             .TwitchCustomRewards.AsNoTracking()
             .Where(x => x.HostId == hostId)
@@ -35,11 +40,13 @@ public sealed class ChannelPointsService(
             .TwitchRewardRedemptions.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Status == TwitchRewardRedemptionStatus.Unfulfilled)
             .OrderByDescending(x => x.RedeemedAtUtc)
+            .ThenByDescending(x => x.ProviderRedemptionId)
             .ToArrayAsync(ct);
         var history = await db
             .TwitchRewardRedemptions.AsNoTracking()
             .Where(x => x.HostId == hostId && x.Status != TwitchRewardRedemptionStatus.Unfulfilled)
-            .OrderByDescending(x => x.UpdatedAtUtc)
+            .OrderByDescending(x => x.RedeemedAtUtc)
+            .ThenByDescending(x => x.ProviderRedemptionId)
             .Take(_terminalToKeep)
             .ToArrayAsync(ct);
         return new(
@@ -274,10 +281,18 @@ public sealed class ChannelPointsService(
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
+        await ReconcileCoreAsync(hostId, ct);
+    }
+
+    private async Task<ChannelPointsReconciliationOutcome> ReconcileCoreAsync(
+        int hostId,
+        CancellationToken ct
+    )
+    {
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
         {
-            return;
+            return new ChannelPointsReconciliationOutcome.Incomplete();
         }
         var allRewards = await helix.GetCustomRewardsAsync(
             context.Value.Context,
@@ -287,7 +302,7 @@ public sealed class ChannelPointsService(
         );
         if (allRewards is not HelixCustomRewardsLookupOutcome.Found all)
         {
-            return;
+            return ReconciliationFailure(allRewards);
         }
         var manageableRewards = await helix.GetCustomRewardsAsync(
             context.Value.Context,
@@ -297,22 +312,17 @@ public sealed class ChannelPointsService(
         );
         if (manageableRewards is not HelixCustomRewardsLookupOutcome.Found manageable)
         {
-            return;
+            return ReconciliationFailure(manageableRewards);
         }
-        var redemptions = new Dictionary<string, IReadOnlyList<HelixRewardRedemption>>();
-        foreach (var reward in manageable.Rewards)
+        var redemptions = await ReconcileRedemptionsAsync(
+            context.Value.Context,
+            context.Value.BroadcasterId,
+            manageable.Rewards,
+            ct
+        );
+        if (redemptions is not ChannelPointsReconciliationOutcome.Completed recovered)
         {
-            var recovered = await ReconcileRewardRedemptionsAsync(
-                context.Value.Context,
-                context.Value.BroadcasterId,
-                reward.Id,
-                ct
-            );
-            if (recovered is null)
-            {
-                return;
-            }
-            redemptions[reward.Id] = recovered;
+            return redemptions;
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -338,12 +348,9 @@ public sealed class ChannelPointsService(
             db.TwitchCustomRewards.RemoveRange(absentRewards);
             changed = true;
         }
-        foreach (var pair in redemptions)
+        foreach (var redemption in recovered.Redemptions)
         {
-            foreach (var redemption in pair.Value)
-            {
-                changed |= UpsertRedemption(db, hostId, redemption, now);
-            }
+            changed |= UpsertRedemption(db, hostId, redemption, now);
         }
         if (changed)
         {
@@ -358,6 +365,7 @@ public sealed class ChannelPointsService(
         {
             await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         }
+        return new ChannelPointsReconciliationOutcome.Completed(recovered.Redemptions);
     }
 
     public async Task RedemptionReceivedAsync(
@@ -490,22 +498,15 @@ public sealed class ChannelPointsService(
         );
     }
 
-    private async Task<IReadOnlyList<HelixRewardRedemption>?> ReconcileRewardRedemptionsAsync(
+    private async Task<ChannelPointsReconciliationOutcome> ReconcileRedemptionsAsync(
         HelixRequestContext context,
         string broadcasterId,
-        string rewardId,
+        IReadOnlyList<HelixCustomReward> rewards,
         CancellationToken ct
     )
     {
         var redemptions = new List<HelixRewardRedemption>();
-        foreach (
-            var status in new[]
-            {
-                HelixRewardRedemptionStatus.Unfulfilled,
-                HelixRewardRedemptionStatus.Fulfilled,
-                HelixRewardRedemptionStatus.Canceled,
-            }
-        )
+        foreach (var reward in rewards.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
             string? cursor = null;
             do
@@ -513,20 +514,147 @@ public sealed class ChannelPointsService(
                 var result = await helix.GetRewardRedemptionsAsync(
                     context,
                     broadcasterId,
-                    rewardId,
-                    status,
+                    reward.Id,
+                    HelixRewardRedemptionStatus.Unfulfilled,
+                    HelixRewardRedemptionSort.Newest,
                     cursor,
                     ct
                 );
                 if (result is not HelixRewardRedemptionsLookupOutcome.Found page)
                 {
-                    return null;
+                    return ReconciliationFailure(result);
                 }
                 redemptions.AddRange(page.Page.Redemptions);
                 cursor = page.Page.Cursor;
             } while (!string.IsNullOrEmpty(cursor));
         }
-        return redemptions.OrderByDescending(x => x.RedeemedAt).ToArray();
+
+        var terminalBuckets = rewards
+            .OrderBy(x => x.Id, StringComparer.Ordinal)
+            .SelectMany(reward =>
+                new[]
+                {
+                    new TerminalRedemptionBucket(reward.Id, HelixRewardRedemptionStatus.Fulfilled),
+                    new TerminalRedemptionBucket(reward.Id, HelixRewardRedemptionStatus.Canceled),
+                }
+            )
+            .ToArray();
+        foreach (var bucket in terminalBuckets)
+        {
+            var result = await helix.GetRewardRedemptionsAsync(
+                context,
+                broadcasterId,
+                bucket.RewardId,
+                bucket.Status,
+                HelixRewardRedemptionSort.Newest,
+                null,
+                ct
+            );
+            if (result is not HelixRewardRedemptionsLookupOutcome.Found page)
+            {
+                return ReconciliationFailure(result);
+            }
+            bucket.Redemptions.AddRange(page.Page.Redemptions);
+            bucket.Cursor = page.Page.Cursor;
+        }
+
+        while (true)
+        {
+            var ordered = OrderByRedemptionRecency(terminalBuckets.SelectMany(x => x.Redemptions))
+                .ToArray();
+            var next =
+                ordered.Length < _terminalToKeep
+                    ? terminalBuckets.FirstOrDefault(x => x.CanFetchMore)
+                    : terminalBuckets.FirstOrDefault(x =>
+                        x.CanFetchMore
+                        && (
+                            x.Redemptions.Count == 0
+                            || x.Redemptions[^1].RedeemedAt
+                                >= ordered[_terminalToKeep - 1].RedeemedAt
+                        )
+                    );
+            if (next is null)
+            {
+                break;
+            }
+            var result = await helix.GetRewardRedemptionsAsync(
+                context,
+                broadcasterId,
+                next.RewardId,
+                next.Status,
+                HelixRewardRedemptionSort.Newest,
+                next.Cursor,
+                ct
+            );
+            if (result is not HelixRewardRedemptionsLookupOutcome.Found page)
+            {
+                return ReconciliationFailure(result);
+            }
+            next.Redemptions.AddRange(page.Page.Redemptions);
+            next.Cursor = page.Page.Cursor;
+        }
+
+        redemptions.AddRange(
+            OrderByRedemptionRecency(terminalBuckets.SelectMany(x => x.Redemptions))
+                .Take(_terminalToKeep)
+        );
+        return new ChannelPointsReconciliationOutcome.Completed(redemptions);
+    }
+
+    private static IOrderedEnumerable<HelixRewardRedemption> OrderByRedemptionRecency(
+        IEnumerable<HelixRewardRedemption> redemptions
+    )
+    {
+        return redemptions
+            .OrderByDescending(x => x.RedeemedAt)
+            .ThenByDescending(x => x.Id, StringComparer.Ordinal);
+    }
+
+    private static ChannelPointsReconciliationOutcome ReconciliationFailure(
+        HelixCustomRewardsLookupOutcome result
+    )
+    {
+        return result is HelixCustomRewardsLookupOutcome.Ineligible
+            ? new ChannelPointsReconciliationOutcome.Ineligible()
+            : new ChannelPointsReconciliationOutcome.Incomplete();
+    }
+
+    private static ChannelPointsReconciliationOutcome ReconciliationFailure(
+        HelixRewardRedemptionsLookupOutcome result
+    )
+    {
+        return result is HelixRewardRedemptionsLookupOutcome.Ineligible
+            ? new ChannelPointsReconciliationOutcome.Ineligible()
+            : new ChannelPointsReconciliationOutcome.Incomplete();
+    }
+
+    private abstract record ChannelPointsReconciliationOutcome
+    {
+        private ChannelPointsReconciliationOutcome() { }
+
+        public sealed record Completed(IReadOnlyList<HelixRewardRedemption> Redemptions)
+            : ChannelPointsReconciliationOutcome;
+
+        public sealed record Ineligible : ChannelPointsReconciliationOutcome;
+
+        public sealed record Incomplete : ChannelPointsReconciliationOutcome;
+    }
+
+    private sealed class TerminalRedemptionBucket(
+        string rewardId,
+        HelixRewardRedemptionStatus status
+    )
+    {
+        public string RewardId { get; } = rewardId;
+
+        public HelixRewardRedemptionStatus Status { get; } = status;
+
+        public List<HelixRewardRedemption> Redemptions { get; } = [];
+
+        public string? Cursor { get; set; }
+
+        public bool CanFetchMore =>
+            Redemptions.Count < _terminalToKeep && !string.IsNullOrWhiteSpace(Cursor);
     }
 
     private static (TwitchCustomReward Reward, bool Changed) UpsertReward(
@@ -663,7 +791,8 @@ public sealed class ChannelPointsService(
             .TwitchRewardRedemptions.Where(x =>
                 x.HostId == hostId && x.Status != TwitchRewardRedemptionStatus.Unfulfilled
             )
-            .OrderByDescending(x => x.UpdatedAtUtc)
+            .OrderByDescending(x => x.RedeemedAtUtc)
+            .ThenByDescending(x => x.ProviderRedemptionId)
             .Skip(_terminalToKeep)
             .ToArrayAsync(ct);
         db.TwitchRewardRedemptions.RemoveRange(remove);

@@ -843,6 +843,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         string broadcasterId,
         string rewardId,
         HelixRewardRedemptionStatus status,
+        HelixRewardRedemptionSort sort,
         string? cursor,
         CancellationToken cancellationToken
     )
@@ -854,6 +855,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 new("broadcaster_id", broadcasterId),
                 new("reward_id", rewardId),
                 new("status", RedemptionStatusToken(status)),
+                new("sort", RedemptionSortToken(sort)),
                 new("first", "50"),
                 new("after", cursor),
             ]);
@@ -952,6 +954,16 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             HelixChannelPointsOutcome.Ineligible =>
                 new HelixRewardRedemptionsLookupOutcome.Ineligible(),
             _ => new HelixRewardRedemptionsLookupOutcome.Unavailable(),
+        };
+    }
+
+    private static string RedemptionSortToken(HelixRewardRedemptionSort sort)
+    {
+        return sort switch
+        {
+            HelixRewardRedemptionSort.Newest => "NEWEST",
+            HelixRewardRedemptionSort.Oldest => "OLDEST",
+            _ => throw new ArgumentOutOfRangeException(nameof(sort)),
         };
     }
 

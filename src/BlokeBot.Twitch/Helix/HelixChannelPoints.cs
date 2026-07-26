@@ -54,6 +54,12 @@ public enum HelixRewardRedemptionStatus
     Unknown,
 }
 
+public enum HelixRewardRedemptionSort
+{
+    Newest,
+    Oldest,
+}
+
 public abstract record HelixChannelPointsOutcome
 {
     private HelixChannelPointsOutcome() { }
