@@ -24,6 +24,8 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private readonly Dictionary<string, int> _accountCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly Dictionary<string, List<EventSubAuthorizationContext>> _authorizations =
+            new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<
             string,
             Queue<Func<CancellationToken, ValueTask<EventSubSubscriptionSetupOutcome>>>
@@ -101,6 +103,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
             return _accountCounts.GetValueOrDefault(channel);
         }
 
+        internal IReadOnlyList<EventSubAuthorizationContext> Authorizations(string channel)
+        {
+            return _authorizations.TryGetValue(channel, out var values) ? values : [];
+        }
+
         internal void EnqueueCreateFailure(string channel, Exception exception)
         {
             EnqueueCreate(
@@ -172,11 +179,28 @@ public abstract partial class EventSubChannelRecoveryTestBase
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
         }
 
-        public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(string channel)
+        public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
+            string channel,
+            EventSubAuthorizationContext authorization
+        )
         {
             return IO<BotAccount, AccessTokenUnavailableReason>.Create(cancellationToken =>
             {
                 _accountCounts[channel] = AccountCount(channel) + 1;
+                if (!_authorizations.TryGetValue(channel, out var authorizations))
+                {
+                    authorizations = [];
+                    _authorizations[channel] = authorizations;
+                }
+                authorizations.Add(authorization);
+                if (authorization is EventSubAuthorizationContext.Broadcaster)
+                {
+                    return ValueTask.FromResult(
+                        Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                            AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                        )
+                    );
+                }
                 return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
                     ? scripts.Dequeue()(cancellationToken)
                     : ValueTask.FromResult(
@@ -189,6 +213,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
         public ValueTask<EventSubSubscriptionSetupOutcome> CreateSubscriptionAsync(
             string channel,
+            EventSubAuthorizationContext authorization,
             BotAccount account,
             string sessionId,
             CancellationToken cancellationToken
@@ -207,6 +232,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
                         Channel = channel,
                         SubscriptionId = $"{sessionId}-{channel}",
                         BotLogin = account.Login,
+                        Authorization = authorization,
                         AccessToken = account.AccessToken,
                         Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
                     }

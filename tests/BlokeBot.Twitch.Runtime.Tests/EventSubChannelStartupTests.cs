@@ -400,4 +400,103 @@ public sealed class EventSubChannelStartupTests : EventSubChannelRecoveryTestBas
         harness.Status.Current.Channels.ShouldHaveSingleItem().ShouldBe(reports[2]);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
     }
+
+    [Test]
+    [Arguments(1)]
+    [Arguments(2)]
+    public async Task PartialSubscriptionSet_SetupFailure_DeletesEveryCreatedSubscriptionBeforeRetry(
+        int createdCount
+    )
+    {
+        var operations = new ScriptedChannelOperations();
+        var ids = Enumerable.Range(1, createdCount).Select(x => $"created-{x}").ToArray();
+        operations.EnqueueCreateOutcome(
+            "channel",
+            new EventSubSubscriptionSetupOutcome.PartiallyCreated(
+                new ActiveEventSubSubscription
+                {
+                    Channel = "channel",
+                    SubscriptionId = ids[0],
+                    AdditionalSubscriptionIds = ids.Skip(1).ToArray(),
+                    BotLogin = "channel-bot",
+                    Authorization = EventSubAuthorizationContext.ConfiguredBotAuthority,
+                    AccessToken = "secret",
+                    Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+                },
+                new HttpRequestException("second subscription failed")
+            )
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 2);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        var deleted = operations.DeleteAttempts("channel").ShouldHaveSingleItem();
+        deleted.AdditionalSubscriptionIds.Count.ShouldBe(createdCount - 1);
+        operations.CreateCount("channel").ShouldBe(2);
+    }
+
+    [Test]
+    public async Task BroadcasterSubscription_Reconciliation_ReportsUnavailableWithoutConfiguredBotFallback()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueCreateOutcome(
+            "channel",
+            new EventSubSubscriptionSetupOutcome.Created(
+                new ActiveEventSubSubscription
+                {
+                    Channel = "channel",
+                    SubscriptionId = "broadcaster-subscription",
+                    BotLogin = "broadcaster",
+                    Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
+                    AccessToken = "broadcaster-token",
+                    Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+                }
+            )
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        harness.Session.TriggerReconciliation(["channel"], EventSubChannelRecoveryTrigger.Explicit);
+        await harness.Session.DrainAsync();
+
+        operations
+            .Authorizations("channel")
+            .ShouldBe([
+                EventSubAuthorizationContext.ConfiguredBotAuthority,
+                EventSubAuthorizationContext.BroadcasterAuthority,
+            ]);
+    }
+
+    [Test]
+    public async Task CompleteSubscriptionSet_ChannelRemoval_DeletesChatAndBothShoutoutSubscriptions()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.EnqueueCreateOutcome(
+            "channel",
+            new EventSubSubscriptionSetupOutcome.Created(
+                new ActiveEventSubSubscription
+                {
+                    Channel = "channel",
+                    SubscriptionId = "chat",
+                    AdditionalSubscriptionIds = ["shoutout-create", "shoutout-receive"],
+                    BotLogin = "bot",
+                    Authorization = EventSubAuthorizationContext.ConfiguredBotAuthority,
+                    AccessToken = "secret",
+                    Readiness = EventSubSubscriptionReadiness.PendingStartupDelivery,
+                }
+            )
+        );
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+        harness.Session.TriggerReconciliation([], EventSubChannelRecoveryTrigger.Explicit);
+        await harness.Session.DrainAsync();
+
+        var deleted = operations.DeleteAttempts("channel").ShouldHaveSingleItem();
+        deleted.SubscriptionId.ShouldBe("chat");
+        deleted.AdditionalSubscriptionIds.ShouldBe(["shoutout-create", "shoutout-receive"]);
+    }
 }

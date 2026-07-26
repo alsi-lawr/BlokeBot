@@ -25,7 +25,7 @@ internal sealed record ActiveEventSubSubscription
     internal required string BotLogin { get; init; }
 
     internal EventSubAuthorizationContext Authorization { get; init; } =
-        EventSubAuthorizationContext.ConfiguredBot;
+        EventSubAuthorizationContext.ConfiguredBotAuthority;
 
     internal required string AccessToken { get; init; }
 

@@ -24,7 +24,11 @@ public sealed class ShoutoutService(
         Scopes.ModeratorManageShoutouts,
     ];
 
-    public async Task<ShoutoutDashboardState> LoadAsync(int hostId, CancellationToken ct)
+    public async Task<ShoutoutDashboardState> LoadAsync(
+        int hostId,
+        string? targetLogin,
+        CancellationToken ct
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var cooldown = await db
@@ -32,6 +36,25 @@ public sealed class ShoutoutService(
             .Where(x => x.HostId == hostId && x.TargetTwitchUserId == null)
             .Select(x => x.GlobalEligibleAtUtc)
             .SingleOrDefaultAsync(ct);
+        var normalizedTarget = Login.Normalize(targetLogin);
+        var targetId = string.IsNullOrWhiteSpace(normalizedTarget)
+            ? null
+            : await db
+                .ShoutoutHistory.AsNoTracking()
+                .Where(x => x.HostId == hostId && x.TargetLogin == normalizedTarget)
+                .OrderByDescending(x => x.OccurredAtUtc)
+                .Select(x => x.TargetTwitchUserId)
+                .FirstOrDefaultAsync(ct);
+        ShoutoutTargetCooldownReadiness targetCooldown =
+            string.IsNullOrWhiteSpace(targetId) ? new ShoutoutTargetCooldownReadiness.Unknown()
+            : await db
+                .ShoutoutCooldowns.AsNoTracking()
+                .Where(x => x.HostId == hostId && x.TargetTwitchUserId == targetId)
+                .Select(x => x.TargetEligibleAtUtc)
+                .SingleOrDefaultAsync(ct)
+                is { } eligibleAt
+                ? new ShoutoutTargetCooldownReadiness.EligibleAt(eligibleAt)
+            : new ShoutoutTargetCooldownReadiness.Unknown();
         var history = await db
             .ShoutoutHistory.AsNoTracking()
             .Where(x => x.HostId == hostId)
@@ -49,7 +72,7 @@ public sealed class ShoutoutService(
                 x.TargetCooldownEndsAtUtc
             ))
             .ToArrayAsync(ct);
-        return new(cooldown, history);
+        return new(cooldown, targetCooldown, history);
     }
 
     public async Task<ShoutoutOperationOutcome> SendAsync(

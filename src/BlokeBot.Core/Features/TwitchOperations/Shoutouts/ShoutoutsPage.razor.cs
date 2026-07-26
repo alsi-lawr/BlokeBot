@@ -9,9 +9,19 @@ public partial class ShoutoutsPage
     private string _targetLogin = string.Empty;
 
     private string _cooldownText =>
-        _state?.GlobalEligibleAtUtc is { } eligible
-            ? $"Next global shoutout: {eligible.ToLocalTime():g}."
-            : "Twitch has not supplied a global cooldown yet.";
+        _state switch
+        {
+            {
+                GlobalEligibleAtUtc: { } global,
+                TargetCooldown: ShoutoutTargetCooldownReadiness.EligibleAt target
+            } =>
+                $"Next global shoutout: {global.ToLocalTime():g}. @{_targetLogin} is eligible at {target.Value.ToLocalTime():g}.",
+            { GlobalEligibleAtUtc: { } global } =>
+                $"Next global shoutout: {global.ToLocalTime():g}. Twitch has not supplied a same-target cooldown for @{_targetLogin}.",
+            { TargetCooldown: ShoutoutTargetCooldownReadiness.EligibleAt target } =>
+                $"Global cooldown is unknown. @{_targetLogin} is eligible at {target.Value.ToLocalTime():g}.",
+            _ => "Twitch has not supplied applicable cooldown metadata yet.",
+        };
 
     protected override async Task OnInitializedAsync()
     {
@@ -23,7 +33,7 @@ public partial class ShoutoutsPage
     {
         if (HostId != 0)
         {
-            _state = await _shoutouts.LoadAsync(HostId, CancellationToken.None);
+            _state = await _shoutouts.LoadAsync(HostId, _targetLogin, CancellationToken.None);
         }
     }
 

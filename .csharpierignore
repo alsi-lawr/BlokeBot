@@ -1,0 +1,3 @@
+# EF emits migration source and the model snapshot from provider templates. They are checked by
+# the migration topology/schema-equivalence gate, not rewritten by the general formatter.
+src/BlokeBot.Persistence/Migrations/**
