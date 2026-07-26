@@ -140,7 +140,10 @@ public sealed class PollServiceTests
                     ImmutableArray.CreateRange(HostBroadcasterAuthorizationService.MilestoneScopes)
                 )
             ),
-            new HelixClient(new PollHttpClientFactory()),
+            new HelixClient(
+                new PollHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
@@ -199,7 +202,7 @@ public sealed class PollServiceTests
         return new(
             dbFactory,
             new ReadyBroadcasterProvider(),
-            new HelixClient(http),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),

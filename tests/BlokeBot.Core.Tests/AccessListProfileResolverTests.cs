@@ -43,8 +43,12 @@ public sealed class AccessListProfileResolverTests
         );
         var resolver = new AccessListProfileResolver(
             new HelixAccessListProfileEnrichmentPolicy(
-                new AppAccessTokenProvider(http, identity),
-                new HelixClient(http),
+                new AppAccessTokenProvider(
+                    http,
+                    identity,
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                ),
+                new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 identity
             )
         );

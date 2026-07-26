@@ -46,7 +46,7 @@ public sealed class ChannelPointsServiceTests
         var service = new ChannelPointsService(
             dbFactory,
             new ReadyBroadcasterProvider(),
-            new HelixClient(http),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             ),

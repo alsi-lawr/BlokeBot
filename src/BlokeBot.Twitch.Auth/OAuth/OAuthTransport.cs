@@ -5,12 +5,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch.Auth;
 
-public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
+public sealed class OAuthTransport(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _authorizationEndpoint = "https://id.twitch.tv/oauth2/authorize";
-    private const string _tokenEndpoint = "https://id.twitch.tv/oauth2/token";
-    private const string _validationEndpoint = "https://id.twitch.tv/oauth2/validate";
-
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-oauth");
 
@@ -31,7 +30,7 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
             }
         );
 
-        return new Uri($"{_authorizationEndpoint}?{query}");
+        return new Uri($"{endpointPolicy.OAuthAuthorizationEndpoint}?{query}");
     }
 
     public async Task<OAuthTokenResponse> ExchangeCodeAsync(
@@ -49,7 +48,7 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         };
 
         using var response = await _http.PostAsync(
-            _tokenEndpoint,
+            endpointPolicy.OAuthTokenEndpoint,
             new FormUrlEncodedContent(form),
             cancellationToken
         );
@@ -97,7 +96,7 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         };
 
         using var response = await _http.PostAsync(
-            _tokenEndpoint,
+            endpointPolicy.OAuthTokenEndpoint,
             new FormUrlEncodedContent(form),
             cancellationToken
         );
@@ -113,7 +112,10 @@ public sealed class OAuthTransport(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, _validationEndpoint);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            endpointPolicy.OAuthValidationEndpoint
+        );
         request.Headers.Authorization = new AuthenticationHeaderValue("OAuth", accessToken);
 
         using var response = await _http.SendAsync(request, cancellationToken);

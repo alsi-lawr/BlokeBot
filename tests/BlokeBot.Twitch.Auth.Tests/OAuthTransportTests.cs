@@ -12,7 +12,10 @@ public sealed class OAuthTransportTests
     [Test]
     public void DuplicateNoisyScopes_CreatingAuthorizationUri_NormalizesAndEncodesRequest()
     {
-        var client = new OAuthTransport(new ScriptedHttpClientFactory());
+        var client = new OAuthTransport(
+            new ScriptedHttpClientFactory(),
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         string[] requestedScopes = [" channel:bot ", "BITS:READ", "bits:read"];
         var scopes = OAuthAuthorizationScopeSet.Create(requestedScopes);
         requestedScopes[0] = "user:write:chat";
@@ -37,7 +40,10 @@ public sealed class OAuthTransportTests
     [Test]
     public void SingleExplicitScope_CreatingAuthorizationUri_SerializesExactSelection()
     {
-        var client = new OAuthTransport(new ScriptedHttpClientFactory());
+        var client = new OAuthTransport(
+            new ScriptedHttpClientFactory(),
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var uri = client.CreateAuthorizationUri(
             new AuthorizationUriRequest(
@@ -93,7 +99,10 @@ public sealed class OAuthTransportTests
                 """
             );
         });
-        var client = new OAuthTransport(factory);
+        var client = new OAuthTransport(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var token = await client.ExchangeCodeAsync(
             new AuthorizationCodeExchange("client", "secret", "https://localhost/callback", "code"),
@@ -118,7 +127,10 @@ public sealed class OAuthTransportTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized));
-        var client = new OAuthTransport(factory);
+        var client = new OAuthTransport(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var outcome = await client.ValidateTokenAsync("invalid", CancellationToken.None);
 
@@ -130,7 +142,10 @@ public sealed class OAuthTransportTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(_ => JsonResponse("""{"user_id":"123","login":"Streamer","scopes":[]}"""));
-        var client = new OAuthTransport(factory);
+        var client = new OAuthTransport(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         var validation = (await client.ValidateTokenAsync("access", CancellationToken.None))
             .ShouldBeOfType<TokenValidationOutcome.Validated>()
@@ -146,7 +161,10 @@ public sealed class OAuthTransportTests
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.TooManyRequests));
         factory.Respond(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
-        var client = new OAuthTransport(factory);
+        var client = new OAuthTransport(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         await Should.ThrowAsync<HttpRequestException>(() =>
             client.ValidateTokenAsync("limited", CancellationToken.None)
@@ -161,7 +179,10 @@ public sealed class OAuthTransportTests
     {
         var factory = new ScriptedHttpClientFactory();
         factory.Respond(_ => JsonResponse("{}"));
-        var client = new OAuthTransport(factory);
+        var client = new OAuthTransport(
+            factory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
 
         await Should.ThrowAsync<JsonException>(() =>
             client.ValidateTokenAsync("malformed", CancellationToken.None)

@@ -4,9 +4,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class ChatAnnouncementClient(IHttpClientFactory httpClientFactory)
+public sealed class ChatAnnouncementClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _announcementsEndpoint = "https://api.twitch.tv/helix/chat/announcements";
     private const int _maximumMessageLength = 500;
 
     private readonly HttpClient _http = httpClientFactory.CreateClient("twitch-helix");
@@ -30,7 +32,7 @@ public sealed class ChatAnnouncementClient(IHttpClientFactory httpClientFactory)
         }
 
         var uri =
-            $"{_announcementsEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("chat/announcements").AbsoluteUri}?"
             + QueryString.Create(
                 new Dictionary<string, string?>
                 {

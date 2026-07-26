@@ -132,7 +132,7 @@ public sealed class FollowerOnlyChatReadinessTests
         return new(
             new StaticAppAccessTokenSource(),
             botTokens,
-            new HelixClient(http),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             Settings(),
             new FixedTimeProvider(_now)
         );

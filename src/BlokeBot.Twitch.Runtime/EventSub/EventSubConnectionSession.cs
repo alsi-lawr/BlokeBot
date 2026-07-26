@@ -29,6 +29,7 @@ internal sealed class EventSubConnectionSession(
         ChatObserverDeadLetter
     > messageObserverFanOut,
     ILogger<EventSubConnectionSession> log,
+    TwitchEndpointPolicy endpointPolicy,
     IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null,
     IEnumerable<IPollEventObserver>? pollObservers = null,
     IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null,
@@ -39,7 +40,7 @@ internal sealed class EventSubConnectionSession(
         "TwitchChatMessage"
     );
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly Uri _defaultEndpoint = new("wss://eventsub.wss.twitch.tv/ws");
+    private Uri _initialEndpoint { get; } = endpointPolicy.InitialEventSubWebSocketEndpoint;
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
     private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
@@ -56,6 +57,8 @@ internal sealed class EventSubConnectionSession(
     private const int _deliveredMessageCapacity = 512;
     private ILogger<EventSubConnectionSession> _log { get; } = log;
 
+    internal Uri InitialEndpoint => _initialEndpoint;
+
     public async Task<RuntimeSessionEstablishment> EstablishAsync(
         RuntimeConnectionTarget target,
         CancellationToken cancellationToken
@@ -65,7 +68,7 @@ internal sealed class EventSubConnectionSession(
             await channels.GetChannelsAsync(cancellationToken)
         );
         var connectionTarget = target.Match(
-            static _ => (Endpoint: _defaultEndpoint, IsInitial: true),
+            _ => (Endpoint: _initialEndpoint, IsInitial: true),
             static reconnect => (Endpoint: reconnect.Uri, IsInitial: false)
         );
         if (

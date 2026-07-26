@@ -6,25 +6,11 @@ using System.Text.Json.Serialization;
 
 namespace BlokeBot.Twitch;
 
-public sealed class HelixClient(IHttpClientFactory httpClientFactory)
+public sealed class HelixClient(
+    IHttpClientFactory httpClientFactory,
+    TwitchEndpointPolicy endpointPolicy
+)
 {
-    private const string _usersEndpoint = "https://api.twitch.tv/helix/users";
-    private const string _streamsEndpoint = "https://api.twitch.tv/helix/streams";
-    private const string _chatSettingsEndpoint = "https://api.twitch.tv/helix/chat/settings";
-    private const string _followersEndpoint = "https://api.twitch.tv/helix/channels/followers";
-    private const string _followedChannelsEndpoint =
-        "https://api.twitch.tv/helix/channels/followed";
-    private const string _moderatedChannelsEndpoint =
-        "https://api.twitch.tv/helix/moderation/channels";
-    private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
-    private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
-    private const string _predictionsEndpoint = "https://api.twitch.tv/helix/predictions";
-    private const string _clipsEndpoint = "https://api.twitch.tv/helix/clips";
-    private const string _streamMarkersEndpoint = "https://api.twitch.tv/helix/streams/markers";
-    private const string _customRewardsEndpoint =
-        "https://api.twitch.tv/helix/channel_points/custom_rewards";
-    private const string _redemptionsEndpoint =
-        "https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions";
     private const int _streamMarkerLookupPageLimit = 3;
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -35,7 +21,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            endpointPolicy.HelixEndpoint("users").AbsoluteUri,
+            context
+        );
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
@@ -54,7 +44,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            endpointPolicy.HelixEndpoint("users").AbsoluteUri,
+            context
+        );
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
@@ -85,7 +79,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         }
 
         var uri =
-            $"{_usersEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("users").AbsoluteUri}?"
             + QueryString.Create(
                 normalized.Select(login => new KeyValuePair<string, string?>("login", login))
             );
@@ -121,7 +115,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _shoutoutsEndpoint
+            endpointPolicy.HelixEndpoint("chat/shoutouts").AbsoluteUri
             + "?"
             + QueryString.Create(
                 new Dictionary<string, string?>
@@ -152,7 +146,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _pollsEndpoint
+            endpointPolicy.HelixEndpoint("polls").AbsoluteUri
             + "?"
             + QueryString.Create([
                 new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
@@ -182,7 +176,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Post, _pollsEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("polls").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -243,7 +241,10 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             {
                 parameters.Add(new("after", cursor));
             }
-            var uri = _predictionsEndpoint + "?" + QueryString.Create(parameters);
+            var uri =
+                endpointPolicy.HelixEndpoint("predictions").AbsoluteUri
+                + "?"
+                + QueryString.Create(parameters);
             using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.StatusCode is HttpStatusCode.Unauthorized)
@@ -312,7 +313,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Post, _predictionsEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Post,
+            endpointPolicy.HelixEndpoint("predictions").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -370,7 +375,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Patch, _predictionsEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Patch,
+            endpointPolicy.HelixEndpoint("predictions").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -427,7 +436,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _clipsEndpoint
+            endpointPolicy.HelixEndpoint("clips").AbsoluteUri
             + "?"
             + QueryString.Create([
                 new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
@@ -482,7 +491,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _clipsEndpoint
+            endpointPolicy.HelixEndpoint("clips").AbsoluteUri
             + "?"
             + QueryString.Create([new KeyValuePair<string, string?>("id", clipId)]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
@@ -513,7 +522,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         {
             using var request = HelixRequest.Create(
                 HttpMethod.Post,
-                _streamMarkersEndpoint,
+                endpointPolicy.HelixEndpoint("streams/markers").AbsoluteUri,
                 context
             );
             request.Content = JsonContent.Create(
@@ -583,7 +592,10 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 query.Add(new("after", cursor));
             }
 
-            var uri = _streamMarkersEndpoint + "?" + QueryString.Create(query);
+            var uri =
+                endpointPolicy.HelixEndpoint("streams/markers").AbsoluteUri
+                + "?"
+                + QueryString.Create(query);
             using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
             using var response = await _http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -682,7 +694,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        using var request = HelixRequest.Create(HttpMethod.Patch, _pollsEndpoint, context);
+        using var request = HelixRequest.Create(
+            HttpMethod.Patch,
+            endpointPolicy.HelixEndpoint("polls").AbsoluteUri,
+            context
+        );
         request.Content = JsonContent.Create(
             new
             {
@@ -809,7 +825,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            $"{_streamsEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("streams").AbsoluteUri}?"
             + QueryString.Create([
                 new KeyValuePair<string, string?>("user_login", Login.Normalize(channelLogin)),
             ]);
@@ -833,7 +849,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            $"{_chatSettingsEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("chat/settings").AbsoluteUri}?"
             + QueryString.Create([
                 new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
             ]);
@@ -864,7 +880,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            $"{_followersEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("channels/followers").AbsoluteUri}?"
             + QueryString.Create(
                 new Dictionary<string, string?>
                 {
@@ -898,7 +914,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            $"{_followedChannelsEndpoint}?"
+            $"{endpointPolicy.HelixEndpoint("channels/followed").AbsoluteUri}?"
             + QueryString.Create(
                 new Dictionary<string, string?>
                 {
@@ -931,7 +947,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _customRewardsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards").AbsoluteUri
             + "?"
             + QueryString.Create([
                 new("broadcaster_id", broadcasterId),
@@ -964,7 +980,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _customRewardsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards").AbsoluteUri
             + "?"
             + QueryString.Create([new("broadcaster_id", broadcasterId)]);
         using var request = HelixRequest.Create(HttpMethod.Post, uri, context);
@@ -1016,7 +1032,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _customRewardsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards").AbsoluteUri
             + "?"
             + QueryString.Create([new("broadcaster_id", broadcasterId), new("id", rewardId)]);
         using var request = HelixRequest.Create(HttpMethod.Patch, uri, context);
@@ -1056,7 +1072,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _customRewardsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards").AbsoluteUri
             + "?"
             + QueryString.Create([new("broadcaster_id", broadcasterId), new("id", rewardId)]);
         using var request = HelixRequest.Create(HttpMethod.Delete, uri, context);
@@ -1078,7 +1094,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(pageSize, 50);
         var uri =
-            _redemptionsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards/redemptions").AbsoluteUri
             + "?"
             + QueryString.Create([
                 new("broadcaster_id", broadcasterId),
@@ -1117,7 +1133,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     )
     {
         var uri =
-            _redemptionsEndpoint
+            endpointPolicy.HelixEndpoint("channel_points/custom_rewards/redemptions").AbsoluteUri
             + "?"
             + QueryString.Create([
                 new("broadcaster_id", broadcasterId),
@@ -1207,7 +1223,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         };
     }
 
-    private static string ModeratedChannelsUri(string userId, string? cursor)
+    private string ModeratedChannelsUri(string userId, string? cursor)
     {
         var query = new Dictionary<string, string?> { ["first"] = "100", ["user_id"] = userId };
 
@@ -1216,7 +1232,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             query["after"] = cursor;
         }
 
-        return $"{_moderatedChannelsEndpoint}?{QueryString.Create(query)}";
+        return $"{endpointPolicy.HelixEndpoint("moderation/channels").AbsoluteUri}?{QueryString.Create(query)}";
     }
 
     private sealed record UsersResponse

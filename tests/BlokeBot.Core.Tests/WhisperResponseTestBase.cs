@@ -170,8 +170,14 @@ public abstract class WhisperResponseTestBase
                 cancelOnWhisper
             );
             var options = BotOptions();
-            var oauth = new OAuthTransport(http);
-            var helixUsers = new HelixClient(http);
+            var oauth = new OAuthTransport(
+                http,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            );
+            var helixUsers = new HelixClient(
+                http,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            );
             var hostBotAccounts = new HostBotAccountAuthorizationService(
                 dbFactory,
                 new HostBotAccountOAuthService(options, oauth, helixUsers),
@@ -196,7 +202,7 @@ public abstract class WhisperResponseTestBase
                 hostBotAccounts,
                 quota,
                 helixUsers,
-                new WhisperClient(http),
+                new WhisperClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
                 dbFactory,
                 options.Identity,
                 failureHandler,

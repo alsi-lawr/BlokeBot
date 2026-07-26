@@ -32,7 +32,10 @@ public sealed class HostedChannelRuntimeStatusTests
                 },
             }
         );
-        var helix = new HelixClient(httpClientFactory);
+        var helix = new HelixClient(
+            httpClientFactory,
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
         var service = new HostedChannelRuntimeStatusService(
             dbFactory,
             ChannelAuthorizationService(dbFactory, "channel:bot"),
@@ -82,7 +85,10 @@ public sealed class HostedChannelRuntimeStatusTests
 
         return new(
             new ConfigurationBuilder().AddInMemoryCollection(values).Build(),
-            new OAuthTransport(new CountingHttpClientFactory())
+            new OAuthTransport(
+                new CountingHttpClientFactory(),
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            )
         );
     }
 

@@ -209,7 +209,10 @@ public sealed class HostConfigFaultRoutingTests
         context.Services.AddSingleton<ModeratorAuthorityService>(
             serviceProvider => new ModeratorAuthorityService(
                 tokens,
-                new HelixClient(new ModeratedChannelsHttpClientFactory()),
+                new HelixClient(
+                    new ModeratedChannelsHttpClientFactory(),
+                    global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+                ),
                 serviceProvider.GetRequiredService<BotSettings>(),
                 serviceProvider.GetRequiredService<HostModAccessService>(),
                 serviceProvider.GetRequiredService<TimeProvider>()

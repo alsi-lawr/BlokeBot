@@ -85,7 +85,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory),
+            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier()
@@ -115,7 +115,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory),
+            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier()
@@ -144,11 +144,15 @@ public sealed class ChatIdentityResolverTests
         );
         var identity = Identity();
         var transport = new HelixPublicChatTransport(
-            new AppAccessTokenProvider(factory, identity),
+            new AppAccessTokenProvider(
+                factory,
+                identity,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
-            new ChatClient(factory),
+            new ChatClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             NullLogger<HelixPublicChatTransport>.Instance
         );
 
@@ -176,11 +180,15 @@ public sealed class ChatIdentityResolverTests
         );
         var identity = Identity();
         var transport = new HelixPublicChatTransport(
-            new AppAccessTokenProvider(factory, identity),
+            new AppAccessTokenProvider(
+                factory,
+                identity,
+                global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+            ),
             new StaticAccountProvider(new BotAccount("private-bot-login", "access-token")),
             identity,
             CreateResolver(factory),
-            new ChatClient(factory),
+            new ChatClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             NullLogger<HelixPublicChatTransport>.Instance
         );
 
@@ -415,7 +423,10 @@ public sealed class ChatIdentityResolverTests
 
     private static ChatIdentityResolver CreateResolver(IHttpClientFactory factory)
     {
-        return new(Identity(), new HelixClient(factory));
+        return new(
+            Identity(),
+            new HelixClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default)
+        );
     }
 
     private static EventSubChannelOperations CreateEventSubOperations(
@@ -427,7 +438,7 @@ public sealed class ChatIdentityResolverTests
             Settings(),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory),
+            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
@@ -459,7 +470,7 @@ public sealed class ChatIdentityResolverTests
             Settings("private startup payload"),
             new UnusedAccountProvider(),
             CreateResolver(factory),
-            new EventSubClient(factory),
+            new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             new StaticStartupMessageProvider(
                 startupMessage ?? new StartupChatMessage.Enabled("private startup payload")
             ),
