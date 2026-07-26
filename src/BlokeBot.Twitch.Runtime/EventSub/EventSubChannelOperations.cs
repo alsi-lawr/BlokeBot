@@ -230,7 +230,7 @@ internal sealed class EventSubChannelOperations(
             }
             if (subscription.BroadcasterSubscriptionIds.Count > 0)
             {
-                var broadcaster = await broadcasters
+                var broadcaster = await broadcasters!
                     .GetBroadcasterAccount(subscription.Channel)
                     .ExecuteAsync(cancellationToken);
                 await broadcaster.Match(
