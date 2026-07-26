@@ -392,61 +392,94 @@ public sealed class ClipMarkerService(
             await SaveReconciliationChangesAsync(db, hostId, ct);
         }
 
-        var token = await ReadyTokenAsync(hostId, ct);
-        await PollPendingClipsAsync(db, hostId, token, ct);
+        var deadline = pending
+            .Where(clip => clip.Status == TwitchClipStatus.Pending)
+            .Select(clip => clip.RequestedAtUtc + _clipAvailabilityBound)
+            .DefaultIfEmpty()
+            .Max();
+        using var deadlineCancellation =
+            deadline == default
+                ? null
+                : new CancellationTokenSource(
+                    deadline - timeProvider.GetUtcNow().UtcDateTime,
+                    timeProvider
+                );
+        using var reconciliationCancellation = deadlineCancellation is null
+            ? null
+            : CancellationTokenSource.CreateLinkedTokenSource(ct, deadlineCancellation.Token);
+        var reconciliationToken = reconciliationCancellation?.Token ?? ct;
 
-        if (token is null)
+        try
         {
-            return;
-        }
-        var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
-        if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
-        {
-            return;
-        }
+            var token = await ReadyTokenAsync(hostId, reconciliationToken);
+            await PollPendingClipsAsync(db, hostId, token, reconciliationToken, ct);
 
-        var markers = await db
-            .TwitchStreamMarkers.Where(marker =>
-                marker.HostId == hostId && marker.Status == TwitchStreamMarkerStatus.Succeeded
-            )
-            .ToArrayAsync(ct);
-        if (markers.Length > 0)
-        {
-            var providerMarkers = await helix.GetStreamMarkersAsync(
-                new HelixRequestContext(settings.Identity.ClientId, token),
-                broadcasterId,
-                markers
-                    .Select(marker => marker.ProviderMarkerId)
-                    .OfType<string>()
-                    .ToHashSet(StringComparer.Ordinal),
-                ct
-            );
-            var changed = false;
-            if (providerMarkers is HelixStreamMarkerLookupOutcome.Found found)
+            if (token is null)
             {
-                foreach (var marker in markers)
-                {
-                    var provider = found.Markers.FirstOrDefault(item =>
-                        item.Id == marker.ProviderMarkerId
-                    );
-                    if (
-                        provider is null
-                        || (marker.VideoId == provider.VideoId && marker.MarkerUrl == provider.Url)
-                    )
-                    {
-                        continue;
-                    }
+                return;
+            }
+            var host = await db.Hosts.SingleOrDefaultAsync(
+                host => host.Id == hostId,
+                reconciliationToken
+            );
+            if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
+            {
+                return;
+            }
 
-                    marker.VideoId = provider.VideoId;
-                    marker.MarkerUrl = provider.Url;
-                    marker.EnrichedAtUtc = now;
-                    changed = true;
+            var markers = await db
+                .TwitchStreamMarkers.Where(marker =>
+                    marker.HostId == hostId && marker.Status == TwitchStreamMarkerStatus.Succeeded
+                )
+                .ToArrayAsync(reconciliationToken);
+            if (markers.Length > 0)
+            {
+                var providerMarkers = await helix.GetStreamMarkersAsync(
+                    new HelixRequestContext(settings.Identity.ClientId, token),
+                    broadcasterId,
+                    markers
+                        .Select(marker => marker.ProviderMarkerId)
+                        .OfType<string>()
+                        .ToHashSet(StringComparer.Ordinal),
+                    reconciliationToken
+                );
+                var changed = false;
+                if (providerMarkers is HelixStreamMarkerLookupOutcome.Found found)
+                {
+                    foreach (var marker in markers)
+                    {
+                        var provider = found.Markers.FirstOrDefault(item =>
+                            item.Id == marker.ProviderMarkerId
+                        );
+                        if (
+                            provider is null
+                            || (
+                                marker.VideoId == provider.VideoId
+                                && marker.MarkerUrl == provider.Url
+                            )
+                        )
+                        {
+                            continue;
+                        }
+
+                        marker.VideoId = provider.VideoId;
+                        marker.MarkerUrl = provider.Url;
+                        marker.EnrichedAtUtc = now;
+                        changed = true;
+                    }
+                }
+                if (changed)
+                {
+                    await SaveReconciliationChangesAsync(db, hostId, ct);
                 }
             }
-            if (changed)
-            {
-                await SaveReconciliationChangesAsync(db, hostId, ct);
-            }
+        }
+        catch (OperationCanceledException)
+            when (!ct.IsCancellationRequested
+                && deadlineCancellation?.IsCancellationRequested == true
+            )
+        {
+            await ExpirePendingClipsAsync(db, hostId, ct);
         }
     }
 
@@ -454,6 +487,63 @@ public sealed class ClipMarkerService(
         BlokeBotDbContext db,
         int hostId,
         string? token,
+        CancellationToken pollingToken,
+        CancellationToken ct
+    )
+    {
+        var pending = await db
+            .TwitchClips.Where(clip =>
+                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+            )
+            .ToArrayAsync(pollingToken);
+        if (pending.Length == 0)
+        {
+            return;
+        }
+
+        while (pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+        {
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var changed = ExpireClips(pending, now);
+            foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
+            {
+                if (token is null || clip.ProviderClipId is null)
+                {
+                    continue;
+                }
+
+                var provider = await helix.GetClipAsync(
+                    new HelixRequestContext(settings.Identity.ClientId, token),
+                    clip.ProviderClipId!,
+                    pollingToken
+                );
+                clip.LastCheckedAtUtc = now;
+                if (provider is HelixClipLookupOutcome.Found found)
+                {
+                    Apply(clip, found.Clip);
+                    clip.Status = TwitchClipStatus.Available;
+                    clip.ResolvedAtUtc = now;
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                await SaveReconciliationChangesAsync(db, hostId, ct);
+            }
+
+            if (!pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+            {
+                return;
+            }
+
+            await Task.Delay(_clipPollCadence, timeProvider, pollingToken);
+        }
+    }
+
+    private async Task ExpirePendingClipsAsync(
+        BlokeBotDbContext db,
+        int hostId,
         CancellationToken ct
     )
     {
@@ -462,85 +552,9 @@ public sealed class ClipMarkerService(
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        if (pending.Length == 0)
+        if (ExpireClips(pending, timeProvider.GetUtcNow().UtcDateTime))
         {
-            return;
-        }
-
-        var deadline = pending.Max(clip => clip.RequestedAtUtc + _clipAvailabilityBound);
-        var remainingToDeadline = deadline - timeProvider.GetUtcNow().UtcDateTime;
-        if (remainingToDeadline <= TimeSpan.Zero)
-        {
-            if (ExpireClips(pending, deadline))
-            {
-                await SaveReconciliationChangesAsync(db, hostId, ct);
-            }
-            return;
-        }
-
-        using var deadlineCancellation = new CancellationTokenSource(remainingToDeadline);
-        using var pollingCancellation = CancellationTokenSource.CreateLinkedTokenSource(
-            ct,
-            deadlineCancellation.Token
-        );
-        try
-        {
-            while (pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
-            {
-                var now = timeProvider.GetUtcNow().UtcDateTime;
-                var changed = ExpireClips(pending, now);
-                foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
-                {
-                    if (token is null || clip.ProviderClipId is null)
-                    {
-                        continue;
-                    }
-
-                    var provider = await helix.GetClipAsync(
-                        new HelixRequestContext(settings.Identity.ClientId, token),
-                        clip.ProviderClipId!,
-                        pollingCancellation.Token
-                    );
-                    clip.LastCheckedAtUtc = now;
-                    if (provider is HelixClipLookupOutcome.Found found)
-                    {
-                        Apply(clip, found.Clip);
-                        clip.Status = TwitchClipStatus.Available;
-                        clip.ResolvedAtUtc = now;
-                        changed = true;
-                    }
-                }
-
-                if (changed)
-                {
-                    await SaveReconciliationChangesAsync(db, hostId, ct);
-                }
-
-                if (!pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
-                {
-                    return;
-                }
-
-                var remaining = deadline - timeProvider.GetUtcNow().UtcDateTime;
-                if (remaining <= TimeSpan.Zero)
-                {
-                    continue;
-                }
-
-                await Task.Delay(
-                    remaining < _clipPollCadence ? remaining : _clipPollCadence,
-                    timeProvider,
-                    pollingCancellation.Token
-                );
-            }
-        }
-        catch (OperationCanceledException)
-            when (!ct.IsCancellationRequested && deadlineCancellation.IsCancellationRequested)
-        {
-            if (ExpireClips(pending, deadline))
-            {
-                await SaveReconciliationChangesAsync(db, hostId, ct);
-            }
+            await SaveReconciliationChangesAsync(db, hostId, ct);
         }
     }
 
