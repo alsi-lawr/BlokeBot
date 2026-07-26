@@ -5,12 +5,12 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class EventSubChannelOperations(
     BotSettings settings,
     IBotAccountProvider accounts,
-    IBroadcasterAccountProvider broadcasters,
     ChatIdentityResolver identities,
     EventSubClient eventSub,
     IStartupChatMessageProvider startupMessages,
     IPublicChatMessageSender sender,
-    IBotChannelLifecycleNotifier lifecycle
+    IBotChannelLifecycleNotifier lifecycle,
+    IBroadcasterAccountProvider? broadcasters = null
 ) : IEventSubChannelOperations
 {
     public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
@@ -105,7 +105,7 @@ internal sealed class EventSubChannelOperations(
                     cancellationToken
                 )
             );
-            var broadcaster = await broadcasters
+            var broadcaster = await broadcasters!
                 .GetBroadcasterAccount(channel)
                 .ExecuteAsync(cancellationToken);
             return await broadcaster.Match<Task<EventSubSubscriptionSetupOutcome>>(
