@@ -393,18 +393,17 @@ public sealed class ClipMarkerService(
         }
 
         var token = await ReadyTokenAsync(hostId, ct);
+        await PollPendingClipsAsync(db, hostId, token, ct);
+
         if (token is null)
         {
             return;
         }
-
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
         {
             return;
         }
-
-        await PollPendingClipsAsync(db, hostId, token, ct);
 
         var markers = await db
             .TwitchStreamMarkers.Where(marker =>
@@ -454,15 +453,13 @@ public sealed class ClipMarkerService(
     private async Task PollPendingClipsAsync(
         BlokeBotDbContext db,
         int hostId,
-        string token,
+        string? token,
         CancellationToken ct
     )
     {
         var pending = await db
             .TwitchClips.Where(clip =>
-                clip.HostId == hostId
-                && clip.Status == TwitchClipStatus.Pending
-                && clip.ProviderClipId != null
+                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
         if (pending.Length == 0)
@@ -494,6 +491,11 @@ public sealed class ClipMarkerService(
                 var changed = ExpireClips(pending, now);
                 foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
                 {
+                    if (token is null || clip.ProviderClipId is null)
+                    {
+                        continue;
+                    }
+
                     var provider = await helix.GetClipAsync(
                         new HelixRequestContext(settings.Identity.ClientId, token),
                         clip.ProviderClipId!,
