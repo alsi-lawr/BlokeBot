@@ -449,7 +449,9 @@ internal sealed class EventSubConnectionSession(
     )
     {
         foreach (var observer in _predictionObservers)
+        {
             await observer.PredictionReceivedAsync(prediction, cancellationToken);
+        }
     }
 
     private async Task DispatchRewardRedemptionAsync(

@@ -38,7 +38,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
         using var response = await _http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
+        {
             return null;
+        }
 
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>(
             _jsonOptions,
@@ -201,26 +203,30 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         CancellationToken cancellationToken
     )
     {
-        const int pageSize = 25;
-        const int maximumPredictions = 101;
+        const int PageSize = 25;
+        const int MaximumPredictions = 101;
         var predictions = new List<HelixPrediction>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
         var seenCursors = new HashSet<string>(StringComparer.Ordinal);
         string? cursor = null;
-        while (predictions.Count < maximumPredictions)
+        while (predictions.Count < MaximumPredictions)
         {
             var parameters = new List<KeyValuePair<string, string?>>
             {
                 new("broadcaster_id", broadcasterId),
-                new("first", pageSize.ToString()),
+                new("first", PageSize.ToString()),
             };
             if (cursor is not null)
+            {
                 parameters.Add(new("after", cursor));
+            }
             var uri = _predictionsEndpoint + "?" + QueryString.Create(parameters);
             using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
             using var response = await _http.SendAsync(request, cancellationToken);
             if (response.StatusCode is HttpStatusCode.Unauthorized)
+            {
                 return new HelixPredictionLookupOutcome.Unauthorized();
+            }
             if (response.StatusCode is HttpStatusCode.Forbidden)
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -231,7 +237,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                     : new HelixPredictionLookupOutcome.Unauthorized();
             }
             if (!response.IsSuccessStatusCode)
+            {
                 return new HelixPredictionLookupOutcome.Unavailable();
+            }
             var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
                 _jsonOptions,
                 cancellationToken
@@ -239,13 +247,19 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             foreach (var prediction in payload?.Data.Select(x => x.ToDomain()) ?? [])
             {
                 if (seenIds.Add(prediction.Id))
+                {
                     predictions.Add(prediction);
-                if (predictions.Count == maximumPredictions)
+                }
+                if (predictions.Count == MaximumPredictions)
+                {
                     break;
+                }
             }
             var next = payload?.Pagination?.Cursor;
             if (string.IsNullOrWhiteSpace(next) || !seenCursors.Add(next) || next == cursor)
+            {
                 break;
+            }
             cursor = next;
         }
         return predictions.Count == 0
@@ -284,7 +298,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 : new HelixPredictionCreateOutcome.ProviderRejected();
         }
         if (!response.IsSuccessStatusCode)
+        {
             return new HelixPredictionCreateOutcome.ProviderRejected();
+        }
         var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
             _jsonOptions,
             cancellationToken
@@ -323,7 +339,9 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         );
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
             return new HelixPredictionEndOutcome.Unauthorized();
+        }
         if (response.StatusCode is HttpStatusCode.Forbidden)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -334,9 +352,13 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 : new HelixPredictionEndOutcome.Unauthorized();
         }
         if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadRequest)
+        {
             return new HelixPredictionEndOutcome.InvalidRequest();
+        }
         if (!response.IsSuccessStatusCode)
+        {
             return new HelixPredictionEndOutcome.Unavailable();
+        }
         var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
             _jsonOptions,
             cancellationToken
@@ -997,13 +1019,13 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         string rewardId,
         HelixRewardRedemptionStatus status,
         HelixRewardRedemptionSort sort,
-        int pageSize,
+        int PageSize,
         string? cursor,
         CancellationToken cancellationToken
     )
     {
-        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(pageSize, 50);
+        ArgumentOutOfRangeException.ThrowIfLessThan(PageSize, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(PageSize, 50);
         var uri =
             _redemptionsEndpoint
             + "?"
@@ -1012,7 +1034,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 new("reward_id", rewardId),
                 new("status", RedemptionStatusToken(status)),
                 new("sort", RedemptionSortToken(sort)),
-                new("first", pageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                new("first", PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 new("after", cursor),
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);

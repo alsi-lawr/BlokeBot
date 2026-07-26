@@ -21,9 +21,9 @@ public sealed class PredictionService(
 ) : IPredictionEventObserver
 {
     private const int ResultsToKeep = 100;
-    private const string NotReadyMessage =
+    private const string _notReadyMessage =
         "Reconnect the selected broadcaster with Twitch operations permissions.";
-    private const string IneligibleMessage =
+    private const string _ineligibleMessage =
         "Twitch Predictions are available only to Affiliate or Partner broadcasters.";
     private readonly ConcurrentDictionary<int, PendingProgress> _pendingProgress = new();
 
@@ -72,7 +72,9 @@ public sealed class PredictionService(
     )
     {
         if (draft.Validate() is PredictionTemplateValidationOutcome.Invalid invalid)
+        {
             return new PredictionOperationOutcome.InvalidTemplate(invalid.Message);
+        }
         var valid = ((PredictionTemplateValidationOutcome.Valid)draft.Validate()).Draft;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var template = new TwitchPredictionTemplate
@@ -106,7 +108,9 @@ public sealed class PredictionService(
             ct
         );
         if (template is null)
+        {
             return new PredictionOperationOutcome.TemplateNotFound();
+        }
         db.TwitchPredictionTemplates.Remove(template);
         await db.SaveChangesAsync(ct);
         await ChangedAsync(ct);
@@ -121,14 +125,18 @@ public sealed class PredictionService(
     {
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
-            return new PredictionOperationOutcome.NotReady(NotReadyMessage);
+        {
+            return new PredictionOperationOutcome.NotReady(_notReadyMessage);
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         var template = await db
             .TwitchPredictionTemplates.Include(x => x.Outcomes)
             .SingleOrDefaultAsync(x => x.Id == templateId && x.HostId == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } || template is null)
+        {
             return new PredictionOperationOutcome.TemplateNotFound();
+        }
         if (
             await db.TwitchPredictions.AnyAsync(
                 x =>
@@ -152,7 +160,9 @@ public sealed class PredictionService(
             ct
         );
         if (provider is HelixPredictionCreateOutcome.ActivePredictionExists)
+        {
             return new PredictionOperationOutcome.ActivePredictionExists();
+        }
         if (provider is not HelixPredictionCreateOutcome.Created created)
             return new PredictionOperationOutcome.ProviderRejected(
                 "Twitch did not permit creating this prediction."
@@ -192,7 +202,9 @@ public sealed class PredictionService(
     {
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
-            return new PredictionOperationOutcome.NotReady(NotReadyMessage);
+        {
+            return new PredictionOperationOutcome.NotReady(_notReadyMessage);
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         var active = await db.TwitchPredictions.SingleOrDefaultAsync(
@@ -209,11 +221,15 @@ public sealed class PredictionService(
                 "There is no active prediction."
             );
         if (!confirmed)
+        {
             return new PredictionOperationOutcome.ConfirmationRequired();
+        }
         var outcomes =
             JsonSerializer.Deserialize<PredictionOutcomeView[]>(active.OutcomesJson) ?? [];
         if (status is HelixPredictionEndStatus.Resolved && !outcomes.Any(x => x.Id == outcomeId))
+        {
             return new PredictionOperationOutcome.InvalidOutcome();
+        }
         var provider = await helix.EndPredictionAsync(
             new(settings.Identity.ClientId, token),
             host.TwitchUserId,
@@ -223,9 +239,13 @@ public sealed class PredictionService(
             ct
         );
         if (provider is HelixPredictionEndOutcome.Unauthorized)
-            return new PredictionOperationOutcome.NotReady(NotReadyMessage);
+        {
+            return new PredictionOperationOutcome.NotReady(_notReadyMessage);
+        }
         if (provider is HelixPredictionEndOutcome.Ineligible)
-            return new PredictionOperationOutcome.Ineligible(IneligibleMessage);
+        {
+            return new PredictionOperationOutcome.Ineligible(_ineligibleMessage);
+        }
         if (provider is HelixPredictionEndOutcome.InvalidRequest)
             return new PredictionOperationOutcome.ProviderRejected(
                 "Twitch did not permit that prediction transition."
@@ -241,7 +261,9 @@ public sealed class PredictionService(
             active.IsExternallyStarted
         ).Prediction;
         if (Terminal(prediction.Status))
+        {
             await TrimAsync(db, hostId, ct);
+        }
         await db.SaveChangesAsync(ct);
         await ChangedAsync(ct);
         return new PredictionOperationOutcome.Updated(View(prediction));
@@ -251,25 +273,33 @@ public sealed class PredictionService(
     {
         var login = Login.Normalize(channel);
         if (login.Length == 0)
+        {
             return;
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await db
             .Hosts.Where(x => x.Login == login)
             .Select(x => (int?)x.Id)
             .SingleOrDefaultAsync(ct);
         if (hostId is { } id)
+        {
             await ReconcileAsync(id, ct);
+        }
     }
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
+        {
             return;
+        }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } id)
+        {
             return;
+        }
         var provider = await helix.GetLatestPredictionAsync(
             new(settings.Identity.ClientId, token),
             id,
@@ -279,7 +309,9 @@ public sealed class PredictionService(
         if (provider is HelixPredictionLookupOutcome.Found found)
         {
             foreach (var prediction in found.Predictions)
+            {
                 changed |= Upsert(db, hostId, prediction, true).Changed;
+            }
             if (
                 !found.Predictions.Any(x =>
                     x.Status is HelixPredictionStatus.Active or HelixPredictionStatus.Locked
@@ -290,7 +322,9 @@ public sealed class PredictionService(
         else if (provider is HelixPredictionLookupOutcome.NoPrediction)
             changed = ArchiveMissingActive(db, hostId);
         if (!changed)
+        {
             return;
+        }
         await TrimAsync(db, hostId, ct);
         await db.SaveChangesAsync(ct);
         await ChangedAsync(ct);
@@ -309,7 +343,9 @@ public sealed class PredictionService(
             ct
         );
         if (host is null || prediction.ToHelix().Status is HelixPredictionStatus.Unknown)
+        {
             return;
+        }
         if (prediction.ToHelix().Status is HelixPredictionStatus.Active)
         {
             QueueProgress(host.Id, prediction.ToHelix());
@@ -318,9 +354,13 @@ public sealed class PredictionService(
         _pendingProgress.TryRemove(host.Id, out _);
         var upsert = Upsert(db, host.Id, prediction.ToHelix(), true);
         if (!upsert.Changed)
+        {
             return;
+        }
         if (Terminal(upsert.Prediction.Status))
+        {
             await TrimAsync(db, host.Id, ct);
+        }
         await db.SaveChangesAsync(ct);
         await ChangedAsync(ct);
     }
@@ -333,7 +373,9 @@ public sealed class PredictionService(
             (_, current) => current with { Prediction = prediction }
         );
         if (pending.Started)
+        {
             return;
+        }
         _pendingProgress[hostId] = pending with { Started = true };
         _ = FlushProgressAsync(hostId);
     }
@@ -342,11 +384,15 @@ public sealed class PredictionService(
     {
         await Task.Delay(TimeSpan.FromSeconds(1));
         if (!_pendingProgress.TryRemove(hostId, out var pending))
+        {
             return;
+        }
         await using var db = await dbFactory.CreateDbContextAsync();
         var upsert = Upsert(db, hostId, pending.Prediction, true);
         if (!upsert.Changed)
+        {
             return;
+        }
         await db.SaveChangesAsync();
         await ChangedAsync(CancellationToken.None);
     }
@@ -358,13 +404,13 @@ public sealed class PredictionService(
     {
         if (await ReadyTokenAsync(hostId, ct) is not { } token)
             return new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(
-                NotReadyMessage
+                _notReadyMessage
             );
         var user = await helix.GetCurrentUserAsync(new(settings.Identity.ClientId, token), ct);
         return user?.BroadcasterType is "affiliate" or "partner"
                 ? new PredictionAuthorizationReadiness.Ready()
             : user is null or { BroadcasterType: "" } ? new PredictionAuthorizationReadiness.Ready()
-            : new PredictionAuthorizationReadiness.Ineligible(IneligibleMessage);
+            : new PredictionAuthorizationReadiness.Ineligible(_ineligibleMessage);
     }
 
     private async Task<string?> ReadyTokenAsync(int hostId, CancellationToken ct) =>
@@ -383,7 +429,7 @@ public sealed class PredictionService(
     )
     {
         await AlertAsync(hostId, ct);
-        return new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(NotReadyMessage);
+        return new PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization(_notReadyMessage);
     }
 
     private async Task<string?> MissingTokenAsync(int hostId, CancellationToken ct)
@@ -422,7 +468,9 @@ public sealed class PredictionService(
             )
         );
         if (active is null)
+        {
             return false;
+        }
         active.Status = TwitchPredictionStatus.Archived;
         active.EndedAtUtc = active.UpdatedAtUtc = DateTime.UtcNow;
         return true;
@@ -469,7 +517,9 @@ public sealed class PredictionService(
         var previous =
             JsonSerializer.Deserialize<PredictionOutcomeView[]>(record.OutcomesJson) ?? [];
         if (record.Status == status && record.OutcomesJson == outcomesJson)
+        {
             return new(record, false);
+        }
         if (
             status is TwitchPredictionStatus.Active
             && HasParticipationRegression(previous, outcomes)
