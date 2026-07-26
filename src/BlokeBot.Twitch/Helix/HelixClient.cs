@@ -237,7 +237,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             var parameters = new List<KeyValuePair<string, string?>>
             {
                 new("broadcaster_id", broadcasterId),
-                new("first", PageSize.ToString()),
+                new("first", PageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             };
             if (cursor is not null)
             {

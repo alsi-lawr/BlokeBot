@@ -23,6 +23,7 @@ using BlokeBot.Twitch.Runtime;
 using Bunit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
 
@@ -157,7 +158,8 @@ public sealed class TwitchOperationsUiTests
                 new HelixClient(new RejectingHttpClientFactory()),
                 settings,
                 events,
-                alerts
+                alerts,
+                NullLogger<PredictionService>.Instance
             )
         );
         context.Services.AddSingleton(

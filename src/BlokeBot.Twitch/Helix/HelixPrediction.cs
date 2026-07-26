@@ -158,8 +158,9 @@ internal sealed record HelixPredictionWire
     [JsonPropertyName("winning_outcome_id")]
     public string? WinningOutcomeId { get; init; }
 
-    public HelixPrediction ToDomain() =>
-        new(
+    public HelixPrediction ToDomain()
+    {
+        return new(
             Id,
             BroadcasterId,
             Title,
@@ -177,6 +178,7 @@ internal sealed record HelixPredictionWire
             EndedAt,
             WinningOutcomeId
         );
+    }
 }
 
 internal sealed record HelixPredictionOutcomeWire
@@ -199,8 +201,9 @@ internal sealed record HelixPredictionOutcomeWire
     [JsonPropertyName("top_predictors")]
     public IReadOnlyList<HelixPredictionTopPredictorWire>? TopPredictors { get; init; }
 
-    public HelixPredictionOutcome ToDomain() =>
-        new(
+    public HelixPredictionOutcome ToDomain()
+    {
+        return new(
             Id,
             Title,
             Color,
@@ -208,6 +211,7 @@ internal sealed record HelixPredictionOutcomeWire
             ChannelPoints,
             (TopPredictors ?? []).Select(x => x.ToDomain()).ToArray()
         );
+    }
 }
 
 internal sealed record HelixPredictionTopPredictorWire
@@ -227,6 +231,8 @@ internal sealed record HelixPredictionTopPredictorWire
     [JsonPropertyName("channel_points_won")]
     public int? ChannelPointsWon { get; init; }
 
-    public HelixPredictionTopPredictor ToDomain() =>
-        new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);
+    public HelixPredictionTopPredictor ToDomain()
+    {
+        return new(UserId, UserLogin, UserName, ChannelPointsUsed, ChannelPointsWon);
+    }
 }

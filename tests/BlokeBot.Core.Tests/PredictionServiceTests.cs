@@ -11,12 +11,13 @@ using BlokeBot.Testing;
 using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class PredictionTemplateDraftTests
+public sealed class PredictionServiceTests
 {
     [Test]
     public async Task PredictionLifecycle_EnforcesEligibilityHostIsolationConfirmationAndTerminalNonRegression()
@@ -33,7 +34,9 @@ public sealed class PredictionTemplateDraftTests
         handler.BroadcasterType = "affiliate";
         await service.ReconcileAsync(first.Id, CancellationToken.None);
         handler.Requests.ShouldContain(request =>
-            request.Method == HttpMethod.Get && request.Query.Contains("first=25")
+            request.Method == HttpMethod.Get
+            && request.Query.Contains("first=25")
+            && request.Query.Contains("broadcaster_id=first-id")
         );
         (
             await service.LoadAsync(second.Id, CancellationToken.None)
@@ -86,7 +89,8 @@ public sealed class PredictionTemplateDraftTests
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
             ),
             events,
-            new DurableAlertService(database, TimeProvider.System, events)
+            new DurableAlertService(database, TimeProvider.System, events),
+            NullLogger<PredictionService>.Instance
         );
     }
 

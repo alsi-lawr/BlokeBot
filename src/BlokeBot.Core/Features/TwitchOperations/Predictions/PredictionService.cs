@@ -8,6 +8,7 @@ using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Predictions;
 
@@ -17,10 +18,11 @@ public sealed class PredictionService(
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts
+    DurableAlertService alerts,
+    ILogger<PredictionService> logger
 ) : IPredictionEventObserver
 {
-    private const int ResultsToKeep = 100;
+    private const int _resultsToKeep = 100;
     private const string _notReadyMessage =
         "Reconnect the selected broadcaster with Twitch operations permissions.";
     private const string _ineligibleMessage =
@@ -55,7 +57,7 @@ public sealed class PredictionService(
                 && x.Status != TwitchPredictionStatus.Locked
             )
             .OrderByDescending(x => x.EndedAtUtc)
-            .Take(ResultsToKeep)
+            .Take(_resultsToKeep)
             .ToArrayAsync(ct);
         return new(
             readiness,
@@ -392,21 +394,26 @@ public sealed class PredictionService(
 
     private void QueueProgress(int hostId, HelixPrediction prediction)
     {
-        var pending = _pendingProgress.AddOrUpdate(
-            hostId,
-            _ => new PendingProgress(prediction),
-            (_, current) =>
-                current with
+        while (true)
+        {
+            if (_pendingProgress.TryGetValue(hostId, out var current))
+            {
+                var merged = current with
                 {
                     Prediction = MergeProgress(current.Prediction, prediction),
+                };
+                if (_pendingProgress.TryUpdate(hostId, merged, current))
+                {
+                    return;
                 }
-        );
-        if (pending.Started)
-        {
-            return;
+                continue;
+            }
+            if (_pendingProgress.TryAdd(hostId, new PendingProgress(prediction)))
+            {
+                _ = FlushProgressAsync(hostId);
+                return;
+            }
         }
-        _pendingProgress[hostId] = pending with { Started = true };
-        _ = FlushProgressAsync(hostId);
     }
 
     private async Task FlushProgressAsync(int hostId)
@@ -427,9 +434,13 @@ public sealed class PredictionService(
             await db.SaveChangesAsync();
             await ChangedAsync(CancellationToken.None);
         }
-        catch
+        catch (Exception exception)
         {
-            // EventSub delivery must not surface a detached debounce fault to the socket loop.
+            logger.LogWarning(
+                exception,
+                "Prediction progress debounce failed for host {HostId}.",
+                hostId
+            );
         }
     }
 
@@ -676,7 +687,7 @@ public sealed class PredictionService(
                 && x.Status != TwitchPredictionStatus.Locked
             )
             .OrderByDescending(x => x.EndedAtUtc)
-            .Skip(ResultsToKeep)
+            .Skip(_resultsToKeep)
             .ToArrayAsync(ct);
         db.TwitchPredictions.RemoveRange(excess);
     }
@@ -703,5 +714,5 @@ public sealed class PredictionService(
 
     private sealed record PredictionUpsertOutcome(TwitchPrediction Prediction, bool Changed);
 
-    private sealed record PendingProgress(HelixPrediction Prediction, bool Started = false);
+    private sealed record PendingProgress(HelixPrediction Prediction);
 }
