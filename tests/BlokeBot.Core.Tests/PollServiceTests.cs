@@ -1,0 +1,239 @@
+using System.Collections.Immutable;
+using System.Net;
+using System.Text;
+using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations.Polls;
+using BlokeBot.Eventing;
+using BlokeBot.Functional;
+using BlokeBot.Persistence.Models;
+using BlokeBot.Twitch;
+using BlokeBot.Twitch.Runtime;
+using Microsoft.EntityFrameworkCore;
+using Shouldly;
+using TUnit.Core;
+
+namespace BlokeBot.Core.Tests;
+
+public sealed class PollServiceTests
+{
+    [Test]
+    public async Task Polls_SelectedHostKeepsOneActivePollAndReconcilesExternalProviderState()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.AddRange(
+                new BotHost
+                {
+                    Login = "first",
+                    DisplayName = "First",
+                    TwitchUserId = "first-id",
+                },
+                new BotHost
+                {
+                    Login = "second",
+                    DisplayName = "Second",
+                    TwitchUserId = "second-id",
+                }
+            );
+            db.TwitchPollTemplates.AddRange(Template(1, "First poll"), Template(2, "Second poll"));
+            await db.SaveChangesAsync();
+        }
+        var http = new PollHttpClientFactory();
+        http.Enqueue(CreateResponse("first-poll", "first-id", "First poll", "ACTIVE"));
+        http.Enqueue(CreateResponse("second-poll", "second-id", "Second poll", "ACTIVE"));
+        http.Enqueue(CreateResponse("external-poll", "first-id", "External poll", "ACTIVE"));
+        var service = CreateService(dbFactory, http);
+
+        (
+            await service.StartAsync(1, 1, CancellationToken.None)
+        ).ShouldBeOfType<PollOperationOutcome.Started>();
+        (
+            await service.StartAsync(1, 1, CancellationToken.None)
+        ).ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
+        (
+            await service.StartAsync(2, 2, CancellationToken.None)
+        ).ShouldBeOfType<PollOperationOutcome.Started>();
+        await using (var transition = await dbFactory.CreateDbContextAsync())
+        {
+            (
+                await transition.TwitchPolls.SingleAsync(x => x.ProviderPollId == "first-poll")
+            ).Status = TwitchPollStatus.Completed;
+            await transition.SaveChangesAsync();
+        }
+
+        await service.ReconcileAsync(1, CancellationToken.None);
+
+        var first = await service.LoadAsync(1, CancellationToken.None);
+        var second = await service.LoadAsync(2, CancellationToken.None);
+        first.ActivePoll.ShouldNotBeNull().ProviderPollId.ShouldBe("external-poll");
+        first.ActivePoll.IsExternallyStarted.ShouldBeTrue();
+        first.Results.Select(x => x.ProviderPollId).ShouldBe(["first-poll"]);
+        second.ActivePoll.ShouldNotBeNull().ProviderPollId.ShouldBe("second-poll");
+        http.CreateRequests.ShouldBe(2);
+        http.ActivePollRequests.ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ReconciledExternalPoll_EndingRequiresConfirmationBeforeProviderMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "host",
+                    DisplayName = "Host",
+                    TwitchUserId = "host-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new PollHttpClientFactory();
+        http.Enqueue(CreateResponse("external-poll", "host-id", "External poll", "ACTIVE"));
+        http.Enqueue(CreateResponse("external-poll", "host-id", "External poll", "TERMINATED"));
+        var service = CreateService(dbFactory, http);
+
+        await service.ReconcileAsync(1, CancellationToken.None);
+        var guarded = await service.EndAsync(1, false, CancellationToken.None);
+        var ended = await service.EndAsync(1, true, CancellationToken.None);
+
+        guarded.ShouldBeOfType<PollOperationOutcome.ConfirmationRequired>();
+        ended.ShouldBeOfType<PollOperationOutcome.Ended>().Poll.Status.ShouldBe("Terminated");
+        http.EndRequests.ShouldBe(1);
+        (await service.LoadAsync(1, CancellationToken.None)).ActivePoll.ShouldBeNull();
+    }
+
+    private static PollService CreateService(
+        SqliteBlokeBotDbFactory dbFactory,
+        PollHttpClientFactory http
+    )
+    {
+        return new(
+            dbFactory,
+            new ReadyBroadcasterProvider(),
+            new HelixClient(http),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
+            ),
+            TestEventBus.Create<AppEventKind>()
+        );
+    }
+
+    private static TwitchPollTemplate Template(int hostId, string title)
+    {
+        return new()
+        {
+            HostId = hostId,
+            Title = title,
+            DurationSeconds = 60,
+            CreatedAtUtc = DateTime.UtcNow,
+            Choices =
+            [
+                new TwitchPollTemplateChoice { Position = 0, Title = "Yes" },
+                new TwitchPollTemplateChoice { Position = 1, Title = "No" },
+            ],
+        };
+    }
+
+    private static HttpResponseMessage CreateResponse(
+        string id,
+        string broadcasterId,
+        string title,
+        string status
+    )
+    {
+        return new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                $$"""
+                {"data":[{"id":"{{id}}","broadcaster_id":"{{broadcasterId}}","title":"{{title}}","choices":[{"id":"yes","title":"Yes","votes":1,"channel_points_votes":0},{"id":"no","title":"No","votes":0,"channel_points_votes":0}],"status":"{{status}}","started_at":"2026-07-26T10:00:00Z","ends_at":"2026-07-26T10:01:00Z"}]}
+                """,
+                Encoding.UTF8,
+                "application/json"
+            ),
+        };
+    }
+
+    private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
+    {
+        public Task<TokenStatus> GetTokenStatusAsync(
+            int hostId,
+            IEnumerable<string?> requiredScopes,
+            CancellationToken ct
+        )
+        {
+            var scopes = ImmutableArray.CreateRange(requiredScopes.Select(x => x!));
+            return Task.FromResult<TokenStatus>(
+                new TokenStatus.Ready(
+                    "broadcaster-token",
+                    new TokenValidation("host-id", "host", OAuthScopeSet.Create(scopes)),
+                    scopes,
+                    scopes
+                )
+            );
+        }
+
+        public IO<BotAccount, AccessTokenUnavailableReason> GetBroadcasterAccount(
+            string channelLogin
+        )
+        {
+            return IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                        AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                    )
+                )
+            );
+        }
+    }
+
+    private sealed class PollHttpClientFactory : IHttpClientFactory
+    {
+        private readonly Queue<HttpResponseMessage> _responses = [];
+
+        internal int CreateRequests { get; private set; }
+
+        internal int ActivePollRequests { get; private set; }
+
+        internal int EndRequests { get; private set; }
+
+        internal void Enqueue(HttpResponseMessage response)
+        {
+            _responses.Enqueue(response);
+        }
+
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler(this), disposeHandler: false);
+        }
+
+        private sealed class Handler(PollHttpClientFactory owner) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken
+            )
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                request.RequestUri!.AbsolutePath.ShouldBe("/helix/polls");
+                switch (request.Method)
+                {
+                    case var method when method == HttpMethod.Post:
+                        owner.CreateRequests++;
+                        break;
+                    case var method when method == HttpMethod.Get:
+                        owner.ActivePollRequests++;
+                        break;
+                    case var method when method == HttpMethod.Patch:
+                        owner.EndRequests++;
+                        break;
+                    default:
+                        throw new InvalidOperationException("Unexpected poll request.");
+                }
+                return Task.FromResult(owner._responses.Dequeue());
+            }
+        }
+    }
+}
