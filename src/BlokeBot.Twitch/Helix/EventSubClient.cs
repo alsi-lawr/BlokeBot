@@ -86,6 +86,26 @@ public sealed class EventSubClient(IHttpClientFactory httpClientFactory)
         );
     }
 
+    public Task<string> CreatePollSubscriptionAsync(
+        HelixRequestContext context,
+        string type,
+        string broadcasterId,
+        string sessionId,
+        CancellationToken cancellationToken
+    )
+    {
+        return CreateSubscriptionAsync(
+            context,
+            new(
+                type,
+                "1",
+                new Dictionary<string, string> { ["broadcaster_user_id"] = broadcasterId },
+                sessionId
+            ),
+            cancellationToken
+        );
+    }
+
     public async Task<string> CreateSubscriptionAsync(
         HelixRequestContext context,
         EventSubSubscriptionRequest subscription,

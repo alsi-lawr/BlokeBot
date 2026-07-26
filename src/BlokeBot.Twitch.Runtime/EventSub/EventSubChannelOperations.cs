@@ -5,6 +5,7 @@ namespace BlokeBot.Twitch.Runtime;
 internal sealed class EventSubChannelOperations(
     BotSettings settings,
     IBotAccountProvider accounts,
+    IBroadcasterAccountProvider broadcasters,
     ChatIdentityResolver identities,
     EventSubClient eventSub,
     IStartupChatMessageProvider startupMessages,
@@ -104,7 +105,52 @@ internal sealed class EventSubChannelOperations(
                     cancellationToken
                 )
             );
-            return new EventSubSubscriptionSetupOutcome.Created(CreateActive(created));
+            var broadcaster = await broadcasters
+                .GetBroadcasterAccount(channel)
+                .ExecuteAsync(cancellationToken);
+            return await broadcaster.Match<Task<EventSubSubscriptionSetupOutcome>>(
+                async broadcasterAccount =>
+                {
+                    var broadcasterContext = new HelixRequestContext(
+                        settings.Identity.ClientId,
+                        broadcasterAccount.AccessToken
+                    );
+                    var pollIds = new[]
+                    {
+                        await eventSub.CreatePollSubscriptionAsync(
+                            broadcasterContext,
+                            "channel.poll.begin",
+                            resolved.BroadcasterId,
+                            sessionId,
+                            cancellationToken
+                        ),
+                        await eventSub.CreatePollSubscriptionAsync(
+                            broadcasterContext,
+                            "channel.poll.progress",
+                            resolved.BroadcasterId,
+                            sessionId,
+                            cancellationToken
+                        ),
+                        await eventSub.CreatePollSubscriptionAsync(
+                            broadcasterContext,
+                            "channel.poll.end",
+                            resolved.BroadcasterId,
+                            sessionId,
+                            cancellationToken
+                        ),
+                    };
+                    return new EventSubSubscriptionSetupOutcome.Created(
+                        CreateActive(created, pollIds)
+                    );
+                },
+                reason =>
+                    Task.FromResult<EventSubSubscriptionSetupOutcome>(
+                        new EventSubSubscriptionSetupOutcome.PartiallyCreated(
+                            CreateActive(created, []),
+                            new InvalidOperationException(reason.ToString())
+                        )
+                    )
+            );
         }
         catch (Exception exception) when (created.Count > 0)
         {
@@ -114,13 +160,17 @@ internal sealed class EventSubChannelOperations(
             );
         }
 
-        ActiveEventSubSubscription CreateActive(IReadOnlyList<string> ids)
+        ActiveEventSubSubscription CreateActive(
+            IReadOnlyList<string> ids,
+            IReadOnlyList<string>? pollIds = null
+        )
         {
             return new()
             {
                 Channel = channel,
                 SubscriptionId = ids[0],
                 AdditionalSubscriptionIds = ids.Skip(1).ToArray(),
+                BroadcasterSubscriptionIds = pollIds ?? [],
                 BotLogin = account.Login,
                 Authorization = authorization,
                 AccessToken = account.AccessToken,
@@ -177,6 +227,30 @@ internal sealed class EventSubChannelOperations(
             foreach (var subscriptionId in subscription.AdditionalSubscriptionIds)
             {
                 await eventSub.DeleteSubscriptionAsync(context, subscriptionId, cancellationToken);
+            }
+            if (subscription.BroadcasterSubscriptionIds.Count > 0)
+            {
+                var broadcaster = await broadcasters
+                    .GetBroadcasterAccount(subscription.Channel)
+                    .ExecuteAsync(cancellationToken);
+                await broadcaster.Match(
+                    async account =>
+                    {
+                        var broadcasterContext = new HelixRequestContext(
+                            settings.Identity.ClientId,
+                            account.AccessToken
+                        );
+                        foreach (var subscriptionId in subscription.BroadcasterSubscriptionIds)
+                        {
+                            await eventSub.DeleteSubscriptionAsync(
+                                broadcasterContext,
+                                subscriptionId,
+                                cancellationToken
+                            );
+                        }
+                    },
+                    reason => throw new InvalidOperationException(reason.ToString())
+                );
             }
             return new EventSubSubscriptionDeletionOutcome.Deleted();
         }

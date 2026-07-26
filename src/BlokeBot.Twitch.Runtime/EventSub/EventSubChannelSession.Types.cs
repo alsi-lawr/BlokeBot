@@ -32,4 +32,6 @@ internal sealed record ActiveEventSubSubscription
     internal required EventSubSubscriptionReadiness Readiness { get; init; }
 
     internal IReadOnlyList<string> AdditionalSubscriptionIds { get; init; } = [];
+
+    internal IReadOnlyList<string> BroadcasterSubscriptionIds { get; init; } = [];
 }

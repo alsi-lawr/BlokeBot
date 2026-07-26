@@ -384,6 +384,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IHostBroadcasterTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
         );
+        services.AddSingleton<IBroadcasterAccountProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<HostBroadcasterAuthorizationService>()
+        );
         services.AddSingleton<IHostBotAccountTokenStatusProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<HostBotAccountAuthorizationService>()
         );

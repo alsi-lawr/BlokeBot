@@ -24,7 +24,7 @@ public sealed class HostBroadcasterAuthorizationService(
     OAuthTransport transport,
     BotSettings settings,
     HostedChannelChangeNotifier changes
-) : IHostBroadcasterTokenStatusProvider
+) : IHostBroadcasterTokenStatusProvider, IBroadcasterAccountProvider
 {
     public static readonly string[] MilestoneScopes =
     [
