@@ -45,7 +45,26 @@ public abstract record HelixPredictionCreateOutcome
 
     public sealed record ActivePredictionExists : HelixPredictionCreateOutcome;
 
-    public sealed record ProviderRejected : HelixPredictionCreateOutcome;
+    public sealed record Unauthorized : HelixPredictionCreateOutcome;
+
+    public sealed record Ineligible : HelixPredictionCreateOutcome;
+
+    public sealed record InvalidRequest : HelixPredictionCreateOutcome;
+
+    public sealed record Unavailable : HelixPredictionCreateOutcome;
+}
+
+public abstract record HelixPredictionEligibilityOutcome
+{
+    private HelixPredictionEligibilityOutcome() { }
+
+    public sealed record Eligible : HelixPredictionEligibilityOutcome;
+
+    public sealed record Ineligible : HelixPredictionEligibilityOutcome;
+
+    public sealed record Unauthorized : HelixPredictionEligibilityOutcome;
+
+    public sealed record Unavailable : HelixPredictionEligibilityOutcome;
 }
 
 public abstract record HelixPredictionLookupOutcome

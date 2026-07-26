@@ -284,6 +284,10 @@
                 {
                     <p class="text-sm text-amber-700">@ineligible.Message</p>
                 }
+                else if (_predictionState.Authorization is PredictionAuthorizationReadiness.Unavailable unavailable)
+                {
+                    <p class="text-sm text-amber-700">@unavailable.Message</p>
+                }
                 else
                 {
                     @if (_predictionState.ActivePrediction is { } prediction)

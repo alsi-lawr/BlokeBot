@@ -49,6 +49,29 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return payload?.Data.FirstOrDefault();
     }
 
+    public async Task<HelixPredictionEligibilityOutcome> GetPredictionEligibilityAsync(
+        HelixRequestContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Get, _usersEndpoint, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return new HelixPredictionEligibilityOutcome.Unauthorized();
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            return new HelixPredictionEligibilityOutcome.Unavailable();
+        }
+        var user = (
+            await response.Content.ReadFromJsonAsync<UsersResponse>(_jsonOptions, cancellationToken)
+        )?.Data.FirstOrDefault();
+        return user?.BroadcasterType is "affiliate" or "partner"
+            ? new HelixPredictionEligibilityOutcome.Eligible()
+            : new HelixPredictionEligibilityOutcome.Ineligible();
+    }
+
     public async Task<IReadOnlyList<HelixUser>> GetUsersByLoginAsync(
         HelixRequestContext context,
         IEnumerable<string?> logins,
@@ -244,21 +267,36 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 _jsonOptions,
                 cancellationToken
             );
+            var pageAdded = 0;
+            var unknownStatus = false;
             foreach (var prediction in payload?.Data.Select(x => x.ToDomain()) ?? [])
             {
-                if (seenIds.Add(prediction.Id))
+                unknownStatus |= prediction.Status is HelixPredictionStatus.Unknown;
+                if (
+                    prediction.Status is not HelixPredictionStatus.Unknown
+                    && seenIds.Add(prediction.Id)
+                )
                 {
                     predictions.Add(prediction);
+                    pageAdded++;
                 }
                 if (predictions.Count == MaximumPredictions)
                 {
                     break;
                 }
             }
+            if (unknownStatus)
+            {
+                return new HelixPredictionLookupOutcome.Unavailable();
+            }
             var next = payload?.Pagination?.Cursor;
             if (string.IsNullOrWhiteSpace(next) || !seenCursors.Add(next) || next == cursor)
             {
                 break;
+            }
+            if (pageAdded == 0)
+            {
+                return new HelixPredictionLookupOutcome.Unavailable();
             }
             cursor = next;
         }
@@ -286,6 +324,19 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             options: _jsonOptions
         );
         using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
+            return new HelixPredictionCreateOutcome.Unauthorized();
+        }
+        if (response.StatusCode is HttpStatusCode.Forbidden)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return
+                error.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                || error.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                ? new HelixPredictionCreateOutcome.Ineligible()
+                : new HelixPredictionCreateOutcome.Unauthorized();
+        }
         if (response.StatusCode == HttpStatusCode.BadRequest)
         {
             var error = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -295,11 +346,11 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
                 || error.Contains("prediction that is running", StringComparison.OrdinalIgnoreCase)
             )
                 ? new HelixPredictionCreateOutcome.ActivePredictionExists()
-                : new HelixPredictionCreateOutcome.ProviderRejected();
+                : new HelixPredictionCreateOutcome.InvalidRequest();
         }
         if (!response.IsSuccessStatusCode)
         {
-            return new HelixPredictionCreateOutcome.ProviderRejected();
+            return new HelixPredictionCreateOutcome.Unavailable();
         }
         var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
             _jsonOptions,
@@ -307,7 +358,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         );
         return payload?.Data.FirstOrDefault()?.ToDomain() is { } created
             ? new HelixPredictionCreateOutcome.Created(created)
-            : new HelixPredictionCreateOutcome.ProviderRejected();
+            : new HelixPredictionCreateOutcome.Unavailable();
     }
 
     public async Task<HelixPredictionEndOutcome> EndPredictionAsync(
