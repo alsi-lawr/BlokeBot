@@ -1,8 +1,5 @@
-using System.Buffers;
 using System.Net;
-using System.Net.WebSockets;
 using System.Text;
-using System.Text.Json;
 using BlokeBot.Commands;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
@@ -303,24 +300,6 @@ public sealed class FakeTwitchIntegrationTests
         return Uri.UnescapeDataString(
             query.Select(pair => pair.Split('=', 2)).Single(pair => pair[0] == key)[1]
         );
-    }
-
-    private static async Task<string> ReceiveTextAsync(ClientWebSocket socket)
-    {
-        var payload = new ArrayBufferWriter<byte>();
-        var buffer = new byte[2048];
-        do
-        {
-            var result = await socket.ReceiveAsync(buffer, CancellationToken.None);
-            result.MessageType.ShouldBe(WebSocketMessageType.Text);
-            payload.Write(buffer.AsSpan(0, result.Count));
-            if (result.EndOfMessage)
-            {
-                break;
-            }
-        } while (true);
-
-        return Encoding.UTF8.GetString(payload.WrittenSpan);
     }
 
     private sealed class ReplyCommandModule : IChatCommandModule
