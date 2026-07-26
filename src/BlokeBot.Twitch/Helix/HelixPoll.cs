@@ -42,6 +42,17 @@ public abstract record HelixPollCreateOutcome
     public sealed record ProviderRejected : HelixPollCreateOutcome;
 }
 
+public abstract record HelixPollLookupOutcome
+{
+    private HelixPollLookupOutcome() { }
+
+    public sealed record Found(HelixPoll Poll) : HelixPollLookupOutcome;
+
+    public sealed record NoPoll : HelixPollLookupOutcome;
+
+    public sealed record Unavailable : HelixPollLookupOutcome;
+}
+
 public enum HelixPollEndStatus
 {
     Terminated,

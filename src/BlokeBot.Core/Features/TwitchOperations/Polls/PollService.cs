@@ -191,6 +191,27 @@ public sealed class PollService(
         return new PollOperationOutcome.Ended(View(poll));
     }
 
+    public async Task ReconcileChannelAsync(string channel, CancellationToken ct)
+    {
+        var login = Login.Normalize(channel);
+        if (login.Length == 0)
+        {
+            return;
+        }
+
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var hostId = await db
+            .Hosts.Where(host => host.Login == login)
+            .Select(host => (int?)host.Id)
+            .SingleOrDefaultAsync(ct);
+        if (hostId is not { } id)
+        {
+            return;
+        }
+
+        await ReconcileAsync(id, ct);
+    }
+
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
         var token = await ReadyTokenAsync(hostId, ct);
@@ -204,17 +225,20 @@ public sealed class PollService(
         {
             return;
         }
-        var provider = await helix.GetActivePollAsync(
+
+        var provider = await helix.GetLatestPollAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
             broadcasterId,
             ct
         );
-        if (provider is null)
+        var changed = provider switch
         {
-            return;
-        }
-        var upsert = Upsert(db, hostId, provider, true);
-        if (!upsert.Changed)
+            HelixPollLookupOutcome.Found found => Upsert(db, hostId, found.Poll, true).Changed,
+            HelixPollLookupOutcome.NoPoll => ArchiveMissingActivePoll(db, hostId),
+            HelixPollLookupOutcome.Unavailable => false,
+            _ => throw new InvalidOperationException("Unknown Twitch poll lookup outcome."),
+        };
+        if (!changed)
         {
             return;
         }
@@ -340,6 +364,22 @@ public sealed class PollService(
                 "/twitch-operations"
             )
             .ExecuteAsync(ct);
+    }
+
+    private static bool ArchiveMissingActivePoll(BlokeBotDbContext db, int hostId)
+    {
+        var active = db.TwitchPolls.SingleOrDefault(poll =>
+            poll.HostId == hostId && poll.Status == TwitchPollStatus.Active
+        );
+        if (active is null)
+        {
+            return false;
+        }
+
+        active.Status = TwitchPollStatus.Archived;
+        active.EndedAtUtc = DateTime.UtcNow;
+        active.UpdatedAtUtc = DateTime.UtcNow;
+        return true;
     }
 
     private static PollUpsertOutcome Upsert(

@@ -368,7 +368,7 @@ public sealed class HelixClientTests
         });
         var client = new HelixClient(factory);
 
-        var active = await client.GetActivePollAsync(
+        var active = await client.GetLatestPollAsync(
             Context(),
             "broadcaster-id",
             CancellationToken.None
@@ -387,7 +387,10 @@ public sealed class HelixClientTests
             CancellationToken.None
         );
 
-        active.ShouldNotBeNull().Choices[0].ChannelPointsVotes.ShouldBe(1);
+        active
+            .ShouldBeOfType<HelixPollLookupOutcome.Found>()
+            .Poll.Choices[0]
+            .ChannelPointsVotes.ShouldBe(1);
         created
             .ShouldBeOfType<HelixPollCreateOutcome.Created>()
             .Poll.Status.ShouldBe(HelixPollStatus.Active);

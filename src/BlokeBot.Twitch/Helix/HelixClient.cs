@@ -111,7 +111,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         };
     }
 
-    public async Task<HelixPoll?> GetActivePollAsync(
+    public async Task<HelixPollLookupOutcome> GetLatestPollAsync(
         HelixRequestContext context,
         string broadcasterId,
         CancellationToken cancellationToken
@@ -126,18 +126,19 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
             ]);
         using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        if (!response.IsSuccessStatusCode)
         {
-            return null;
+            return new HelixPollLookupOutcome.Unavailable();
         }
-        response.EnsureSuccessStatusCode();
+
         var payload = await response.Content.ReadFromJsonAsync<HelixPollResponse>(
             _jsonOptions,
             cancellationToken
         );
-        return payload
-            ?.Data.Select(x => x.ToDomain())
-            .FirstOrDefault(x => x.Status is HelixPollStatus.Active);
+        var poll = payload?.Data.FirstOrDefault()?.ToDomain();
+        return poll is null
+            ? new HelixPollLookupOutcome.NoPoll()
+            : new HelixPollLookupOutcome.Found(poll);
     }
 
     public async Task<HelixPollCreateOutcome> CreatePollAsync(

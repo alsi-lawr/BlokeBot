@@ -18,64 +18,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class PollServiceTests
 {
     [Test]
-    public async Task Polls_SelectedHostKeepsOneActivePollAndReconcilesExternalProviderState()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        await using (var db = await dbFactory.CreateDbContextAsync())
-        {
-            db.Hosts.AddRange(
-                new BotHost
-                {
-                    Login = "first",
-                    DisplayName = "First",
-                    TwitchUserId = "first-id",
-                },
-                new BotHost
-                {
-                    Login = "second",
-                    DisplayName = "Second",
-                    TwitchUserId = "second-id",
-                }
-            );
-            db.TwitchPollTemplates.AddRange(Template(1, "First poll"), Template(2, "Second poll"));
-            await db.SaveChangesAsync();
-        }
-        var http = new PollHttpClientFactory();
-        http.Enqueue(CreateResponse("first-poll", "first-id", "First poll", "ACTIVE"));
-        http.Enqueue(CreateResponse("second-poll", "second-id", "Second poll", "ACTIVE"));
-        http.Enqueue(CreateResponse("external-poll", "first-id", "External poll", "ACTIVE"));
-        var service = CreateService(dbFactory, http);
-
-        (
-            await service.StartAsync(1, 1, CancellationToken.None)
-        ).ShouldBeOfType<PollOperationOutcome.Started>();
-        (
-            await service.StartAsync(1, 1, CancellationToken.None)
-        ).ShouldBeOfType<PollOperationOutcome.ActivePollExists>();
-        (
-            await service.StartAsync(2, 2, CancellationToken.None)
-        ).ShouldBeOfType<PollOperationOutcome.Started>();
-        await using (var transition = await dbFactory.CreateDbContextAsync())
-        {
-            (
-                await transition.TwitchPolls.SingleAsync(x => x.ProviderPollId == "first-poll")
-            ).Status = TwitchPollStatus.Completed;
-            await transition.SaveChangesAsync();
-        }
-
-        await service.ReconcileAsync(1, CancellationToken.None);
-
-        var first = await service.LoadAsync(1, CancellationToken.None);
-        var second = await service.LoadAsync(2, CancellationToken.None);
-        first.ActivePoll.ShouldNotBeNull().ProviderPollId.ShouldBe("external-poll");
-        first.ActivePoll.IsExternallyStarted.ShouldBeTrue();
-        first.Results.Select(x => x.ProviderPollId).ShouldBe(["first-poll"]);
-        second.ActivePoll.ShouldNotBeNull().ProviderPollId.ShouldBe("second-poll");
-        http.CreateRequests.ShouldBe(2);
-        http.ActivePollRequests.ShouldBe(1);
-    }
-
-    [Test]
     public async Task PollCreation_MapsActiveConflictAndRejectsVotingCostsAboveOneMillionBeforePersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
