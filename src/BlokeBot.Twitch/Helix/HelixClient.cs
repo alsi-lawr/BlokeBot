@@ -18,6 +18,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         "https://api.twitch.tv/helix/moderation/channels";
     private const string _shoutoutsEndpoint = "https://api.twitch.tv/helix/chat/shoutouts";
     private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
+    private const string _predictionsEndpoint = "https://api.twitch.tv/helix/predictions";
     private const string _clipsEndpoint = "https://api.twitch.tv/helix/clips";
     private const string _streamMarkersEndpoint = "https://api.twitch.tv/helix/streams/markers";
     private const string _customRewardsEndpoint =
@@ -191,6 +192,113 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return created is null
             ? new HelixPollCreateOutcome.ProviderRejected()
             : new HelixPollCreateOutcome.Created(created);
+    }
+
+    public async Task<HelixPredictionLookupOutcome> GetLatestPredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _predictionsEndpoint
+            + "?"
+            + QueryString.Create([
+                new KeyValuePair<string, string?>("broadcaster_id", broadcasterId),
+                new KeyValuePair<string, string?>("first", "1"),
+            ]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            return new HelixPredictionLookupOutcome.Unavailable();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain() is { } prediction
+            ? new HelixPredictionLookupOutcome.Found(prediction)
+            : new HelixPredictionLookupOutcome.NoPrediction();
+    }
+
+    public async Task<HelixPredictionCreateOutcome> CreatePredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        HelixPredictionCreateRequest prediction,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Post, _predictionsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                title = prediction.Title,
+                outcomes = prediction.Outcomes.Select(title => new { title }).ToArray(),
+                prediction_window = prediction.PredictionWindowSeconds,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var error = await response.Content.ReadAsStringAsync(cancellationToken);
+            return error.Contains("active prediction", StringComparison.OrdinalIgnoreCase)
+                ? new HelixPredictionCreateOutcome.ActivePredictionExists()
+                : new HelixPredictionCreateOutcome.ProviderRejected();
+        }
+        if (!response.IsSuccessStatusCode)
+            return new HelixPredictionCreateOutcome.ProviderRejected();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain() is { } created
+            ? new HelixPredictionCreateOutcome.Created(created)
+            : new HelixPredictionCreateOutcome.ProviderRejected();
+    }
+
+    public async Task<HelixPrediction?> EndPredictionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string predictionId,
+        HelixPredictionEndStatus status,
+        string? winningOutcomeId,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Patch, _predictionsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                id = predictionId,
+                status = status switch
+                {
+                    HelixPredictionEndStatus.Locked => "LOCKED",
+                    HelixPredictionEndStatus.Resolved => "RESOLVED",
+                    _ => "CANCELED",
+                },
+                winning_outcome_id = status is HelixPredictionEndStatus.Resolved
+                    ? winningOutcomeId
+                    : null,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (
+            response.StatusCode
+            is HttpStatusCode.NotFound
+                or HttpStatusCode.Forbidden
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.BadRequest
+        )
+            return null;
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<HelixPredictionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault()?.ToDomain();
     }
 
     public async Task<HelixClipCreateOutcome> CreateClipAsync(

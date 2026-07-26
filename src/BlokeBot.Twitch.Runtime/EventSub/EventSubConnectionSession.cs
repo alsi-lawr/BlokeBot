@@ -31,7 +31,8 @@ internal sealed class EventSubConnectionSession(
     ILogger<EventSubConnectionSession> log,
     IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null,
     IEnumerable<IPollEventObserver>? pollObservers = null,
-    IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null
+    IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null,
+    IEnumerable<IPredictionEventObserver>? predictionObservers = null
 ) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -42,6 +43,10 @@ internal sealed class EventSubConnectionSession(
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
     private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
+    private readonly IPredictionEventObserver[] _predictionObservers =
+    [
+        .. (predictionObservers ?? []),
+    ];
     private readonly IChannelPointsEventObserver[] _channelPointsObservers =
     [
         .. (channelPointsObservers ?? []),
@@ -385,6 +390,12 @@ internal sealed class EventSubConnectionSession(
                                 case EventSubNotification.Poll { Event: var poll }:
                                     await owner.DispatchPollAsync(poll, cancellationToken);
                                     break;
+                                case EventSubNotification.Prediction { Event: var prediction }:
+                                    await owner.DispatchPredictionAsync(
+                                        prediction,
+                                        cancellationToken
+                                    );
+                                    break;
                                 case EventSubNotification.RewardRedemption
                                 {
                                     Event: var redemption
@@ -430,6 +441,15 @@ internal sealed class EventSubConnectionSession(
         {
             await observer.PollReceivedAsync(poll, cancellationToken);
         }
+    }
+
+    private async Task DispatchPredictionAsync(
+        EventSubPredictionEvent prediction,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _predictionObservers)
+            await observer.PredictionReceivedAsync(prediction, cancellationToken);
     }
 
     private async Task DispatchRewardRedemptionAsync(

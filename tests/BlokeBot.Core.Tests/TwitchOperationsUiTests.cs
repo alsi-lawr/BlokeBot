@@ -11,6 +11,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
+using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
@@ -56,7 +57,7 @@ public sealed class TwitchOperationsUiTests
         page.Find("#poll-channel-points-enabled").Change(true);
         page.Find("#poll-channel-points-per-vote").Change("250");
         page.FindAll("button")
-            .Single(button => button.TextContent.Trim() == "Save template")
+            .First(button => button.TextContent.Trim() == "Save template")
             .Click();
 
         page.WaitForAssertion(() => page.Markup.ShouldContain("250 Channel Points per vote"));
@@ -147,6 +148,16 @@ public sealed class TwitchOperationsUiTests
                 events,
                 alerts,
                 TimeProvider.System
+            )
+        );
+        context.Services.AddSingleton(
+            new PredictionService(
+                dbFactory,
+                new ReadyBroadcasterProvider(),
+                new HelixClient(new RejectingHttpClientFactory()),
+                settings,
+                events,
+                alerts
             )
         );
         context.Services.AddSingleton(
