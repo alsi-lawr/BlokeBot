@@ -124,6 +124,41 @@ namespace BlokeBot.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "twitch_custom_rewards",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    ProviderRewardId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Title = table.Column<string>(type: "TEXT", maxLength: 45, nullable: false),
+                    Prompt = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    Cost = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsManageable = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsPaused = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsUserInputRequired = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsMaxPerStreamEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    MaxPerStream = table.Column<int>(type: "INTEGER", nullable: true),
+                    IsMaxPerUserPerStreamEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    MaxPerUserPerStream = table.Column<int>(type: "INTEGER", nullable: true),
+                    IsGlobalCooldownEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
+                    GlobalCooldownSeconds = table.Column<int>(type: "INTEGER", nullable: true),
+                    ShouldRedemptionsSkipRequestQueue = table.Column<bool>(type: "INTEGER", nullable: false),
+                    BackgroundColor = table.Column<string>(type: "TEXT", maxLength: 16, nullable: true),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_twitch_custom_rewards", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_twitch_custom_rewards_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "twitch_poll_templates",
                 columns: table => new
                 {
@@ -170,6 +205,35 @@ namespace BlokeBot.Persistence.Migrations
                     table.CheckConstraint("CK_twitch_polls_Status", "Status IN ('Active', 'Archived', 'Completed', 'Terminated')");
                     table.ForeignKey(
                         name: "FK_twitch_polls_hosts_HostId",
+                        column: x => x.HostId,
+                        principalTable: "hosts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "twitch_reward_redemptions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    HostId = table.Column<int>(type: "INTEGER", nullable: false),
+                    ProviderRedemptionId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    ProviderRewardId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    RewardTitle = table.Column<string>(type: "TEXT", maxLength: 45, nullable: false),
+                    UserId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    UserLogin = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    UserInput = table.Column<string>(type: "TEXT", maxLength: 500, nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    RedeemedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_twitch_reward_redemptions", x => x.Id);
+                    table.CheckConstraint("CK_twitch_reward_redemptions_Status", "Status IN ('Canceled', 'Fulfilled', 'Unfulfilled')");
+                    table.ForeignKey(
+                        name: "FK_twitch_reward_redemptions_hosts_HostId",
                         column: x => x.HostId,
                         principalTable: "hosts",
                         principalColumn: "Id",
@@ -263,6 +327,12 @@ namespace BlokeBot.Persistence.Migrations
                 columns: new[] { "HostId", "Status", "ResolvedAtUtc" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_twitch_custom_rewards_HostId_ProviderRewardId",
+                table: "twitch_custom_rewards",
+                columns: new[] { "HostId", "ProviderRewardId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_twitch_poll_template_choices_TwitchPollTemplateId_Position",
                 table: "twitch_poll_template_choices",
                 columns: new[] { "TwitchPollTemplateId", "Position" },
@@ -292,6 +362,17 @@ namespace BlokeBot.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_twitch_reward_redemptions_HostId_ProviderRedemptionId",
+                table: "twitch_reward_redemptions",
+                columns: new[] { "HostId", "ProviderRedemptionId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_twitch_reward_redemptions_HostId_Status_UpdatedAtUtc",
+                table: "twitch_reward_redemptions",
+                columns: new[] { "HostId", "Status", "UpdatedAtUtc" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_twitch_stream_markers_HostId_CreatedAtUtc",
                 table: "twitch_stream_markers",
                 columns: new[] { "HostId", "CreatedAtUtc" });
@@ -319,10 +400,16 @@ namespace BlokeBot.Persistence.Migrations
                 name: "twitch_clips");
 
             migrationBuilder.DropTable(
+                name: "twitch_custom_rewards");
+
+            migrationBuilder.DropTable(
                 name: "twitch_poll_template_choices");
 
             migrationBuilder.DropTable(
                 name: "twitch_polls");
+
+            migrationBuilder.DropTable(
+                name: "twitch_reward_redemptions");
 
             migrationBuilder.DropTable(
                 name: "twitch_stream_markers");

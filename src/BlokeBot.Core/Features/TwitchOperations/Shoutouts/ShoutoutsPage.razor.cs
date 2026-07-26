@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using Microsoft.JSInterop;
@@ -22,6 +23,19 @@ public partial class ShoutoutsPage
     private bool _clipHasDelay;
     private string _markerRequestKey = Guid.NewGuid().ToString("N");
     private string _markerDescription = string.Empty;
+    private ChannelPointsDashboardState? _channelPointsState;
+    private string _rewardTitle = string.Empty;
+    private string _rewardPrompt = string.Empty;
+    private string _rewardCost = "100";
+    private bool _rewardUserInput;
+    private bool _rewardQueueSkip;
+    private bool _rewardMaxPerStreamEnabled;
+    private string _rewardMaxPerStream = string.Empty;
+    private bool _rewardMaxPerUserPerStreamEnabled;
+    private string _rewardMaxPerUserPerStream = string.Empty;
+    private bool _rewardCooldownEnabled;
+    private string _rewardCooldownSeconds = string.Empty;
+    private string _rewardBackgroundColor = string.Empty;
 
     private string _cooldownText =>
         _state switch
@@ -52,6 +66,7 @@ public partial class ShoutoutsPage
         await LoadAsync();
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
+        await LoadChannelPointsAsync();
     }
 
     private async Task LoadAsync()
@@ -144,6 +159,7 @@ public partial class ShoutoutsPage
         await LoadPageContextAsync();
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
+        await LoadChannelPointsAsync();
     }
 
     private async Task LoadClipsMarkersAsync()
@@ -151,6 +167,14 @@ public partial class ShoutoutsPage
         if (HostId != 0)
         {
             _clipMarkerState = await _clipsMarkers.LoadAsync(HostId, CancellationToken.None);
+        }
+    }
+
+    private async Task LoadChannelPointsAsync()
+    {
+        if (HostId != 0)
+        {
+            _channelPointsState = await _channelPoints.LoadAsync(HostId, CancellationToken.None);
         }
     }
 
@@ -327,5 +351,158 @@ public partial class ShoutoutsPage
                 await LoadPollsAsync();
             }
         );
+    }
+
+    private async Task CreateRewardAsync()
+    {
+        if (!int.TryParse(_rewardCost, out var cost))
+        {
+            _toasts.Publish(
+                new ToastRequest<WarningToastStrategy>("Reward cost must be a whole number.")
+            );
+            return;
+        }
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _channelPoints.CreateRewardAsync(
+                    hostId,
+                    new(
+                        _rewardTitle,
+                        _rewardPrompt,
+                        cost,
+                        _rewardUserInput,
+                        _rewardMaxPerStreamEnabled,
+                        ParseNullableInt(_rewardMaxPerStream),
+                        _rewardMaxPerUserPerStreamEnabled,
+                        ParseNullableInt(_rewardMaxPerUserPerStream),
+                        _rewardCooldownEnabled,
+                        ParseNullableInt(_rewardCooldownSeconds),
+                        _rewardQueueSkip,
+                        string.IsNullOrWhiteSpace(_rewardBackgroundColor)
+                            ? null
+                            : _rewardBackgroundColor
+                    ),
+                    CancellationToken.None
+                );
+                PublishChannelPointsOutcome(outcome);
+                await LoadChannelPointsAsync();
+            }
+        );
+    }
+
+    private async Task ToggleRewardAsync(ChannelPointsRewardView reward)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _channelPoints.UpdateRewardAsync(
+                    hostId,
+                    reward.ProviderRewardId,
+                    new(
+                        reward.Title,
+                        reward.Prompt,
+                        reward.Cost,
+                        reward.IsUserInputRequired,
+                        reward.IsMaxPerStreamEnabled,
+                        reward.MaxPerStream,
+                        reward.IsMaxPerUserPerStreamEnabled,
+                        reward.MaxPerUserPerStream,
+                        reward.IsGlobalCooldownEnabled,
+                        reward.GlobalCooldownSeconds,
+                        reward.ShouldRedemptionsSkipRequestQueue,
+                        reward.BackgroundColor
+                    ),
+                    !reward.IsPaused,
+                    CancellationToken.None
+                );
+                PublishChannelPointsOutcome(outcome);
+                await LoadChannelPointsAsync();
+            }
+        );
+    }
+
+    private async Task DeleteRewardAsync(string rewardId)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var confirmed = await _js.InvokeAsync<bool>(
+                    "confirm",
+                    "Deleting this reward makes Twitch fulfil all outstanding unfulfilled redemptions. Cancel redemptions first if viewers should receive a refund."
+                );
+                var outcome = await _channelPoints.DeleteRewardAsync(
+                    hostId,
+                    rewardId,
+                    confirmed,
+                    CancellationToken.None
+                );
+                PublishChannelPointsOutcome(outcome);
+                await LoadChannelPointsAsync();
+            }
+        );
+    }
+
+    private async Task UpdateRedemptionAsync(string redemptionId, bool fulfill)
+    {
+        var hostId = HostId;
+        await RunSelectedHostMutationAsync(
+            hostId,
+            async () =>
+            {
+                var outcome = await _channelPoints.UpdateRedemptionAsync(
+                    hostId,
+                    redemptionId,
+                    fulfill,
+                    CancellationToken.None
+                );
+                PublishChannelPointsOutcome(outcome);
+                await LoadChannelPointsAsync();
+            }
+        );
+    }
+
+    private static int? ParseNullableInt(string value)
+    {
+        return int.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private void PublishChannelPointsOutcome(ChannelPointsOperationOutcome outcome)
+    {
+        var message = outcome switch
+        {
+            ChannelPointsOperationOutcome.RewardCreated => "Reward created.",
+            ChannelPointsOperationOutcome.RewardUpdated => "Reward updated.",
+            ChannelPointsOperationOutcome.RewardDeleted => "Reward deleted.",
+            ChannelPointsOperationOutcome.RedemptionUpdated => "Redemption updated.",
+            ChannelPointsOperationOutcome.ConfirmationRequired confirmation => confirmation.Message,
+            ChannelPointsOperationOutcome.NotReady notReady => notReady.Message,
+            ChannelPointsOperationOutcome.Ineligible ineligible => ineligible.Message,
+            ChannelPointsOperationOutcome.ExternalReadOnly =>
+                "This Twitch reward is managed outside BlokeBot and is read-only.",
+            ChannelPointsOperationOutcome.RedemptionNotActionable =>
+                "Only unfulfilled redemptions can be updated.",
+            ChannelPointsOperationOutcome.InvalidRequest invalid => invalid.Message,
+            ChannelPointsOperationOutcome.ProviderRejected rejected => rejected.Message,
+            _ => throw new UnreachableException(),
+        };
+        if (
+            outcome
+            is ChannelPointsOperationOutcome.RewardCreated
+                or ChannelPointsOperationOutcome.RewardUpdated
+                or ChannelPointsOperationOutcome.RewardDeleted
+                or ChannelPointsOperationOutcome.RedemptionUpdated
+        )
+        {
+            _toasts.Publish(new ToastRequest<SuccessToastStrategy>(message));
+            return;
+        }
+        _toasts.Publish(new ToastRequest<WarningToastStrategy>(message));
     }
 }

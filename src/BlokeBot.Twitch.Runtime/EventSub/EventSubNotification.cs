@@ -12,6 +12,9 @@ internal abstract record EventSubNotification
 
     internal sealed record Poll(EventSubPollEvent Event) : EventSubNotification;
 
+    internal sealed record RewardRedemption(EventSubRewardRedemptionEvent Event)
+        : EventSubNotification;
+
     internal sealed record Unknown : EventSubNotification;
 
     internal static EventSubNotification Parse(
@@ -47,6 +50,11 @@ internal abstract record EventSubNotification
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
                     ? new Poll(poll.ToDomain(envelope.Metadata.MessageId))
+                    : new Unknown(),
+            "channel.channel_points_custom_reward_redemption.add"
+            or "channel.channel_points_custom_reward_redemption.update" =>
+                payload.Deserialize<EventSubRewardRedemptionWireEvent>(options) is { } redemption
+                    ? new RewardRedemption(redemption.ToDomain(envelope.Metadata.MessageId))
                     : new Unknown(),
             _ => new Unknown(),
         };

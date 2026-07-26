@@ -1,3 +1,4 @@
+#pragma warning disable IDE0011, IDE0022
 using System.Collections.Immutable;
 using System.Net;
 using System.Net.Http.Json;
@@ -20,6 +21,10 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     private const string _pollsEndpoint = "https://api.twitch.tv/helix/polls";
     private const string _clipsEndpoint = "https://api.twitch.tv/helix/clips";
     private const string _streamMarkersEndpoint = "https://api.twitch.tv/helix/streams/markers";
+    private const string _customRewardsEndpoint =
+        "https://api.twitch.tv/helix/channel_points/custom_rewards";
+    private const string _redemptionsEndpoint =
+        "https://api.twitch.tv/helix/channel_points/custom_rewards/redemptions";
     private const int _streamMarkerLookupPageLimit = 3;
 
     private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -691,6 +696,207 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return payload?.Data.FirstOrDefault() is { } follow
             ? new ActiveBotFollowStatus.Follows(follow.FollowedAt)
             : new ActiveBotFollowStatus.DoesNotFollow();
+    }
+
+    public async Task<IReadOnlyList<HelixCustomReward>?> GetCustomRewardsAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _customRewardsEndpoint
+            + "?"
+            + QueryString.Create([new("broadcaster_id", broadcasterId)]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            return null;
+        var payload = await response.Content.ReadFromJsonAsync<HelixCustomRewardsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray();
+    }
+
+    public async Task<(
+        HelixChannelPointsOutcome Outcome,
+        HelixCustomReward? Reward
+    )> CreateCustomRewardAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        HelixCustomRewardDraft draft,
+        CancellationToken cancellationToken
+    )
+    {
+        using var request = HelixRequest.Create(HttpMethod.Post, _customRewardsEndpoint, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                broadcaster_id = broadcasterId,
+                title = draft.Title,
+                prompt = draft.Prompt,
+                cost = draft.Cost,
+                is_user_input_required = draft.IsUserInputRequired,
+                is_max_per_stream_enabled = draft.IsMaxPerStreamEnabled,
+                max_per_stream = draft.IsMaxPerStreamEnabled ? draft.MaxPerStream : null,
+                is_max_per_user_per_stream_enabled = draft.IsMaxPerUserPerStreamEnabled,
+                max_per_user_per_stream = draft.IsMaxPerUserPerStreamEnabled
+                    ? draft.MaxPerUserPerStream
+                    : null,
+                is_global_cooldown_enabled = draft.IsGlobalCooldownEnabled,
+                global_cooldown_seconds = draft.IsGlobalCooldownEnabled
+                    ? draft.GlobalCooldownSeconds
+                    : null,
+                should_redemptions_skip_request_queue = draft.ShouldRedemptionsSkipRequestQueue,
+                background_color = draft.BackgroundColor,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var outcome = await ChannelPointsOutcomeAsync(response, cancellationToken);
+        if (outcome is not HelixChannelPointsOutcome.Success)
+            return (outcome, null);
+        var payload = await response.Content.ReadFromJsonAsync<HelixCustomRewardsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return payload?.Data.FirstOrDefault() is { } value
+            ? (outcome, value.ToDomain())
+            : (new HelixChannelPointsOutcome.Unavailable(), null);
+    }
+
+    public async Task<HelixChannelPointsOutcome> UpdateCustomRewardAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string rewardId,
+        HelixCustomRewardDraft draft,
+        bool? isPaused,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _customRewardsEndpoint
+            + "?"
+            + QueryString.Create([new("broadcaster_id", broadcasterId), new("id", rewardId)]);
+        using var request = HelixRequest.Create(HttpMethod.Patch, uri, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                title = draft.Title,
+                prompt = draft.Prompt,
+                cost = draft.Cost,
+                is_user_input_required = draft.IsUserInputRequired,
+                is_max_per_stream_enabled = draft.IsMaxPerStreamEnabled,
+                max_per_stream = draft.IsMaxPerStreamEnabled ? draft.MaxPerStream : null,
+                is_max_per_user_per_stream_enabled = draft.IsMaxPerUserPerStreamEnabled,
+                max_per_user_per_stream = draft.IsMaxPerUserPerStreamEnabled
+                    ? draft.MaxPerUserPerStream
+                    : null,
+                is_global_cooldown_enabled = draft.IsGlobalCooldownEnabled,
+                global_cooldown_seconds = draft.IsGlobalCooldownEnabled
+                    ? draft.GlobalCooldownSeconds
+                    : null,
+                should_redemptions_skip_request_queue = draft.ShouldRedemptionsSkipRequestQueue,
+                background_color = draft.BackgroundColor,
+                is_paused = isPaused,
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        return await ChannelPointsOutcomeAsync(response, cancellationToken);
+    }
+
+    public async Task<HelixChannelPointsOutcome> DeleteCustomRewardAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string rewardId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _customRewardsEndpoint
+            + "?"
+            + QueryString.Create([new("broadcaster_id", broadcasterId), new("id", rewardId)]);
+        using var request = HelixRequest.Create(HttpMethod.Delete, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        return await ChannelPointsOutcomeAsync(response, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HelixRewardRedemption>?> GetRewardRedemptionsAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string rewardId,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _redemptionsEndpoint
+            + "?"
+            + QueryString.Create([
+                new("broadcaster_id", broadcasterId),
+                new("reward_id", rewardId),
+                new("first", "50"),
+            ]);
+        using var request = HelixRequest.Create(HttpMethod.Get, uri, context);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            return null;
+        var payload = await response.Content.ReadFromJsonAsync<HelixRewardRedemptionsResponse>(
+            _jsonOptions,
+            cancellationToken
+        );
+        return (payload?.Data ?? []).Select(x => x.ToDomain()).ToArray();
+    }
+
+    public async Task<HelixChannelPointsOutcome> UpdateRedemptionStatusAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string rewardId,
+        string redemptionId,
+        HelixRewardRedemptionStatus status,
+        CancellationToken cancellationToken
+    )
+    {
+        var uri =
+            _redemptionsEndpoint
+            + "?"
+            + QueryString.Create([
+                new("broadcaster_id", broadcasterId),
+                new("reward_id", rewardId),
+            ]);
+        using var request = HelixRequest.Create(HttpMethod.Patch, uri, context);
+        request.Content = JsonContent.Create(
+            new
+            {
+                redemption_ids = new[] { redemptionId },
+                status = status == HelixRewardRedemptionStatus.Fulfilled ? "FULFILLED" : "CANCELED",
+            },
+            options: _jsonOptions
+        );
+        using var response = await _http.SendAsync(request, cancellationToken);
+        return await ChannelPointsOutcomeAsync(response, cancellationToken);
+    }
+
+    private static async Task<HelixChannelPointsOutcome> ChannelPointsOutcomeAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken
+    )
+    {
+        if (response.IsSuccessStatusCode)
+            return new HelixChannelPointsOutcome.Success();
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+            return new HelixChannelPointsOutcome.Unauthorized();
+        if (response.StatusCode is HttpStatusCode.Forbidden)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return
+                body.Contains("affiliate", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("partner", StringComparison.OrdinalIgnoreCase)
+                ? new HelixChannelPointsOutcome.Ineligible()
+                : new HelixChannelPointsOutcome.ExternalReward();
+        }
+        return new HelixChannelPointsOutcome.Unavailable();
     }
 
     private static string ModeratedChannelsUri(string userId, string? cursor)

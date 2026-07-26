@@ -30,7 +30,8 @@ internal sealed class EventSubConnectionSession(
     > messageObserverFanOut,
     ILogger<EventSubConnectionSession> log,
     IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null,
-    IEnumerable<IPollEventObserver>? pollObservers = null
+    IEnumerable<IPollEventObserver>? pollObservers = null,
+    IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null
 ) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -41,6 +42,10 @@ internal sealed class EventSubConnectionSession(
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
     private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
+    private readonly IChannelPointsEventObserver[] _channelPointsObservers =
+    [
+        .. (channelPointsObservers ?? []),
+    ];
     private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
     private readonly Queue<string> _deliveredMessageIdOrder = new();
     private const int _deliveredMessageCapacity = 512;
@@ -380,6 +385,15 @@ internal sealed class EventSubConnectionSession(
                                 case EventSubNotification.Poll { Event: var poll }:
                                     await owner.DispatchPollAsync(poll, cancellationToken);
                                     break;
+                                case EventSubNotification.RewardRedemption
+                                {
+                                    Event: var redemption
+                                }:
+                                    await owner.DispatchRewardRedemptionAsync(
+                                        redemption,
+                                        cancellationToken
+                                    );
+                                    break;
                             }
                         }
                         break;
@@ -415,6 +429,17 @@ internal sealed class EventSubConnectionSession(
         foreach (var observer in _pollObservers)
         {
             await observer.PollReceivedAsync(poll, cancellationToken);
+        }
+    }
+
+    private async Task DispatchRewardRedemptionAsync(
+        EventSubRewardRedemptionEvent redemption,
+        CancellationToken cancellationToken
+    )
+    {
+        foreach (var observer in _channelPointsObservers)
+        {
+            await observer.RedemptionReceivedAsync(redemption, cancellationToken);
         }
     }
 }
