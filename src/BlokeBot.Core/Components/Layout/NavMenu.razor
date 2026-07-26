@@ -34,7 +34,9 @@
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showAlerts = selection is not null && !session.IsBotAccount;
-                    var showBotFunctions = showGuessing || showPoints || showCustomCommands;
+                    var showNativeTwitch = selection is not null && session.CanUseBotFunctions(_existingHostIds);
+                    var showChatTools =
+                        showGuessing || showPoints || showCustomCommands || showNativeTwitch;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -71,7 +73,7 @@
                                 <path d="M14 15h6v4h-6Z" />
                             </svg>
                         </span>
-                        Home
+                        Overview
                     </NavLink>
                 </div>
 
@@ -112,20 +114,7 @@
                     </div>
                 }
 
-                @if (selection is not null && session.CanUseBotFunctions(_existingHostIds))
-                {
-                    <div class="nav-menu__panel rounded-xl p-1">
-                        <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="twitch-operations"
-                                 @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-700">✦</span>
-                            Native Twitch operations
-                        </NavLink>
-                    </div>
-                }
-
-                @if (showBotFunctions)
+                @if (showChatTools)
                 {
         <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>
         @if (showGuessing)
@@ -223,15 +212,28 @@
             </div>
         </details>
         }
+        @if (showNativeTwitch)
+        {
+        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1" data-nav-section="native-twitch" open="@_nativeTwitchOpen">
+            <summary class="nav-menu__summary flex min-h-9 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleNativeTwitchAsync">
+                <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-700">✦</span>
+                <span class="min-w-0 flex-1">Native Twitch</span>
+                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6" />
+                </svg>
+            </summary>
+            <div class="nav-menu__section-body mt-0.5 grid gap-0.5 border-t border-slate-100 pt-0.5">
+                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
+                         ActiveClass="nav-menu__item-active"
+                         href="twitch-operations"
+                         @onclick="NotifyNavigatedAsync">
+                    Native Twitch operations
+                </NavLink>
+            </div>
+        </details>
+        }
                 }
 
-                @if (selection is not null)
-                {
-                    <div class="nav-menu__active-channel mt-auto rounded-xl p-2.5">
-                        <p class="text-sm font-bold text-slate-950">Active channel</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">Choose a channel from the top bar when you manage more than one.</p>
-                    </div>
-                }
             </Authorized>
         </AuthorizeView>
     </nav>

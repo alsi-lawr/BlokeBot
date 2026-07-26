@@ -47,10 +47,12 @@ public partial class NavMenu
     private const string _guessingOpenStorageKey = "blokebot.sidebar.guessing.open";
     private const string _pointsOpenStorageKey = "blokebot.sidebar.points.open";
     private const string _customCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
+    private const string _nativeTwitchOpenStorageKey = "blokebot.sidebar.native-twitch.open";
 
-    private bool _guessingOpen = true;
-    private bool _pointsOpen = true;
-    private bool _customCommandsOpen = true;
+    private bool _guessingOpen;
+    private bool _pointsOpen;
+    private bool _customCommandsOpen;
+    private bool _nativeTwitchOpen;
     private IDisposable? _hostedChannelSubscription;
     private IReadOnlyDictionary<int, HostFeatureFlags> _hostedFeatures =
         new Dictionary<int, HostFeatureFlags>();
@@ -84,20 +86,15 @@ public partial class NavMenu
                 "import",
                 "./Components/Layout/NavMenu.razor.js"
             );
-            _guessingOpen = await _module.InvokeAsync<bool>(
-                "readBoolean",
-                _guessingOpenStorageKey,
-                true
-            );
-            _pointsOpen = await _module.InvokeAsync<bool>(
-                "readBoolean",
-                _pointsOpenStorageKey,
-                true
-            );
+            _guessingOpen = await _module.InvokeAsync<bool>("readBoolean", _guessingOpenStorageKey);
+            _pointsOpen = await _module.InvokeAsync<bool>("readBoolean", _pointsOpenStorageKey);
             _customCommandsOpen = await _module.InvokeAsync<bool>(
                 "readBoolean",
-                _customCommandsOpenStorageKey,
-                true
+                _customCommandsOpenStorageKey
+            );
+            _nativeTwitchOpen = await _module.InvokeAsync<bool>(
+                "readBoolean",
+                _nativeTwitchOpenStorageKey
             );
             StateHasChanged();
         }
@@ -149,6 +146,19 @@ public partial class NavMenu
                 "writeBoolean",
                 _customCommandsOpenStorageKey,
                 _customCommandsOpen
+            );
+        }
+    }
+
+    private async Task ToggleNativeTwitchAsync()
+    {
+        _nativeTwitchOpen = !_nativeTwitchOpen;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync(
+                "writeBoolean",
+                _nativeTwitchOpenStorageKey,
+                _nativeTwitchOpen
             );
         }
     }
