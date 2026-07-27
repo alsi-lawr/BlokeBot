@@ -213,6 +213,36 @@ public sealed class CustomCommandSettingsUiTests
             cut.FindAll($"#command-{seeded.CommandId}-name").ShouldBeEmpty();
         });
 
+        await using var scheduledContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var scheduledModule = scheduledContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        scheduledModule
+            .Setup<string?>("readString", "blokebot.task.custom-command-settings")
+            .SetResult(
+                $"v2:Commands:ScheduledMessage,{seeded.AnnouncementId}:Reply,{seeded.MessageEntryId}"
+            );
+        var scheduledCut = scheduledContext.Render<CustomCommandSettingsPage>();
+        scheduledCut.WaitForAssertion(() =>
+        {
+            scheduledCut
+                .Find("#custom-command-commands-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            scheduledCut
+                .Find("button[aria-controls='custom-announcement-settings']")
+                .GetAttribute("aria-expanded")
+                .ShouldBe("true");
+            scheduledCut.Find($"#announcement-{seeded.AnnouncementId}-name").ShouldNotBeNull();
+            scheduledCut.FindAll($"#command-{seeded.CommandId}-name").ShouldBeEmpty();
+            scheduledCut.FindAll($"#counter-{seeded.CounterId}-name").ShouldBeEmpty();
+        });
+        scheduledCut.Find("button[aria-controls='custom-announcement-settings']").Click();
+        scheduledCut
+            .Find("button[aria-controls='custom-announcement-settings']")
+            .GetAttribute("aria-expanded")
+            .ShouldBe("false");
+
         await using var pendingContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var pendingModule = pendingContext.JSInterop.SetupModule(
             "./Components/CollapsibleSection.razor.js"

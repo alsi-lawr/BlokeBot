@@ -336,6 +336,7 @@ public partial class CustomCommandSettingsPage
     {
         _activeTab = EditorTab(kind);
         _selectedEditors[_activeTab] = new(kind, id);
+        OpenEditorSection(kind);
         _hasExplicitSelection = true;
         _editorFocusControlId = focusControlId;
         _editorFocusRequest++;
@@ -366,6 +367,7 @@ public partial class CustomCommandSettingsPage
         if (replacement is { } selected)
         {
             _selectedEditors[tab] = selected;
+            OpenEditorSection(selected.Kind);
         }
         else
         {
@@ -467,6 +469,28 @@ public partial class CustomCommandSettingsPage
             _selectedEditors[CustomCommandSettingsTab.MessageLibrary] = messageLibrarySelection;
         }
         _activeTab = preference.ActiveTab;
+        OpenSelectedEditorSections();
+    }
+
+    private void OpenSelectedEditorSections()
+    {
+        foreach (var selection in _selectedEditors.Values)
+        {
+            OpenEditorSection(selection.Kind);
+        }
+    }
+
+    private void OpenEditorSection(CustomCommandEditorKind kind)
+    {
+        switch (kind)
+        {
+            case CustomCommandEditorKind.Counter:
+                _counterSectionOpenRequest++;
+                break;
+            case CustomCommandEditorKind.ScheduledMessage:
+                _announcementSectionOpenRequest++;
+                break;
+        }
     }
 
     private async Task PersistEditorSelectionAsync()
@@ -600,6 +624,7 @@ public partial class CustomCommandSettingsPage
             }
         }
         EnsureActiveEditorSelection();
+        OpenSelectedEditorSections();
         _hasExplicitSelection = true;
         _ = PersistEditorSelectionAsync();
     }
