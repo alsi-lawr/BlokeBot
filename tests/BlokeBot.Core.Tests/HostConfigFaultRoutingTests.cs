@@ -7,6 +7,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
+using BlokeBot.Core.Features.Home;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels;
@@ -60,6 +61,47 @@ public sealed class HostConfigFaultRoutingTests
             customBotToggle.GetAttribute("disabled").ShouldBeNull();
             page.Markup.ShouldContain("The channel owner must connect this Twitch account.");
             page.Markup.ShouldNotContain("/oauth/channel-bot/start");
+        });
+    }
+
+    [Test]
+    public async Task Overview_UnmanageableSelectedChannel_ShowsOwnerRecoveryWithoutActorFallback()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddBlokeBotToasts();
+        context.Services.AddSingleton(new BlokeBotPageContextAccessor());
+        var authorization = context.AddAuthorization();
+        authorization.SetAuthorized("moderator");
+        var selected = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
+        authorization.SetClaims(
+            TestPrincipals
+                .BlokeBotUser(
+                    "moderator",
+                    role: AuthRole.Moderator,
+                    availableHosts: [selected],
+                    selectedHost: selected
+                )
+                .Claims.ToArray()
+        );
+
+        var page = context.Render<HomePage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("Switch to your own channel");
+            page.Markup.ShouldNotContain("Create your channel setup");
+            page.Markup.ShouldNotContain("Connect Twitch chat");
+            page.Markup.ShouldNotContain("Start bot");
         });
     }
 
