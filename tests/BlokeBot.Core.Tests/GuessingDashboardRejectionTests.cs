@@ -30,7 +30,17 @@ public sealed class GuessingDashboardRejectionTests
         context.Services.AddSingleton<PointBalanceService>();
         context.Services.AddSingleton<PointsChangeNotifier>();
         context.Services.AddSingleton<GuessingRoundService>();
+        var preferences = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        preferences
+            .Setup<string?>("readString", "blokebot.task.guessing-dashboard")
+            .SetResult("History");
+        preferences
+            .SetupVoid("writeString", "blokebot.task.guessing-dashboard", "Leaderboard")
+            .SetVoidResult();
         var cut = context.Render<GuessingDashboard>();
+
+        cut.Find("#guessing-panel-history");
+        cut.Find("#guessing-tab-history").GetAttribute("tabindex").ShouldBe("0");
 
         await cut.Instance.HandleTabKeyAsync("End");
 

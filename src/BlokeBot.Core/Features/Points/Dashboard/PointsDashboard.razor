@@ -221,6 +221,10 @@
                         }
                     </tbody>
                 </table>
+                @if (_state.RecentLedger.Count == 0)
+                {
+                    <PageState Kind="DashboardPageState.Empty" Title="No recent point changes" Description="Point changes will appear here after you adjust a viewer balance." />
+                }
             </div>
         </section>
         </CollapsibleSection>

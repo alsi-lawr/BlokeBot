@@ -16,6 +16,10 @@
         {
             <PageState Kind="DashboardPageState.Loading" Title="Loading channel readiness" Description="Checking the selected channel’s connection and bot status." />
         }
+        else if (_blockedBySelectedChannel)
+        {
+            <PageState Kind="DashboardPageState.Unavailable" Title="Switch to your own channel" Description="Only the channel owner can review this channel’s readiness. Use the top bar to switch channels." />
+        }
         else if (Host is null || _state is null)
         {
             <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select a channel from the top bar to review its readiness." />

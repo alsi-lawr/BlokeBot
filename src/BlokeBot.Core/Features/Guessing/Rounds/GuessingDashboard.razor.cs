@@ -161,6 +161,7 @@ public partial class GuessingDashboard : IAsyncDisposable
             )
             {
                 await ActivateTabAsync(selected);
+                await InvokeAsync(StateHasChanged);
             }
             else if (_hasExplicitTaskSelection)
             {
@@ -547,6 +548,7 @@ public partial class GuessingDashboard : IAsyncDisposable
         {
             if (_tabKeyHandler is not null)
             {
+                await _tabKeyHandler.InvokeVoidAsync("dispose");
                 await _tabKeyHandler.DisposeAsync();
             }
 

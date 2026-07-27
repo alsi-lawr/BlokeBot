@@ -78,7 +78,7 @@
                 {
                     <AuthPopupButton Class="auth-action" Url="/oauth/channel-bot/start" PopupName="blokebot-channel-oauth" OpeningText="Opening..." OnClosed="LoadAsync">@(_state.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")</AuthPopupButton>
                 }
-                @if (_canStart)
+                else if (_canStart)
                 {
                     <button class="btn-primary" type="button" @onclick="() => StartAsync(hostId)">Start bot</button>
                 }
