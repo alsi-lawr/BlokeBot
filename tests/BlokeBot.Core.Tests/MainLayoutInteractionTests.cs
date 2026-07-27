@@ -449,5 +449,13 @@ public sealed class TaskSelectionScopeTests
             pendingCut.Find("input#first-task");
             pendingCut.FindAll("input#second-task").ShouldBeEmpty();
         });
+        var writes = pendingModule
+            .Invocations.Where(invocation => invocation.Identifier == "writeString")
+            .ToArray();
+        writes.ShouldNotBeEmpty();
+        writes.ShouldAllBe(invocation =>
+            Equals(invocation.Arguments[0], "blokebot.task.test-scope")
+            && Equals(invocation.Arguments[1], "first")
+        );
     }
 }
