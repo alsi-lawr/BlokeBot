@@ -71,6 +71,7 @@ public partial class GuessingDashboard
     private string _leaderboardUsername = string.Empty;
     private IReadOnlyList<GuessRoundHistoryEntry>? _recentRounds;
     private int _selectedProfileId;
+    private IJSObjectReference? _taskModule;
     private GuessingDashboardState? _state;
     private string _winnerName = string.Empty;
 
@@ -116,6 +117,36 @@ public partial class GuessingDashboard
         await LoadRouteAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            _taskModule = await _js.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./Components/CollapsibleSection.razor.js"
+            );
+            var remembered = await _taskModule.InvokeAsync<string?>(
+                "readString",
+                "blokebot.task.guessing-dashboard"
+            );
+            if (
+                Enum.TryParse<DashboardTab>(remembered, out var selected)
+                && selected != DashboardTab.Live
+            )
+            {
+                await ActivateTabAsync(selected);
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (TaskCanceledException) { }
+    }
+
     private Task LoadRouteAsync()
     {
         return ObserveRouteLoadAsync(LoadRouteCoreAsync);
@@ -131,6 +162,14 @@ public partial class GuessingDashboard
     private async Task ActivateTabAsync(DashboardTab tab)
     {
         _activeTab = tab;
+        if (_taskModule is not null)
+        {
+            await _taskModule.InvokeVoidAsync(
+                "writeString",
+                "blokebot.task.guessing-dashboard",
+                tab.ToString()
+            );
+        }
 
         if (tab == DashboardTab.History && _recentRounds is null)
         {

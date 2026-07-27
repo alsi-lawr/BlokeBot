@@ -24,6 +24,7 @@ public sealed class GuessingUnsavedChangesUiTests
         OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
 
+        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         page.FindAll("[data-unsaved-profile-dialog] button")
@@ -46,6 +47,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var page = context.Render<GuessingSettings>();
         OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
+        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Discard and switch");
@@ -68,6 +70,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var page = context.Render<GuessingSettings>();
         OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
+        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Save and switch");
@@ -102,6 +105,7 @@ public sealed class GuessingUnsavedChangesUiTests
                     )
                 );
         }
+        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Save and switch");
@@ -141,7 +145,9 @@ public sealed class GuessingUnsavedChangesUiTests
         string answer
     )
     {
+        OpenSection(page, "Round types");
         page.Find("#profileSelect").GetAttribute("value").ShouldBe(profileId.ToString());
+        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").GetAttribute("value").ShouldBe(answer);
     }
 

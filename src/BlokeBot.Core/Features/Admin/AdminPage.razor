@@ -37,6 +37,7 @@
     }
     else
     {
+        <TaskSelectionScope PreferenceKey="admin-operations" DefaultTask="bot-account">
         <TaskPanel Title="Administration status" Description="Choose an operation below. Connect the bot account before adding or managing hosted channels.">
             <p class="text-sm text-muted-foreground">@(_botAccountStatus?.Message ?? "Checking the bot account.")</p>
         </TaskPanel>
@@ -47,7 +48,8 @@
                                         Refresh="@RefreshBotAccountAuthorizationAsync"
                                         Collapsible="true"
                                         InitiallyOpen="true"
-                                        PreferenceKey="admin-bot-account" />
+                                        PreferenceKey="admin-bot-account"
+                                        TaskKey="bot-account" />
 
         <SiteAccessSection State="@_state"
                            WhitelistEntries="@_siteWhitelistEntries"
@@ -67,5 +69,6 @@
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
+        </TaskSelectionScope>
     }
 </DashboardPage>

@@ -72,6 +72,9 @@ public partial class BotAccountAuthorizationSection
     public string? PreferenceKey { get; set; }
 
     [Parameter]
+    public string? TaskKey { get; set; }
+
+    [Parameter]
     public string? DisabledMessage { get; set; }
 
     [Parameter]

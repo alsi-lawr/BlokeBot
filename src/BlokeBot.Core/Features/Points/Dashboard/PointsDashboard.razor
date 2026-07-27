@@ -37,7 +37,8 @@
     }
     else
     {
-        <TaskPanel Title="Find a viewer" Description="Look up the current balance for a viewer in this channel.">
+        <TaskSelectionScope PreferenceKey="points-dashboard" DefaultTask="lookup">
+        <CollapsibleSection Title="Find a viewer" Description="Look up the current balance for a viewer in this channel." TaskKey="lookup">
             <div class="grid gap-4 p-5 md:grid-cols-2">
                 <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
                 <div class="flex items-end">
@@ -51,18 +52,18 @@
                     </div>
                 }
             </div>
-        </TaskPanel>
+        </CollapsibleSection>
 
-        <CollapsibleSection Title="Viewer balances"
+        <CollapsibleSection Title="Viewer balances" TaskKey="balances"
                             Description="Review balances or remove a balance."
                             InitiallyOpen="false"
                             PreferenceKey="points-dashboard-balances">
-            <section class="card">
+            <section>
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
                 </div>
-                <div class="points-dashboard__leaderboard scroll-panel scroll-panel--data-table overflow-x-auto">
+                <div class="points-dashboard__leaderboard wide-data-region scroll-panel scroll-panel--data-table">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
@@ -100,7 +101,7 @@
 
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Adjust viewer points"
+        <CollapsibleSection Title="Adjust viewer points" TaskKey="adjustments"
                             Description="Move, add, or take away points with the same moderator permissions."
                             InitiallyOpen="false"
                             PreferenceKey="points-dashboard-adjustments">
@@ -127,11 +128,11 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Giveaway administration"
+        <CollapsibleSection Title="Giveaway administration" TaskKey="giveaway"
                             Description="Start, end, or cancel the current giveaway."
                             InitiallyOpen="false"
                             PreferenceKey="points-dashboard-giveaway">
-        <section class="card">
+        <section>
             <div class="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
@@ -166,16 +167,16 @@
         </section>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Recent point changes"
+        <CollapsibleSection Title="Recent point changes" TaskKey="ledger"
                             Description="Review the latest balance ledger entries."
                             InitiallyOpen="false"
                             PreferenceKey="points-dashboard-ledger">
-        <section class="card">
+        <section>
             <div class="border-b border-slate-200 p-5">
                 <h2 class="text-lg font-semibold text-slate-950">Recent changes</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
-            <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+            <div class="wide-data-region scroll-panel scroll-panel--data-table">
                 <table class="w-full text-left text-sm">
                     <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>
@@ -202,6 +203,7 @@
             </div>
         </section>
         </CollapsibleSection>
+        </TaskSelectionScope>
     }
     </ChildContent>
 </DashboardPage>

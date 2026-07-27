@@ -36,8 +36,9 @@
     }
     else
     {
+        <TaskSelectionScope PreferenceKey="guessing-settings" DefaultTask="round-types">
         <div id="profiles">
-            <ProfileSettingsSection Configuration="_config"
+            <ProfileSettingsSection TaskKey="round-types" Configuration="_config"
                                     CreateProfile="CreateProfileAsync"
                                     DeleteProfile="DeleteProfileAsync"
                                     SelectProfile="SelectProfileAsync"
@@ -46,10 +47,10 @@
 
         <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div id="aliases">
-                <CommandAliasSettingsSection Aliases="_config.Aliases" />
+                <CommandAliasSettingsSection Aliases="_config.Aliases" TaskKey="commands" />
             </div>
 
-            <GuessOptionsSettingsSection Options="_config.Profile.Options"
+            <GuessOptionsSettingsSection TaskKey="answers" Options="_config.Profile.Options"
                                          WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                          @bind-WhisperAnswerReplies="_config.Profile.WhisperAnswerReplies"
                                          AddOption="AddOption"
@@ -57,11 +58,13 @@
         </div>
 
         <div id="replies">
-            <ReplySettingsSection Replies="_config.Profile.Replies" />
+            <ReplySettingsSection Replies="_config.Profile.Replies" TaskKey="replies" />
+            <CollapsibleSection Title="Reply delivery" Description="Choose where viewers receive replies." TaskKey="delivery" InitiallyOpen="false">
             <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                           WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                           Options="_whisperReplyOptions" />
-            <section class="card mt-6 space-y-4 p-6" aria-labelledby="round-start-pin-title">
+            </CollapsibleSection>
+            <CollapsibleSection Title="Round start pin" Description="Pin the confirmed round-start reply in Twitch chat." TaskKey="pin" InitiallyOpen="false">
                 <div>
                     <h2 id="round-start-pin-title" class="text-lg font-bold">Round start pin</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Pin the confirmed round-start reply in Twitch chat.</p>
@@ -81,8 +84,9 @@
                         Remove this pin when the round stops
                     </label>
                 }
-            </section>
+            </CollapsibleSection>
         </div>
+        </TaskSelectionScope>
     }
     </ChildContent>
 </DashboardPage>

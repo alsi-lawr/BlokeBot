@@ -70,7 +70,9 @@ public partial class PointsConfigurationPage
     private bool _featureEnabled;
     private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
     private long _generalOpenRequest;
+    private long _generalFocusRequest;
     private long _giveawaysOpenRequest;
+    private long _giveawaysFocusRequest;
 
     protected override async Task OnInitializedAsync()
     {
@@ -130,6 +132,7 @@ public partial class PointsConfigurationPage
                 {
                     _validationErrors = errors.ToArray();
                     _generalOpenRequest++;
+                    _generalFocusRequest++;
                     if (
                         errors.Any(error =>
                             error
@@ -140,6 +143,7 @@ public partial class PointsConfigurationPage
                     )
                     {
                         _giveawaysOpenRequest++;
+                        _giveawaysFocusRequest++;
                     }
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(

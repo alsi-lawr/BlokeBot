@@ -67,6 +67,22 @@
     else if (_state.HostId is { } hostId)
     {
         <TaskPanel Title="@($"#{_state.DisplayName} readiness")" Description="Complete the current connection or bot-status action for this channel.">
+            <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+                <span class="@_runtimeBadgeClass"><span class="@_runtimeDotClass"></span><span class="status-pill__label">@_runtimeText</span></span>
+                @if (!PageContext.Session.CanAuthorizeSelectedHost)
+                {
+                    <p class="text-sm text-muted-foreground">The channel owner must connect this Twitch account.</p>
+                }
+                @if (_canStart)
+                {
+                    <button class="btn-primary" type="button" @onclick="() => StartAsync(hostId)">Start bot</button>
+                }
+                else if (_canStop)
+                {
+                    <button class="btn-secondary" type="button" @onclick="() => StopAsync(hostId)">Stop bot</button>
+                }
+            </div>
+            <CollapsibleSection Title="Connection diagnostics" Description="Review Twitch connection, follower-only, and runtime details." InitiallyOpen="false" PreferenceKey="host-setup-diagnostics">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -146,6 +162,8 @@
                         </span>
                     </div>
                     <div class="runtime-control-actions mt-3">
+                        @if (_canStart)
+                        {
                         <span class="block min-w-0" title="@_startRuntimeTooltip">
                             <button class="primary-control grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                                     type="button"
@@ -163,6 +181,9 @@
                                 </span>
                             </button>
                         </span>
+                        }
+                        @if (_canStop)
+                        {
                         <span class="block min-w-0" title="@_stopRuntimeTooltip">
                             <button class="control-surface grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
                                     type="button"
@@ -180,9 +201,11 @@
                                 </span>
                             </button>
                         </span>
+                        }
                     </div>
                 </div>
             </div>
+            </CollapsibleSection>
         </TaskPanel>
 
         <CollapsibleSection Title="Startup chat message" PreferenceKey="host-setup-startup-message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">

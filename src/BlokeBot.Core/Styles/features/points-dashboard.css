@@ -1,5 +1,5 @@
 @layer components {
-    @media (max-width: 24.375rem) {
+    @media (max-width: 30rem) {
         .points-dashboard__leaderboard {
             overflow-x: hidden;
         }

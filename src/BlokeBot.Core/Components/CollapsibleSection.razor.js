@@ -23,3 +23,15 @@ export function writeBoolean(key, value) {
     resetPreferences();
     localStorage.setItem(key, value ? "true" : "false");
 }
+
+export function readString(key) {
+    return window.localStorage.getItem(key);
+}
+
+export function writeString(key, value) {
+    window.localStorage.setItem(key, value);
+}
+
+export function focusElement(id) {
+    document.getElementById(id)?.focus();
+}

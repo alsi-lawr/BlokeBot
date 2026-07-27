@@ -6,39 +6,40 @@
 
 <DashboardPage Kicker="Overview"
                Title="Run your channel with BlokeBot"
-               Description="Set up your channel, choose the chat tools you need, and keep the bot ready for stream.">
-    <Actions>
-        <a class="btn-primary" href="/host">Set up your channel</a>
-    </Actions>
-
+               Description="See the selected channel’s next setup action and keep the bot ready for stream.">
     <ChildContent>
-    <TaskPanel Title="Get your channel ready"
-               Description="Channel setup is where you connect the bot, choose your chat tools, and decide which moderators can help.">
-        <ol class="grid gap-4 text-sm leading-6 text-muted-foreground md:grid-cols-3">
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">1. Connect the bot</strong>Let BlokeBot join your Twitch chat when you are ready to stream.</li>
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">2. Choose chat tools</strong>Turn on the games, points, and commands that fit your channel.</li>
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">3. Invite trusted moderators</strong>Choose who can help run the tools for this channel.</li>
-        </ol>
-    </TaskPanel>
+        <AuthorizeView>
+            <Authorized Context="homeAuth">
+                @{
+                    var selectedChannel = AuthenticatedSession
+                        .FromPrincipal(homeAuth.User)
+                        .State.Match<string?>(
+                            _ => null,
+                            selected => selected.Selection.Current.Login,
+                            _ => null
+                        );
+                }
+                @if (string.IsNullOrWhiteSpace(selectedChannel))
+                {
+                    <PageState Kind="DashboardPageState.Unavailable"
+                               Title="Choose a channel"
+                               Description="Choose a channel from the top bar before setting it up." />
+                }
+                else
+                {
+                    <TaskPanel Title="@($"#{selectedChannel} readiness")"
+                               Description="Channel setup shows the current connection and bot action for this channel.">
+                        <a class="btn-primary" href="/host">Open Channel setup</a>
+                    </TaskPanel>
+                }
 
-    <AuthorizeView>
-        <Authorized Context="homeAuth">
-            @{
-                var selectedChannel = AuthenticatedSession
-                    .FromPrincipal(homeAuth.User)
-                    .State.Match<string?>(
-                        _ => null,
-                        selected => selected.Selection.Current.Login,
-                        _ => null
-                    );
-            }
-            <CollapsibleSection Title="Public leaderboard"
-                                Description="Open a public guessing or points leaderboard for a Twitch channel."
-                                InitiallyOpen="false"
-                                PreferenceKey="overview-public-leaderboard">
-                <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@selectedChannel" />
-            </CollapsibleSection>
-        </Authorized>
-    </AuthorizeView>
+                <CollapsibleSection Title="Public leaderboard"
+                                    Description="Open a public guessing or points leaderboard for a Twitch channel."
+                                    InitiallyOpen="false"
+                                    PreferenceKey="overview-public-leaderboard">
+                    <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@selectedChannel" />
+                </CollapsibleSection>
+            </Authorized>
+        </AuthorizeView>
     </ChildContent>
 </DashboardPage>

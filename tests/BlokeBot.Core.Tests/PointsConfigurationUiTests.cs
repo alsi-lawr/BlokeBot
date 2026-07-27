@@ -23,9 +23,8 @@ public sealed class PointsConfigurationUiTests
         context.ComponentFactories.AddStub<PointsEligibilitySelector>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
-        OpenSection(page, "Giveaways");
-
         page.Find("#gamblingCooldown").GetAttribute("value").ShouldBe("-4");
+        OpenSection(page, "Giveaways");
         page.Find("#duration").GetAttribute("value").ShouldBe("0");
         page.Find("#winnerCount").GetAttribute("value").ShouldBe("0");
         page.Find("#cooldown").GetAttribute("value").ShouldBe("299");
@@ -42,12 +41,14 @@ public sealed class PointsConfigurationUiTests
         error.Message.ShouldContain(
             $"The wait between giveaways must be at least {PointsConfigurationValidator.MinimumGiveawayCooldownSeconds} seconds."
         );
+        OpenSection(page, "General");
         AssertFieldError(
             page,
             "#gamblingCooldown",
             "gamblingCooldown-error",
             "The wait between gambles cannot be negative."
         );
+        OpenSection(page, "Giveaways");
         AssertFieldError(
             page,
             "#duration",
@@ -75,7 +76,9 @@ public sealed class PointsConfigurationUiTests
             persisted.GiveawayCooldownSeconds.ShouldBe(299);
         }
 
+        OpenSection(page, "General");
         page.Find("#gamblingCooldown").Change("0");
+        OpenSection(page, "Giveaways");
         page.Find("#duration").Change("1");
         page.Find("#winnerCount").Change("1");
         page.Find("#cooldown")
@@ -84,7 +87,9 @@ public sealed class PointsConfigurationUiTests
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
 
+        OpenSection(page, "General");
         AssertFieldErrorCleared(page, "#gamblingCooldown", "gamblingCooldown-error");
+        OpenSection(page, "Giveaways");
         AssertFieldErrorCleared(page, "#duration", "duration-error");
         AssertFieldErrorCleared(page, "#winnerCount", "winnerCount-error");
         AssertFieldErrorCleared(page, "#cooldown", "cooldown-error");

@@ -1,4 +1,4 @@
-<CollapsibleSection Title="Round types" Description="Save different versions of the guessing game, each with its own answers and replies." InitiallyOpen="true" PreferenceKey="guessing-settings-round-types">
+<CollapsibleSection Title="Round types" Description="Save different versions of the guessing game, each with its own answers and replies." InitiallyOpen="true" TaskKey="@TaskKey" PreferenceKey="guessing-settings-round-types">
     <div class="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
         <div>
             <label class="label" for="profileSelect">Round type to edit</label>
@@ -28,3 +28,8 @@
         <Field Id="@($"guess-profile-{Configuration.Profile.Id}-winning-reward")" Label="Points for a winning guess" @bind-Value="Configuration.Profile.WinningGuessPointReward" Placeholder="0" />
     </div>
 </CollapsibleSection>
+
+@code {
+    [Parameter]
+    public string? TaskKey { get; set; }
+}
