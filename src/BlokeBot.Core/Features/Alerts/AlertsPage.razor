@@ -80,7 +80,16 @@
             }
             else
             {
-                <div class="wide-data-region scroll-panel scroll-panel--data-table">
+                <div class="phone-card-list" data-phone-cards="alert-history">
+                    @foreach (var alert in _state.History)
+                    {
+                        <article @key="alert.Id" class="phone-card">
+                            <div><strong>@alert.Title</strong><p>@AlertAreaLabel(alert.Source)</p></div>
+                            <dl><dt>Importance</dt><dd>@ImportanceLabel(alert.Severity)</dd><dt>Handled by</dt><dd>@alert.AcknowledgedByLogin</dd><dt>Handled at</dt><dd>@FormatTimestamp(alert.AcknowledgedAtUtc)</dd></dl>
+                        </article>
+                    }
+                </div>
+                <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Handled alert history">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>

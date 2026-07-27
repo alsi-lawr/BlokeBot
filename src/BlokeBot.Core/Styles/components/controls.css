@@ -132,3 +132,9 @@
     max-width: 72rem;
     overflow-x: auto;
 }
+
+.phone-card-list { display: none; }
+@media (max-width: 30rem) {
+  .phone-card-list { display: grid; }
+  .phone-card-list + .wide-data-region { display: none; }
+}

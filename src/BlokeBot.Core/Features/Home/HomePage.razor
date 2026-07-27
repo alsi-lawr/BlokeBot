@@ -1,45 +1,51 @@
 @page "/"
 @using Microsoft.AspNetCore.Authorization
+@using BlokeBot.Core.Features.HostedChannels.Runtime
+@using BlokeBot.Core.Features.HostConfig.Page
 @attribute [Authorize]
+@inherits AuthenticatedPageComponent
+@inject HostConfigService _hostConfig
 
 <PageTitle>BlokeBot | Overview</PageTitle>
 
 <DashboardPage Kicker="Overview"
                Title="Run your channel with BlokeBot"
-               Description="See the selected channel’s next setup action and keep the bot ready for stream.">
+               Description="See the selected channel’s actual readiness and next action." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <ChildContent>
-        <AuthorizeView>
-            <Authorized Context="homeAuth">
-                @{
-                    var selectedChannel = AuthenticatedSession
-                        .FromPrincipal(homeAuth.User)
-                        .State.Match<string?>(
-                            _ => null,
-                            selected => selected.Selection.Current.Login,
-                            _ => null
-                        );
-                }
-                @if (string.IsNullOrWhiteSpace(selectedChannel))
-                {
-                    <PageState Kind="DashboardPageState.Unavailable"
-                               Title="Choose a channel"
-                               Description="Choose a channel from the top bar before setting it up." />
-                }
-                else
-                {
-                    <TaskPanel Title="@($"#{selectedChannel} readiness")"
-                               Description="Channel setup shows the current connection and bot action for this channel.">
-                        <a class="btn-primary" href="/host">Open Channel setup</a>
-                    </TaskPanel>
-                }
+        @if (_state is null)
+        {
+            <PageState Kind="DashboardPageState.Loading" Title="Loading channel readiness" Description="Checking the selected channel’s connection and bot status." />
+        }
+        else if (!_state.IsHostCreated)
+        {
+            <TaskPanel Title="Create your channel setup" Description="Create this channel before connecting the bot or enabling chat tools.">
+                <a class="btn-primary" href="/host/create?returnUrl=/">Create channel setup</a>
+            </TaskPanel>
+        }
+        else if (!_state.IsChannelBotAuthorized || _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true)
+        {
+            <TaskPanel Title="Connect Twitch chat" Description="The selected channel needs a current Twitch chat connection.">
+                <a class="btn-primary" href="/host">@(_state.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")</a>
+            </TaskPanel>
+        }
+        else if (_state.RuntimeStatus?.Lifecycle is HostedChannelRuntimeLifecycle.Stopped)
+        {
+            <TaskPanel Title="Bot is ready to start" Description="Twitch chat is connected; start the bot from Channel setup.">
+                <a class="btn-primary" href="/host">Start bot</a>
+            </TaskPanel>
+        }
+        else
+        {
+            <TaskPanel Title="Channel ready" Description="The selected channel is connected and the bot is active.">
+                <a class="btn-secondary" href="/host">Review Channel setup</a>
+            </TaskPanel>
+        }
 
-                <CollapsibleSection Title="Public leaderboard"
-                                    Description="Open a public guessing or points leaderboard for a Twitch channel."
-                                    InitiallyOpen="false"
-                                    PreferenceKey="overview-public-leaderboard">
-                    <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@selectedChannel" />
-                </CollapsibleSection>
-            </Authorized>
-        </AuthorizeView>
+        <CollapsibleSection Title="Public leaderboard"
+                            Description="Open a public guessing or points leaderboard for a Twitch channel."
+                            InitiallyOpen="false"
+                            PreferenceKey="overview-public-leaderboard">
+            <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@_state!.Login" />
+        </CollapsibleSection>
     </ChildContent>
 </DashboardPage>

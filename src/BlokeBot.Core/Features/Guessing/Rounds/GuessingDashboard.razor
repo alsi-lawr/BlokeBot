@@ -126,7 +126,13 @@
                 }
                 else
                 {
-                    <div class="wide-data-region scroll-panel scroll-panel--data-table">
+                    <div class="phone-card-list" data-phone-cards="guess-history">
+                        @foreach (var round in _recentRounds)
+                        {
+                            <article @key="round.Id" class="phone-card"><strong>@round.ProfileName</strong><span>Winner @round.Lifecycle.WinningName</span><span>@round.GuessCount guesses</span><span>@FormatEndedAt(round)</span></article>
+                        }
+                    </div>
+                    <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Recent guessing rounds">
                         <table class="w-full text-left text-sm">
                             <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>

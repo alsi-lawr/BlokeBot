@@ -63,7 +63,14 @@
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
                 </div>
-                <div class="points-dashboard__leaderboard wide-data-region scroll-panel scroll-panel--data-table">
+                <div class="phone-card-list" data-phone-cards="point-balances">
+                    @for (var i = 0; i < _state.Leaderboard.Count; i++)
+                    {
+                        var entry = _state.Leaderboard[i];
+                        <article @key="entry.Login" class="phone-card"><strong>@entry.Login</strong><span>Rank @(i + 1)</span><span>@entry.Balance.ToDisplayString()</span><button class="control-surface" type="button" @onclick="() => RemoveLeaderboardEntryAsync(entry.Login)">Delete balance</button></article>
+                    }
+                </div>
+                <div class="points-dashboard__leaderboard wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Viewer balances">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
@@ -176,7 +183,13 @@
                 <h2 class="text-lg font-semibold text-slate-950">Recent changes</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
-            <div class="wide-data-region scroll-panel scroll-panel--data-table">
+            <div class="phone-card-list" data-phone-cards="point-ledger">
+                @foreach (var entry in _state.RecentLedger)
+                {
+                    <article @key="entry" class="phone-card"><strong>@entry.Login</strong><span>@LedgerChangeLabel(entry.Kind)</span><span>@entry.Delta</span><span>Balance @entry.BalanceAfter</span><span>@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</span></article>
+                }
+            </div>
+            <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Recent point changes">
                 <table class="w-full text-left text-sm">
                     <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>
