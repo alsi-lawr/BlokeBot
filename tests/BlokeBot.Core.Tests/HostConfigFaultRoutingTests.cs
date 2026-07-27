@@ -106,6 +106,56 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
+    public async Task Readiness_CurrentAction_IsExclusiveAcrossAuthorizationAndRuntimeStates()
+    {
+        foreach (
+            var (authorized, scopes, runtime, expected) in new[]
+            {
+                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
+                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
+                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
+                (true, "chat:read", BotChannelRuntimeState.Starting, "Stop bot"),
+                (true, "chat:read", BotChannelRuntimeState.Started, "Stop bot"),
+            }
+        )
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostAsync(dbFactory);
+            await using (var db = await dbFactory.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(hostId);
+                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
+                host.ChannelBotAuthorizedScopes = scopes;
+                host.BotRuntimeState = runtime;
+                host.BotRuntimeStateChangedAtUtc = runtime
+                    is BotChannelRuntimeState.Starting
+                        or BotChannelRuntimeState.Started
+                    ? DateTime.UtcNow
+                    : null;
+                await db.SaveChangesAsync();
+            }
+            await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+            ConfigureHostServices(
+                context,
+                dbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var page = RenderHostConfigPage(context);
+            page.WaitForAssertion(() =>
+                page.FindAll("button")
+                    .Count(button => button.TextContent.Trim() == expected)
+                    .ShouldBe(1)
+            );
+            await OpenDisclosureAsync(page, "Connection diagnostics");
+            page.FindAll("button")
+                .Count(button => button.TextContent.Trim() == expected)
+                .ShouldBe(1);
+        }
+    }
+
+    [Test]
     public async Task ReorderedAuthorityCompletions_KeepLatestPolicyIntentAndDoNotSaveStaleGrant()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -149,7 +199,8 @@ public sealed class HostConfigFaultRoutingTests
         BunitContext context,
         IDbContextFactory<BlokeBotDbContext> dbFactory,
         ILogger<UiFaultTelemetry> logger,
-        TimeProvider clock
+        TimeProvider clock,
+        string[]? channelScopes = null
     )
     {
         context.Services.AddSingleton(dbFactory);
@@ -158,7 +209,19 @@ public sealed class HostConfigFaultRoutingTests
             Options.Create(new BlokeBotOptions())
         );
         context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
-        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        context.Services.AddSingleton<IConfiguration>(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    (channelScopes ?? []).Select(
+                        (scope, index) =>
+                            new KeyValuePair<string, string?>(
+                                "TwitchBot:ChannelAuthorization:Scopes:" + index,
+                                scope
+                            )
+                    )
+                )
+                .Build()
+        );
         context.Services.AddOAuthTransport();
         context.Services.AddHelix();
         context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
