@@ -143,15 +143,9 @@ public sealed class HostConfigFaultRoutingTests
                 ["chat:read"]
             );
             var page = RenderHostConfigPage(context);
-            page.WaitForAssertion(() =>
-                page.FindAll("button")
-                    .Count(button => button.TextContent.Trim() == expected)
-                    .ShouldBe(1)
-            );
+            page.WaitForAssertion(() => AssertCurrentReadinessAction(page, expected, 0));
             await OpenDisclosureAsync(page, "Connection diagnostics");
-            page.FindAll("button")
-                .Count(button => button.TextContent.Trim() == expected)
-                .ShouldBe(1);
+            AssertCurrentReadinessAction(page, expected, authorized ? 1 : 0);
         }
     }
 
@@ -342,6 +336,22 @@ public sealed class HostConfigFaultRoutingTests
                 && report.FailureType == typeof(InvalidOperationException).FullName
             );
         }
+    }
+
+    private static void AssertCurrentReadinessAction(
+        IRenderedComponent<HostConfigPage> page,
+        string expected,
+        int expectedDisconnects
+    )
+    {
+        var labels = new[] { "Connect bot", "Reconnect bot", "Start bot", "Stop bot" };
+        page.FindAll("button")
+            .Where(button => labels.Contains(button.TextContent.Trim()))
+            .Select(button => button.TextContent.Trim())
+            .ShouldBe([expected]);
+        page.FindAll("button")
+            .Count(button => button.TextContent.Trim() == "Disconnect")
+            .ShouldBe(expectedDisconnects);
     }
 
     private static IRenderedComponent<HostConfigPage> RenderHostConfigPage(BunitContext context)
