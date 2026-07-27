@@ -6,6 +6,8 @@ namespace BlokeBot.Core.Components;
 public partial class TaskSelectionScope
 {
     private readonly List<CollapsibleSection> _sections = [];
+    private readonly HashSet<string> _taskKeys = [];
+    private bool _hasExplicitSelection;
     private IJSObjectReference? _module;
     private string? _selectedTask;
 
@@ -23,13 +25,15 @@ public partial class TaskSelectionScope
         return (_selectedTask ?? DefaultTask) == taskKey;
     }
 
-    internal void Register(CollapsibleSection section)
+    internal void Register(CollapsibleSection section, string taskKey)
     {
         _sections.Add(section);
+        _taskKeys.Add(taskKey);
     }
 
     internal async Task SelectAsync(string taskKey)
     {
+        _hasExplicitSelection = true;
         _selectedTask = taskKey;
         UpdateSections();
         if (_module is not null)
@@ -52,10 +56,18 @@ public partial class TaskSelectionScope
                 "./Components/CollapsibleSection.razor.js"
             );
             var rememberedTask = await _module.InvokeAsync<string?>("readString", _storageKey);
-            if (!string.IsNullOrWhiteSpace(rememberedTask))
+            if (!_hasExplicitSelection && _taskKeys.Contains(rememberedTask ?? string.Empty))
             {
                 _selectedTask = rememberedTask;
                 UpdateSections();
+            }
+            else if (_hasExplicitSelection)
+            {
+                await _module.InvokeVoidAsync(
+                    "writeString",
+                    _storageKey,
+                    _selectedTask ?? DefaultTask
+                );
             }
         }
         catch (JSDisconnectedException) { }

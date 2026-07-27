@@ -73,6 +73,7 @@ public partial class PointsConfigurationPage
     private long _generalFocusRequest;
     private long _giveawaysOpenRequest;
     private long _giveawaysFocusRequest;
+    private string _validationFocusId = "gamblingCooldown";
 
     protected override async Task OnInitializedAsync()
     {
@@ -131,19 +132,28 @@ public partial class PointsConfigurationPage
                 errors =>
                 {
                     _validationErrors = errors.ToArray();
-                    _generalOpenRequest++;
-                    _generalFocusRequest++;
-                    if (
-                        errors.Any(error =>
-                            error
-                                is PointsConfigurationValidationError.GiveawayDurationBelowMinimum
-                                    or PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum
-                                    or PointsConfigurationValidationError.GiveawayCooldownBelowMinimum
-                        )
-                    )
+                    switch (_validationErrors[0])
                     {
-                        _giveawaysOpenRequest++;
-                        _giveawaysFocusRequest++;
+                        case PointsConfigurationValidationError.NegativeGamblingCooldown:
+                            _validationFocusId = "gamblingCooldown";
+                            _generalOpenRequest++;
+                            _generalFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayDurationBelowMinimum:
+                            _validationFocusId = "duration";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum:
+                            _validationFocusId = "winnerCount";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayCooldownBelowMinimum:
+                            _validationFocusId = "cooldown";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
                     }
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(

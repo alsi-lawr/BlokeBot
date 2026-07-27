@@ -66,6 +66,7 @@
     }
     else if (_state.HostId is { } hostId)
     {
+        <TaskSelectionScope PreferenceKey="host-setup" DefaultTask="readiness">
         <TaskPanel Title="@($"#{_state.DisplayName} readiness")" Description="Complete the current connection or bot-status action for this channel.">
             <div class="flex flex-wrap items-center justify-between gap-3 p-4">
                 <span class="@_runtimeBadgeClass"><span class="@_runtimeDotClass"></span><span class="status-pill__label">@_runtimeText</span></span>
@@ -82,7 +83,7 @@
                     <button class="btn-secondary" type="button" @onclick="() => StopAsync(hostId)">Stop bot</button>
                 }
             </div>
-            <CollapsibleSection Title="Connection diagnostics" Description="Review Twitch connection, follower-only, and runtime details." InitiallyOpen="false" PreferenceKey="host-setup-diagnostics">
+            <CollapsibleSection Title="Connection diagnostics" TaskKey="diagnostics" Description="Review Twitch connection, follower-only, and runtime details." InitiallyOpen="false" PreferenceKey="host-setup-diagnostics">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -208,7 +209,7 @@
             </CollapsibleSection>
         </TaskPanel>
 
-        <CollapsibleSection Title="Startup chat message" PreferenceKey="host-setup-startup-message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Startup chat message" TaskKey="startup" PreferenceKey="host-setup-startup-message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
             <div class="space-y-4 p-5">
                 <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
                     <input class="h-4 w-4"
@@ -254,10 +255,11 @@
                                             Refresh="LoadAsync"
                                             Collapsible="true"
                                             InitiallyOpen="false"
-                                            PreferenceKey="host-setup-custom-bot" />
+                                            PreferenceKey="host-setup-custom-bot"
+                                            TaskKey="custom-bot" />
         </div>
 
-        <CollapsibleSection Title="Whisper responses" PreferenceKey="host-setup-whisper-responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
+        <CollapsibleSection Title="Whisper responses" TaskKey="whispers" PreferenceKey="host-setup-whisper-responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
             <div class="p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
@@ -293,7 +295,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Moderator help" PreferenceKey="host-setup-moderator-help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Moderator help" TaskKey="moderators" PreferenceKey="host-setup-moderator-help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -347,7 +349,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat tools" PreferenceKey="host-setup-chat-tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Chat tools" TaskKey="tools" PreferenceKey="host-setup-chat-tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in _state.Features)
                 {
@@ -372,5 +374,6 @@
                 }
             </div>
         </CollapsibleSection>
+        </TaskSelectionScope>
     }
 </DashboardPage>

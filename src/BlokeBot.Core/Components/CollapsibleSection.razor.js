@@ -6,7 +6,7 @@ function resetPreferences() {
         return;
 
     for (const key of Object.keys(localStorage)) {
-        if (key.startsWith("blokebot.disclosure."))
+        if (key.startsWith("blokebot.disclosure.") || key.startsWith("blokebot.task."))
             localStorage.removeItem(key);
     }
 
@@ -25,10 +25,12 @@ export function writeBoolean(key, value) {
 }
 
 export function readString(key) {
+    resetPreferences();
     return window.localStorage.getItem(key);
 }
 
 export function writeString(key, value) {
+    resetPreferences();
     window.localStorage.setItem(key, value);
 }
 

@@ -71,6 +71,7 @@ public partial class GuessingDashboard
     private string _leaderboardUsername = string.Empty;
     private IReadOnlyList<GuessRoundHistoryEntry>? _recentRounds;
     private int _selectedProfileId;
+    private bool _hasExplicitTaskSelection;
     private IJSObjectReference? _taskModule;
     private GuessingDashboardState? _state;
     private string _winnerName = string.Empty;
@@ -135,11 +136,21 @@ public partial class GuessingDashboard
                 "blokebot.task.guessing-dashboard"
             );
             if (
-                Enum.TryParse<DashboardTab>(remembered, out var selected)
+                !_hasExplicitTaskSelection
+                && Enum.TryParse<DashboardTab>(remembered, out var selected)
+                && Enum.IsDefined(selected)
                 && selected != DashboardTab.Live
             )
             {
                 await ActivateTabAsync(selected);
+            }
+            else if (_hasExplicitTaskSelection)
+            {
+                await _taskModule.InvokeVoidAsync(
+                    "writeString",
+                    "blokebot.task.guessing-dashboard",
+                    _activeTab.ToString()
+                );
             }
         }
         catch (JSDisconnectedException) { }
@@ -159,9 +170,27 @@ public partial class GuessingDashboard
         await LoadAsync();
     }
 
+    private Task OnTabKeyDownAsync(KeyboardEventArgs args)
+    {
+        var next = args.Key switch
+        {
+            "ArrowRight" => _activeTab == DashboardTab.Leaderboard
+                ? DashboardTab.Live
+                : _activeTab + 1,
+            "ArrowLeft" => _activeTab == DashboardTab.Live
+                ? DashboardTab.Leaderboard
+                : _activeTab - 1,
+            "Home" => DashboardTab.Live,
+            "End" => DashboardTab.Leaderboard,
+            _ => _activeTab,
+        };
+        return next == _activeTab ? Task.CompletedTask : ActivateTabAsync(next);
+    }
+
     private async Task ActivateTabAsync(DashboardTab tab)
     {
         _activeTab = tab;
+        _hasExplicitTaskSelection = true;
         if (_taskModule is not null)
         {
             await _taskModule.InvokeVoidAsync(

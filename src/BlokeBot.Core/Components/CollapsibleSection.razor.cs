@@ -61,7 +61,7 @@ public partial class CollapsibleSection
         _isOpen = TaskScope?.IsSelected(TaskKey ?? string.Empty) ?? InitiallyOpen;
         if (!string.IsNullOrWhiteSpace(TaskKey))
         {
-            TaskScope?.Register(this);
+            TaskScope?.Register(this, TaskKey);
         }
     }
 

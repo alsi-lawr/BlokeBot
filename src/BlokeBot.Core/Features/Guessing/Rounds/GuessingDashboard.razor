@@ -51,21 +51,33 @@
             <button class="@TabClass(DashboardTab.Live)"
                     type="button"
                     role="tab"
+                    id="guessing-tab-live"
+                    aria-controls="guessing-panel-live"
+                    tabindex="@(_activeTab == DashboardTab.Live ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Live)"
+                    @onkeydown="OnTabKeyDownAsync"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
             </button>
             <button class="@TabClass(DashboardTab.History)"
                     type="button"
                     role="tab"
+                    id="guessing-tab-history"
+                    aria-controls="guessing-panel-history"
+                    tabindex="@(_activeTab == DashboardTab.History ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.History)"
+                    @onkeydown="OnTabKeyDownAsync"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
             </button>
             <button class="@TabClass(DashboardTab.Leaderboard)"
                     type="button"
                     role="tab"
+                    id="guessing-tab-leaderboard"
+                    aria-controls="guessing-panel-leaderboard"
+                    tabindex="@(_activeTab == DashboardTab.Leaderboard ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Leaderboard)"
+                    @onkeydown="OnTabKeyDownAsync"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard
             </button>
@@ -73,6 +85,7 @@
 
         @if (_activeTab == DashboardTab.Live)
         {
+            <section id="guessing-panel-live" role="tabpanel" aria-labelledby="guessing-tab-live">
             @if (_state is null)
             {
                 <PageState Kind="DashboardPageState.Loading" Title="Loading guessing" Description="Getting the current round and viewer guesses ready." />
@@ -94,10 +107,11 @@
                 </div>
                 </TaskPanel>
             }
+            </section>
         }
         else if (_activeTab == DashboardTab.History)
         {
-            <section id="history" class="card">
+            <section id="guessing-panel-history" role="tabpanel" aria-labelledby="guessing-tab-history" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Recent rounds</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Past rounds for this channel.</p>
@@ -144,7 +158,7 @@
         }
         else
         {
-            <section id="leaderboard" class="card">
+            <section id="guessing-panel-leaderboard" role="tabpanel" aria-labelledby="guessing-tab-leaderboard" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
