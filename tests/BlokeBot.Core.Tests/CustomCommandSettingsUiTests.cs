@@ -285,17 +285,57 @@ public sealed class CustomCommandSettingsUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<CustomCommandSettingsPage>();
 
         cut.Find($"#command-{seeded.CommandId}-name").Input("Unsaved command");
         cut.Find("button[data-action='edit-counter']").Click();
 
         cut.FindAll("input[id^='command-'][id$='-name']").ShouldBeEmpty();
-        cut.Find($"#counter-{seeded.CounterId}-name").ShouldNotBeNull();
+        var counterName = cut.Find($"#counter-{seeded.CounterId}-name");
+        counterName.ShouldNotBeNull();
         cut.Find("button[data-action='edit-command']").Click();
         cut.Find($"#command-{seeded.CommandId}-name")
             .GetAttribute("value")
             .ShouldBe("Unsaved command");
+
+        cut.Find("button[data-action='edit-counter']").Click();
+        var counterEditor = cut.Find(
+            $"#counter-{seeded.CounterId}-name"
+        ).ParentElement!.ParentElement!;
+        counterEditor
+            .QuerySelectorAll("button")
+            .Single(button => button.TextContent.Trim() == "Delete")
+            .Click();
+
+        cut.Find("button[data-action='edit-counter']").ShouldNotBeNull();
+        cut.Find($"#counter-{seeded.CounterId}-name").ShouldNotBeNull();
+        var counterWarning = toasts.Current.Last();
+        counterWarning.Kind.ShouldBe(ToastKind.Warning);
+        counterWarning.Message.ShouldBe(
+            "This counter is used by a command. Change that command first, then delete it."
+        );
+
+        cut.Find("#custom-command-message-library-tab").Click();
+        cut.Find("button[data-action='edit-reply']").Click();
+        var replyEditor = cut.Find(
+            $"#message-entry-{seeded.MessageEntryId}-name"
+        ).ParentElement!.ParentElement!.ParentElement!;
+        replyEditor
+            .QuerySelectorAll("button")
+            .Single(button => button.TextContent.Trim() == "Delete")
+            .Click();
+
+        cut.Find("button[data-action='edit-reply']").ShouldNotBeNull();
+        cut.Find($"#message-entry-{seeded.MessageEntryId}-name").ShouldNotBeNull();
+        var replyWarning = toasts.Current.Last();
+        replyWarning.Kind.ShouldBe(ToastKind.Warning);
+        replyWarning.Message.ShouldBe(
+            "This reply is used by a command or announcement. Change that first, then delete it."
+        );
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.CustomCounters.FindAsync(seeded.CounterId)).ShouldNotBeNull();
+        (await db.CustomMessageLibraryEntries.FindAsync(seeded.MessageEntryId)).ShouldNotBeNull();
     }
 
     [Test]
@@ -441,9 +481,15 @@ public sealed class CustomCommandSettingsUiTests
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var cut = context.Render<CustomCommandSettingsPage>();
 
-        cut.Find("button[aria-controls='custom-command-advanced-settings']").Click();
+        var advancedSettings = cut.Find("button[aria-controls='custom-command-advanced-settings']");
+        advancedSettings.TextContent.ShouldContain($"Counter {seeded.CounterId}");
+        advancedSettings.Click();
         cut.Find($"#command-{seeded.CommandId}-invocation-limit")
             .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
+        advancedSettings = cut.Find("button[aria-controls='custom-command-advanced-settings']");
+        advancedSettings.Click();
+        advancedSettings.GetAttribute("aria-expanded").ShouldBe("false");
+        advancedSettings.TextContent.ShouldContain("Once per viewer (until reset)");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         await using var savedDb = await dbFactory.CreateDbContextAsync();
