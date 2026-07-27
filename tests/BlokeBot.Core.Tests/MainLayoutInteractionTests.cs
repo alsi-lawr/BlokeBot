@@ -431,5 +431,23 @@ public sealed class TaskSelectionScopeTests
 
         cut.Find("input#first-task");
         cut.FindAll("input#second-task").ShouldBeEmpty();
+
+        using var pendingContext = new BunitContext();
+        var pendingModule = pendingContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        var pendingRead = pendingModule.Setup<string?>("readString", "blokebot.task.test-scope");
+        pendingModule.SetupVoid("writeString", "blokebot.task.test-scope", "first").SetVoidResult();
+        var pendingCut = pendingContext.Render(content);
+        pendingCut
+            .FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains("First"))
+            .Click();
+        pendingRead.SetResult("second");
+        pendingCut.WaitForAssertion(() =>
+        {
+            pendingCut.Find("input#first-task");
+            pendingCut.FindAll("input#second-task").ShouldBeEmpty();
+        });
     }
 }
