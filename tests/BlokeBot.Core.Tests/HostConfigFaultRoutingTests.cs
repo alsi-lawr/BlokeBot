@@ -144,6 +144,44 @@ public sealed class HostConfigFaultRoutingTests
             });
         }
 
+        await using (var retryInner = await SqliteBlokeBotDbFactory.CreateAsync())
+        {
+            var retryHostId = await SeedHostAsync(retryInner);
+            await using (var db = await retryInner.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(retryHostId);
+                host!.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
+                host.ChannelBotAuthorizedScopes = "chat:read";
+                host.BotRuntimeState = BotChannelRuntimeState.Stopped;
+                await db.SaveChangesAsync();
+            }
+            var retryTest = UiTestContextFactory.CreateWithAuthorization(retryInner, retryHostId);
+            await using var retryContext = retryTest.Context;
+            var controlled = new ControlledDbFactory(retryInner) { Fail = true };
+            ConfigureHostServices(
+                retryContext,
+                controlled,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var retryPage = retryContext.Render<HomePage>();
+            retryPage.WaitForAssertion(() =>
+                retryPage.Find("[role='alert']").TextContent.ShouldContain("overview load failed")
+            );
+            controlled.Fail = false;
+            retryPage.Find("[role='alert'] button").Click();
+            retryPage.WaitForAssertion(() =>
+            {
+                retryPage.FindAll("[role='alert']").ShouldBeEmpty();
+                retryPage
+                    .FindAll("a")
+                    .Select(anchor => anchor.TextContent.Trim())
+                    .Where(text => text == "Start bot")
+                    .ShouldBe(["Start bot"]);
+            });
+        }
+
         foreach (
             var (authorized, scopes, runtime, expected) in new[]
             {
