@@ -103,6 +103,59 @@ public sealed class HostConfigFaultRoutingTests
             page.Markup.ShouldNotContain("Connect Twitch chat");
             page.Markup.ShouldNotContain("Start bot");
         });
+
+        foreach (
+            var (authorized, scopes, runtime, expected) in new[]
+            {
+                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
+                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
+                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
+                (true, "chat:read", BotChannelRuntimeState.Starting, "Review Channel setup"),
+                (true, "chat:read", BotChannelRuntimeState.Started, "Review Channel setup"),
+            }
+        )
+        {
+            await using var ownerDbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var ownerHostId = await SeedHostAsync(ownerDbFactory);
+            await using (var db = await ownerDbFactory.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(ownerHostId);
+                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
+                host.ChannelBotAuthorizedScopes = scopes;
+                host.BotRuntimeState = runtime;
+                host.BotRuntimeStateChangedAtUtc = runtime
+                    is BotChannelRuntimeState.Starting
+                        or BotChannelRuntimeState.Started
+                    ? DateTime.UtcNow
+                    : null;
+                await db.SaveChangesAsync();
+            }
+            await using var ownerContext = UiTestContextFactory.Create(ownerDbFactory, ownerHostId);
+            ConfigureHostServices(
+                ownerContext,
+                ownerDbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var ownerPage = ownerContext.Render<HomePage>();
+            ownerPage.WaitForAssertion(() =>
+            {
+                var actions = ownerPage
+                    .FindAll("a")
+                    .Select(anchor => anchor.TextContent.Trim())
+                    .Where(text =>
+                        new[]
+                        {
+                            "Connect bot",
+                            "Reconnect bot",
+                            "Start bot",
+                            "Review Channel setup",
+                        }.Contains(text)
+                    );
+                actions.ShouldBe([expected]);
+            });
+        }
     }
 
     [Test]
