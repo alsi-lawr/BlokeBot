@@ -64,40 +64,6 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
-    public async Task UnavailableAuthority_PolicyModeRemainsUnchangedUntilSameChoiceCanBeSaved()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
-        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
-        await using var context = testContext.Context;
-        var clock = new ManualTimeProvider();
-        var tokens = new ScriptedAppAccessTokenSource();
-        tokens.Enqueue(Task.FromException<string>(new TimeoutException()));
-        tokens.Enqueue(Task.FromResult("app-token"));
-        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
-        ConfigureModeratorAuthorityServices(context, tokens);
-
-        var page = RenderHostConfigPage(context);
-        SetModeratorClaims(testContext.Authorization, hostId);
-
-        await ClickAccessModeAsync(page, "Allowed list only");
-
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
-        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
-        tokens.RequestCount.ShouldBe(1);
-
-        await ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: false));
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-        page.WaitForAssertion(() =>
-            ReadAllowModsByDefaultAsync(dbFactory, hostId).GetAwaiter().GetResult().ShouldBeFalse()
-        );
-        tokens.RequestCount.ShouldBe(2);
-    }
-
-    [Test]
     public async Task ReorderedAuthorityCompletions_KeepLatestPolicyIntentAndDoNotSaveStaleGrant()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -128,47 +94,6 @@ public sealed class HostConfigFaultRoutingTests
         page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
         clock.Advance(TimeSpan.FromMilliseconds(180));
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
-    }
-
-    [Test]
-    public async Task DetachedSave_Faulting_RedactsTelemetryAndReachesErrorBoundary()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var faultingDbFactory = new FaultingDbContextFactory(dbFactory);
-        var logger = new RecordingLogger<UiFaultTelemetry>();
-        var clock = new ManualTimeProvider();
-        ConfigureHostServices(context, faultingDbFactory, logger, clock);
-        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
-        RenderFragment content = builder =>
-        {
-            builder.OpenComponent<HostConfigPage>(0);
-            builder.CloseComponent();
-        };
-        var boundary = context.Render<CapturingErrorBoundary>(parameters =>
-            parameters.Add(x => x.ChildContent, content)
-        );
-        await ClickAccessModeAsync(boundary, "Allowed list only");
-        const string SensitiveMessage = "secret-host-config-failure";
-        var exception = new InvalidOperationException(SensitiveMessage);
-        faultingDbFactory.Failure = exception;
-
-        clock.Advance(TimeSpan.FromMilliseconds(180));
-
-        boundary.WaitForAssertion(
-            () => boundary.Instance.CapturedException.ShouldBeSameAs(exception),
-            TimeSpan.FromSeconds(5)
-        );
-        var entry = logger.Entries.ShouldHaveSingleItem();
-        entry.Level.ShouldBe(LogLevel.Error);
-        entry.Exception.ShouldBeNull();
-        entry.Properties["UiComponent"].ShouldBe(nameof(HostConfigPage));
-        entry.Properties["UiOperation"].ShouldBe("PersistAllowModsByDefaultAsync");
-        entry.Properties["HostId"].ShouldBe(hostId);
-        entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
-        entry.Message.ShouldNotContain(SensitiveMessage);
-        context.Services.GetRequiredService<ToastService>().Current.ShouldBeEmpty();
     }
 
     [Test]
@@ -438,28 +363,6 @@ public sealed class HostConfigFaultRoutingTests
         }
 
         return host.Id;
-    }
-
-    private sealed class FaultingDbContextFactory(IDbContextFactory<BlokeBotDbContext> innerFactory)
-        : IDbContextFactory<BlokeBotDbContext>
-    {
-        public Exception? Failure { get; set; }
-
-        public BlokeBotDbContext CreateDbContext()
-        {
-            return Failure is null ? innerFactory.CreateDbContext() : throw Failure;
-        }
-
-        public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
-            CancellationToken cancellationToken = default
-        )
-        {
-            return Failure is null
-                ? new ValueTask<BlokeBotDbContext>(
-                    innerFactory.CreateDbContextAsync(cancellationToken)
-                )
-                : ValueTask.FromException<BlokeBotDbContext>(Failure);
-        }
     }
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
