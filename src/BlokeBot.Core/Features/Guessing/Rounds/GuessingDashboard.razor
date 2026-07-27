@@ -55,7 +55,7 @@
                     id="guessing-tab-live"
                     aria-controls="guessing-panel-live"
                     tabindex="@(_activeTab == DashboardTab.Live ? "0" : "-1")"
-                    aria-selected="@(_activeTab == DashboardTab.Live)"
+                    aria-selected="@(_activeTab == DashboardTab.Live ? "true" : "false")"
                     @ref="_liveTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
@@ -66,7 +66,7 @@
                     id="guessing-tab-history"
                     aria-controls="guessing-panel-history"
                     tabindex="@(_activeTab == DashboardTab.History ? "0" : "-1")"
-                    aria-selected="@(_activeTab == DashboardTab.History)"
+                    aria-selected="@(_activeTab == DashboardTab.History ? "true" : "false")"
                     @ref="_historyTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
@@ -77,7 +77,7 @@
                     id="guessing-tab-leaderboard"
                     aria-controls="guessing-panel-leaderboard"
                     tabindex="@(_activeTab == DashboardTab.Leaderboard ? "0" : "-1")"
-                    aria-selected="@(_activeTab == DashboardTab.Leaderboard)"
+                    aria-selected="@(_activeTab == DashboardTab.Leaderboard ? "true" : "false")"
                     @ref="_leaderboardTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard

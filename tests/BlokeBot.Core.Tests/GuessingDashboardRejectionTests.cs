@@ -44,12 +44,14 @@ public sealed class GuessingDashboardRejectionTests
 
         await cut.Instance.HandleTabKeyAsync("End");
 
-        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldNotBeNull();
+        cut.Find("#guessing-tab-live").GetAttribute("aria-selected").ShouldBe("false");
+        cut.Find("#guessing-tab-history").GetAttribute("aria-selected").ShouldBe("false");
+        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldBe("true");
         cut.Find("#guessing-tab-leaderboard").GetAttribute("tabindex").ShouldBe("0");
 
         await cut.Instance.HandleTabKeyAsync("Tab");
 
-        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldNotBeNull();
+        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldBe("true");
     }
 
     [Test]
