@@ -217,11 +217,7 @@ public partial class CustomCommandSettingsPage
         if (_pendingTabFocus is { } tab)
         {
             _pendingTabFocus = null;
-            await (
-                tab == CustomCommandSettingsTab.Commands
-                    ? _commandsTab.FocusAsync()
-                    : _messageLibraryTab.FocusAsync()
-            );
+            await FocusTabAsync(tab);
         }
 
         if (
@@ -234,9 +230,32 @@ public partial class CustomCommandSettingsPage
         }
     }
 
+    private async Task FocusTabAsync(CustomCommandSettingsTab tab)
+    {
+        if (_preferenceModule is not null)
+        {
+            await _preferenceModule.InvokeVoidAsync("focusElement", TabElementId(tab));
+            return;
+        }
+
+        await (
+            tab == CustomCommandSettingsTab.Commands
+                ? _commandsTab.FocusAsync()
+                : _messageLibraryTab.FocusAsync()
+        );
+    }
+
+    private static string TabElementId(CustomCommandSettingsTab tab)
+    {
+        return tab == CustomCommandSettingsTab.Commands
+            ? "custom-command-commands-tab"
+            : "custom-command-message-library-tab";
+    }
+
     private void ActivateTab(CustomCommandSettingsTab tab)
     {
         _activeTab = tab;
+        _editorFocusControlId = null;
         _hasExplicitSelection = true;
         EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();

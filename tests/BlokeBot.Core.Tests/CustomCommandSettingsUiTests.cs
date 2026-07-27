@@ -323,8 +323,24 @@ public sealed class CustomCommandSettingsUiTests
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var seeded = await SeedConfigurationAsync(dbFactory);
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module
+            .Setup<string?>("readString", "blokebot.task.custom-command-settings")
+            .SetResult($"v2:Commands:Command,{seeded.CommandId}:Reply,{seeded.MessageEntryId}");
         var cut = context.Render<CustomCommandSettingsPage>();
+        cut.WaitForAssertion(() =>
+            module
+                .Invocations.Any(invocation => invocation.Identifier == "readString")
+                .ShouldBeTrue()
+        );
+        cut.Find("button[data-action='edit-command']").Click();
 
+        var tabFocusCount = module.Invocations.Count(invocation =>
+            invocation.Identifier == "focusElement"
+        );
+        var editorFocusCount = context.JSInterop.Invocations.Count(invocation =>
+            invocation.Identifier == "Blazor._internal.domWrapper.focus"
+        );
         cut.Find("#custom-command-commands-tab")
             .KeyDown(new KeyboardEventArgs { Key = "ArrowRight" });
 
@@ -338,6 +354,18 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldBeNull();
         cut.Find("input[id^='message-entry-'][id$='-name']").ShouldNotBeNull();
         cut.FindAll("input[id^='command-'][id$='-name']").ShouldBeEmpty();
+        var messageLibraryFocus = module.Invocations.Last(invocation =>
+            invocation.Identifier == "focusElement"
+        );
+        messageLibraryFocus.Arguments[0].ShouldBe("custom-command-message-library-tab");
+        module
+            .Invocations.Count(invocation => invocation.Identifier == "focusElement")
+            .ShouldBe(tabFocusCount + 1);
+        context
+            .JSInterop.Invocations.Count(invocation =>
+                invocation.Identifier == "Blazor._internal.domWrapper.focus"
+            )
+            .ShouldBe(editorFocusCount);
 
         cut.Find("#custom-command-message-library-tab")
             .KeyDown(new KeyboardEventArgs { Key = "Home" });
@@ -346,8 +374,33 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldNotBeNull();
         cut.Find("input[id^='command-'][id$='-name']").ShouldNotBeNull();
         cut.FindAll("input[id^='message-entry-'][id$='-name']").ShouldBeEmpty();
+        var commandsFocus = module.Invocations.Last(invocation =>
+            invocation.Identifier == "focusElement"
+        );
+        commandsFocus.Arguments[0].ShouldBe("custom-command-commands-tab");
+        module
+            .Invocations.Count(invocation => invocation.Identifier == "focusElement")
+            .ShouldBe(tabFocusCount + 2);
+        context
+            .JSInterop.Invocations.Count(invocation =>
+                invocation.Identifier == "Blazor._internal.domWrapper.focus"
+            )
+            .ShouldBe(editorFocusCount);
+
         cut.Find("#custom-command-commands-tab").KeyDown(new KeyboardEventArgs { Key = "End" });
         cut.Find("#custom-command-message-library-tab").GetAttribute("tabindex").ShouldBe("0");
+        var finalMessageLibraryFocus = module.Invocations.Last(invocation =>
+            invocation.Identifier == "focusElement"
+        );
+        finalMessageLibraryFocus.Arguments[0].ShouldBe("custom-command-message-library-tab");
+        module
+            .Invocations.Count(invocation => invocation.Identifier == "focusElement")
+            .ShouldBe(tabFocusCount + 3);
+        context
+            .JSInterop.Invocations.Count(invocation =>
+                invocation.Identifier == "Blazor._internal.domWrapper.focus"
+            )
+            .ShouldBe(editorFocusCount);
     }
 
     [Test]
