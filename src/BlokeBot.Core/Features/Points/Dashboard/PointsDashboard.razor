@@ -64,6 +64,10 @@
                     <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
                 </div>
                 <div class="phone-card-list" data-phone-cards="point-balances">
+                    @if (_state.Leaderboard.Count == 0)
+                    {
+                        <p class="phone-card">No balances yet.</p>
+                    }
                     @for (var i = 0; i < _state.Leaderboard.Count; i++)
                     {
                         var entry = _state.Leaderboard[i];
@@ -184,6 +188,10 @@
                 <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
             <div class="phone-card-list" data-phone-cards="point-ledger">
+                @if (_state.RecentLedger.Count == 0)
+                {
+                    <p class="phone-card">No recent point changes.</p>
+                }
                 @foreach (var entry in _state.RecentLedger)
                 {
                     <article @key="entry" class="phone-card"><strong>@entry.Login</strong><span>@LedgerChangeLabel(entry.Kind)</span><span>@entry.Delta</span><span>Balance @entry.BalanceAfter</span><span>@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</span></article>

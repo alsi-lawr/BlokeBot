@@ -12,9 +12,13 @@
                Title="Run your channel with BlokeBot"
                Description="See the selected channel’s actual readiness and next action." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <ChildContent>
-        @if (_state is null)
+        @if (!_loaded)
         {
             <PageState Kind="DashboardPageState.Loading" Title="Loading channel readiness" Description="Checking the selected channel’s connection and bot status." />
+        }
+        else if (Host is null || _state is null)
+        {
+            <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select a channel from the top bar to review its readiness." />
         }
         else if (!_state.IsHostCreated)
         {
@@ -41,11 +45,14 @@
             </TaskPanel>
         }
 
-        <CollapsibleSection Title="Public leaderboard"
-                            Description="Open a public guessing or points leaderboard for a Twitch channel."
-                            InitiallyOpen="false"
-                            PreferenceKey="overview-public-leaderboard">
-            <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@_state!.Login" />
-        </CollapsibleSection>
+        @if (_state is not null)
+        {
+            <CollapsibleSection Title="Public leaderboard"
+                                Description="Open a public guessing or points leaderboard for a Twitch channel."
+                                InitiallyOpen="false"
+                                PreferenceKey="overview-public-leaderboard">
+                <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@_state.Login" />
+            </CollapsibleSection>
+        }
     </ChildContent>
 </DashboardPage>

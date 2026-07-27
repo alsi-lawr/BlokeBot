@@ -50,7 +50,7 @@ using static Microsoft.AspNetCore.Components.Web.RenderMode;
 
 namespace BlokeBot.Core.Features.Guessing.Rounds;
 
-public partial class GuessingDashboard
+public partial class GuessingDashboard : IAsyncDisposable
 {
     private enum DashboardTab
     {
@@ -73,8 +73,15 @@ public partial class GuessingDashboard
     private int _selectedProfileId;
     private bool _hasExplicitTaskSelection;
     private IJSObjectReference? _taskModule;
+    private IJSObjectReference? _tabModule;
+    private IJSObjectReference? _tabKeyHandler;
+    private DotNetObjectReference<GuessingDashboard>? _tabKeyComponent;
     private GuessingDashboardState? _state;
     private string _winnerName = string.Empty;
+    private ElementReference _tabList;
+    private ElementReference _liveTab;
+    private ElementReference _historyTab;
+    private ElementReference _leaderboardTab;
 
     private string _roundStartedText =>
         _state?.CurrentRound is null
@@ -135,6 +142,17 @@ public partial class GuessingDashboard
                 "readString",
                 "blokebot.task.guessing-dashboard"
             );
+            _tabModule = await _js.InvokeAsync<IJSObjectReference>(
+                "import",
+                "./Features/Guessing/Rounds/GuessingDashboard.razor.js"
+            );
+            _tabKeyComponent = DotNetObjectReference.Create(this);
+            _tabKeyHandler = await _tabModule.InvokeAsync<IJSObjectReference>(
+                "bindTabKeys",
+                _tabList,
+                _tabKeyComponent
+            );
+
             if (
                 !_hasExplicitTaskSelection
                 && Enum.TryParse<DashboardTab>(remembered, out var selected)
@@ -170,9 +188,10 @@ public partial class GuessingDashboard
         await LoadAsync();
     }
 
-    private Task OnTabKeyDownAsync(KeyboardEventArgs args)
+    [JSInvokable]
+    public Task HandleTabKeyAsync(string key)
     {
-        var next = args.Key switch
+        var next = key switch
         {
             "ArrowRight" => _activeTab == DashboardTab.Leaderboard
                 ? DashboardTab.Live
@@ -184,7 +203,26 @@ public partial class GuessingDashboard
             "End" => DashboardTab.Leaderboard,
             _ => _activeTab,
         };
-        return next == _activeTab ? Task.CompletedTask : ActivateTabAsync(next);
+        return next == _activeTab ? Task.CompletedTask : ActivateAndFocusAndRenderTabAsync(next);
+    }
+
+    private async Task ActivateAndFocusAndRenderTabAsync(DashboardTab tab)
+    {
+        await ActivateAndFocusTabAsync(tab);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ActivateAndFocusTabAsync(DashboardTab tab)
+    {
+        await ActivateTabAsync(tab);
+        await (
+            tab switch
+            {
+                DashboardTab.History => _historyTab.FocusAsync().AsTask(),
+                DashboardTab.Leaderboard => _leaderboardTab.FocusAsync().AsTask(),
+                _ => _liveTab.FocusAsync().AsTask(),
+            }
+        );
     }
 
     private async Task ActivateTabAsync(DashboardTab tab)
@@ -499,5 +537,33 @@ public partial class GuessingDashboard
         {
             _toasts.Publish(new ToastRequest<WarningToastStrategy>(result.Message));
         }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _tabKeyComponent?.Dispose();
+
+        try
+        {
+            if (_tabKeyHandler is not null)
+            {
+                await _tabKeyHandler.DisposeAsync();
+            }
+
+            if (_tabModule is not null)
+            {
+                await _tabModule.DisposeAsync();
+            }
+
+            if (_taskModule is not null)
+            {
+                await _taskModule.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (JSException) { }
+        catch (TaskCanceledException) { }
+
+        Dispose();
     }
 }

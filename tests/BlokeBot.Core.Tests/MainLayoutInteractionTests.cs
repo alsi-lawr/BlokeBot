@@ -326,6 +326,57 @@ public sealed class SharedLayoutDomContracts
 public sealed class TaskSelectionScopeTests
 {
     [Test]
+    public void Scope_IgnoresAStaleRememberedTaskAndKeepsTheDefaultOpen()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<string?>("readString", "blokebot.task.stale-scope").SetResult("removed-task");
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<TaskSelectionScope>(0);
+            builder.AddAttribute(1, "PreferenceKey", "stale-scope");
+            builder.AddAttribute(2, "DefaultTask", "current");
+            builder.AddAttribute(
+                3,
+                "ChildContent",
+                (RenderFragment)(
+                    child =>
+                    {
+                        child.OpenComponent<CollapsibleSection>(0);
+                        child.AddAttribute(1, "Title", "Current");
+                        child.AddAttribute(2, "TaskKey", "current");
+                        child.AddAttribute(
+                            3,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='current-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                        child.OpenComponent<CollapsibleSection>(4);
+                        child.AddAttribute(5, "Title", "Other");
+                        child.AddAttribute(6, "TaskKey", "other");
+                        child.AddAttribute(
+                            7,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='other-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                    }
+                )
+            );
+            builder.CloseComponent();
+        };
+
+        var cut = context.Render(content);
+
+        cut.Find("input#current-task");
+        cut.FindAll("input#other-task").ShouldBeEmpty();
+    }
+
+    [Test]
     public void Scope_HydratesOneRememberedTaskAndSelectionClosesTheOther()
     {
         using var context = new BunitContext();

@@ -7,6 +7,7 @@ namespace BlokeBot.Core.Features.Home;
 
 public partial class HomePage
 {
+    private bool _loaded;
     private HostConfigState? _state;
 
     protected override async Task OnInitializedAsync()
@@ -27,5 +28,6 @@ public partial class HomePage
             option => option.Match<HostConfigState?>(state => state, () => null),
             _ => throw new UnreachableException()
         );
+        _loaded = true;
     }
 }

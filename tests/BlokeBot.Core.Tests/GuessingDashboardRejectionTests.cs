@@ -18,6 +18,31 @@ namespace BlokeBot.Core.Tests;
 public sealed class GuessingDashboardRejectionTests
 {
     [Test]
+    public async Task KeyboardTabs_ActivateHandledKeysAndLeaveTabSelectionUntouched()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedGuessingAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        context.Services.AddSingleton<IPublicChatMessageSender>(new RejectingChatSender());
+        context.Services.AddSingleton<GuessingDashboardService>();
+        context.Services.AddSingleton<GuessingHistoryService>();
+        context.Services.AddSingleton<GuessingChangeNotifier>();
+        context.Services.AddSingleton<PointBalanceService>();
+        context.Services.AddSingleton<PointsChangeNotifier>();
+        context.Services.AddSingleton<GuessingRoundService>();
+        var cut = context.Render<GuessingDashboard>();
+
+        await cut.Instance.HandleTabKeyAsync("End");
+
+        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldNotBeNull();
+        cut.Find("#guessing-tab-leaderboard").GetAttribute("tabindex").ShouldBe("0");
+
+        await cut.Instance.HandleTabKeyAsync("Tab");
+
+        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldNotBeNull();
+    }
+
+    [Test]
     public async Task PublicChatRejected_StartingRound_ShowsWarningWithoutDeliverySuccess()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

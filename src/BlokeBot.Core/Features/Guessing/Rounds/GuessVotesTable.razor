@@ -6,6 +6,10 @@
         <p class="mt-1 text-sm text-muted-foreground">Latest guesses for the current round.</p>
     </div>
     <div class="phone-card-list" data-phone-cards="guess-votes">
+        @if (Votes.Count == 0)
+        {
+            <p class="phone-card">No guesses recorded for the current round.</p>
+        }
         @foreach (var vote in Votes)
         {
             <article @key="vote" class="phone-card"><strong>@vote.Login</strong><span>@vote.GuessName</span><span>@vote.GuessedAtUtc.ToLocalTime().ToString("HH:mm:ss")</span></article>

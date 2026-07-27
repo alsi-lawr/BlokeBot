@@ -46,7 +46,8 @@
         <div id="live"
              class="@_segmentedControlClass"
              role="tablist"
-             aria-label="Guessing dashboard view">
+             aria-label="Guessing dashboard view"
+             @ref="_tabList">
             <span class="segmented-motion__indicator" aria-hidden="true"></span>
             <button class="@TabClass(DashboardTab.Live)"
                     type="button"
@@ -55,7 +56,7 @@
                     aria-controls="guessing-panel-live"
                     tabindex="@(_activeTab == DashboardTab.Live ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Live)"
-                    @onkeydown="OnTabKeyDownAsync"
+                    @ref="_liveTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
             </button>
@@ -66,7 +67,7 @@
                     aria-controls="guessing-panel-history"
                     tabindex="@(_activeTab == DashboardTab.History ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.History)"
-                    @onkeydown="OnTabKeyDownAsync"
+                    @ref="_historyTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
             </button>
@@ -77,7 +78,7 @@
                     aria-controls="guessing-panel-leaderboard"
                     tabindex="@(_activeTab == DashboardTab.Leaderboard ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Leaderboard)"
-                    @onkeydown="OnTabKeyDownAsync"
+                    @ref="_leaderboardTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard
             </button>
@@ -219,7 +220,7 @@
                         </div>
                     </div>
 
-                    <div class="wide-data-region scroll-panel scroll-panel--data-table">
+                    <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Guessing leaderboard">
                         @if (_leaderboard.Entries.Count == 0)
                         {
                             <PageState Kind="DashboardPageState.Empty" Title="No matching guesses" Description="Try a different date, round type, or viewer name." />
