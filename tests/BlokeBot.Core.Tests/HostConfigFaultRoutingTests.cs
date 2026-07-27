@@ -104,6 +104,46 @@ public sealed class HostConfigFaultRoutingTests
             page.Markup.ShouldNotContain("Start bot");
         });
 
+        var noSelection = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using (var noSelectionContext = noSelection.Context)
+        {
+            ConfigureHostServices(
+                noSelectionContext,
+                dbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider()
+            );
+            var available = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
+            noSelection.Authorization.SetClaims(
+                TestPrincipals
+                    .BlokeBotUser("streamer", availableHosts: [available])
+                    .Claims.ToArray()
+            );
+            var noSelectionPage = noSelectionContext.Render<HomePage>();
+            noSelectionPage.WaitForAssertion(() =>
+            {
+                noSelectionPage.Markup.ShouldContain("Choose a channel");
+                noSelectionPage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
+            });
+        }
+
+        await using (var noneFactory = await SqliteBlokeBotDbFactory.CreateAsync())
+        await using (var noneContext = UiTestContextFactory.Create(noneFactory, 999))
+        {
+            ConfigureHostServices(
+                noneContext,
+                noneFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider()
+            );
+            var nonePage = noneContext.Render<HomePage>();
+            nonePage.WaitForAssertion(() =>
+            {
+                nonePage.Markup.ShouldContain("Choose a channel");
+                nonePage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
+            });
+        }
+
         foreach (
             var (authorized, scopes, runtime, expected) in new[]
             {
