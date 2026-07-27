@@ -625,8 +625,10 @@ public sealed class HostConfigFaultRoutingTests
     {
         public bool Fail { get; set; }
 
-        public BlokeBotDbContext CreateDbContext() =>
-            CreateDbContextAsync().GetAwaiter().GetResult();
+        public BlokeBotDbContext CreateDbContext()
+        {
+            return CreateDbContextAsync().GetAwaiter().GetResult();
+        }
 
         public async Task<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
