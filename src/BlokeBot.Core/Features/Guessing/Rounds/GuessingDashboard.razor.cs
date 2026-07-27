@@ -113,6 +113,16 @@ public partial class GuessingDashboard
                 StateHasChanged
             )
         );
+        await LoadRouteAsync();
+    }
+
+    private Task LoadRouteAsync()
+    {
+        return ObserveRouteLoadAsync(LoadRouteCoreAsync);
+    }
+
+    private async Task LoadRouteCoreAsync()
+    {
         await LoadPageContextAsync();
         await LoadFeatureStateAsync();
         await LoadAsync();

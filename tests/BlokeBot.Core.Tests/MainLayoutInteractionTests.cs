@@ -4,6 +4,7 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Shouldly;
 using TUnit.Core;
 
@@ -158,10 +159,12 @@ public sealed class SharedDisclosureAndFailureTests
                 .Add(parameter => parameter.ChildContent, content)
         );
 
-        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+        var trigger = cut.Find("button");
+        trigger.GetAttribute("aria-expanded").ShouldBe("false");
+        cut.Find($"#{trigger.GetAttribute("aria-controls")}").HasAttribute("hidden").ShouldBeTrue();
         cut.FindAll("input").ShouldBeEmpty();
 
-        cut.Find("button").Click();
+        trigger.Click();
 
         cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
         cut.Find("input[aria-label='Configuration value']").ShouldNotBeNull();
@@ -220,5 +223,103 @@ public sealed class RailPreferenceTests
             invocation.Identifier == "writeRailCollapsed"
         );
         write.Arguments[0].ShouldBe(false);
+    }
+}
+
+public sealed class DisclosurePreferenceContracts
+{
+    [Test]
+    public void KeyedDisclosure_PreservesItsPrimaryDefaultWhenNoPreferenceExists()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<bool?>("readBoolean", "blokebot.disclosure.settings.primary").SetResult(null);
+        var cut = RenderKeyedDisclosure(context, initiallyOpen: true);
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
+    }
+
+    [Test]
+    public void KeyedDisclosure_HydratesAnExplicitStoredChoiceAndPersistsAnExplicitToggle()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<bool?>("readBoolean", "blokebot.disclosure.settings.primary").SetResult(false);
+        module.SetupVoid("writeBoolean", "blokebot.disclosure.settings.primary", true);
+        var cut = RenderKeyedDisclosure(context, initiallyOpen: true);
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
+        cut.Find("button").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+
+        module
+            .Invocations.Single(invocation => invocation.Identifier == "writeBoolean")
+            .Arguments[1]
+            .ShouldBe(true);
+    }
+
+    [Test]
+    public void KeyedDisclosure_ValidationRevealWinsOverFirstRenderHydrationWithoutPersisting()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<bool?>("readBoolean", "blokebot.disclosure.settings.primary").SetResult(false);
+        RenderFragment content = builder =>
+            builder.AddMarkupContent(
+                0,
+                "<input id='validation-target' aria-label='Validation target' />"
+            );
+        var cut = context.Render<CollapsibleSection>(parameters =>
+            parameters
+                .Add(parameter => parameter.Title, "Configuration")
+                .Add(parameter => parameter.PreferenceKey, "settings.primary")
+                .Add(parameter => parameter.OpenRequest, 1L)
+                .Add(parameter => parameter.ChildContent, content)
+        );
+
+        cut.Find("button").GetAttribute("aria-expanded").ShouldBe("true");
+        cut.Find("#validation-target").ShouldNotBeNull();
+        module
+            .Invocations.Any(invocation => invocation.Identifier == "writeBoolean")
+            .ShouldBeFalse();
+    }
+
+    private static IRenderedComponent<CollapsibleSection> RenderKeyedDisclosure(
+        BunitContext context,
+        bool initiallyOpen
+    )
+    {
+        return context.Render<CollapsibleSection>(parameters =>
+            parameters
+                .Add(parameter => parameter.Title, "Configuration")
+                .Add(parameter => parameter.PreferenceKey, "settings.primary")
+                .Add(parameter => parameter.InitiallyOpen, initiallyOpen)
+        );
+    }
+}
+
+public sealed class SharedLayoutDomContracts
+{
+    [Test]
+    public void StickySaveAndResponsiveDataRoles_AreExposedBySharedPrimitives()
+    {
+        using var context = new BunitContext();
+        RenderFragment actions = builder => builder.AddMarkupContent(0, "<button>Save</button>");
+        RenderFragment content = builder =>
+            builder.AddMarkupContent(
+                0,
+                "<div class='phone-card-list'><article class='phone-card'>Phone row</article></div><section class='wide-data-region' aria-label='Analytical table'>Wide table</section>"
+            );
+        var cut = context.Render<DashboardPage>(parameters =>
+            parameters
+                .Add(parameter => parameter.Title, "Settings")
+                .Add(parameter => parameter.SaveStatus, "Saving changes")
+                .Add(parameter => parameter.Actions, actions)
+                .Add(parameter => parameter.ChildContent, content)
+        );
+
+        cut.Find("[data-sticky-save-actions]").TextContent.ShouldContain("Save");
+        cut.Find("[data-sticky-save-status]").GetAttribute("role").ShouldBe("status");
+        cut.Find(".phone-card").TextContent.ShouldContain("Phone row");
+        cut.Find(".wide-data-region").GetAttribute("aria-label").ShouldBe("Analytical table");
     }
 }

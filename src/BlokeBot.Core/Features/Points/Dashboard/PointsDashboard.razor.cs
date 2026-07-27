@@ -86,12 +86,11 @@ public partial class PointsDashboard
             _events.SubscribeForComponentRefresh(
                 [AppEventKind.PointsChanged, AppEventKind.HostedChannelsChanged],
                 InvokeAsync,
-                LoadAsync,
+                LoadCoreAsync,
                 StateHasChanged
             )
         );
-        await LoadPageContextAsync();
-        await LoadAsync();
+        await LoadRouteAsync();
     }
 
     private Task AddAsync()
@@ -120,7 +119,18 @@ public partial class PointsDashboard
         );
     }
 
-    private async Task LoadAsync()
+    private Task LoadRouteAsync()
+    {
+        return ObserveRouteLoadAsync(LoadRouteCoreAsync);
+    }
+
+    private async Task LoadRouteCoreAsync()
+    {
+        await LoadPageContextAsync();
+        await LoadCoreAsync();
+    }
+
+    private async Task LoadCoreAsync()
     {
         if (HostId == 0)
         {
@@ -145,7 +155,7 @@ public partial class PointsDashboard
 
     private async Task RefreshAsync()
     {
-        await LoadAsync();
+        await LoadCoreAsync();
     }
 
     private Task RemoveAsync()
@@ -182,7 +192,7 @@ public partial class PointsDashboard
             {
                 var result = await operation();
                 PublishResult(result);
-                await LoadAsync();
+                await LoadCoreAsync();
             }
         );
     }

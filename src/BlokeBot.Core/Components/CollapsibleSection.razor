@@ -6,7 +6,9 @@
             class="disclosure-trigger"
             aria-controls="@_resolvedContentId"
             aria-expanded="@(_isOpen ? "true" : "false")"
-            @onclick="ToggleAsync">
+            @onclick="ToggleAsync"
+            @onkeydown="OnKeyDownAsync"
+            @onkeydown:preventDefault="@_handlesDisclosureKey">
         <span class="disclosure-copy">
             <span class="disclosure-title">@Title</span>
             @if (!string.IsNullOrWhiteSpace(Description))
@@ -21,10 +23,10 @@
         </span>
     </button>
 
-    @if (_isOpen)
-    {
-        <div id="@_resolvedContentId" class="disclosure-content">
+    <div id="@_resolvedContentId" class="disclosure-content" hidden="@(!_isOpen)" aria-hidden="@(_isOpen ? "false" : "true")">
+        @if (_isOpen)
+        {
             @ChildContent
-        </div>
-    }
+        }
+    </div>
 </section>

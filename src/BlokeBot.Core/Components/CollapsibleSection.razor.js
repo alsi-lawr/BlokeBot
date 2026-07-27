@@ -15,7 +15,8 @@ function resetPreferences() {
 
 export function readBoolean(key) {
     resetPreferences();
-    return localStorage.getItem(key) === "true";
+    const value = localStorage.getItem(key);
+    return value === null ? null : value === "true";
 }
 
 export function writeBoolean(key, value) {

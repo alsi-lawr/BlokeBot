@@ -24,11 +24,11 @@ public partial class AlertsPage
             _events.SubscribeForComponentRefresh(
                 AppEventKind.AlertsChanged,
                 InvokeAsync,
-                LoadAsync,
+                LoadCoreAsync,
                 StateHasChanged
             )
         );
-        await LoadAsync();
+        await LoadRouteAsync();
     }
 
     private async Task AcknowledgeAsync(DurableAlertItem alert)
@@ -47,12 +47,17 @@ public partial class AlertsPage
                 await _alerts
                     .Acknowledge(HostId, alert.Id, ActorLogin)
                     .ExecuteAsync(CancellationToken.None);
-                await LoadAsync();
+                await LoadCoreAsync();
             }
         );
     }
 
-    private async Task LoadAsync()
+    private Task LoadRouteAsync()
+    {
+        return ObserveRouteLoadAsync(LoadCoreAsync);
+    }
+
+    private async Task LoadCoreAsync()
     {
         await LoadPageContextAsync();
         _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
@@ -61,7 +66,7 @@ public partial class AlertsPage
 
     private Task RefreshAsync()
     {
-        return LoadAsync();
+        return LoadRouteAsync();
     }
 
     private static string FormatTimestamp(DateTime? value)

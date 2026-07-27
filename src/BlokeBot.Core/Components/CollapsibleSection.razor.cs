@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Components;
@@ -72,7 +73,12 @@ public partial class CollapsibleSection
                 "import",
                 "./Components/CollapsibleSection.razor.js"
             );
-            _isOpen = await _module.InvokeAsync<bool>("readBoolean", _storageKey);
+            var rememberedOpen = await _module.InvokeAsync<bool?>("readBoolean", _storageKey);
+            if (rememberedOpen is not null && _handledOpenRequest == 0)
+            {
+                _isOpen = rememberedOpen.Value;
+            }
+
             await InvokeAsync(StateHasChanged);
         }
         catch (JSDisconnectedException) { }
@@ -96,6 +102,17 @@ public partial class CollapsibleSection
     }
 
     private long _handledOpenRequest;
+
+    private bool _handlesDisclosureKey;
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs args)
+    {
+        _handlesDisclosureKey = args.Key is "Enter" or " ";
+        if (_handlesDisclosureKey)
+        {
+            await ToggleAsync();
+        }
+    }
 
     private async Task ToggleAsync()
     {

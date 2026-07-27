@@ -19,6 +19,10 @@
         {
             <div class="page-header__actions" data-sticky-save-actions>
                 @ChildContent
+                @if (!string.IsNullOrWhiteSpace(SaveStatus))
+                {
+                    <span class="page-header__save-status" role="status" data-sticky-save-status>@SaveStatus</span>
+                }
             </div>
         }
     </div>
@@ -33,6 +37,9 @@
 
     [Parameter]
     public string Kicker { get; set; } = string.Empty;
+
+    [Parameter]
+    public string SaveStatus { get; set; } = string.Empty;
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;

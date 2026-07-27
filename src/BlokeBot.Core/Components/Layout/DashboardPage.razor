@@ -1,7 +1,7 @@
 @using Microsoft.AspNetCore.Components.Web
 
 <div class="dashboard-page app-motion-stack mx-auto space-y-4">
-    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description">
+    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description" SaveStatus="@SaveStatus">
         @Actions
     </PageHeader>
 
@@ -48,6 +48,9 @@
 
     [Parameter]
     public string Kicker { get; set; } = string.Empty;
+
+    [Parameter]
+    public string SaveStatus { get; set; } = string.Empty;
 
     [Parameter]
     public Exception? LoadFailure { get; set; }
