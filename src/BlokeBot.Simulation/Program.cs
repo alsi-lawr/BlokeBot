@@ -5,9 +5,16 @@ SimulationApplication.ConfigureBootstrapLogging();
 
 try
 {
-    await using var app = SimulationApplication.Build(args);
-    await app.InitializeSimulationAsync(CancellationToken.None);
-    await app.RunAsync();
+    await using var simulation = await SimulationApplication.BuildAsync(
+        args,
+        CancellationToken.None
+    );
+    await simulation.App.InitializeSimulationAsync(CancellationToken.None);
+    await simulation.App.StartAsync();
+    await simulation
+        .App.Services.GetRequiredService<SimulationStartupCoordinator>()
+        .BootstrapAsync(simulation.App, CancellationToken.None);
+    await simulation.App.WaitForShutdownAsync();
 }
 finally
 {
