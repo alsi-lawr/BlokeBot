@@ -4,7 +4,6 @@ using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Shouldly;
 using TUnit.Core;
 
@@ -249,7 +248,7 @@ public sealed class DisclosurePreferenceContracts
         var cut = RenderKeyedDisclosure(context, initiallyOpen: true);
 
         cut.Find("button").GetAttribute("aria-expanded").ShouldBe("false");
-        cut.Find("button").KeyDown(new KeyboardEventArgs { Key = "Enter" });
+        cut.Find("button").Click();
 
         module
             .Invocations.Single(invocation => invocation.Identifier == "writeBoolean")

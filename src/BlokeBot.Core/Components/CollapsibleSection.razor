@@ -6,9 +6,7 @@
             class="disclosure-trigger"
             aria-controls="@_resolvedContentId"
             aria-expanded="@(_isOpen ? "true" : "false")"
-            @onclick="ToggleAsync"
-            @onkeydown="OnKeyDownAsync"
-            @onkeydown:preventDefault="@_handlesDisclosureKey">
+            @onclick="ToggleAsync">
         <span class="disclosure-copy">
             <span class="disclosure-title">@Title</span>
             @if (!string.IsNullOrWhiteSpace(Description))

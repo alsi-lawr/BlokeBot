@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace BlokeBot.Core.Components;
@@ -102,17 +101,6 @@ public partial class CollapsibleSection
     }
 
     private long _handledOpenRequest;
-
-    private bool _handlesDisclosureKey;
-
-    private async Task OnKeyDownAsync(KeyboardEventArgs args)
-    {
-        _handlesDisclosureKey = args.Key is "Enter" or " ";
-        if (_handlesDisclosureKey)
-        {
-            await ToggleAsync();
-        }
-    }
 
     private async Task ToggleAsync()
     {
