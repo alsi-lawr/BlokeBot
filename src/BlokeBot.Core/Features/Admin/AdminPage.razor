@@ -29,7 +29,7 @@
 
 <DashboardPage Kicker="Administration"
                Title="Manage BlokeBot"
-               Description="Connect the bot account, manage access, and look after hosted channels.">
+               Description="Connect the bot account, manage access, and look after hosted channels." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
 
     @if (_state is null)
     {

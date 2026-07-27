@@ -1,10 +1,12 @@
+@inject IJSRuntime _js
+@implements IAsyncDisposable
+
 <section class="@_panelClass">
-    <button
-        type="button"
-        class="disclosure-trigger"
-        aria-controls="@_resolvedContentId"
-        aria-expanded="@_isOpen"
-        @onclick="Toggle">
+    <button type="button"
+            class="disclosure-trigger"
+            aria-controls="@_resolvedContentId"
+            aria-expanded="@(_isOpen ? "true" : "false")"
+            @onclick="ToggleAsync">
         <span class="disclosure-copy">
             <span class="disclosure-title">@Title</span>
             @if (!string.IsNullOrWhiteSpace(Description))

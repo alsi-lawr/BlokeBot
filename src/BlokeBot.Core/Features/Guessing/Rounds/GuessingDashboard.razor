@@ -23,7 +23,7 @@
 
 <DashboardPage Kicker="Chat tools"
                Title="Run a guessing round"
-               Description="Start a live round, manage guesses, and review results for the selected channel.">
+               Description="Start a live round, manage guesses, and review results for the selected channel." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <Actions>
         <button class="btn-secondary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </Actions>

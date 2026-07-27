@@ -15,7 +15,7 @@
 
 <DashboardPage Kicker="Chat tools"
                Title="Manage points"
-               Description="Check balances, adjust viewer points, and run the current giveaway.">
+               Description="Check balances, adjust viewer points, and run the current giveaway." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <Actions>
         <button class="btn-secondary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
     </Actions>

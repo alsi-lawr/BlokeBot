@@ -228,3 +228,88 @@
         }
     }
 }
+
+@layer components {
+    .dashboard-page {
+        max-width: 44rem;
+        padding: 0;
+    }
+
+    .page-header {
+        background: transparent;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        position: static;
+    }
+
+    .page-header__inner {
+        gap: 0.75rem;
+    }
+
+    .page-header__title {
+        font-size: 1.5rem;
+    }
+
+    .page-header__description {
+        line-height: 1.4;
+    }
+
+    .page-header__actions {
+        position: sticky;
+        bottom: 0.75rem;
+        z-index: 10;
+    }
+
+    .task-panel,
+    .page-state {
+        border-radius: 0.5rem;
+        box-shadow: none;
+    }
+
+    .task-panel__header,
+    .page-state {
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .task-panel__body {
+        padding: 0.75rem;
+    }
+
+    .task-panel:has(> .page-state:only-child),
+    .task-panel:has(> .page-state:only-child) .task-panel__body {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+    }
+
+    .task-panel:has(> .page-state:only-child) .task-panel__header {
+        display: none;
+    }
+
+    .page-state--failure {
+        background: var(--app-warning-bg);
+        color: var(--app-warning-text);
+    }
+
+    @media (min-width: 40rem) {
+        .task-panel__header,
+        .page-state,
+        .task-panel__body {
+            padding: 1rem;
+        }
+    }
+
+    @media (max-width: 30rem) {
+        .page-header__actions {
+            align-self: stretch;
+            width: 100%;
+        }
+
+        .page-header__actions > * {
+            flex: 1 1 auto;
+        }
+    }
+}

@@ -28,7 +28,7 @@ public partial class HostConfigPage
 
     private Task LoadAsync()
     {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+        return ObserveRouteLoadAsync(LoadCoreAsync);
     }
 
     private async Task LoadCoreAsync()

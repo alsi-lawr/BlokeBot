@@ -15,7 +15,7 @@
 
 <DashboardPage Kicker="Chat tools"
                Title="Edit custom commands"
-               Description="Create commands, choose the bot’s replies, keep counters, and schedule messages.">
+               Description="Create commands, choose the bot’s replies, keep counters, and schedule messages." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <Actions>
         <button class="btn-primary"
                 aria-label="Save custom commands"

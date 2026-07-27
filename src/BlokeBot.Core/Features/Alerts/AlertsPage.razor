@@ -10,7 +10,7 @@
 
 <DashboardPage Kicker="Channel health"
                Title="Review alerts"
-               Description="See problems that need attention and the alerts that have already been handled.">
+               Description="See problems that need attention and the alerts that have already been handled." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <Actions>
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
     </Actions>
