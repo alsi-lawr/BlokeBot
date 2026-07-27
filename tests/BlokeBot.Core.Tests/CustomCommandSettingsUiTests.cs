@@ -67,7 +67,6 @@ public sealed class CustomCommandSettingsUiTests
         var disclosure = cut.Find($"button[aria-controls='{expected.ContentId}']");
 
         disclosure.Click();
-
         cut.Find($"#{expected.ContentId}").HasAttribute("hidden").ShouldBeTrue();
         cut.Find("button[aria-label='Save custom commands']").Click();
 
@@ -75,7 +74,9 @@ public sealed class CustomCommandSettingsUiTests
         var control = cut.Find($"#{expected.ControlId}");
         control.GetAttribute("aria-invalid").ShouldBe("true");
         control.GetAttribute("aria-describedby").ShouldBe($"{expected.ControlId}-error");
-        var focus = context.JSInterop.VerifyFocusAsyncInvoke();
+        var focus = context.JSInterop.Invocations.Last(invocation =>
+            invocation.Identifier == "Blazor._internal.domWrapper.focus"
+        );
         focus.Arguments[0].ShouldBeElementReferenceTo(control);
     }
 
@@ -88,9 +89,12 @@ public sealed class CustomCommandSettingsUiTests
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<CustomCommandSettingsPage>();
         cut.Find("#custom-command-message-library-tab").Click();
+        cut.Find("button[data-action='edit-reply']").Click();
         cut.Find("textarea").Input(string.Empty);
         cut.Find("#custom-command-commands-tab").Click();
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
+        cut.Find("button[data-action='edit-scheduled-message']").Click();
+        cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("0");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("61");
 
@@ -104,6 +108,8 @@ public sealed class CustomCommandSettingsUiTests
         invalidMessage.GetAttribute("aria-invalid").ShouldBe("true");
         invalidMessage.GetAttribute("aria-describedby").ShouldNotBeNull();
         cut.Find("#custom-command-commands-tab").Click();
+        cut.Find("button[data-action='edit-scheduled-message']").Click();
+        cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
         var invalidRetry = cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay");
         invalidRetry.GetAttribute("aria-invalid").ShouldBe("true");
         invalidRetry
@@ -117,6 +123,8 @@ public sealed class CustomCommandSettingsUiTests
             );
         }
 
+        cut.Find("#custom-command-message-library-tab").Click();
+        cut.Find("button[data-action='edit-reply']").Click();
         cut.Find("textarea").Input("Corrected reply");
         cut.Find("button[aria-label='Save custom commands']").Click();
 
@@ -172,6 +180,71 @@ public sealed class CustomCommandSettingsUiTests
         toasts.Current.ShouldHaveSingleItem().Kind.ShouldBe(ToastKind.Error);
         await using var savedDb = await dbFactory.CreateDbContextAsync();
         (await savedDb.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("command");
+    }
+
+    [Test]
+    public async Task RememberedMessageLibraryItem_ReopensOnlyThatEditor()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module
+            .Setup<string?>("readString", "blokebot.task.custom-command-settings")
+            .SetResult($"MessageLibrary:Reply:{seeded.MessageEntryId}");
+        module
+            .SetupVoid(
+                "writeString",
+                "blokebot.task.custom-command-settings",
+                $"MessageLibrary:Reply:{seeded.MessageEntryId}"
+            )
+            .SetVoidResult();
+
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Find("#custom-command-message-library-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            cut.Find($"#message-entry-{seeded.MessageEntryId}-name").ShouldNotBeNull();
+            cut.FindAll($"#command-{seeded.CommandId}-name").ShouldBeEmpty();
+        });
+    }
+
+    [Test]
+    public async Task InventoryEditing_ReplacesTheOpenEditorAndPreservesUnsavedValues()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find($"#command-{seeded.CommandId}-name").Input("Unsaved command");
+        cut.Find("button[data-action='edit-counter']").Click();
+
+        cut.FindAll("input[id^='command-'][id$='-name']").ShouldBeEmpty();
+        cut.Find($"#counter-{seeded.CounterId}-name").ShouldNotBeNull();
+        cut.Find("button[data-action='edit-command']").Click();
+        cut.Find($"#command-{seeded.CommandId}-name")
+            .GetAttribute("value")
+            .ShouldBe("Unsaved command");
+    }
+
+    [Test]
+    public async Task EmptyCommands_CreateReply_AddsSelectsAndFocusesTheReplyEditor()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedEmptyConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        cut.Find("button[data-action='create-reply']").Click();
+
+        cut.Find("button[data-action='edit-reply']").ShouldNotBeNull();
+        var name = cut.Find("input[id^='message-entry-'][id$='-name']");
+        name.GetAttribute("value").ShouldBe("New reply");
+        context.JSInterop.VerifyFocusAsyncInvoke().Arguments[0].ShouldBeElementReferenceTo(name);
     }
 
     [Test]
@@ -241,6 +314,7 @@ public sealed class CustomCommandSettingsUiTests
         await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
         var cut = context.Render<CustomCommandSettingsPage>();
 
+        cut.Find("button[aria-controls='custom-command-advanced-settings']").Click();
         cut.Find($"#command-{seeded.CommandId}-invocation-limit")
             .Change(CustomCommandInvocationLimit.OncePerUser.ToString());
         cut.Find("button[aria-label='Save custom commands']").Click();
@@ -252,6 +326,7 @@ public sealed class CustomCommandSettingsUiTests
                 .Select(command => command.InvocationLimit)
                 .SingleAsync()
         ).ShouldBe(CustomCommandInvocationLimit.OncePerUser);
+        cut.Find("button[aria-controls='custom-command-advanced-settings']").Click();
         cut.FindAll("button[data-action='reset-viewer-use']").Count.ShouldBe(1);
         cut.FindAll("button[data-action='reset-all-viewer-uses']").Count.ShouldBe(1);
 
@@ -302,6 +377,7 @@ public sealed class CustomCommandSettingsUiTests
     )
     {
         page.Find("#custom-command-message-library-tab").Click();
+        page.Find("button[data-action='edit-reply']").Click();
         var controlId = $"message-entry-{seeded.MessageEntryId}-name";
         page.Find($"#{controlId}").Input(string.Empty);
         return new("custom-command-replies-settings", controlId);
@@ -322,6 +398,7 @@ public sealed class CustomCommandSettingsUiTests
         SeededConfiguration seeded
     )
     {
+        page.Find("button[data-action='edit-counter']").Click();
         var controlId = $"counter-{seeded.CounterId}-name";
         page.Find($"#{controlId}").Input(string.Empty);
         return new("custom-command-counters-settings", controlId);
