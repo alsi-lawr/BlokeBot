@@ -3,13 +3,16 @@
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
+@implements IAsyncDisposable
 @inject CustomCommandConfigurationService _configuration
 @inject HostFeatureService _features
 @inject EventBus<AppEventKind> _events
 @inject ToastService _toasts
 @inject CustomCommandInvocationResetService _invocationResets
+@inject IJSRuntime _js
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
@@ -113,15 +116,24 @@
                 }
                 else
                 {
-                    <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
+                    <div class="space-y-3">
                         @foreach (var entry in _config.MessageEntries)
                         {
+                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="reply">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">@entry.Name</p>
+                                    <p class="text-xs text-muted-foreground">@CountLabel(entry.Variants.Count, "message") · @MessageSelectionLabel(entry.SelectionMode)</p>
+                                </div>
+                                <button class="btn-secondary" data-action="edit-reply" @onclick="() => SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry))">Edit reply</button>
+                            </div>
+                            @if (IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id))
+                            {
                             <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,1.2fr)_12rem_auto] xl:items-end">
                                     <Field Id="@MessageEntryNameFieldId(entry)"
                                            Label="Reply name"
                                            ErrorMessage="@ValidationMessage(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
-                                           FocusRequest="@FocusRequestFor(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@Math.Max(FocusRequestFor(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(MessageEntryNameFieldId(entry)))"
                                            @bind-Value="entry.Name"
                                            Placeholder="welcome" />
                                     <div class="space-y-2">
@@ -184,6 +196,7 @@
                                     }
                                 </div>
                             </div>
+                            }
                         }
                     </div>
                 }
@@ -208,7 +221,7 @@
                     {
                         <button class="btn-secondary"
                                 data-action="create-reply"
-                                @onclick="() => ActivateTab(CustomCommandSettingsTab.MessageLibrary)">Create a reply in Message Library</button>
+                                @onclick="AddMessageEntry">Create a reply in Message Library</button>
                     }
                     else
                     {
@@ -222,15 +235,24 @@
                 }
                 else
                 {
-                    <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
+                    <div class="space-y-3">
                         @foreach (var command in _config.Commands)
                         {
+                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="command">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">@command.Name</p>
+                                    <p class="text-xs text-muted-foreground">@(command.Enabled ? "On" : "Off") · @ActionKindLabel(command.ActionKind) · @CommandAdvancedSummary(command)</p>
+                                </div>
+                                <button class="btn-secondary" data-action="edit-command" @onclick="() => SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command))">Edit command</button>
+                            </div>
+                            @if (IsEditorOpen(CustomCommandEditorKind.Command, command.Id))
+                            {
                             <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
                                     <Field Id="@CommandNameFieldId(command)"
                                            Label="Command name"
                                            ErrorMessage="@ValidationMessage(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name))"
-                                           FocusRequest="@FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@Math.Max(FocusRequestFor(CommandTarget(command.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(CommandNameFieldId(command)))"
                                            @bind-Value="command.Name"
                                            Placeholder="Hello" />
                                     <Field Id="@CommandAliasesFieldId(command)"
@@ -250,45 +272,6 @@
                                         <input id="@CommandModeratorOnlyToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
                                         Only moderators can use this
                                     </label>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
-                                        <input id="@CommandCooldownFieldId(command)"
-                                               class="input"
-                                               type="number"
-                                               min="0"
-                                               @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
-                                               @ref="_controls[CommandCooldownFieldId(command)]"
-                                               @bind="command.CooldownSeconds" />
-                                        @(ValidationMessageFor(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown)))
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
-                                        <select id="@CommandCooldownScopeFieldId(command)"
-                                                class="input"
-                                                @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
-                                                @ref="_controls[CommandCooldownScopeFieldId(command)]"
-                                                @bind="command.CooldownScope">
-                                            @foreach (var scope in _cooldownScopes)
-                                            {
-                                                <option value="@scope">@CooldownScopeLabel(scope)</option>
-                                            }
-                                        </select>
-                                        @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
-                                        <select id="@CommandInvocationLimitFieldId(command)"
-                                                class="input"
-                                                @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
-                                                @ref="_controls[CommandInvocationLimitFieldId(command)]"
-                                                @bind="command.InvocationLimit">
-                                            @foreach (var limit in _invocationLimits)
-                                            {
-                                                <option value="@limit">@InvocationLimitLabel(limit)</option>
-                                            }
-                                        </select>
-                                        @(ValidationMessageFor(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
-                                    </div>
                                     <div class="space-y-2">
                                         <label class="label" for="@CommandActionFieldId(command)">What happens?</label>
                                         <select id="@CommandActionFieldId(command)"
@@ -354,6 +337,52 @@
                                         </div>
                                         <p class="text-xs text-muted-foreground">Choose at least one reply. Unmapped counts and commands with more than two arguments are ignored without a response.</p>
                                     </div>
+                                </div>
+                                <CollapsibleSection ContentId="custom-command-advanced-settings"
+                                                    Title="Advanced settings"
+                                                    Description="@CommandAdvancedSummary(command)"
+                                                    InitiallyOpen="false"
+                                                    OpenRequest="@_commandAdvancedOpenRequest">
+                                    <div class="grid gap-3 p-4 md:grid-cols-2">
+                                    <div class="space-y-2">
+                                        <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
+                                        <input id="@CommandCooldownFieldId(command)"
+                                               class="input"
+                                               type="number"
+                                               min="0"
+                                               @attributes="ValidationAttributes(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown))"
+                                               @ref="_controls[CommandCooldownFieldId(command)]"
+                                               @bind="command.CooldownSeconds" />
+                                        @(ValidationMessageFor(CommandCooldownFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Cooldown)))
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="label" for="@CommandCooldownScopeFieldId(command)">Who waits?</label>
+                                        <select id="@CommandCooldownScopeFieldId(command)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope))"
+                                                @ref="_controls[CommandCooldownScopeFieldId(command)]"
+                                                @bind="command.CooldownScope">
+                                            @foreach (var scope in _cooldownScopes)
+                                            {
+                                                <option value="@scope">@CooldownScopeLabel(scope)</option>
+                                            }
+                                        </select>
+                                        @(ValidationMessageFor(CommandCooldownScopeFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.CooldownScope)))
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="label" for="@CommandInvocationLimitFieldId(command)">Use limit</label>
+                                        <select id="@CommandInvocationLimitFieldId(command)"
+                                                class="input"
+                                                @attributes="ValidationAttributes(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit))"
+                                                @ref="_controls[CommandInvocationLimitFieldId(command)]"
+                                                @bind="command.InvocationLimit">
+                                            @foreach (var limit in _invocationLimits)
+                                            {
+                                                <option value="@limit">@InvocationLimitLabel(limit)</option>
+                                            }
+                                        </select>
+                                        @(ValidationMessageFor(CommandInvocationLimitFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.InvocationLimit)))
+                                    </div>
                                     @if (command.Action is CounterCustomCommandActionEditor counterAction)
                                     {
                                         <div class="space-y-2 md:col-span-2">
@@ -375,7 +404,6 @@
                                             @(ValidationMessageFor(CommandCounterFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Counter)))
                                         </div>
                                     }
-                                </div>
                                 <p class="text-xs text-muted-foreground">The wait is checked first. A use is only claimed after the wait passes; moderators follow the same use limit.</p>
                                 @if (command.Id > 0)
                                 {
@@ -402,7 +430,10 @@
                                         </div>
                                     }
                                 }
+                                    </div>
+                                </CollapsibleSection>
                             </div>
+                            }
                         }
                     </div>
                 }
@@ -429,11 +460,20 @@
                     <div class="grid gap-3">
                         @foreach (var counter in _config.Counters)
                         {
+                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="counter">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">@counter.Name</p>
+                                    <p class="text-xs text-muted-foreground">Current value: @counter.Value</p>
+                                </div>
+                                <button class="btn-secondary" data-action="edit-counter" @onclick="() => SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter))">Edit counter</button>
+                            </div>
+                            @if (IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id))
+                            {
                             <div @key="counter" class="surface-muted grid gap-3 rounded-lg p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
                                 <Field Id="@CounterNameFieldId(counter)"
                                        Label="Counter name"
                                        ErrorMessage="@ValidationMessage(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
-                                       FocusRequest="@FocusRequestFor(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
+                                       FocusRequest="@Math.Max(FocusRequestFor(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(CounterNameFieldId(counter)))"
                                        @bind-Value="counter.Name"
                                        Placeholder="deaths" />
                                 <div class="space-y-2">
@@ -442,6 +482,7 @@
                                 </div>
                                 <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete</button>
                             </div>
+                            }
                         }
                     </div>
                 }
@@ -468,15 +509,24 @@
                 }
                 else
                 {
-                    <div class="scroll-panel scroll-panel--settings space-y-3 pr-2">
+                    <div class="space-y-3">
                         @foreach (var announcement in _config.Announcements)
                         {
+                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="scheduled-message">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-900">@announcement.Name</p>
+                                    <p class="text-xs text-muted-foreground">@(announcement.Enabled ? "On" : "Off") · @AnnouncementDeliveryTypeLabel(announcement.DeliveryType) · @AnnouncementScheduleLabel(announcement.ScheduleKind)</p>
+                                </div>
+                                <button class="btn-secondary" data-action="edit-scheduled-message" @onclick="() => SelectEditor(CustomCommandEditorKind.ScheduledMessage, announcement.Id, AnnouncementNameFieldId(announcement))">Edit scheduled message</button>
+                            </div>
+                            @if (IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id))
+                            {
                             <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
                                     <Field Id="@AnnouncementNameFieldId(announcement)"
                                            Label="Scheduled message name"
                                            ErrorMessage="@ValidationMessage(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name))"
-                                           FocusRequest="@FocusRequestFor(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name))"
+                                           FocusRequest="@Math.Max(FocusRequestFor(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(AnnouncementNameFieldId(announcement)))"
                                            @bind-Value="announcement.Name"
                                            Placeholder="Hydrate reminder" />
                                     <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
@@ -557,6 +607,12 @@
                                         </select>
                                         @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
                                     </div>
+                                    <CollapsibleSection ContentId="custom-announcement-delivery-details"
+                                                        Title="Delivery details"
+                                                        Description="Retry policy and latest delivery"
+                                                        InitiallyOpen="false"
+                                                        OpenRequest="@_announcementAdvancedOpenRequest">
+                                        <div class="grid gap-3 p-4 md:grid-cols-2">
                                     <div class="space-y-2">
                                         <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
                                         <input id="@AnnouncementRetryDelayFieldId(announcement)"
@@ -581,6 +637,8 @@
                                                @bind="announcement.OccurrenceLifetimeSeconds" />
                                         @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
                                     </div>
+                                        </div>
+                                    </CollapsibleSection>
                                     <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
                                        class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
@@ -643,20 +701,28 @@
                                             <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
-                                    <div class="surface-row rounded-lg px-3 py-2">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
-                                        <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
-                                    </div>
-                                    <div class="surface-row rounded-lg px-3 py-2">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
-                                        <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
-                                    </div>
-                                    <div class="surface-row rounded-lg px-3 py-2">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
-                                        <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
-                                    </div>
+                                    <CollapsibleSection ContentId="custom-announcement-delivery-history"
+                                                        Title="Delivery history"
+                                                        Description="Last send and latest result"
+                                                        InitiallyOpen="false">
+                                        <div class="grid gap-3 p-4 md:grid-cols-3">
+                                            <div class="surface-row rounded-lg px-3 py-2">
+                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
+                                                <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
+                                            </div>
+                                            <div class="surface-row rounded-lg px-3 py-2">
+                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
+                                                <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                            </div>
+                                            <div class="surface-row rounded-lg px-3 py-2">
+                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
+                                                <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
+                                            </div>
+                                        </div>
+                                    </CollapsibleSection>
                                 </div>
                             </div>
+                            }
                         }
                     </div>
                 }
