@@ -23,6 +23,7 @@ public sealed class PointsConfigurationUiTests
         context.ComponentFactories.AddStub<PointsEligibilitySelector>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
+        OpenSection(page, "Giveaways");
 
         page.Find("#gamblingCooldown").GetAttribute("value").ShouldBe("-4");
         page.Find("#duration").GetAttribute("value").ShouldBe("0");
@@ -95,6 +96,13 @@ public sealed class PointsConfigurationUiTests
         corrected.GiveawayCooldownSeconds.ShouldBe(
             PointsConfigurationValidator.MinimumGiveawayCooldownSeconds
         );
+    }
+
+    private static void OpenSection(IRenderedComponent<PointsConfigurationPage> page, string title)
+    {
+        page.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+            .Click();
     }
 
     private static void AssertFieldError(

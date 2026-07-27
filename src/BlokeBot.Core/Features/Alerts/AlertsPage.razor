@@ -70,11 +70,10 @@
             }
         </TaskPanel>
 
-        <section class="card">
-            <div class="border-b border-slate-200 p-5">
-                <h2 class="text-lg font-semibold text-slate-950">History</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Handled alerts stay here so you can see who dealt with them and when.</p>
-            </div>
+        <CollapsibleSection Title="Handled alert history"
+                            Description="Review who handled an alert and when."
+                            InitiallyOpen="false"
+                            PreferenceKey="alerts-history">
             @if (_state.History.Count == 0)
             {
                 <PageState Kind="DashboardPageState.Empty" Title="No handled alerts yet" Description="Alerts you mark as handled will remain here." />
@@ -108,7 +107,7 @@
                     </table>
                 </div>
             }
-        </section>
+        </CollapsibleSection>
     }
     </ChildContent>
 </DashboardPage>

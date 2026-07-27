@@ -69,6 +69,8 @@ public partial class PointsConfigurationPage
     private PointsConfiguration? _config;
     private bool _featureEnabled;
     private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
+    private long _generalOpenRequest;
+    private long _giveawaysOpenRequest;
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,6 +129,18 @@ public partial class PointsConfigurationPage
                 errors =>
                 {
                     _validationErrors = errors.ToArray();
+                    _generalOpenRequest++;
+                    if (
+                        errors.Any(error =>
+                            error
+                                is PointsConfigurationValidationError.GiveawayDurationBelowMinimum
+                                    or PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum
+                                    or PointsConfigurationValidationError.GiveawayCooldownBelowMinimum
+                        )
+                    )
+                    {
+                        _giveawaysOpenRequest++;
+                    }
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(
                             string.Join(" ", errors.Select(error => error.Message))

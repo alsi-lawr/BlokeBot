@@ -69,6 +69,9 @@ public partial class BotAccountAuthorizationSection
     public bool InitiallyOpen { get; set; } = true;
 
     [Parameter]
+    public string? PreferenceKey { get; set; }
+
+    [Parameter]
     public string? DisabledMessage { get; set; }
 
     [Parameter]

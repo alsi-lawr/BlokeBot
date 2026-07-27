@@ -21,6 +21,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
+        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
 
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
@@ -43,6 +44,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
+        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
@@ -64,6 +66,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
+        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
@@ -86,6 +89,7 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<GuessingSettings>();
+        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
         await using (var concurrentDb = await dbFactory.CreateDbContextAsync())
         {
@@ -115,6 +119,13 @@ public sealed class GuessingUnsavedChangesUiTests
             .SelectMany(profile => profile.Options)
             .SingleAsync();
         persisted.Name.ShouldBe("red");
+    }
+
+    private static void OpenSection(IRenderedComponent<GuessingSettings> page, string title)
+    {
+        page.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+            .Click();
     }
 
     private static void ChooseDialogAction(IRenderedComponent<GuessingSettings> page, string action)

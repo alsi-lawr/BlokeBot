@@ -32,7 +32,12 @@
                         _ => null
                     );
             }
-            <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
+            <CollapsibleSection Title="Public leaderboard"
+                                Description="Open a public guessing or points leaderboard for a Twitch channel."
+                                InitiallyOpen="false"
+                                PreferenceKey="overview-public-leaderboard">
+                <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@selectedChannel" />
+            </CollapsibleSection>
         </Authorized>
     </AuthorizeView>
     </ChildContent>

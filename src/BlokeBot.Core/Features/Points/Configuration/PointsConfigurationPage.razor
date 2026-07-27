@@ -49,7 +49,7 @@
             .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
             .FirstOrDefault();
 
-        <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true">
+        <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true" PreferenceKey="points-settings-general" OpenRequest="@_generalOpenRequest">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
                 <div class="space-y-2">
@@ -73,7 +73,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="true">
+        <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="false" PreferenceKey="points-settings-commands">
             <div class="grid gap-4 p-4 md:grid-cols-2">
                 <Field Id="points-aliases" Label="Balance" @bind-Value="_config.Aliases.PointsAliases" Placeholder="points" />
                 <Field Id="points-give-aliases" Label="Give" @bind-Value="_config.Aliases.GivePointsAliases" Placeholder="givepoints" />
@@ -87,7 +87,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Giveaways" Description="Prizes, timing, and who can enter." InitiallyOpen="true">
+        <CollapsibleSection Title="Giveaways" Description="Prizes, timing, and who can enter." InitiallyOpen="false" PreferenceKey="points-settings-giveaways" OpenRequest="@_giveawaysOpenRequest">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <div class="space-y-2">
                     <label class="label" for="duration">Time to enter (seconds)</label>
@@ -137,7 +137,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false">
+        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false" PreferenceKey="points-settings-replies">
             <div class="scroll-panel scroll-panel--settings grid gap-4 p-4 md:grid-cols-2">
                 <TextAreaField Id="points-balance-reply" Label="Balance" @bind-Value="_config.Replies.BalanceReply" />
                 <TextAreaField Id="points-other-balance-reply" Label="Another viewer's balance" @bind-Value="_config.Replies.OtherBalanceReply" />

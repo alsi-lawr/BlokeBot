@@ -66,7 +66,7 @@
     }
     else if (_state.HostId is { } hostId)
     {
-        <TaskPanel Title="@($"Keep #{_state.DisplayName} ready")" Description="Connect the bot and start or stop it for this channel.">
+        <TaskPanel Title="@($"#{_state.DisplayName} readiness")" Description="Complete the current connection or bot-status action for this channel.">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -185,7 +185,7 @@
             </div>
         </TaskPanel>
 
-        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Startup chat message" PreferenceKey="host-setup-startup-message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
             <div class="space-y-4 p-5">
                 <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
                     <input class="h-4 w-4"
@@ -230,10 +230,11 @@
                                             Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
                                             Refresh="LoadAsync"
                                             Collapsible="true"
-                                            InitiallyOpen="false" />
+                                            InitiallyOpen="false"
+                                            PreferenceKey="host-setup-custom-bot" />
         </div>
 
-        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
+        <CollapsibleSection Title="Whisper responses" PreferenceKey="host-setup-whisper-responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
             <div class="p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
@@ -269,7 +270,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Moderator help" PreferenceKey="host-setup-moderator-help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -323,7 +324,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Chat tools" PreferenceKey="host-setup-chat-tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in _state.Features)
                 {
