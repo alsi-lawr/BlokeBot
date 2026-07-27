@@ -37,14 +37,19 @@
     }
     else
     {
-        <TaskPanel Title="Connect the bot account" Description="Start here before adding or managing hosted channels.">
-            <BotAccountAuthorizationSection Status="@_botAccountStatus"
-                                            Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
-                                            Clear="@ClearBotAccountAuthorizationAsync"
-                                            Refresh="@RefreshBotAccountAuthorizationAsync"
-                                            Collapsible="true"
-                                            InitiallyOpen="true" />
+        <TaskSelectionScope PreferenceKey="admin-operations" DefaultTask="bot-account">
+        <TaskPanel Title="Administration status" Description="Choose an operation below. Connect the bot account before adding or managing hosted channels.">
+            <p class="text-sm text-muted-foreground">@(_botAccountStatus?.Message ?? "Checking the bot account.")</p>
         </TaskPanel>
+
+        <BotAccountAuthorizationSection Status="@_botAccountStatus"
+                                        Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
+                                        Clear="@ClearBotAccountAuthorizationAsync"
+                                        Refresh="@RefreshBotAccountAuthorizationAsync"
+                                        Collapsible="true"
+                                        InitiallyOpen="true"
+                                        PreferenceKey="admin-bot-account"
+                                        TaskKey="bot-account" />
 
         <SiteAccessSection State="@_state"
                            WhitelistEntries="@_siteWhitelistEntries"
@@ -64,5 +69,6 @@
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
+        </TaskSelectionScope>
     }
 </DashboardPage>

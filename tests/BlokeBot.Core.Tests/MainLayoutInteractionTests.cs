@@ -322,3 +322,140 @@ public sealed class SharedLayoutDomContracts
         cut.Find(".wide-data-region").GetAttribute("aria-label").ShouldBe("Analytical table");
     }
 }
+
+public sealed class TaskSelectionScopeTests
+{
+    [Test]
+    public void Scope_IgnoresAStaleRememberedTaskAndKeepsTheDefaultOpen()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<string?>("readString", "blokebot.task.stale-scope").SetResult("removed-task");
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<TaskSelectionScope>(0);
+            builder.AddAttribute(1, "PreferenceKey", "stale-scope");
+            builder.AddAttribute(2, "DefaultTask", "current");
+            builder.AddAttribute(
+                3,
+                "ChildContent",
+                (RenderFragment)(
+                    child =>
+                    {
+                        child.OpenComponent<CollapsibleSection>(0);
+                        child.AddAttribute(1, "Title", "Current");
+                        child.AddAttribute(2, "TaskKey", "current");
+                        child.AddAttribute(
+                            3,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='current-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                        child.OpenComponent<CollapsibleSection>(4);
+                        child.AddAttribute(5, "Title", "Other");
+                        child.AddAttribute(6, "TaskKey", "other");
+                        child.AddAttribute(
+                            7,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='other-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                    }
+                )
+            );
+            builder.CloseComponent();
+        };
+
+        var cut = context.Render(content);
+
+        cut.Find("input#current-task");
+        cut.FindAll("input#other-task").ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Scope_HydratesOneRememberedTaskAndSelectionClosesTheOther()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.Setup<string?>("readString", "blokebot.task.test-scope").SetResult("second");
+        module.SetupVoid("writeString", "blokebot.task.test-scope", "first");
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<TaskSelectionScope>(0);
+            builder.AddAttribute(1, "PreferenceKey", "test-scope");
+            builder.AddAttribute(2, "DefaultTask", "first");
+            builder.AddAttribute(
+                3,
+                "ChildContent",
+                (RenderFragment)(
+                    child =>
+                    {
+                        child.OpenComponent<CollapsibleSection>(0);
+                        child.AddAttribute(1, "Title", "First");
+                        child.AddAttribute(2, "TaskKey", "first");
+                        child.AddAttribute(
+                            3,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='first-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                        child.OpenComponent<CollapsibleSection>(4);
+                        child.AddAttribute(5, "Title", "Second");
+                        child.AddAttribute(6, "TaskKey", "second");
+                        child.AddAttribute(
+                            7,
+                            "ChildContent",
+                            (RenderFragment)(
+                                body => body.AddMarkupContent(0, "<input id='second-task' />")
+                            )
+                        );
+                        child.CloseComponent();
+                    }
+                )
+            );
+            builder.CloseComponent();
+        };
+        var cut = context.Render(content);
+
+        cut.Find("input#second-task");
+        cut.FindAll("input#first-task").ShouldBeEmpty();
+        cut.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains("First"))
+            .Click();
+
+        cut.Find("input#first-task");
+        cut.FindAll("input#second-task").ShouldBeEmpty();
+
+        using var pendingContext = new BunitContext();
+        var pendingModule = pendingContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        var pendingRead = pendingModule.Setup<string?>("readString", "blokebot.task.test-scope");
+        pendingModule.SetupVoid("writeString", "blokebot.task.test-scope", "first").SetVoidResult();
+        var pendingCut = pendingContext.Render(content);
+        pendingCut
+            .FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains("First"))
+            .Click();
+        pendingRead.SetResult("second");
+        pendingCut.WaitForAssertion(() =>
+        {
+            pendingCut.Find("input#first-task");
+            pendingCut.FindAll("input#second-task").ShouldBeEmpty();
+        });
+        var writes = pendingModule
+            .Invocations.Where(invocation => invocation.Identifier == "writeString")
+            .ToArray();
+        writes.ShouldNotBeEmpty();
+        writes.ShouldAllBe(invocation =>
+            Equals(invocation.Arguments[0], "blokebot.task.test-scope")
+            && Equals(invocation.Arguments[1], "first")
+        );
+    }
+}

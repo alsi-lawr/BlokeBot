@@ -1,0 +1,6 @@
+@inject IJSRuntime _js
+@implements IAsyncDisposable
+
+<CascadingValue Value="this" IsFixed="true">
+    @ChildContent
+</CascadingValue>

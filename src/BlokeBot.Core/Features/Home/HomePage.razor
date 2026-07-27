@@ -1,39 +1,62 @@
 @page "/"
 @using Microsoft.AspNetCore.Authorization
+@using BlokeBot.Core.Features.HostedChannels.Runtime
+@using BlokeBot.Core.Features.HostConfig.Page
 @attribute [Authorize]
+@inherits AuthenticatedPageComponent
+@inject HostConfigService _hostConfig
 
 <PageTitle>BlokeBot | Overview</PageTitle>
 
 <DashboardPage Kicker="Overview"
                Title="Run your channel with BlokeBot"
-               Description="Set up your channel, choose the chat tools you need, and keep the bot ready for stream.">
-    <Actions>
-        <a class="btn-primary" href="/host">Set up your channel</a>
-    </Actions>
-
+               Description="See the selected channel’s actual readiness and next action." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <ChildContent>
-    <TaskPanel Title="Get your channel ready"
-               Description="Channel setup is where you connect the bot, choose your chat tools, and decide which moderators can help.">
-        <ol class="grid gap-4 text-sm leading-6 text-muted-foreground md:grid-cols-3">
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">1. Connect the bot</strong>Let BlokeBot join your Twitch chat when you are ready to stream.</li>
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">2. Choose chat tools</strong>Turn on the games, points, and commands that fit your channel.</li>
-            <li class="surface-muted rounded-lg p-4"><strong class="block text-foreground">3. Invite trusted moderators</strong>Choose who can help run the tools for this channel.</li>
-        </ol>
-    </TaskPanel>
+        @if (!_loaded)
+        {
+            <PageState Kind="DashboardPageState.Loading" Title="Loading channel readiness" Description="Checking the selected channel’s connection and bot status." />
+        }
+        else if (_blockedBySelectedChannel)
+        {
+            <PageState Kind="DashboardPageState.Unavailable" Title="Switch to your own channel" Description="Only the channel owner can review this channel’s readiness. Use the top bar to switch channels." />
+        }
+        else if (Host is null || _state is null)
+        {
+            <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select a channel from the top bar to review its readiness." />
+        }
+        else if (!_state.IsHostCreated)
+        {
+            <TaskPanel Title="Create your channel setup" Description="Create this channel before connecting the bot or enabling chat tools.">
+                <a class="btn-primary" href="/host/create?returnUrl=/">Create channel setup</a>
+            </TaskPanel>
+        }
+        else if (!_state.IsChannelBotAuthorized || _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true)
+        {
+            <TaskPanel Title="Connect Twitch chat" Description="The selected channel needs a current Twitch chat connection.">
+                <a class="btn-primary" href="/host">@(_state.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")</a>
+            </TaskPanel>
+        }
+        else if (_state.RuntimeStatus?.Lifecycle is HostedChannelRuntimeLifecycle.Stopped)
+        {
+            <TaskPanel Title="Bot is ready to start" Description="Twitch chat is connected; start the bot from Channel setup.">
+                <a class="btn-primary" href="/host">Start bot</a>
+            </TaskPanel>
+        }
+        else
+        {
+            <TaskPanel Title="Channel ready" Description="The selected channel is connected and the bot is active.">
+                <a class="btn-secondary" href="/host">Review Channel setup</a>
+            </TaskPanel>
+        }
 
-    <AuthorizeView>
-        <Authorized Context="homeAuth">
-            @{
-                var selectedChannel = AuthenticatedSession
-                    .FromPrincipal(homeAuth.User)
-                    .State.Match<string?>(
-                        _ => null,
-                        selected => selected.Selection.Current.Login,
-                        _ => null
-                    );
-            }
-            <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
-        </Authorized>
-    </AuthorizeView>
+        @if (_state is not null)
+        {
+            <CollapsibleSection Title="Public leaderboard"
+                                Description="Open a public guessing or points leaderboard for a Twitch channel."
+                                InitiallyOpen="false"
+                                PreferenceKey="overview-public-leaderboard">
+                <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@_state.Login" />
+            </CollapsibleSection>
+        }
     </ChildContent>
 </DashboardPage>

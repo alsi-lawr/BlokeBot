@@ -66,7 +66,28 @@
     }
     else if (_state.HostId is { } hostId)
     {
-        <TaskPanel Title="@($"Keep #{_state.DisplayName} ready")" Description="Connect the bot and start or stop it for this channel.">
+        <TaskSelectionScope PreferenceKey="host-setup" DefaultTask="readiness">
+        <TaskPanel Title="@($"#{_state.DisplayName} readiness")" Description="Complete the current connection or bot-status action for this channel.">
+            <div class="flex flex-wrap items-center justify-between gap-3 p-4">
+                <span class="@_runtimeBadgeClass"><span class="@_runtimeDotClass"></span><span class="status-pill__label">@_runtimeText</span></span>
+                @if (!PageContext.Session.CanAuthorizeSelectedHost)
+                {
+                    <p class="text-sm text-muted-foreground">The channel owner must connect this Twitch account.</p>
+                }
+                else if (!_state.IsChannelBotAuthorized || _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true)
+                {
+                    <AuthPopupButton Class="auth-action" Url="/oauth/channel-bot/start" PopupName="blokebot-channel-oauth" OpeningText="Opening..." OnClosed="LoadAsync">@(_state.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")</AuthPopupButton>
+                }
+                else if (_canStart)
+                {
+                    <button class="btn-primary" type="button" @onclick="() => StartAsync(hostId)">Start bot</button>
+                }
+                else if (_canStop)
+                {
+                    <button class="btn-secondary" type="button" @onclick="() => StopAsync(hostId)">Stop bot</button>
+                }
+            </div>
+            <CollapsibleSection Title="Connection diagnostics" TaskKey="diagnostics" Description="Review Twitch connection, follower-only, and runtime details." InitiallyOpen="false" PreferenceKey="host-setup-diagnostics">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -81,55 +102,28 @@
                         <p class="mt-2 text-xs font-medium text-slate-500">Channel chat access is connected. Check follower-only chat below for the active bot account.</p>
                         @if (PageContext.Session.CanAuthorizeSelectedHost)
                         {
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                                 Url="/oauth/channel-bot/start"
-                                                 PopupName="blokebot-channel-oauth"
-                                                 OpeningText="Opening..."
-                                                 OnClosed="LoadAsync">
-                                    Reconnect bot
-                                </AuthPopupButton>
-                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
-                            </div>
+                            <button class="control-surface mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
                         }
                     }
                     else if (_state.IsChannelBotAuthorized)
                     {
-                        <p class="mt-2 text-xs font-medium text-slate-500">The bot needs a fresh Twitch connection for this channel.</p>
+                        <p class="mt-2 text-xs font-medium text-slate-500">The bot needs a fresh Twitch connection. Reconnect it from the readiness task above.</p>
                         @if (PageContext.Session.CanAuthorizeSelectedHost)
                         {
-                            <div class="mt-2 flex flex-wrap gap-2">
-                                <AuthPopupButton Class="auth-action inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                                 Url="/oauth/channel-bot/start"
-                                                 PopupName="blokebot-channel-oauth"
-                                                 OpeningText="Opening..."
-                                                 OnClosed="LoadAsync">
-                                    Reconnect bot
-                                </AuthPopupButton>
-                                <button class="control-surface inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
-                            </div>
+                            <button class="control-surface mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition" @onclick="() => ClearChannelAuthorizationAsync(hostId)">Disconnect</button>
                         }
                         else
                         {
                             <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must reconnect this Twitch account.</p>
                         }
                     }
+                    else if (PageContext.Session.CanAuthorizeSelectedHost)
+                    {
+                        <p class="mt-2 text-xs font-medium text-slate-500">Connect Twitch chat from the readiness task above.</p>
+                    }
                     else
                     {
-                        @if (PageContext.Session.CanAuthorizeSelectedHost)
-                        {
-                            <AuthPopupButton Class="auth-action mt-2 inline-flex h-7 items-center rounded-full px-3 text-xs font-bold transition disabled:opacity-70"
-                                             Url="/oauth/channel-bot/start"
-                                             PopupName="blokebot-channel-oauth"
-                                             OpeningText="Opening..."
-                                             OnClosed="LoadAsync">
-                                Connect channel
-                            </AuthPopupButton>
-                        }
-                        else
-                        {
-                            <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this Twitch account.</p>
-                        }
+                        <p class="mt-2 text-xs font-medium text-slate-500">The channel owner must connect this Twitch account.</p>
                     }
                 </div>
                 <HostBotChannelStatusPanel HostLogin="@_state.Login" ReloadKey="@_botAccountStatusReloadKey" />
@@ -145,47 +139,13 @@
                             <span class="status-pill__label">@_runtimeText</span>
                         </span>
                     </div>
-                    <div class="runtime-control-actions mt-3">
-                        <span class="block min-w-0" title="@_startRuntimeTooltip">
-                            <button class="primary-control grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                                    type="button"
-                                    disabled="@(!_canStart)"
-                                    aria-label="Start bot"
-                                    @onclick="() => StartAsync(hostId)">
-                                <span class="inline-flex h-9 w-9 items-center justify-center">
-                                    <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path d="M8 5.5v13l10-6.5Z" />
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-bold">Start bot</span>
-                                    <span class="mt-1 block text-xs font-medium opacity-75">Let the bot join chat</span>
-                                </span>
-                            </button>
-                        </span>
-                        <span class="block min-w-0" title="@_stopRuntimeTooltip">
-                            <button class="control-surface grid min-h-24 w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50"
-                                    type="button"
-                                    disabled="@(!_canStop)"
-                                    aria-label="Stop bot"
-                                    @onclick="() => StopAsync(hostId)">
-                                <span class="inline-flex h-9 w-9 items-center justify-center text-red-700">
-                                    <svg class="h-6 w-6 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                                        <rect x="7" y="7" width="10" height="10" rx="1.5" />
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-bold text-red-700">Stop bot</span>
-                                    <span class="mt-1 block text-xs font-medium text-slate-500">Take the bot out of chat</span>
-                                </span>
-                            </button>
-                        </span>
-                    </div>
+                    <p class="mt-3 text-xs text-muted-foreground">Runtime controls are available in the readiness task above.</p>
                 </div>
             </div>
+            </CollapsibleSection>
         </TaskPanel>
 
-        <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Startup chat message" TaskKey="startup" PreferenceKey="host-setup-startup-message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="false">
             <div class="space-y-4 p-5">
                 <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
                     <input class="h-4 w-4"
@@ -230,10 +190,12 @@
                                             Clear="() => ClearBotOverrideAuthorizationAsync(hostId)"
                                             Refresh="LoadAsync"
                                             Collapsible="true"
-                                            InitiallyOpen="false" />
+                                            InitiallyOpen="false"
+                                            PreferenceKey="host-setup-custom-bot"
+                                            TaskKey="custom-bot" />
         </div>
 
-        <CollapsibleSection Title="Whisper responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
+        <CollapsibleSection Title="Whisper responses" TaskKey="whispers" PreferenceKey="host-setup-whisper-responses" Description="Send command replies with your custom bot account." InitiallyOpen="false">
             <div class="p-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="@(!_state.BotOverride.Enabled ? "opacity-60" : null)">
@@ -269,7 +231,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Moderator help" TaskKey="moderators" PreferenceKey="host-setup-moderator-help" Description="Choose which mods can view and change this channel." InitiallyOpen="false">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -323,7 +285,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Chat tools" TaskKey="tools" PreferenceKey="host-setup-chat-tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="false">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in _state.Features)
                 {
@@ -348,5 +310,6 @@
                 }
             </div>
         </CollapsibleSection>
+        </TaskSelectionScope>
     }
 </DashboardPage>

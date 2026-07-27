@@ -23,8 +23,8 @@ public sealed class PointsConfigurationUiTests
         context.ComponentFactories.AddStub<PointsEligibilitySelector>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
-
         page.Find("#gamblingCooldown").GetAttribute("value").ShouldBe("-4");
+        OpenSection(page, "Giveaways");
         page.Find("#duration").GetAttribute("value").ShouldBe("0");
         page.Find("#winnerCount").GetAttribute("value").ShouldBe("0");
         page.Find("#cooldown").GetAttribute("value").ShouldBe("299");
@@ -32,6 +32,14 @@ public sealed class PointsConfigurationUiTests
         page.FindAll("button")
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
+
+        page.WaitForAssertion(() =>
+            page.Find("#gamblingCooldown").GetAttribute("aria-invalid").ShouldBe("true")
+        );
+        context.JSInterop.Invocations.ShouldContain(invocation =>
+            invocation.Identifier == "focusElement"
+            && invocation.Arguments.OfType<string>().SingleOrDefault() == "gamblingCooldown"
+        );
 
         var error = toasts.Current.ShouldHaveSingleItem();
         error.Kind.ShouldBe(ToastKind.Error);
@@ -41,12 +49,14 @@ public sealed class PointsConfigurationUiTests
         error.Message.ShouldContain(
             $"The wait between giveaways must be at least {PointsConfigurationValidator.MinimumGiveawayCooldownSeconds} seconds."
         );
+        OpenSection(page, "General");
         AssertFieldError(
             page,
             "#gamblingCooldown",
             "gamblingCooldown-error",
             "The wait between gambles cannot be negative."
         );
+        OpenSection(page, "Giveaways");
         AssertFieldError(
             page,
             "#duration",
@@ -74,7 +84,9 @@ public sealed class PointsConfigurationUiTests
             persisted.GiveawayCooldownSeconds.ShouldBe(299);
         }
 
+        OpenSection(page, "General");
         page.Find("#gamblingCooldown").Change("0");
+        OpenSection(page, "Giveaways");
         page.Find("#duration").Change("1");
         page.Find("#winnerCount").Change("1");
         page.Find("#cooldown")
@@ -83,7 +95,9 @@ public sealed class PointsConfigurationUiTests
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
 
+        OpenSection(page, "General");
         AssertFieldErrorCleared(page, "#gamblingCooldown", "gamblingCooldown-error");
+        OpenSection(page, "Giveaways");
         AssertFieldErrorCleared(page, "#duration", "duration-error");
         AssertFieldErrorCleared(page, "#winnerCount", "winnerCount-error");
         AssertFieldErrorCleared(page, "#cooldown", "cooldown-error");
@@ -95,6 +109,13 @@ public sealed class PointsConfigurationUiTests
         corrected.GiveawayCooldownSeconds.ShouldBe(
             PointsConfigurationValidator.MinimumGiveawayCooldownSeconds
         );
+    }
+
+    private static void OpenSection(IRenderedComponent<PointsConfigurationPage> page, string title)
+    {
+        page.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+            .Click();
     }
 
     private static void AssertFieldError(

@@ -7,6 +7,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
+using BlokeBot.Core.Features.Home;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels;
@@ -64,6 +65,222 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
+    public async Task Overview_UnmanageableSelectedChannel_ShowsOwnerRecoveryWithoutActorFallback()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        context.Services.AddBlokeBotToasts();
+        context.Services.AddSingleton(new BlokeBotPageContextAccessor());
+        var authorization = context.AddAuthorization();
+        authorization.SetAuthorized("moderator");
+        var selected = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
+        authorization.SetClaims(
+            TestPrincipals
+                .BlokeBotUser(
+                    "moderator",
+                    role: AuthRole.Moderator,
+                    availableHosts: [selected],
+                    selectedHost: selected
+                )
+                .Claims.ToArray()
+        );
+
+        var page = context.Render<HomePage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("Switch to your own channel");
+            page.Markup.ShouldNotContain("Create your channel setup");
+            page.Markup.ShouldNotContain("Connect Twitch chat");
+            page.Markup.ShouldNotContain("Start bot");
+        });
+
+        var noSelection = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using (var noSelectionContext = noSelection.Context)
+        {
+            ConfigureHostServices(
+                noSelectionContext,
+                dbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider()
+            );
+            var available = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
+            noSelection.Authorization.SetClaims(
+                TestPrincipals
+                    .BlokeBotUser("streamer", availableHosts: [available])
+                    .Claims.ToArray()
+            );
+            var noSelectionPage = noSelectionContext.Render<HomePage>();
+            noSelectionPage.WaitForAssertion(() =>
+            {
+                noSelectionPage.Markup.ShouldContain("Choose a channel");
+                noSelectionPage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
+            });
+        }
+
+        await using (var noneFactory = await SqliteBlokeBotDbFactory.CreateAsync())
+        await using (var noneContext = UiTestContextFactory.Create(noneFactory, 999))
+        {
+            ConfigureHostServices(
+                noneContext,
+                noneFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider()
+            );
+            var nonePage = noneContext.Render<HomePage>();
+            nonePage.WaitForAssertion(() =>
+            {
+                nonePage.Markup.ShouldContain("Choose a channel");
+                nonePage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
+            });
+        }
+
+        await using (var retryInner = await SqliteBlokeBotDbFactory.CreateAsync())
+        {
+            var retryHostId = await SeedHostAsync(retryInner);
+            await using (var db = await retryInner.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(retryHostId);
+                host!.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
+                host.ChannelBotAuthorizedScopes = "chat:read";
+                host.BotRuntimeState = BotChannelRuntimeState.Stopped;
+                await db.SaveChangesAsync();
+            }
+            var retryTest = UiTestContextFactory.CreateWithAuthorization(retryInner, retryHostId);
+            await using var retryContext = retryTest.Context;
+            var controlled = new ControlledDbFactory(retryInner) { Fail = true };
+            ConfigureHostServices(
+                retryContext,
+                controlled,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var retryPage = retryContext.Render<HomePage>();
+            retryPage.WaitForAssertion(() =>
+                retryPage.Find("[role='alert']").TextContent.ShouldContain("overview load failed")
+            );
+            controlled.Fail = false;
+            retryPage.Find("[role='alert'] button").Click();
+            retryPage.WaitForAssertion(() =>
+            {
+                retryPage.FindAll("[role='alert']").ShouldBeEmpty();
+                retryPage
+                    .FindAll("a")
+                    .Select(anchor => anchor.TextContent.Trim())
+                    .Where(text => text == "Start bot")
+                    .ShouldBe(["Start bot"]);
+            });
+        }
+
+        foreach (
+            var (authorized, scopes, runtime, expected) in new[]
+            {
+                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
+                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
+                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
+                (true, "chat:read", BotChannelRuntimeState.Starting, "Review Channel setup"),
+                (true, "chat:read", BotChannelRuntimeState.Started, "Review Channel setup"),
+            }
+        )
+        {
+            await using var ownerDbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var ownerHostId = await SeedHostAsync(ownerDbFactory);
+            await using (var db = await ownerDbFactory.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(ownerHostId);
+                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
+                host.ChannelBotAuthorizedScopes = scopes;
+                host.BotRuntimeState = runtime;
+                host.BotRuntimeStateChangedAtUtc = runtime
+                    is BotChannelRuntimeState.Starting
+                        or BotChannelRuntimeState.Started
+                    ? DateTime.UtcNow
+                    : null;
+                await db.SaveChangesAsync();
+            }
+            await using var ownerContext = UiTestContextFactory.Create(ownerDbFactory, ownerHostId);
+            ConfigureHostServices(
+                ownerContext,
+                ownerDbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var ownerPage = ownerContext.Render<HomePage>();
+            ownerPage.WaitForAssertion(() =>
+            {
+                var actions = ownerPage
+                    .FindAll("a")
+                    .Select(anchor => anchor.TextContent.Trim())
+                    .Where(text =>
+                        new[]
+                        {
+                            "Connect bot",
+                            "Reconnect bot",
+                            "Start bot",
+                            "Review Channel setup",
+                        }.Contains(text)
+                    );
+                actions.ShouldBe([expected]);
+            });
+        }
+    }
+
+    [Test]
+    public async Task Readiness_CurrentAction_IsExclusiveAcrossAuthorizationAndRuntimeStates()
+    {
+        foreach (
+            var (authorized, scopes, runtime, expected) in new[]
+            {
+                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
+                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
+                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
+                (true, "chat:read", BotChannelRuntimeState.Starting, "Stop bot"),
+                (true, "chat:read", BotChannelRuntimeState.Started, "Stop bot"),
+            }
+        )
+        {
+            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+            var hostId = await SeedHostAsync(dbFactory);
+            await using (var db = await dbFactory.CreateDbContextAsync())
+            {
+                var host = await db.Hosts.FindAsync(hostId);
+                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
+                host.ChannelBotAuthorizedScopes = scopes;
+                host.BotRuntimeState = runtime;
+                host.BotRuntimeStateChangedAtUtc = runtime
+                    is BotChannelRuntimeState.Starting
+                        or BotChannelRuntimeState.Started
+                    ? DateTime.UtcNow
+                    : null;
+                await db.SaveChangesAsync();
+            }
+            await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+            ConfigureHostServices(
+                context,
+                dbFactory,
+                new RecordingLogger<UiFaultTelemetry>(),
+                new ManualTimeProvider(),
+                ["chat:read"]
+            );
+            var page = RenderHostConfigPage(context);
+            page.WaitForAssertion(() => AssertCurrentReadinessAction(page, expected, 0));
+            await OpenDisclosureAsync(page, "Connection diagnostics");
+            AssertCurrentReadinessAction(page, expected, authorized ? 1 : 0);
+        }
+    }
+
+    [Test]
     public async Task ReorderedAuthorityCompletions_KeepLatestPolicyIntentAndDoNotSaveStaleGrant()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -107,7 +324,8 @@ public sealed class HostConfigFaultRoutingTests
         BunitContext context,
         IDbContextFactory<BlokeBotDbContext> dbFactory,
         ILogger<UiFaultTelemetry> logger,
-        TimeProvider clock
+        TimeProvider clock,
+        string[]? channelScopes = null
     )
     {
         context.Services.AddSingleton(dbFactory);
@@ -116,7 +334,19 @@ public sealed class HostConfigFaultRoutingTests
             Options.Create(new BlokeBotOptions())
         );
         context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
-        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        context.Services.AddSingleton<IConfiguration>(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    (channelScopes ?? []).Select(
+                        (scope, index) =>
+                            new KeyValuePair<string, string?>(
+                                "TwitchBot:ChannelAuthorization:Scopes:" + index,
+                                scope
+                            )
+                    )
+                )
+                .Build()
+        );
         context.Services.AddOAuthTransport();
         context.Services.AddHelix();
         context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
@@ -237,6 +467,22 @@ public sealed class HostConfigFaultRoutingTests
                 && report.FailureType == typeof(InvalidOperationException).FullName
             );
         }
+    }
+
+    private static void AssertCurrentReadinessAction(
+        IRenderedComponent<HostConfigPage> page,
+        string expected,
+        int expectedDisconnects
+    )
+    {
+        var labels = new[] { "Connect bot", "Reconnect bot", "Start bot", "Stop bot" };
+        page.FindAll("button")
+            .Where(button => labels.Contains(button.TextContent.Trim()))
+            .Select(button => button.TextContent.Trim())
+            .ShouldBe([expected]);
+        page.FindAll("button")
+            .Count(button => button.TextContent.Trim() == "Disconnect")
+            .ShouldBe(expectedDisconnects);
     }
 
     private static IRenderedComponent<HostConfigPage> RenderHostConfigPage(BunitContext context)
@@ -372,6 +618,29 @@ public sealed class HostConfigFaultRoutingTests
         }
 
         return host.Id;
+    }
+
+    private sealed class ControlledDbFactory(SqliteBlokeBotDbFactory inner)
+        : IDbContextFactory<BlokeBotDbContext>
+    {
+        public bool Fail { get; set; }
+
+        public BlokeBotDbContext CreateDbContext()
+        {
+            return CreateDbContextAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("overview load failed");
+            }
+
+            return await inner.CreateDbContextAsync(cancellationToken);
+        }
     }
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource

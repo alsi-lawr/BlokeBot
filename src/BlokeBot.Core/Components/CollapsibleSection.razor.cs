@@ -7,6 +7,7 @@ public partial class CollapsibleSection
 {
     private bool _isOpen;
     private IJSObjectReference? _module;
+    private long _handledFocusRequest;
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -27,6 +28,18 @@ public partial class CollapsibleSection
     public long OpenRequest { get; set; }
 
     [Parameter]
+    public string? FocusElementId { get; set; }
+
+    [Parameter]
+    public long FocusRequest { get; set; }
+
+    [Parameter]
+    public string? TaskKey { get; set; }
+
+    [CascadingParameter]
+    internal TaskSelectionScope? TaskScope { get; set; }
+
+    [Parameter]
     public string? PreferenceKey { get; set; }
 
     [Parameter]
@@ -45,7 +58,11 @@ public partial class CollapsibleSection
 
     protected override void OnInitialized()
     {
-        _isOpen = InitiallyOpen;
+        _isOpen = TaskScope?.IsSelected(TaskKey ?? string.Empty) ?? InitiallyOpen;
+        if (!string.IsNullOrWhiteSpace(TaskKey))
+        {
+            TaskScope?.Register(this, TaskKey);
+        }
     }
 
     protected override void OnParametersSet()
@@ -57,28 +74,52 @@ public partial class CollapsibleSection
 
         _handledOpenRequest = OpenRequest;
         _isOpen = true;
+        if (!string.IsNullOrWhiteSpace(TaskKey))
+        {
+            _ = TaskScope?.SelectAsync(TaskKey);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || _storageKey is null)
+        if (firstRender && _storageKey is not null && TaskScope is null)
+        {
+            try
+            {
+                _module = await _js.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./Components/CollapsibleSection.razor.js"
+                );
+                var rememberedOpen = await _module.InvokeAsync<bool?>("readBoolean", _storageKey);
+                if (rememberedOpen is not null && _handledOpenRequest == 0)
+                {
+                    _isOpen = rememberedOpen.Value;
+                }
+
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (TaskCanceledException) { }
+        }
+
+        if (
+            FocusRequest <= _handledFocusRequest
+            || !_isOpen
+            || string.IsNullOrWhiteSpace(FocusElementId)
+        )
         {
             return;
         }
 
+        _handledFocusRequest = FocusRequest;
         try
         {
-            _module = await _js.InvokeAsync<IJSObjectReference>(
+            _module ??= await _js.InvokeAsync<IJSObjectReference>(
                 "import",
                 "./Components/CollapsibleSection.razor.js"
             );
-            var rememberedOpen = await _module.InvokeAsync<bool?>("readBoolean", _storageKey);
-            if (rememberedOpen is not null && _handledOpenRequest == 0)
-            {
-                _isOpen = rememberedOpen.Value;
-            }
-
-            await InvokeAsync(StateHasChanged);
+            await _module.InvokeVoidAsync("focusElement", FocusElementId);
         }
         catch (JSDisconnectedException) { }
         catch (JSException) { }
@@ -102,8 +143,20 @@ public partial class CollapsibleSection
 
     private long _handledOpenRequest;
 
+    internal void UpdateSelection()
+    {
+        _isOpen = TaskScope?.IsSelected(TaskKey ?? string.Empty) ?? _isOpen;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
     private async Task ToggleAsync()
     {
+        if (!string.IsNullOrWhiteSpace(TaskKey) && TaskScope is not null)
+        {
+            await TaskScope.SelectAsync(TaskKey);
+            return;
+        }
+
         _isOpen = !_isOpen;
         if (_module is not null && _storageKey is not null)
         {

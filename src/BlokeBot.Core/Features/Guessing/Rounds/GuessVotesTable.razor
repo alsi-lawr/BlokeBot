@@ -1,11 +1,21 @@
 @using BlokeBot.Core.Features.Guessing.Guesses
 
-<section class="card">
+<section class="guessing-task-surface">
     <div class="border-b border-slate-200 p-5">
         <h2 class="text-lg font-semibold text-slate-950">Votes</h2>
         <p class="mt-1 text-sm text-muted-foreground">Latest guesses for the current round.</p>
     </div>
-    <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+    <div class="phone-card-list" data-phone-cards="guess-votes">
+        @if (Votes.Count == 0)
+        {
+            <p class="phone-card">No guesses recorded for the current round.</p>
+        }
+        @foreach (var vote in Votes)
+        {
+            <article @key="vote" class="phone-card"><strong>@vote.Login</strong><span>@vote.GuessName</span><span>@vote.GuessedAtUtc.ToLocalTime().ToString("HH:mm:ss")</span></article>
+        }
+    </div>
+    <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Current round votes">
         @if (Votes.Count == 0)
         {
             <div class="p-8 text-sm text-muted-foreground">No guesses recorded for the current round.</div>

@@ -69,6 +69,11 @@ public partial class PointsConfigurationPage
     private PointsConfiguration? _config;
     private bool _featureEnabled;
     private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
+    private long _generalOpenRequest;
+    private long _generalFocusRequest;
+    private long _giveawaysOpenRequest;
+    private long _giveawaysFocusRequest;
+    private string _validationFocusId = "gamblingCooldown";
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,6 +132,29 @@ public partial class PointsConfigurationPage
                 errors =>
                 {
                     _validationErrors = errors.ToArray();
+                    switch (_validationErrors[0])
+                    {
+                        case PointsConfigurationValidationError.NegativeGamblingCooldown:
+                            _validationFocusId = "gamblingCooldown";
+                            _generalOpenRequest++;
+                            _generalFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayDurationBelowMinimum:
+                            _validationFocusId = "duration";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum:
+                            _validationFocusId = "winnerCount";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
+                        case PointsConfigurationValidationError.GiveawayCooldownBelowMinimum:
+                            _validationFocusId = "cooldown";
+                            _giveawaysOpenRequest++;
+                            _giveawaysFocusRequest++;
+                            break;
+                    }
                     _toasts.Publish(
                         new ToastRequest<ErrorToastStrategy>(
                             string.Join(" ", errors.Select(error => error.Message))
