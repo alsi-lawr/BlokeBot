@@ -33,6 +33,14 @@ public sealed class PointsConfigurationUiTests
             .Single(button => button.TextContent.Trim() == "Save changes")
             .Click();
 
+        page.WaitForAssertion(() =>
+            page.Find("#gamblingCooldown").GetAttribute("aria-invalid").ShouldBe("true")
+        );
+        context.JSInterop.Invocations.ShouldContain(invocation =>
+            invocation.Identifier == "focusElement"
+            && invocation.Arguments.OfType<string>().SingleOrDefault() == "gamblingCooldown"
+        );
+
         var error = toasts.Current.ShouldHaveSingleItem();
         error.Kind.ShouldBe(ToastKind.Error);
         error.Message.ShouldContain("The wait between gambles cannot be negative.");
