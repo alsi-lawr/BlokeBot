@@ -191,12 +191,14 @@ public sealed class CustomCommandSettingsUiTests
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
         module
             .Setup<string?>("readString", "blokebot.task.custom-command-settings")
-            .SetResult($"MessageLibrary:Reply:{seeded.MessageEntryId}");
+            .SetResult(
+                $"v2:MessageLibrary:Command,{seeded.CommandId}:Reply,{seeded.MessageEntryId}"
+            );
         module
             .SetupVoid(
                 "writeString",
                 "blokebot.task.custom-command-settings",
-                $"MessageLibrary:Reply:{seeded.MessageEntryId}"
+                $"v2:MessageLibrary:Command,{seeded.CommandId}:Reply,{seeded.MessageEntryId}"
             )
             .SetVoidResult();
 
@@ -209,6 +211,71 @@ public sealed class CustomCommandSettingsUiTests
                 .ShouldBe("true");
             cut.Find($"#message-entry-{seeded.MessageEntryId}-name").ShouldNotBeNull();
             cut.FindAll($"#command-{seeded.CommandId}-name").ShouldBeEmpty();
+        });
+
+        await using var pendingContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var pendingModule = pendingContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        var pendingRead = pendingModule.Setup<string?>(
+            "readString",
+            "blokebot.task.custom-command-settings"
+        );
+        pendingModule
+            .SetupVoid(
+                "writeString",
+                "blokebot.task.custom-command-settings",
+                $"v2:MessageLibrary:Command,{seeded.CommandId}:Reply,{seeded.MessageEntryId}"
+            )
+            .SetVoidResult();
+        var pendingCut = pendingContext.Render<CustomCommandSettingsPage>();
+        pendingCut.Find("#custom-command-message-library-tab").Click();
+        pendingRead.SetResult(
+            $"v2:Commands:Command,{seeded.CommandId}:Reply,{seeded.MessageEntryId}"
+        );
+        pendingCut.WaitForAssertion(() =>
+        {
+            pendingCut
+                .Find("#custom-command-message-library-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            pendingCut.Find($"#message-entry-{seeded.MessageEntryId}-name").ShouldNotBeNull();
+        });
+
+        await using var staleContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var staleModule = staleContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        staleModule
+            .Setup<string?>("readString", "blokebot.task.custom-command-settings")
+            .SetResult(
+                $"v2:MessageLibrary:Reply,{seeded.MessageEntryId}:Reply,{seeded.MessageEntryId}"
+            );
+        var staleCut = staleContext.Render<CustomCommandSettingsPage>();
+        staleCut.WaitForAssertion(() =>
+        {
+            staleCut
+                .Find("#custom-command-commands-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            staleCut.Find($"#command-{seeded.CommandId}-name").ShouldNotBeNull();
+        });
+
+        await using var undefinedContext = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var undefinedModule = undefinedContext.JSInterop.SetupModule(
+            "./Components/CollapsibleSection.razor.js"
+        );
+        undefinedModule
+            .Setup<string?>("readString", "blokebot.task.custom-command-settings")
+            .SetResult($"v2:99:99,{seeded.CommandId}:Reply,{seeded.MessageEntryId}");
+        var undefinedCut = undefinedContext.Render<CustomCommandSettingsPage>();
+        undefinedCut.WaitForAssertion(() =>
+        {
+            undefinedCut
+                .Find("#custom-command-commands-tab")
+                .GetAttribute("aria-selected")
+                .ShouldBe("true");
+            undefinedCut.Find($"#command-{seeded.CommandId}-name").ShouldNotBeNull();
         });
     }
 
@@ -245,6 +312,9 @@ public sealed class CustomCommandSettingsUiTests
         var name = cut.Find("input[id^='message-entry-'][id$='-name']");
         name.GetAttribute("value").ShouldBe("New reply");
         context.JSInterop.VerifyFocusAsyncInvoke().Arguments[0].ShouldBeElementReferenceTo(name);
+        cut.Find("button[aria-label='Save custom commands']").Click();
+        cut.Find("input[id^='message-entry-'][id$='-name']").ShouldNotBeNull();
+        cut.FindAll("input[id^='message-entry--'][id$='-name']").ShouldBeEmpty();
     }
 
     [Test]
@@ -266,12 +336,16 @@ public sealed class CustomCommandSettingsUiTests
             .GetAttribute("aria-labelledby")
             .ShouldBe("custom-command-message-library-tab");
         cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldBeNull();
+        cut.Find("input[id^='message-entry-'][id$='-name']").ShouldNotBeNull();
+        cut.FindAll("input[id^='command-'][id$='-name']").ShouldBeEmpty();
 
         cut.Find("#custom-command-message-library-tab")
             .KeyDown(new KeyboardEventArgs { Key = "Home" });
 
         cut.Find("#custom-command-commands-tab").GetAttribute("aria-selected").ShouldBe("true");
         cut.Find("#custom-command-message-library-panel").GetAttribute("hidden").ShouldNotBeNull();
+        cut.Find("input[id^='command-'][id$='-name']").ShouldNotBeNull();
+        cut.FindAll("input[id^='message-entry-'][id$='-name']").ShouldBeEmpty();
         cut.Find("#custom-command-commands-tab").KeyDown(new KeyboardEventArgs { Key = "End" });
         cut.Find("#custom-command-message-library-tab").GetAttribute("tabindex").ShouldBe("0");
     }

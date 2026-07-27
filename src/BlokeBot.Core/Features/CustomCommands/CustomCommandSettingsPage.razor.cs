@@ -21,6 +21,18 @@ public partial class CustomCommandSettingsPage
 
     private sealed record CustomCommandEditorSelection(CustomCommandEditorKind Kind, int Id);
 
+    private sealed record CustomCommandEditorPreference(
+        CustomCommandSettingsTab ActiveTab,
+        CustomCommandEditorSelection? CommandsSelection,
+        CustomCommandEditorSelection? MessageLibrarySelection
+    );
+
+    private sealed record CustomCommandEditorReloadBookmark(
+        CustomCommandEditorKind Kind,
+        int Id,
+        string? Name
+    );
+
     private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
@@ -61,9 +73,13 @@ public partial class CustomCommandSettingsPage
     private ElementReference _commandsTab;
     private ElementReference _messageLibraryTab;
     private int? _pendingResetAllCommandId;
-    private CustomCommandEditorSelection? _selectedEditor;
+    private readonly Dictionary<
+        CustomCommandSettingsTab,
+        CustomCommandEditorSelection
+    > _selectedEditors = [];
     private IJSObjectReference? _preferenceModule;
     private bool _preferenceHydrated;
+    private bool _hasExplicitSelection;
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,6 +101,8 @@ public partial class CustomCommandSettingsPage
 
     private async Task LoadCoreAsync()
     {
+        var previousHostId = HostId;
+        var bookmarks = _config is null ? [] : CaptureEditorReloadBookmarks();
         await LoadPageContextAsync();
         _featureEnabled =
             HostId != 0
@@ -96,12 +114,21 @@ public partial class CustomCommandSettingsPage
         _config = _featureEnabled
             ? await _configuration.LoadConfigurationAsync(HostId, CancellationToken.None)
             : null;
+        if (HostId == previousHostId && bookmarks.Count > 0)
+        {
+            RestoreEditorsAfterReload(bookmarks);
+        }
+        else
+        {
+            _selectedEditors.Clear();
+            _hasExplicitSelection = false;
+            _activeTab = CustomCommandSettingsTab.Commands;
+            EnsureActiveEditorSelection();
+        }
         _nextTemporaryId = -1;
         _validationErrors = [];
-        _activeTab = CustomCommandSettingsTab.Commands;
         _focusTarget = null;
         _pendingResetAllCommandId = null;
-        EnsureEditorSelection();
     }
 
     private Task SaveAsync()
@@ -151,10 +178,12 @@ public partial class CustomCommandSettingsPage
                 await result.Match(
                     async _ =>
                     {
+                        var bookmarks = CaptureEditorReloadBookmarks();
                         _config = await _configuration.LoadConfigurationAsync(
                             HostId,
                             CancellationToken.None
                         );
+                        RestoreEditorsAfterReload(bookmarks);
                         _nextTemporaryId = -1;
                         _validationErrors = [];
                         _focusTarget = null;
@@ -208,6 +237,8 @@ public partial class CustomCommandSettingsPage
     private void ActivateTab(CustomCommandSettingsTab tab)
     {
         _activeTab = tab;
+        _hasExplicitSelection = true;
+        EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();
     }
 
@@ -226,9 +257,8 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _activeTab = tab;
+        ActivateTab(tab);
         _pendingTabFocus = tab;
-        _ = PersistEditorSelectionAsync();
     }
 
     private static CustomCommandSettingsTab PreviousTab(CustomCommandSettingsTab tab)
@@ -267,48 +297,91 @@ public partial class CustomCommandSettingsPage
         };
         if (selection is not null)
         {
-            _selectedEditor = selection;
+            _activeTab = target.Tab;
+            _selectedEditors[target.Tab] = selection;
+            _hasExplicitSelection = true;
             _ = PersistEditorSelectionAsync();
         }
     }
 
     private bool IsEditorOpen(CustomCommandEditorKind kind, int id)
     {
-        return _selectedEditor is { Kind: var selectedKind, Id: var selectedId }
+        return EditorTab(kind) == _activeTab
+            && _selectedEditors.GetValueOrDefault(_activeTab)
+                is { Kind: var selectedKind, Id: var selectedId }
             && selectedKind == kind
             && selectedId == id;
     }
 
     private void SelectEditor(CustomCommandEditorKind kind, int id, string focusControlId)
     {
-        _selectedEditor = new(kind, id);
+        _activeTab = EditorTab(kind);
+        _selectedEditors[_activeTab] = new(kind, id);
+        _hasExplicitSelection = true;
         _editorFocusControlId = focusControlId;
         _editorFocusRequest++;
         _ = PersistEditorSelectionAsync();
     }
 
-    private void EnsureEditorSelection()
+    private void EnsureActiveEditorSelection()
     {
-        if (_config is null || _selectedEditor is { } selection && EditorExists(selection))
+        EnsureEditorSelection(_activeTab);
+    }
+
+    private void EnsureEditorSelection(CustomCommandSettingsTab tab)
+    {
+        if (_config is null)
         {
             return;
         }
 
-        _selectedEditor =
-            _config.Commands.FirstOrDefault() is { } command
+        if (
+            _selectedEditors.GetValueOrDefault(tab) is { } selection
+            && EditorExists(tab, selection)
+        )
+        {
+            return;
+        }
+
+        var replacement = DefaultEditorSelection(tab);
+        if (replacement is { } selected)
+        {
+            _selectedEditors[tab] = selected;
+        }
+        else
+        {
+            _selectedEditors.Remove(tab);
+        }
+    }
+
+    private CustomCommandEditorSelection? DefaultEditorSelection(CustomCommandSettingsTab tab)
+    {
+        if (_config is null)
+        {
+            return null;
+        }
+
+        return tab switch
+        {
+            CustomCommandSettingsTab.Commands => _config.Commands.FirstOrDefault() is { } command
                 ? new(CustomCommandEditorKind.Command, command.Id)
-            : _config.MessageEntries.FirstOrDefault() is { } reply
-                ? new(CustomCommandEditorKind.Reply, reply.Id)
             : _config.Counters.FirstOrDefault() is { } counter
                 ? new(CustomCommandEditorKind.Counter, counter.Id)
             : _config.Announcements.FirstOrDefault() is { } announcement
                 ? new(CustomCommandEditorKind.ScheduledMessage, announcement.Id)
-            : null;
+            : null,
+            CustomCommandSettingsTab.MessageLibrary => _config.MessageEntries.FirstOrDefault()
+                is { } reply
+                ? new(CustomCommandEditorKind.Reply, reply.Id)
+                : null,
+            _ => null,
+        };
     }
 
-    private bool EditorExists(CustomCommandEditorSelection selection)
+    private bool EditorExists(CustomCommandSettingsTab tab, CustomCommandEditorSelection selection)
     {
-        return _config is not null
+        return EditorTab(selection.Kind) == tab
+            && _config is not null
             && selection.Kind switch
             {
                 CustomCommandEditorKind.Reply => _config.MessageEntries.Any(x =>
@@ -323,6 +396,13 @@ public partial class CustomCommandSettingsPage
             };
     }
 
+    private static CustomCommandSettingsTab EditorTab(CustomCommandEditorKind kind)
+    {
+        return kind == CustomCommandEditorKind.Reply
+            ? CustomCommandSettingsTab.MessageLibrary
+            : CustomCommandSettingsTab.Commands;
+    }
+
     private async Task HydrateEditorSelectionAsync()
     {
         try
@@ -335,18 +415,12 @@ public partial class CustomCommandSettingsPage
                 "readString",
                 _editorPreferenceKey
             );
-            if (
-                TryParseEditorSelection(remembered, out var activeTab, out var selection)
-                && EditorExists(selection)
-            )
+            if (!_hasExplicitSelection && TryParseEditorPreference(remembered, out var preference))
             {
-                _activeTab = activeTab;
-                _selectedEditor = selection;
+                ApplyRememberedEditorPreference(preference);
             }
-            else
-            {
-                EnsureEditorSelection();
-            }
+
+            EnsureActiveEditorSelection();
             _preferenceHydrated = true;
             await PersistEditorSelectionAsync();
             await InvokeAsync(StateHasChanged);
@@ -356,6 +430,26 @@ public partial class CustomCommandSettingsPage
         catch (TaskCanceledException) { }
     }
 
+    private void ApplyRememberedEditorPreference(CustomCommandEditorPreference preference)
+    {
+        _selectedEditors.Clear();
+        if (
+            preference.CommandsSelection is { } commandsSelection
+            && EditorExists(CustomCommandSettingsTab.Commands, commandsSelection)
+        )
+        {
+            _selectedEditors[CustomCommandSettingsTab.Commands] = commandsSelection;
+        }
+        if (
+            preference.MessageLibrarySelection is { } messageLibrarySelection
+            && EditorExists(CustomCommandSettingsTab.MessageLibrary, messageLibrarySelection)
+        )
+        {
+            _selectedEditors[CustomCommandSettingsTab.MessageLibrary] = messageLibrarySelection;
+        }
+        _activeTab = preference.ActiveTab;
+    }
+
     private async Task PersistEditorSelectionAsync()
     {
         if (!_preferenceHydrated || _preferenceModule is null)
@@ -363,9 +457,7 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        var value = _selectedEditor is { } selection
-            ? $"{_activeTab}:{selection.Kind}:{selection.Id}"
-            : $"{_activeTab}:none";
+        var value = FormatEditorPreference();
         try
         {
             await _preferenceModule.InvokeVoidAsync("writeString", _editorPreferenceKey, value);
@@ -375,30 +467,183 @@ public partial class CustomCommandSettingsPage
         catch (TaskCanceledException) { }
     }
 
-    private static bool TryParseEditorSelection(
-        string? value,
-        out CustomCommandSettingsTab activeTab,
-        out CustomCommandEditorSelection selection
-    )
+    private string FormatEditorPreference()
     {
-        activeTab = default;
-        selection = new(default, 0);
-        var parts = value?.Split(':');
-        return parts is [var tab, var kind, var id]
-            && Enum.TryParse<CustomCommandSettingsTab>(tab, out activeTab)
-            && Enum.TryParse<CustomCommandEditorKind>(kind, out var parsedKind)
-            && int.TryParse(id, out var parsedId)
-            && AssignSelection(parsedKind, parsedId, out selection);
+        return string.Join(
+            ':',
+            "v2",
+            _activeTab,
+            FormatSelection(_selectedEditors.GetValueOrDefault(CustomCommandSettingsTab.Commands)),
+            FormatSelection(
+                _selectedEditors.GetValueOrDefault(CustomCommandSettingsTab.MessageLibrary)
+            )
+        );
     }
 
-    private static bool AssignSelection(
-        CustomCommandEditorKind kind,
-        int id,
-        out CustomCommandEditorSelection selection
+    private static string FormatSelection(CustomCommandEditorSelection? selection)
+    {
+        return selection is { } value ? $"{value.Kind},{value.Id}" : "none";
+    }
+
+    private static bool TryParseEditorPreference(
+        string? value,
+        out CustomCommandEditorPreference preference
     )
     {
-        selection = new(kind, id);
+        preference = new(CustomCommandSettingsTab.Commands, null, null);
+        var parts = value?.Split(':');
+        return parts is ["v2", var activeTab, var commands, var messageLibrary]
+            && TryParseDefinedTab(activeTab, out var parsedActiveTab)
+            && TryParseSelection(
+                commands,
+                CustomCommandSettingsTab.Commands,
+                out var commandsSelection
+            )
+            && TryParseSelection(
+                messageLibrary,
+                CustomCommandSettingsTab.MessageLibrary,
+                out var messageLibrarySelection
+            )
+            && AssignPreference(
+                parsedActiveTab,
+                commandsSelection,
+                messageLibrarySelection,
+                out preference
+            );
+    }
+
+    private static bool TryParseDefinedTab(string value, out CustomCommandSettingsTab tab)
+    {
+        return Enum.TryParse(value, out tab) && Enum.IsDefined(tab);
+    }
+
+    private static bool TryParseSelection(
+        string value,
+        CustomCommandSettingsTab tab,
+        out CustomCommandEditorSelection? selection
+    )
+    {
+        selection = null;
+        if (value == "none")
+        {
+            return true;
+        }
+
+        var parts = value.Split(',');
+        if (
+            parts is not [var kind, var id]
+            || !Enum.TryParse<CustomCommandEditorKind>(kind, out var parsedKind)
+            || !Enum.IsDefined(parsedKind)
+            || EditorTab(parsedKind) != tab
+            || !int.TryParse(id, out var parsedId)
+            || parsedId == 0
+        )
+        {
+            return false;
+        }
+
+        selection = new(parsedKind, parsedId);
         return true;
+    }
+
+    private static bool AssignPreference(
+        CustomCommandSettingsTab activeTab,
+        CustomCommandEditorSelection? commandsSelection,
+        CustomCommandEditorSelection? messageLibrarySelection,
+        out CustomCommandEditorPreference preference
+    )
+    {
+        preference = new(activeTab, commandsSelection, messageLibrarySelection);
+        return true;
+    }
+
+    private IReadOnlyList<CustomCommandEditorReloadBookmark> CaptureEditorReloadBookmarks()
+    {
+        return _selectedEditors
+            .Values.Select(selection => new CustomCommandEditorReloadBookmark(
+                selection.Kind,
+                selection.Id,
+                EditorName(selection)
+            ))
+            .ToArray();
+    }
+
+    private void RestoreEditorsAfterReload(
+        IReadOnlyList<CustomCommandEditorReloadBookmark> bookmarks
+    )
+    {
+        _selectedEditors.Clear();
+        foreach (var bookmark in bookmarks)
+        {
+            if (FindEditorByBookmark(bookmark) is { } selection)
+            {
+                _selectedEditors[EditorTab(selection.Kind)] = selection;
+            }
+        }
+        EnsureActiveEditorSelection();
+        _hasExplicitSelection = true;
+        _ = PersistEditorSelectionAsync();
+    }
+
+    private string? EditorName(CustomCommandEditorSelection selection)
+    {
+        return _config is null
+            ? null
+            : selection.Kind switch
+            {
+                CustomCommandEditorKind.Reply => _config
+                    .MessageEntries.FirstOrDefault(x => x.Id == selection.Id)
+                    ?.Name,
+                CustomCommandEditorKind.Command => _config
+                    .Commands.FirstOrDefault(x => x.Id == selection.Id)
+                    ?.Name,
+                CustomCommandEditorKind.Counter => _config
+                    .Counters.FirstOrDefault(x => x.Id == selection.Id)
+                    ?.Name,
+                CustomCommandEditorKind.ScheduledMessage => _config
+                    .Announcements.FirstOrDefault(x => x.Id == selection.Id)
+                    ?.Name,
+                _ => null,
+            };
+    }
+
+    private CustomCommandEditorSelection? FindEditorByBookmark(
+        CustomCommandEditorReloadBookmark bookmark
+    )
+    {
+        if (_config is null)
+        {
+            return null;
+        }
+
+        return bookmark.Kind switch
+        {
+            CustomCommandEditorKind.Reply => _config.MessageEntries.FirstOrDefault(x =>
+                x.Id == bookmark.Id || x.Name == bookmark.Name
+            )
+                is { } reply
+                ? new(CustomCommandEditorKind.Reply, reply.Id)
+                : null,
+            CustomCommandEditorKind.Command => _config.Commands.FirstOrDefault(x =>
+                x.Id == bookmark.Id || x.Name == bookmark.Name
+            )
+                is { } command
+                ? new(CustomCommandEditorKind.Command, command.Id)
+                : null,
+            CustomCommandEditorKind.Counter => _config.Counters.FirstOrDefault(x =>
+                x.Id == bookmark.Id || x.Name == bookmark.Name
+            )
+                is { } counter
+                ? new(CustomCommandEditorKind.Counter, counter.Id)
+                : null,
+            CustomCommandEditorKind.ScheduledMessage => _config.Announcements.FirstOrDefault(x =>
+                x.Id == bookmark.Id || x.Name == bookmark.Name
+            )
+                is { } announcement
+                ? new(CustomCommandEditorKind.ScheduledMessage, announcement.Id)
+                : null,
+            _ => null,
+        };
     }
 
     private long EditorFocusRequestFor(string controlId)
@@ -935,7 +1180,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.MessageEntries.Remove(entry);
-        EnsureEditorSelection();
+        EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();
     }
 
@@ -1018,7 +1263,7 @@ public partial class CustomCommandSettingsPage
     private void RemoveCommand(CustomCommandEditor command)
     {
         _config?.Commands.Remove(command);
-        EnsureEditorSelection();
+        EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();
     }
 
@@ -1170,7 +1415,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.Counters.Remove(counter);
-        EnsureEditorSelection();
+        EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();
     }
 
@@ -1200,7 +1445,7 @@ public partial class CustomCommandSettingsPage
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
     {
         _config?.Announcements.Remove(announcement);
-        EnsureEditorSelection();
+        EnsureActiveEditorSelection();
         _ = PersistEditorSelectionAsync();
     }
 
