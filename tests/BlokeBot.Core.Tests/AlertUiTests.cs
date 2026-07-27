@@ -8,12 +8,13 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Shouldly;
 using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed class AlertUiTests
+public sealed partial class AlertUiTests
 {
     [Test]
     public async Task ActiveAlertInTopBar_ClickingIndicator_NavigatesToAlerts()
@@ -98,5 +99,51 @@ public sealed class AlertUiTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host.Id;
+    }
+}
+
+public sealed partial class AlertUiTests
+{
+    [Test]
+    public async Task RouteLoadFailure_RendersInlineRetryAndRecoversWhenTheLoadSucceeds()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var controlledFactory = new ControlledDbFactory(dbFactory) { Fail = true };
+        context.Services.RemoveAll<IDbContextFactory<BlokeBotDbContext>>();
+        context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(controlledFactory);
+
+        var cut = context.Render<AlertsPage>();
+        cut.Find("[role='alert']").TextContent.ShouldContain("alert load failed");
+
+        controlledFactory.Fail = false;
+        cut.Find("[role='alert'] button").Click();
+
+        cut.FindAll("[role='alert']").ShouldBeEmpty();
+        cut.Find("h1").TextContent.ShouldBe("Review alerts");
+    }
+
+    private sealed class ControlledDbFactory(SqliteBlokeBotDbFactory inner)
+        : IDbContextFactory<BlokeBotDbContext>
+    {
+        public bool Fail { get; set; }
+
+        public BlokeBotDbContext CreateDbContext()
+        {
+            return CreateDbContextAsync().GetAwaiter().GetResult();
+        }
+
+        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("alert load failed");
+            }
+
+            return await inner.CreateDbContextAsync(cancellationToken);
+        }
     }
 }

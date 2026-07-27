@@ -68,7 +68,7 @@ public sealed class CustomCommandSettingsUiTests
 
         disclosure.Click();
 
-        cut.FindAll($"#{expected.ContentId}").ShouldBeEmpty();
+        cut.Find($"#{expected.ContentId}").HasAttribute("hidden").ShouldBeTrue();
         cut.Find("button[aria-label='Save custom commands']").Click();
 
         cut.Find($"#{expected.ContentId}").ShouldNotBeNull();

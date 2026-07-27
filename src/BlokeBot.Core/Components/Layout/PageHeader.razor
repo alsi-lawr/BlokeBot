@@ -1,9 +1,9 @@
 <header class="page-header">
     <div class="page-header__inner">
-        <div class="min-w-0 space-y-2">
+        <div class="min-w-0 space-y-1">
             @if (!string.IsNullOrWhiteSpace(Kicker))
             {
-                <div class="page-kicker inline-flex items-center rounded-full px-3 py-1 text-xs font-medium">
+                <div class="page-kicker inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium">
                     @Kicker
                 </div>
             }
@@ -17,8 +17,12 @@
         </div>
         @if (ChildContent is not null)
         {
-            <div class="page-header__actions">
+            <div class="page-header__actions" data-sticky-save-actions>
                 @ChildContent
+                @if (!string.IsNullOrWhiteSpace(SaveStatus))
+                {
+                    <span class="page-header__save-status" role="status" data-sticky-save-status>@SaveStatus</span>
+                }
             </div>
         }
     </div>
@@ -33,6 +37,9 @@
 
     [Parameter]
     public string Kicker { get; set; } = string.Empty;
+
+    [Parameter]
+    public string SaveStatus { get; set; } = string.Empty;
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;

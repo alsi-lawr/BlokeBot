@@ -14,7 +14,7 @@
 
 <DashboardPage Kicker="Chat tools"
                Title="Configure guessing"
-               Description="Choose round types, answers, chat commands, and the replies viewers receive.">
+               Description="Choose round types, answers, chat commands, and the replies viewers receive." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
     <Actions>
         <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
     </Actions>

@@ -103,3 +103,32 @@
         font-weight: 600;
     }
 }
+
+@media (max-width: 30rem) {
+    .btn-primary,
+    .btn-secondary,
+    .auth-action,
+    .input,
+    select.input,
+    textarea.input {
+        min-height: 2.5rem;
+    }
+}
+
+.phone-card-list {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.phone-card {
+    border: 1px solid var(--app-border);
+    border-radius: 0.5rem;
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem;
+}
+
+.wide-data-region {
+    max-width: 72rem;
+    overflow-x: auto;
+}

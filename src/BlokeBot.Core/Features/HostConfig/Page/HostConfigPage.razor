@@ -31,7 +31,7 @@
 
 <DashboardPage Kicker="Channel setup"
                Title="Set up your channel"
-               Description="Connect the bot, choose who can help, and turn chat tools on or off for this channel.">
+               Description="Connect the bot, choose who can help, and turn chat tools on or off for this channel." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
 
     @if (_blockedByMode)
     {

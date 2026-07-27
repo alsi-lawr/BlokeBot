@@ -274,13 +274,22 @@ public sealed class HostConfigFaultRoutingTests
             .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal));
         var contentId = trigger.GetAttribute("aria-controls");
         contentId.ShouldNotBeNullOrWhiteSpace();
-        if (page.FindAll($"#{contentId}").Count > 0)
+        var content = page.Find($"#{contentId}");
+        if (!content.HasAttribute("hidden"))
         {
             return;
         }
 
-        await page.InvokeAsync(() => trigger.Click());
-        page.WaitForAssertion(() => page.FindAll($"#{contentId}").Count.ShouldBe(1));
+        await page.InvokeAsync(() =>
+            page.FindAll("button.disclosure-trigger")
+                .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+                .ClickAsync(new())
+        );
+        page.Find($"#{contentId}").HasAttribute("hidden").ShouldBeFalse();
+        page.FindAll("button.disclosure-trigger")
+            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
+            .GetAttribute("aria-expanded")
+            .ShouldBe("true");
     }
 
     private static void AssertAccessMode<TComponent>(

@@ -53,6 +53,23 @@ public abstract class AuthenticatedPageComponent : ComponentBase, IDisposable
         return subscription;
     }
 
+    protected Exception? RouteLoadFailure { get; private set; }
+
+    protected async Task ObserveRouteLoadAsync(Func<Task> load)
+    {
+        RouteLoadFailure = null;
+
+        try
+        {
+            await load();
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(nameof(ObserveRouteLoadAsync), exception);
+            RouteLoadFailure = exception;
+        }
+    }
+
     protected async Task ObserveUiOperationAsync(string operation, Func<Task> execute)
     {
         try

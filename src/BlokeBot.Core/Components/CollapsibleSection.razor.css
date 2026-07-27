@@ -94,3 +94,24 @@
         transition-duration: 1ms !important;
     }
 }
+
+.disclosure-panel {
+    border-radius: 0.5rem;
+    box-shadow: none;
+}
+
+.disclosure-trigger {
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.disclosure-description {
+    line-height: 1.25;
+}
+
+@media (min-width: 40rem) {
+    .disclosure-trigger {
+        padding-inline: 1rem;
+    }
+}

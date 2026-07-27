@@ -62,7 +62,7 @@ public partial class CustomCommandSettingsPage
 
     private Task LoadAsync()
     {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+        return ObserveRouteLoadAsync(LoadCoreAsync);
     }
 
     private async Task LoadCoreAsync()

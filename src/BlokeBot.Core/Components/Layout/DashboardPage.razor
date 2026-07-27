@@ -1,12 +1,42 @@
-<div class="dashboard-page app-motion-stack mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description">
+@using Microsoft.AspNetCore.Components.Web
+
+<div class="dashboard-page app-motion-stack mx-auto space-y-4">
+    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description" SaveStatus="@SaveStatus">
         @Actions
     </PageHeader>
 
-    @ChildContent
+    @if (LoadFailure is not null)
+    {
+        <PageState Kind="DashboardPageState.Failure"
+                   Title="We couldn’t load this page"
+                   Description="@LoadFailure.Message">
+            <Actions>
+                <button type="button" class="btn-primary" @onclick="RetryAsync">Retry</button>
+            </Actions>
+        </PageState>
+    }
+    else
+    {
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @ChildContent
+            </ChildContent>
+            <ErrorContent Context="exception">
+                <PageState Kind="DashboardPageState.Failure"
+                           Title="We couldn’t load this page"
+                           Description="@exception.Message">
+                    <Actions>
+                        <button type="button" class="btn-primary" @onclick="RetryAsync">Retry</button>
+                    </Actions>
+                </PageState>
+            </ErrorContent>
+        </ErrorBoundary>
+    }
 </div>
 
 @code {
+    private ErrorBoundary? _errorBoundary;
+
     [Parameter]
     public RenderFragment? Actions { get; set; }
 
@@ -19,6 +49,21 @@
     [Parameter]
     public string Kicker { get; set; } = string.Empty;
 
+    [Parameter]
+    public string SaveStatus { get; set; } = string.Empty;
+
+    [Parameter]
+    public Exception? LoadFailure { get; set; }
+
+    [Parameter]
+    public EventCallback RetryLoadAsync { get; set; }
+
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
+
+    private async Task RetryAsync()
+    {
+        _errorBoundary?.Recover();
+        await RetryLoadAsync.InvokeAsync();
+    }
 }
