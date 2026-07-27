@@ -582,6 +582,27 @@ public sealed class HostConfigFaultRoutingTests
         return host.Id;
     }
 
+    private sealed class ControlledDbFactory(SqliteBlokeBotDbFactory inner)
+        : IDbContextFactory<BlokeBotDbContext>
+    {
+        public bool Fail { get; set; }
+
+        public BlokeBotDbContext CreateDbContext() =>
+            CreateDbContextAsync().GetAwaiter().GetResult();
+
+        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (Fail)
+            {
+                throw new InvalidOperationException("overview load failed");
+            }
+
+            return await inner.CreateDbContextAsync(cancellationToken);
+        }
+    }
+
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
         private readonly Queue<Task<string>> _tokens = [];
