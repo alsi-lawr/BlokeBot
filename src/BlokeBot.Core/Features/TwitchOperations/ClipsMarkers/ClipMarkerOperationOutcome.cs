@@ -24,7 +24,10 @@ public abstract record ClipMarkerOperationOutcome
 
     public sealed record RerunOrPremiere : ClipMarkerOperationOutcome;
 
-    public sealed record Ambiguous : ClipMarkerOperationOutcome;
+    public sealed record ClipAmbiguous(ClipAttemptReference Attempt) : ClipMarkerOperationOutcome;
+
+    public sealed record MarkerAmbiguous(StreamMarkerAttemptReference Attempt)
+        : ClipMarkerOperationOutcome;
 
     public sealed record ProviderRejected(string Message) : ClipMarkerOperationOutcome;
 }

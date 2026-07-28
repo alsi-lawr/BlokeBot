@@ -1,219 +1,69 @@
-@page "/twitch-operations"
-@using BlokeBot.Core.Auth.Sessions
-@using BlokeBot.Core.Features.HostedChannels
+@page "/twitch-operations/shoutouts"
 @using BlokeBot.Core.Features.Toasts
-@using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
-@using BlokeBot.Core.Features.TwitchOperations.Polls
+@using BlokeBot.Core.Features.TwitchOperations
+@using BlokeBot.Core.Features.TwitchOperations.Shared
+@using BlokeBot.Core.Features.TwitchOperations.Shoutouts
 @using BlokeBot.Eventing
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject ShoutoutService _shoutouts
 @inject ToastService _toasts
-@inject PollService _polls
-@inject ClipMarkerService _clipsMarkers
 @inject NativeTwitchFeatureGate _nativeTwitch
-@inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
 
-<PageTitle>BlokeBot | Native Twitch operations</PageTitle>
+<PageTitle>BlokeBot | Shoutouts</PageTitle>
 
-<div class="mx-auto max-w-5xl space-y-6">
-    <PageHeader Kicker="Native Twitch operations" Title="Native Twitch operations" Description="Manage Twitch operations for the selected channel." />
-    @if (!_nativeTwitchEnabled)
+<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="shoutouts">
+    <PageHeader Kicker="Native Twitch" Title="Shoutouts" Description="Send a native Twitch shoutout and see Twitch-provided cooldowns." />
+    <NativeTwitchToolSwitcher />
+
+    @if (_loadFailed)
     {
-        <section class="card p-6" role="status">
-            <h2 class="text-lg font-semibold text-slate-950">Native Twitch is turned off</h2>
-            <p class="mt-2 text-sm text-muted-foreground">
-                Existing history, templates, results, and Twitch identifiers are retained. Turn Native Twitch back on in Channel setup to use them again.
-            </p>
-            <a class="btn-primary mt-5" href="/host#chat-tools">Open Channel setup</a>
-        </section>
+        <PageState Kind="PageStateKind.Failure" Title="Shoutouts could not load" Description="BlokeBot couldn’t load shoutouts for this channel.">
+            <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
     }
-    else
+    else if (_loading)
     {
-    <section class="card">
-        <div class="border-b border-slate-200 p-5">
-            <h2 class="text-lg font-semibold text-slate-950">Shoutouts</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Send a native Twitch shoutout and see Twitch-provided cooldowns.</p>
-        </div>
-        @if (_state is null)
-        {
-            <p class="p-5 text-sm text-muted-foreground">Loading shoutouts...</p>
-        }
-        else
-        {
-            <div class="space-y-5 p-5">
-                <div class="flex flex-wrap gap-3">
-                    <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
-                    <button class="btn-primary self-end" @onclick="SendAsync">Send shoutout</button>
-                </div>
-                <p class="text-sm text-muted-foreground">@_cooldownText</p>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground"><tr><th class="px-3 py-2">Direction</th><th class="px-3 py-2">Channel</th><th class="px-3 py-2">Viewers</th><th class="px-3 py-2">Time</th></tr></thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @foreach (var item in _state.History)
-                            {
-                                <tr @key="item"><td class="px-3 py-2">@item.Direction</td><td class="px-3 py-2">@item.TargetLogin</td><td class="px-3 py-2">@item.ViewerCount</td><td class="px-3 py-2">@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td></tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+        <PageState Kind="PageStateKind.Loading" Title="Loading shoutouts" Description="Checking cooldowns and recent activity." />
+    }
+    else if (!_nativeTwitchEnabled)
+    {
+        <NativeTwitchUnavailable />
+    }
+    else if (_state is not null)
+    {
+        <TaskPanel Title="Send a shoutout" Description="Choose a live channel with viewers. Twitch applies global and same-channel cooldowns.">
+            <div class="field-row native-primary-row">
+                <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
+                <button class="btn-primary" @onclick="SendAsync">Send shoutout</button>
             </div>
-        }
-    </section>
-    <section class="card">
-        <div class="border-b border-slate-200 p-5">
-            <h2 class="text-lg font-semibold text-slate-950">Polls</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Create reusable Twitch poll templates and monitor the active poll.</p>
-        </div>
-        @if (_pollState is null)
-        {
-            <p class="p-5 text-sm text-muted-foreground">Loading polls...</p>
-        }
-        else
-        {
-            <div class="space-y-4 p-5">
-                @if (_pollState.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+            <p class="form-help mt-4">@_cooldownText</p>
+        </TaskPanel>
+
+        <CollapsibleSection Title="Recent shoutouts" Description="Sent and received shoutouts for this channel." InitiallyOpen="false">
+            <div class="p-4">
+                @if (_state.History.Count == 0)
                 {
-                    <div class="text-sm text-amber-700">
-                        <p>@readiness.Message</p>
-                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70"
-                                         Url="@readiness.ReauthorizationUrl"
-                                         PopupName="blokebot-broadcaster-oauth"
-                                         OpeningText="Opening..."
-                                         OnClosed="LoadPollsAsync">
-                            Reconnect broadcaster
-                        </AuthPopupButton>
-                    </div>
+                    <p class="text-sm text-muted-foreground">No shoutouts recorded yet.</p>
                 }
-                @if (_pollState.ActivePoll is { } poll)
+                else
                 {
-                    <div class="rounded-lg border border-slate-200 p-3">
-                        <div class="flex flex-wrap items-center gap-3">
-                            <strong>@poll.Title</strong>
-                            <span class="text-sm text-muted-foreground">@poll.Status</span>
-                            <button class="btn-secondary" @onclick="EndPollAsync">End poll</button>
-                        </div>
-                        @if (poll.IsExternallyStarted)
+                    <div class="phone-card-list" data-native-history="shoutouts">
+                        @foreach (var item in _state.History)
                         {
-                            <p class="mt-2 text-sm text-amber-700">This poll was started in Twitch. Confirm before ending it.</p>
-                        }
-                        <ul class="mt-3 space-y-1 text-sm">
-                            @foreach (var choice in poll.Choices)
-                            {
-                                <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
-                            }
-                        </ul>
-                    </div>
-                }
-                <div class="flex flex-wrap gap-3">
-                    <Field Id="poll-title" Label="Template title" @bind-Value="_pollTitle" Placeholder="Question" />
-                    <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_pollChoices" Placeholder="Yes&#10;No" />
-                    <Field Id="poll-duration" Label="Seconds" @bind-Value="_pollDuration" Placeholder="60" />
-                    <div class="space-y-2 self-end">
-                        <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="poll-channel-points-enabled">
-                            <input id="poll-channel-points-enabled" type="checkbox" @bind="_channelPointsVotingEnabled" />
-                            Enable Channel Points voting
-                        </label>
-                        @if (_channelPointsVotingEnabled)
-                        {
-                            <div class="space-y-1">
-                                <label class="label" for="poll-channel-points-per-vote">Channel Points per vote</label>
-                                <input id="poll-channel-points-per-vote" class="input" type="number" min="1" max="1000000" step="1" @bind="_channelPointsPerVote" />
-                                <p class="text-xs text-muted-foreground">1–1,000,000. Twitch owns Channel Points balances and votes.</p>
-                            </div>
-                        }
-                    </div>
-                    <button class="btn-primary self-end" @onclick="SavePollTemplateAsync">Save template</button>
-                </div>
-                @foreach (var template in _pollState.Templates)
-                {
-                    <div class="flex items-center justify-between rounded-lg border border-slate-200 p-3" @key="template.Id">
-                        <span>
-                            @template.Title (@string.Join(", ", template.Choices))
-                            @if (template.ChannelPointsVotingEnabled)
-                            {
-                                <span class="text-sm text-muted-foreground">— @template.ChannelPointsPerVote Channel Points per vote</span>
-                            }
-                        </span>
-                        <button class="btn-secondary" @onclick="() => StartPollAsync(template.Id)">Start poll</button>
-                    </div>
-                }
-                @if (_pollState.Results.Count > 0)
-                {
-                    <div class="border-t border-slate-200 pt-4">
-                        <h3 class="text-base font-semibold text-slate-950">Recent results</h3>
-                        <div class="mt-2 space-y-3">
-                            @foreach (var result in _pollState.Results)
-                            {
-                                <div class="rounded-lg border border-slate-200 p-3" @key="result.ProviderPollId">
-                                    <strong>@result.Title</strong>
-                                    <span class="ml-2 text-sm text-muted-foreground">@result.Status</span>
-                                    <ul class="mt-2 space-y-1 text-sm">
-                                        @foreach (var choice in result.Choices)
-                                        {
-                                            <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
-                                        }
-                                    </ul>
+                            <article class="surface-row rounded-lg p-4" @key="item">
+                                <div class="flex flex-wrap items-start justify-between gap-2">
+                                    <strong class="text-slate-950">@item.Direction · @item.TargetLogin</strong>
+                                    <span class="text-xs text-muted-foreground">@item.OccurredAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</span>
                                 </div>
-                            }
-                        </div>
+                                <p class="mt-2 text-sm text-muted-foreground">@item.ViewerCount viewers</p>
+                            </article>
+                        }
                     </div>
                 }
             </div>
-        }
-    </section>
-    <section class="card">
-        <div class="border-b border-slate-200 p-5">
-            <h2 class="text-lg font-semibold text-slate-950">Clips &amp; Markers</h2>
-            <p class="mt-1 text-sm text-muted-foreground">Request a Twitch clip or place a stream marker for the selected live channel.</p>
-        </div>
-        @if (_clipMarkerState is null)
-        {
-            <p class="p-5 text-sm text-muted-foreground">Loading clips and markers...</p>
-        }
-        else
-        {
-            <div class="space-y-4 p-5">
-                @if (_clipMarkerState.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
-                {
-                    <div class="text-sm text-amber-700">
-                        <p>@readiness.Message</p>
-                        <AuthPopupButton Class="auth-action mt-2 inline-flex h-8 items-center rounded-full px-3 text-sm font-bold transition disabled:opacity-70"
-                                         Url="@readiness.ReauthorizationUrl"
-                                         PopupName="blokebot-broadcaster-oauth"
-                                         OpeningText="Opening..."
-                                         OnClosed="LoadClipsMarkersAsync">
-                            Reconnect broadcaster
-                        </AuthPopupButton>
-                    </div>
-                }
-                <div class="flex flex-wrap gap-3">
-                    <Field Id="clip-request-key" Label="Clip request key" @bind-Value="_clipRequestKey" Placeholder="stable request key" />
-                    <label class="flex items-center gap-2 self-end text-sm font-semibold text-slate-900" for="clip-has-delay"><input id="clip-has-delay" type="checkbox" @bind="_clipHasDelay" />Include delay</label>
-                    <button class="btn-primary self-end" @onclick="CreateClipAsync">Create clip</button>
-                </div>
-                <div class="flex flex-wrap gap-3">
-                    <Field Id="marker-request-key" Label="Marker request key" @bind-Value="_markerRequestKey" Placeholder="stable request key" />
-                    <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
-                    <button class="btn-secondary self-end" @onclick="CreateMarkerAsync">Create marker</button>
-                </div>
-                @foreach (var clip in _clipMarkerState.PendingClips)
-                {
-                    <div class="rounded-lg border border-slate-200 p-3" @key="clip.Id"><strong>Clip pending</strong><span class="ml-2 text-sm text-muted-foreground">@clip.EditUrl</span></div>
-                }
-                @foreach (var clip in _clipMarkerState.Results)
-                {
-                    <div class="rounded-lg border border-slate-200 p-3" @key="clip.Id"><strong>@clip.Status</strong><span class="ml-2 text-sm text-muted-foreground">@(clip.FinalUrl ?? clip.FailureReason)</span></div>
-                }
-                @foreach (var marker in _clipMarkerState.Markers)
-                {
-                    <div class="rounded-lg border border-slate-200 p-3" @key="marker.Id"><strong>@marker.Description</strong><span class="ml-2 text-sm text-muted-foreground">@marker.Status at @marker.PositionSeconds seconds</span></div>
-                }
-            </div>
-        }
-    </section>
+        </CollapsibleSection>
     }
 </div>

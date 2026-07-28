@@ -150,6 +150,10 @@ html[data-nav-points-open="false"]
 html[data-nav-custom-commands-open="false"]
     .nav-menu[data-navigation-mode="labelled"]
     .nav-menu__group[data-nav-section="custom-commands"]
+    .nav-menu__section-body,
+html[data-nav-native-twitch-open="false"]
+    .nav-menu[data-navigation-mode="labelled"]
+    .nav-menu__group[data-nav-section="twitch-operations"]
     .nav-menu__section-body {
     display: none;
 }

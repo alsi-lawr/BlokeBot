@@ -1,0 +1,56 @@
+@layer components {
+    .native-tool-switcher {
+        background: var(--app-surface-muted);
+        border: 1px solid var(--app-border);
+        border-radius: 0.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        max-width: 100%;
+        padding: 0.35rem;
+    }
+
+    .native-tool-switcher__link {
+        border: 1px solid transparent;
+        border-radius: 0.5rem;
+        color: var(--app-text-medium);
+        flex: 1 1 8.5rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+        min-width: 0;
+        padding: 0.65rem 0.75rem;
+        text-align: center;
+    }
+
+    .native-tool-switcher__link:hover {
+        background: var(--app-control-hover);
+        color: var(--app-text-strong);
+    }
+
+    .native-tool-switcher__link:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--app-focus-border) 38%, transparent);
+        outline-offset: 2px;
+    }
+
+    .native-tool-switcher__link--current {
+        background: var(--app-nav-selected-bg);
+        border-color: var(--app-nav-selected-border);
+        color: var(--app-nav-selected-text);
+    }
+
+    .native-primary-row > .field:only-of-type {
+        flex-grow: 1;
+    }
+
+    @media (max-width: 30rem) {
+        .native-tool-switcher__link {
+            flex-basis: calc(50% - 0.35rem);
+        }
+
+        .native-primary-row > button,
+        .native-primary-row > .btn-primary,
+        .native-primary-row > .btn-secondary {
+            width: 100%;
+        }
+    }
+}

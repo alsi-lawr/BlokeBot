@@ -99,7 +99,9 @@ public sealed class NavMenuInventoryTests
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var module = context.JSInterop.SetupModule("./Components/Layout/NavMenu.razor.js");
         SetupExpandedGroups(module);
-        context.Services.GetRequiredService<NavigationManager>().NavigateTo("/points/settings");
+        context
+            .Services.GetRequiredService<NavigationManager>()
+            .NavigateTo("/twitch-operations/polls");
 
         var cut = context.Render<NavMenu>(parameters =>
             parameters.Add(parameter => parameter.Presentation, NavigationPresentation.IconRail)
@@ -108,34 +110,39 @@ public sealed class NavMenuInventoryTests
         cut.Find(".nav-menu").GetAttribute("data-navigation-mode").ShouldBe("icon");
         cut.FindAll("[data-nav-destination]")
             .Select(element => element.GetAttribute("data-nav-destination"))
-            .ShouldBe(["home", "alerts", "host", "twitch-operations"]);
+            .ShouldBe(["home", "alerts", "host"]);
         cut.FindAll("[data-nav-section]")
             .Select(element => element.GetAttribute("data-nav-section"))
-            .ShouldBe(["guessing", "points", "custom-commands"]);
+            .ShouldBe(["twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
             .ShouldAllBe(button => button.GetAttribute("aria-expanded") == "false");
 
-        var pointsButton = cut.Find("[data-nav-section='points'] button");
-        var pointsBodyId = pointsButton.GetAttribute("aria-controls");
-        pointsBodyId.ShouldNotBeNullOrWhiteSpace();
-        cut.Find($"#{pointsBodyId}").HasAttribute("hidden").ShouldBeTrue();
+        var nativeButton = cut.Find("[data-nav-section='twitch-operations'] button");
+        var nativeBodyId = nativeButton.GetAttribute("aria-controls");
+        nativeBodyId.ShouldNotBeNullOrWhiteSpace();
+        cut.Find($"#{nativeBodyId}").HasAttribute("hidden").ShouldBeTrue();
 
-        pointsButton.Click();
+        nativeButton.Click();
 
-        pointsButton = cut.Find("[data-nav-section='points'] button");
-        pointsButton.GetAttribute("aria-expanded").ShouldBe("true");
-        pointsButton.GetAttribute("aria-current").ShouldBe("page");
+        nativeButton = cut.Find("[data-nav-section='twitch-operations'] button");
+        nativeButton.GetAttribute("aria-expanded").ShouldBe("true");
+        nativeButton.GetAttribute("aria-current").ShouldBe("page");
         var childDestinations = cut.FindAll("[data-nav-section] a")
             .Select(link => link.GetAttribute("href"))
             .ToArray();
         childDestinations.ShouldBe([
+            "twitch-operations/shoutouts",
+            "twitch-operations/polls",
+            "twitch-operations/clips-markers",
+            "twitch-operations/channel-points",
+            "twitch-operations/predictions",
             "guessing",
             "guessing/settings",
             "points",
             "points/settings",
             "custom-commands/settings",
         ]);
-        cut.Find("a[href='points/settings']").GetAttribute("aria-current").ShouldBe("page");
+        cut.Find("a[href='twitch-operations/polls']").GetAttribute("aria-current").ShouldBe("page");
         cut.FindAll("nav a[href]")
             .Where(link => !link.ClassList.Contains("nav-menu__brand-link"))
             .ShouldAllBe(link => !string.IsNullOrWhiteSpace(link.GetAttribute("aria-label")));
@@ -147,12 +154,12 @@ public sealed class NavMenuInventoryTests
             cut.Find($"#{helpId}").GetAttribute("role").ShouldBe("tooltip");
         }
 
-        pointsButton.KeyDown("Escape");
+        nativeButton.KeyDown("Escape");
 
-        cut.Find("[data-nav-section='points'] button")
+        cut.Find("[data-nav-section='twitch-operations'] button")
             .GetAttribute("aria-expanded")
             .ShouldBe("false");
-        cut.Find($"#{pointsBodyId}").HasAttribute("hidden").ShouldBeTrue();
+        cut.Find($"#{nativeBodyId}").HasAttribute("hidden").ShouldBeTrue();
     }
 
     [Test]
@@ -197,6 +204,9 @@ public sealed class NavMenuInventoryTests
         module.Setup<bool>("readBoolean", "blokebot.sidebar.points.open", true).SetResult(true);
         module
             .Setup<bool>("readBoolean", "blokebot.sidebar.customcommands.open", true)
+            .SetResult(true);
+        module
+            .Setup<bool>("readBoolean", "blokebot.sidebar.nativetwitch.open", true)
             .SetResult(true);
     }
 }

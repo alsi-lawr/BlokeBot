@@ -7,9 +7,12 @@ public sealed record ClipMarkerDashboardState(
     IReadOnlyList<StreamMarkerView> Markers
 );
 
+public readonly record struct ClipAttemptReference(int Value);
+
+public readonly record struct StreamMarkerAttemptReference(int Value);
+
 public sealed record ClipView(
-    int Id,
-    string IdempotencyKey,
+    ClipAttemptReference Attempt,
     string Status,
     string? ProviderClipId,
     string? EditUrl,
@@ -22,8 +25,7 @@ public sealed record ClipView(
 );
 
 public sealed record StreamMarkerView(
-    int Id,
-    string IdempotencyKey,
+    StreamMarkerAttemptReference Attempt,
     string Status,
     string? ProviderMarkerId,
     string Description,

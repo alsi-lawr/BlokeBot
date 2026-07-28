@@ -148,19 +148,67 @@
 
                 @if (showNativeTwitch)
                 {
-                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
-                         data-nav-destination="twitch-operations">
-                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                                 ActiveClass="nav-menu__item-active"
-                                 href="twitch-operations"
-                                 aria-label="Native Twitch operations"
-                                 aria-describedby="@RouteHelpReference("twitch-operations")"
-                                 aria-current="@CurrentRoute("twitch-operations")"
-                                 @onclick="NotifyNavigatedAsync">
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="twitch-operations"
+                         data-open="@GroupIsOpen(NavigationGroup.NativeTwitch).ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Native Twitch"
+                                aria-describedby="@RouteHelpReference("twitch-operations-group")"
+                                aria-controls="@GroupBodyId(NavigationGroup.NativeTwitch)"
+                                aria-expanded="@GroupIsOpen(NavigationGroup.NativeTwitch).ToString().ToLowerInvariant()"
+                                aria-current="@CurrentGroup("twitch-operations")"
+                                data-current="@GroupIsCurrent("twitch-operations").ToString().ToLowerInvariant()"
+                                @onclick="() => ToggleGroupAsync(NavigationGroup.NativeTwitch)"
+                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.NativeTwitch, args)">
                             <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">✦</span>
-                            <span class="nav-menu__label min-w-0">Native Twitch operations</span>
-                        </NavLink>
-                        @RouteHelp("twitch-operations", "Native Twitch operations")
+                            <span class="nav-menu__label min-w-0 flex-1">Native Twitch</span>
+                            <span class="nav-menu__badge" aria-label="5 destinations">5</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @RouteHelp("twitch-operations-group", "Native Twitch")
+                        <div id="@GroupBodyId(NavigationGroup.NativeTwitch)"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!GroupIsOpen(NavigationGroup.NativeTwitch))">
+                            <p class="nav-menu__flyout-title">Native Twitch</p>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/shoutouts"
+                                     aria-label="Shoutouts"
+                                     aria-current="@CurrentRoute("twitch-operations/shoutouts", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">Shoutouts</NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/polls"
+                                     aria-label="Polls"
+                                     aria-current="@CurrentRoute("twitch-operations/polls", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">Polls</NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/clips-markers"
+                                     aria-label="Clips and markers"
+                                     aria-current="@CurrentRoute("twitch-operations/clips-markers", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">Clips &amp; markers</NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/channel-points"
+                                     aria-label="Rewards and redemptions"
+                                     aria-current="@CurrentRoute("twitch-operations/channel-points", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">Rewards &amp; redemptions</NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="twitch-operations/predictions"
+                                     aria-label="Predictions"
+                                     aria-current="@CurrentRoute("twitch-operations/predictions", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">Predictions</NavLink>
+                        </div>
                     </div>
                 }
 
