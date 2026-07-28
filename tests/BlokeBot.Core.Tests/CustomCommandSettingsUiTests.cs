@@ -126,8 +126,12 @@ public sealed class CustomCommandSettingsUiTests
         {
             var secondary = cut.Find($"#{contentId}").ParentElement?.ParentElement;
             secondary.ShouldNotBeNull();
-            secondary.ClassList.ShouldContain("md:col-span-2");
+            secondary.ClassList.ShouldContain("col-span-full");
+            secondary.ClassList.ShouldNotContain("md:col-span-2");
         }
+        cut.Find($"#announcement-{seeded.AnnouncementId}-delivery-timing-help")
+            .ClassList.ShouldContain("col-span-full");
+        cut.Markup.ShouldNotContain("xl:col-span-4");
         cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("0");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("61");

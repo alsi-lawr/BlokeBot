@@ -331,7 +331,7 @@
                                         </select>
                                         @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
-                                    <div class="space-y-2 md:col-span-2 xl:col-span-4">
+                                    <div class="space-y-2 col-span-full">
                                         <span class="label">Replies by argument count</span>
                                         <div class="grid gap-3 md:grid-cols-3">
                                             <div class="space-y-2">
@@ -661,7 +661,7 @@
                                             </select>
                                             @(ValidationMessageFor(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color)))
                                         </div>
-                                        <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 md:col-span-2 xl:col-span-4">
+                                        <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 col-span-full">
                                             <p>@TwitchAnnouncementCapabilityMessage(_config.TwitchAnnouncementReadiness)</p>
                                             @if (_config.TwitchAnnouncementReadiness.Availability != TwitchAnnouncementAvailability.Available)
                                             {
@@ -744,7 +744,7 @@
                                             <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
-                                    <div class="md:col-span-2" data-announcement-secondary="delivery-details">
+                                    <div class="col-span-full" data-announcement-secondary="delivery-details">
                                         <CollapsibleSection ContentId="custom-announcement-delivery-details"
                                                             Title="Delivery details"
                                                             Description="Retry policy and latest delivery"
@@ -779,8 +779,8 @@
                                         </CollapsibleSection>
                                     </div>
                                     <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
-                                       class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
-                                    <div class="md:col-span-2" data-announcement-secondary="delivery-history">
+                                       class="text-xs font-medium text-slate-500 col-span-full">These timings apply only when a scheduled send cannot happen.</p>
+                                    <div class="col-span-full" data-announcement-secondary="delivery-history">
                                         <CollapsibleSection ContentId="custom-announcement-delivery-history"
                                                             Title="Delivery history"
                                                             Description="Last send and latest result"
