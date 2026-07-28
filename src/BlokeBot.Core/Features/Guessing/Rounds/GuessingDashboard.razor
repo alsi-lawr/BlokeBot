@@ -47,21 +47,21 @@
             <button class="@TabClass(DashboardTab.Live)"
                     type="button"
                     role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.Live)"
+                    aria-selected="@(_activeTab == DashboardTab.Live ? "true" : "false")"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
             </button>
             <button class="@TabClass(DashboardTab.History)"
                     type="button"
                     role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.History)"
+                    aria-selected="@(_activeTab == DashboardTab.History ? "true" : "false")"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
             </button>
             <button class="@TabClass(DashboardTab.Leaderboard)"
                     type="button"
                     role="tab"
-                    aria-selected="@(_activeTab == DashboardTab.Leaderboard)"
+                    aria-selected="@(_activeTab == DashboardTab.Leaderboard ? "true" : "false")"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard
             </button>
@@ -106,7 +106,7 @@
                 }
                 else
                 {
-                    <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                    <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
@@ -122,12 +122,12 @@
                                 @foreach (var round in _recentRounds)
                                 {
                                     <tr @key="round.Id" class="motion-list__item">
-                                        <td class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.Lifecycle.WinningName</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.GuessCount</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.CorrectGuessCount</td>
-                                        <td class="px-5 py-3 text-muted-foreground">@round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
-                                        <td class="px-5 py-3 text-muted-foreground">@FormatEndedAt(round)</td>
+                                        <td data-label="Round" class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
+                                        <td data-label="Winner" class="px-5 py-3 text-slate-700">@round.Lifecycle.WinningName</td>
+                                        <td data-label="Guesses" class="px-5 py-3 text-slate-700">@round.GuessCount</td>
+                                        <td data-label="Correct" class="px-5 py-3 text-slate-700">@round.CorrectGuessCount</td>
+                                        <td data-label="Started" class="px-5 py-3 text-muted-foreground">@round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                        <td data-label="Ended" class="px-5 py-3 text-muted-foreground">@FormatEndedAt(round)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -193,7 +193,7 @@
                         </div>
                     </div>
 
-                    <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
+                    <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
                         @if (_leaderboard.Entries.Count == 0)
                         {
                             <div class="p-8 text-sm text-muted-foreground">No past guesses match these filters.</div>
@@ -215,12 +215,12 @@
                                     @foreach (var entry in _leaderboard.Entries)
                                     {
                                         <tr @key="entry" class="motion-list__item">
-                                            <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
-                                            <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
-                                            <td class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                            <td data-label="Rank" class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
+                                            <td data-label="Player" class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                            <td data-label="Correct" class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
+                                            <td data-label="Rounds" class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
+                                            <td data-label="Accuracy" class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
+                                            <td data-label="Latest" class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
                                         </tr>
                                     }
                                 </tbody>

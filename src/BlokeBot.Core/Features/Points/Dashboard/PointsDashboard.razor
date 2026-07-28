@@ -157,31 +157,38 @@
                 <h2 class="text-lg font-semibold text-slate-950">Recent changes</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
-            <div class="scroll-panel scroll-panel--data-table overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                            <th class="px-5 py-3 font-semibold">Time</th>
-                            <th class="px-5 py-3 font-semibold">Change</th>
-                            <th class="px-5 py-3 font-semibold">User</th>
-                            <th class="px-5 py-3 font-semibold">Amount</th>
-                            <th class="px-5 py-3 font-semibold">Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach (var entry in _state.RecentLedger)
-                        {
-                            <tr @key="entry" class="motion-list__item">
-                                <td class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
-                                <td class="px-5 py-3 font-medium text-slate-900">@LedgerChangeLabel(entry.Kind)</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.Login</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.Delta</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>
+            @if (_state.RecentLedger.Count == 0)
+            {
+                <div class="p-8 text-sm text-muted-foreground">No point changes yet.</div>
+            }
+            else
+            {
+                <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Time</th>
+                                <th class="px-5 py-3 font-semibold">Change</th>
+                                <th class="px-5 py-3 font-semibold">User</th>
+                                <th class="px-5 py-3 font-semibold">Amount</th>
+                                <th class="px-5 py-3 font-semibold">Balance</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var entry in _state.RecentLedger)
+                            {
+                                <tr @key="entry" class="motion-list__item">
+                                    <td data-label="Time" class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                    <td data-label="Change" class="px-5 py-3 font-medium text-slate-900">@LedgerChangeLabel(entry.Kind)</td>
+                                    <td data-label="User" class="px-5 py-3 text-slate-700">@entry.Login</td>
+                                    <td data-label="Amount" class="px-5 py-3 text-slate-700">@entry.Delta</td>
+                                    <td data-label="Balance" class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </section>
     }
 </div>

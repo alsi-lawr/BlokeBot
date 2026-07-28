@@ -67,7 +67,17 @@
     }
     else if (_state.HostId is { } hostId)
     {
-        <CollapsibleSection Title="@($"#{_state.DisplayName}")" Description="Connect the bot and start or stop it for your channel." InitiallyOpen="true">
+        <div id="bot-status"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Bot status"
+             tabindex="-1">
+        <CollapsibleSection Title="@($"#{_state.DisplayName}")"
+                            Description="Connect the bot and start or stop it for your channel."
+                            InitiallyOpen="true"
+                            OpenRequest="@_botStatusFragmentRequest"
+                            FocusElementId="bot-status"
+                            FocusRequest="@_botStatusFragmentRequest">
             <div class="grid gap-3 p-4 lg:grid-cols-4">
                 <div class="surface-muted rounded-lg px-3 py-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -185,6 +195,7 @@
                 </div>
             </div>
         </CollapsibleSection>
+        </div>
 
         <CollapsibleSection Title="Startup chat message" Description="Choose what the bot says when it joins this channel." InitiallyOpen="true">
             <div class="space-y-4 p-5">
@@ -270,7 +281,17 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Moderator help" Description="Choose which mods can view and change this channel." InitiallyOpen="true">
+        <div id="moderator-help"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Moderator help"
+             tabindex="-1">
+        <CollapsibleSection Title="Moderator help"
+                            Description="Choose which mods can view and change this channel."
+                            InitiallyOpen="true"
+                            OpenRequest="@_moderatorHelpFragmentRequest"
+                            FocusElementId="moderator-help"
+                            FocusRequest="@_moderatorHelpFragmentRequest">
             <div class="space-y-5 p-5">
                 <div class="space-y-2">
                     <label class="flex items-center gap-3 text-sm font-semibold text-foreground">
@@ -323,8 +344,19 @@
                 </div>
             </div>
         </CollapsibleSection>
+        </div>
 
-        <CollapsibleSection Title="Chat tools" Description="Turn on the bot tools you want in this channel." InitiallyOpen="true">
+        <div id="chat-tools"
+             class="host-config-fragment-target scroll-mt-24"
+             role="region"
+             aria-label="Chat tools"
+             tabindex="-1">
+        <CollapsibleSection Title="Chat tools"
+                            Description="Turn on the bot tools you want in this channel."
+                            InitiallyOpen="true"
+                            OpenRequest="@_chatToolsFragmentRequest"
+                            FocusElementId="chat-tools"
+                            FocusRequest="@_chatToolsFragmentRequest">
             <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                 @foreach (var feature in _state.Features)
                 {
@@ -349,5 +381,6 @@
                 }
             </div>
         </CollapsibleSection>
+        </div>
     }
 </div>

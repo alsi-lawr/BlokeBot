@@ -104,7 +104,49 @@ public sealed class AlertUiTests
 
         failFirstFactory.AttemptCount.ShouldBe(2);
         cut.FindAll("[role='alert']").ShouldBeEmpty();
-        cut.FindAll("h2").Select(heading => heading.TextContent.Trim()).ShouldContain("Active");
+        cut.FindAll("h2")
+            .Select(heading => heading.TextContent.Trim())
+            .ShouldContain("Active alerts");
+    }
+
+    [Test]
+    public async Task AlertsPage_NoActiveAlerts_RendersOneNamedFrameAndSemanticHistoryCards()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var alerts = context.Services.GetRequiredService<DurableAlertService>();
+        var alert = await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "test",
+                "history-card",
+                "Queue delayed",
+                "Outbound messages are delayed.",
+                null
+            )
+            .RunAsync(CancellationToken.None);
+        await alerts
+            .Acknowledge(hostId, alert.Alert.Id, "streamer")
+            .RunAsync(CancellationToken.None);
+
+        var cut = context.Render<AlertsPage>();
+
+        var active = cut.Find("section[aria-labelledby='active-alerts-title']");
+        active.ClassList.ShouldContain("card");
+        active
+            .QuerySelectorAll("h2")
+            .ShouldHaveSingleItem()
+            .TextContent.Trim()
+            .ShouldBe("Active alerts");
+        active.TextContent.ShouldContain("No active alerts.");
+
+        var history = cut.Find(".responsive-data-cards");
+        history
+            .QuerySelectorAll("td")
+            .Select(cell => cell.GetAttribute("data-label"))
+            .ShouldBe(["Alert", "Importance", "Handled by", "Handled at"]);
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)

@@ -5,16 +5,22 @@ using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
+using Microsoft.AspNetCore.Components.Routing;
 
 namespace BlokeBot.Core.Features.HostConfig.Page;
 
 public partial class HostConfigPage
 {
     private bool _blockedByMode;
+    private long _botStatusFragmentRequest;
+    private long _chatToolsFragmentRequest;
+    private long _moderatorHelpFragmentRequest;
     private HostConfigState? _state;
 
     protected override async Task OnInitializedAsync()
     {
+        _navigation.LocationChanged += OnLocationChanged;
+        RequestFragmentReveal(_navigation.Uri);
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
                 AppEventKind.HostedChannelsChanged,
@@ -101,6 +107,32 @@ public partial class HostConfigPage
         if (_runtimeLifecycle is not null)
         {
             _toasts.Publish(new ToastRequest<StatusToastStrategy>(_runtimeStatusMessage));
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            RequestFragmentReveal(args.Location);
+            StateHasChanged();
+        });
+    }
+
+    private void RequestFragmentReveal(string location)
+    {
+        var fragment = new Uri(location).Fragment.TrimStart('#');
+        switch (Uri.UnescapeDataString(fragment))
+        {
+            case "bot-status":
+                _botStatusFragmentRequest++;
+                break;
+            case "chat-tools":
+                _chatToolsFragmentRequest++;
+                break;
+            case "moderator-help":
+                _moderatorHelpFragmentRequest++;
+                break;
         }
     }
 }

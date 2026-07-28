@@ -8,6 +8,7 @@
 @import "./components/segmented-controls.css";
 @import "./features/home-and-feature-cards.css";
 @import "./features/points-dashboard.css";
+@import "./features/responsive-data-cards.css";
 @import "./utilities/motion-components.css";
 @import "./components/scroll-panels.css";
 @import "./components/controls.css";

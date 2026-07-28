@@ -63,6 +63,48 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
+    public async Task FragmentNavigation_RevealsNamedTargetWithoutDiscardingDirtyStartupMessage()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/host#bot-status");
+
+        var page = RenderHostConfigPage(context);
+
+        page.Find("#startup-chat-message").Change("unsaved startup message");
+        navigation.NavigateTo("/host#chat-tools");
+
+        page.WaitForAssertion(() =>
+        {
+            var chatTools = page.Find("#chat-tools");
+            chatTools.GetAttribute("role").ShouldBe("region");
+            chatTools.GetAttribute("aria-label").ShouldBe("Chat tools");
+            page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
+            page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
+            page.Find("#startup-chat-message")
+                .GetAttribute("value")
+                .ShouldBe("unsaved startup message");
+            module
+                .Invocations.Count(invocation =>
+                    invocation.Identifier == "focusElement"
+                    && invocation.Arguments.Single()?.ToString() == "chat-tools"
+                )
+                .ShouldBe(1);
+        });
+    }
+
+    [Test]
     public async Task UnavailableAuthority_PolicyModeRemainsUnchangedUntilSameChoiceCanBeSaved()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
