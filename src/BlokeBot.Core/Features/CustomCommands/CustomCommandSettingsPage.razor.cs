@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Toasts;
@@ -10,6 +12,16 @@ namespace BlokeBot.Core.Features.CustomCommands;
 
 public partial class CustomCommandSettingsPage
 {
+    private enum CustomCommandEditorKind
+    {
+        Reply,
+        Command,
+        Counter,
+        ScheduledMessage,
+    }
+
+    private sealed record CustomCommandEditorSelection(CustomCommandEditorKind Kind, int Id);
+
     private static readonly IReadOnlyList<CustomMessageSelectionMode> _messageSelectionModes =
         Enum.GetValues<CustomMessageSelectionMode>();
     private static readonly IReadOnlyList<CustomCommandCooldownScope> _cooldownScopes =
@@ -29,7 +41,10 @@ public partial class CustomCommandSettingsPage
         TimeZoneInfo.GetSystemTimeZones();
 
     private CustomCommandConfiguration? _config;
+    private string? _loadedConfigurationFingerprint;
+    private string? _loadFailureMessage;
     private bool _featureEnabled;
+    private bool _isLoading = true;
     private int _nextTemporaryId = -1;
     private IReadOnlyList<CustomCommandConfigurationValidationError> _validationErrors = [];
     private CustomCommandSettingsTab _activeTab;
@@ -37,15 +52,22 @@ public partial class CustomCommandSettingsPage
     private long _focusRequest;
     private CustomCommandSettingsTab? _pendingTabFocus;
     private string? _pendingControlFocusId;
+    private string? _editorFocusControlId;
+    private long _editorFocusRequest;
     private long _replySectionOpenRequest;
     private long _commandSectionOpenRequest;
+    private long _commandAdvancedOpenRequest;
+    private int? _commandAdvancedEntityId;
     private long _counterSectionOpenRequest;
     private long _announcementSectionOpenRequest;
+    private long _announcementAdvancedOpenRequest;
+    private int? _announcementAdvancedEntityId;
     private long _timeZoneSectionOpenRequest;
     private readonly Dictionary<string, ElementReference> _controls = [];
     private ElementReference _commandsTab;
     private ElementReference _messageLibraryTab;
     private int? _pendingResetAllCommandId;
+    private CustomCommandEditorSelection? _selectedEditor;
 
     protected override async Task OnInitializedAsync()
     {
@@ -60,9 +82,26 @@ public partial class CustomCommandSettingsPage
         await LoadAsync();
     }
 
-    private Task LoadAsync()
+    private async Task LoadAsync()
     {
-        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
+        _isLoading = true;
+        _loadFailureMessage = null;
+        try
+        {
+            await LoadCoreAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportUiFault(nameof(LoadAsync), exception);
+            _config = null;
+            _loadedConfigurationFingerprint = null;
+            _loadFailureMessage =
+                "BlokeBot could not load these settings. Check the connection and try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private async Task LoadCoreAsync()
@@ -83,6 +122,14 @@ public partial class CustomCommandSettingsPage
         _activeTab = CustomCommandSettingsTab.Commands;
         _focusTarget = null;
         _pendingResetAllCommandId = null;
+        _commandAdvancedEntityId = null;
+        _commandAdvancedOpenRequest = 0;
+        _announcementAdvancedEntityId = null;
+        _announcementAdvancedOpenRequest = 0;
+        EnsureEditorSelection();
+        _loadedConfigurationFingerprint = _config is null
+            ? null
+            : EditableConfigurationFingerprint(_config);
     }
 
     private Task SaveAsync()
@@ -139,6 +186,12 @@ public partial class CustomCommandSettingsPage
                         _nextTemporaryId = -1;
                         _validationErrors = [];
                         _focusTarget = null;
+                        _commandAdvancedEntityId = null;
+                        _commandAdvancedOpenRequest = 0;
+                        _announcementAdvancedEntityId = null;
+                        _announcementAdvancedOpenRequest = 0;
+                        EnsureEditorSelection();
+                        _loadedConfigurationFingerprint = EditableConfigurationFingerprint(_config);
                         _toasts.Publish(
                             new ToastRequest<SuccessToastStrategy>("Custom commands saved.")
                         );
@@ -184,6 +237,7 @@ public partial class CustomCommandSettingsPage
     private void ActivateTab(CustomCommandSettingsTab tab)
     {
         _activeTab = tab;
+        EnsureEditorSelection();
     }
 
     private void HandleTabKeyDown(KeyboardEventArgs args, CustomCommandSettingsTab currentTab)
@@ -202,6 +256,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _activeTab = tab;
+        EnsureEditorSelection();
         _pendingTabFocus = tab;
     }
 
@@ -219,9 +274,230 @@ public partial class CustomCommandSettingsPage
             : CustomCommandSettingsTab.MessageLibrary;
     }
 
+    private void SelectValidationEditor(CustomCommandConfigurationValidationTarget target)
+    {
+        var selection = target.EntityKind switch
+        {
+            CustomCommandValidationEntityKind.Reply or CustomCommandValidationEntityKind.Variant =>
+                new CustomCommandEditorSelection(CustomCommandEditorKind.Reply, target.EntityId),
+            CustomCommandValidationEntityKind.Command => new(
+                CustomCommandEditorKind.Command,
+                target.EntityId
+            ),
+            CustomCommandValidationEntityKind.Counter => new(
+                CustomCommandEditorKind.Counter,
+                target.EntityId
+            ),
+            CustomCommandValidationEntityKind.ScheduledMessage => new(
+                CustomCommandEditorKind.ScheduledMessage,
+                target.EntityId
+            ),
+            _ => null,
+        };
+        if (selection is not null)
+        {
+            _selectedEditor = selection;
+        }
+    }
+
+    private bool IsEditorOpen(CustomCommandEditorKind kind, int id)
+    {
+        return _selectedEditor is { Kind: var selectedKind, Id: var selectedId }
+            && selectedKind == kind
+            && selectedId == id;
+    }
+
+    private void SelectEditor(CustomCommandEditorKind kind, int id, string focusControlId)
+    {
+        _selectedEditor = new(kind, id);
+        _editorFocusControlId = focusControlId;
+        _editorFocusRequest++;
+    }
+
+    private void EnsureEditorSelection()
+    {
+        if (
+            _config is null
+            || _selectedEditor is { } selection
+                && EditorExists(selection)
+                && SelectionBelongsToActiveTab(selection)
+        )
+        {
+            return;
+        }
+
+        _selectedEditor = _activeTab switch
+        {
+            CustomCommandSettingsTab.MessageLibrary => _config.MessageEntries.FirstOrDefault()
+                is { } reply
+                ? new(CustomCommandEditorKind.Reply, reply.Id)
+                : null,
+            CustomCommandSettingsTab.Commands => _config.Commands.FirstOrDefault() is { } command
+                ? new(CustomCommandEditorKind.Command, command.Id)
+            : _config.Counters.FirstOrDefault() is { } counter
+                ? new(CustomCommandEditorKind.Counter, counter.Id)
+            : _config.Announcements.FirstOrDefault() is { } announcement
+                ? new(CustomCommandEditorKind.ScheduledMessage, announcement.Id)
+            : null,
+            _ => null,
+        };
+    }
+
+    private bool SelectionBelongsToActiveTab(CustomCommandEditorSelection selection)
+    {
+        return _activeTab switch
+        {
+            CustomCommandSettingsTab.MessageLibrary => selection.Kind
+                == CustomCommandEditorKind.Reply,
+            CustomCommandSettingsTab.Commands => selection.Kind
+                is CustomCommandEditorKind.Command
+                    or CustomCommandEditorKind.Counter
+                    or CustomCommandEditorKind.ScheduledMessage,
+            _ => false,
+        };
+    }
+
+    private bool EditorExists(CustomCommandEditorSelection selection)
+    {
+        return _config is not null
+            && selection.Kind switch
+            {
+                CustomCommandEditorKind.Reply => _config.MessageEntries.Any(x =>
+                    x.Id == selection.Id
+                ),
+                CustomCommandEditorKind.Command => _config.Commands.Any(x => x.Id == selection.Id),
+                CustomCommandEditorKind.Counter => _config.Counters.Any(x => x.Id == selection.Id),
+                CustomCommandEditorKind.ScheduledMessage => _config.Announcements.Any(x =>
+                    x.Id == selection.Id
+                ),
+                _ => false,
+            };
+    }
+
+    private long EditorFocusRequestFor(string controlId)
+    {
+        return _editorFocusControlId == controlId ? _editorFocusRequest : 0;
+    }
+
+    private static string InventoryLabelId(CustomCommandEditorKind kind, int id)
+    {
+        return $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-inventory-label";
+    }
+
+    private static string EditorRegionId(CustomCommandEditorKind kind, int id)
+    {
+        return $"custom-command-{kind.ToString().ToLowerInvariant()}-{id}-editor";
+    }
+
+    private long CommandAdvancedOpenRequest(int commandId)
+    {
+        return _commandAdvancedEntityId == commandId ? _commandAdvancedOpenRequest : 0;
+    }
+
+    private long AnnouncementAdvancedOpenRequest(int announcementId)
+    {
+        return _announcementAdvancedEntityId == announcementId
+            ? _announcementAdvancedOpenRequest
+            : 0;
+    }
+
+    private bool _hasChanges =>
+        _config is not null
+        && _loadedConfigurationFingerprint is not null
+        && EditableConfigurationFingerprint(_config) != _loadedConfigurationFingerprint;
+
+    private static string EditableConfigurationFingerprint(CustomCommandConfiguration config)
+    {
+        var result = new StringBuilder();
+
+        static void Append(StringBuilder builder, object? value)
+        {
+            var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            builder.Append(text.Length);
+            builder.Append(':');
+            builder.Append(text);
+            builder.Append('|');
+        }
+
+        Append(result, config.TimeZoneId);
+        foreach (var entry in config.MessageEntries)
+        {
+            Append(result, "reply");
+            Append(result, entry.Id);
+            Append(result, entry.Name);
+            Append(result, entry.SelectionMode);
+            Append(result, entry.CurrentVariantIndex);
+            foreach (var variant in entry.Variants)
+            {
+                Append(result, variant.Id);
+                Append(result, variant.Text);
+            }
+        }
+
+        foreach (var command in config.Commands)
+        {
+            Append(result, "command");
+            Append(result, command.Id);
+            Append(result, command.Name);
+            Append(result, command.Aliases);
+            Append(result, command.Enabled);
+            Append(result, command.ModeratorOnly);
+            Append(result, command.CooldownSeconds);
+            Append(result, command.CooldownScope);
+            Append(result, command.InvocationLimit);
+            Append(result, command.ActionKind);
+            Append(result, command.Action.ReplyRoutes.ZeroArgumentMessageLibraryEntryId);
+            Append(result, command.Action.ReplyRoutes.OneArgumentMessageLibraryEntryId);
+            Append(result, command.Action.ReplyRoutes.TwoArgumentMessageLibraryEntryId);
+            if (command.Action is CounterCustomCommandActionEditor counterAction)
+            {
+                Append(result, counterAction.CounterId);
+            }
+        }
+
+        foreach (var counter in config.Counters)
+        {
+            Append(result, "counter");
+            Append(result, counter.Id);
+            Append(result, counter.Name);
+            Append(result, counter.Value);
+        }
+
+        foreach (var announcement in config.Announcements)
+        {
+            Append(result, "announcement");
+            Append(result, announcement.Id);
+            Append(result, announcement.Name);
+            Append(result, announcement.Enabled);
+            Append(result, announcement.MessageLibraryEntryId);
+            Append(result, announcement.DeliveryType);
+            Append(result, announcement.AnnouncementColor);
+            Append(result, announcement.RetryDelaySeconds);
+            Append(result, announcement.OccurrenceLifetimeSeconds);
+            Append(result, announcement.ScheduleKind);
+            switch (announcement.Schedule)
+            {
+                case IntervalCustomAnnouncementScheduleEditor interval:
+                    Append(result, interval.IntervalMinutes);
+                    break;
+                case IntervalAfterChatCustomAnnouncementScheduleEditor intervalAfterChat:
+                    Append(result, intervalAfterChat.IntervalMinutes);
+                    Append(result, intervalAfterChat.RequiredChatMessages);
+                    break;
+                case WeeklyCustomAnnouncementScheduleEditor weekly:
+                    Append(result, weekly.Day);
+                    Append(result, weekly.Time);
+                    break;
+            }
+        }
+
+        return result.ToString();
+    }
+
     private void FocusValidationTarget(CustomCommandConfigurationValidationTarget target)
     {
         _activeTab = target.Tab;
+        SelectValidationEditor(target);
         OpenValidationSection(target);
         _focusTarget = target;
         _focusRequest++;
@@ -244,6 +520,17 @@ public partial class CustomCommandSettingsPage
                 EntityKind: CustomCommandValidationEntityKind.Command,
             }:
                 _commandSectionOpenRequest++;
+                if (
+                    target.FieldKind
+                    is CustomCommandValidationFieldKind.Cooldown
+                        or CustomCommandValidationFieldKind.CooldownScope
+                        or CustomCommandValidationFieldKind.InvocationLimit
+                        or CustomCommandValidationFieldKind.Counter
+                )
+                {
+                    _commandAdvancedEntityId = target.EntityId;
+                    _commandAdvancedOpenRequest++;
+                }
                 break;
             case {
                 Tab: CustomCommandSettingsTab.Commands,
@@ -256,6 +543,15 @@ public partial class CustomCommandSettingsPage
                 EntityKind: CustomCommandValidationEntityKind.ScheduledMessage,
             }:
                 _announcementSectionOpenRequest++;
+                if (
+                    target.FieldKind
+                    is CustomCommandValidationFieldKind.RetryDelay
+                        or CustomCommandValidationFieldKind.OccurrenceLifetime
+                )
+                {
+                    _announcementAdvancedEntityId = target.EntityId;
+                    _announcementAdvancedOpenRequest++;
+                }
                 break;
             case {
                 Tab: CustomCommandSettingsTab.Commands,
@@ -688,21 +984,22 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.MessageEntries.Add(
-            new CustomMessageLibraryEntryEditor
-            {
-                Id = NextTemporaryId(),
-                Name = "New reply",
-                Variants =
-                [
-                    new CustomMessageVariantEditor
-                    {
-                        Id = NextTemporaryId(),
-                        Text = "Type your reply here.",
-                    },
-                ],
-            }
-        );
+        var entry = new CustomMessageLibraryEntryEditor
+        {
+            Id = NextTemporaryId(),
+            Name = "New reply",
+            Variants =
+            [
+                new CustomMessageVariantEditor
+                {
+                    Id = NextTemporaryId(),
+                    Text = "Type your reply here.",
+                },
+            ],
+        };
+        _config.MessageEntries.Add(entry);
+        _activeTab = CustomCommandSettingsTab.MessageLibrary;
+        SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry));
     }
 
     private void RemoveMessageEntry(CustomMessageLibraryEntryEditor entry)
@@ -726,6 +1023,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.MessageEntries.Remove(entry);
+        EnsureEditorSelection();
     }
 
     private static bool CommandUsesReply(CustomCommandEditor command, int messageEntryId)
@@ -786,26 +1084,28 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.Commands.Add(
-            new CustomCommandEditor
+        var command = new CustomCommandEditor
+        {
+            Id = NextTemporaryId(),
+            Name = "New command",
+            Aliases = "newcommand",
+            Action = new MessageCustomCommandActionEditor
             {
-                Id = NextTemporaryId(),
-                Name = "New command",
-                Aliases = "newcommand",
-                Action = new MessageCustomCommandActionEditor
+                ReplyRoutes = new CustomCommandReplyRoutesEditor
                 {
-                    ReplyRoutes = new CustomCommandReplyRoutesEditor
-                    {
-                        ZeroArgumentMessageLibraryEntryId = _config.MessageEntries[0].Id,
-                    },
+                    ZeroArgumentMessageLibraryEntryId = _config.MessageEntries[0].Id,
                 },
-            }
-        );
+            },
+        };
+        _config.Commands.Add(command);
+        _activeTab = CustomCommandSettingsTab.Commands;
+        SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command));
     }
 
     private void RemoveCommand(CustomCommandEditor command)
     {
         _config?.Commands.Remove(command);
+        EnsureEditorSelection();
     }
 
     private Task ResetViewerAsync(CustomCommandEditor command)
@@ -927,9 +1227,10 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.Counters.Add(
-            new CustomCounterEditor { Id = NextTemporaryId(), Name = "New counter" }
-        );
+        var counter = new CustomCounterEditor { Id = NextTemporaryId(), Name = "New counter" };
+        _config.Counters.Add(counter);
+        _activeTab = CustomCommandSettingsTab.Commands;
+        SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter));
     }
 
     private void RemoveCounter(CustomCounterEditor counter)
@@ -955,6 +1256,7 @@ public partial class CustomCommandSettingsPage
         }
 
         _config.Counters.Remove(counter);
+        EnsureEditorSelection();
     }
 
     private void AddAnnouncement()
@@ -964,20 +1266,26 @@ public partial class CustomCommandSettingsPage
             return;
         }
 
-        _config.Announcements.Add(
-            new CustomAnnouncementEditor
-            {
-                Id = NextTemporaryId(),
-                Name = "New scheduled message",
-                MessageLibraryEntryId = _config.MessageEntries[0].Id,
-                Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
-            }
+        var announcement = new CustomAnnouncementEditor
+        {
+            Id = NextTemporaryId(),
+            Name = "New scheduled message",
+            MessageLibraryEntryId = _config.MessageEntries[0].Id,
+            Schedule = new IntervalCustomAnnouncementScheduleEditor { IntervalMinutes = 30 },
+        };
+        _config.Announcements.Add(announcement);
+        _activeTab = CustomCommandSettingsTab.Commands;
+        SelectEditor(
+            CustomCommandEditorKind.ScheduledMessage,
+            announcement.Id,
+            AnnouncementNameFieldId(announcement)
         );
     }
 
     private void RemoveAnnouncement(CustomAnnouncementEditor announcement)
     {
         _config?.Announcements.Remove(announcement);
+        EnsureEditorSelection();
     }
 
     private int NextTemporaryId()
@@ -990,6 +1298,28 @@ public partial class CustomCommandSettingsPage
         : _timeZones.FirstOrDefault(x => x.Id == _config.TimeZoneId) is { } timeZone
             ? TimeZoneLabel(timeZone)
         : _config.TimeZoneId;
+
+    private static string CommandAdvancedSummary(CustomCommandEditor command)
+    {
+        var summaries = new List<string>();
+        if (command.CooldownSeconds > 0)
+        {
+            summaries.Add($"{command.CooldownSeconds}s cooldown");
+        }
+        if (command.CooldownScope != CustomCommandCooldownScope.Global)
+        {
+            summaries.Add(CooldownScopeLabel(command.CooldownScope));
+        }
+        if (command.InvocationLimit != CustomCommandInvocationLimit.Unlimited)
+        {
+            summaries.Add(InvocationLimitLabel(command.InvocationLimit));
+        }
+        if (command.Action is CounterCustomCommandActionEditor counter)
+        {
+            summaries.Add($"Counter {counter.CounterId}");
+        }
+        return summaries.Count == 0 ? "Default settings" : string.Join(" · ", summaries);
+    }
 
     private static string CountLabel(int count, string singular)
     {
