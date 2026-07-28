@@ -116,6 +116,18 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find("#custom-command-commands-tab").Click();
         cut.Find("button[aria-controls='custom-announcement-settings']").Click();
         cut.Find("button[data-action='edit-scheduled-message']").Click();
+        foreach (
+            var contentId in new[]
+            {
+                "custom-announcement-delivery-details",
+                "custom-announcement-delivery-history",
+            }
+        )
+        {
+            var secondary = cut.Find($"#{contentId}").ParentElement?.ParentElement;
+            secondary.ShouldNotBeNull();
+            secondary.ClassList.ShouldContain("md:col-span-2");
+        }
         cut.Find("button[aria-controls='custom-announcement-delivery-details']").Click();
         cut.Find($"#announcement-{seeded.AnnouncementId}-retry-delay").Change("0");
         cut.Find($"#announcement-{seeded.AnnouncementId}-occurrence-lifetime").Change("61");
@@ -247,6 +259,43 @@ public sealed class CustomCommandSettingsUiTests
         cut.Find($"#command-{seeded.CommandId}-name")
             .GetAttribute("value")
             .ShouldBe("Unsaved command");
+    }
+
+    [Test]
+    public async Task RepeatedItemSelection_NameValidationStillIssuesANewerFocusRequest()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seeded = await SeedConfigurationAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, seeded.HostId);
+        var cut = context.Render<CustomCommandSettingsPage>();
+
+        for (var selection = 0; selection < 3; selection++)
+        {
+            cut.Find("button[data-action='edit-counter']").Click();
+            cut.Find("button[data-action='edit-command']").Click();
+        }
+
+        var name = cut.Find($"#command-{seeded.CommandId}-name");
+        name.Input(string.Empty);
+        var focusCountBeforeValidation = context.JSInterop.Invocations.Count(invocation =>
+            invocation.Identifier == "Blazor._internal.domWrapper.focus"
+        );
+        var expectedNameReference = context
+            .JSInterop.Invocations.Last(invocation =>
+                invocation.Identifier == "Blazor._internal.domWrapper.focus"
+            )
+            .Arguments[0];
+
+        cut.Find("button[aria-label='Save custom commands']").Click();
+
+        var focusInvocations = context
+            .JSInterop.Invocations.Where(invocation =>
+                invocation.Identifier == "Blazor._internal.domWrapper.focus"
+            )
+            .ToArray();
+        focusInvocations.Length.ShouldBe(focusCountBeforeValidation + 1);
+        focusInvocations[^1].Arguments[0].ShouldBe(expectedNameReference);
+        cut.Find($"#command-{seeded.CommandId}-name").GetAttribute("aria-invalid").ShouldBe("true");
     }
 
     [Test]

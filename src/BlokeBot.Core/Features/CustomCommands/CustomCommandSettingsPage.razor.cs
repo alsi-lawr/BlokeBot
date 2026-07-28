@@ -49,11 +49,10 @@ public partial class CustomCommandSettingsPage
     private IReadOnlyList<CustomCommandConfigurationValidationError> _validationErrors = [];
     private CustomCommandSettingsTab _activeTab;
     private CustomCommandConfigurationValidationTarget? _focusTarget;
-    private long _focusRequest;
+    private long _fieldFocusRequest;
     private CustomCommandSettingsTab? _pendingTabFocus;
     private string? _pendingControlFocusId;
     private string? _editorFocusControlId;
-    private long _editorFocusRequest;
     private long _replySectionOpenRequest;
     private long _commandSectionOpenRequest;
     private long _commandAdvancedOpenRequest;
@@ -311,7 +310,7 @@ public partial class CustomCommandSettingsPage
     {
         _selectedEditor = new(kind, id);
         _editorFocusControlId = focusControlId;
-        _editorFocusRequest++;
+        _fieldFocusRequest++;
     }
 
     private void EnsureEditorSelection()
@@ -376,7 +375,7 @@ public partial class CustomCommandSettingsPage
 
     private long EditorFocusRequestFor(string controlId)
     {
-        return _editorFocusControlId == controlId ? _editorFocusRequest : 0;
+        return _editorFocusControlId == controlId ? _fieldFocusRequest : 0;
     }
 
     private static string InventoryLabelId(CustomCommandEditorKind kind, int id)
@@ -500,7 +499,7 @@ public partial class CustomCommandSettingsPage
         SelectValidationEditor(target);
         OpenValidationSection(target);
         _focusTarget = target;
-        _focusRequest++;
+        _fieldFocusRequest++;
         _pendingControlFocusId = ValidationControlId(target);
     }
 
@@ -834,7 +833,7 @@ public partial class CustomCommandSettingsPage
 
     private long FocusRequestFor(CustomCommandConfigurationValidationTarget target)
     {
-        return _focusTarget == target ? _focusRequest : 0;
+        return _focusTarget == target ? _fieldFocusRequest : 0;
     }
 
     private IReadOnlyDictionary<string, object> ValidationAttributes(

@@ -684,40 +684,6 @@
                                         </select>
                                         @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
                                     </div>
-                                    <CollapsibleSection ContentId="custom-announcement-delivery-details"
-                                                        Title="Delivery details"
-                                                        Description="Retry policy and latest delivery"
-                                                        InitiallyOpen="false"
-                                                        OpenRequest="@AnnouncementAdvancedOpenRequest(announcement.Id)">
-                                        <div class="grid gap-3 p-4 md:grid-cols-2">
-                                    <div class="space-y-2">
-                                        <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
-                                        <input id="@AnnouncementRetryDelayFieldId(announcement)"
-                                               class="input"
-                                               type="number"
-                                               min="1"
-                                               max="59"
-                                               @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
-                                               @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
-                                               @bind="announcement.RetryDelaySeconds" />
-                                        @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
-                                        <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
-                                               class="input"
-                                               type="number"
-                                               min="1"
-                                               max="60"
-                                               @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
-                                               @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
-                                               @bind="announcement.OccurrenceLifetimeSeconds" />
-                                        @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
-                                    </div>
-                                        </div>
-                                    </CollapsibleSection>
-                                    <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
-                                       class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">
@@ -778,25 +744,63 @@
                                             <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
-                                    <CollapsibleSection ContentId="custom-announcement-delivery-history"
-                                                        Title="Delivery history"
-                                                        Description="Last send and latest result"
-                                                        InitiallyOpen="false">
-                                        <div class="grid gap-3 p-4 md:grid-cols-3">
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
+                                    <div class="md:col-span-2" data-announcement-secondary="delivery-details">
+                                        <CollapsibleSection ContentId="custom-announcement-delivery-details"
+                                                            Title="Delivery details"
+                                                            Description="Retry policy and latest delivery"
+                                                            InitiallyOpen="false"
+                                                            OpenRequest="@AnnouncementAdvancedOpenRequest(announcement.Id)">
+                                            <div class="grid gap-3 p-4 md:grid-cols-2">
+                                                <div class="space-y-2">
+                                                    <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
+                                                    <input id="@AnnouncementRetryDelayFieldId(announcement)"
+                                                           class="input"
+                                                           type="number"
+                                                           min="1"
+                                                           max="59"
+                                                           @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
+                                                           @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
+                                                           @bind="announcement.RetryDelaySeconds" />
+                                                    @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
+                                                    <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
+                                                           class="input"
+                                                           type="number"
+                                                           min="1"
+                                                           max="60"
+                                                           @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
+                                                           @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
+                                                           @bind="announcement.OccurrenceLifetimeSeconds" />
+                                                    @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
+                                                </div>
                                             </div>
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                        </CollapsibleSection>
+                                    </div>
+                                    <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
+                                       class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
+                                    <div class="md:col-span-2" data-announcement-secondary="delivery-history">
+                                        <CollapsibleSection ContentId="custom-announcement-delivery-history"
+                                                            Title="Delivery history"
+                                                            Description="Last send and latest result"
+                                                            InitiallyOpen="false">
+                                            <div class="grid gap-3 p-4 md:grid-cols-3">
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
+                                                </div>
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                                </div>
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
+                                                </div>
                                             </div>
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
-                                            </div>
-                                        </div>
-                                    </CollapsibleSection>
+                                        </CollapsibleSection>
+                                    </div>
                                 </div>
                             </section>
                         }
