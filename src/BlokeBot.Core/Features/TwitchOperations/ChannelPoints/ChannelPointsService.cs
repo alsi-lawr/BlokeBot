@@ -302,8 +302,11 @@ public sealed class ChannelPointsService(
             : TwitchRewardRedemptionStatus.Canceled;
         redemption.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
-        await TrimTerminalAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
+        if (await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            await TrimTerminalAsync(db, hostId, ct);
+            await db.SaveChangesAsync(ct);
+        }
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return new ChannelPointsOperationOutcome.RedemptionUpdated();
     }

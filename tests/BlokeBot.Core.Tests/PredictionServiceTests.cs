@@ -155,6 +155,73 @@ public sealed class PredictionServiceTests
         ).ShouldBe(HostFeatureFlags.None);
     }
 
+    [Test]
+    [Arguments(true, 102, 101)]
+    [Arguments(false, 100, 99)]
+    public async Task ProviderAcceptedPredictionEnd_PersistsOutcomeAndOnlyTrimsWhileEnabled(
+        bool disableAfterProvider,
+        int expectedTotal,
+        int expectedHistory
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            for (var index = 0; index < 101; index++)
+            {
+                db.TwitchPredictions.Add(
+                    new TwitchPrediction
+                    {
+                        HostId = host.Id,
+                        ProviderPredictionId = $"history-{index:D3}",
+                        Title = "History",
+                        OutcomesJson = "[]",
+                        Status = TwitchPredictionStatus.Resolved,
+                        CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                        EndedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
+                        UpdatedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
+                    }
+                );
+            }
+            db.TwitchPredictions.Add(
+                new TwitchPrediction
+                {
+                    HostId = host.Id,
+                    ProviderPredictionId = "prediction-id",
+                    Title = "Question",
+                    OutcomesJson =
+                        """[{"Id":"yes","Title":"Yes","Color":"BLUE","Users":1,"ChannelPoints":100,"TopPredictors":[]}]""",
+                    Status = TwitchPredictionStatus.Active,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var handler = new PredictionHandler
+        {
+            BroadcasterType = "affiliate",
+            AfterPredictionEnded = disableAfterProvider
+                ? () => SetNativeAsync(database, false)
+                : null,
+        };
+        var service = CreateService(database, handler);
+
+        var outcome = await service.ResolveAsync(host.Id, "yes", true, CancellationToken.None);
+
+        outcome.ShouldBeOfType<PredictionOperationOutcome.Updated>();
+        await using var verify = await database.CreateDbContextAsync();
+        var predictions = await verify.TwitchPredictions.ToArrayAsync();
+        predictions.Length.ShouldBe(expectedTotal);
+        predictions
+            .Single(value => value.ProviderPredictionId == "prediction-id")
+            .Status.ShouldBe(TwitchPredictionStatus.Resolved);
+        predictions
+            .Count(value => value.ProviderPredictionId.StartsWith("history-"))
+            .ShouldBe(expectedHistory);
+    }
+
     private static PredictionTemplateDraft ValidTemplate()
     {
         return new("Question", ["Yes", "No"], 60);
@@ -271,6 +338,7 @@ public sealed class PredictionServiceTests
     {
         public string BroadcasterType { get; set; } = string.Empty;
         public Func<Task>? AfterPredictionCreated { get; init; }
+        public Func<Task>? AfterPredictionEnded { get; init; }
         public List<(HttpMethod Method, string Query)> Requests { get; } = [];
         public List<string> PatchBodies { get; } = [];
 
@@ -289,6 +357,10 @@ public sealed class PredictionServiceTests
             if (request.Method == HttpMethod.Patch)
             {
                 PatchBodies.Add(await request.Content!.ReadAsStringAsync(ct));
+                if (AfterPredictionEnded is not null)
+                {
+                    await AfterPredictionEnded();
+                }
                 return Json(Prediction("RESOLVED"));
             }
             if (request.Method == HttpMethod.Post && AfterPredictionCreated is not null)

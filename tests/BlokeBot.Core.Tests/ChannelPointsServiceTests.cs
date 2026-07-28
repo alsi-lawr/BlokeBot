@@ -233,6 +233,97 @@ public sealed class ChannelPointsServiceTests
         ).ShouldBe(HostFeatureFlags.None);
     }
 
+    [Test]
+    [Arguments(true, 102, 101)]
+    [Arguments(false, 100, 99)]
+    public async Task ProviderAcceptedRedemption_PersistsOutcomeAndOnlyTrimsWhileEnabled(
+        bool disableAfterProvider,
+        int expectedTotal,
+        int expectedHistory
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            db.TwitchCustomRewards.Add(
+                new TwitchCustomReward
+                {
+                    HostId = 1,
+                    ProviderRewardId = "managed",
+                    Title = "Managed",
+                    Cost = 100,
+                    IsManageable = true,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            for (var index = 0; index < 101; index++)
+            {
+                db.TwitchRewardRedemptions.Add(
+                    new TwitchRewardRedemption
+                    {
+                        HostId = 1,
+                        ProviderRedemptionId = $"history-{index:D3}",
+                        ProviderRewardId = "managed",
+                        RewardTitle = "Managed",
+                        UserId = $"viewer-{index:D3}",
+                        UserLogin = $"viewer-{index:D3}",
+                        Status = TwitchRewardRedemptionStatus.Fulfilled,
+                        RedeemedAtUtc = DateTime.UtcNow.AddMinutes(-index - 1),
+                        UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-index - 1),
+                    }
+                );
+            }
+            db.TwitchRewardRedemptions.Add(
+                new TwitchRewardRedemption
+                {
+                    HostId = 1,
+                    ProviderRedemptionId = "redemption",
+                    ProviderRewardId = "managed",
+                    RewardTitle = "Managed",
+                    UserId = "viewer",
+                    UserLogin = "viewer",
+                    Status = TwitchRewardRedemptionStatus.Unfulfilled,
+                    RedeemedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ChannelPointsHttpClientFactory
+        {
+            AfterRedemptionUpdated = disableAfterProvider
+                ? () => SetNativeAsync(dbFactory, false)
+                : null,
+        };
+        var service = CreateService(dbFactory, http);
+
+        var outcome = await service.UpdateRedemptionAsync(
+            1,
+            "redemption",
+            true,
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var redemptions = await verify.TwitchRewardRedemptions.ToArrayAsync();
+        redemptions.Length.ShouldBe(expectedTotal);
+        redemptions
+            .Single(value => value.ProviderRedemptionId == "redemption")
+            .Status.ShouldBe(TwitchRewardRedemptionStatus.Fulfilled);
+        redemptions
+            .Count(value => value.ProviderRedemptionId.StartsWith("history-"))
+            .ShouldBe(expectedHistory);
+    }
+
     private static ChannelPointsService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         ChannelPointsHttpClientFactory http
@@ -341,6 +432,7 @@ public sealed class ChannelPointsServiceTests
     {
         internal int Requests { get; private set; }
         internal Func<Task>? AfterRewardCreated { get; init; }
+        internal Func<Task>? AfterRedemptionUpdated { get; init; }
         internal int RedemptionPatches { get; private set; }
         internal bool ReturnIneligibleCustomRewards { get; set; }
         internal int AllRewardsLists { get; private set; }
@@ -411,6 +503,10 @@ public sealed class ChannelPointsServiceTests
                     using var document = JsonDocument.Parse(body);
                     document.RootElement.EnumerateObject().Select(x => x.Name).ShouldBe(["status"]);
                     document.RootElement.GetProperty("status").GetString().ShouldBe("FULFILLED");
+                    if (owner.AfterRedemptionUpdated is not null)
+                    {
+                        await owner.AfterRedemptionUpdated();
+                    }
                     return Json("""{"data":[]}""");
                 }
                 throw new InvalidOperationException(

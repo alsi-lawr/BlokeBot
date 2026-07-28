@@ -359,12 +359,10 @@ public sealed class PredictionService(
             updated.Prediction,
             active.IsExternallyStarted
         ).Prediction;
-        if (Terminal(prediction.Status))
+        await db.SaveChangesAsync(ct);
+        if (Terminal(prediction.Status) && await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
-            await SaveAndTrimAsync(db, hostId, ct);
-        }
-        else
-        {
+            await TrimAsync(db, hostId, ct);
             await db.SaveChangesAsync(ct);
         }
         await ChangedAsync(ct);
