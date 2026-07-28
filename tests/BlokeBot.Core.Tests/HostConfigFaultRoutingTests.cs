@@ -78,30 +78,32 @@ public sealed class HostConfigFaultRoutingTests
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
         module.SetupVoid("focusElement", _ => true).SetVoidResult();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
-        navigation.NavigateTo("/host#bot-status");
+        navigation.NavigateTo("/host");
 
         var page = RenderHostConfigPage(context);
 
-        page.Find("#startup-chat-message").Change("unsaved startup message");
-        navigation.NavigateTo("/host#chat-tools");
-
-        page.WaitForAssertion(() =>
+        page.Find("#startup-chat-message").Input("unsaved startup message");
+        foreach (var fragment in new[] { "chat-tools", "moderator-help", "bot-status" })
         {
-            var chatTools = page.Find("#chat-tools");
-            chatTools.GetAttribute("role").ShouldBe("region");
-            chatTools.GetAttribute("aria-label").ShouldBe("Chat tools");
-            page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
-            page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
-            page.Find("#startup-chat-message")
-                .GetAttribute("value")
-                .ShouldBe("unsaved startup message");
-            module
-                .Invocations.Count(invocation =>
-                    invocation.Identifier == "focusElement"
-                    && invocation.Arguments.Single()?.ToString() == "chat-tools"
-                )
-                .ShouldBe(1);
-        });
+            navigation.NavigateTo($"/host#{fragment}");
+
+            page.WaitForAssertion(() =>
+            {
+                page.Find("#startup-chat-message")
+                    .GetAttribute("value")
+                    .ShouldBe("unsaved startup message");
+                module
+                    .Invocations.Count(invocation =>
+                        invocation.Identifier == "focusElement"
+                        && invocation.Arguments.Single()?.ToString() == fragment
+                    )
+                    .ShouldBe(1);
+            });
+        }
+
+        page.Find("#chat-tools").GetAttribute("aria-label").ShouldBe("Chat tools");
+        page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
+        page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
     }
 
     [Test]

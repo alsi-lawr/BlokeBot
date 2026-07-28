@@ -212,7 +212,8 @@
                               class="input min-h-24 w-full"
                               maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
                               disabled="@(!_startupMessageEnabled)"
-                              @bind="_startupMessageText"></textarea>
+                              @bind="_startupMessageText"
+                              @bind:event="oninput"></textarea>
                     <p class="text-xs font-medium text-slate-500">
                         This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
                     </p>
