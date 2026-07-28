@@ -45,6 +45,7 @@
             .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
             .FirstOrDefault();
 
+        <div class="settings-disclosure-stack">
         <CollapsibleSection Title="General" Description="What points are called and how gambling works." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
@@ -164,5 +165,6 @@
         <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                       WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                       Options="_whisperReplyOptions" />
+        </div>
     }
 </div>

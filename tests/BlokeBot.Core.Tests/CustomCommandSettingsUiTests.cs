@@ -22,6 +22,7 @@ public sealed class CustomCommandSettingsUiTests
 
         var cut = context.Render<CustomCommandSettingsPage>();
 
+        cut.FindAll(".settings-disclosure-stack").Count.ShouldBe(2);
         var actionSelect = cut.Find($"#command-{seeded.CommandId}-action-kind");
         var reply = cut.Find($"#command-{seeded.CommandId}-0-argument-reply");
         reply.GetAttribute("aria-invalid").ShouldBeNull();

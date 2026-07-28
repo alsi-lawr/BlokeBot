@@ -24,6 +24,7 @@ public sealed class PointsConfigurationUiTests
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<PointsConfigurationPage>();
 
+        page.FindAll(".settings-disclosure-stack").Count.ShouldBe(1);
         page.Find("#gamblingCooldown").GetAttribute("value").ShouldBe("-4");
         page.Find("#duration").GetAttribute("value").ShouldBe("0");
         page.Find("#winnerCount").GetAttribute("value").ShouldBe("0");

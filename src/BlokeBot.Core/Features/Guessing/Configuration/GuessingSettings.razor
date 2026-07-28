@@ -32,6 +32,7 @@
     }
     else
     {
+        <div class="settings-disclosure-stack">
         <div id="profiles">
             <ProfileSettingsSection Configuration="_config"
                                     CreateProfile="CreateProfileAsync"
@@ -40,7 +41,7 @@
                                     @bind-NewProfileName="_newProfileName" />
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div class="settings-disclosure-stack xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div id="aliases">
                 <CommandAliasSettingsSection Aliases="_config.Aliases" />
             </div>
@@ -52,12 +53,12 @@
                                          RemoveOption="RemoveOption" />
         </div>
 
-        <div id="replies">
+        <div id="replies" class="settings-disclosure-stack">
             <ReplySettingsSection Replies="_config.Profile.Replies" />
             <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                           WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                           Options="_whisperReplyOptions" />
-            <section class="card mt-6 space-y-4 p-6" aria-labelledby="round-start-pin-title">
+            <section class="card space-y-4 p-6" aria-labelledby="round-start-pin-title">
                 <div>
                     <h2 id="round-start-pin-title" class="text-lg font-bold">Round start pin</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Pin the confirmed round-start reply in Twitch chat.</p>
@@ -78,6 +79,7 @@
                     </label>
                 }
             </section>
+        </div>
         </div>
     }
 </div>

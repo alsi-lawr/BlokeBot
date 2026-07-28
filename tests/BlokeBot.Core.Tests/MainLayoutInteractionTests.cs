@@ -385,6 +385,40 @@ public sealed class SharedPageContractTests
         );
     }
 
+    [Test]
+    public void SettingsDisclosureStack_WithAdjacentPanels_UsesTwelvePixelGapContract()
+    {
+        using var context = new BunitContext();
+        RenderFragment stack = builder =>
+            builder.AddMarkupContent(
+                0,
+                """
+                <div class="settings-disclosure-stack">
+                    <section class="disclosure-panel">General</section>
+                    <section class="disclosure-panel">Chat commands</section>
+                </div>
+                """
+            );
+
+        var cut = context.Render(stack);
+        var pageContextStyles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "components",
+            "page-context.css"
+        );
+        var normalizedStyles = string.Join(
+            " ",
+            pageContextStyles.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        );
+
+        cut.FindAll(".settings-disclosure-stack > .disclosure-panel").Count.ShouldBe(2);
+        normalizedStyles.ShouldContain(
+            ".settings-disclosure-stack { display: grid; gap: 0.75rem; }"
+        );
+    }
+
     private static string ReadRepositoryFile(params string[] relativePath)
     {
         for (
