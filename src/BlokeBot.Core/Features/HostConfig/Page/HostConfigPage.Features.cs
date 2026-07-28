@@ -98,17 +98,30 @@ public partial class HostConfigPage
         bool enabled
     )
     {
-        if (enabled)
+        var startupMessageEnabled = _startupMessageEnabled;
+        var startupMessageText = _startupMessageText;
+        try
         {
-            await _features.EnableAsync(hostId, feature, CancellationToken.None);
-        }
-        else
-        {
-            await _features.DisableAsync(hostId, feature, CancellationToken.None);
-        }
+            if (enabled)
+            {
+                await _features.EnableAsync(hostId, feature, CancellationToken.None);
+            }
+            else
+            {
+                await _features.DisableAsync(hostId, feature, CancellationToken.None);
+            }
 
-        await LoadCoreAsync();
-        ToastFeatureChange(feature, enabled);
+            await LoadCoreAsync();
+            ToastFeatureChange(feature, enabled);
+        }
+        finally
+        {
+            if (_state?.HostId == hostId)
+            {
+                _startupMessageEnabled = startupMessageEnabled;
+                _startupMessageText = startupMessageText;
+            }
+        }
     }
 
     private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)

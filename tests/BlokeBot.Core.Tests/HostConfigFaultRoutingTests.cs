@@ -143,12 +143,17 @@ public sealed class HostConfigFaultRoutingTests
                 "Use shoutouts, polls, clips, and stream markers."
             );
         });
+        page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
         await page.InvokeAsync(() => FindNativeTwitchFeatureButton(page).ClickAsync(new()));
 
         page.WaitForAssertion(() =>
-            FindNativeTwitchFeatureButton(page).HasAttribute("aria-pressed").ShouldBeFalse()
-        );
+        {
+            FindNativeTwitchFeatureButton(page).HasAttribute("aria-pressed").ShouldBeFalse();
+            page.Find("#startup-chat-message")
+                .GetAttribute("value")
+                .ShouldBe("unsaved Native switch draft");
+        });
         await using var verify = await dbFactory.CreateDbContextAsync();
         var enabled = await verify
             .Hosts.Where(host => host.Id == hostId)
