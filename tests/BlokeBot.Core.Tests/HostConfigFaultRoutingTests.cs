@@ -77,15 +77,25 @@ public sealed class HostConfigFaultRoutingTests
         );
         var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
         module.SetupVoid("focusElement", _ => true).SetVoidResult();
+        var fragmentModule = context.JSInterop.SetupModule(
+            "./Features/HostConfig/Page/HostConfigFragmentObserver.razor.js"
+        );
+        fragmentModule.SetupVoid("observe", _ => true).SetVoidResult();
+        fragmentModule.SetupVoid("dispose", _ => true).SetVoidResult();
         var navigation = context.Services.GetRequiredService<NavigationManager>();
         navigation.NavigateTo("/host");
 
         var page = RenderHostConfigPage(context);
+        var observer = page.FindComponent<HostConfigFragmentObserver>();
 
         page.Find("#startup-chat-message").Input("unsaved startup message");
         foreach (var fragment in new[] { "chat-tools", "moderator-help", "bot-status" })
         {
-            navigation.NavigateTo($"/host#{fragment}");
+            await observer.InvokeAsync(() =>
+                observer.Instance.NotifyFragmentChangedAsync(
+                    $"http://localhost/host?simulationTheme=light#{fragment}"
+                )
+            );
 
             page.WaitForAssertion(() =>
             {
@@ -104,6 +114,9 @@ public sealed class HostConfigFaultRoutingTests
         page.Find("#chat-tools").GetAttribute("aria-label").ShouldBe("Chat tools");
         page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
         page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
+        fragmentModule
+            .Invocations.Count(invocation => invocation.Identifier == "observe")
+            .ShouldBe(1);
     }
 
     [Test]

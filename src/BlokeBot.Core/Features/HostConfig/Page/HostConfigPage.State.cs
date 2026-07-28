@@ -119,6 +119,13 @@ public partial class HostConfigPage
         });
     }
 
+    private Task OnNativeFragmentChangedAsync(string location)
+    {
+        RequestFragmentReveal(location);
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
     private void RequestFragmentReveal(string location)
     {
         var fragment = new Uri(location).Fragment.TrimStart('#');
