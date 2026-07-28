@@ -15,7 +15,21 @@
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
     </PageHeader>
 
-    @if (Host is null)
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure"
+                   Title="We couldn’t load alerts"
+                   Description="BlokeBot couldn’t load alerts for this channel.">
+            <Actions>
+                <button type="button"
+                        class="btn-primary"
+                        @onclick="RetryLoadAsync">
+                    Retry
+                </button>
+            </Actions>
+        </PageState>
+    }
+    else if (Host is null)
     {
         <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }

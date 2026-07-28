@@ -346,4 +346,62 @@ public sealed class SharedPageContractTests
         region.Find("[role='region']").GetAttribute("aria-label").ShouldBe("Channel history");
         region.Find("[role='region']").GetAttribute("tabindex").ShouldBe("0");
     }
+
+    [Test]
+    public void MobileFieldRow_WithAdjacentAction_ExposesFullRowFieldContract()
+    {
+        using var context = new BunitContext();
+        RenderFragment fieldRow = builder =>
+        {
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "field-row");
+            builder.OpenComponent<Field>(2);
+            builder.AddAttribute(3, nameof(Field.Id), "channel");
+            builder.AddAttribute(4, nameof(Field.Label), "Channel");
+            builder.CloseComponent();
+            builder.OpenElement(5, "button");
+            builder.AddContent(6, "Connect");
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+        var cut = context.Render(fieldRow);
+        var controlsStyles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "components",
+            "controls.css"
+        );
+        var normalizedStyles = string.Join(
+            " ",
+            controlsStyles.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        );
+
+        cut.Find(".field-row > .field").ClassList.ShouldContain("field");
+        cut.Find(".field-row > .field + button").TextContent.ShouldBe("Connect");
+        normalizedStyles.ShouldContain(
+            "@media (max-width: 30rem) { .field { flex-basis: 100%; min-width: 100%; width: 100%; }"
+        );
+    }
+
+    private static string ReadRepositoryFile(params string[] relativePath)
+    {
+        for (
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent
+        )
+        {
+            var candidate = Path.Combine([directory.FullName, .. relativePath]);
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+        }
+
+        throw new FileNotFoundException(
+            $"Could not find repository file '{Path.Combine(relativePath)}'."
+        );
+    }
 }

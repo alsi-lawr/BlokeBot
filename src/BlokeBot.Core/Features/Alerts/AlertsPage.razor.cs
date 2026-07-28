@@ -8,6 +8,7 @@ public partial class AlertsPage
 {
     private DurableAlertState? _state;
     private bool _canAcknowledge;
+    private bool _loadFailed;
 
     private string _activeSummary =>
         _state?.ActiveCount switch
@@ -54,14 +55,34 @@ public partial class AlertsPage
 
     private async Task LoadAsync()
     {
-        await LoadPageContextAsync();
-        _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
-        _state = HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
+        _loadFailed = false;
+        _state = null;
+
+        try
+        {
+            await LoadPageContextAsync();
+            _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
+            _state =
+                HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _canAcknowledge = false;
+            _loadFailed = true;
+            ReportUiFault(nameof(LoadAsync), exception);
+        }
     }
 
     private Task RefreshAsync()
     {
         return LoadAsync();
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        _loadFailed = false;
+        await InvokeAsync(StateHasChanged);
+        await LoadAsync();
     }
 
     private static string FormatTimestamp(DateTime? value)
