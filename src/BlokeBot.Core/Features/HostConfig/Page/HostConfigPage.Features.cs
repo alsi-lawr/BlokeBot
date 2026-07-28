@@ -35,6 +35,7 @@ public partial class HostConfigPage
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
                 HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
+                HostFeatureFlags.NativeTwitch => "feature-toggle-card__icon text-purple-700",
                 _ => "feature-toggle-card__icon text-blue-600",
             }
             : "feature-toggle-card__icon text-slate-500";
@@ -67,6 +68,11 @@ public partial class HostConfigPage
                     <path d="M4 12h10" />
                     <path d="M4 17h7" />
                     <path d="m16 14 3 3-3 3" />
+                </svg>
+                """,
+                HostFeatureFlags.NativeTwitch => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m13 2-7 11h6l-1 9 7-12h-6l1-8Z" />
                 </svg>
                 """,
                 _ => string.Empty,
@@ -133,6 +139,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.CustomCommands => "Custom commands",
+            HostFeatureFlags.NativeTwitch => "Native Twitch",
             _ => "Feature",
         };
     }

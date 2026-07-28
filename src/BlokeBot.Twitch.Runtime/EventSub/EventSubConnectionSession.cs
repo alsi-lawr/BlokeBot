@@ -22,6 +22,8 @@ internal sealed class EventSubConnectionSession(
     ChatCommandDispatcher dispatcher,
     ICommandResponseSender responses,
     BotRuntimeStatusStore status,
+    INativeTwitchFeatureStateProvider nativeTwitch,
+    EventSubChannelReconciliationTrigger reconciliation,
     IEnumerable<IChatMessageObserver> messageObservers,
     ObserverFanOut<
         EventSubMessageObserverBoundary,
@@ -41,6 +43,7 @@ internal sealed class EventSubConnectionSession(
     private readonly IChatMessageObserver[] _messageObservers = [.. messageObservers];
     private readonly IShoutoutEventObserver[] _shoutoutObservers = [.. (shoutoutObservers ?? [])];
     private readonly IPollEventObserver[] _pollObservers = [.. (pollObservers ?? [])];
+    private readonly EventSubChannelReconciliationTrigger _reconciliation = reconciliation;
     private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
     private readonly Queue<string> _deliveredMessageIdOrder = new();
     private const int _deliveredMessageCapacity = 512;
@@ -160,6 +163,11 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(shoutout.BroadcasterUserLogin, cancellationToken))
+        {
+            return;
+        }
+
         foreach (var observer in _shoutoutObservers)
         {
             await observer.ShoutoutReceivedAsync(shoutout, cancellationToken);
@@ -323,6 +331,7 @@ internal sealed class EventSubConnectionSession(
         public async Task<RuntimeReconnectRequest> ListenAsync(CancellationToken cancellationToken)
         {
             channelSession.Start(initialChannels, cancellationToken);
+            using var registration = owner._reconciliation.Register(channelSession);
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -412,6 +421,11 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(poll.BroadcasterUserLogin, cancellationToken))
+        {
+            return;
+        }
+
         foreach (var observer in _pollObservers)
         {
             await observer.PollReceivedAsync(poll, cancellationToken);

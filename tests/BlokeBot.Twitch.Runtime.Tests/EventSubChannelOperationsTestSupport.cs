@@ -61,6 +61,9 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private readonly Dictionary<string, int> _completeStopCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
+        private readonly Dictionary<string, bool> _nativeTwitchEnabled = new(
+            StringComparer.OrdinalIgnoreCase
+        );
         private readonly Dictionary<string, Queue<Exception>> _completeStopFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -179,6 +182,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
             GetQueue(_completeStopFailures, channel).Enqueue(exception);
         }
 
+        internal void SetNativeTwitchEnabled(string channel, bool enabled)
+        {
+            _nativeTwitchEnabled[channel] = enabled;
+        }
+
         public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
             string channel,
             EventSubAuthorizationContext authorization
@@ -252,6 +260,14 @@ public abstract partial class EventSubChannelRecoveryTestBase
                     ? outcomes.Dequeue()
                     : new EventSubStartupDeliveryOutcome.Completed();
             return ValueTask.FromResult(outcome);
+        }
+
+        public ValueTask<bool> NativeTwitchIsEnabledAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromResult(_nativeTwitchEnabled.GetValueOrDefault(channel));
         }
 
         public ValueTask NotifyChannelStartedAsync(

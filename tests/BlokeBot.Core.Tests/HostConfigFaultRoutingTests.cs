@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Channels;
+using AngleSharp.Dom;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
@@ -117,6 +118,43 @@ public sealed class HostConfigFaultRoutingTests
         fragmentModule
             .Invocations.Count(invocation => invocation.Identifier == "observe")
             .ShouldBe(1);
+    }
+
+    [Test]
+    public async Task NativeTwitchCard_Toggling_UpdatesThePersistedHostFeatureSwitch()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+
+        var page = RenderHostConfigPage(context);
+        page.WaitForAssertion(() =>
+        {
+            var nativeTwitch = FindNativeTwitchFeatureButton(page);
+            nativeTwitch.HasAttribute("aria-pressed").ShouldBeTrue();
+            nativeTwitch.TextContent.ShouldContain(
+                "Use shoutouts, polls, clips, and stream markers."
+            );
+        });
+
+        await page.InvokeAsync(() => FindNativeTwitchFeatureButton(page).ClickAsync(new()));
+
+        page.WaitForAssertion(() =>
+            FindNativeTwitchFeatureButton(page).HasAttribute("aria-pressed").ShouldBeFalse()
+        );
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var enabled = await verify
+            .Hosts.Where(host => host.Id == hostId)
+            .Select(host => host.EnabledFeatures)
+            .SingleAsync();
+        enabled.Contains(HostFeatureFlags.NativeTwitch).ShouldBeFalse();
     }
 
     [Test]
@@ -371,6 +409,14 @@ public sealed class HostConfigFaultRoutingTests
     {
         context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         return context.Render<HostConfigPage>();
+    }
+
+    private static IElement FindNativeTwitchFeatureButton(IRenderedComponent<HostConfigPage> page)
+    {
+        return page.FindAll("#chat-tools button")
+            .Single(button =>
+                button.TextContent.Contains("Native Twitch", StringComparison.Ordinal)
+            );
     }
 
     private static Task ClickAccessModeAsync<TComponent>(

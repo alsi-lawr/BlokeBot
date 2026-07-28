@@ -88,7 +88,8 @@ public sealed class ChatIdentityResolverTests
             new EventSubClient(factory),
             null!,
             new UnusedChatSender(),
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
 
         var outcome = await operations.CreateSubscriptionAsync(
@@ -118,7 +119,8 @@ public sealed class ChatIdentityResolverTests
             new EventSubClient(factory),
             null!,
             new UnusedChatSender(),
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
 
         var outcome = await operations.CreateSubscriptionAsync(
@@ -283,6 +285,14 @@ public sealed class ChatIdentityResolverTests
         var botSubscription = botSetup
             .ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>()
             .Subscription;
+        var shoutoutSetup = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
+            configuredBot,
+            "session-id",
+            CancellationToken.None
+        );
+        shoutoutSetup.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         var unavailable = await operations
             .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
             .ExecuteAsync(CancellationToken.None);
@@ -292,7 +302,7 @@ public sealed class ChatIdentityResolverTests
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
             )
         );
-        botSubscription.PollSubscriptions.ShouldBeOfType<BroadcasterPollSubscriptionState.NotConfigured>();
+        botSubscription.PollSubscriptions.ShouldBeOfType<EventSubOperationSubscriptionState.NotConfigured>();
         factory.EventSubRequestCount.ShouldBe(3);
 
         var created = await operations.CreateSubscriptionAsync(
@@ -431,6 +441,7 @@ public sealed class ChatIdentityResolverTests
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider(),
             broadcasters
         );
     }
@@ -464,7 +475,8 @@ public sealed class ChatIdentityResolverTests
                 startupMessage ?? new StartupChatMessage.Enabled("private startup payload")
             ),
             sender,
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
     }
 

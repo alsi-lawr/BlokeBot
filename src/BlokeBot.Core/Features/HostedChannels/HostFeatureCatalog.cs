@@ -26,6 +26,12 @@ public static class HostFeatureCatalog
                 "Create chat commands, keep counters, and schedule messages.",
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
+            new(
+                HostFeatureFlags.NativeTwitch,
+                "Native Twitch",
+                "Use shoutouts, polls, clips, and stream markers.",
+                enabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
+            ),
         ];
     }
 

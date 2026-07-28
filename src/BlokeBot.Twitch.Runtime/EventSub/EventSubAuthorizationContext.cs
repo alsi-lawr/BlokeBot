@@ -8,6 +8,7 @@ public abstract record EventSubAuthorizationContext
 
     public abstract TResult Match<TResult>(
         Func<ConfiguredBot, TResult> configuredBot,
+        Func<ConfiguredBotOperations, TResult> configuredBotOperations,
         Func<Broadcaster, TResult> broadcaster
     );
 
@@ -15,6 +16,7 @@ public abstract record EventSubAuthorizationContext
     {
         public override TResult Match<TResult>(
             Func<ConfiguredBot, TResult> configuredBot,
+            Func<ConfiguredBotOperations, TResult> configuredBotOperations,
             Func<Broadcaster, TResult> broadcaster
         )
         {
@@ -22,10 +24,23 @@ public abstract record EventSubAuthorizationContext
         }
     }
 
+    public sealed record ConfiguredBotOperations : EventSubAuthorizationContext
+    {
+        public override TResult Match<TResult>(
+            Func<ConfiguredBot, TResult> configuredBot,
+            Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+            Func<Broadcaster, TResult> broadcaster
+        )
+        {
+            return configuredBotOperations(this);
+        }
+    }
+
     public sealed record Broadcaster : EventSubAuthorizationContext
     {
         public override TResult Match<TResult>(
             Func<ConfiguredBot, TResult> configuredBot,
+            Func<ConfiguredBotOperations, TResult> configuredBotOperations,
             Func<Broadcaster, TResult> broadcaster
         )
         {
@@ -35,6 +50,9 @@ public abstract record EventSubAuthorizationContext
 
     public static EventSubAuthorizationContext ConfiguredBotAuthority { get; } =
         new ConfiguredBot();
+
+    public static EventSubAuthorizationContext ConfiguredBotOperationsAuthority { get; } =
+        new ConfiguredBotOperations();
 
     public static EventSubAuthorizationContext BroadcasterAuthority { get; } = new Broadcaster();
 }

@@ -38,6 +38,8 @@ public abstract record ClipMarkerAuthorizationReadiness
 {
     private ClipMarkerAuthorizationReadiness() { }
 
+    public sealed record Disabled : ClipMarkerAuthorizationReadiness;
+
     public sealed record Ready : ClipMarkerAuthorizationReadiness;
 
     public sealed record NeedsBroadcasterAuthorization(string Message)

@@ -17,6 +17,8 @@ internal interface IEventSubChannelOperations
         CancellationToken cancellationToken
     );
 
+    ValueTask<bool> NativeTwitchIsEnabledAsync(string channel, CancellationToken cancellationToken);
+
     ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
         string channel,
         CancellationToken cancellationToken

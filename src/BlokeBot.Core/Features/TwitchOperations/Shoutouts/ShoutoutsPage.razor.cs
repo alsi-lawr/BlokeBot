@@ -22,6 +22,7 @@ public partial class ShoutoutsPage
     private bool _clipHasDelay;
     private string _markerRequestKey = Guid.NewGuid().ToString("N");
     private string _markerDescription = string.Empty;
+    private bool _nativeTwitchEnabled;
 
     private string _cooldownText =>
         _state switch
@@ -42,16 +43,14 @@ public partial class ShoutoutsPage
     {
         TrackSubscription(
             _events.SubscribeForComponentRefresh(
-                AppEventKind.TwitchOperationsChanged,
+                [AppEventKind.HostedChannelsChanged, AppEventKind.TwitchOperationsChanged],
                 InvokeAsync,
-                ReloadPollsForEventAsync,
+                ReloadForEventAsync,
                 StateHasChanged
             )
         );
         await LoadPageContextAsync();
-        await LoadAsync();
-        await LoadPollsAsync();
-        await LoadClipsMarkersAsync();
+        await ReloadForSelectedHostAsync();
     }
 
     private async Task LoadAsync()
@@ -139,9 +138,25 @@ public partial class ShoutoutsPage
         }
     }
 
-    private async Task ReloadPollsForEventAsync()
+    private async Task ReloadForEventAsync()
     {
         await LoadPageContextAsync();
+        await ReloadForSelectedHostAsync();
+    }
+
+    private async Task ReloadForSelectedHostAsync()
+    {
+        _nativeTwitchEnabled =
+            HostId != 0 && await _nativeTwitch.IsEnabledAsync(HostId, CancellationToken.None);
+        if (!_nativeTwitchEnabled)
+        {
+            _state = null;
+            _pollState = null;
+            _clipMarkerState = null;
+            return;
+        }
+
+        await LoadAsync();
         await LoadPollsAsync();
         await LoadClipsMarkersAsync();
     }

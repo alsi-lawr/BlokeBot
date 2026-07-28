@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
@@ -28,6 +29,58 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class TwitchOperationsUiTests
 {
+    [Test]
+    public async Task NativeTwitchDisabled_DirectRoute_HidesOperationsAndRetainsSavedData()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(
+            dbFactory,
+            "streamer",
+            "streamer-id",
+            HostFeatureFlags.All & ~HostFeatureFlags.NativeTwitch
+        );
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.TwitchPollTemplates.Add(
+                new TwitchPollTemplate
+                {
+                    HostId = host.Id,
+                    Title = "Retained question",
+                    DurationSeconds = 60,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    Choices =
+                    [
+                        new TwitchPollTemplateChoice { Position = 0, Title = "Yes" },
+                        new TwitchPollTemplateChoice { Position = 1, Title = "No" },
+                    ],
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var testContext = UiTestContextFactory.CreateWithAuthorization(
+            dbFactory,
+            host.Id,
+            host.Login
+        );
+        await using var context = testContext.Context;
+        ConfigureServices(context, dbFactory);
+
+        var page = context.Render<ShoutoutsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Markup.ShouldContain("Native Twitch is turned off");
+            page.Markup.ShouldContain(
+                "Existing history, templates, results, and Twitch identifiers are retained."
+            );
+            page.Find("a[href='/host#chat-tools']").TextContent.ShouldContain("Open Channel setup");
+            page.Markup.ShouldNotContain("Save template");
+            page.Markup.ShouldNotContain("Clips &amp; Markers");
+        });
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchPollTemplates.CountAsync()).ShouldBe(1);
+    }
+
     [Test]
     public async Task PollHub_ChannelPointsAndProviderRefresh_RenderProgressFinalResultsAndExternalGuard()
     {
@@ -124,8 +177,18 @@ public sealed class TwitchOperationsUiTests
         context.Services.AddSingleton(events);
         context.Services.AddSingleton(changes);
         context.Services.AddSingleton(alerts);
+        var nativeTwitch = new NativeTwitchFeatureGate(dbFactory);
+        context.Services.AddSingleton(nativeTwitch);
         context.Services.AddSingleton(
-            new ShoutoutService(dbFactory, null!, null!, null!, events, TimeProvider.System)
+            new ShoutoutService(
+                dbFactory,
+                null!,
+                null!,
+                null!,
+                events,
+                TimeProvider.System,
+                nativeTwitch
+            )
         );
         context.Services.AddSingleton(
             new PollService(
@@ -134,7 +197,8 @@ public sealed class TwitchOperationsUiTests
                 new HelixClient(new RejectingHttpClientFactory()),
                 settings,
                 events,
-                alerts
+                alerts,
+                nativeTwitch
             )
         );
         context.Services.AddSingleton(
@@ -145,7 +209,8 @@ public sealed class TwitchOperationsUiTests
                 settings,
                 events,
                 alerts,
-                TimeProvider.System
+                TimeProvider.System,
+                nativeTwitch
             )
         );
         context.Services.AddSingleton(
@@ -163,7 +228,8 @@ public sealed class TwitchOperationsUiTests
     private static async Task<BotHost> SeedHostAsync(
         SqliteBlokeBotDbFactory dbFactory,
         string login,
-        string twitchUserId
+        string twitchUserId,
+        HostFeatureFlags enabledFeatures = HostFeatureFlags.All
     )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -172,6 +238,7 @@ public sealed class TwitchOperationsUiTests
             Login = login,
             DisplayName = login,
             TwitchUserId = twitchUserId,
+            EnabledFeatures = enabledFeatures,
         };
         db.Hosts.Add(host);
         await db.SaveChangesAsync();

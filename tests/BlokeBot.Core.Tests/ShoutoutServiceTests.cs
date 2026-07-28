@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -17,6 +18,80 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class ShoutoutServiceTests
 {
+    [Test]
+    public async Task NativeTwitchDisabled_InboundDelivery_IsIgnoredUntilReenabledWithoutDeletingHistory()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "host",
+                DisplayName = "Host",
+                TwitchUserId = "host-id",
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.NativeTwitch,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            db.ShoutoutHistory.Add(
+                new ShoutoutHistoryEntry
+                {
+                    HostId = host.Id,
+                    Direction = ShoutoutHistoryDirection.Received,
+                    ProviderMessageId = "retained-delivery",
+                    SourceTwitchUserId = "source-id",
+                    SourceLogin = "source",
+                    TargetTwitchUserId = "host-id",
+                    TargetLogin = "host",
+                    ViewerCount = 10,
+                    OccurredAtUtc = DateTime.Parse("2026-07-25T00:00:00Z").ToUniversalTime(),
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var service = new ShoutoutService(
+            dbFactory,
+            null!,
+            null!,
+            null!,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
+        );
+        var delivery = new EventSubShoutoutEvent(
+            "host-id",
+            "host",
+            "source-id",
+            "source",
+            "target-id",
+            "target",
+            42,
+            DateTimeOffset.Parse("2026-07-26T00:00:00Z"),
+            null,
+            null,
+            EventSubShoutoutDirection.Received,
+            "new-delivery"
+        );
+
+        await service.ShoutoutReceivedAsync(delivery, CancellationToken.None);
+
+        (await service.LoadAsync(1, null, CancellationToken.None)).History.ShouldBeEmpty();
+        await using (var verifyDisabled = await dbFactory.CreateDbContextAsync())
+        {
+            (await verifyDisabled.ShoutoutHistory.CountAsync()).ShouldBe(1);
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.NativeTwitch;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        await service.ShoutoutReceivedAsync(delivery, CancellationToken.None);
+
+        var enabledState = await service.LoadAsync(1, null, CancellationToken.None);
+        enabledState.History.Count.ShouldBe(2);
+        await using var verifyEnabled = await dbFactory.CreateDbContextAsync();
+        (await verifyEnabled.ShoutoutHistory.CountAsync()).ShouldBe(2);
+    }
+
     [Test]
     public async Task DuplicateProviderDelivery_RecordingShoutout_UpdatesOnlyMatchingHostOnce()
     {
@@ -45,7 +120,8 @@ public sealed class ShoutoutServiceTests
             null!,
             null!,
             TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
         );
         var delivery = new EventSubShoutoutEvent(
             "first-id",
@@ -102,7 +178,8 @@ public sealed class ShoutoutServiceTests
             null!,
             null!,
             TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
         );
         var targetEligibility = DateTimeOffset.Parse("2026-07-26T02:00:00Z");
         await service.ShoutoutReceivedAsync(
@@ -204,7 +281,8 @@ public sealed class ShoutoutServiceTests
             new HelixClient(new ScenarioHttpClientFactory(scenario)),
             Settings(),
             TestEventBus.Create<AppEventKind>(),
-            TimeProvider.System
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
         );
 
         var outcome = await service.SendAsync(1, "target", CancellationToken.None);

@@ -1,4 +1,5 @@
 using BlokeBot.Core;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -14,7 +15,8 @@ public sealed class ShoutoutService(
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    TimeProvider timeProvider
+    TimeProvider timeProvider,
+    NativeTwitchFeatureGate nativeTwitch
 ) : IShoutoutEventObserver
 {
     private static readonly string[] _requiredScopes =
@@ -30,6 +32,11 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new(null, new ShoutoutTargetCooldownReadiness.Unknown(), []);
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var cooldown = await db
             .ShoutoutCooldowns.AsNoTracking()
@@ -74,6 +81,11 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var normalizedTarget = Login.Normalize(targetLogin);
         if (string.IsNullOrWhiteSpace(normalizedTarget))
         {
@@ -88,6 +100,10 @@ public sealed class ShoutoutService(
             return new ShoutoutOperationOutcome.NotReady(
                 "Select a connected Twitch channel first."
             );
+        }
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
         var account = await accounts.GetActiveTokenStatusAsync(host.Login, _requiredScopes, ct);
@@ -144,7 +160,7 @@ public sealed class ShoutoutService(
                 || x.Login == Login.Normalize(shoutout.BroadcasterUserLogin),
             ct
         );
-        if (host is null)
+        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
         {
             return;
         }
@@ -259,6 +275,11 @@ public sealed class ShoutoutService(
                 "The configured bot must be this channel's broadcaster or moderator."
             );
         }
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, ct))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var result = await helix.SendShoutoutAsync(context, broadcasterId, botId, target.Id, ct);
         return result switch
         {

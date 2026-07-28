@@ -12,6 +12,7 @@
 @inject ToastService _toasts
 @inject PollService _polls
 @inject ClipMarkerService _clipsMarkers
+@inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
 
@@ -19,6 +20,18 @@
 
 <div class="mx-auto max-w-5xl space-y-6">
     <PageHeader Kicker="Native Twitch operations" Title="Native Twitch operations" Description="Manage Twitch operations for the selected channel." />
+    @if (!_nativeTwitchEnabled)
+    {
+        <section class="card p-6" role="status">
+            <h2 class="text-lg font-semibold text-slate-950">Native Twitch is turned off</h2>
+            <p class="mt-2 text-sm text-muted-foreground">
+                Existing history, templates, results, and Twitch identifiers are retained. Turn Native Twitch back on in Channel setup to use them again.
+            </p>
+            <a class="btn-primary mt-5" href="/host#chat-tools">Open Channel setup</a>
+        </section>
+    }
+    else
+    {
     <section class="card">
         <div class="border-b border-slate-200 p-5">
             <h2 class="text-lg font-semibold text-slate-950">Shoutouts</h2>
@@ -202,4 +215,5 @@
             </div>
         }
     </section>
+    }
 </div>

@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
@@ -145,7 +146,8 @@ public sealed class PollServiceTests
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events)
+            new DurableAlertService(dbFactory, TimeProvider.System, events),
+            new NativeTwitchFeatureGate(dbFactory)
         );
 
         var state = await service.LoadAsync(1, CancellationToken.None);
@@ -204,7 +206,8 @@ public sealed class PollServiceTests
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events)
+            new DurableAlertService(dbFactory, TimeProvider.System, events),
+            new NativeTwitchFeatureGate(dbFactory)
         );
     }
 

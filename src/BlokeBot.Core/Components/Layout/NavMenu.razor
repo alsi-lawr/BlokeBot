@@ -42,7 +42,11 @@
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showAlerts = selection is not null && !session.IsBotAccount;
-                    var showNativeTwitch = selection is not null && session.CanUseBotFunctions(_existingHostIds);
+                    var showNativeTwitch = FeatureIsVisible(
+                        session,
+                        selection,
+                        HostFeatureFlags.NativeTwitch
+                    );
                     var showChatTools =
                         showGuessing || showPoints || showCustomCommands;
                 }

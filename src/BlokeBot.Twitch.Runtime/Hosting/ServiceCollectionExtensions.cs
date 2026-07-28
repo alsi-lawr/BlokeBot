@@ -56,6 +56,10 @@ public static class ServiceCollectionExtensions
 
         var options = configuration.Get<BotOptions>() ?? new BotOptions();
         RegisterSettings(services, BotSettings.FromOptions(options));
+        services.TryAddSingleton<
+            IEventSubChannelReconciliationTrigger,
+            NoOpEventSubChannelReconciliationTrigger
+        >();
         return services;
     }
 
@@ -96,6 +100,10 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IRuntimeIdleWait, RuntimeIdleWait>();
         RegisterPolicies(services, policies);
         services.AddSingleton<IBotAccountProvider, DefaultBotAccountProvider>();
+        services.TryAddSingleton<
+            INativeTwitchFeatureStateProvider,
+            EnabledNativeTwitchFeatureStateProvider
+        >();
         services.TryAddSingleton<
             IStartupChatMessageProvider,
             ConfiguredStartupChatMessageProvider
@@ -144,6 +152,10 @@ public static class ServiceCollectionExtensions
             serviceProvider.GetRequiredService<EventSubChannelStatusStore>()
         );
         services.TryAddSingleton<EventSubSubscriptionReconciliationStore>();
+        services.TryAddSingleton<EventSubChannelReconciliationTrigger>();
+        services.TryAddSingleton<IEventSubChannelReconciliationTrigger>(serviceProvider =>
+            serviceProvider.GetRequiredService<EventSubChannelReconciliationTrigger>()
+        );
         services.TryAddSingleton<
             IEventSubChannelDiagnosticReporter,
             EventSubChannelDiagnosticLogger

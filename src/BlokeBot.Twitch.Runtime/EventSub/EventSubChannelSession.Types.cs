@@ -16,31 +16,20 @@ internal enum EventSubSubscriptionReadiness
     Ready,
 }
 
-internal sealed record BroadcasterPollSubscriptionGroup(
-    string SubscriptionId,
-    IReadOnlyList<string> AdditionalSubscriptionIds
-)
+internal abstract record EventSubOperationSubscriptionState
 {
-    internal static BroadcasterPollSubscriptionGroup From(ActiveEventSubSubscription subscription)
-    {
-        return new(subscription.SubscriptionId, subscription.AdditionalSubscriptionIds);
-    }
-}
+    private EventSubOperationSubscriptionState() { }
 
-internal abstract record BroadcasterPollSubscriptionState
-{
-    private BroadcasterPollSubscriptionState() { }
-
-    internal sealed record NotConfigured : BroadcasterPollSubscriptionState;
+    internal sealed record NotConfigured : EventSubOperationSubscriptionState;
 
     internal sealed record Unavailable(AccessTokenUnavailableReason Reason)
-        : BroadcasterPollSubscriptionState;
+        : EventSubOperationSubscriptionState;
 
-    internal sealed record Active(BroadcasterPollSubscriptionGroup Group)
-        : BroadcasterPollSubscriptionState;
+    internal sealed record Active(ActiveEventSubSubscription Subscription)
+        : EventSubOperationSubscriptionState;
 
-    internal sealed record CleanupPending(BroadcasterPollSubscriptionGroup Group)
-        : BroadcasterPollSubscriptionState;
+    internal sealed record CleanupPending(ActiveEventSubSubscription Subscription)
+        : EventSubOperationSubscriptionState;
 }
 
 internal sealed record ActiveEventSubSubscription
@@ -60,6 +49,15 @@ internal sealed record ActiveEventSubSubscription
 
     internal IReadOnlyList<string> AdditionalSubscriptionIds { get; init; } = [];
 
-    internal BroadcasterPollSubscriptionState PollSubscriptions { get; init; } =
-        new BroadcasterPollSubscriptionState.NotConfigured();
+    internal EventSubOperationSubscriptionState ShoutoutSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
+    internal EventSubOperationSubscriptionState PollSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+}
+
+internal enum EventSubOperationSubscriptionKind
+{
+    Shoutouts,
+    Polls,
 }

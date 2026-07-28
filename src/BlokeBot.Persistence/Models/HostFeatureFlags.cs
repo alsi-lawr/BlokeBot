@@ -7,5 +7,6 @@ public enum HostFeatureFlags : ulong
     Guessing = 1UL << 0,
     Points = 1UL << 1,
     CustomCommands = 1UL << 2,
-    All = Guessing | Points | CustomCommands,
+    NativeTwitch = 1UL << 3,
+    All = Guessing | Points | CustomCommands | NativeTwitch,
 }

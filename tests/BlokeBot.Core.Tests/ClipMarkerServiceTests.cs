@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
@@ -18,6 +19,74 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class ClipMarkerServiceTests
 {
+    [Test]
+    public async Task NativeTwitchDisabled_MutationsAndReconciliationStopUntilReenabled()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero));
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "one",
+                DisplayName = "One",
+                TwitchUserId = "one-id",
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.NativeTwitch,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            db.TwitchClips.Add(
+                new TwitchClip
+                {
+                    HostId = host.Id,
+                    IdempotencyKey = "retained",
+                    ProviderClipId = "clip-id",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ClipMarkerHttpClientFactory();
+        var service = CreateService(dbFactory, http, now);
+
+        var state = await service.LoadAsync(1, CancellationToken.None);
+        var clip = await service.CreateClipAsync(1, "disabled-clip", false, CancellationToken.None);
+        var marker = await service.CreateMarkerAsync(
+            1,
+            "disabled-marker",
+            "Disabled marker",
+            CancellationToken.None
+        );
+        await service.ReconcileAsync(1, CancellationToken.None);
+
+        state.Authorization.ShouldBeOfType<ClipMarkerAuthorizationReadiness.Disabled>();
+        state.PendingClips.ShouldBeEmpty();
+        state.Results.ShouldBeEmpty();
+        state.Markers.ShouldBeEmpty();
+        clip.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
+        marker.ShouldBeOfType<ClipMarkerOperationOutcome.NotReady>();
+        http.ClipPosts.ShouldBe(0);
+        http.MarkerPosts.ShouldBe(0);
+        http.ClipGets.ShouldBe(0);
+        await using (var verifyDisabled = await dbFactory.CreateDbContextAsync())
+        {
+            (await verifyDisabled.TwitchClips.CountAsync()).ShouldBe(1);
+            (await verifyDisabled.TwitchClips.SingleAsync()).Status.ShouldBe(
+                TwitchClipStatus.Pending
+            );
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.NativeTwitch;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        await service.ReconcileAsync(1, CancellationToken.None);
+
+        http.ClipGets.ShouldBe(1);
+        await using var verifyEnabled = await dbFactory.CreateDbContextAsync();
+        (await verifyEnabled.TwitchClips.SingleAsync()).Status.ShouldBe(TwitchClipStatus.Available);
+    }
+
     [Test]
     public async Task ClipMarkerOperations_DedupePerHostRecoverBoundedClipsAndEnrichMarkers()
     {
@@ -136,7 +205,8 @@ public sealed class ClipMarkerServiceTests
             ),
             events,
             new DurableAlertService(dbFactory, timeProvider, events),
-            timeProvider
+            timeProvider,
+            new NativeTwitchFeatureGate(dbFactory)
         );
     }
 
@@ -195,6 +265,8 @@ public sealed class ClipMarkerServiceTests
     {
         internal int ClipPosts { get; private set; }
 
+        internal int ClipGets { get; private set; }
+
         internal int MarkerPosts { get; private set; }
 
         public HttpClient CreateClient(string name)
@@ -218,6 +290,7 @@ public sealed class ClipMarkerServiceTests
                             """{"data":[{"id":"clip-id","edit_url":"https://twitch.test/edit"}]}"""
                         );
                     case ("/helix/clips", "GET"):
+                        owner.ClipGets++;
                         request.RequestUri.Query.ShouldContain("id=clip-id");
                         return Json(
                             """

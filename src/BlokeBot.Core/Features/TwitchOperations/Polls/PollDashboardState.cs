@@ -33,6 +33,8 @@ public abstract record PollAuthorizationReadiness
 {
     private PollAuthorizationReadiness() { }
 
+    public sealed record Disabled : PollAuthorizationReadiness;
+
     public sealed record Ready : PollAuthorizationReadiness;
 
     public sealed record NeedsBroadcasterAuthorization(string Message) : PollAuthorizationReadiness
