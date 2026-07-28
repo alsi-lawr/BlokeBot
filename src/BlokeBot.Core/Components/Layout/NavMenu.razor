@@ -5,20 +5,28 @@
 @inject EventBus<AppEventKind> _events
 @inject HostFeatureService _features
 @inject IJSRuntime _js
+@inject NavigationManager _navigation
 @inject BlokeBotPageContextAccessor _pageContext
 @inject BlokeBotBuildIdentity _buildIdentity
 @implements IAsyncDisposable
 
-<div class="nav-menu flex h-full min-h-0 flex-col">
+<div id="@_rootId"
+     class="nav-menu flex h-full min-h-0 flex-col"
+     data-navigation-mode="@(Presentation is NavigationPresentation.IconRail ? "icon" : "labelled")">
     <div class="nav-menu__brand flex shrink-0 items-center gap-2.5 border-b px-4 py-3">
-        <img class="h-9 w-9 rounded-lg border shadow-soft" src="/blokebot-mark.svg" alt="" />
-        <div>
-            <a class="block text-base font-bold text-slate-950" href="">BlokeBot</a>
-            <p class="text-xs font-medium text-slate-500">Channel tools</p>
-        </div>
+        <a class="nav-menu__brand-link inline-flex items-center gap-2.5 rounded-lg"
+           href=""
+           aria-label="BlokeBot home">
+            <img class="h-9 w-9 rounded-lg border shadow-soft" src="/blokebot-mark.svg" alt="" />
+            <span class="nav-menu__metadata">
+                <span class="block text-base font-bold text-slate-950">BlokeBot</span>
+                <span class="block text-xs font-medium text-slate-500">Channel tools</span>
+            </span>
+        </a>
     </div>
 
-    <nav class="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 py-2.5">
+    <nav class="nav-menu__navigation flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-2.5 py-2.5"
+         aria-label="Signed-in navigation">
         <AuthorizeView>
             <Authorized Context="navAuth">
                 @{
@@ -34,36 +42,47 @@
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showAlerts = selection is not null && !session.IsBotAccount;
-                    var showBotFunctions = showGuessing || showPoints || showCustomCommands;
+                    var showNativeTwitch = selection is not null && session.CanUseBotFunctions(_existingHostIds);
+                    var showChatTools =
+                        showGuessing || showPoints || showCustomCommands;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
                     <Authorized>
-                <div class="nav-menu__panel nav-menu__panel--admin rounded-xl p-1">
-                    <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
-                             ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
-                             href="admin"
-                             @onclick="NotifyNavigatedAsync">
-                        <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-blue-600">
-                            <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
-                            <path d="m9.5 12 1.7 1.7 3.6-4" />
-                        </svg>
-                        </span>
-                        Admin
-                    </NavLink>
-                </div>
-                <div class="nav-menu__separator" aria-hidden="true"></div>
+                        <div class="nav-menu__route-item nav-menu__panel nav-menu__panel--admin rounded-xl p-1"
+                             data-nav-destination="admin">
+                            <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                     ActiveClass="nav-menu__item-active nav-menu__item-active--admin"
+                                     href="admin"
+                                     aria-label="Admin"
+                                     aria-describedby="@RouteHelpReference("admin")"
+                                     aria-current="@CurrentRoute("admin")"
+                                     @onclick="NotifyNavigatedAsync">
+                                <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 3.5 19 6v5.4c0 4.1-2.8 7.8-7 9.1-4.2-1.3-7-5-7-9.1V6l7-2.5Z" />
+                                        <path d="m9.5 12 1.7 1.7 3.6-4" />
+                                    </svg>
+                                </span>
+                                <span class="nav-menu__label min-w-0">Admin</span>
+                            </NavLink>
+                            @RouteHelp("admin", "Admin")
+                        </div>
+                        <div class="nav-menu__separator" aria-hidden="true"></div>
                     </Authorized>
                 </AuthorizeView>
 
-                <div class="nav-menu__panel rounded-xl p-1">
-                    <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                     data-nav-destination="home">
+                    <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                              ActiveClass="nav-menu__item-active"
                              Match="NavLinkMatch.All"
                              href=""
+                             aria-label="Home"
+                             aria-describedby="@RouteHelpReference("home")"
+                             aria-current="@CurrentRoute("", exact: true)"
                              @onclick="NotifyNavigatedAsync">
-                        <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-600">
+                        <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600">
                             <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 5h6v6H4Z" />
                                 <path d="M14 5h6v6h-6Z" />
@@ -71,173 +90,253 @@
                                 <path d="M14 15h6v4h-6Z" />
                             </svg>
                         </span>
-                        Home
+                        <span class="nav-menu__label min-w-0">Home</span>
                     </NavLink>
+                    @RouteHelp("home", "Home")
                 </div>
 
                 @if (showAlerts)
                 {
-                    <div class="nav-menu__panel rounded-xl p-1">
-                        <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="alerts">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                                  ActiveClass="nav-menu__item-active"
                                  href="alerts"
+                                 aria-label="Alerts"
+                                 aria-describedby="@RouteHelpReference("alerts")"
+                                 aria-current="@CurrentRoute("alerts")"
                                  @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-amber-700">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700">
                                 <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M10.3 4.3 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.3a2 2 0 0 0-3.4 0Z" />
                                     <path d="M12 9v4" />
                                     <path d="M12 17h.01" />
                                 </svg>
                             </span>
-                            Alerts
+                            <span class="nav-menu__label min-w-0">Alerts</span>
                         </NavLink>
+                        @RouteHelp("alerts", "Alerts")
                     </div>
                 }
 
                 @if (showHostConfig)
                 {
-                    <div class="nav-menu__panel rounded-xl p-1">
-                        <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="host">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                                  ActiveClass="nav-menu__item-active nav-menu__item-active--host"
                                  href="host"
+                                 aria-label="Channel setup"
+                                 aria-describedby="@RouteHelpReference("host")"
+                                 aria-current="@CurrentRoute("host")"
                                  @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
                                 <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M4 10.5 12 4l8 6.5V20H4Z" />
                                     <path d="M9 20v-6h6v6" />
                                 </svg>
                             </span>
-                            Channel setup
+                            <span class="nav-menu__label min-w-0">Channel setup</span>
                         </NavLink>
+                        @RouteHelp("host", "Channel setup")
                     </div>
                 }
 
-                @if (selection is not null && session.CanUseBotFunctions(_existingHostIds))
+                @if (showNativeTwitch)
                 {
-                    <div class="nav-menu__panel rounded-xl p-1">
-                        <NavLink class="nav-menu__link flex min-h-9 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="twitch-operations">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
                                  ActiveClass="nav-menu__item-active"
                                  href="twitch-operations"
+                                 aria-label="Native Twitch operations"
+                                 aria-describedby="@RouteHelpReference("twitch-operations")"
+                                 aria-current="@CurrentRoute("twitch-operations")"
                                  @onclick="NotifyNavigatedAsync">
-                            <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-700">✦</span>
-                            Native Twitch operations
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700" aria-hidden="true">✦</span>
+                            <span class="nav-menu__label min-w-0">Native Twitch operations</span>
                         </NavLink>
+                        @RouteHelp("twitch-operations", "Native Twitch operations")
                     </div>
                 }
 
-                @if (showBotFunctions)
+                @if (showChatTools)
                 {
-        <div class="px-2 text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Chat tools</div>
-        @if (showGuessing)
-        {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1" data-nav-section="guessing" open="@_guessingOpen">
-            <summary class="nav-menu__summary flex min-h-9 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleGuessingAsync">
-                <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-blue-600">
-                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
-                        <path d="M9 9h.01" />
-                        <path d="M15 9h.01" />
-                        <path d="M12 12h.01" />
-                        <path d="M9 15h.01" />
-                        <path d="M15 15h.01" />
-                    </svg>
-                </span>
-                <span class="min-w-0 flex-1">Guessing game</span>
-                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                </svg>
-            </summary>
-            <div class="nav-menu__section-body mt-0.5 grid gap-0.5 border-t border-slate-100 pt-0.5">
-                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
-                         ActiveClass="nav-menu__item-active"
-                         Match="NavLinkMatch.All"
-                         href="guessing"
-                         @onclick="NotifyNavigatedAsync">
-                    Dashboard
-                </NavLink>
-                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
-                         ActiveClass="nav-menu__item-active"
-                         href="guessing/settings"
-                         @onclick="NotifyNavigatedAsync">
-                    Settings
-                </NavLink>
-            </div>
-        </details>
-        }
-        @if (showPoints)
-        {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1" data-nav-section="points" open="@_pointsOpen">
-            <summary class="nav-menu__summary flex min-h-9 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="TogglePointsAsync">
-                <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-emerald-600">
-                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 3v18" />
-                        <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
-                    </svg>
-                </span>
-                <span class="min-w-0 flex-1">Points</span>
-                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                </svg>
-            </summary>
-            <div class="nav-menu__section-body mt-0.5 grid gap-0.5 border-t border-slate-100 pt-0.5">
-                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
-                         ActiveClass="nav-menu__item-active"
-                         Match="NavLinkMatch.All"
-                         href="points"
-                         @onclick="NotifyNavigatedAsync">
-                    Dashboard
-                </NavLink>
-                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
-                         ActiveClass="nav-menu__item-active"
-                         href="points/settings"
-                         @onclick="NotifyNavigatedAsync">
-                    Settings
-                </NavLink>
-            </div>
-        </details>
-        }
-        @if (showCustomCommands)
-        {
-        <details class="nav-menu__panel nav-menu__section group rounded-xl p-1" data-nav-section="custom-commands" open="@_customCommandsOpen">
-            <summary class="nav-menu__summary flex min-h-9 cursor-pointer list-none items-center gap-2.5 rounded-lg px-2.5 text-sm font-bold transition marker:hidden" @onclick="ToggleCustomCommandsAsync">
-                <span class="nav-menu__icon inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-700">
-                    <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 7h16" />
-                        <path d="M4 12h10" />
-                        <path d="M4 17h7" />
-                        <path d="m16 14 3 3-3 3" />
-                    </svg>
-                </span>
-                <span class="min-w-0 flex-1">Custom commands</span>
-                <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition group-open:rotate-180 [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="m6 9 6 6 6-6" />
-                </svg>
-            </summary>
-            <div class="nav-menu__section-body mt-0.5 grid gap-0.5 border-t border-slate-100 pt-0.5">
-                <NavLink class="nav-menu__sub-link flex min-h-8 items-center rounded-lg px-9 text-sm font-semibold transition"
-                         ActiveClass="nav-menu__item-active"
-                         href="custom-commands/settings"
-                         @onclick="NotifyNavigatedAsync">
-                    Settings
-                </NavLink>
-            </div>
-        </details>
-        }
+                    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                        Chat tools
+                    </div>
+                }
+
+                @if (showGuessing)
+                {
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="guessing"
+                         data-open="@GroupIsOpen(NavigationGroup.Guessing).ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Guessing game"
+                                aria-describedby="@RouteHelpReference("guessing-group")"
+                                aria-controls="@GroupBodyId(NavigationGroup.Guessing)"
+                                aria-expanded="@GroupIsOpen(NavigationGroup.Guessing).ToString().ToLowerInvariant()"
+                                aria-current="@CurrentGroup("guessing")"
+                                data-current="@GroupIsCurrent("guessing").ToString().ToLowerInvariant()"
+                                @onclick="() => ToggleGroupAsync(NavigationGroup.Guessing)"
+                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Guessing, args)">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-blue-600">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M8.5 4h7l4 4v8l-4 4h-7l-4-4V8l4-4Z" />
+                                    <path d="M9 9h.01" />
+                                    <path d="M15 9h.01" />
+                                    <path d="M12 12h.01" />
+                                    <path d="M9 15h.01" />
+                                    <path d="M15 15h.01" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0 flex-1">Guessing game</span>
+                            <span class="nav-menu__badge" aria-label="2 destinations">2</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @RouteHelp("guessing-group", "Guessing game")
+                        <div id="@GroupBodyId(NavigationGroup.Guessing)"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!GroupIsOpen(NavigationGroup.Guessing))">
+                            <p class="nav-menu__flyout-title">Guessing game</p>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="guessing"
+                                     aria-label="Guessing dashboard"
+                                     aria-current="@CurrentRoute("guessing", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">
+                                Dashboard
+                            </NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     href="guessing/settings"
+                                     aria-label="Guessing settings"
+                                     aria-current="@CurrentRoute("guessing/settings")"
+                                     @onclick="NotifyNavigatedAsync">
+                                Settings
+                            </NavLink>
+                        </div>
+                    </div>
+                }
+
+                @if (showPoints)
+                {
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="points"
+                         data-open="@GroupIsOpen(NavigationGroup.Points).ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Points"
+                                aria-describedby="@RouteHelpReference("points-group")"
+                                aria-controls="@GroupBodyId(NavigationGroup.Points)"
+                                aria-expanded="@GroupIsOpen(NavigationGroup.Points).ToString().ToLowerInvariant()"
+                                aria-current="@CurrentGroup("points")"
+                                data-current="@GroupIsCurrent("points").ToString().ToLowerInvariant()"
+                                @onclick="() => ToggleGroupAsync(NavigationGroup.Points)"
+                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.Points, args)">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-600">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 3v18" />
+                                    <path d="M17 7.5c0-1.4-1.6-2.5-5-2.5S7 6.1 7 7.5 8.6 10 12 10s5 1.1 5 2.5-1.6 2.5-5 2.5-5-1.1-5-2.5" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0 flex-1">Points</span>
+                            <span class="nav-menu__badge" aria-label="2 destinations">2</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @RouteHelp("points-group", "Points")
+                        <div id="@GroupBodyId(NavigationGroup.Points)"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!GroupIsOpen(NavigationGroup.Points))">
+                            <p class="nav-menu__flyout-title">Points</p>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     Match="NavLinkMatch.All"
+                                     href="points"
+                                     aria-label="Points dashboard"
+                                     aria-current="@CurrentRoute("points", exact: true)"
+                                     @onclick="NotifyNavigatedAsync">
+                                Dashboard
+                            </NavLink>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     href="points/settings"
+                                     aria-label="Points settings"
+                                     aria-current="@CurrentRoute("points/settings")"
+                                     @onclick="NotifyNavigatedAsync">
+                                Settings
+                            </NavLink>
+                        </div>
+                    </div>
+                }
+
+                @if (showCustomCommands)
+                {
+                    <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
+                         data-nav-section="custom-commands"
+                         data-open="@GroupIsOpen(NavigationGroup.CustomCommands).ToString().ToLowerInvariant()">
+                        <button class="nav-menu__summary flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm font-bold transition"
+                                type="button"
+                                aria-label="Custom commands"
+                                aria-describedby="@RouteHelpReference("custom-commands-group")"
+                                aria-controls="@GroupBodyId(NavigationGroup.CustomCommands)"
+                                aria-expanded="@GroupIsOpen(NavigationGroup.CustomCommands).ToString().ToLowerInvariant()"
+                                aria-current="@CurrentGroup("custom-commands")"
+                                data-current="@GroupIsCurrent("custom-commands").ToString().ToLowerInvariant()"
+                                @onclick="() => ToggleGroupAsync(NavigationGroup.CustomCommands)"
+                                @onkeydown="args => CloseGroupOnEscape(NavigationGroup.CustomCommands, args)">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-purple-700">
+                                <svg class="h-4 w-4 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M4 7h16" />
+                                    <path d="M4 12h10" />
+                                    <path d="M4 17h7" />
+                                    <path d="m16 14 3 3-3 3" />
+                                </svg>
+                            </span>
+                            <span class="nav-menu__label min-w-0 flex-1">Custom commands</span>
+                            <span class="nav-menu__badge" aria-label="1 destination">1</span>
+                            <svg class="nav-menu__section-chevron h-4 w-4 shrink-0 fill-none stroke-current text-slate-400 transition [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:2]" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        @RouteHelp("custom-commands-group", "Custom commands")
+                        <div id="@GroupBodyId(NavigationGroup.CustomCommands)"
+                             class="nav-menu__section-body grid gap-1 border-t border-slate-100"
+                             hidden="@(!GroupIsOpen(NavigationGroup.CustomCommands))">
+                            <p class="nav-menu__flyout-title">Custom commands</p>
+                            <NavLink class="nav-menu__sub-link flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold transition"
+                                     ActiveClass="nav-menu__item-active"
+                                     href="custom-commands/settings"
+                                     aria-label="Custom command settings"
+                                     aria-current="@CurrentRoute("custom-commands/settings")"
+                                     @onclick="NotifyNavigatedAsync">
+                                Settings
+                            </NavLink>
+                        </div>
+                    </div>
                 }
 
                 @if (selection is not null)
                 {
-                    <div class="nav-menu__active-channel mt-auto rounded-xl p-2.5">
-                        <p class="text-sm font-bold text-slate-950">Active channel</p>
-                        <p class="mt-1 text-xs leading-5 text-slate-500">Choose a channel from the top bar when you manage more than one.</p>
+                    <div class="nav-menu__active-channel nav-menu__metadata mt-auto rounded-xl p-3">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Active channel</p>
+                        <p class="mt-1 truncate text-sm font-bold text-slate-950">@selection.Current.DisplayName</p>
+                        <p class="truncate text-xs leading-5 text-slate-500">#@selection.Current.Login</p>
                     </div>
                 }
             </Authorized>
         </AuthorizeView>
     </nav>
 
-    <footer class="nav-menu__build shrink-0 border-t px-4 py-2">
-        <p class="text-[0.67rem] font-extrabold uppercase tracking-[0.16em] text-slate-500">Build</p>
-        <p class="mt-1 break-all font-mono text-[0.68rem] leading-4 text-slate-500">@_buildIdentity.InformationalVersion</p>
+    <footer class="nav-menu__build nav-menu__metadata shrink-0 border-t px-4 py-3">
+        <p class="text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">Build</p>
+        <p class="mt-1 break-all font-mono text-xs leading-4 text-slate-500">@_buildIdentity.InformationalVersion</p>
     </footer>
 </div>

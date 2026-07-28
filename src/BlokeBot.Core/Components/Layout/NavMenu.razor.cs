@@ -1,44 +1,13 @@
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Security.Claims;
-using BlokeBot.Core;
+using System.Diagnostics;
 using BlokeBot.Core.Auth.Sessions;
-using BlokeBot.Core.Components;
-using BlokeBot.Core.Components.Layout;
-using BlokeBot.Core.Features.Admin.Authorization;
-using BlokeBot.Core.Features.Admin.HostedChannels;
-using BlokeBot.Core.Features.Guessing.Commands;
-using BlokeBot.Core.Features.Guessing.Configuration;
-using BlokeBot.Core.Features.Guessing.Game;
-using BlokeBot.Core.Features.Guessing.Guesses;
-using BlokeBot.Core.Features.Guessing.History;
-using BlokeBot.Core.Features.Guessing.Profiles;
-using BlokeBot.Core.Features.Guessing.Replies;
-using BlokeBot.Core.Features.Guessing.Rounds;
-using BlokeBot.Core.Features.HostConfig.Access;
-using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels;
-using BlokeBot.Core.Features.HostedChannels.Runtime;
-using BlokeBot.Core.Features.HostedChannels.Status;
-using BlokeBot.Core.Features.Points;
-using BlokeBot.Core.Features.Points.Balances;
-using BlokeBot.Core.Features.Points.Commands;
-using BlokeBot.Core.Features.Points.Configuration;
-using BlokeBot.Core.Features.Points.Dashboard;
-using BlokeBot.Core.Features.Points.Giveaways;
-using BlokeBot.Core.Features.SiteAccess;
-using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.Web.Virtualization;
 using Microsoft.JSInterop;
-using static Microsoft.AspNetCore.Components.Web.RenderMode;
 
 namespace BlokeBot.Core.Components.Layout;
 
@@ -48,9 +17,12 @@ public partial class NavMenu
     private const string _pointsOpenStorageKey = "blokebot.sidebar.points.open";
     private const string _customCommandsOpenStorageKey = "blokebot.sidebar.customcommands.open";
 
+    private readonly string _rootId = $"navigation-{Guid.NewGuid():N}";
+    private NavigationGroup? _iconRailOpenGroup;
     private bool _guessingOpen = true;
     private bool _pointsOpen = true;
     private bool _customCommandsOpen = true;
+    private bool _routeHelpActive;
     private IDisposable? _hostedChannelSubscription;
     private IReadOnlyDictionary<int, HostFeatureFlags> _hostedFeatures =
         new Dictionary<int, HostFeatureFlags>();
@@ -60,8 +32,12 @@ public partial class NavMenu
     [Parameter]
     public EventCallback OnNavigate { get; set; }
 
+    [Parameter]
+    public NavigationPresentation Presentation { get; set; } = NavigationPresentation.Expanded;
+
     protected override async Task OnInitializedAsync()
     {
+        _navigation.LocationChanged += HandleLocationChanged;
         _hostedChannelSubscription = _events.SubscribeForComponentRefresh(
             AppEventKind.HostedChannelsChanged,
             InvokeAsync,
@@ -73,40 +49,56 @@ public partial class NavMenu
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender)
+        if (firstRender)
+        {
+            try
+            {
+                _module = await _js.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./Components/Layout/NavMenu.razor.js"
+                );
+                _guessingOpen = await _module.InvokeAsync<bool>(
+                    "readBoolean",
+                    _guessingOpenStorageKey,
+                    true
+                );
+                _pointsOpen = await _module.InvokeAsync<bool>(
+                    "readBoolean",
+                    _pointsOpenStorageKey,
+                    true
+                );
+                _customCommandsOpen = await _module.InvokeAsync<bool>(
+                    "readBoolean",
+                    _customCommandsOpenStorageKey,
+                    true
+                );
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (JSDisconnectedException) { }
+            catch (JSException) { }
+            catch (TaskCanceledException) { }
+        }
+
+        if (_module is null)
         {
             return;
         }
 
-        try
+        if (Presentation is NavigationPresentation.IconRail && !_routeHelpActive)
         {
-            _module = await _js.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./Components/Layout/NavMenu.razor.js"
-            );
-            _guessingOpen = await _module.InvokeAsync<bool>(
-                "readBoolean",
-                _guessingOpenStorageKey,
-                true
-            );
-            _pointsOpen = await _module.InvokeAsync<bool>(
-                "readBoolean",
-                _pointsOpenStorageKey,
-                true
-            );
-            _customCommandsOpen = await _module.InvokeAsync<bool>(
-                "readBoolean",
-                _customCommandsOpenStorageKey,
-                true
-            );
-            StateHasChanged();
+            await _module.InvokeVoidAsync("activateRouteHelp", _rootId);
+            _routeHelpActive = true;
         }
-        catch (JSDisconnectedException) { }
-        catch (TaskCanceledException) { }
+        else if (Presentation is NavigationPresentation.Expanded && _routeHelpActive)
+        {
+            await _module.InvokeVoidAsync("deactivateRouteHelp", _rootId);
+            _routeHelpActive = false;
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
+        _navigation.LocationChanged -= HandleLocationChanged;
         _hostedChannelSubscription?.Dispose();
 
         if (_module is null)
@@ -116,46 +108,155 @@ public partial class NavMenu
 
         try
         {
+            if (_routeHelpActive)
+            {
+                await _module.InvokeVoidAsync("deactivateRouteHelp", _rootId);
+            }
+
             await _module.DisposeAsync();
         }
         catch (JSDisconnectedException) { }
         catch (TaskCanceledException) { }
     }
 
-    private async Task ToggleGuessingAsync()
+    private string? CurrentRoute(string route, bool exact = false)
     {
-        _guessingOpen = !_guessingOpen;
-        if (_module is not null)
+        return RouteIsCurrent(route, exact) ? "page" : null;
+    }
+
+    private bool GroupIsCurrent(string route)
+    {
+        return RouteIsCurrent(route, exact: false);
+    }
+
+    private string? CurrentGroup(string route)
+    {
+        return GroupIsCurrent(route) ? "page" : null;
+    }
+
+    private bool GroupIsOpen(NavigationGroup group)
+    {
+        return Presentation switch
         {
-            await _module.InvokeVoidAsync("writeBoolean", _guessingOpenStorageKey, _guessingOpen);
+            NavigationPresentation.Expanded => group switch
+            {
+                NavigationGroup.Guessing => _guessingOpen,
+                NavigationGroup.Points => _pointsOpen,
+                NavigationGroup.CustomCommands => _customCommandsOpen,
+                _ => throw new UnreachableException(),
+            },
+            NavigationPresentation.IconRail => _iconRailOpenGroup == group,
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    private string GroupBodyId(NavigationGroup group)
+    {
+        return $"{_rootId}-{group.ToString().ToLowerInvariant()}-destinations";
+    }
+
+    private string? RouteHelpReference(string routeKey)
+    {
+        return Presentation is NavigationPresentation.IconRail ? RouteHelpId(routeKey) : null;
+    }
+
+    private string RouteHelpId(string routeKey)
+    {
+        return $"{_rootId}-{routeKey}-help";
+    }
+
+    private RenderFragment RouteHelp(string routeKey, string label)
+    {
+        return builder =>
+        {
+            builder.OpenElement(0, "span");
+            builder.AddAttribute(1, "id", RouteHelpId(routeKey));
+            builder.AddAttribute(2, "class", "nav-menu__route-help");
+            builder.AddAttribute(3, "role", "tooltip");
+            builder.AddContent(4, label);
+            builder.CloseElement();
+        };
+    }
+
+    private async Task ToggleGroupAsync(NavigationGroup group)
+    {
+        if (Presentation is NavigationPresentation.IconRail)
+        {
+            _iconRailOpenGroup = _iconRailOpenGroup == group ? null : group;
+            return;
+        }
+
+        switch (group)
+        {
+            case NavigationGroup.Guessing:
+                _guessingOpen = !_guessingOpen;
+                await PersistGroupAsync(_guessingOpenStorageKey, _guessingOpen);
+                break;
+            case NavigationGroup.Points:
+                _pointsOpen = !_pointsOpen;
+                await PersistGroupAsync(_pointsOpenStorageKey, _pointsOpen);
+                break;
+            case NavigationGroup.CustomCommands:
+                _customCommandsOpen = !_customCommandsOpen;
+                await PersistGroupAsync(_customCommandsOpenStorageKey, _customCommandsOpen);
+                break;
+            default:
+                throw new UnreachableException();
         }
     }
 
-    private async Task TogglePointsAsync()
+    private void CloseGroupOnEscape(NavigationGroup group, KeyboardEventArgs args)
     {
-        _pointsOpen = !_pointsOpen;
-        if (_module is not null)
+        if (
+            Presentation is NavigationPresentation.IconRail
+            && _iconRailOpenGroup == group
+            && args.Key == "Escape"
+        )
         {
-            await _module.InvokeVoidAsync("writeBoolean", _pointsOpenStorageKey, _pointsOpen);
+            _iconRailOpenGroup = null;
         }
     }
 
-    private async Task ToggleCustomCommandsAsync()
+    private async Task PersistGroupAsync(string storageKey, bool open)
     {
-        _customCommandsOpen = !_customCommandsOpen;
         if (_module is not null)
         {
-            await _module.InvokeVoidAsync(
-                "writeBoolean",
-                _customCommandsOpenStorageKey,
-                _customCommandsOpen
+            await _module.InvokeVoidAsync("writeBoolean", storageKey, open);
+        }
+    }
+
+    private async Task NotifyNavigatedAsync()
+    {
+        _iconRailOpenGroup = null;
+        if (OnNavigate.HasDelegate)
+        {
+            await OnNavigate.InvokeAsync();
+        }
+    }
+
+    private bool RouteIsCurrent(string route, bool exact)
+    {
+        var path = _navigation.ToBaseRelativePath(_navigation.Uri);
+        var suffixIndex = path.IndexOfAny(['?', '#']);
+        if (suffixIndex >= 0)
+        {
+            path = path[..suffixIndex];
+        }
+
+        path = path.Trim('/');
+        route = route.Trim('/');
+        return string.Equals(path, route, StringComparison.OrdinalIgnoreCase)
+            || (
+                !exact
+                && route.Length > 0
+                && path.StartsWith($"{route}/", StringComparison.OrdinalIgnoreCase)
             );
-        }
     }
 
-    private Task NotifyNavigatedAsync()
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
     {
-        return OnNavigate.HasDelegate ? OnNavigate.InvokeAsync() : Task.CompletedTask;
+        _iconRailOpenGroup = null;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private bool FeatureIsVisible(
@@ -177,5 +278,12 @@ public partial class NavMenu
     {
         _hostedFeatures = await _features.LoadHostedFeaturesAsync(CancellationToken.None);
         _existingHostIds = _hostedFeatures.Keys.ToHashSet();
+    }
+
+    private enum NavigationGroup
+    {
+        Guessing,
+        Points,
+        CustomCommands,
     }
 }

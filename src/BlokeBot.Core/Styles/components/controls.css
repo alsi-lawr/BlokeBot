@@ -76,6 +76,37 @@
         color: var(--app-text-strong);
     }
 
+    .btn-primary:focus-visible,
+    .btn-secondary:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--app-focus-border) 34%, transparent);
+        outline-offset: 2px;
+    }
+
+    .field {
+        flex: 1 1 16rem;
+        max-width: 100%;
+        min-width: min(100%, 16rem);
+    }
+
+    .field-row {
+        align-items: flex-end;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .form-grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    }
+
+    .form-help {
+        color: var(--app-text-muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+    }
+
     .input {
         background: var(--app-control-bg);
         border: 1px solid var(--app-control-border);
@@ -101,5 +132,28 @@
         display: block;
         font-size: 0.8125rem;
         font-weight: 600;
+    }
+
+    @media (max-width: 30rem) {
+        .field {
+            flex-basis: 100%;
+            min-width: 100%;
+            width: 100%;
+        }
+
+        .field-row {
+            align-items: stretch;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .btn-primary,
+        .btn-secondary {
+            transition-duration: 1ms;
+        }
+
+        .btn-primary:hover {
+            transform: none;
+        }
     }
 }

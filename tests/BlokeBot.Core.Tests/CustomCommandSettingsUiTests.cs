@@ -68,10 +68,11 @@ public sealed class CustomCommandSettingsUiTests
 
         disclosure.Click();
 
-        cut.FindAll($"#{expected.ContentId}").ShouldBeEmpty();
+        cut.Find($"#{expected.ContentId}").HasAttribute("hidden").ShouldBeTrue();
+        cut.FindAll($"#{expected.ControlId}").ShouldBeEmpty();
         cut.Find("button[aria-label='Save custom commands']").Click();
 
-        cut.Find($"#{expected.ContentId}").ShouldNotBeNull();
+        cut.Find($"#{expected.ContentId}").HasAttribute("hidden").ShouldBeFalse();
         var control = cut.Find($"#{expected.ControlId}");
         control.GetAttribute("aria-invalid").ShouldBe("true");
         control.GetAttribute("aria-describedby").ShouldBe($"{expected.ControlId}-error");

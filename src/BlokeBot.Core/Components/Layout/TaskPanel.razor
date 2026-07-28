@@ -1,0 +1,32 @@
+<section class="task-panel">
+    <header class="task-panel__header">
+        <div class="min-w-0 space-y-2">
+            <h2 class="task-panel__title">@Title</h2>
+            @if (!string.IsNullOrWhiteSpace(Description))
+            {
+                <p class="task-panel__description">@Description</p>
+            }
+        </div>
+        @if (Actions is not null)
+        {
+            <div class="task-panel__actions">@Actions</div>
+        }
+    </header>
+    <div class="task-panel__body">
+        @ChildContent
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public RenderFragment? Actions { get; set; }
+
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+}

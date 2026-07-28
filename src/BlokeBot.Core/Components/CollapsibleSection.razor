@@ -1,10 +1,12 @@
+@inject IJSRuntime _js
+@implements IAsyncDisposable
+
 <section class="@_panelClass">
-    <button
-        type="button"
-        class="disclosure-trigger"
-        aria-controls="@_resolvedContentId"
-        aria-expanded="@_isOpen"
-        @onclick="Toggle">
+    <button type="button"
+            class="disclosure-trigger"
+            aria-controls="@_resolvedContentId"
+            aria-expanded="@(_isOpen ? "true" : "false")"
+            @onclick="Toggle">
         <span class="disclosure-copy">
             <span class="disclosure-title">@Title</span>
             @if (!string.IsNullOrWhiteSpace(Description))
@@ -19,10 +21,13 @@
         </span>
     </button>
 
-    @if (_isOpen)
-    {
-        <div id="@_resolvedContentId" class="disclosure-content">
+    <div id="@_resolvedContentId"
+         class="disclosure-content"
+         hidden="@(!_isOpen)"
+         aria-hidden="@(_isOpen ? "false" : "true")">
+        @if (_isOpen)
+        {
             @ChildContent
-        </div>
-    }
+        }
+    </div>
 </section>
