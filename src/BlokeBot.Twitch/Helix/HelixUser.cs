@@ -15,4 +15,7 @@ public sealed record HelixUser
 
     [JsonPropertyName("profile_image_url")]
     public string ProfileImageUrl { get; init; } = string.Empty;
+
+    [JsonPropertyName("broadcaster_type")]
+    public string BroadcasterType { get; init; } = string.Empty;
 }

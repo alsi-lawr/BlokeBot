@@ -243,6 +243,8 @@ internal sealed partial class EventSubChannelSession
             {
                 EventSubOperationSubscriptionKind.Shoutouts,
                 EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.RewardRedemptions,
+                EventSubOperationSubscriptionKind.Predictions,
             }
         )
         {
@@ -488,6 +490,8 @@ internal sealed partial class EventSubChannelSession
             {
                 EventSubOperationSubscriptionKind.Shoutouts,
                 EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.RewardRedemptions,
+                EventSubOperationSubscriptionKind.Predictions,
             }
         )
         {
@@ -632,6 +636,9 @@ internal sealed partial class EventSubChannelSession
         {
             EventSubOperationSubscriptionKind.Shoutouts => subscription.ShoutoutSubscriptions,
             EventSubOperationSubscriptionKind.Polls => subscription.PollSubscriptions,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                subscription.RewardRedemptionSubscriptions,
+            EventSubOperationSubscriptionKind.Predictions => subscription.PredictionSubscriptions,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -654,6 +661,14 @@ internal sealed partial class EventSubChannelSession
             {
                 PollSubscriptions = state,
             },
+            EventSubOperationSubscriptionKind.RewardRedemptions => subscription with
+            {
+                RewardRedemptionSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.Predictions => subscription with
+            {
+                PredictionSubscriptions = state,
+            },
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -670,6 +685,10 @@ internal sealed partial class EventSubChannelSession
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
             EventSubOperationSubscriptionKind.Polls =>
                 EventSubAuthorizationContext.BroadcasterAuthority,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                EventSubAuthorizationContext.RewardRedemptionsAuthority,
+            EventSubOperationSubscriptionKind.Predictions =>
+                EventSubAuthorizationContext.PredictionsAuthority,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."
             ),
@@ -685,6 +704,10 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Shoutouts =>
                 AccessTokenUnavailableReason.MissingRefreshToken,
             EventSubOperationSubscriptionKind.Polls =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            EventSubOperationSubscriptionKind.Predictions =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
             _ => throw new UnreachableException(
                 "Unknown Native Twitch EventSub subscription kind."

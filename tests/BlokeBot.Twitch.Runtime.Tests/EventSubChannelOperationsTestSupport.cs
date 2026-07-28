@@ -21,6 +21,10 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 Func<CancellationToken, ValueTask<Result<BotAccount, AccessTokenUnavailableReason>>>
             >
         > _accountScripts = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            string,
+            Queue<Func<CancellationToken, ValueTask<BotAccount>>>
+        > _broadcasterAccountScripts = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _accountCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -33,7 +37,7 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private readonly Dictionary<string, int> _createCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, Queue<Exception>> _deleteFailures = new(
+        private readonly Dictionary<string, Queue<Exception?>> _deleteOutcomes = new(
             StringComparer.OrdinalIgnoreCase
         );
         private readonly Dictionary<string, Queue<Action>> _beforeDelete = new(
@@ -91,6 +95,12 @@ public abstract partial class EventSubChannelRecoveryTestBase
             EnqueueAccount(channel, _ => ValueTask.FromResult(new BotAccount(botLogin, "secret")));
         }
 
+        internal void EnqueueBroadcasterAccountResult(string channel, string login)
+        {
+            GetQueue(_broadcasterAccountScripts, channel)
+                .Enqueue(_ => ValueTask.FromResult(new BotAccount(login, "broadcaster-secret")));
+        }
+
         internal void EnqueueAccountUnavailable(string channel, AccessTokenUnavailableReason reason)
         {
             GetQueue(_accountScripts, channel)
@@ -131,7 +141,12 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
         internal void EnqueueDeleteFailure(string channel, Exception exception)
         {
-            GetQueue(_deleteFailures, channel).Enqueue(exception);
+            GetQueue(_deleteOutcomes, channel).Enqueue(exception);
+        }
+
+        internal void EnqueueDeleteSuccess(string channel)
+        {
+            GetQueue(_deleteOutcomes, channel).Enqueue(null);
         }
 
         internal void EnqueueBeforeDelete(string channel, Action action)
@@ -203,11 +218,15 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 authorizations.Add(authorization);
                 if (authorization is EventSubAuthorizationContext.Broadcaster)
                 {
-                    return ValueTask.FromResult(
-                        Result<BotAccount, AccessTokenUnavailableReason>.Error(
-                            AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
-                        )
-                    );
+                    return
+                        _broadcasterAccountScripts.TryGetValue(channel, out var broadcasters)
+                        && broadcasters.Count > 0
+                        ? GetBroadcasterAccountAsync(broadcasters.Dequeue(), cancellationToken)
+                        : ValueTask.FromResult(
+                            Result<BotAccount, AccessTokenUnavailableReason>.Error(
+                                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                            )
+                        );
                 }
                 return _accountScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0
                     ? scripts.Dequeue()(cancellationToken)
@@ -309,8 +328,9 @@ public abstract partial class EventSubChannelRecoveryTestBase
             }
 
             if (
-                !_deleteFailures.TryGetValue(subscription.Channel, out var failures)
-                || failures.Count == 0
+                !_deleteOutcomes.TryGetValue(subscription.Channel, out var outcomes)
+                || outcomes.Count == 0
+                || outcomes.Dequeue() is not { } exception
             )
             {
                 return ValueTask.FromResult<EventSubSubscriptionDeletionOutcome>(
@@ -318,7 +338,6 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 );
             }
 
-            var exception = failures.Dequeue();
             if (
                 exception is OperationCanceledException
                 && cancellationToken.IsCancellationRequested
@@ -346,6 +365,18 @@ public abstract partial class EventSubChannelRecoveryTestBase
                 _completeStopFailures.TryGetValue(channel, out var failures) && failures.Count > 0
                 ? ValueTask.FromException(failures.Dequeue())
                 : ValueTask.CompletedTask;
+        }
+
+        private static async ValueTask<
+            Result<BotAccount, AccessTokenUnavailableReason>
+        > GetBroadcasterAccountAsync(
+            Func<CancellationToken, ValueTask<BotAccount>> operation,
+            CancellationToken cancellationToken
+        )
+        {
+            return Result<BotAccount, AccessTokenUnavailableReason>.Success(
+                await operation(cancellationToken)
+            );
         }
 
         private static Queue<TValue> GetQueue<TValue>(

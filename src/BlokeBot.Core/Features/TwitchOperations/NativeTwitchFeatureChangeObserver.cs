@@ -1,6 +1,8 @@
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
+using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Twitch.Runtime;
 
 namespace BlokeBot.Core.Features.TwitchOperations;
@@ -8,7 +10,9 @@ namespace BlokeBot.Core.Features.TwitchOperations;
 internal sealed class NativeTwitchFeatureChangeObserver(
     IEventSubChannelReconciliationTrigger eventSub,
     PollService polls,
-    ClipMarkerService clipsMarkers
+    ClipMarkerService clipsMarkers,
+    ChannelPointsService channelPoints,
+    PredictionService predictions
 ) : INativeTwitchFeatureChangeObserver
 {
     public async Task NativeTwitchFeatureChangedAsync(
@@ -25,5 +29,7 @@ internal sealed class NativeTwitchFeatureChangeObserver(
 
         await polls.ReconcileAsync(hostId, cancellationToken);
         await clipsMarkers.ReconcileAsync(hostId, cancellationToken);
+        await channelPoints.ReconcileAsync(hostId, cancellationToken);
+        await predictions.ReconcileAsync(hostId, cancellationToken);
     }
 }
