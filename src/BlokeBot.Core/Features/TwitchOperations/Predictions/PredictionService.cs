@@ -21,7 +21,7 @@ public sealed class PredictionService(
     DurableAlertService alerts,
     ILogger<PredictionService> logger,
     NativeTwitchFeatureGate nativeTwitch
-) : IPredictionEventObserver
+) : IPredictionEventObserver, IPredictionDashboardOperations
 {
     private const int _resultsToKeep = 100;
     private const string _notReadyMessage =

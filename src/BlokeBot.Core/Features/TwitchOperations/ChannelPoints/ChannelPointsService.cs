@@ -18,7 +18,7 @@ public sealed class ChannelPointsService(
     DurableAlertService alerts,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
-) : IChannelPointsEventObserver
+) : IChannelPointsEventObserver, IChannelPointsDashboardOperations
 {
     private const int _terminalToKeep = 100;
     private const int _redemptionsPageSize = 50;

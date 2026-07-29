@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,6 +20,32 @@ internal static class SimulationServiceCollectionExtensions
                 IAutomaticRaidShoutoutDelivery,
                 SimulationAutomaticRaidShoutoutDelivery
             >()
+        );
+        services.AddSingleton<SimulationNativeTwitchDashboardOperations>();
+        services.Replace(
+            ServiceDescriptor.Singleton<IShoutoutDashboardOperations>(provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
+        );
+        services.Replace(
+            ServiceDescriptor.Singleton<IPollDashboardOperations>(provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
+        );
+        services.Replace(
+            ServiceDescriptor.Singleton<IClipMarkerDashboardOperations>(provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
+        );
+        services.Replace(
+            ServiceDescriptor.Singleton<IChannelPointsDashboardOperations>(provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
+        );
+        services.Replace(
+            ServiceDescriptor.Singleton<IPredictionDashboardOperations>(provider =>
+                provider.GetRequiredService<SimulationNativeTwitchDashboardOperations>()
+            )
         );
         services.AddSingleton<SimulationFixtureSeeder>();
         return services;

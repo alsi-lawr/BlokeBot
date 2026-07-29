@@ -108,29 +108,35 @@ public partial class ClipsMarkersPage
             ),
             ClipMarkerOperationOutcome.ClipAvailable => ("Clip is available.", true),
             ClipMarkerOperationOutcome.MarkerCreated => ("Stream marker created.", true),
-            ClipMarkerOperationOutcome.NotReady notReady => (notReady.Message, false),
+            ClipMarkerOperationOutcome.NotReady => (
+                "Reconnect this channel to Twitch, then try again.",
+                false
+            ),
             ClipMarkerOperationOutcome.InvalidRequest invalid => (invalid.Message, false),
             ClipMarkerOperationOutcome.Offline => (
-                "Twitch reports that the channel is offline.",
+                "Go live before creating a clip or marker.",
                 false
             ),
             ClipMarkerOperationOutcome.VodsDisabled => (
-                "Twitch reports that VOD or clip creation is disabled.",
+                "Turn on stream recordings and clips in Twitch, then try again.",
                 false
             ),
             ClipMarkerOperationOutcome.RerunOrPremiere => (
-                "Twitch reports that this stream cannot create clips or markers.",
+                "Clips and markers are not available during a rerun or premiere.",
                 false
             ),
             ClipMarkerOperationOutcome.ClipAmbiguous => (
-                "Twitch did not confirm the clip outcome. BlokeBot retained the attempt for a safe status check.",
+                "Twitch did not confirm whether the clip was made. Use Check outcome on this attempt.",
                 false
             ),
             ClipMarkerOperationOutcome.MarkerAmbiguous => (
-                "Twitch did not confirm the marker outcome. BlokeBot retained the attempt for a safe status check.",
+                "Twitch did not confirm whether the marker was made. Use Check outcome on this attempt.",
                 false
             ),
-            ClipMarkerOperationOutcome.ProviderRejected rejected => (rejected.Message, false),
+            ClipMarkerOperationOutcome.ProviderRejected => (
+                "Twitch could not complete that action. Check the stream and try again.",
+                false
+            ),
             ClipMarkerOperationOutcome.ClipFailed failed => (
                 failed.Clip.FailureReason ?? "Twitch did not create the clip.",
                 false

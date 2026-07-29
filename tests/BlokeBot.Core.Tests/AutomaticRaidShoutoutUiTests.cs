@@ -30,7 +30,7 @@ public sealed class AutomaticRaidShoutoutUiTests
             section.Find("#automatic-raid-minimum-viewers").HasAttribute("disabled").ShouldBeTrue();
             section.Find("#automatic-raid-mechanism-native").HasAttribute("checked").ShouldBeTrue();
             section.FindAll("[data-automatic-raid-chat-controls]").ShouldBeEmpty();
-            section.Markup.ShouldContain("Disabled. Saved settings are retained");
+            section.Markup.ShouldContain("Off. Your settings are saved");
         });
     }
 
@@ -126,7 +126,7 @@ public sealed class AutomaticRaidShoutoutUiTests
             section.FindAll("[data-automatic-raid-outcomes] article").Count.ShouldBe(20);
             section.Markup.ShouldContain("Message sent, pin failed");
             section.Markup.ShouldContain("will not resend or switch modes");
-            section.Markup.ShouldContain("Native shoutout cooldown active");
+            section.Markup.ShouldContain("Skipped during Twitch cooldown");
             section.FindAll("[data-automatic-raid-outcomes] button").ShouldBeEmpty();
         });
 

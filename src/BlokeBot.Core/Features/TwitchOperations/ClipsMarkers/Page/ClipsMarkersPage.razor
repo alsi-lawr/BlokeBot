@@ -7,26 +7,28 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject ClipMarkerService _clipsMarkers
+@inject IClipMarkerDashboardOperations _clipsMarkers
 @inject ToastService _toasts
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject EventBus<AppEventKind> _events
 
 <PageTitle>BlokeBot | Clips &amp; markers</PageTitle>
 
-<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="clips-markers">
-    <PageHeader Kicker="Native Twitch" Title="Clips &amp; markers" Description="Capture live moments and safely check outcomes after an uncertain response." />
+<DashboardPage Kicker="Native Twitch"
+               Title="Clips &amp; markers"
+               Description="Save a shareable clip or mark a moment to find in your stream recording later."
+               data-native-route="clips-markers">
     <NativeTwitchToolSwitcher />
 
     @if (_loadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" Description="BlokeBot couldn’t load clip and marker activity for this channel.">
+        <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" Description="Try again. Any earlier attempts are still saved.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
-        <PageState Kind="PageStateKind.Loading" Title="Loading clips and markers" Description="Checking Twitch authorization and recent attempts." />
+        <PageState Kind="PageStateKind.Loading" Title="Loading clips and markers" Description="Getting recent clips, markers, and unfinished attempts." />
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is ClipMarkerAuthorizationReadiness.Disabled)
     {
@@ -36,14 +38,14 @@
     {
         @if (_state.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
         {
-            <PageState Kind="PageStateKind.Unavailable" Title="Reconnect the broadcaster" Description="@readiness.Message">
-                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect broadcaster</AuthPopupButton></Actions>
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can create clips and markers for this channel.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
 
         @if (_state.Authorization is ClipMarkerAuthorizationReadiness.Ready)
         {
-        <TaskPanel Title="Create a clip" Description="Ask Twitch to capture the current live moment.">
+        <TaskPanel Title="Create a clip" Description="Save the current live moment as a clip you can share.">
             <div class="field-row native-primary-row">
                 <label class="flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-900" for="clip-has-delay">
                     <input id="clip-has-delay" type="checkbox" @bind="_clipHasDelay" />
@@ -60,7 +62,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Attempts and results" Description="Pending, ambiguous, completed, and failed clip or marker attempts." InitiallyOpen="@_hasAttentionRequired">
+        <CollapsibleSection Title="Clips and markers" Description="Open completed clips or check anything Twitch is still preparing." InitiallyOpen="@_hasAttentionRequired">
             <div class="p-4">
                 @if (_state.PendingClips.Count == 0 && _state.Results.Count == 0 && _state.Markers.Count == 0)
                 {
@@ -118,4 +120,4 @@
         </CollapsibleSection>
         }
     }
-</div>
+</DashboardPage>

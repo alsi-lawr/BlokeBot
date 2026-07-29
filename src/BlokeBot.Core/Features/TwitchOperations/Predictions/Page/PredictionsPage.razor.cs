@@ -159,11 +159,23 @@ public partial class PredictionsPage
                 "That Prediction outcome is no longer available.",
                 false
             ),
-            PredictionOperationOutcome.NotReady notReady => (notReady.Message, false),
-            PredictionOperationOutcome.Ineligible ineligible => (ineligible.Message, false),
-            PredictionOperationOutcome.Unavailable unavailable => (unavailable.Message, false),
+            PredictionOperationOutcome.NotReady => (
+                "Reconnect this channel to Twitch, then try again.",
+                false
+            ),
+            PredictionOperationOutcome.Ineligible => (
+                "Predictions are available after this channel becomes a Twitch Affiliate or Partner.",
+                false
+            ),
+            PredictionOperationOutcome.Unavailable => (
+                "Predictions are not available right now. Reload the page before trying again.",
+                false
+            ),
             PredictionOperationOutcome.InvalidTemplate invalid => (invalid.Message, false),
-            PredictionOperationOutcome.ProviderRejected rejected => (rejected.Message, false),
+            PredictionOperationOutcome.ProviderRejected => (
+                "Twitch could not complete that Prediction action. Reload the page before trying again.",
+                false
+            ),
             _ => throw new UnreachableException(),
         };
         if (success)

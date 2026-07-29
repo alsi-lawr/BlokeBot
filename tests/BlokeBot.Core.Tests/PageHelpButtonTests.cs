@@ -10,13 +10,13 @@ namespace BlokeBot.Core.Tests;
 public sealed class PageHelpButtonTests
 {
     [Test]
-    [Arguments("/twitch-operations/shoutouts", "Shoutouts", "same-channel cooldown")]
-    [Arguments("/twitch-operations/polls", "Polls", "reusable template")]
+    [Arguments("/twitch-operations/shoutouts", "Shoutouts", "page shows when you can send")]
+    [Arguments("/twitch-operations/polls", "Polls", "Save a question")]
     [Arguments("/twitch-operations/clips-markers", "Clips & markers", "Check outcome")]
     [Arguments(
         "/twitch-operations/channel-points",
         "Rewards & redemptions",
-        "cancel it so Twitch refunds"
+        "return the viewer’s Channel Points"
     )]
     [Arguments("/twitch-operations/predictions", "Predictions", "winning outcome")]
     public void NativeRoute_RendersOneButtonAndOpensRouteSpecificHelp(
@@ -54,16 +54,16 @@ public sealed class PageHelpButtonTests
         cut.Find("button[aria-label='Page help']").Click();
 
         var text = cut.Markup;
-        text.ShouldContain("When the Automatic raid shoutouts section is shown");
-        text.ShouldContain("within two minutes");
+        text.ShouldContain("Automatic raid shoutouts");
+        text.ShouldContain("up to two minutes");
         text.ShouldContain("either a native Twitch shoutout or one chat message");
         text.ShouldContain("When chat delivery is selected");
-        text.ShouldContain("When chat delivery settings are shown");
-        text.ShouldContain("When pinned chat delivery is selected");
+        text.ShouldContain("Use these details in the message");
+        text.ShouldContain("A pinned shoutout");
         text.ShouldContain("regular, pinned, or announcement");
-        text.ShouldContain("does not switch mechanisms or automatically retry");
+        text.ShouldContain("does not switch modes or send it again");
         text.ShouldContain("replaces the current pin");
-        text.ShouldContain("does not restore the previous pin");
+        text.ShouldContain("previous pin is not restored");
         text.ShouldContain("{twitch_handle}");
         text.ShouldContain("{display_name}");
         text.ShouldContain("{channel_url}");

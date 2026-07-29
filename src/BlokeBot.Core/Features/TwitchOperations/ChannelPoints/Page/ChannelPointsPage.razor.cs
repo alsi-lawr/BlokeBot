@@ -255,8 +255,14 @@ public partial class ChannelPointsPage
                 confirmation.Message,
                 false
             ),
-            ChannelPointsOperationOutcome.NotReady notReady => (notReady.Message, false),
-            ChannelPointsOperationOutcome.Ineligible ineligible => (ineligible.Message, false),
+            ChannelPointsOperationOutcome.NotReady => (
+                "Reconnect this channel to Twitch, then try again.",
+                false
+            ),
+            ChannelPointsOperationOutcome.Ineligible => (
+                "Channel Points rewards are available after this channel becomes a Twitch Affiliate or Partner.",
+                false
+            ),
             ChannelPointsOperationOutcome.ExternalReadOnly => (
                 "This Twitch reward is managed outside BlokeBot and is read-only.",
                 false
@@ -266,7 +272,10 @@ public partial class ChannelPointsPage
                 false
             ),
             ChannelPointsOperationOutcome.InvalidRequest invalid => (invalid.Message, false),
-            ChannelPointsOperationOutcome.ProviderRejected rejected => (rejected.Message, false),
+            ChannelPointsOperationOutcome.ProviderRejected => (
+                "Twitch could not complete that reward action. Reload the page before trying again.",
+                false
+            ),
             _ => throw new UnreachableException(),
         };
         if (success)

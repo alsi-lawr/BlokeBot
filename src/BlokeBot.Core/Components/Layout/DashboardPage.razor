@@ -1,6 +1,6 @@
 @using System.Diagnostics
 
-<div class="@PageClass">
+<div class="@PageClass" @attributes="AdditionalAttributes">
     <PageHeader Kicker="@Kicker"
                 Title="@Title"
                 Description="@Description" />
@@ -54,6 +54,9 @@
 @code {
     [Parameter]
     public RenderFragment? Actions { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
     [Parameter, EditorRequired]
     public RenderFragment? ChildContent { get; set; }

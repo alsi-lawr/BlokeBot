@@ -8,26 +8,28 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject ShoutoutService _shoutouts
+@inject IShoutoutDashboardOperations _shoutouts
 @inject ToastService _toasts
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject EventBus<AppEventKind> _events
 
 <PageTitle>BlokeBot | Shoutouts</PageTitle>
 
-<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="shoutouts">
-    <PageHeader Kicker="Native Twitch" Title="Shoutouts" Description="Send a native Twitch shoutout and see Twitch-provided cooldowns." />
+<DashboardPage Kicker="Native Twitch"
+               Title="Shoutouts"
+               Description="Recommend another live channel to your viewers, or welcome incoming raids automatically."
+               data-native-route="shoutouts">
     <NativeTwitchToolSwitcher />
 
     @if (_loadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Shoutouts could not load" Description="BlokeBot couldn’t load shoutouts for this channel.">
+        <PageState Kind="PageStateKind.Failure" Title="Shoutouts could not load" Description="Try again. Nothing was sent or changed.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
-        <PageState Kind="PageStateKind.Loading" Title="Loading shoutouts" Description="Checking cooldowns and recent activity." />
+        <PageState Kind="PageStateKind.Loading" Title="Loading shoutouts" Description="Getting recent shoutouts and the next available send time." />
     }
     else if (!_nativeTwitchEnabled)
     {
@@ -35,7 +37,7 @@
     }
     else if (_state is not null)
     {
-        <TaskPanel Title="Send a shoutout" Description="Choose a live channel with viewers. Twitch applies global and same-channel cooldowns.">
+        <TaskPanel Title="Send a shoutout" Description="Enter the Twitch name of another channel that is live with viewers.">
             <div class="field-row native-primary-row">
                 <Field Id="shoutout-target" Label="Target channel" @bind-Value="_targetLogin" Placeholder="channel login" />
                 <button class="btn-primary" @onclick="SendAsync">Send shoutout</button>
@@ -46,7 +48,7 @@
         <AutomaticRaidShoutoutSection HostId="HostId"
                                       RunHostMutationAsync="RunAutomaticRaidMutationAsync" />
 
-        <CollapsibleSection Title="Recent shoutouts" Description="Sent and received shoutouts for this channel." InitiallyOpen="false">
+        <CollapsibleSection Title="Recent shoutouts" Description="See who you recommended and who recommended you." InitiallyOpen="false">
             <div class="p-4">
                 @if (_state.History.Count == 0)
                 {
@@ -70,4 +72,4 @@
             </div>
         </CollapsibleSection>
     }
-</div>
+</DashboardPage>

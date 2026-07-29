@@ -18,7 +18,7 @@ public sealed class ClipMarkerService(
     DurableAlertService alerts,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
-)
+) : IClipMarkerDashboardOperations
 {
     private const int _resultsToKeep = 100;
     private static readonly TimeSpan _clipAvailabilityBound = TimeSpan.FromSeconds(60);

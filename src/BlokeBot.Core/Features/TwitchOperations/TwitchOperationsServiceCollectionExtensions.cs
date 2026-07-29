@@ -27,6 +27,9 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<NativeTwitchFeatureGate>()
         );
         services.AddSingleton<ShoutoutService>();
+        services.AddSingleton<IShoutoutDashboardOperations>(provider =>
+            provider.GetRequiredService<ShoutoutService>()
+        );
         services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(provider =>
             provider.GetRequiredService<ShoutoutService>()
         );
@@ -46,8 +49,17 @@ public static class TwitchOperationsServiceCollectionExtensions
         services.TryAddSingleton<IAutomaticRaidShoutoutDelivery, AutomaticRaidShoutoutDelivery>();
         services.AddSingleton<AutomaticRaidShoutoutObserver>();
         services.AddSingleton<PollService>();
+        services.AddSingleton<IPollDashboardOperations>(provider =>
+            provider.GetRequiredService<PollService>()
+        );
         services.AddSingleton<ClipMarkerService>();
+        services.AddSingleton<IClipMarkerDashboardOperations>(provider =>
+            provider.GetRequiredService<ClipMarkerService>()
+        );
         services.AddSingleton<ChannelPointsService>();
+        services.AddSingleton<IChannelPointsDashboardOperations>(provider =>
+            provider.GetRequiredService<ChannelPointsService>()
+        );
         services.AddSingleton(provider => new PredictionService(
             provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
             provider.GetRequiredService<IHostBroadcasterTokenStatusProvider>(),
@@ -59,6 +71,9 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<NativeTwitchFeatureGate>(),
             TimeProvider.System
         ));
+        services.AddSingleton<IPredictionDashboardOperations>(provider =>
+            provider.GetRequiredService<PredictionService>()
+        );
         services.AddSingleton<
             INativeTwitchFeatureChangeObserver,
             NativeTwitchFeatureChangeObserver

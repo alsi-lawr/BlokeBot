@@ -7,7 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject PollService _polls
+@inject IPollDashboardOperations _polls
 @inject ToastService _toasts
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
@@ -15,19 +15,21 @@
 
 <PageTitle>BlokeBot | Polls</PageTitle>
 
-<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="polls">
-    <PageHeader Kicker="Native Twitch" Title="Polls" Description="Start a Twitch poll from a reusable template and monitor its result." />
+<DashboardPage Kicker="Native Twitch"
+               Title="Polls"
+               Description="Ask viewers a question, watch the votes, and end voting when you are ready."
+               data-native-route="polls">
     <NativeTwitchToolSwitcher />
 
     @if (_loadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Polls could not load" Description="BlokeBot couldn’t load polls for this channel.">
+        <PageState Kind="PageStateKind.Failure" Title="Polls could not load" Description="Try again. Your saved questions have not changed.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
-        <PageState Kind="PageStateKind.Loading" Title="Loading polls" Description="Checking Twitch authorization, templates, and activity." />
+        <PageState Kind="PageStateKind.Loading" Title="Loading polls" Description="Getting saved questions and the poll running now." />
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is PollAuthorizationReadiness.Disabled)
     {
@@ -37,14 +39,14 @@
     {
         @if (_state.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
         {
-            <PageState Kind="PageStateKind.Unavailable" Title="Reconnect the broadcaster" Description="@readiness.Message">
-                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect broadcaster</AuthPopupButton></Actions>
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can start and end polls for this channel.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
 
         @if (_state.Authorization is PollAuthorizationReadiness.Ready)
         {
-        <TaskPanel Title="Run a poll" Description="Start from a saved template, or end the poll currently running on Twitch.">
+        <TaskPanel Title="Run a poll" Description="Start a saved question, watch the votes, or end voting early.">
             @if (_state.ActivePoll is { } poll)
             {
                 <article class="surface-row rounded-lg p-4" data-active-poll>
@@ -109,7 +111,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Recent results" Description="Completed and terminated Twitch polls." InitiallyOpen="false">
+        <CollapsibleSection Title="Recent results" Description="Review polls that finished or were ended early." InitiallyOpen="false">
             <div class="p-4">
                 @if (_state.Results.Count == 0)
                 {
@@ -136,4 +138,4 @@
         </CollapsibleSection>
         }
     }
-</div>
+</DashboardPage>

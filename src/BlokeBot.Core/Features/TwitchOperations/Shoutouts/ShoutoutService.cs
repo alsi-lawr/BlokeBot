@@ -18,7 +18,7 @@ public sealed class ShoutoutService(
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
-) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation
+) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation, IShoutoutDashboardOperations
 {
     internal const string UnauthorizedAuthorityMessage =
         "Twitch rejected the configured bot's shoutout authority.";

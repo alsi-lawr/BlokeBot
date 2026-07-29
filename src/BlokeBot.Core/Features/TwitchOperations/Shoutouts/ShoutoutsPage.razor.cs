@@ -21,10 +21,10 @@ public partial class ShoutoutsPage
             } =>
                 $"Next global shoutout: {global.ToLocalTime():g}. @{_targetLogin} is eligible at {target.Value.ToLocalTime():g}.",
             { GlobalEligibleAtUtc: { } global } =>
-                $"Next global shoutout: {global.ToLocalTime():g}. Twitch has not supplied a same-target cooldown for @{_targetLogin}.",
+                $"You can send another shoutout after {global.ToLocalTime():g}. No separate time is available yet for @{_targetLogin}.",
             { TargetCooldown: ShoutoutTargetCooldownReadiness.EligibleAt target } =>
-                $"Global cooldown is unknown. @{_targetLogin} is eligible at {target.Value.ToLocalTime():g}.",
-            _ => "Twitch has not supplied applicable cooldown metadata yet.",
+                $"@{_targetLogin} can be shouted out after {target.Value.ToLocalTime():g}. The overall next-send time is not available yet.",
+            _ => "No cooldown time is available yet. Try sending when you are ready.",
         };
 
     protected override async Task OnInitializedAsync()
@@ -100,7 +100,10 @@ public partial class ShoutoutsPage
                         $"@{offline.TargetLogin} must be live with viewers.",
                         false
                     ),
-                    ShoutoutOperationOutcome.NotReady notReady => (notReady.Message, false),
+                    ShoutoutOperationOutcome.NotReady => (
+                        "Connect the bot account to Twitch, then try again.",
+                        false
+                    ),
                     ShoutoutOperationOutcome.CooldownActive cooldown => (
                         $"Try again after {cooldown.EligibleAtUtc.ToLocalTime():g}.",
                         false
@@ -109,7 +112,10 @@ public partial class ShoutoutsPage
                         "Twitch did not confirm the cooldown state.",
                         false
                     ),
-                    ShoutoutOperationOutcome.ProviderRejected rejected => (rejected.Message, false),
+                    ShoutoutOperationOutcome.ProviderRejected => (
+                        "Twitch could not send this shoutout. Check the channel name and try again.",
+                        false
+                    ),
                     _ => throw new UnreachableException(),
                 };
                 if (success)

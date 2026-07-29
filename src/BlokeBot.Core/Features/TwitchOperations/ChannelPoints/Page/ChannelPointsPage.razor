@@ -7,7 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject ChannelPointsService _channelPoints
+@inject IChannelPointsDashboardOperations _channelPoints
 @inject ToastService _toasts
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
@@ -15,19 +15,21 @@
 
 <PageTitle>BlokeBot | Rewards &amp; redemptions</PageTitle>
 
-<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="channel-points">
-    <PageHeader Kicker="Native Twitch" Title="Rewards &amp; redemptions" Description="Manage rewards created by BlokeBot and respond to viewer redemptions." />
+<DashboardPage Kicker="Native Twitch"
+               Title="Rewards &amp; redemptions"
+               Description="Offer Channel Points rewards and complete or refund viewer requests."
+               data-native-route="channel-points">
     <NativeTwitchToolSwitcher />
 
     @if (_loadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Rewards could not load" Description="BlokeBot couldn’t load Channel Points activity for this channel.">
+        <PageState Kind="PageStateKind.Failure" Title="Rewards could not load" Description="Try again. Your rewards and viewer requests have not changed.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
-        <PageState Kind="PageStateKind.Loading" Title="Loading rewards" Description="Checking eligibility, authorization, rewards, and redemptions." />
+        <PageState Kind="PageStateKind.Loading" Title="Loading rewards" Description="Getting rewards and viewer requests that need attention." />
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is ChannelPointsAuthorizationReadiness.Disabled)
     {
@@ -37,8 +39,8 @@
     {
         @if (_state.Authorization is ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization authorization)
         {
-            <PageState Kind="PageStateKind.Unavailable" Title="Reconnect the broadcaster" Description="@authorization.Message">
-                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@authorization.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect broadcaster</AuthPopupButton></Actions>
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can manage rewards and viewer requests.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@authorization.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
         else if (_state.Authorization is ChannelPointsAuthorizationReadiness.Ineligible ineligible)
@@ -47,7 +49,7 @@
         }
         else
         {
-            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Twitch owns viewer balances. BlokeBot manages only rewards it created.">
+            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
                 <div class="form-grid">
                     <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
                     <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
@@ -151,4 +153,4 @@
             </CollapsibleSection>
         }
     }
-</div>
+</DashboardPage>

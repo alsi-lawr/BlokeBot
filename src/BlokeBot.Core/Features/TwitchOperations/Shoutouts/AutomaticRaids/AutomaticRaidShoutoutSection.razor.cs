@@ -59,14 +59,14 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
 
     private string _readinessText =>
         !_draft.Enabled
-            ? "Disabled. Saved settings are retained, but incoming raids will not trigger a shoutout."
+            ? "Off. Your settings are saved, but incoming raids will not trigger a shoutout."
         : _draft.Mechanism == AutomaticRaidShoutoutMechanism.Native
-            ? "Native delivery is ready when Twitch is connected, the bot has shoutout authority, and Twitch’s shoutout cooldown permits delivery. BlokeBot never falls back to chat."
+            ? "Keep the bot account connected to Twitch. If Twitch’s shoutout cooldown is still active, this raid is skipped rather than sent as a chat message."
         : _draft.ChatPresentation == AutomaticRaidChatPresentation.Announcement
-            ? "Announcement delivery is ready when public chat and Twitch announcement authority are available. A failed announcement is not retried as another mode."
+            ? "Keep public chat connected and allow the bot to send announcements. If the announcement fails, BlokeBot does not send a regular message instead."
         : _draft.ChatPresentation == AutomaticRaidChatPresentation.Pinned
-            ? "Pinned delivery is ready when public chat and pin authority are available. The chat message may be sent even if the later pin step fails."
-        : "Regular chat delivery is ready when the public chat connection can accept one message.";
+            ? "Keep public chat connected and allow the bot to pin messages. The message may appear even if Twitch cannot pin it afterwards."
+        : "Keep public chat connected so BlokeBot can send the message once.";
 
     protected override Task OnInitializedAsync()
     {
@@ -422,18 +422,18 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
             AutomaticRaidShoutoutResultCode.Delivered => "Delivered",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
                 "Message exceeded the rendered limit",
-            AutomaticRaidShoutoutResultCode.NotReady => "Delivery was not ready",
-            AutomaticRaidShoutoutResultCode.AuthorityRequired => "Twitch authority required",
-            AutomaticRaidShoutoutResultCode.Cooldown => "Native shoutout cooldown active",
+            AutomaticRaidShoutoutResultCode.NotReady => "Account was not connected",
+            AutomaticRaidShoutoutResultCode.AuthorityRequired => "Reconnect the Twitch account",
+            AutomaticRaidShoutoutResultCode.Cooldown => "Skipped during Twitch cooldown",
             AutomaticRaidShoutoutResultCode.Invalid => "Raid was not eligible",
-            AutomaticRaidShoutoutResultCode.Rejected => "Twitch rejected delivery",
-            AutomaticRaidShoutoutResultCode.RateLimited => "Chat delivery was rate limited",
+            AutomaticRaidShoutoutResultCode.Rejected => "Twitch did not send the shoutout",
+            AutomaticRaidShoutoutResultCode.RateLimited => "Chat was too busy to send",
             AutomaticRaidShoutoutResultCode.PartialFailure => "Message sent, pin failed",
-            AutomaticRaidShoutoutResultCode.Unexpected => "Delivery failed unexpectedly",
-            AutomaticRaidShoutoutResultCode.Ambiguous => "Delivery outcome is uncertain",
+            AutomaticRaidShoutoutResultCode.Unexpected => "Shoutout failed",
+            AutomaticRaidShoutoutResultCode.Ambiguous => "Check Twitch for the result",
             _ when outcome.Status == AutomaticRaidShoutoutOutcomeStatus.Processing =>
-                "Delivery in progress",
-            _ => "Delivery did not complete",
+                "Sending shoutout",
+            _ => "Shoutout was not sent",
         };
     }
 
@@ -441,29 +441,28 @@ public partial class AutomaticRaidShoutoutSection : IDisposable
     {
         return outcome.ResultCode switch
         {
-            AutomaticRaidShoutoutResultCode.Delivered =>
-                "BlokeBot completed the selected shoutout mechanism.",
+            AutomaticRaidShoutoutResultCode.Delivered => "BlokeBot sent the shoutout you selected.",
             AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong =>
                 "Live Twitch values pushed the chat message over 500 characters. Nothing was sent.",
             AutomaticRaidShoutoutResultCode.NotReady =>
-                "The selected delivery connection was unavailable. No fallback mode was attempted.",
+                "Reconnect the account used by this shoutout. BlokeBot did not switch to another mode.",
             AutomaticRaidShoutoutResultCode.AuthorityRequired =>
-                "Reconnect the relevant Twitch account with the required authority before a future raid.",
+                "Reconnect the account shown in Channel setup before the next raid.",
             AutomaticRaidShoutoutResultCode.Cooldown =>
-                "Twitch’s native shoutout cooldown prevented this delivery.",
+                "Twitch’s native shoutout cooldown was still active, so nothing was sent.",
             AutomaticRaidShoutoutResultCode.Invalid =>
-                "The raid target or configured delivery choice could not be used.",
+                "The raiding channel or saved shoutout choice could not be used.",
             AutomaticRaidShoutoutResultCode.Rejected =>
-                "The selected delivery mechanism rejected this shoutout. No fallback mode was attempted.",
+                "Twitch did not send this shoutout. BlokeBot did not switch to another mode.",
             AutomaticRaidShoutoutResultCode.RateLimited =>
-                "The selected chat message was not admitted before its delivery deadline.",
+                "Chat stayed busy until this raid’s send window ended, so nothing was sent.",
             AutomaticRaidShoutoutResultCode.PartialFailure =>
                 "The chat message was sent once, but the later pin step failed. BlokeBot will not resend or switch modes.",
             AutomaticRaidShoutoutResultCode.Unexpected =>
-                "The selected delivery mechanism failed. Review Alerts for operational details.",
+                "Open Alerts for the failure details before the next raid.",
             AutomaticRaidShoutoutResultCode.Ambiguous =>
                 "BlokeBot cannot safely tell whether Twitch completed the request, so it will not retry.",
-            _ => "BlokeBot is waiting for the selected delivery mechanism to finish.",
+            _ => "BlokeBot is waiting for Twitch or chat to finish this shoutout.",
         };
     }
 

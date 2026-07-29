@@ -18,7 +18,7 @@ public sealed class PollService(
     EventBus<AppEventKind> events,
     DurableAlertService alerts,
     NativeTwitchFeatureGate nativeTwitch
-) : IPollEventObserver
+) : IPollEventObserver, IPollDashboardOperations
 {
     private const int _resultsToKeep = 100;
 

@@ -153,25 +153,23 @@ public partial class PageHelpButton
         "Shoutouts",
         [
             new(
-                "Manual shoutouts",
-                "Choose another channel that is live with viewers. Twitch applies a global cooldown and a same-channel cooldown before another native shoutout is eligible.",
-                [
-                    "The page shows the cooldown information Twitch has supplied. If a cooldown is still active, wait until the displayed time before trying again.",
-                ]
+                "Recommend a live channel",
+                "Enter the Twitch name of another channel that is live with viewers, then send the shoutout.",
+                ["If Twitch asks you to wait, the page shows when you can send again."]
             ),
             new(
-                "Automatic incoming-raid shoutouts",
-                "When the Automatic raid shoutouts section is shown, set an editable viewer threshold. Only fresh incoming raids that meet the threshold are eligible, and an incoming raid must be handled within two minutes of arriving.",
+                "Welcome incoming raids",
+                "Turn on Automatic raid shoutouts and choose the smallest raid that should receive one. New raids at or above that viewer count can be welcomed for up to two minutes after they arrive.",
                 [
-                    "In that section, choose either a native Twitch shoutout or one chat message. The two mechanisms are exclusive.",
+                    "Choose either a native Twitch shoutout or one chat message.",
                     "When chat delivery is selected, choose one presentation: regular, pinned, or announcement.",
-                    "If the selected mechanism fails, BlokeBot does not switch mechanisms or automatically retry that shoutout.",
-                    "When pinned chat delivery is selected, the shoutout replaces the current pin. BlokeBot does not restore the previous pin afterwards.",
+                    "If the chosen shoutout fails, BlokeBot does not switch modes or send it again.",
+                    "A pinned shoutout replaces the current pin. The previous pin is not restored afterwards.",
                 ]
             ),
             new(
-                "Chat message details",
-                "When chat delivery settings are shown, use the six supported tokens to add raid and channel details. Last game and stream title require inline fallback text for times when Twitch has no value.",
+                "Personalise the chat message",
+                "Use these details in the message. Add fallback text for the last game and stream title in case Twitch has no value.",
                 [
                     "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
                     "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
@@ -185,20 +183,17 @@ public partial class PageHelpButton
         [
             new(
                 "Run a poll",
-                "Save a question, choices, and duration as a reusable template, then start it when Twitch has no active poll.",
+                "Save a question and its choices, then start it whenever you want viewers to vote.",
                 [
                     "The active poll shows votes while it runs. End it here when voting should stop.",
-                    "If a poll was started in Twitch, BlokeBot asks you to confirm before ending it.",
-                    "Completed and terminated polls remain available under Recent results.",
+                    "If someone started the poll in Twitch, BlokeBot asks before ending it.",
+                    "Finished polls remain under Recent results.",
                 ]
             ),
             new(
-                "Readiness and recovery",
-                "Polls require the selected broadcaster to be connected with the required Twitch access.",
-                [
-                    "Use Reconnect broadcaster when the page asks for renewed access.",
-                    "If the page cannot load or Twitch is temporarily unavailable, use Retry before starting another action.",
-                ]
+                "If you cannot run a poll",
+                "Use Reconnect to Twitch when the page asks you to connect this channel again.",
+                ["If the page cannot load, use Retry before starting another poll."]
             ),
         ]
     );
@@ -208,18 +203,17 @@ public partial class PageHelpButton
         [
             new(
                 "Capture a live moment",
-                "Create a clip from the current live stream, or add a short private marker to help find the moment in the recording later.",
+                "Create a shareable clip of the current stream, or add a private marker to find the moment in the recording later.",
                 [
-                    "The channel must be live, and Twitch may reject clips or markers when recordings are disabled or the stream is a rerun or premiere.",
+                    "Go live and turn on stream recordings and clips before using these actions.",
                     "A clip can remain pending while Twitch prepares it.",
                 ]
             ),
             new(
-                "Readiness and recovery",
-                "Clips and markers require the selected broadcaster to be connected with the required Twitch access.",
+                "If the result is not clear",
+                "Use Check status or Check outcome on the existing attempt instead of creating the same clip or marker again.",
                 [
-                    "Use Reconnect broadcaster when the page asks for renewed access.",
-                    "When an attempt is pending or Twitch did not confirm its outcome, use Check status or Check outcome on that attempt instead of creating it again.",
+                    "Use Reconnect to Twitch when the page asks you to connect this channel again.",
                     "Use Retry if the page itself could not load.",
                 ]
             ),
@@ -231,25 +225,22 @@ public partial class PageHelpButton
         [
             new(
                 "Manage rewards",
-                "Create and update custom Channel Points rewards made by BlokeBot. Rewards created elsewhere remain visible but read-only.",
+                "Create a Channel Points reward, set its cost and instructions, then enable or pause it when needed.",
                 [
-                    "You can edit, enable, pause, resume, or delete rewards that BlokeBot manages.",
-                    "Twitch owns viewer Channel Points balances; this page does not change those balances directly.",
+                    "You can edit, enable, pause, resume, or delete rewards created in BlokeBot.",
+                    "Rewards created somewhere else remain visible but cannot be changed here.",
                 ]
             ),
             new(
-                "Handle redemptions",
-                "Fulfil an unfulfilled redemption when the request is complete, or cancel it so Twitch refunds the viewer.",
-                [
-                    "Only redemptions for rewards BlokeBot manages can be updated here.",
-                    "Recent fulfilled and refunded requests appear in Redemption history.",
-                ]
+                "Complete viewer requests",
+                "Fulfil a request when it is complete, or cancel it to return the viewer’s Channel Points.",
+                ["Recent completed and refunded requests appear in Redemption history."]
             ),
             new(
-                "Readiness and recovery",
-                "Custom rewards require an eligible selected broadcaster with the required Twitch access.",
+                "If rewards are unavailable",
+                "Channel Points rewards require a Twitch Affiliate or Partner channel.",
                 [
-                    "Use Reconnect broadcaster when the page asks for renewed access.",
+                    "Use Reconnect to Twitch when the page asks you to connect this channel again.",
                     "If the page cannot load, use Retry before changing a reward or redemption.",
                 ]
             ),
@@ -261,20 +252,20 @@ public partial class PageHelpButton
         [
             new(
                 "Run a Prediction",
-                "Save a question, possible outcomes, and an entry window as a reusable template, then start it when Twitch has no active Prediction.",
+                "Save a question and possible outcomes, then start it whenever viewers should back an answer with Channel Points.",
                 [
                     "Lock an active Prediction to stop new entries.",
                     "Resolve a locked Prediction by choosing the winning outcome, or cancel it to refund viewers.",
-                    "BlokeBot asks you to confirm actions that change an active Prediction.",
-                    "Resolved and cancelled Predictions remain available under Recent results.",
+                    "BlokeBot asks before locking, resolving, or cancelling.",
+                    "Finished Predictions remain under Recent results.",
                 ]
             ),
             new(
-                "Readiness and recovery",
-                "Predictions require an eligible Affiliate or Partner broadcaster with the required Twitch access.",
+                "If Predictions are unavailable",
+                "Predictions require a Twitch Affiliate or Partner channel.",
                 [
-                    "Use Reconnect broadcaster when the page asks for renewed access.",
-                    "If Twitch is temporarily unavailable or the page cannot load, use Retry before starting another action.",
+                    "Use Reconnect to Twitch when the page asks you to connect this channel again.",
+                    "If the page cannot load, use Retry before starting another Prediction.",
                 ]
             ),
         ]

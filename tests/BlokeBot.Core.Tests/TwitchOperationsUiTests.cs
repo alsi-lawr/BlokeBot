@@ -13,6 +13,7 @@ using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
 using BlokeBot.Core.Features.TwitchOperations.Polls.Page;
 using BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
+using BlokeBot.Core.Features.TwitchOperations.Shared;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
@@ -33,6 +34,40 @@ namespace BlokeBot.Core.Tests;
 public sealed class TwitchOperationsUiTests
 {
     [Test]
+    public void NativeSwitcherExposesFiveLinksAndSharedAtRestCurrentHoverAndFocusHooks()
+    {
+        using var context = new BunitContext();
+        context
+            .Services.GetRequiredService<NavigationManager>()
+            .NavigateTo("/twitch-operations/polls");
+
+        var switcher = context.Render<NativeTwitchToolSwitcher>();
+
+        switcher.FindAll("nav[aria-label='Native Twitch tools'] a").Count.ShouldBe(5);
+        var links = switcher.FindAll(".native-tool-switcher__link");
+        links.ShouldAllBe(link => link.TextContent.Trim().Length > 0);
+        links
+            .Single(link => link.GetAttribute("aria-current") == "page")
+            .TextContent.ShouldContain("Polls");
+
+        var styles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "features",
+            "native-twitch.css"
+        );
+        styles.ShouldContain("background: var(--app-control-bg)");
+        styles.ShouldContain("align-items: center");
+        styles.ShouldContain("justify-content: center");
+        styles.ShouldContain("min-height: 3rem");
+        styles.ShouldContain(".native-tool-switcher__link:hover");
+        styles.ShouldContain(".native-tool-switcher__link:focus-visible");
+        styles.ShouldContain(".native-tool-switcher__link--current");
+        styles.ShouldContain("flex-wrap: wrap");
+    }
+
+    [Test]
     public async Task ShoutoutsRoute_KeepsManualTaskThenAutomaticSettingsThenNativeHistory()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -50,6 +85,8 @@ public sealed class TwitchOperationsUiTests
         page.WaitForAssertion(() =>
         {
             page.Find("[data-native-route='shoutouts']");
+            page.Find("[data-native-route='shoutouts']")
+                .ClassList.ShouldContain("dashboard-page--readable");
             page.Find("#shoutout-target");
             var sections = page.FindAll(".disclosure-title")
                 .Select(element => element.TextContent.Trim())
@@ -130,7 +167,7 @@ public sealed class TwitchOperationsUiTests
 
             page.WaitForAssertion(() =>
             {
-                page.Markup.ShouldContain("Native Twitch is turned off");
+                page.Markup.ShouldContain("This Twitch tool is turned off");
                 page.Find("a[href='/host#chat-tools']")
                     .TextContent.ShouldContain("Open Channel setup");
                 page.Markup.ShouldNotContain("Create clip");
@@ -184,6 +221,9 @@ public sealed class TwitchOperationsUiTests
                 nativeTwitch
             )
         );
+        context.Services.AddSingleton<IShoutoutDashboardOperations>(provider =>
+            provider.GetRequiredService<ShoutoutService>()
+        );
         context.Services.AddSingleton(
             new AutomaticRaidShoutoutConfigurationService(dbFactory, TimeProvider.System)
         );
@@ -198,6 +238,9 @@ public sealed class TwitchOperationsUiTests
                 TimeProvider.System,
                 nativeTwitch
             )
+        );
+        context.Services.AddSingleton<IClipMarkerDashboardOperations>(provider =>
+            provider.GetRequiredService<ClipMarkerService>()
         );
         context.Services.AddSingleton(
             new ModeratorAuthorityService(
@@ -282,5 +325,25 @@ public sealed class TwitchOperationsUiTests
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
             }
         }
+    }
+
+    private static string ReadRepositoryFile(params string[] relativePath)
+    {
+        for (
+            var directory = new DirectoryInfo(AppContext.BaseDirectory);
+            directory is not null;
+            directory = directory.Parent
+        )
+        {
+            var candidate = Path.Combine([directory.FullName, .. relativePath]);
+            if (File.Exists(candidate))
+            {
+                return File.ReadAllText(candidate);
+            }
+        }
+
+        throw new FileNotFoundException(
+            $"Could not find repository file '{Path.Combine(relativePath)}'."
+        );
     }
 }

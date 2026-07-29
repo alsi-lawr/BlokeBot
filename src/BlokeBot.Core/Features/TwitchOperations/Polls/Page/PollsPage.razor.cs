@@ -137,9 +137,15 @@ public partial class PollsPage
                 "Confirm before ending a poll started outside BlokeBot.",
                 false
             ),
-            PollOperationOutcome.NotReady notReady => (notReady.Message, false),
+            PollOperationOutcome.NotReady => (
+                "Reconnect this channel to Twitch, then try again.",
+                false
+            ),
             PollOperationOutcome.InvalidTemplate invalid => (invalid.Message, false),
-            PollOperationOutcome.ProviderRejected rejected => (rejected.Message, false),
+            PollOperationOutcome.ProviderRejected => (
+                "Twitch could not complete that poll action. Reload the page before trying again.",
+                false
+            ),
             _ => throw new UnreachableException(),
         };
         if (success)

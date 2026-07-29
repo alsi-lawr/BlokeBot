@@ -7,7 +7,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@inject PredictionService _predictions
+@inject IPredictionDashboardOperations _predictions
 @inject ToastService _toasts
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
@@ -15,19 +15,21 @@
 
 <PageTitle>BlokeBot | Predictions</PageTitle>
 
-<div class="dashboard-page dashboard-page--readable app-motion-stack" data-native-route="predictions">
-    <PageHeader Kicker="Native Twitch" Title="Predictions" Description="Run Twitch Channel Points Predictions from reusable templates." />
+<DashboardPage Kicker="Native Twitch"
+               Title="Predictions"
+               Description="Let viewers back an outcome with Channel Points, then choose the winner or refund everyone."
+               data-native-route="predictions">
     <NativeTwitchToolSwitcher />
 
     @if (_loadFailed)
     {
-        <PageState Kind="PageStateKind.Failure" Title="Predictions could not load" Description="BlokeBot couldn’t load Predictions for this channel.">
+        <PageState Kind="PageStateKind.Failure" Title="Predictions could not load" Description="Try again. Your saved questions have not changed.">
             <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
         </PageState>
     }
     else if (_loading)
     {
-        <PageState Kind="PageStateKind.Loading" Title="Loading Predictions" Description="Checking eligibility, authorization, templates, and activity." />
+        <PageState Kind="PageStateKind.Loading" Title="Loading Predictions" Description="Getting saved questions and the Prediction running now." />
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is PredictionAuthorizationReadiness.Disabled)
     {
@@ -37,8 +39,8 @@
     {
         @if (_state.Authorization is PredictionAuthorizationReadiness.NeedsBroadcasterAuthorization authorization)
         {
-            <PageState Kind="PageStateKind.Unavailable" Title="Reconnect the broadcaster" Description="@authorization.Message">
-                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@authorization.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect broadcaster</AuthPopupButton></Actions>
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can run Predictions for this channel.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@authorization.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
             </PageState>
         }
         else if (_state.Authorization is PredictionAuthorizationReadiness.Ineligible ineligible)
@@ -47,13 +49,13 @@
         }
         else if (_state.Authorization is PredictionAuthorizationReadiness.Unavailable unavailable)
         {
-            <PageState Kind="PageStateKind.Failure" Title="Twitch is temporarily unavailable" Description="@unavailable.Message">
+            <PageState Kind="PageStateKind.Failure" Title="Predictions are not available right now" Description="Wait a moment, then reload this page before starting anything new.">
                 <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
             </PageState>
         }
         else
         {
-            <TaskPanel Title="Run a Prediction" Description="Start from a saved template, then lock, cancel, or resolve the active Prediction.">
+            <TaskPanel Title="Run a Prediction" Description="Start a saved question, close entries, choose the winner, or refund everyone.">
                 @if (_state.ActivePrediction is { } prediction)
                 {
                     <article class="surface-row rounded-lg p-4" data-active-prediction>
@@ -94,7 +96,7 @@
                 }
             </CollapsibleSection>
 
-            <CollapsibleSection Title="Recent results" Description="Resolved and cancelled Twitch Predictions." InitiallyOpen="false">
+            <CollapsibleSection Title="Recent results" Description="Review Predictions that paid a winner or refunded viewers." InitiallyOpen="false">
                 <div class="p-4">
                     @if (_state.Results.Count == 0)
                     {
@@ -113,4 +115,4 @@
             </CollapsibleSection>
         }
     }
-</div>
+</DashboardPage>
