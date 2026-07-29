@@ -1,11 +1,13 @@
 using System.Globalization;
+using BlokeBot.Core.Components;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Components;
 using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 
-public partial class AutomaticRaidShoutoutSection
+public partial class AutomaticRaidShoutoutSection : IDisposable
 {
     private static readonly PersistedAnnouncementColor[] _announcementColors =
     [
@@ -36,9 +38,17 @@ public partial class AutomaticRaidShoutoutSection
     private string? _previewError;
     private string? _preview;
     private string? _saveStatus;
+    private IDisposable? _refreshSubscription;
+    private int? _loadedHostId;
+    private long _hostVersion;
 
     [Parameter, EditorRequired]
     public int HostId { get; set; }
+
+    [Parameter, EditorRequired]
+    public Func<int, Func<Task>, Task> RunHostMutationAsync { get; set; } =
+        static (_, _) =>
+            throw new InvalidOperationException("A selected-host mutation guard is required.");
 
     private string _pinDurationValue =>
         (_draft.PinDurationSeconds ?? _retainedPinDurationSeconds).ToString(
@@ -58,78 +68,191 @@ public partial class AutomaticRaidShoutoutSection
             ? "Pinned delivery is ready when public chat and pin authority are available. The chat message may be sent even if the later pin step fails."
         : "Regular chat delivery is ready when the public chat connection can accept one message.";
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        await LoadAsync();
+        _refreshSubscription = _events.SubscribeForComponentRefresh(
+            [
+                AppEventKind.AlertsChanged,
+                AppEventKind.HostedChannelsChanged,
+                AppEventKind.TwitchOperationsChanged,
+            ],
+            InvokeAsync,
+            RefreshOutcomesAsync,
+            StateHasChanged
+        );
+        return Task.CompletedTask;
     }
 
-    private async Task LoadAsync()
+    protected override async Task OnParametersSetAsync()
     {
+        if (_loadedHostId == HostId)
+        {
+            return;
+        }
+
+        _loadedHostId = HostId;
+        var version = ++_hostVersion;
+        ResetForHost();
+        await LoadAsync(HostId, version);
+    }
+
+    private void ResetForHost()
+    {
+        _draft = AutomaticRaidShoutoutConfiguration.Defaults;
+        _validationErrors = [];
+        _outcomes = [];
         _loading = true;
+        _saving = false;
+        _retainedPinDurationSeconds = 300;
+        _previewUsesFallback = false;
         _loadError = null;
+        _previewError = null;
+        _preview = null;
+        _saveStatus = null;
+    }
+
+    private async Task LoadAsync(int hostId, long version)
+    {
         try
         {
-            var configuration = await _configuration.LoadAsync(HostId, CancellationToken.None);
+            var configuration = await _configuration.LoadAsync(hostId, CancellationToken.None);
+            if (!IsCurrentHost(hostId, version))
+            {
+                return;
+            }
             if (configuration is null)
             {
                 _loadError = "The selected channel is no longer available.";
                 return;
             }
-            _draft = configuration;
-            if (configuration.PinDurationSeconds is { } pinDuration)
+
+            var outcomes = await _configuration.LoadOutcomesAsync(hostId, CancellationToken.None);
+            if (!IsCurrentHost(hostId, version))
             {
-                _retainedPinDurationSeconds = pinDuration;
+                return;
             }
-            _outcomes = (await _configuration.LoadOutcomesAsync(HostId, CancellationToken.None))
-                .Take(20)
-                .ToArray();
+
+            ApplyConfiguration(configuration);
+            _outcomes = outcomes.Take(20).ToArray();
             UpdatePreview();
         }
         catch (Exception)
         {
-            _loadError = "BlokeBot could not load the saved settings and outcomes.";
+            if (IsCurrentHost(hostId, version))
+            {
+                _loadError = "BlokeBot could not load the saved settings and outcomes.";
+            }
         }
         finally
         {
-            _loading = false;
+            if (IsCurrentHost(hostId, version))
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task RefreshOutcomesAsync()
+    {
+        if (_loadedHostId is not { } hostId)
+        {
+            return;
+        }
+
+        var version = _hostVersion;
+        try
+        {
+            var outcomes = await _configuration.LoadOutcomesAsync(hostId, CancellationToken.None);
+            if (IsCurrentHost(hostId, version))
+            {
+                _outcomes = outcomes.Take(20).ToArray();
+            }
+        }
+        catch (Exception)
+        {
+            if (IsCurrentHost(hostId, version))
+            {
+                _loadError = "BlokeBot could not load the saved settings and outcomes.";
+            }
         }
     }
 
     private async Task SaveAsync()
     {
+        var hostId = HostId;
+        var version = _hostVersion;
+        var draft = _draft;
         _saving = true;
         _saveStatus = null;
         _validationErrors = [];
         try
         {
-            var outcome = await _configuration.SaveAsync(HostId, _draft, CancellationToken.None);
-            switch (outcome)
-            {
-                case AutomaticRaidShoutoutSaveOutcome.Saved saved:
-                    _draft = saved.Configuration;
-                    _saveStatus = _draft.Enabled
-                        ? "Automatic raid shoutouts saved and enabled."
-                        : "Automatic raid shoutouts saved and disabled.";
-                    UpdatePreview();
-                    break;
-                case AutomaticRaidShoutoutSaveOutcome.Invalid invalid:
-                    _validationErrors = invalid.Errors;
-                    _saveStatus = "Settings were not saved.";
-                    break;
-                case AutomaticRaidShoutoutSaveOutcome.HostNotFound:
-                    _saveStatus =
-                        "The selected channel is no longer available. Settings were not saved.";
-                    break;
-            }
+            await RunHostMutationAsync(
+                hostId,
+                async () =>
+                {
+                    var outcome = await _configuration.SaveAsync(
+                        hostId,
+                        draft,
+                        CancellationToken.None
+                    );
+                    if (IsCurrentHost(hostId, version))
+                    {
+                        ApplySaveOutcome(outcome);
+                    }
+                }
+            );
         }
         catch (Exception)
         {
-            _saveStatus = "Automatic shoutout settings could not be saved.";
+            if (IsCurrentHost(hostId, version))
+            {
+                _saveStatus = "Automatic shoutout settings could not be saved.";
+            }
         }
         finally
         {
-            _saving = false;
+            if (IsCurrentHost(hostId, version))
+            {
+                _saving = false;
+            }
         }
+    }
+
+    private void ApplySaveOutcome(AutomaticRaidShoutoutSaveOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case AutomaticRaidShoutoutSaveOutcome.Saved saved:
+                ApplyConfiguration(saved.Configuration);
+                _saveStatus = _draft.Enabled
+                    ? "Automatic raid shoutouts saved and enabled."
+                    : "Automatic raid shoutouts saved and disabled.";
+                UpdatePreview();
+                break;
+            case AutomaticRaidShoutoutSaveOutcome.Invalid invalid:
+                _validationErrors = invalid.Errors;
+                _saveStatus = "Settings were not saved.";
+                break;
+            case AutomaticRaidShoutoutSaveOutcome.HostNotFound:
+                _saveStatus =
+                    "The selected channel is no longer available. Settings were not saved.";
+                break;
+        }
+    }
+
+    private void ApplyConfiguration(AutomaticRaidShoutoutConfiguration configuration)
+    {
+        _draft = configuration;
+        if (configuration.PinDurationSeconds is { } pinDuration)
+        {
+            _retainedPinDurationSeconds = pinDuration;
+        }
+    }
+
+    private bool IsCurrentHost(int hostId, long version)
+    {
+        return _loadedHostId == hostId && _hostVersion == version;
     }
 
     private void SetEnabled(ChangeEventArgs args)
@@ -342,5 +465,12 @@ public partial class AutomaticRaidShoutoutSection
                 "BlokeBot cannot safely tell whether Twitch completed the request, so it will not retry.",
             _ => "BlokeBot is waiting for the selected delivery mechanism to finish.",
         };
+    }
+
+    public void Dispose()
+    {
+        _refreshSubscription?.Dispose();
+        _refreshSubscription = null;
+        GC.SuppressFinalize(this);
     }
 }

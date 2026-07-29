@@ -1,5 +1,7 @@
 @using BlokeBot.Persistence.Models
+@using BlokeBot.Eventing
 @inject AutomaticRaidShoutoutConfigurationService _configuration
+@inject EventBus<AppEventKind> _events
 
 <CollapsibleSection Title="Automatic raid shoutouts"
                     Description="Welcome qualifying incoming raids automatically."

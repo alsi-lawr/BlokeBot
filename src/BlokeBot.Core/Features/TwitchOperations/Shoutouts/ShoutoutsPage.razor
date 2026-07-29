@@ -43,7 +43,8 @@
             <p class="form-help mt-4">@_cooldownText</p>
         </TaskPanel>
 
-        <AutomaticRaidShoutoutSection HostId="HostId" />
+        <AutomaticRaidShoutoutSection HostId="HostId"
+                                      RunHostMutationAsync="RunAutomaticRaidMutationAsync" />
 
         <CollapsibleSection Title="Recent shoutouts" Description="Sent and received shoutouts for this channel." InitiallyOpen="false">
             <div class="p-4">
