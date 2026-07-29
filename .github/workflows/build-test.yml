@@ -27,4 +27,4 @@ jobs:
         run: >-
           ./scripts/verify-release
           --base-ref "${{ github.event.pull_request.base.sha }}"
-          --expected-migration-count 4
+          --expected-migration-count 6
