@@ -54,9 +54,12 @@ public sealed class PageHelpButtonTests
         cut.Find("button[aria-label='Page help']").Click();
 
         var text = cut.Markup;
-        text.ShouldContain("viewer threshold");
+        text.ShouldContain("When the Automatic raid shoutouts section is shown");
         text.ShouldContain("within two minutes");
         text.ShouldContain("either a native Twitch shoutout or one chat message");
+        text.ShouldContain("When chat delivery is selected");
+        text.ShouldContain("When chat delivery settings are shown");
+        text.ShouldContain("When pinned chat delivery is selected");
         text.ShouldContain("regular, pinned, or announcement");
         text.ShouldContain("does not switch mechanisms or automatically retry");
         text.ShouldContain("replaces the current pin");

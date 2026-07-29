@@ -161,17 +161,17 @@ public partial class PageHelpButton
             ),
             new(
                 "Automatic incoming-raid shoutouts",
-                "Automatic shoutouts can use an editable viewer threshold. A fresh incoming raid must meet that threshold, and must be handled within two minutes of arriving.",
+                "When the Automatic raid shoutouts section is shown, set an editable viewer threshold. Only fresh incoming raids that meet the threshold are eligible, and an incoming raid must be handled within two minutes of arriving.",
                 [
-                    "Choose either a native Twitch shoutout or one chat message. The two mechanisms are exclusive.",
-                    "For chat, choose one presentation: regular, pinned, or announcement.",
+                    "In that section, choose either a native Twitch shoutout or one chat message. The two mechanisms are exclusive.",
+                    "When chat delivery is selected, choose one presentation: regular, pinned, or announcement.",
                     "If the selected mechanism fails, BlokeBot does not switch mechanisms or automatically retry that shoutout.",
-                    "A pinned shoutout replaces the current pin. BlokeBot does not restore the previous pin afterwards.",
+                    "When pinned chat delivery is selected, the shoutout replaces the current pin. BlokeBot does not restore the previous pin afterwards.",
                 ]
             ),
             new(
                 "Chat message details",
-                "Use the six supported tokens to add raid and channel details. Last game and stream title require inline fallback text for times when Twitch has no value.",
+                "When chat delivery settings are shown, use the six supported tokens to add raid and channel details. Last game and stream title require inline fallback text for times when Twitch has no value.",
                 [
                     "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
                     "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
