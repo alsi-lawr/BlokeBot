@@ -61,6 +61,7 @@ public sealed class SitePathBaseTests
                 "data-theme-light-source=\"media/laptop-light-native-shoutouts.png\""
             );
             nativeShoutouts.ShouldContain("aria-label=\"Guide features\"");
+            nativeShoutouts.ShouldContain("Current topic: <strong>Shoutouts</strong>");
 
             var serverOwners = await client.GetStringAsync("/blokebot/server-owners");
             serverOwners.ShouldContain("1. Install and run");

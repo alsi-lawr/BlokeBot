@@ -367,7 +367,7 @@ internal static class SiteGuideCatalog
                 LightPhoneSource: "media/phone-light-native-shoutouts.png",
                 DarkLaptopSource: "media/laptop-dark-native-shoutouts.png",
                 LightLaptopSource: "media/laptop-light-native-shoutouts.png",
-                PhoneAlt: "BlokeBot Shoutouts page showing the manual target and automatic raid shoutout settings.",
+                PhoneAlt: "BlokeBot Shoutouts page on a phone showing a Twitch channel name field and the Send shoutout action.",
                 LaptopAlt: "BlokeBot Shoutouts page showing the manual target and automatic raid shoutout settings.",
                 "Manual shoutouts, automatic incoming-raid settings and recent outcomes stay on one task page."
             ),

@@ -96,6 +96,8 @@ public sealed class SiteGuideMediaManifestTests
                 response.StatusCode.ShouldBe(HttpStatusCode.OK, route);
                 var content = await response.Content.ReadAsStringAsync();
                 content.ShouldContain("aria-label=\"Guide features\"");
+                content.ShouldContain("<details class=\"guide-sidebar__disclosure\" open>");
+                content.ShouldContain("Browse help topics");
                 content.ShouldContain("All help topics");
                 content.ShouldContain("Native Twitch");
             }
@@ -111,6 +113,17 @@ public sealed class SiteGuideMediaManifestTests
             shoutouts.ShouldContain("Regular, Pinned or Announcement");
             shoutouts.ShouldContain("{twitch_handle}");
             shoutouts.ShouldContain("There is no retry or fallback action for an earlier raid.");
+            shoutouts.ShouldContain("Current topic: <strong>Shoutouts</strong>");
+            shoutouts.ShouldContain(
+                "BlokeBot Shoutouts page on a phone showing a Twitch channel name field and the Send shoutout action."
+            );
+            var shoutoutsMedia = SiteGuideCatalog.Get("/twitch-operations/shoutouts").Media!;
+            shoutoutsMedia.PhoneAlt.ShouldBe(
+                "BlokeBot Shoutouts page on a phone showing a Twitch channel name field and the Send shoutout action."
+            );
+            shoutoutsMedia.LaptopAlt.ShouldBe(
+                "BlokeBot Shoutouts page showing the manual target and automatic raid shoutout settings."
+            );
 
             var clips = await client.GetStringAsync("/twitch-operations/clips-markers");
             clips.ShouldContain("include the stream delay");

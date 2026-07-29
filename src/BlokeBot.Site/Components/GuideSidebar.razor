@@ -1,24 +1,53 @@
+@inject NavigationManager Navigation
+
 <aside class="guide-sidebar">
     <nav aria-label="Guide features">
         <p class="guide-sidebar__title">Help by feature</p>
-        <div class="guide-sidebar__links">
-            <NavLink class="guide-sidebar__index" href="guide" Match="NavLinkMatch.All">
-                All help topics
-            </NavLink>
-            @foreach (var group in SiteGuideCatalog.NavigationGroups)
-            {
-                <div class="guide-sidebar__group">
-                    <p>@group.Label</p>
-                    <ul>
-                        @foreach (var link in group.Links)
-                        {
-                            <li>
-                                <NavLink href="@link.Href" Match="NavLinkMatch.All">@link.Label</NavLink>
-                            </li>
-                        }
-                    </ul>
-                </div>
-            }
-        </div>
+        <details class="guide-sidebar__disclosure" open>
+            <summary>
+                <span>Browse help topics</span>
+                <span class="guide-sidebar__current">Current topic: <strong>@CurrentTopicLabel</strong></span>
+            </summary>
+            <div class="guide-sidebar__links">
+                <NavLink class="guide-sidebar__index" href="guide" Match="NavLinkMatch.All">
+                    All help topics
+                </NavLink>
+                @foreach (var group in SiteGuideCatalog.NavigationGroups)
+                {
+                    <div class="guide-sidebar__group">
+                        <p>@group.Label</p>
+                        <ul>
+                            @foreach (var link in group.Links)
+                            {
+                                <li>
+                                    <NavLink href="@link.Href" Match="NavLinkMatch.All">@link.Label</NavLink>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </details>
     </nav>
 </aside>
+
+@code {
+    private string CurrentTopicLabel
+    {
+        get
+        {
+            var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+            var relativePath = relativeUri.Split('?', '#')[0].Trim('/');
+            if (relativePath == "guide")
+            {
+                return "All help topics";
+            }
+
+            return SiteGuideCatalog
+                    .NavigationGroups.SelectMany(group => group.Links)
+                    .FirstOrDefault(link => link.Href == relativePath)
+                    ?.Label
+                ?? "All help topics";
+        }
+    }
+}
