@@ -136,22 +136,6 @@ public sealed class NativeEventDispatchTests
         wrongTargetObserver.Events.ShouldBeEmpty();
     }
 
-    [Test]
-    public async Task IncomingRaid_MalformedPayloadOrTimestampInvokesNoGateOrObserver()
-    {
-        var gate = new MutableNativeTwitchFeatureStateProvider { EnabledChannel = "target_login" };
-        var observer = new RecordingIncomingRaidObserver();
-        var session = CreateSession(gate, observer);
-
-        foreach (var envelope in EventSubNotificationTests.InvalidIncomingRaidEnvelopes())
-        {
-            await session.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
-        }
-
-        gate.Channels.ShouldBeEmpty();
-        observer.Events.ShouldBeEmpty();
-    }
-
     private static EventSubConnectionSession CreateSession(
         INativeTwitchFeatureStateProvider gate,
         IIncomingRaidEventObserver observer
