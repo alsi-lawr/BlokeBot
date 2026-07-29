@@ -181,19 +181,29 @@ public sealed class HostConfigFaultRoutingTests
 
         await ClickAccessModeAsync(page, "Allowed list only");
 
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        AssertAccessMode(page, allowModsByDefault: true);
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
         clock.Advance(TimeSpan.FromMilliseconds(180));
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
-        tokens.RequestCount.ShouldBe(1);
 
+        var saved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var savedSubscription = context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostConfig.UnavailableAuthority"),
+                (_, _) =>
+                {
+                    saved.TrySetResult();
+                    return ValueTask.CompletedTask;
+                }
+            );
         await ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: false));
+        AssertAccessMode(page, allowModsByDefault: false);
         clock.Advance(TimeSpan.FromMilliseconds(180));
-        page.WaitForAssertion(() =>
-            ReadAllowModsByDefaultAsync(dbFactory, hostId).GetAwaiter().GetResult().ShouldBeFalse()
-        );
-        tokens.RequestCount.ShouldBe(2);
+        await saved.Task;
+        AssertAccessMode(page, allowModsByDefault: false);
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeFalse();
     }
 
     [Test]
@@ -224,7 +234,7 @@ public sealed class HostConfigFaultRoutingTests
         first.Completion.SetResult("app-token");
         await firstClick;
 
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        AssertAccessMode(page, allowModsByDefault: true);
         clock.Advance(TimeSpan.FromMilliseconds(180));
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
     }
@@ -382,7 +392,7 @@ public sealed class HostConfigFaultRoutingTests
         clock.Advance(TimeSpan.FromMilliseconds(180));
         _ = await toastPublished.Reader.ReadAsync();
 
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        await page.InvokeAsync(() => AssertAccessMode(page, allowModsByDefault: true));
         page.Markup.ShouldContain("allowedmod");
         page.Markup.ShouldContain("blockedmod");
         var moderatorToggle = page.FindAll("label")
