@@ -242,6 +242,7 @@ internal sealed partial class EventSubChannelSession
             var kind in new[]
             {
                 EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Raids,
                 EventSubOperationSubscriptionKind.Polls,
                 EventSubOperationSubscriptionKind.RewardRedemptions,
                 EventSubOperationSubscriptionKind.Predictions,
@@ -489,6 +490,7 @@ internal sealed partial class EventSubChannelSession
             var kind in new[]
             {
                 EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Raids,
                 EventSubOperationSubscriptionKind.Polls,
                 EventSubOperationSubscriptionKind.RewardRedemptions,
                 EventSubOperationSubscriptionKind.Predictions,
@@ -635,6 +637,7 @@ internal sealed partial class EventSubChannelSession
         return kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts => subscription.ShoutoutSubscriptions,
+            EventSubOperationSubscriptionKind.Raids => subscription.RaidSubscriptions,
             EventSubOperationSubscriptionKind.Polls => subscription.PollSubscriptions,
             EventSubOperationSubscriptionKind.RewardRedemptions =>
                 subscription.RewardRedemptionSubscriptions,
@@ -656,6 +659,10 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Shoutouts => subscription with
             {
                 ShoutoutSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.Raids => subscription with
+            {
+                RaidSubscriptions = state,
             },
             EventSubOperationSubscriptionKind.Polls => subscription with
             {
@@ -683,6 +690,8 @@ internal sealed partial class EventSubChannelSession
         {
             EventSubOperationSubscriptionKind.Shoutouts =>
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
+            EventSubOperationSubscriptionKind.Raids =>
+                EventSubAuthorizationContext.ConfiguredBotRaidsAuthority,
             EventSubOperationSubscriptionKind.Polls =>
                 EventSubAuthorizationContext.BroadcasterAuthority,
             EventSubOperationSubscriptionKind.RewardRedemptions =>
@@ -702,6 +711,8 @@ internal sealed partial class EventSubChannelSession
         return kind switch
         {
             EventSubOperationSubscriptionKind.Shoutouts =>
+                AccessTokenUnavailableReason.MissingRefreshToken,
+            EventSubOperationSubscriptionKind.Raids =>
                 AccessTokenUnavailableReason.MissingRefreshToken,
             EventSubOperationSubscriptionKind.Polls =>
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,

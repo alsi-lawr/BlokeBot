@@ -34,7 +34,8 @@ internal sealed class EventSubConnectionSession(
     IEnumerable<IShoutoutEventObserver>? shoutoutObservers = null,
     IEnumerable<IPollEventObserver>? pollObservers = null,
     IEnumerable<IChannelPointsEventObserver>? channelPointsObservers = null,
-    IEnumerable<IPredictionEventObserver>? predictionObservers = null
+    IEnumerable<IPredictionEventObserver>? predictionObservers = null,
+    IEnumerable<IIncomingRaidEventObserver>? incomingRaidObservers = null
 ) : IEventSubConnectionSession
 {
     private static readonly ObserverEventIdentity _chatMessageEvent = ObserverEventIdentity.Named(
@@ -52,6 +53,10 @@ internal sealed class EventSubConnectionSession(
     private readonly IPredictionEventObserver[] _predictionObservers =
     [
         .. (predictionObservers ?? []),
+    ];
+    private readonly IIncomingRaidEventObserver[] _incomingRaidObservers =
+    [
+        .. (incomingRaidObservers ?? []),
     ];
     private readonly EventSubChannelReconciliationTrigger _reconciliation = reconciliation;
     private readonly HashSet<string> _deliveredMessageIds = new(StringComparer.Ordinal);
@@ -202,6 +207,40 @@ internal sealed class EventSubConnectionSession(
                 _deliveredMessageIds.Remove(_deliveredMessageIdOrder.Dequeue());
             }
             return true;
+        }
+    }
+
+    internal async Task DispatchNotificationAsync(
+        EventSubEnvelope envelope,
+        string rawJson,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!ShouldDispatch(envelope.Metadata.MessageId))
+        {
+            return;
+        }
+
+        switch (EventSubNotification.Parse(envelope, _jsonOptions))
+        {
+            case EventSubNotification.Chat { Event: var chatEvent }:
+                await DispatchChatMessageAsync(chatEvent, rawJson, cancellationToken);
+                break;
+            case EventSubNotification.Shoutout { Event: var shoutout }:
+                await DispatchShoutoutAsync(shoutout, cancellationToken);
+                break;
+            case EventSubNotification.IncomingRaid { Event: var incomingRaid }:
+                await DispatchIncomingRaidAsync(incomingRaid, cancellationToken);
+                break;
+            case EventSubNotification.Poll { Event: var poll }:
+                await DispatchPollAsync(poll, cancellationToken);
+                break;
+            case EventSubNotification.Prediction { Event: var prediction }:
+                await DispatchPredictionAsync(prediction, cancellationToken);
+                break;
+            case EventSubNotification.RewardRedemption { Event: var redemption }:
+                await DispatchRewardRedemptionAsync(redemption, cancellationToken);
+                break;
         }
     }
 
@@ -379,50 +418,19 @@ internal sealed class EventSubConnectionSession(
                         };
 
                     case EventSubMessageType.Notification:
-                        if (
-                            envelope is not null
-                            && owner.ShouldDispatch(envelope.Metadata.MessageId)
-                        )
+                        if (envelope is not null)
                         {
-                            switch (EventSubNotification.Parse(envelope, _jsonOptions))
-                            {
-                                case EventSubNotification.Chat { Event: var chatEvent }:
-                                    await owner.DispatchChatMessageAsync(
-                                        chatEvent,
-                                        json,
-                                        cancellationToken
-                                    );
-                                    break;
-                                case EventSubNotification.Shoutout { Event: var shoutout }:
-                                    await owner.DispatchShoutoutAsync(shoutout, cancellationToken);
-                                    break;
-                                case EventSubNotification.Poll { Event: var poll }:
-                                    await owner.DispatchPollAsync(poll, cancellationToken);
-                                    break;
-                                case EventSubNotification.Prediction { Event: var prediction }:
-                                    await owner.DispatchPredictionAsync(
-                                        prediction,
-                                        cancellationToken
-                                    );
-                                    break;
-                                case EventSubNotification.RewardRedemption
-                                {
-                                    Event: var redemption
-                                }:
-                                    await owner.DispatchRewardRedemptionAsync(
-                                        redemption,
-                                        cancellationToken
-                                    );
-                                    break;
-                            }
+                            await owner.DispatchNotificationAsync(
+                                envelope,
+                                json,
+                                cancellationToken
+                            );
                         }
                         break;
 
                     case EventSubMessageType.Revocation:
                         owner._log.LogWarning("EventSub subscription was revoked.");
-                        throw new InvalidOperationException(
-                            "EventSub chat subscription was revoked."
-                        );
+                        throw new EventSubSubscriptionRevokedException();
 
                     case EventSubMessageType.Unknown:
                         owner._log.LogDebug("Unhandled EventSub message was ignored.");
@@ -454,6 +462,27 @@ internal sealed class EventSubConnectionSession(
         foreach (var observer in _pollObservers)
         {
             await observer.PollReceivedAsync(poll, cancellationToken);
+        }
+    }
+
+    internal async Task DispatchIncomingRaidAsync(
+        EventSubIncomingRaidEvent incomingRaid,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                incomingRaid.ToBroadcasterUserLogin,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        foreach (var observer in _incomingRaidObservers)
+        {
+            await observer.IncomingRaidReceivedAsync(incomingRaid, cancellationToken);
         }
     }
 

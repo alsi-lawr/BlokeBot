@@ -16,6 +16,7 @@ public abstract record EventSubAuthorizationContext
     public abstract TResult Match<TResult>(
         Func<ConfiguredBot, TResult> configuredBot,
         Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+        Func<ConfiguredBotRaids, TResult> configuredBotRaids,
         Func<Broadcaster, TResult> broadcaster
     );
 
@@ -24,6 +25,7 @@ public abstract record EventSubAuthorizationContext
         public override TResult Match<TResult>(
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+            Func<ConfiguredBotRaids, TResult> configuredBotRaids,
             Func<Broadcaster, TResult> broadcaster
         )
         {
@@ -36,10 +38,24 @@ public abstract record EventSubAuthorizationContext
         public override TResult Match<TResult>(
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+            Func<ConfiguredBotRaids, TResult> configuredBotRaids,
             Func<Broadcaster, TResult> broadcaster
         )
         {
             return configuredBotOperations(this);
+        }
+    }
+
+    public sealed record ConfiguredBotRaids : EventSubAuthorizationContext
+    {
+        public override TResult Match<TResult>(
+            Func<ConfiguredBot, TResult> configuredBot,
+            Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+            Func<ConfiguredBotRaids, TResult> configuredBotRaids,
+            Func<Broadcaster, TResult> broadcaster
+        )
+        {
+            return configuredBotRaids(this);
         }
     }
 
@@ -55,6 +71,7 @@ public abstract record EventSubAuthorizationContext
         public override TResult Match<TResult>(
             Func<ConfiguredBot, TResult> configuredBot,
             Func<ConfiguredBotOperations, TResult> configuredBotOperations,
+            Func<ConfiguredBotRaids, TResult> configuredBotRaids,
             Func<Broadcaster, TResult> broadcaster
         )
         {
@@ -67,6 +84,9 @@ public abstract record EventSubAuthorizationContext
 
     public static EventSubAuthorizationContext ConfiguredBotOperationsAuthority { get; } =
         new ConfiguredBotOperations();
+
+    public static EventSubAuthorizationContext ConfiguredBotRaidsAuthority { get; } =
+        new ConfiguredBotRaids();
 
     public static EventSubAuthorizationContext BroadcasterAuthority { get; } =
         new Broadcaster(EventSubBroadcasterOperationKind.Polls);

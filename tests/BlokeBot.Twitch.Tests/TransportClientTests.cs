@@ -48,6 +48,43 @@ public sealed class TransportClientTests
     }
 
     [Test]
+    public async Task IncomingRaidSubscription_Creating_UsesVersionOneTargetConditionAndWebSocket()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(
+            async (request, cancellationToken) =>
+            {
+                AssertContext(request, HttpMethod.Post, "/helix/eventsub/subscriptions");
+                using var payload = JsonDocument.Parse(
+                    await request.Content!.ReadAsStringAsync(cancellationToken)
+                );
+                payload.RootElement.GetProperty("type").GetString().ShouldBe("channel.raid");
+                payload.RootElement.GetProperty("version").GetString().ShouldBe("1");
+                var condition = payload.RootElement.GetProperty("condition");
+                condition
+                    .EnumerateObject()
+                    .Select(property => property.Name)
+                    .ShouldBe(["to_broadcaster_user_id"]);
+                condition.GetProperty("to_broadcaster_user_id").GetString().ShouldBe("target-id");
+                var transport = payload.RootElement.GetProperty("transport");
+                transport.GetProperty("method").GetString().ShouldBe("websocket");
+                transport.GetProperty("session_id").GetString().ShouldBe("session-id");
+                return JsonResponse("""{"data":[{"id":"raid-subscription-id"}]}""");
+            }
+        );
+        var client = new EventSubClient(factory);
+
+        var subscriptionId = await client.CreateIncomingRaidSubscriptionAsync(
+            Context(),
+            "target-id",
+            "session-id",
+            CancellationToken.None
+        );
+
+        subscriptionId.ShouldBe("raid-subscription-id");
+    }
+
+    [Test]
     public async Task ExistingSubscription_Deleting_SendsAuthenticatedDelete()
     {
         var factory = new ScriptedHttpClientFactory();

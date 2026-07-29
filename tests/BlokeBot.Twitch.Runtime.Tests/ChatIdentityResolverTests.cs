@@ -254,6 +254,39 @@ public sealed class ChatIdentityResolverTests
     }
 
     [Test]
+    public async Task IncomingRaidSubscription_Creating_UsesConfiguredBotUserTokenWithoutAppToken()
+    {
+        var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"channel-id","login":"channel"}]}"""
+        );
+        var operations = CreateEventSubOperations(
+            factory,
+            new ScriptedBroadcasterAccountProvider()
+        );
+
+        var outcome = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.ConfiguredBotRaidsAuthority,
+            new BotAccount("bot", "configured-bot-user-token"),
+            "session-id",
+            CancellationToken.None
+        );
+
+        var created = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
+        created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotRaids>();
+        created.Subscription.AccessToken.ShouldBe("configured-bot-user-token");
+        factory.AppTokenRequestCount.ShouldBe(0);
+        factory
+            .EventSubRequests.ShouldHaveSingleItem()
+            .ShouldSatisfyAllConditions(
+                request => request.Method.ShouldBe(HttpMethod.Post),
+                request => request.Type.ShouldBe("channel.raid"),
+                request => request.Authorization.ShouldBe("Bearer configured-bot-user-token")
+            );
+        factory.LastAuthorization.ShouldBe("Bearer configured-bot-user-token");
+    }
+
+    [Test]
     public async Task PollSubscriptionGroup_NoGrantPreservesBotGroup_AndRecreateUsesBroadcasterAuthority()
     {
         var factory = new IdentityHttpClientFactory(

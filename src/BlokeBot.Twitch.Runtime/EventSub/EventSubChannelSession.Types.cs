@@ -52,6 +52,9 @@ internal sealed record ActiveEventSubSubscription
     internal EventSubOperationSubscriptionState ShoutoutSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
 
+    internal EventSubOperationSubscriptionState RaidSubscriptions { get; init; } =
+        new EventSubOperationSubscriptionState.NotConfigured();
+
     internal EventSubOperationSubscriptionState PollSubscriptions { get; init; } =
         new EventSubOperationSubscriptionState.NotConfigured();
 
@@ -65,6 +68,7 @@ internal sealed record ActiveEventSubSubscription
 internal enum EventSubOperationSubscriptionKind
 {
     Shoutouts,
+    Raids,
     Polls,
     RewardRedemptions,
     Predictions,

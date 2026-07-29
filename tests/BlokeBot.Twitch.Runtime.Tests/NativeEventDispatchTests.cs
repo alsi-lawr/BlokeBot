@@ -74,13 +74,120 @@ public sealed class NativeEventDispatchTests
         predictions.Deliveries.ShouldBe(1);
     }
 
+    [Test]
+    public async Task IncomingRaid_TargetGateAndConnectionLocalDuplicateSuppressionPrecedeObserver()
+    {
+        var firstGate = new MutableNativeTwitchFeatureStateProvider
+        {
+            EnabledChannel = "target_login",
+        };
+        var firstObserver = new RecordingIncomingRaidObserver();
+        var firstSession = CreateSession(firstGate, firstObserver);
+        var envelope = EventSubNotificationTests.IncomingRaidEnvelope();
+
+        await firstSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+        await firstSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+
+        firstGate.Channels.ShouldBe(["target_login"]);
+        firstObserver.Events.ShouldHaveSingleItem().MessageId.ShouldBe("raid-message-1");
+
+        var secondGate = new MutableNativeTwitchFeatureStateProvider
+        {
+            EnabledChannel = "target_login",
+        };
+        var secondObserver = new RecordingIncomingRaidObserver();
+        var secondSession = CreateSession(secondGate, secondObserver);
+
+        await secondSession.DispatchNotificationAsync(envelope, "{}", CancellationToken.None);
+
+        secondObserver.Events.ShouldHaveSingleItem();
+    }
+
+    [Test]
+    public async Task IncomingRaid_DisabledOrWrongTargetInvokesNoObserver()
+    {
+        var disabledGate = new MutableNativeTwitchFeatureStateProvider();
+        var disabledObserver = new RecordingIncomingRaidObserver();
+        var disabledSession = CreateSession(disabledGate, disabledObserver);
+
+        await disabledSession.DispatchNotificationAsync(
+            EventSubNotificationTests.IncomingRaidEnvelope(),
+            "{}",
+            CancellationToken.None
+        );
+
+        disabledGate.Channels.ShouldBe(["target_login"]);
+        disabledObserver.Events.ShouldBeEmpty();
+
+        var wrongTargetGate = new MutableNativeTwitchFeatureStateProvider
+        {
+            EnabledChannel = "source_login",
+        };
+        var wrongTargetObserver = new RecordingIncomingRaidObserver();
+        var wrongTargetSession = CreateSession(wrongTargetGate, wrongTargetObserver);
+
+        await wrongTargetSession.DispatchNotificationAsync(
+            EventSubNotificationTests.IncomingRaidEnvelope(),
+            "{}",
+            CancellationToken.None
+        );
+
+        wrongTargetGate.Channels.ShouldBe(["target_login"]);
+        wrongTargetObserver.Events.ShouldBeEmpty();
+    }
+
+    private static EventSubConnectionSession CreateSession(
+        INativeTwitchFeatureStateProvider gate,
+        IIncomingRaidEventObserver observer
+    )
+    {
+        return new(
+            null!,
+            null!,
+            null!,
+            null!,
+            new BotRuntimeStatusStore(),
+            gate,
+            new EventSubChannelReconciliationTrigger(null!),
+            [],
+            RuntimeTestObserverFanOut.Continue<
+                EventSubMessageObserverBoundary,
+                ChatMessage,
+                ChatObserverDeadLetter
+            >(BotObserverBoundaries.EventSubMessages),
+            NullLogger<EventSubConnectionSession>.Instance,
+            incomingRaidObservers: [observer]
+        );
+    }
+
     private sealed class MutableNativeTwitchFeatureStateProvider : INativeTwitchFeatureStateProvider
     {
         internal bool Enabled { get; set; }
 
+        internal string? EnabledChannel { get; init; }
+
+        internal List<string> Channels { get; } = [];
+
         public ValueTask<bool> IsEnabledAsync(string channel, CancellationToken cancellationToken)
         {
-            return ValueTask.FromResult(Enabled);
+            Channels.Add(channel);
+            return ValueTask.FromResult(
+                Enabled || channel.Equals(EnabledChannel, StringComparison.OrdinalIgnoreCase)
+            );
+        }
+    }
+
+    private sealed class RecordingIncomingRaidObserver : IIncomingRaidEventObserver
+    {
+        internal List<EventSubIncomingRaidEvent> Events { get; } = [];
+
+        public Task IncomingRaidReceivedAsync(
+            EventSubIncomingRaidEvent incomingRaid,
+            CancellationToken cancellationToken
+        )
+        {
+            Events.Add(incomingRaid);
+            return Task.CompletedTask;
         }
     }
 

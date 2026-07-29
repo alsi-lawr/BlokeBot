@@ -23,6 +23,7 @@ internal sealed class EventSubChannelOperations(
         return authorization.Match(
             _ => accounts.GetBotAccount(channel),
             _ => accounts.GetBotAccount(channel),
+            _ => accounts.GetBotAccount(channel),
             _ =>
                 broadcasters?.GetBroadcasterAccount(channel)
                 ?? IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
@@ -60,6 +61,14 @@ internal sealed class EventSubChannelOperations(
                     sessionId,
                     cancellationToken
                 ),
+            _ =>
+                CreateConfiguredBotRaidSubscriptionAsync(
+                    channel,
+                    authorization,
+                    account,
+                    sessionId,
+                    cancellationToken
+                ),
             broadcaster =>
                 broadcaster.Operation switch
                 {
@@ -90,6 +99,36 @@ internal sealed class EventSubChannelOperations(
                         "Unknown broadcaster EventSub operation kind."
                     ),
                 }
+        );
+    }
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        CancellationToken ct
+    )
+    {
+        var broadcasterId = await identities.ResolveBroadcasterIdAsync(
+            channel,
+            account.AccessToken,
+            ct
+        );
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return new EventSubSubscriptionSetupOutcome.MissingChannel();
+        }
+
+        var context = new HelixRequestContext(settings.Identity.ClientId, account.AccessToken);
+        var id = await eventSub.CreateIncomingRaidSubscriptionAsync(
+            context,
+            broadcasterId,
+            sessionId,
+            ct
+        );
+        return new EventSubSubscriptionSetupOutcome.Created(
+            CreateActive(channel, authorization, account, [id])
         );
     }
 
