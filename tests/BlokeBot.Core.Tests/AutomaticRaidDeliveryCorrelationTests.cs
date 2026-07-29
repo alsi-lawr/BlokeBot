@@ -14,6 +14,102 @@ namespace BlokeBot.Core.Tests;
 public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxIntegrationTestBase
 {
     [Test]
+    public async Task CorrelatedRateLimit_DirectRetryExhaustionRecordsRateLimitedAndOneAlert()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedTwoHostsAndOutcomesAsync(database);
+        var now = Utc(12, 0, 0);
+        var outbox = new EfPublicChatOutbox(
+            database,
+            CreateRetryPolicy(
+                1,
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1),
+                Polly.DelayBackoffType.Constant
+            ),
+            StandardLifetimePolicy,
+            StandardRetentionPolicy,
+            TestEventBus.Create<AppEventKind>()
+        );
+        await EnqueueCorrelatedAsync(
+            outbox,
+            now,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum()
+        );
+        var claimed = await ClaimAsync(outbox, now, TimeSpan.Zero);
+
+        (
+            await outbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                RateLimitedPreparationOutcome(),
+                now,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+
+        await AssertRateLimitedOutcomeAsync(database);
+    }
+
+    [Test]
+    public async Task CorrelatedRateLimit_MaintenanceRetryExhaustionRecordsRateLimitedAndOneAlert()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedTwoHostsAndOutcomesAsync(database);
+        var now = Utc(12, 0, 0);
+        var schedulingOutbox = new EfPublicChatOutbox(
+            database,
+            CreateRetryPolicy(
+                2,
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1),
+                Polly.DelayBackoffType.Constant
+            ),
+            StandardLifetimePolicy,
+            StandardRetentionPolicy,
+            TestEventBus.Create<AppEventKind>()
+        );
+        await EnqueueCorrelatedAsync(
+            schedulingOutbox,
+            now,
+            new PublicChatDeliveryDeadline.ConfiguredMaximum()
+        );
+        var claimed = await ClaimAsync(schedulingOutbox, now, TimeSpan.Zero);
+        (
+            await schedulingOutbox.RecordDeliveryOutcomeAsync(
+                claimed,
+                RateLimitedPreparationOutcome(),
+                now,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
+        var retryAt = now.AddSeconds(1);
+        var maintenanceOutbox = new EfPublicChatOutbox(
+            database,
+            CreateRetryPolicy(
+                1,
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1),
+                Polly.DelayBackoffType.Constant
+            ),
+            StandardLifetimePolicy,
+            StandardRetentionPolicy,
+            TestEventBus.Create<AppEventKind>()
+        );
+
+        (
+            await maintenanceOutbox.TryClaimNextAsync(
+                retryAt,
+                retryAt.AddMinutes(5),
+                TimeSpan.Zero,
+                TimeSpan.Zero,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
+
+        await AssertRateLimitedOutcomeAsync(database);
+    }
+
+    [Test]
     public async Task CorrelatedRegularRejection_UpdatesOnlyOwningHostAndCreatesOneAlert()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -190,6 +286,42 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             StandardRetentionPolicy,
             TestEventBus.Create<AppEventKind>()
         );
+    }
+
+    private static PublicChatDeliveryOutcome RateLimitedPreparationOutcome()
+    {
+        return PublicChatDeliveryClassifier.MapPreparationFailure(
+            PublicChatDeliveryClassifier.ClassifyPreparationFailure(
+                new HttpRequestException(
+                    "rate limited",
+                    null,
+                    System.Net.HttpStatusCode.TooManyRequests
+                ),
+                CancellationToken.None
+            )
+        );
+    }
+
+    private static async Task AssertRateLimitedOutcomeAsync(SqliteBlokeBotDbFactory database)
+    {
+        await using var verify = await database.CreateDbContextAsync();
+        var first = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+            outcome.HostId == 1
+        );
+        first.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.NotDelivered);
+        first.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.RateLimited);
+        var second = await verify.AutomaticRaidShoutoutOutcomes.SingleAsync(outcome =>
+            outcome.HostId == 2
+        );
+        second.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Delivered);
+        second.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Delivered);
+        var message = await verify.PublicChatOutboxMessages.SingleAsync();
+        message.Status.ShouldBe(PublicChatOutboxStatus.SafePreSendExhausted);
+        message.HttpStatusCode.ShouldBe(429);
+        var alert = await verify.DurableAlerts.SingleAsync();
+        alert.HostId.ShouldBe(1);
+        alert.SourceKey.ShouldBe("same-provider-message");
+        alert.Message.ShouldContain(nameof(AutomaticRaidShoutoutResultCode.RateLimited));
     }
 
     private static async Task EnqueueCorrelatedAsync(

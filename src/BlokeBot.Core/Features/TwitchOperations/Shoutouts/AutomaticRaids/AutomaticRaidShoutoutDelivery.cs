@@ -97,6 +97,10 @@ internal sealed class AutomaticRaidNativeShoutoutSender(
             || message.Contains("moderator", StringComparison.OrdinalIgnoreCase)
             || message.Contains("reconnect", StringComparison.OrdinalIgnoreCase)
             || message.Contains("connect the bot", StringComparison.OrdinalIgnoreCase)
+            || message.Equals(
+                ShoutoutService.UnauthorizedAuthorityMessage,
+                StringComparison.Ordinal
+            )
             ? AutomaticRaidShoutoutResultCode.AuthorityRequired
             : AutomaticRaidShoutoutResultCode.NotReady;
     }

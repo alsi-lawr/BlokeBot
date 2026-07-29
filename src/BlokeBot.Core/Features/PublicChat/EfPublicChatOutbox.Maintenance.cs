@@ -242,7 +242,12 @@ internal sealed partial class EfPublicChatOutbox
                 && row.SafePreSendFailureCount >= _safePreSendRetryPolicy.AttemptLimit
                 && row.ExpiresAtUtc > nowUtc
             )
-            .Select(row => new { row.Id, row.DeduplicationKey })
+            .Select(row => new
+            {
+                row.Id,
+                row.DeduplicationKey,
+                row.HttpStatusCode,
+            })
             .ToArrayAsync(cancellationToken);
         _ = await db
             .PublicChatOutboxMessages.Where(row =>
@@ -270,7 +275,7 @@ internal sealed partial class EfPublicChatOutbox
                 db,
                 row.DeduplicationKey,
                 row.Id,
-                AutomaticRaidShoutoutResultCode.Unexpected,
+                SafePreSendExhaustionResult(row.HttpStatusCode),
                 ToDateTimeOffset(nowUtc),
                 cancellationToken
             );

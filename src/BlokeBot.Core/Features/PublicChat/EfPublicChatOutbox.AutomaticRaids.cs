@@ -8,6 +8,23 @@ namespace BlokeBot.Core.Features.PublicChat;
 
 internal sealed partial class EfPublicChatOutbox
 {
+    private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(
+        PublicChatHttpStatus httpStatus
+    )
+    {
+        return httpStatus.Match(
+            known => SafePreSendExhaustionResult(known.Value),
+            () => AutomaticRaidShoutoutResultCode.Unexpected
+        );
+    }
+
+    private static AutomaticRaidShoutoutResultCode SafePreSendExhaustionResult(int? httpStatusCode)
+    {
+        return httpStatusCode == (int)System.Net.HttpStatusCode.TooManyRequests
+            ? AutomaticRaidShoutoutResultCode.RateLimited
+            : AutomaticRaidShoutoutResultCode.Unexpected;
+    }
+
     private static async Task<bool> RecordAutomaticRaidTerminalAsync(
         BlokeBotDbContext db,
         PublicChatClaimedMessage message,

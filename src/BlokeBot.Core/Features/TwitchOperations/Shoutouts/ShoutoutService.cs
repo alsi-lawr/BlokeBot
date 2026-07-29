@@ -20,6 +20,9 @@ public sealed class ShoutoutService(
     NativeTwitchFeatureGate nativeTwitch
 ) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation
 {
+    internal const string UnauthorizedAuthorityMessage =
+        "Twitch rejected the configured bot's shoutout authority.";
+
     private static readonly string[] _requiredScopes =
     [
         Scopes.UserReadModeratedChannels,
@@ -287,7 +290,7 @@ public sealed class ShoutoutService(
             ShoutoutSendResult.Sent => new ShoutoutOperationOutcome.Sent(target.Login),
             ShoutoutSendResult.Cooldown => new ShoutoutOperationOutcome.CooldownUnknown(),
             ShoutoutSendResult.Unauthorized => new ShoutoutOperationOutcome.NotReady(
-                "Twitch rejected the configured bot's shoutout authority."
+                UnauthorizedAuthorityMessage
             ),
             ShoutoutSendResult.InvalidTarget => new ShoutoutOperationOutcome.ProviderRejected(
                 "Twitch rejected that shoutout target."

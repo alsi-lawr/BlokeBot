@@ -317,7 +317,7 @@ internal sealed partial class EfPublicChatOutbox
                 _ = await RecordAutomaticRaidTerminalAsync(
                     db,
                     message,
-                    AutomaticRaidShoutoutResultCode.Unexpected,
+                    SafePreSendExhaustionResult(diagnostic.HttpStatus),
                     recordedAt,
                     cancellationToken
                 );
