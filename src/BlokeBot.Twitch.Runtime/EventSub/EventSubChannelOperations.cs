@@ -23,7 +23,6 @@ internal sealed class EventSubChannelOperations(
         return authorization.Match(
             _ => accounts.GetBotAccount(channel),
             _ => accounts.GetBotAccount(channel),
-            _ => accounts.GetBotAccount(channel),
             _ =>
                 broadcasters?.GetBroadcasterAccount(channel)
                 ?? IO<BotAccount, AccessTokenUnavailableReason>.Create(_ =>
@@ -41,9 +40,21 @@ internal sealed class EventSubChannelOperations(
         EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        EventSubOperationSubscriptionKind? operationKind = null
     )
     {
+        if (operationKind is EventSubOperationSubscriptionKind.Raids)
+        {
+            return CreateConfiguredBotRaidSubscriptionAsync(
+                channel,
+                authorization,
+                account,
+                sessionId,
+                cancellationToken
+            );
+        }
+
         return authorization.Match(
             _ =>
                 CreateConfiguredBotSubscriptionsAsync(
@@ -55,14 +66,6 @@ internal sealed class EventSubChannelOperations(
                 ),
             _ =>
                 CreateConfiguredBotOperationSubscriptionsAsync(
-                    channel,
-                    authorization,
-                    account,
-                    sessionId,
-                    cancellationToken
-                ),
-            _ =>
-                CreateConfiguredBotRaidSubscriptionAsync(
                     channel,
                     authorization,
                     account,

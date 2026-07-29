@@ -266,14 +266,15 @@ public sealed class ChatIdentityResolverTests
 
         var outcome = await operations.CreateSubscriptionAsync(
             "channel",
-            EventSubAuthorizationContext.ConfiguredBotRaidsAuthority,
+            EventSubAuthorizationContext.ConfiguredBotAuthority,
             new BotAccount("bot", "configured-bot-user-token"),
             "session-id",
-            CancellationToken.None
+            CancellationToken.None,
+            EventSubOperationSubscriptionKind.Raids
         );
 
         var created = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
-        created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotRaids>();
+        created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
         created.Subscription.AccessToken.ShouldBe("configured-bot-user-token");
         factory.AppTokenRequestCount.ShouldBe(0);
         factory

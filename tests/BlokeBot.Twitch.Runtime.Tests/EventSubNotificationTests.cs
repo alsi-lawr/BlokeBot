@@ -8,6 +8,19 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 
 public sealed class EventSubNotificationTests
 {
+    private const string _shoutoutReceiveJson = """
+        {
+          "metadata": { "message_id": "delivery-1", "subscription_type": "channel.shoutout.receive" },
+          "payload": { "event": {
+            "broadcaster_user_id": "host-id", "broadcaster_user_login": "host",
+            "from_broadcaster_user_id": "source-id", "from_broadcaster_user_login": "source",
+            "to_broadcaster_user_id": "target-id", "to_broadcaster_user_login": "target",
+            "viewer_count": 42, "started_at": "2026-07-26T00:00:00Z",
+            "cooldown_ends_at": "2026-07-26T01:00:00Z",
+            "target_cooldown_ends_at": "2026-07-26T02:00:00Z"
+          } }
+        }
+        """;
     private const string _incomingRaidJson = """
         {
           "metadata": {
@@ -31,21 +44,7 @@ public sealed class EventSubNotificationTests
     [Test]
     public void ShoutoutReceiveEnvelope_ParsingTypedNotification_MapsProviderCooldowns()
     {
-        var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(
-            """
-            {
-              "metadata": { "message_id": "delivery-1", "subscription_type": "channel.shoutout.receive" },
-              "payload": { "event": {
-                "broadcaster_user_id": "host-id", "broadcaster_user_login": "host",
-                "from_broadcaster_user_id": "source-id", "from_broadcaster_user_login": "source",
-                "to_broadcaster_user_id": "target-id", "to_broadcaster_user_login": "target",
-                "viewer_count": 42, "started_at": "2026-07-26T00:00:00Z",
-                "cooldown_ends_at": "2026-07-26T01:00:00Z",
-                "target_cooldown_ends_at": "2026-07-26T02:00:00Z"
-              } }
-            }
-            """
-        )!;
+        var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(_shoutoutReceiveJson)!;
 
         var notification = EventSubNotification.Parse(
             envelope,
@@ -110,9 +109,80 @@ public sealed class EventSubNotificationTests
         Parse(wrongVersion.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
     }
 
+    [Test]
+    public void IncomingRaidEnvelope_TypeInvalidPayloadOrTimestamp_IsRejectedWithoutThrowing()
+    {
+        foreach (
+            var field in new[]
+            {
+                "from_broadcaster_user_id",
+                "from_broadcaster_user_login",
+                "from_broadcaster_user_name",
+                "to_broadcaster_user_id",
+                "to_broadcaster_user_login",
+                "to_broadcaster_user_name",
+            }
+        )
+        {
+            var document = JsonNode.Parse(_incomingRaidJson)!.AsObject();
+            document["payload"]!["event"]![field] = new JsonObject();
+            Parse(document.ToJsonString()).ShouldBeOfType<EventSubNotification.Unknown>();
+        }
+
+        foreach (var envelope in InvalidIncomingRaidEnvelopes())
+        {
+            EventSubNotification
+                .Parse(envelope, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                .ShouldBeOfType<EventSubNotification.Unknown>();
+        }
+    }
+
+    [Test]
+    public void UnrelatedNotification_TypeInvalidPayload_PreservesTerminalJsonFailure()
+    {
+        var document = JsonNode.Parse(_shoutoutReceiveJson)!.AsObject();
+        document["payload"]!["event"]!["viewer_count"] = new JsonObject();
+        var envelope = JsonSerializer.Deserialize<EventSubEnvelope>(document.ToJsonString())!;
+
+        Should.Throw<JsonException>(() =>
+            EventSubNotification.Parse(
+                envelope,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            )
+        );
+    }
+
+    [Test]
+    public void UnrelatedEnvelope_InvalidTimestamp_PreservesTerminalJsonFailure()
+    {
+        var document = JsonNode.Parse(_shoutoutReceiveJson)!.AsObject();
+        document["metadata"]!["message_timestamp"] = "not-a-timestamp";
+
+        Should.Throw<JsonException>(() =>
+            JsonSerializer.Deserialize<EventSubEnvelope>(document.ToJsonString())
+        );
+    }
+
     internal static EventSubEnvelope IncomingRaidEnvelope()
     {
         return JsonSerializer.Deserialize<EventSubEnvelope>(_incomingRaidJson)!;
+    }
+
+    internal static IReadOnlyList<EventSubEnvelope> InvalidIncomingRaidEnvelopes()
+    {
+        var invalidViewers = JsonNode.Parse(_incomingRaidJson)!.AsObject();
+        invalidViewers["metadata"]!["message_id"] = "raid-invalid-viewers";
+        invalidViewers["payload"]!["event"]!["viewers"] = new JsonObject();
+
+        var invalidTimestamp = JsonNode.Parse(_incomingRaidJson)!.AsObject();
+        invalidTimestamp["metadata"]!["message_id"] = "raid-invalid-timestamp";
+        invalidTimestamp["metadata"]!["message_timestamp"] = "not-a-timestamp";
+
+        return new[]
+        {
+            JsonSerializer.Deserialize<EventSubEnvelope>(invalidViewers.ToJsonString())!,
+            JsonSerializer.Deserialize<EventSubEnvelope>(invalidTimestamp.ToJsonString())!,
+        };
     }
 
     private static EventSubNotification Parse(string json)

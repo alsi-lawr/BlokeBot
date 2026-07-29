@@ -32,6 +32,10 @@ public abstract partial class EventSubChannelRecoveryTestBase
             new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<
             string,
+            List<EventSubOperationSubscriptionKind?>
+        > _operationKinds = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<
+            string,
             Queue<Func<CancellationToken, ValueTask<EventSubSubscriptionSetupOutcome>>>
         > _createScripts = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _createCounts = new(
@@ -119,6 +123,11 @@ public abstract partial class EventSubChannelRecoveryTestBase
         internal IReadOnlyList<EventSubAuthorizationContext> Authorizations(string channel)
         {
             return _authorizations.TryGetValue(channel, out var values) ? values : [];
+        }
+
+        internal IReadOnlyList<EventSubOperationSubscriptionKind?> OperationKinds(string channel)
+        {
+            return _operationKinds.TryGetValue(channel, out var values) ? values : [];
         }
 
         internal void EnqueueCreateFailure(string channel, Exception exception)
@@ -243,10 +252,17 @@ public abstract partial class EventSubChannelRecoveryTestBase
             EventSubAuthorizationContext authorization,
             BotAccount account,
             string sessionId,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            EventSubOperationSubscriptionKind? operationKind = null
         )
         {
             _createCounts[channel] = CreateCount(channel) + 1;
+            if (!_operationKinds.TryGetValue(channel, out var operationKinds))
+            {
+                operationKinds = [];
+                _operationKinds[channel] = operationKinds;
+            }
+            operationKinds.Add(operationKind);
             if (_createScripts.TryGetValue(channel, out var scripts) && scripts.Count > 0)
             {
                 return scripts.Dequeue()(cancellationToken);

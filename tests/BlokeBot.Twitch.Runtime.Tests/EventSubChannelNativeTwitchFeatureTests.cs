@@ -29,7 +29,15 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
         operations
             .DeleteAttempts("channel")
             .Last()
-            .Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotRaids>();
+            .Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+        operations
+            .OperationKinds("channel")
+            .Take(3)
+            .ShouldBe([
+                null,
+                EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Raids,
+            ]);
         harness.Session.ActiveChannels.ShouldBe(["channel"]);
         operations.CompleteStopCount("channel").ShouldBe(0);
 
@@ -179,7 +187,7 @@ public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRec
                 authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotOperations>();
                 break;
             case 1:
-                authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBotRaids>();
+                authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
                 break;
             case 2:
                 authorization

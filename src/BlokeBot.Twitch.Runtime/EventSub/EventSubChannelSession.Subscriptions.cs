@@ -328,7 +328,8 @@ internal sealed partial class EventSubChannelSession
                             authorization,
                             resolvedAccount,
                             sessionId,
-                            token
+                            token,
+                            kind
                         ),
                     cancellationToken
                 );
@@ -691,7 +692,7 @@ internal sealed partial class EventSubChannelSession
             EventSubOperationSubscriptionKind.Shoutouts =>
                 EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
             EventSubOperationSubscriptionKind.Raids =>
-                EventSubAuthorizationContext.ConfiguredBotRaidsAuthority,
+                EventSubAuthorizationContext.ConfiguredBotAuthority,
             EventSubOperationSubscriptionKind.Polls =>
                 EventSubAuthorizationContext.BroadcasterAuthority,
             EventSubOperationSubscriptionKind.RewardRedemptions =>

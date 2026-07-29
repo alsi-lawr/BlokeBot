@@ -51,12 +51,11 @@ internal abstract record EventSubNotification
                     )
                 )
                 : new Unknown(),
-            "channel.raid" when envelope.Metadata.SubscriptionVersion == "1" =>
-                payload.Deserialize<EventSubIncomingRaidWireEvent>(options) is { } incomingRaid
-                    ? incomingRaid.ToDomain(envelope.Metadata) is { } normalized
-                        ? new IncomingRaid(normalized)
-                        : new Unknown()
-                    : new Unknown(),
+            "channel.raid" when envelope.Metadata.SubscriptionVersion == "1" => ParseIncomingRaid(
+                payload,
+                envelope.Metadata,
+                options
+            ),
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
                     ? new Poll(poll.ToDomain(envelope.Metadata.MessageId))
@@ -81,5 +80,25 @@ internal abstract record EventSubNotification
                     : new Unknown(),
             _ => new Unknown(),
         };
+    }
+
+    private static EventSubNotification ParseIncomingRaid(
+        JsonElement payload,
+        EventSubMetadata metadata,
+        JsonSerializerOptions options
+    )
+    {
+        try
+        {
+            return
+                payload.Deserialize<EventSubIncomingRaidWireEvent>(options) is { } incomingRaid
+                && incomingRaid.ToDomain(metadata) is { } normalized
+                ? new IncomingRaid(normalized)
+                : new Unknown();
+        }
+        catch (JsonException)
+        {
+            return new Unknown();
+        }
     }
 }
