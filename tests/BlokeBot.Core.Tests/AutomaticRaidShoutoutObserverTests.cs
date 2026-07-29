@@ -1,6 +1,9 @@
+using System.Data.Common;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 using TUnit.Core;
 
@@ -80,22 +83,128 @@ public sealed class AutomaticRaidShoutoutObserverTests
     }
 
     [Test]
-    public async Task ConcurrentDuplicate_HasOneClaimWinnerAndOneDelivery()
+    public async Task UnrelatedWriterContention_DoesNotSilentlySuppressDistinctRaid()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
+        await using var writer = await factory.CreateDbContextAsync();
+        await using var transaction = await writer.Database.BeginTransactionAsync();
+        writer.AutomaticRaidShoutoutOutcomes.Add(
+            Outcome(
+                hostId,
+                "held-writer",
+                AutomaticRaidShoutoutOutcomeStatus.Processing,
+                null,
+                null
+            )
+        );
+        await writer.SaveChangesAsync();
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
+
+        var observation = Task.Run(() =>
+            Observer(factory, delivery)
+                .IncomingRaidReceivedAsync(
+                    Raid("distinct-under-lock", _now, 1),
+                    CancellationToken.None
+                )
+        );
+        await Task.Delay(AutomaticRaidShoutoutObserver.ClaimContentionRetryDelay * 2);
+        observation.IsCompleted.ShouldBeFalse();
+        await transaction.CommitAsync();
+        await observation;
+
+        delivery.Requests.ShouldHaveSingleItem().ProviderMessageId.ShouldBe("distinct-under-lock");
+        await using var verification = await factory.CreateDbContextAsync();
+        (
+            await verification.AutomaticRaidProcessedEvents.CountAsync(value =>
+                value.ProviderMessageId == "distinct-under-lock"
+            )
+        ).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task PersistentWriterContention_SurfacesFailureInsteadOfLookingLikeDuplicate()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
+        await using var writer = await factory.CreateDbContextAsync();
+        await using var transaction = await writer.Database.BeginTransactionAsync();
+        writer.AutomaticRaidShoutoutOutcomes.Add(
+            Outcome(
+                hostId,
+                "held-writer",
+                AutomaticRaidShoutoutOutcomeStatus.Processing,
+                null,
+                null
+            )
+        );
+        await writer.SaveChangesAsync();
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
+
+        var observation = Task.Run(() =>
+            Observer(factory, delivery)
+                .IncomingRaidReceivedAsync(
+                    Raid("contention-exhausted", _now, 1),
+                    CancellationToken.None
+                )
+        );
+        SqliteException exception;
+        try
+        {
+            exception = await Should.ThrowAsync<SqliteException>(async () =>
+                await observation.WaitAsync(TimeSpan.FromSeconds(6))
+            );
+        }
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
+
+        exception.SqliteErrorCode.ShouldBeOneOf(
+            SQLitePCL.raw.SQLITE_BUSY,
+            SQLitePCL.raw.SQLITE_LOCKED
+        );
+        delivery.Requests.ShouldBeEmpty();
+        await using var verification = await factory.CreateDbContextAsync();
+        (await verification.AutomaticRaidProcessedEvents.CountAsync()).ShouldBe(0);
+        (await verification.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(0);
+    }
+
+    [Test]
+    public async Task ConcurrentDuplicate_PreCommitContention_HasOneDurableWinnerAndOneDelivery()
+    {
+        var coordination = new ClaimInsertCoordination();
+        await using var factory = await CoordinatedSqliteDbFactory.CreateAsync(coordination);
         await SeedAsync(factory, enabled: true, threshold: 1);
-        var delivery = new BlockingDelivery();
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
         var raid = Raid("concurrent", _now, 1);
         var first = Observer(factory, delivery)
             .IncomingRaidReceivedAsync(raid, CancellationToken.None);
-        await delivery.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var second = Observer(factory, delivery)
-            .IncomingRaidReceivedAsync(raid, CancellationToken.None);
-        await second;
-        delivery.Release.SetResult();
-        await first;
+        await coordination.FirstInsertStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var secondClock = new SignalingTimeProvider(_now);
+        var second = Task.Run(() =>
+            new AutomaticRaidShoutoutObserver(
+                factory,
+                delivery,
+                secondClock
+            ).IncomingRaidReceivedAsync(raid, CancellationToken.None)
+        );
+        await secondClock.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        try
+        {
+            await Task.Delay(AutomaticRaidShoutoutObserver.ClaimContentionRetryDelay * 2);
+            second.IsCompleted.ShouldBeFalse();
+        }
+        finally
+        {
+            coordination.ReleaseFirstInsert.TrySetResult();
+        }
+        await Task.WhenAll(first, second);
 
-        delivery.CallCount.ShouldBe(1);
+        delivery.Requests.Count.ShouldBe(1);
+        await using var verification = await factory.CreateDbContextAsync();
+        (await verification.AutomaticRaidProcessedEvents.CountAsync()).ShouldBe(1);
+        (await verification.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(1);
     }
 
     [Test]
@@ -120,6 +229,131 @@ public sealed class AutomaticRaidShoutoutObserverTests
         (await db.AutomaticRaidShoutoutOutcomes.SingleAsync()).Status.ShouldBe(
             AutomaticRaidShoutoutOutcomeStatus.Processing
         );
+    }
+
+    [Test]
+    public async Task AmbiguousResult_IsVisibleAndSameHostRedeliveryNeverReplays()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedAsync(factory, enabled: true, threshold: 1);
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Ambiguous());
+        var observer = Observer(factory, delivery);
+        var raid = Raid("ambiguous-replay", _now, 1);
+
+        await observer.IncomingRaidReceivedAsync(raid, CancellationToken.None);
+        await observer.IncomingRaidReceivedAsync(raid, CancellationToken.None);
+
+        delivery.Requests.Count.ShouldBe(1);
+        await using var verification = await factory.CreateDbContextAsync();
+        var outcome = await verification.AutomaticRaidShoutoutOutcomes.SingleAsync();
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.Ambiguous);
+        outcome.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Ambiguous);
+    }
+
+    [Test]
+    [Arguments(
+        DeliveryResultShape.Delivered,
+        AutomaticRaidShoutoutResultCode.NotReady,
+        AutomaticRaidShoutoutOutcomeStatus.Delivered,
+        AutomaticRaidShoutoutResultCode.Delivered
+    )]
+    [Arguments(
+        DeliveryResultShape.Ambiguous,
+        AutomaticRaidShoutoutResultCode.NotReady,
+        AutomaticRaidShoutoutOutcomeStatus.Ambiguous,
+        AutomaticRaidShoutoutResultCode.Ambiguous
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.RuntimeMessageTooLong
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.NotReady,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.NotReady
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.AuthorityRequired,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.AuthorityRequired
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Cooldown,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Cooldown
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Invalid,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Invalid
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Rejected,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Rejected
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.RateLimited,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.RateLimited
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.PartialFailure,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.PartialFailure
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Unexpected,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Unexpected
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Delivered,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Unexpected
+    )]
+    [Arguments(
+        DeliveryResultShape.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Ambiguous,
+        AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+        AutomaticRaidShoutoutResultCode.Unexpected
+    )]
+    public async Task DeliveryResultMapping_PersistsEveryStableTerminalDistinction(
+        DeliveryResultShape shape,
+        AutomaticRaidShoutoutResultCode inputCode,
+        AutomaticRaidShoutoutOutcomeStatus expectedStatus,
+        AutomaticRaidShoutoutResultCode expectedCode
+    )
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedAsync(factory, enabled: true, threshold: 1);
+        AutomaticRaidShoutoutDeliveryResult result = shape switch
+        {
+            DeliveryResultShape.Delivered => new AutomaticRaidShoutoutDeliveryResult.Delivered(),
+            DeliveryResultShape.Ambiguous => new AutomaticRaidShoutoutDeliveryResult.Ambiguous(),
+            DeliveryResultShape.NotDelivered =>
+                new AutomaticRaidShoutoutDeliveryResult.NotDelivered(inputCode),
+            _ => throw new InvalidOperationException("Unsupported test delivery result."),
+        };
+
+        await Observer(factory, new RecordingDelivery(result))
+            .IncomingRaidReceivedAsync(Raid("result-mapping", _now, 1), CancellationToken.None);
+
+        await using var verification = await factory.CreateDbContextAsync();
+        var outcome = await verification.AutomaticRaidShoutoutOutcomes.SingleAsync();
+        outcome.Status.ShouldBe(expectedStatus);
+        outcome.ResultCode.ShouldBe(expectedCode);
     }
 
     [Test]
@@ -206,24 +440,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
     }
 
     [Test]
-    public async Task RetentionKeepsNewest100TerminalAndAllProcessingOrAmbiguousOutcomes()
+    public async Task RetentionEvictsOldestTerminalButKeepsClaimAndNewest100InOrder()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using (var db = await factory.CreateDbContextAsync())
         {
-            for (var index = 0; index < 101; index++)
-            {
-                db.AutomaticRaidShoutoutOutcomes.Add(
-                    Outcome(
-                        hostId,
-                        $"terminal-{index}",
-                        AutomaticRaidShoutoutOutcomeStatus.Delivered,
-                        AutomaticRaidShoutoutResultCode.Delivered,
-                        _now.AddMinutes(-index - 1).UtcDateTime
-                    )
-                );
-            }
             db.AutomaticRaidShoutoutOutcomes.Add(
                 Outcome(
                     hostId,
@@ -244,30 +466,58 @@ public sealed class AutomaticRaidShoutoutObserverTests
             );
             await db.SaveChangesAsync();
         }
-
-        await Observer(
-                factory,
-                new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered())
-            )
-            .IncomingRaidReceivedAsync(Raid("newest", _now, 1), CancellationToken.None);
+        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
+        var observer = Observer(factory, delivery);
+        for (var index = 0; index < 101; index++)
+        {
+            await observer.IncomingRaidReceivedAsync(
+                Raid($"terminal-{index}", _now, 1),
+                CancellationToken.None
+            );
+        }
 
         await using var verification = await factory.CreateDbContextAsync();
-        (
-            await verification.AutomaticRaidShoutoutOutcomes.CountAsync(value =>
+        var retainedTerminalIds = await verification
+            .AutomaticRaidShoutoutOutcomes.Where(value =>
                 value.Status == AutomaticRaidShoutoutOutcomeStatus.Delivered
                 || value.Status == AutomaticRaidShoutoutOutcomeStatus.NotDelivered
             )
-        ).ShouldBe(100);
+            .OrderByDescending(value => value.CompletedAtUtc)
+            .ThenByDescending(value => value.Id)
+            .Select(value => value.ProviderMessageId)
+            .ToArrayAsync();
+        retainedTerminalIds.ShouldBe(
+            Enumerable.Range(1, 100).Reverse().Select(index => $"terminal-{index}")
+        );
+        retainedTerminalIds.ShouldNotContain("terminal-0");
         (
             await verification.AutomaticRaidShoutoutOutcomes.CountAsync(value =>
                 value.Status == AutomaticRaidShoutoutOutcomeStatus.Processing
                 || value.Status == AutomaticRaidShoutoutOutcomeStatus.Ambiguous
             )
         ).ShouldBe(2);
+        (
+            await verification.AutomaticRaidProcessedEvents.AnyAsync(value =>
+                value.HostId == hostId && value.ProviderMessageId == "terminal-0"
+            )
+        ).ShouldBeTrue();
+        delivery.Requests.Count.ShouldBe(101);
+
+        await observer.IncomingRaidReceivedAsync(
+            Raid("terminal-0", _now, 1),
+            CancellationToken.None
+        );
+
+        delivery.Requests.Count.ShouldBe(101);
+        (
+            await verification.AutomaticRaidShoutoutOutcomes.AnyAsync(value =>
+                value.ProviderMessageId == "terminal-0"
+            )
+        ).ShouldBeFalse();
     }
 
     private static AutomaticRaidShoutoutObserver Observer(
-        SqliteBlokeBotDbFactory factory,
+        IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
         IAutomaticRaidShoutoutDelivery delivery
     )
     {
@@ -295,7 +545,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
     }
 
     private static async Task<int> SeedAsync(
-        SqliteBlokeBotDbFactory factory,
+        IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory,
         bool enabled,
         int threshold,
         string login = "host"
@@ -371,6 +621,18 @@ public sealed class AutomaticRaidShoutoutObserverTests
         }
     }
 
+    private sealed class SignalingTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        internal TaskCompletionSource ReadStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            ReadStarted.TrySetResult();
+            return now;
+        }
+    }
+
     private sealed class RecordingDelivery(AutomaticRaidShoutoutDeliveryResult result)
         : IAutomaticRaidShoutoutDelivery
     {
@@ -386,24 +648,106 @@ public sealed class AutomaticRaidShoutoutObserverTests
         }
     }
 
-    private sealed class BlockingDelivery : IAutomaticRaidShoutoutDelivery
+    private sealed class ClaimInsertCoordination
     {
-        private int _callCount;
-        internal int CallCount => _callCount;
-        internal TaskCompletionSource Started { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        internal TaskCompletionSource Release { get; } =
+        private int _insertCount;
+
+        internal TaskCompletionSource FirstInsertStarted { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
-            AutomaticRaidShoutoutDeliveryRequest request,
-            CancellationToken cancellationToken
+        internal TaskCompletionSource ReleaseFirstInsert { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        internal async ValueTask BeforeInsertAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _insertCount) != 1)
+            {
+                return;
+            }
+
+            FirstInsertStarted.TrySetResult();
+            await ReleaseFirstInsert.Task.WaitAsync(cancellationToken);
+        }
+    }
+
+    private sealed class BlockingClaimInsertInterceptor(ClaimInsertCoordination coordination)
+        : DbCommandInterceptor
+    {
+        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default
         )
         {
-            Interlocked.Increment(ref _callCount);
-            Started.TrySetResult();
-            await Release.Task.WaitAsync(cancellationToken);
-            return new AutomaticRaidShoutoutDeliveryResult.Delivered();
+            if (
+                command.CommandText.Contains(
+                    "INSERT OR IGNORE INTO automatic_raid_processed_events",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                await coordination.BeforeInsertAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    private sealed class CoordinatedSqliteDbFactory
+        : IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>,
+            IAsyncDisposable
+    {
+        private readonly SqliteConnection _keeper;
+        private readonly DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> _options;
+
+        private CoordinatedSqliteDbFactory(
+            SqliteConnection keeper,
+            DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> options
+        )
+        {
+            _keeper = keeper;
+            _options = options;
+        }
+
+        internal static async Task<CoordinatedSqliteDbFactory> CreateAsync(
+            ClaimInsertCoordination coordination
+        )
+        {
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = $"AutomaticRaidClaimTests-{Guid.NewGuid():N}",
+                Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false,
+                DefaultTimeout = 0,
+            }.ToString();
+            var keeper = new SqliteConnection(connectionString);
+            await keeper.OpenAsync();
+            var options = new DbContextOptionsBuilder<BlokeBot.Persistence.BlokeBotDbContext>()
+                .UseSqlite(connectionString)
+                .AddInterceptors(new BlockingClaimInsertInterceptor(coordination))
+                .Options;
+            var factory = new CoordinatedSqliteDbFactory(keeper, options);
+            await using var db = await factory.CreateDbContextAsync();
+            await db.Database.EnsureCreatedAsync();
+            return factory;
+        }
+
+        public BlokeBot.Persistence.BlokeBotDbContext CreateDbContext()
+        {
+            return new(_options);
+        }
+
+        public ValueTask<BlokeBot.Persistence.BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            return ValueTask.FromResult(CreateDbContext());
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _keeper.DisposeAsync();
         }
     }
 
@@ -416,5 +760,12 @@ public sealed class AutomaticRaidShoutoutObserverTests
         {
             throw new InvalidOperationException("interrupted after the durable claim");
         }
+    }
+
+    public enum DeliveryResultShape
+    {
+        Delivered,
+        Ambiguous,
+        NotDelivered,
     }
 }

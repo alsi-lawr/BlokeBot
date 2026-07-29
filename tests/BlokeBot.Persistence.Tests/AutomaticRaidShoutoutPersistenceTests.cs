@@ -32,6 +32,38 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         row.AnnouncementColor.ShouldBe(TwitchAnnouncementColor.Primary);
         row.PinDurationSeconds.ShouldBeNull();
         row.MessageTemplate.ShouldBe(AutomaticRaidShoutoutDefaults.MessageTemplate);
+
+        foreach (var code in Enum.GetValues<AutomaticRaidShoutoutResultCode>())
+        {
+            var status = code switch
+            {
+                AutomaticRaidShoutoutResultCode.Delivered =>
+                    AutomaticRaidShoutoutOutcomeStatus.Delivered,
+                AutomaticRaidShoutoutResultCode.Ambiguous =>
+                    AutomaticRaidShoutoutOutcomeStatus.Ambiguous,
+                _ => AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+            };
+            db.AutomaticRaidShoutoutOutcomes.Add(
+                new AutomaticRaidShoutoutOutcome
+                {
+                    HostId = hostId,
+                    ProviderMessageId = $"result-{code}",
+                    SourceTwitchUserId = "raider-id",
+                    SourceLogin = "raider",
+                    SourceDisplayName = "Raider",
+                    ViewerCount = 1,
+                    Status = status,
+                    ResultCode = code,
+                    MessageTimestampUtc = DateTime.UtcNow,
+                    ClaimedAtUtc = DateTime.UtcNow,
+                    CompletedAtUtc = DateTime.UtcNow,
+                }
+            );
+        }
+        await db.SaveChangesAsync();
+        (await db.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(
+            Enum.GetValues<AutomaticRaidShoutoutResultCode>().Length
+        );
     }
 
     [Test]

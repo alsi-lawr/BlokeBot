@@ -75,6 +75,18 @@ public sealed class AutomaticRaidShoutoutTemplateTests
         tooLong.MaximumCharacters.ShouldBe(500);
     }
 
+    [Test]
+    public void RuntimeReservation_IsExactly350AndCombinesWith150AuthoredFor500Total()
+    {
+        AutomaticRaidShoutoutTemplate.MaximumAuthoredCharacters.ShouldBe(150);
+        AutomaticRaidShoutoutTemplate.ReservedRuntimeCharacters.ShouldBe(350);
+        AutomaticRaidShoutoutTemplate.MaximumRenderedCharacters.ShouldBe(
+            AutomaticRaidShoutoutTemplate.MaximumAuthoredCharacters
+                + AutomaticRaidShoutoutTemplate.ReservedRuntimeCharacters
+        );
+        AutomaticRaidShoutoutTemplate.MaximumRenderedCharacters.ShouldBe(500);
+    }
+
     private static AutomaticRaidTemplateValues Values(string displayName)
     {
         return new("@raider", displayName, "https://twitch.tv/raider", 1, null, null);

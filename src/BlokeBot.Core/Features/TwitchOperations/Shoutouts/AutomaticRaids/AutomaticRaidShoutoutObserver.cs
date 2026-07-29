@@ -14,6 +14,9 @@ public sealed class AutomaticRaidShoutoutObserver(
 ) : IIncomingRaidEventObserver
 {
     internal static readonly TimeSpan FreshnessWindow = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan ClaimContentionRetryDelay = TimeSpan.FromMilliseconds(25);
+    internal const int ClaimContentionCommandTimeoutSeconds = 1;
+    internal const int ClaimContentionMaximumAttempts = 3;
     internal const int TerminalOutcomeRetention = 100;
 
     public async Task IncomingRaidReceivedAsync(
@@ -97,52 +100,60 @@ public sealed class AutomaticRaidShoutoutObserver(
         CancellationToken cancellationToken
     )
     {
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                cancellationToken
-            );
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc < {now.UtcDateTime};",
-                cancellationToken
-            );
-            var expiry = incomingRaid.MessageTimestamp.Add(FreshnessWindow);
-            var changed = await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT OR IGNORE INTO automatic_raid_processed_events
-                    (HostId, ProviderMessageId, ClaimedAtUtc, ExpiresAtUtc)
-                VALUES
-                    ({hostId}, {incomingRaid.MessageId}, {now.UtcDateTime}, {expiry.UtcDateTime});
-                """,
-                cancellationToken
-            );
-            if (changed != 1)
+            try
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return null;
-            }
+                await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+                ((SqliteConnection)db.Database.GetDbConnection()).DefaultTimeout =
+                    ClaimContentionCommandTimeoutSeconds;
+                db.Database.SetCommandTimeout(ClaimContentionCommandTimeoutSeconds);
+                await using var transaction = await db.Database.BeginTransactionAsync(
+                    cancellationToken
+                );
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"DELETE FROM automatic_raid_processed_events WHERE ExpiresAtUtc < {now.UtcDateTime};",
+                    cancellationToken
+                );
+                var expiry = incomingRaid.MessageTimestamp.Add(FreshnessWindow);
+                var changed = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT OR IGNORE INTO automatic_raid_processed_events
+                        (HostId, ProviderMessageId, ClaimedAtUtc, ExpiresAtUtc)
+                    VALUES
+                        ({hostId}, {incomingRaid.MessageId}, {now.UtcDateTime}, {expiry.UtcDateTime});
+                    """,
+                    cancellationToken
+                );
+                if (changed != 1)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return null;
+                }
 
-            var outcome = new AutomaticRaidShoutoutOutcome
+                var outcome = new AutomaticRaidShoutoutOutcome
+                {
+                    HostId = hostId,
+                    ProviderMessageId = incomingRaid.MessageId,
+                    SourceTwitchUserId = incomingRaid.FromBroadcasterUserId,
+                    SourceLogin = Login.Normalize(incomingRaid.FromBroadcasterUserLogin),
+                    SourceDisplayName = incomingRaid.FromBroadcasterUserName,
+                    ViewerCount = incomingRaid.ViewerCount,
+                    Status = AutomaticRaidShoutoutOutcomeStatus.Processing,
+                    MessageTimestampUtc = incomingRaid.MessageTimestamp.UtcDateTime,
+                    ClaimedAtUtc = now.UtcDateTime,
+                };
+                db.AutomaticRaidShoutoutOutcomes.Add(outcome);
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return outcome.Id;
+            }
+            catch (Exception exception)
+                when (IsPersistenceContention(exception) && attempt < ClaimContentionMaximumAttempts
+                )
             {
-                HostId = hostId,
-                ProviderMessageId = incomingRaid.MessageId,
-                SourceTwitchUserId = incomingRaid.FromBroadcasterUserId,
-                SourceLogin = Login.Normalize(incomingRaid.FromBroadcasterUserLogin),
-                SourceDisplayName = incomingRaid.FromBroadcasterUserName,
-                ViewerCount = incomingRaid.ViewerCount,
-                Status = AutomaticRaidShoutoutOutcomeStatus.Processing,
-                MessageTimestampUtc = incomingRaid.MessageTimestamp.UtcDateTime,
-                ClaimedAtUtc = now.UtcDateTime,
-            };
-            db.AutomaticRaidShoutoutOutcomes.Add(outcome);
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return outcome.Id;
-        }
-        catch (SqliteException exception) when (exception.SqliteErrorCode is 5 or 6)
-        {
-            return null;
+                await Task.Delay(ClaimContentionRetryDelay, cancellationToken);
+            }
         }
     }
 
@@ -216,6 +227,19 @@ public sealed class AutomaticRaidShoutoutObserver(
                 || !string.IsNullOrWhiteSpace(Login.Normalize(incomingRaid.ToBroadcasterUserLogin))
             )
             && incomingRaid.ViewerCount >= 0;
+    }
+
+    private static bool IsPersistenceContention(Exception exception)
+    {
+        return exception switch
+        {
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
+            } => true,
+            DbUpdateException { InnerException: { } inner } => IsPersistenceContention(inner),
+            _ => false,
+        };
     }
 }
 

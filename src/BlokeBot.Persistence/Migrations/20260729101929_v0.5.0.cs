@@ -84,7 +84,7 @@ namespace BlokeBot.Persistence.Migrations
                     table.PrimaryKey("PK_automatic_raid_shoutout_outcomes", x => x.Id);
                     table.CheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_ResultCode",
-                        "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'Delivered', 'NotReady', 'PartialFailure', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')"
+                        "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'AuthorityRequired', 'Cooldown', 'Delivered', 'Invalid', 'NotReady', 'PartialFailure', 'RateLimited', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')"
                     );
                     table.CheckConstraint(
                         "CK_automatic_raid_shoutout_outcomes_State",

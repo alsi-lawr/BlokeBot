@@ -160,7 +160,7 @@ namespace BlokeBot.Persistence.Migrations
 
                     b.ToTable("automatic_raid_shoutout_outcomes", null, t =>
                         {
-                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_ResultCode", "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'Delivered', 'NotReady', 'PartialFailure', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')");
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_ResultCode", "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'AuthorityRequired', 'Cooldown', 'Delivered', 'Invalid', 'NotReady', 'PartialFailure', 'RateLimited', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')");
 
                             t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_State", "(Status = 'Processing' AND ResultCode IS NULL AND CompletedAtUtc IS NULL) OR (Status = 'Delivered' AND ResultCode IS NOT NULL AND ResultCode = 'Delivered' AND CompletedAtUtc IS NOT NULL) OR (Status = 'NotDelivered' AND ResultCode IS NOT NULL AND ResultCode NOT IN ('Delivered', 'Ambiguous') AND CompletedAtUtc IS NOT NULL) OR (Status = 'Ambiguous' AND ResultCode IS NOT NULL AND ResultCode = 'Ambiguous' AND CompletedAtUtc IS NOT NULL)");
 

@@ -90,8 +90,20 @@ public enum AutomaticRaidShoutoutResultCode
     [PersistedToken("NotReady")]
     NotReady,
 
+    [PersistedToken("AuthorityRequired")]
+    AuthorityRequired,
+
+    [PersistedToken("Cooldown")]
+    Cooldown,
+
+    [PersistedToken("Invalid")]
+    Invalid,
+
     [PersistedToken("Rejected")]
     Rejected,
+
+    [PersistedToken("RateLimited")]
+    RateLimited,
 
     [PersistedToken("PartialFailure")]
     PartialFailure,
