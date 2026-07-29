@@ -12,6 +12,7 @@ using BlokeBot.Testing;
 using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -111,16 +112,57 @@ public sealed class PredictionServiceTests
     public async Task QueuedPredictionProgress_RechecksGateBeforeDelayedWrite()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
-        await SeedHostAsync(database, "first", "first-id");
+        var host = await SeedHostAsync(database, "first", "first-id");
         var handler = new PredictionHandler();
-        var service = CreateService(database, handler);
+        var clock = new ManualTestTimeProvider(
+            new DateTimeOffset(2026, 7, 29, 12, 0, 0, TimeSpan.Zero)
+        );
+        var service = CreateService(database, handler, clock);
+        var flushDecision = service.ObserveNextProgressFlushAsync(host.Id);
 
         await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
+        _ = await clock.WaitForTimerRegistrationAsync();
         await SetNativeAsync(database, false);
-        await Task.Delay(TimeSpan.FromMilliseconds(1200));
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        (await flushDecision.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(
+            PredictionProgressFlushDecision.SkippedNativeTwitchDisabled
+        );
 
         await using var verify = await database.CreateDbContextAsync();
         (await verify.TwitchPredictions.ToArrayAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ProductionRegistration_UsesSystemTimeAndPreservesPublicConstruction()
+    {
+        var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var events = TestEventBus.Create<AppEventKind>();
+        var handler = new PredictionHandler();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
+        services.AddSingleton(new HelixClient(new SingleHandlerFactory(handler)));
+        services.AddSingleton(
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
+            )
+        );
+        services.AddSingleton(events);
+        services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
+        services.AddBlokeBotTwitchOperations();
+        await using var provider = services.BuildServiceProvider();
+
+        var service = provider.GetRequiredService<PredictionService>();
+
+        service.ProgressTimeProvider.ShouldBeSameAs(TimeProvider.System);
+        provider.GetRequiredService<IPredictionEventObserver>().ShouldBeSameAs(service);
+        typeof(PredictionService)
+            .GetConstructors()
+            .ShouldHaveSingleItem()
+            .GetParameters()
+            .Length.ShouldBe(8);
     }
 
     [Test]
@@ -242,22 +284,41 @@ public sealed class PredictionServiceTests
 
     private static PredictionService CreateService(
         IDbContextFactory<BlokeBotDbContext> database,
-        PredictionHandler handler
+        PredictionHandler handler,
+        TimeProvider? timeProvider = null
     )
     {
         var events = TestEventBus.Create<AppEventKind>();
-        return new PredictionService(
-            database,
-            new ReadyBroadcaster(),
-            new HelixClient(new SingleHandlerFactory(handler)),
-            BotSettings.FromOptions(
-                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
-            ),
-            events,
-            new DurableAlertService(database, TimeProvider.System, events),
-            NullLogger<PredictionService>.Instance,
-            new NativeTwitchFeatureGate(database)
+        var broadcasters = new ReadyBroadcaster();
+        var helix = new HelixClient(new SingleHandlerFactory(handler));
+        var settings = BotSettings.FromOptions(
+            new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
         );
+        var alerts = new DurableAlertService(database, TimeProvider.System, events);
+        var logger = NullLogger<PredictionService>.Instance;
+        var nativeTwitch = new NativeTwitchFeatureGate(database);
+        return timeProvider is null
+            ? new PredictionService(
+                database,
+                broadcasters,
+                helix,
+                settings,
+                events,
+                alerts,
+                logger,
+                nativeTwitch
+            )
+            : new PredictionService(
+                database,
+                broadcasters,
+                helix,
+                settings,
+                events,
+                alerts,
+                logger,
+                nativeTwitch,
+                timeProvider
+            );
     }
 
     private static async Task<BotHost> SeedHostAsync(

@@ -29,6 +29,43 @@ public sealed class PredictionService(
     private const string _ineligibleMessage =
         "Twitch Predictions are available only to Affiliate or Partner broadcasters.";
     private readonly ConcurrentDictionary<int, PendingProgress> _pendingProgress = new();
+    private readonly ConcurrentDictionary<
+        int,
+        TaskCompletionSource<PredictionProgressFlushDecision>
+    > _progressFlushObservers = new();
+
+    internal PredictionService(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        IHostBroadcasterTokenStatusProvider broadcasters,
+        HelixClient helix,
+        BotSettings settings,
+        EventBus<AppEventKind> events,
+        DurableAlertService alerts,
+        ILogger<PredictionService> logger,
+        NativeTwitchFeatureGate nativeTwitch,
+        TimeProvider timeProvider
+    )
+        : this(dbFactory, broadcasters, helix, settings, events, alerts, logger, nativeTwitch)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        ProgressTimeProvider = timeProvider;
+    }
+
+    internal TimeProvider ProgressTimeProvider { get; } = TimeProvider.System;
+
+    internal Task<PredictionProgressFlushDecision> ObserveNextProgressFlushAsync(int hostId)
+    {
+        var observer = new TaskCompletionSource<PredictionProgressFlushDecision>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        if (!_progressFlushObservers.TryAdd(hostId, observer))
+        {
+            throw new InvalidOperationException(
+                $"Prediction progress for host {hostId} already has a flush observer."
+            );
+        }
+        return observer.Task;
+    }
 
     public async Task<PredictionDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
@@ -531,34 +568,56 @@ public sealed class PredictionService(
 
     private async Task FlushProgressAsync(int hostId)
     {
+        PredictionProgressFlushDecision decision;
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(1), ProgressTimeProvider);
             if (!await nativeTwitch.IsEnabledAsync(hostId, CancellationToken.None))
             {
                 _pendingProgress.TryRemove(hostId, out _);
-                return;
+                decision = PredictionProgressFlushDecision.SkippedNativeTwitchDisabled;
             }
-            if (!_pendingProgress.TryRemove(hostId, out var pending))
+            else if (!_pendingProgress.TryRemove(hostId, out var pending))
             {
-                return;
+                decision = PredictionProgressFlushDecision.SkippedNoPendingProgress;
             }
-            await using var db = await dbFactory.CreateDbContextAsync();
-            var upsert = Upsert(db, hostId, pending.Prediction, true);
-            if (!upsert.Changed || !await HostIsEnabledAsync(db, hostId, CancellationToken.None))
+            else
             {
-                return;
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var upsert = Upsert(db, hostId, pending.Prediction, true);
+                if (!upsert.Changed)
+                {
+                    decision = PredictionProgressFlushDecision.SkippedNoChange;
+                }
+                else if (!await HostIsEnabledAsync(db, hostId, CancellationToken.None))
+                {
+                    decision = PredictionProgressFlushDecision.SkippedNativeTwitchDisabled;
+                }
+                else
+                {
+                    await db.SaveChangesAsync();
+                    await ChangedAsync(CancellationToken.None);
+                    decision = PredictionProgressFlushDecision.Persisted;
+                }
             }
-            await db.SaveChangesAsync();
-            await ChangedAsync(CancellationToken.None);
         }
         catch (Exception exception)
         {
+            decision = PredictionProgressFlushDecision.Failed;
             logger.LogWarning(
                 exception,
                 "Prediction progress debounce failed for host {HostId}.",
                 hostId
             );
+        }
+        CompleteProgressFlush(hostId, decision);
+    }
+
+    private void CompleteProgressFlush(int hostId, PredictionProgressFlushDecision decision)
+    {
+        if (_progressFlushObservers.TryRemove(hostId, out var observer))
+        {
+            observer.TrySetResult(decision);
         }
     }
 
@@ -903,4 +962,13 @@ public sealed class PredictionService(
     private sealed record PredictionUpsertOutcome(TwitchPrediction Prediction, bool Changed);
 
     private sealed record PendingProgress(HelixPrediction Prediction);
+}
+
+internal enum PredictionProgressFlushDecision
+{
+    SkippedNativeTwitchDisabled,
+    SkippedNoPendingProgress,
+    SkippedNoChange,
+    Persisted,
+    Failed,
 }

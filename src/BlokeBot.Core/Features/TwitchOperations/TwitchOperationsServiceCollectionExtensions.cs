@@ -1,13 +1,20 @@
+using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
+using BlokeBot.Eventing;
+using BlokeBot.Persistence;
+using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 namespace BlokeBot.Core.Features.TwitchOperations;
 
@@ -29,7 +36,17 @@ public static class TwitchOperationsServiceCollectionExtensions
         services.AddSingleton<PollService>();
         services.AddSingleton<ClipMarkerService>();
         services.AddSingleton<ChannelPointsService>();
-        services.AddSingleton<PredictionService>();
+        services.AddSingleton(provider => new PredictionService(
+            provider.GetRequiredService<IDbContextFactory<BlokeBotDbContext>>(),
+            provider.GetRequiredService<IHostBroadcasterTokenStatusProvider>(),
+            provider.GetRequiredService<HelixClient>(),
+            provider.GetRequiredService<BotSettings>(),
+            provider.GetRequiredService<EventBus<AppEventKind>>(),
+            provider.GetRequiredService<DurableAlertService>(),
+            provider.GetRequiredService<ILogger<PredictionService>>(),
+            provider.GetRequiredService<NativeTwitchFeatureGate>(),
+            TimeProvider.System
+        ));
         services.AddSingleton<
             INativeTwitchFeatureChangeObserver,
             NativeTwitchFeatureChangeObserver

@@ -1,7 +1,9 @@
+using System.Data.Common;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 using TUnit.Core;
 
@@ -83,7 +85,10 @@ public sealed class AutomaticRaidShoutoutObserverTests
     [Test]
     public async Task UnrelatedWriterContention_DoesNotSilentlySuppressDistinctRaid()
     {
-        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var deleteFailure = new ProcessedEventDeleteFailureObserver();
+        await using var factory = await ContentionObservingSqliteDbFactory.CreateAsync(
+            deleteFailure
+        );
         var hostId = await SeedAsync(factory, enabled: true, threshold: 1);
         await using var writer = await factory.CreateDbContextAsync();
         await using var transaction = await writer.Database.BeginTransactionAsync();
@@ -106,9 +111,14 @@ public sealed class AutomaticRaidShoutoutObserverTests
                     CancellationToken.None
                 )
         );
-        await Task.Delay(AutomaticRaidShoutoutObserver.ClaimContentionRetryDelay * 2);
-        observation.IsCompleted.ShouldBeFalse();
-        await transaction.CommitAsync();
+        try
+        {
+            _ = await deleteFailure.Failure.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            await transaction.CommitAsync();
+        }
         await observation;
 
         delivery.Requests.ShouldHaveSingleItem().ProviderMessageId.ShouldBe("distinct-under-lock");
@@ -594,6 +604,124 @@ public sealed class AutomaticRaidShoutoutObserverTests
         {
             Requests.Add(request);
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class ProcessedEventDeleteFailureObserver : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource<SqliteException> _failure = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal Task<SqliteException> Failure => _failure.Task;
+
+        public override Task CommandFailedAsync(
+            DbCommand command,
+            CommandErrorEventData eventData,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (
+                !command.CommandText.Contains(
+                    "DELETE FROM automatic_raid_processed_events",
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return Task.CompletedTask;
+            }
+
+            try
+            {
+                var exception = eventData.Exception.ShouldBeOfType<SqliteException>();
+                exception.SqliteErrorCode.ShouldBeOneOf(
+                    SQLitePCL.raw.SQLITE_BUSY,
+                    SQLitePCL.raw.SQLITE_LOCKED
+                );
+                _failure.TrySetResult(exception);
+            }
+            catch (Exception exception)
+            {
+                _failure.TrySetException(exception);
+            }
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class DeferredSqliteTransactionInterceptor : DbTransactionInterceptor
+    {
+        public override ValueTask<InterceptionResult<DbTransaction>> TransactionStartingAsync(
+            DbConnection connection,
+            TransactionStartingEventData eventData,
+            InterceptionResult<DbTransaction> result,
+            CancellationToken cancellationToken = default
+        )
+        {
+            var transaction = ((SqliteConnection)connection).BeginTransaction(
+                eventData.IsolationLevel,
+                deferred: true
+            );
+            return ValueTask.FromResult(
+                InterceptionResult<DbTransaction>.SuppressWithResult(transaction)
+            );
+        }
+    }
+
+    private sealed class ContentionObservingSqliteDbFactory
+        : IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>,
+            IAsyncDisposable
+    {
+        private readonly SqliteConnection _keeper;
+        private readonly DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> _options;
+
+        private ContentionObservingSqliteDbFactory(
+            SqliteConnection keeper,
+            DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> options
+        )
+        {
+            _keeper = keeper;
+            _options = options;
+        }
+
+        internal static async Task<ContentionObservingSqliteDbFactory> CreateAsync(
+            ProcessedEventDeleteFailureObserver deleteFailure
+        )
+        {
+            var connectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = $"AutomaticRaidContentionTests-{Guid.NewGuid():N}",
+                Mode = SqliteOpenMode.Memory,
+                Cache = SqliteCacheMode.Shared,
+                Pooling = false,
+                DefaultTimeout = 0,
+            }.ToString();
+            var keeper = new SqliteConnection(connectionString);
+            await keeper.OpenAsync();
+            var options = new DbContextOptionsBuilder<BlokeBot.Persistence.BlokeBotDbContext>()
+                .UseSqlite(connectionString)
+                .AddInterceptors(deleteFailure, new DeferredSqliteTransactionInterceptor())
+                .Options;
+            var factory = new ContentionObservingSqliteDbFactory(keeper, options);
+            await using var db = await factory.CreateDbContextAsync();
+            await db.Database.EnsureCreatedAsync();
+            return factory;
+        }
+
+        public BlokeBot.Persistence.BlokeBotDbContext CreateDbContext()
+        {
+            return new(_options);
+        }
+
+        public ValueTask<BlokeBot.Persistence.BlokeBotDbContext> CreateDbContextAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            return ValueTask.FromResult(CreateDbContext());
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _keeper.DisposeAsync();
         }
     }
 
