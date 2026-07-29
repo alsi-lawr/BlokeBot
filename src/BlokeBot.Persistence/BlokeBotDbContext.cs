@@ -52,6 +52,12 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<GuessVote> Votes => Set<GuessVote>();
     public DbSet<ShoutoutHistoryEntry> ShoutoutHistory => Set<ShoutoutHistoryEntry>();
     public DbSet<ShoutoutCooldownState> ShoutoutCooldowns => Set<ShoutoutCooldownState>();
+    public DbSet<AutomaticRaidShoutoutSettings> AutomaticRaidShoutoutSettings =>
+        Set<AutomaticRaidShoutoutSettings>();
+    public DbSet<AutomaticRaidProcessedEvent> AutomaticRaidProcessedEvents =>
+        Set<AutomaticRaidProcessedEvent>();
+    public DbSet<AutomaticRaidShoutoutOutcome> AutomaticRaidShoutoutOutcomes =>
+        Set<AutomaticRaidShoutoutOutcome>();
     public DbSet<HostBroadcasterAuthorization> HostBroadcasterAuthorizations =>
         Set<HostBroadcasterAuthorization>();
     public DbSet<TwitchPollTemplate> TwitchPollTemplates => Set<TwitchPollTemplate>();

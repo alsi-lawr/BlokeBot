@@ -4,8 +4,10 @@ using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BlokeBot.Core.Features.TwitchOperations;
 
@@ -18,6 +20,12 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<NativeTwitchFeatureGate>()
         );
         services.AddSingleton<ShoutoutService>();
+        services.AddSingleton<AutomaticRaidShoutoutConfigurationService>();
+        services.TryAddSingleton<
+            IAutomaticRaidShoutoutDelivery,
+            UnavailableAutomaticRaidShoutoutDelivery
+        >();
+        services.AddSingleton<AutomaticRaidShoutoutObserver>();
         services.AddSingleton<PollService>();
         services.AddSingleton<ClipMarkerService>();
         services.AddSingleton<ChannelPointsService>();
@@ -37,6 +45,9 @@ public static class TwitchOperationsServiceCollectionExtensions
         );
         services.AddSingleton<IShoutoutEventObserver>(provider =>
             provider.GetRequiredService<ShoutoutService>()
+        );
+        services.AddSingleton<IIncomingRaidEventObserver>(provider =>
+            provider.GetRequiredService<AutomaticRaidShoutoutObserver>()
         );
         return services;
     }
