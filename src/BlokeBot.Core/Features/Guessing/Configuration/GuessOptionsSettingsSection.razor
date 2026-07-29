@@ -1,6 +1,6 @@
 @using BlokeBot.Core.Features.Guessing.Profiles
 
-<CollapsibleSection Title="Accepted answers" Description="The first name is canonical; add comma-separated aliases after it. Each answer can have an optional reply." InitiallyOpen="false" TaskKey="@TaskKey" PreferenceKey="guessing-settings-answers">
+<CollapsibleSection Title="Accepted answers" Description="The first name is canonical; add comma-separated aliases after it. Each answer can have an optional reply." InitiallyOpen="true">
     <div class="space-y-3 p-4">
         <div class="surface-muted flex flex-wrap items-center justify-between gap-3 rounded-lg p-3">
             <span class="text-sm font-semibold text-slate-900">Answer replies</span>
@@ -18,7 +18,7 @@
         {
             <p id="answer-replies-whisper-recovery" class="text-sm font-medium text-slate-600">Private replies need a connected custom bot. <a class="font-semibold text-blue-700 underline underline-offset-2" href="/host#custom-bot">Open Channel setup to connect one.</a></p>
         }
-        <div class="motion-list pr-2">
+        <div class="motion-list scroll-panel scroll-panel--valid-guesses pr-2">
             @if (Options.Count == 0)
             {
                 <p class="text-sm text-muted-foreground">No answers added yet.</p>
@@ -39,8 +39,3 @@
         <button class="btn-secondary" @onclick="InvokeAddOptionAsync">Add answer</button>
     </div>
 </CollapsibleSection>
-
-@code {
-    [Parameter]
-    public string? TaskKey { get; set; }
-}

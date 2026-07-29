@@ -86,6 +86,25 @@ public sealed class EventSubClient(
         );
     }
 
+    public Task<string> CreateIncomingRaidSubscriptionAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        string sessionId,
+        CancellationToken cancellationToken
+    )
+    {
+        return CreateSubscriptionAsync(
+            context,
+            new(
+                "channel.raid",
+                "1",
+                new Dictionary<string, string> { ["to_broadcaster_user_id"] = broadcasterId },
+                sessionId
+            ),
+            cancellationToken
+        );
+    }
+
     public Task<string> CreatePollSubscriptionAsync(
         HelixRequestContext context,
         string type,

@@ -1,4 +1,4 @@
-<CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas. Each command word can only be used once in this channel." InitiallyOpen="false" TaskKey="@TaskKey" PreferenceKey="guessing-settings-commands">
+<CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas. Each command word can only be used once in this channel." InitiallyOpen="true">
     <div class="grid gap-4 p-4">
         <Field Id="guessing-start-aliases" Label="Start round" @bind-Value="Aliases.StartAliases" Placeholder="startguessing, start" />
         <Field Id="guessing-stop-aliases" Label="Stop guessing" @bind-Value="Aliases.StopAliases" Placeholder="stopguessing, close" />
@@ -7,8 +7,3 @@
         <Field Id="guessing-guesses-aliases" Label="Available guesses" @bind-Value="Aliases.GuessesAliases" Placeholder="guesses, options" />
     </div>
 </CollapsibleSection>
-
-@code {
-    [Parameter]
-    public string? TaskKey { get; set; }
-}

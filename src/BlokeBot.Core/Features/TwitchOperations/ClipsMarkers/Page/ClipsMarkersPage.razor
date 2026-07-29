@@ -1,0 +1,123 @@
+@page "/twitch-operations/clips-markers"
+@using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations
+@using BlokeBot.Core.Features.TwitchOperations.Shared
+@using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers
+@using BlokeBot.Eventing
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject IClipMarkerDashboardOperations _clipsMarkers
+@inject ToastService _toasts
+@inject NativeTwitchFeatureGate _nativeTwitch
+@inject EventBus<AppEventKind> _events
+
+<PageTitle>BlokeBot | Clips &amp; markers</PageTitle>
+
+<DashboardPage Kicker="Native Twitch"
+               Title="Clips &amp; markers"
+               Description="Save a shareable clip or mark a moment to find in your stream recording later."
+               data-native-route="clips-markers">
+    <NativeTwitchToolSwitcher />
+
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure" Title="Clips and markers could not load" Description="Try again. Any earlier attempts are still saved.">
+            <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
+    }
+    else if (_loading)
+    {
+        <PageState Kind="PageStateKind.Loading" Title="Loading clips and markers" Description="Getting recent clips, markers, and unfinished attempts." />
+    }
+    else if (!_nativeTwitchEnabled || _state?.Authorization is ClipMarkerAuthorizationReadiness.Disabled)
+    {
+        <NativeTwitchUnavailable />
+    }
+    else if (_state is not null)
+    {
+        @if (_state.Authorization is ClipMarkerAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+        {
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can create clips and markers for this channel.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
+            </PageState>
+        }
+
+        @if (_state.Authorization is ClipMarkerAuthorizationReadiness.Ready)
+        {
+        <TaskPanel Title="Create a clip" Description="Save the current live moment as a clip you can share.">
+            <div class="field-row native-primary-row">
+                <label class="flex min-h-10 items-center gap-2 text-sm font-semibold text-slate-900" for="clip-has-delay">
+                    <input id="clip-has-delay" type="checkbox" @bind="_clipHasDelay" />
+                    Include the stream delay
+                </label>
+                <button class="btn-primary" @onclick="CreateClipAsync">Create clip</button>
+            </div>
+        </TaskPanel>
+
+        <CollapsibleSection Title="Place a stream marker" Description="Add a short private marker to the current live stream." InitiallyOpen="false">
+            <div class="field-row native-primary-row p-4">
+                <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
+                <button class="btn-primary" @onclick="CreateMarkerAsync">Create marker</button>
+            </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection Title="Clips and markers" Description="Open completed clips or check anything Twitch is still preparing." InitiallyOpen="@_hasAttentionRequired">
+            <div class="p-4">
+                @if (_state.PendingClips.Count == 0 && _state.Results.Count == 0 && _state.Markers.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No clip or marker attempts yet.</p>
+                }
+                else
+                {
+                    <div class="phone-card-list" data-native-history="clips-markers">
+                        @foreach (var clip in _state.PendingClips)
+                        {
+                            <article class="surface-row rounded-lg p-4" @key="clip.Attempt">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div><strong>Clip pending</strong><p class="mt-1 text-sm text-muted-foreground">Twitch is preparing this clip.</p></div>
+                                    <button class="btn-secondary" @onclick="() => RetryClipAsync(clip.Attempt)">Check status</button>
+                                </div>
+                            </article>
+                        }
+                        @foreach (var clip in _state.Results)
+                        {
+                            <article class="surface-row rounded-lg p-4" @key="clip.Attempt">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <strong>Clip · @clip.Status</strong>
+                                        @if (clip.FinalUrl is { Length: > 0 } finalUrl)
+                                        {
+                                            <p class="mt-1 break-all text-sm"><a class="font-semibold text-blue-700 underline" href="@finalUrl" target="_blank" rel="noopener noreferrer">Open clip</a></p>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(clip.FailureReason))
+                                        {
+                                            <p class="mt-1 text-sm text-muted-foreground">@clip.FailureReason</p>
+                                        }
+                                    </div>
+                                    @if (clip.Status == "Ambiguous")
+                                    {
+                                        <button class="btn-secondary" @onclick="() => RetryClipAsync(clip.Attempt)">Check outcome</button>
+                                    }
+                                </div>
+                            </article>
+                        }
+                        @foreach (var marker in _state.Markers)
+                        {
+                            <article class="surface-row rounded-lg p-4" @key="marker.Attempt">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0"><strong>@marker.Description</strong><p class="mt-1 text-sm text-muted-foreground">Marker · @marker.Status@if (marker.PositionSeconds > 0) { <text> · @marker.PositionSeconds seconds</text> }</p></div>
+                                    @if (marker.Status == "Ambiguous")
+                                    {
+                                        <button class="btn-secondary" @onclick="() => RetryMarkerAsync(marker.Attempt)">Check outcome</button>
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </CollapsibleSection>
+        }
+    }
+</DashboardPage>

@@ -3,8 +3,7 @@
 <div id="host-access">
     <CollapsibleSection Title="Who can create channels"
                         Description="Choose who is allowed to create a BlokeBot channel."
-                        InitiallyOpen="false"
-                        PreferenceKey="admin-site-access" TaskKey="site-access">
+                        InitiallyOpen="true">
         <div class="space-y-5 p-5">
             <label class="inline-flex items-center gap-3 text-sm font-semibold text-slate-800">
                 <input class="h-4 w-4" type="checkbox" checked="@State.WhitelistEnabled" @onchange="ToggleWhitelist" />

@@ -7,6 +7,12 @@
     gap: 0.75rem;
 }
 
+.host-config-fragment-target:focus {
+    border-radius: 0.75rem;
+    outline: 3px solid color-mix(in srgb, var(--app-focus-border) 38%, transparent);
+    outline-offset: 3px;
+}
+
 @container (min-width: 30rem) {
     .runtime-control-actions {
         grid-template-columns: repeat(2, minmax(0, 1fr));

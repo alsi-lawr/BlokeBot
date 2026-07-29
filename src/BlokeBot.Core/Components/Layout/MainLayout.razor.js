@@ -1,21 +1,42 @@
-const preferenceVersionKey = "blokebot.rail.version";
-const preferenceVersion = "2026-07-compact-signed-in-shell";
-const railCollapsedKey = "blokebot.rail.collapsed";
+const railPreferenceKey = "blokebot.shell.rail.v1";
+const preferenceVersion = 1;
 
-function resetPreferences() {
-    if (localStorage.getItem(preferenceVersionKey) === preferenceVersion)
-        return;
+function readPreference() {
+    try {
+        const stored = window.localStorage.getItem(railPreferenceKey);
+        if (stored === null)
+            return null;
 
-    localStorage.setItem(railCollapsedKey, "false");
-    localStorage.setItem(preferenceVersionKey, preferenceVersion);
+        const value = JSON.parse(stored);
+        if (
+            typeof value !== "object" ||
+            value === null ||
+            value.version !== preferenceVersion ||
+            (value.presentation !== "expanded" && value.presentation !== "icon")
+        ) {
+            window.localStorage.removeItem(railPreferenceKey);
+            return null;
+        }
+
+        return value.presentation;
+    } catch {
+        return null;
+    }
 }
 
-export function readRailCollapsed() {
-    resetPreferences();
-    return localStorage.getItem(railCollapsedKey) === "true";
+export function readRailPresentation() {
+    return readPreference() === "icon";
 }
 
-export function writeRailCollapsed(collapsed) {
-    resetPreferences();
-    localStorage.setItem(railCollapsedKey, collapsed ? "true" : "false");
+export function writeRailPresentation(iconRail) {
+    try {
+        window.localStorage.setItem(
+            railPreferenceKey,
+            JSON.stringify({
+                version: preferenceVersion,
+                presentation: iconRail ? "icon" : "expanded",
+            }),
+        );
+    } catch {
+    }
 }

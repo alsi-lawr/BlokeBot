@@ -88,39 +88,22 @@
     </script>
     <script>
         (() => {
-            const preferenceResetStorageKey = "blokebot.sidebar.chat-tools.version";
-            const preferenceResetVersion = "2026-07-dashboard-foundation";
             const states = [
                 ["blokebot.sidebar.guessing.open", "navGuessingOpen"],
                 ["blokebot.sidebar.points.open", "navPointsOpen"],
                 ["blokebot.sidebar.customcommands.open", "navCustomCommandsOpen"],
-                ["blokebot.sidebar.native-twitch.open", "navNativeTwitchOpen"],
             ];
-
-            const resetChatToolsPreferences = () => {
-                try {
-                    if (window.localStorage.getItem(preferenceResetStorageKey) === preferenceResetVersion)
-                        return;
-
-                    for (const [key] of states)
-                        window.localStorage.setItem(key, "false");
-
-                    window.localStorage.setItem(preferenceResetStorageKey, preferenceResetVersion);
-                } catch {
-                    // Local browser preferences are optional; the server-rendered defaults stay collapsed.
-                }
-            };
 
             const readBoolean = key => {
                 try {
-                    return window.localStorage.getItem(key) === "true";
+                    const value = window.localStorage.getItem(key);
+                    return value === null ? true : value === "true";
                 } catch {
-                    return false;
+                    return true;
                 }
             };
 
             const sync = () => {
-                resetChatToolsPreferences();
                 for (const [key, datasetName] of states)
                     document.documentElement.dataset[datasetName] = readBoolean(key) ? "true" : "false";
             };

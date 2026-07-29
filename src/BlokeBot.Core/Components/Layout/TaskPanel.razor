@@ -1,6 +1,6 @@
 <section class="task-panel">
-    <div class="task-panel__header">
-        <div class="min-w-0 space-y-1">
+    <header class="task-panel__header">
+        <div class="min-w-0 space-y-2">
             <h2 class="task-panel__title">@Title</h2>
             @if (!string.IsNullOrWhiteSpace(Description))
             {
@@ -11,7 +11,7 @@
         {
             <div class="task-panel__actions">@Actions</div>
         }
-    </div>
+    </header>
     <div class="task-panel__body">
         @ChildContent
     </div>

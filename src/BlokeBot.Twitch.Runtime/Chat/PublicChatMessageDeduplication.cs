@@ -14,4 +14,19 @@ internal static class PublicChatMessageDeduplication
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))
         );
     }
+
+    public static PublicChatDeduplicationKey CorrelatedKey(
+        PublicChatDeliveryCorrelation correlation
+    )
+    {
+        var validated = correlation.Validate();
+        return Hash($"automatic-raid:{validated.HostId}:{validated.ProviderMessageId}");
+    }
+
+    private static PublicChatDeduplicationKey Hash(string material)
+    {
+        return new PublicChatDeduplicationKey(
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))
+        );
+    }
 }

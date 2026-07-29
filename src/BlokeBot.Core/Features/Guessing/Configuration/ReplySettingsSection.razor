@@ -1,4 +1,4 @@
-<CollapsibleSection Title="Bot replies" Description="Messages the bot sends for guessing commands." InitiallyOpen="false" TaskKey="@TaskKey" PreferenceKey="guessing-settings-replies">
+<CollapsibleSection Title="Bot replies" Description="Messages the bot sends for guessing commands." InitiallyOpen="false">
     <div class="grid gap-4 p-4 md:grid-cols-2">
         <TextAreaField Id="guessing-round-started-reply" Label="Round started" @bind-Value="Replies.RoundStartedReply" />
         <TextAreaField Id="guessing-round-already-open-reply" Label="Round already running" @bind-Value="Replies.RoundAlreadyOpenReply" />
@@ -15,8 +15,3 @@
         <TextAreaField Id="guessing-no-winners-reply" Label="No winners" @bind-Value="Replies.NoWinnersReply" />
     </div>
 </CollapsibleSection>
-
-@code {
-    [Parameter]
-    public string? TaskKey { get; set; }
-}

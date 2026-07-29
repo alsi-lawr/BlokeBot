@@ -25,7 +25,7 @@ internal sealed class SimulationReadiness(
             && exchanges.Count(entry => entry.Detail == authority.Definition.AuthorizedUser.Login)
                 >= 3
             && transcript.Count(entry => entry.Kind == "oauth.validate") >= 2;
-        var subscriptionsReady = authority.ActiveSubscriptions.Count == 12;
+        var subscriptionsReady = authority.ActiveSubscriptions.Count == 13;
         var runtimeReady =
             runtime.Current is BotRuntimeStatus.Connected
             && channels.Current.Channels.Any(status => status is EventSubChannelStatus.Healthy);

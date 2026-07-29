@@ -30,14 +30,20 @@ public sealed class HostFeatureTests
                 return ValueTask.CompletedTask;
             }
         );
-        var service = new HostFeatureService(dbFactory, new HostedChannelChangeNotifier(events));
+        var service = new HostFeatureService(
+            dbFactory,
+            new HostedChannelChangeNotifier(events),
+            []
+        );
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
 
         await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(
-            HostFeatureFlags.Points | HostFeatureFlags.CustomCommands
+            HostFeatureFlags.Points
+                | HostFeatureFlags.CustomCommands
+                | HostFeatureFlags.NativeTwitch
         );
         publishCount.ShouldBe(1);
 
@@ -45,6 +51,29 @@ public sealed class HostFeatureTests
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         publishCount.ShouldBe(2);
+    }
+
+    [Test]
+    public async Task NativeTwitchSwitch_Toggling_PersistsAndNotifiesLifecycleObservers()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer");
+        var observer = new RecordingNativeTwitchFeatureChangeObserver();
+        var service = new HostFeatureService(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            [observer]
+        );
+
+        await service.DisableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
+        await service.DisableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
+        await service.EnableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
+
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
+        observer.Changes.ShouldBe([
+            (hostId, NativeTwitchFeatureState.Disabled),
+            (hostId, NativeTwitchFeatureState.Enabled),
+        ]);
     }
 
     [Test]
@@ -56,7 +85,8 @@ public sealed class HostFeatureTests
         await SeedAliasAsync(dbFactory, hostId, AppCommandKind.Points, "points");
         var features = new HostFeatureService(
             dbFactory,
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
         );
         var aliases = new AppCommandAliasResolver(dbFactory);
         var guessing = new GuessingCommandRouteResolver(aliases, features);
@@ -140,7 +170,8 @@ public sealed class HostFeatureTests
         }
         var features = new HostFeatureService(
             dbFactory,
-            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>())
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
         );
         var resolver = new GuessingCommandRouteResolver(
             new AppCommandAliasResolver(dbFactory),
@@ -214,5 +245,21 @@ public sealed class HostFeatureTests
     {
         var features = await service.Load(hostId).RunAsync(CancellationToken.None);
         return features.Match<HostFeatureFlags?>(value => value, () => null);
+    }
+
+    private sealed class RecordingNativeTwitchFeatureChangeObserver
+        : INativeTwitchFeatureChangeObserver
+    {
+        internal List<(int HostId, NativeTwitchFeatureState State)> Changes { get; } = [];
+
+        public Task NativeTwitchFeatureChangedAsync(
+            int hostId,
+            NativeTwitchFeatureState state,
+            CancellationToken cancellationToken
+        )
+        {
+            Changes.Add((hostId, state));
+            return Task.CompletedTask;
+        }
     }
 }

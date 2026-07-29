@@ -44,6 +44,8 @@ public abstract record ChannelPointsAuthorizationReadiness
 
     public sealed record Ready : ChannelPointsAuthorizationReadiness;
 
+    public sealed record Disabled : ChannelPointsAuthorizationReadiness;
+
     public sealed record Ineligible(string Message) : ChannelPointsAuthorizationReadiness;
 
     public sealed record NeedsBroadcasterAuthorization(string Message)

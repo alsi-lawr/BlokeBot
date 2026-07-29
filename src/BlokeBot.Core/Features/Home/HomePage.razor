@@ -1,62 +1,48 @@
 @page "/"
 @using Microsoft.AspNetCore.Authorization
-@using BlokeBot.Core.Features.HostedChannels.Runtime
-@using BlokeBot.Core.Features.HostConfig.Page
 @attribute [Authorize]
-@inherits AuthenticatedPageComponent
-@inject HostConfigService _hostConfig
 
-<PageTitle>BlokeBot | Overview</PageTitle>
+<PageTitle>BlokeBot | Home</PageTitle>
 
-<DashboardPage Kicker="Overview"
-               Title="Run your channel with BlokeBot"
-               Description="See the selected channel’s actual readiness and next action." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
-    <ChildContent>
-        @if (!_loaded)
-        {
-            <PageState Kind="DashboardPageState.Loading" Title="Loading channel readiness" Description="Checking the selected channel’s connection and bot status." />
-        }
-        else if (_blockedBySelectedChannel)
-        {
-            <PageState Kind="DashboardPageState.Unavailable" Title="Switch to your own channel" Description="Only the channel owner can review this channel’s readiness. Use the top bar to switch channels." />
-        }
-        else if (Host is null || _state is null)
-        {
-            <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select a channel from the top bar to review its readiness." />
-        }
-        else if (!_state.IsHostCreated)
-        {
-            <TaskPanel Title="Create your channel setup" Description="Create this channel before connecting the bot or enabling chat tools.">
-                <a class="btn-primary" href="/host/create?returnUrl=/">Create channel setup</a>
-            </TaskPanel>
-        }
-        else if (!_state.IsChannelBotAuthorized || _state.RuntimeStatus?.ChannelBotAuthorizationScopesCurrent != true)
-        {
-            <TaskPanel Title="Connect Twitch chat" Description="The selected channel needs a current Twitch chat connection.">
-                <a class="btn-primary" href="/host">@(_state.IsChannelBotAuthorized ? "Reconnect bot" : "Connect bot")</a>
-            </TaskPanel>
-        }
-        else if (_state.RuntimeStatus?.Lifecycle is HostedChannelRuntimeLifecycle.Stopped)
-        {
-            <TaskPanel Title="Bot is ready to start" Description="Twitch chat is connected; start the bot from Channel setup.">
-                <a class="btn-primary" href="/host">Start bot</a>
-            </TaskPanel>
-        }
-        else
-        {
-            <TaskPanel Title="Channel ready" Description="The selected channel is connected and the bot is active.">
-                <a class="btn-secondary" href="/host">Review Channel setup</a>
-            </TaskPanel>
-        }
+<div class="home-page app-motion-stack mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Home"
+                Title="BlokeBot"
+                Description="Run Twitch chat games and points from one place. Set up your channel, choose the tools you want, and let the bot handle chat during stream." />
 
-        @if (_state is not null)
-        {
-            <CollapsibleSection Title="Public leaderboard"
-                                Description="Open a public guessing or points leaderboard for a Twitch channel."
-                                InitiallyOpen="false"
-                                PreferenceKey="overview-public-leaderboard">
-                <PublicLeaderboardPrompt ContainerClass="p-4" InitialChannel="@_state.Login" />
-            </CollapsibleSection>
-        }
-    </ChildContent>
-</DashboardPage>
+    <AuthorizeView>
+        <Authorized Context="homeAuth">
+            @{
+                var selectedChannel = AuthenticatedSession
+                    .FromPrincipal(homeAuth.User)
+                    .State.Match<string?>(
+                        _ => null,
+                        selected => selected.Selection.Current.Login,
+                        _ => null
+                    );
+            }
+            <PublicLeaderboardPrompt ContainerClass="home-note rounded-lg p-5" InitialChannel="@selectedChannel" />
+        </Authorized>
+    </AuthorizeView>
+
+    <section class="grid gap-4 md:grid-cols-2">
+        <HomeInfoCard Title="Set up your channel" Icon="@HomeInfoCardIcon.Channel" Href="/host">
+            Connect the bot to your Twitch channel and keep your stream tools separate from everyone else's.
+        </HomeInfoCard>
+
+        <HomeInfoCard Title="Choose your chat tools" Icon="@HomeInfoCardIcon.Points" Href="/host#chat-tools">
+            Turn on guessing rounds, points, giveaways, or only the features that make sense for your stream.
+        </HomeInfoCard>
+
+        <HomeInfoCard Title="Let trusted mods help" Icon="@HomeInfoCardIcon.Moderators" Href="/host#moderator-help">
+            Let the mods you trust help run your channel tools, then change who can help whenever you need.
+        </HomeInfoCard>
+
+        <HomeInfoCard Title="Keep the bot ready" Icon="@HomeInfoCardIcon.Bot" Href="/host#bot-status">
+            Check whether the bot can chat in your stream, then start or stop it from your channel page.
+        </HomeInfoCard>
+    </section>
+
+    <section class="home-note rounded-lg p-5">
+        <p class="text-sm leading-6 text-muted-foreground">BlokeBot is built around your Twitch channel: connect the bot, pick the chat tools you want, and choose who can help manage them.</p>
+    </section>
+</div>

@@ -12,27 +12,23 @@
 
 <PageTitle>BlokeBot | Points Settings</PageTitle>
 
-<DashboardPage Kicker="Chat tools"
-               Title="Configure points"
-               Description="Set up point names, chat commands, giveaways, and the replies viewers receive." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
-    <Actions>
+<div class="mx-auto max-w-7xl space-y-6">
+    <PageHeader Title="Points settings"
+                Description="Choose point names, chat commands, chances of winning, giveaways, and what the bot says.">
         <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
-    </Actions>
+    </PageHeader>
 
-    <ChildContent>
     @if (Host is null)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose points settings you want to configure from the top bar." />
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (!_featureEnabled)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on points" Description="Points are off for this channel. Turn them on in Channel setup before changing their settings.">
-            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
-        </PageState>
+        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
     }
     else if (_config is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading points settings" Description="Getting this channel’s point rules, commands, and replies ready." />
+        <div class="card p-8 text-sm text-muted-foreground">Loading points settings...</div>
     }
     else
     {
@@ -49,8 +45,13 @@
             .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
             .FirstOrDefault();
 
-        <TaskSelectionScope PreferenceKey="points-settings" DefaultTask="general">
-        <CollapsibleSection Title="General" TaskKey="general" Description="What points are called and how gambling works." InitiallyOpen="true" PreferenceKey="points-settings-general" OpenRequest="@_generalOpenRequest" FocusRequest="@_generalFocusRequest" FocusElementId="@_validationFocusId">
+        <div class="settings-disclosure-stack">
+        <CollapsibleSection Title="General"
+                            Description="What points are called and how gambling works."
+                            InitiallyOpen="true"
+                            OpenRequest="@_generalFocusRequest"
+                            FocusElementId="@_validationFocusId"
+                            FocusRequest="@_generalFocusRequest">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <Field Id="points-label" Label="Point label" @bind-Value="_config.PointLabel" Placeholder="points" />
                 <div class="space-y-2">
@@ -74,7 +75,7 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Chat commands" TaskKey="commands" Description="Separate extra command words with commas." InitiallyOpen="false" PreferenceKey="points-settings-commands">
+        <CollapsibleSection Title="Chat commands" Description="Separate extra command words with commas." InitiallyOpen="true">
             <div class="grid gap-4 p-4 md:grid-cols-2">
                 <Field Id="points-aliases" Label="Balance" @bind-Value="_config.Aliases.PointsAliases" Placeholder="points" />
                 <Field Id="points-give-aliases" Label="Give" @bind-Value="_config.Aliases.GivePointsAliases" Placeholder="givepoints" />
@@ -88,7 +89,12 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Giveaways" TaskKey="giveaways" Description="Prizes, timing, and who can enter." InitiallyOpen="false" PreferenceKey="points-settings-giveaways" OpenRequest="@_giveawaysOpenRequest" FocusRequest="@_giveawaysFocusRequest" FocusElementId="@_validationFocusId">
+        <CollapsibleSection Title="Giveaways"
+                            Description="Prizes, timing, and who can enter."
+                            InitiallyOpen="true"
+                            OpenRequest="@_giveawaysFocusRequest"
+                            FocusElementId="@_validationFocusId"
+                            FocusRequest="@_giveawaysFocusRequest">
             <div class="grid gap-4 p-4 md:grid-cols-3">
                 <div class="space-y-2">
                     <label class="label" for="duration">Time to enter (seconds)</label>
@@ -138,8 +144,8 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Bot replies" TaskKey="replies" Description="Messages the bot sends for points commands." InitiallyOpen="false" PreferenceKey="points-settings-replies">
-            <div class="grid gap-4 p-4 md:grid-cols-2">
+        <CollapsibleSection Title="Bot replies" Description="Messages the bot sends for points commands." InitiallyOpen="false">
+            <div class="scroll-panel scroll-panel--settings grid gap-4 p-4 md:grid-cols-2">
                 <TextAreaField Id="points-balance-reply" Label="Balance" @bind-Value="_config.Replies.BalanceReply" />
                 <TextAreaField Id="points-other-balance-reply" Label="Another viewer's balance" @bind-Value="_config.Replies.OtherBalanceReply" />
                 <TextAreaField Id="points-transfer-reply" Label="Points given" @bind-Value="_config.Replies.TransferReply" />
@@ -166,12 +172,9 @@
             </div>
         </CollapsibleSection>
 
-        <CollapsibleSection Title="Reply delivery" Description="Choose where viewers receive replies." TaskKey="delivery" InitiallyOpen="false">
-            <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
+        <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                       WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                       Options="_whisperReplyOptions" />
-        </CollapsibleSection>
-        </TaskSelectionScope>
+        </div>
     }
-    </ChildContent>
-</DashboardPage>
+</div>

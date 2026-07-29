@@ -1,0 +1,141 @@
+@page "/twitch-operations/polls"
+@using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations
+@using BlokeBot.Core.Features.TwitchOperations.Shared
+@using BlokeBot.Core.Features.TwitchOperations.Polls
+@using BlokeBot.Eventing
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject IPollDashboardOperations _polls
+@inject ToastService _toasts
+@inject NativeTwitchFeatureGate _nativeTwitch
+@inject IJSRuntime _js
+@inject EventBus<AppEventKind> _events
+
+<PageTitle>BlokeBot | Polls</PageTitle>
+
+<DashboardPage Kicker="Native Twitch"
+               Title="Polls"
+               Description="Ask viewers a question, watch the votes, and end voting when you are ready."
+               data-native-route="polls">
+    <NativeTwitchToolSwitcher />
+
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure" Title="Polls could not load" Description="Try again. Your saved questions have not changed.">
+            <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
+    }
+    else if (_loading)
+    {
+        <PageState Kind="PageStateKind.Loading" Title="Loading polls" Description="Getting saved questions and the poll running now." />
+    }
+    else if (!_nativeTwitchEnabled || _state?.Authorization is PollAuthorizationReadiness.Disabled)
+    {
+        <NativeTwitchUnavailable />
+    }
+    else if (_state is not null)
+    {
+        @if (_state.Authorization is PollAuthorizationReadiness.NeedsBroadcasterAuthorization readiness)
+        {
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can start and end polls for this channel.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@readiness.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
+            </PageState>
+        }
+
+        @if (_state.Authorization is PollAuthorizationReadiness.Ready)
+        {
+        <TaskPanel Title="Run a poll" Description="Start a saved question, watch the votes, or end voting early.">
+            @if (_state.ActivePoll is { } poll)
+            {
+                <article class="surface-row rounded-lg p-4" data-active-poll>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <strong class="text-slate-950">@poll.Title</strong>
+                            <p class="mt-1 text-sm text-muted-foreground">@poll.Status</p>
+                        </div>
+                        <button class="btn-secondary" @onclick="EndPollAsync">End poll</button>
+                    </div>
+                    @if (poll.IsExternallyStarted)
+                    {
+                        <p class="mt-3 text-sm text-amber-700">This poll was started in Twitch. You will confirm before ending it.</p>
+                    }
+                    <ul class="mt-3 grid gap-2 text-sm">
+                        @foreach (var choice in poll.Choices)
+                        {
+                            <li class="surface-muted rounded-md p-3" @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
+                        }
+                    </ul>
+                </article>
+            }
+            else if (_state.Templates.Count == 0)
+            {
+                <PageState Kind="PageStateKind.Empty" Title="No poll templates yet" Description="Save a template below, then return here to start it." />
+            }
+            else
+            {
+                <div class="phone-card-list" data-poll-templates>
+                    @foreach (var template in _state.Templates)
+                    {
+                        <article class="surface-row rounded-lg p-4" @key="template.Id">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <strong class="text-slate-950">@template.Title</strong>
+                                    <p class="mt-1 text-sm text-muted-foreground">@string.Join(" · ", template.Choices) · @template.DurationSeconds seconds</p>
+                                </div>
+                                <button class="btn-primary" @onclick="() => StartPollAsync(template.Id)">Start poll</button>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </TaskPanel>
+
+        <CollapsibleSection Title="New poll template" Description="Save a question and choices to reuse later." InitiallyOpen="@(_state.Templates.Count == 0)">
+            <div class="form-grid p-4">
+                <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Question" />
+                <Field Id="poll-choices" Label="Choices (one per line)" @bind-Value="_choices" Placeholder="Yes&#10;No" />
+                <Field Id="poll-duration" Label="Duration in seconds" @bind-Value="_duration" Placeholder="60" />
+                <div class="space-y-3">
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="poll-channel-points-enabled">
+                        <input id="poll-channel-points-enabled" type="checkbox" @bind="_channelPointsVotingEnabled" />
+                        Enable Channel Points voting
+                    </label>
+                    @if (_channelPointsVotingEnabled)
+                    {
+                        <Field Id="poll-channel-points-per-vote" Label="Channel Points per vote" @bind-Value="_channelPointsPerVote" Placeholder="250" />
+                    }
+                </div>
+                <div class="self-end"><button class="btn-primary" @onclick="SaveTemplateAsync">Save template</button></div>
+            </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection Title="Recent results" Description="Review polls that finished or were ended early." InitiallyOpen="false">
+            <div class="p-4">
+                @if (_state.Results.Count == 0)
+                {
+                    <p class="text-sm text-muted-foreground">No poll results yet.</p>
+                }
+                else
+                {
+                    <div class="phone-card-list" data-native-history="polls">
+                        @foreach (var result in _state.Results)
+                        {
+                            <article class="surface-row rounded-lg p-4" @key="result.ProviderPollId">
+                                <div class="flex flex-wrap items-start justify-between gap-2"><strong>@result.Title</strong><span class="text-sm text-muted-foreground">@result.Status</span></div>
+                                <ul class="mt-3 grid gap-1 text-sm">
+                                    @foreach (var choice in result.Choices)
+                                    {
+                                        <li @key="choice.Id"><strong>@choice.Title</strong>: @choice.Votes votes (@choice.ChannelPointsVotes Channel Points)</li>
+                                    }
+                                </ul>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </CollapsibleSection>
+        }
+    }
+</DashboardPage>

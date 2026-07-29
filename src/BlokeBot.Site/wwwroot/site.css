@@ -859,6 +859,10 @@ main {
   text-transform: uppercase;
 }
 
+.guide-sidebar__disclosure > summary {
+  display: none;
+}
+
 .guide-sidebar__index,
 .guide-sidebar__group a {
   display: block;
@@ -1323,32 +1327,75 @@ main {
   }
 
   .guide-sidebar__title {
-    margin-left: 0.35rem;
-  }
-
-  .guide-sidebar__links {
-    display: flex;
-    overflow-x: auto;
-    gap: 0.35rem;
-    padding-bottom: 0.25rem;
-    scrollbar-width: thin;
-  }
-
-  .guide-sidebar__index,
-  .guide-sidebar__group li {
-    flex: 0 0 auto;
-  }
-
-  .guide-sidebar__group {
-    display: contents;
-  }
-
-  .guide-sidebar__group > p {
     display: none;
   }
 
+  .guide-sidebar__disclosure > summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.35rem;
+    color: var(--ink-strong);
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.82rem;
+    font-weight: 850;
+  }
+
+  .guide-sidebar__disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .guide-sidebar__disclosure > summary::after {
+    display: grid;
+    width: 1.5rem;
+    height: 1.5rem;
+    place-items: center;
+    color: var(--brand-strong);
+    border-radius: 50%;
+    background: var(--brand-soft);
+    content: "−";
+    font-size: 1rem;
+  }
+
+  .guide-sidebar__disclosure:not([open]) > summary::after {
+    content: "+";
+  }
+
+  .guide-sidebar__current {
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-align: right;
+  }
+
+  .guide-sidebar__current strong {
+    color: var(--ink-strong);
+    font-weight: 850;
+  }
+
+  .guide-sidebar__links {
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 0.55rem;
+    padding-top: 0.8rem;
+    border-top: 0.0625rem solid var(--line);
+  }
+
+  .guide-sidebar__group {
+    display: block;
+    margin-top: 0;
+  }
+
+  .guide-sidebar__group > p {
+    display: block;
+  }
+
   .guide-sidebar__group ul {
-    display: contents;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.1rem 0.35rem;
   }
 
   .guide-sidebar__group li + li {
@@ -1357,7 +1404,7 @@ main {
 
   .guide-sidebar__index,
   .guide-sidebar__group a {
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .hero,

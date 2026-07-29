@@ -12,4 +12,10 @@ internal sealed record EventSubMetadata
 
     [JsonPropertyName("subscription_type")]
     public string SubscriptionType { get; init; } = string.Empty;
+
+    [JsonPropertyName("subscription_version")]
+    public string SubscriptionVersion { get; init; } = string.Empty;
+
+    [JsonPropertyName("message_timestamp")]
+    public DateTimeOffset? MessageTimestamp { get; init; }
 }

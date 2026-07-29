@@ -17,5 +17,7 @@ internal sealed record PublicChatEnqueueCommand
 
     public required PublicChatDeliveryDeadline Deadline { get; init; }
 
+    public PublicChatDeliveryCorrelation? Correlation { get; init; }
+
     public PublicChatPinIntent? PinIntent { get; init; }
 }

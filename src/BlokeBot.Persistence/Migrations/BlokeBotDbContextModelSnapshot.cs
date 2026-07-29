@@ -68,6 +68,178 @@ namespace BlokeBot.Persistence.Migrations
                     b.ToTable("active_public_chat_pins", (string)null);
                 });
 
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidProcessedEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ClaimedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProviderMessageId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("HostId", "ProviderMessageId")
+                        .IsUnique();
+
+                    b.ToTable("automatic_raid_processed_events", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_automatic_raid_processed_events_Expiry", "ExpiresAtUtc >= ClaimedAtUtc");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidShoutoutOutcome", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ClaimedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("MessageTimestampUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProviderMessageId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResultCode")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceDisplayName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceLogin")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SourceTwitchUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ViewerCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId", "CompletedAtUtc");
+
+                    b.HasIndex("HostId", "ProviderMessageId")
+                        .IsUnique();
+
+                    b.ToTable("automatic_raid_shoutout_outcomes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_ResultCode", "ResultCode IS NULL OR ResultCode IN ('Ambiguous', 'AuthorityRequired', 'Cooldown', 'Delivered', 'Invalid', 'NotReady', 'PartialFailure', 'RateLimited', 'Rejected', 'RuntimeMessageTooLong', 'Unexpected')");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_State", "(Status = 'Processing' AND ResultCode IS NULL AND CompletedAtUtc IS NULL) OR (Status = 'Delivered' AND ResultCode IS NOT NULL AND ResultCode = 'Delivered' AND CompletedAtUtc IS NOT NULL) OR (Status = 'NotDelivered' AND ResultCode IS NOT NULL AND ResultCode NOT IN ('Delivered', 'Ambiguous') AND CompletedAtUtc IS NOT NULL) OR (Status = 'Ambiguous' AND ResultCode IS NOT NULL AND ResultCode = 'Ambiguous' AND CompletedAtUtc IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_outcomes_Status", "Status IN ('Ambiguous', 'Delivered', 'NotDelivered', 'Processing')");
+                        });
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidShoutoutSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AnnouncementColor")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Primary");
+
+                    b.Property<string>("ChatPresentation")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Regular");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("HostId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Mechanism")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Native");
+
+                    b.Property<string>("MessageTemplate")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(1024)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("Welcome {display_name}! Check them out at {channel_url}");
+
+                    b.Property<int>("MinimumViewerCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1);
+
+                    b.Property<int?>("PinDurationSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostId")
+                        .IsUnique();
+
+                    b.ToTable("automatic_raid_shoutout_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_AnnouncementColor", "AnnouncementColor IN ('Blue', 'Green', 'Orange', 'Primary', 'Purple')");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_ChatPresentation", "ChatPresentation IN ('Announcement', 'Pinned', 'Regular')");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_Mechanism", "Mechanism IN ('Chat', 'Native')");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_MinimumViewerCount", "MinimumViewerCount >= 1");
+
+                            t.HasCheckConstraint("CK_automatic_raid_shoutout_settings_PinDuration", "PinDurationSeconds IS NULL OR (PinDurationSeconds >= 30 AND PinDurationSeconds <= 1800)");
+                        });
+                });
+
             modelBuilder.Entity("BlokeBot.Persistence.Models.BotHost", b =>
                 {
                     b.Property<int>("Id")
@@ -98,7 +270,7 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<long>("EnabledFeatures")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
-                        .HasDefaultValue(7L);
+                        .HasDefaultValue(15L);
 
                     b.Property<string>("Login")
                         .IsRequired()
@@ -2566,6 +2738,33 @@ namespace BlokeBot.Persistence.Migrations
                 });
 
             modelBuilder.Entity("BlokeBot.Persistence.Models.ActivePublicChatPin", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidProcessedEvent", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidShoutoutOutcome", b =>
+                {
+                    b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
+                        .WithMany()
+                        .HasForeignKey("HostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BlokeBot.Persistence.Models.AutomaticRaidShoutoutSettings", b =>
                 {
                     b.HasOne("BlokeBot.Persistence.Models.BotHost", null)
                         .WithMany()

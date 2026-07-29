@@ -35,6 +35,7 @@ public partial class HostConfigPage
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
                 HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
+                HostFeatureFlags.NativeTwitch => "feature-toggle-card__icon text-purple-700",
                 _ => "feature-toggle-card__icon text-blue-600",
             }
             : "feature-toggle-card__icon text-slate-500";
@@ -69,6 +70,11 @@ public partial class HostConfigPage
                     <path d="m16 14 3 3-3 3" />
                 </svg>
                 """,
+                HostFeatureFlags.NativeTwitch => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m13 2-7 11h6l-1 9 7-12h-6l1-8Z" />
+                </svg>
+                """,
                 _ => string.Empty,
             }
         );
@@ -92,17 +98,30 @@ public partial class HostConfigPage
         bool enabled
     )
     {
-        if (enabled)
+        var startupMessageEnabled = _startupMessageEnabled;
+        var startupMessageText = _startupMessageText;
+        try
         {
-            await _features.EnableAsync(hostId, feature, CancellationToken.None);
-        }
-        else
-        {
-            await _features.DisableAsync(hostId, feature, CancellationToken.None);
-        }
+            if (enabled)
+            {
+                await _features.EnableAsync(hostId, feature, CancellationToken.None);
+            }
+            else
+            {
+                await _features.DisableAsync(hostId, feature, CancellationToken.None);
+            }
 
-        await LoadCoreAsync();
-        ToastFeatureChange(feature, enabled);
+            await LoadCoreAsync();
+            ToastFeatureChange(feature, enabled);
+        }
+        finally
+        {
+            if (_state?.HostId == hostId)
+            {
+                _startupMessageEnabled = startupMessageEnabled;
+                _startupMessageText = startupMessageText;
+            }
+        }
     }
 
     private void ToastFeatureChange(HostFeatureFlags feature, bool enabled)
@@ -133,6 +152,7 @@ public partial class HostConfigPage
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.CustomCommands => "Custom commands",
+            HostFeatureFlags.NativeTwitch => "Native Twitch",
             _ => "Feature",
         };
     }

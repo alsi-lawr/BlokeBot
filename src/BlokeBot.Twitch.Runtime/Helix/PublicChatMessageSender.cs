@@ -13,7 +13,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         CancellationToken cancellationToken
     )
     {
-        return SendCoreAsync(channel, message, deadline, null, cancellationToken);
+        return SendCoreAsync(channel, message, deadline, null, null, cancellationToken);
     }
 
     public ValueTask<PublicChatSendOutcome> SendAsync(
@@ -24,13 +24,58 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
         CancellationToken cancellationToken
     )
     {
-        return SendCoreAsync(channel, message, deadline, pinIntent.Validate(), cancellationToken);
+        return SendCoreAsync(
+            channel,
+            message,
+            deadline,
+            null,
+            pinIntent.Validate(),
+            cancellationToken
+        );
+    }
+
+    public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatDeliveryCorrelation correlation,
+        CancellationToken cancellationToken
+    )
+    {
+        return SendCoreAsync(
+            channel,
+            message,
+            deadline,
+            correlation.Validate(),
+            null,
+            cancellationToken
+        );
+    }
+
+    public ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatDeliveryCorrelation correlation,
+        PublicChatPinIntent pinIntent,
+        CancellationToken cancellationToken
+    )
+    {
+        return SendCoreAsync(
+            channel,
+            message,
+            deadline,
+            correlation.Validate(),
+            pinIntent.Validate(),
+            cancellationToken
+        );
     }
 
     private async ValueTask<PublicChatSendOutcome> SendCoreAsync(
         string channel,
         string message,
         PublicChatDeliveryDeadline deadline,
+        PublicChatDeliveryCorrelation? correlation,
         PublicChatPinIntent? pinIntent,
         CancellationToken cancellationToken
     )
@@ -41,6 +86,7 @@ internal sealed class PublicChatMessageSender(PublicChatMessageQueue queue)
                 Channel = channel,
                 Message = message,
                 Deadline = deadline,
+                Correlation = correlation,
                 PinIntent = pinIntent,
             },
             cancellationToken

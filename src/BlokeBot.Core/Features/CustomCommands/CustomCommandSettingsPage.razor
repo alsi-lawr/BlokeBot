@@ -3,43 +3,53 @@
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Persistence.Models
 @using Microsoft.AspNetCore.Authorization
-@using Microsoft.JSInterop
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
-@implements IAsyncDisposable
 @inject CustomCommandConfigurationService _configuration
 @inject HostFeatureService _features
 @inject EventBus<AppEventKind> _events
 @inject ToastService _toasts
 @inject CustomCommandInvocationResetService _invocationResets
-@inject IJSRuntime _js
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
-<DashboardPage Kicker="Chat tools"
-               Title="Edit custom commands"
-               Description="Create commands, choose the bot’s replies, keep counters, and schedule messages." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
-    <Actions>
-        <button class="btn-primary"
+<div class="mx-auto max-w-7xl space-y-6 custom-command-page">
+    <PageHeader Title="Custom commands"
+                Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
+        <button class="@(_hasChanges ? "btn-primary custom-command-save--dirty" : "btn-secondary")"
                 aria-label="Save custom commands"
-                disabled="@(!_featureEnabled || _config is null)"
+                data-save-state="@(_hasChanges ? "dirty" : "clean")"
+                disabled="@(!_featureEnabled || _config is null || !_hasChanges)"
                 @onclick="SaveAsync">Save changes</button>
-    </Actions>
+    </PageHeader>
 
-    <ChildContent>
-    @if (Host is null)
+    @if (_loadFailureMessage is not null)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose custom commands you want to edit from the top bar." />
+        <section class="page-state" data-page-state="failure" role="alert">
+            <div>
+                <h2 class="page-state__title">Custom commands could not load</h2>
+                <p class="page-state__description">@_loadFailureMessage</p>
+            </div>
+            <div class="page-state__actions">
+                <button class="btn-primary" type="button" @onclick="LoadAsync">Retry</button>
+            </div>
+        </section>
+    }
+    else if (_isLoading)
+    {
+        <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
+    }
+    else if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (!_featureEnabled)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on custom commands" Description="Custom commands are off for this channel. Turn them on in Channel setup before editing commands.">
-            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
-        </PageState>
+        <div class="card p-8 text-sm text-muted-foreground">Custom commands are off for this channel. Turn them on in Channel setup.</div>
     }
     else if (_config is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading custom commands" Description="Getting this channel’s commands, replies, counters, and scheduled messages ready." />
+        <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
     }
     else
     {
@@ -95,6 +105,7 @@
         </div>
 
         <div id="custom-command-message-library-panel"
+             class="settings-disclosure-stack"
              role="tabpanel"
              aria-labelledby="custom-command-message-library-tab"
              hidden="@(_activeTab != CustomCommandSettingsTab.MessageLibrary)"
@@ -104,7 +115,7 @@
                             Description="Save one or more messages for the bot to choose from."
                             InitiallyOpen="true"
                             OpenRequest="@_replySectionOpenRequest">
-            <div class="space-y-4 p-4">
+            <div class="custom-command-workspace-container space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.MessageEntries.Count, "reply")</p>
                     <button class="btn-secondary" @onclick="AddMessageEntry">Add reply</button>
@@ -116,20 +127,37 @@
                 }
                 else
                 {
-                    <div class="space-y-3">
+                    <div class="custom-command-workspace">
+                        <div class="custom-command-inventory">
                         @foreach (var entry in _config.MessageEntries)
                         {
-                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="reply">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">@entry.Name</p>
-                                    <p class="text-xs text-muted-foreground">@CountLabel(entry.Variants.Count, "message") · @MessageSelectionLabel(entry.SelectionMode)</p>
+                            <div class="custom-command-inventory-row surface-row"
+                                 data-inventory="reply"
+                                 data-current="@(IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id) ? "true" : "false")"
+                                 aria-current="@(IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id) ? "true" : null)">
+                                <div class="min-w-0">
+                                    <p id="@InventoryLabelId(CustomCommandEditorKind.Reply, entry.Id)" class="text-sm font-semibold text-slate-900">@entry.Name</p>
+                                    <p class="text-xs text-muted-foreground">Reply · @CountLabel(entry.Variants.Count, "message") · @MessageSelectionLabel(entry.SelectionMode)</p>
                                 </div>
-                                <button class="btn-secondary" data-action="edit-reply" @onclick="() => SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry))">Edit reply</button>
+                                <button class="btn-secondary"
+                                        data-action="edit-reply"
+                                        aria-pressed="@(IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id) ? "true" : "false")"
+                                        aria-controls="@(IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id) ? EditorRegionId(CustomCommandEditorKind.Reply, entry.Id) : null)"
+                                        @onclick="() => SelectEditor(CustomCommandEditorKind.Reply, entry.Id, MessageEntryNameFieldId(entry))">
+                                    @(IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id) ? "Editing" : "Edit reply")
+                                </button>
                             </div>
-                            @if (IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id))
-                            {
-                            <div @key="entry" class="surface-muted space-y-3 rounded-lg p-3">
-                                <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(15rem,1.2fr)_12rem_auto] xl:items-end">
+                        }
+                        </div>
+                        @foreach (var entry in _config.MessageEntries.Where(entry => IsEditorOpen(CustomCommandEditorKind.Reply, entry.Id)))
+                        {
+                            <section @key="entry"
+                                     id="@EditorRegionId(CustomCommandEditorKind.Reply, entry.Id)"
+                                     class="custom-command-editor surface-muted space-y-4"
+                                     role="region"
+                                     aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Reply, entry.Id)"
+                                     data-selected-editor="reply">
+                                <div class="grid gap-3 md:grid-cols-2 md:items-end">
                                     <Field Id="@MessageEntryNameFieldId(entry)"
                                            Label="Reply name"
                                            ErrorMessage="@ValidationMessage(ReplyTarget(entry.Id, CustomCommandValidationFieldKind.Name))"
@@ -195,8 +223,7 @@
                                         </div>
                                     }
                                 </div>
-                            </div>
-                            }
+                            </section>
                         }
                     </div>
                 }
@@ -204,6 +231,7 @@
         </CollapsibleSection>
         </div>
         <div id="custom-command-commands-panel"
+             class="settings-disclosure-stack"
              role="tabpanel"
              aria-labelledby="custom-command-commands-tab"
              hidden="@(_activeTab != CustomCommandSettingsTab.Commands)"
@@ -214,7 +242,7 @@
                             Description="Choose what viewers type and what the bot should do."
                             InitiallyOpen="true"
                             OpenRequest="@_commandSectionOpenRequest">
-            <div class="space-y-4 p-4">
+            <div class="custom-command-workspace-container space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Commands.Count, "command")</p>
                     @if (_config.MessageEntries.Count == 0)
@@ -235,19 +263,36 @@
                 }
                 else
                 {
-                    <div class="space-y-3">
+                    <div class="custom-command-workspace">
+                        <div class="custom-command-inventory">
                         @foreach (var command in _config.Commands)
                         {
-                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="command">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">@command.Name</p>
-                                    <p class="text-xs text-muted-foreground">@(command.Enabled ? "On" : "Off") · @ActionKindLabel(command.ActionKind) · @CommandAdvancedSummary(command)</p>
+                            <div class="custom-command-inventory-row surface-row"
+                                 data-inventory="command"
+                                 data-current="@(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? "true" : "false")"
+                                 aria-current="@(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? "true" : null)">
+                                <div class="min-w-0">
+                                    <p id="@InventoryLabelId(CustomCommandEditorKind.Command, command.Id)" class="text-sm font-semibold text-slate-900">@command.Name</p>
+                                    <p class="text-xs text-muted-foreground">Command · @(command.Enabled ? "On" : "Off") · @ActionKindLabel(command.ActionKind) · @CommandAdvancedSummary(command)</p>
                                 </div>
-                                <button class="btn-secondary" data-action="edit-command" @onclick="() => SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command))">Edit command</button>
+                                <button class="btn-secondary"
+                                        data-action="edit-command"
+                                        aria-pressed="@(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? "true" : "false")"
+                                        aria-controls="@(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? EditorRegionId(CustomCommandEditorKind.Command, command.Id) : null)"
+                                        @onclick="() => SelectEditor(CustomCommandEditorKind.Command, command.Id, CommandNameFieldId(command))">
+                                    @(IsEditorOpen(CustomCommandEditorKind.Command, command.Id) ? "Editing" : "Edit command")
+                                </button>
                             </div>
-                            @if (IsEditorOpen(CustomCommandEditorKind.Command, command.Id))
-                            {
-                            <div @key="command" class="surface-muted space-y-3 rounded-lg p-3">
+                        }
+                        </div>
+                        @foreach (var command in _config.Commands.Where(command => IsEditorOpen(CustomCommandEditorKind.Command, command.Id)))
+                        {
+                            <section @key="command"
+                                     id="@EditorRegionId(CustomCommandEditorKind.Command, command.Id)"
+                                     class="custom-command-editor surface-muted space-y-4"
+                                     role="region"
+                                     aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Command, command.Id)"
+                                     data-selected-editor="command">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
                                     <Field Id="@CommandNameFieldId(command)"
                                            Label="Command name"
@@ -263,12 +308,12 @@
                                            Placeholder="hello, hi" />
                                     <button class="btn-secondary" @onclick="() => RemoveCommand(command)">Delete</button>
                                 </div>
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                    <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
+                                <div class="grid gap-3 md:grid-cols-2">
+                                    <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
                                         <input id="@CommandEnabledToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.Enabled" />
                                         Turned on
                                     </label>
-                                    <label class="control-surface inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium">
+                                    <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
                                         <input id="@CommandModeratorOnlyToggleId(command)" class="h-4 w-4" type="checkbox" @bind="command.ModeratorOnly" />
                                         Only moderators can use this
                                     </label>
@@ -286,7 +331,7 @@
                                         </select>
                                         @(ValidationMessageFor(CommandActionFieldId(command), CommandTarget(command.Id, CustomCommandValidationFieldKind.Action)))
                                     </div>
-                                    <div class="space-y-2 md:col-span-2 xl:col-span-4">
+                                    <div class="space-y-2 col-span-full">
                                         <span class="label">Replies by argument count</span>
                                         <div class="grid gap-3 md:grid-cols-3">
                                             <div class="space-y-2">
@@ -342,7 +387,7 @@
                                                     Title="Advanced settings"
                                                     Description="@CommandAdvancedSummary(command)"
                                                     InitiallyOpen="false"
-                                                    OpenRequest="@_commandAdvancedOpenRequest">
+                                                    OpenRequest="@CommandAdvancedOpenRequest(command.Id)">
                                     <div class="grid gap-3 p-4 md:grid-cols-2">
                                     <div class="space-y-2">
                                         <label class="label" for="@CommandCooldownFieldId(command)">Wait between uses (seconds)</label>
@@ -432,8 +477,7 @@
                                 }
                                     </div>
                                 </CollapsibleSection>
-                            </div>
-                            }
+                            </section>
                         }
                     </div>
                 }
@@ -445,7 +489,7 @@
                             Description="Keep track of things such as deaths, wins, or drinks."
                             InitiallyOpen="true"
                             OpenRequest="@_counterSectionOpenRequest">
-            <div class="space-y-4 p-4">
+            <div class="custom-command-workspace-container space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Counters.Count, "counter")</p>
                     <button class="btn-secondary" @onclick="AddCounter">Add counter</button>
@@ -457,19 +501,36 @@
                 }
                 else
                 {
-                    <div class="grid gap-3">
+                    <div class="custom-command-workspace">
+                        <div class="custom-command-inventory">
                         @foreach (var counter in _config.Counters)
                         {
-                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="counter">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">@counter.Name</p>
-                                    <p class="text-xs text-muted-foreground">Current value: @counter.Value</p>
+                            <div class="custom-command-inventory-row surface-row"
+                                 data-inventory="counter"
+                                 data-current="@(IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id) ? "true" : "false")"
+                                 aria-current="@(IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id) ? "true" : null)">
+                                <div class="min-w-0">
+                                    <p id="@InventoryLabelId(CustomCommandEditorKind.Counter, counter.Id)" class="text-sm font-semibold text-slate-900">@counter.Name</p>
+                                    <p class="text-xs text-muted-foreground">Counter · Current value: @counter.Value</p>
                                 </div>
-                                <button class="btn-secondary" data-action="edit-counter" @onclick="() => SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter))">Edit counter</button>
+                                <button class="btn-secondary"
+                                        data-action="edit-counter"
+                                        aria-pressed="@(IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id) ? "true" : "false")"
+                                        aria-controls="@(IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id) ? EditorRegionId(CustomCommandEditorKind.Counter, counter.Id) : null)"
+                                        @onclick="() => SelectEditor(CustomCommandEditorKind.Counter, counter.Id, CounterNameFieldId(counter))">
+                                    @(IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id) ? "Editing" : "Edit counter")
+                                </button>
                             </div>
-                            @if (IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id))
-                            {
-                            <div @key="counter" class="surface-muted grid gap-3 rounded-lg p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end">
+                        }
+                        </div>
+                        @foreach (var counter in _config.Counters.Where(counter => IsEditorOpen(CustomCommandEditorKind.Counter, counter.Id)))
+                        {
+                            <section @key="counter"
+                                     id="@EditorRegionId(CustomCommandEditorKind.Counter, counter.Id)"
+                                     class="custom-command-editor surface-muted grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end"
+                                     role="region"
+                                     aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.Counter, counter.Id)"
+                                     data-selected-editor="counter">
                                 <Field Id="@CounterNameFieldId(counter)"
                                        Label="Counter name"
                                        ErrorMessage="@ValidationMessage(CounterTarget(counter.Id, CustomCommandValidationFieldKind.Name))"
@@ -481,8 +542,7 @@
                                     <input id="@CounterValueFieldId(counter)" class="input" type="number" @bind="counter.Value" />
                                 </div>
                                 <button class="btn-secondary" @onclick="() => RemoveCounter(counter)">Delete</button>
-                            </div>
-                            }
+                            </section>
                         }
                     </div>
                 }
@@ -494,7 +554,7 @@
                             Description="Send a saved reply automatically on a timer or after chat activity."
                             InitiallyOpen="false"
                             OpenRequest="@_announcementSectionOpenRequest">
-            <div class="space-y-4 p-4">
+            <div class="custom-command-workspace-container space-y-4 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-sm font-semibold text-slate-900">@CountLabel(_config.Announcements.Count, "scheduled message")</p>
                     <button class="btn-secondary"
@@ -509,19 +569,36 @@
                 }
                 else
                 {
-                    <div class="space-y-3">
+                    <div class="custom-command-workspace">
+                        <div class="custom-command-inventory">
                         @foreach (var announcement in _config.Announcements)
                         {
-                            <div class="surface-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2" data-inventory="scheduled-message">
-                                <div>
-                                    <p class="text-sm font-semibold text-slate-900">@announcement.Name</p>
-                                    <p class="text-xs text-muted-foreground">@(announcement.Enabled ? "On" : "Off") · @AnnouncementDeliveryTypeLabel(announcement.DeliveryType) · @AnnouncementScheduleLabel(announcement.ScheduleKind)</p>
+                            <div class="custom-command-inventory-row surface-row"
+                                 data-inventory="scheduled-message"
+                                 data-current="@(IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id) ? "true" : "false")"
+                                 aria-current="@(IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id) ? "true" : null)">
+                                <div class="min-w-0">
+                                    <p id="@InventoryLabelId(CustomCommandEditorKind.ScheduledMessage, announcement.Id)" class="text-sm font-semibold text-slate-900">@announcement.Name</p>
+                                    <p class="text-xs text-muted-foreground">Scheduled message · @(announcement.Enabled ? "On" : "Off") · @AnnouncementDeliveryTypeLabel(announcement.DeliveryType) · @AnnouncementScheduleLabel(announcement.ScheduleKind)</p>
                                 </div>
-                                <button class="btn-secondary" data-action="edit-scheduled-message" @onclick="() => SelectEditor(CustomCommandEditorKind.ScheduledMessage, announcement.Id, AnnouncementNameFieldId(announcement))">Edit scheduled message</button>
+                                <button class="btn-secondary"
+                                        data-action="edit-scheduled-message"
+                                        aria-pressed="@(IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id) ? "true" : "false")"
+                                        aria-controls="@(IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id) ? EditorRegionId(CustomCommandEditorKind.ScheduledMessage, announcement.Id) : null)"
+                                        @onclick="() => SelectEditor(CustomCommandEditorKind.ScheduledMessage, announcement.Id, AnnouncementNameFieldId(announcement))">
+                                    @(IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id) ? "Editing" : "Edit scheduled message")
+                                </button>
                             </div>
-                            @if (IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id))
-                            {
-                            <div @key="announcement" class="surface-muted space-y-3 rounded-lg p-3">
+                        }
+                        </div>
+                        @foreach (var announcement in _config.Announcements.Where(announcement => IsEditorOpen(CustomCommandEditorKind.ScheduledMessage, announcement.Id)))
+                        {
+                            <section @key="announcement"
+                                     id="@EditorRegionId(CustomCommandEditorKind.ScheduledMessage, announcement.Id)"
+                                     class="custom-command-editor surface-muted space-y-4"
+                                     role="region"
+                                     aria-labelledby="@InventoryLabelId(CustomCommandEditorKind.ScheduledMessage, announcement.Id)"
+                                     data-selected-editor="scheduled-message">
                                 <div class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_12rem_auto] xl:items-end">
                                     <Field Id="@AnnouncementNameFieldId(announcement)"
                                            Label="Scheduled message name"
@@ -529,7 +606,7 @@
                                            FocusRequest="@Math.Max(FocusRequestFor(AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Name)), EditorFocusRequestFor(AnnouncementNameFieldId(announcement)))"
                                            @bind-Value="announcement.Name"
                                            Placeholder="Hydrate reminder" />
-                                    <label class="control-surface mt-7 inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium xl:mt-0">
+                                    <label class="control-surface mt-7 inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium xl:mt-0">
                                         <input class="h-4 w-4"
                                                id="@AnnouncementEnabledToggleId(announcement)"
                                                type="checkbox"
@@ -539,7 +616,7 @@
                                     </label>
                                     <button class="btn-secondary" @onclick="() => RemoveAnnouncement(announcement)">Delete</button>
                                 </div>
-                                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <div class="grid gap-3 md:grid-cols-2">
                                     <div class="space-y-2">
                                         <label class="label" for="@AnnouncementReplyFieldId(announcement)">Reply to send</label>
                                         <select id="@AnnouncementReplyFieldId(announcement)"
@@ -584,7 +661,7 @@
                                             </select>
                                             @(ValidationMessageFor(AnnouncementColorFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Color)))
                                         </div>
-                                        <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 md:col-span-2 xl:col-span-4">
+                                        <div class="surface-row rounded-lg px-3 py-2 text-sm text-slate-700 col-span-full">
                                             <p>@TwitchAnnouncementCapabilityMessage(_config.TwitchAnnouncementReadiness)</p>
                                             @if (_config.TwitchAnnouncementReadiness.Availability != TwitchAnnouncementAvailability.Available)
                                             {
@@ -607,40 +684,6 @@
                                         </select>
                                         @(ValidationMessageFor(AnnouncementScheduleFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.Schedule)))
                                     </div>
-                                    <CollapsibleSection ContentId="custom-announcement-delivery-details"
-                                                        Title="Delivery details"
-                                                        Description="Retry policy and latest delivery"
-                                                        InitiallyOpen="false"
-                                                        OpenRequest="@_announcementAdvancedOpenRequest">
-                                        <div class="grid gap-3 p-4 md:grid-cols-2">
-                                    <div class="space-y-2">
-                                        <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
-                                        <input id="@AnnouncementRetryDelayFieldId(announcement)"
-                                               class="input"
-                                               type="number"
-                                               min="1"
-                                               max="59"
-                                               @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
-                                               @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
-                                               @bind="announcement.RetryDelaySeconds" />
-                                        @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
-                                    </div>
-                                    <div class="space-y-2">
-                                        <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
-                                        <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
-                                               class="input"
-                                               type="number"
-                                               min="1"
-                                               max="60"
-                                               @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
-                                               @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
-                                               @bind="announcement.OccurrenceLifetimeSeconds" />
-                                        @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
-                                    </div>
-                                        </div>
-                                    </CollapsibleSection>
-                                    <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
-                                       class="text-xs font-medium text-slate-500 md:col-span-2 xl:col-span-4">These timings apply only when a scheduled send cannot happen.</p>
                                     @if (announcement.Schedule is IntervalCustomAnnouncementScheduleEditor interval)
                                     {
                                         <div class="space-y-2">
@@ -701,28 +744,65 @@
                                             <input id="@AnnouncementWeeklyTimeFieldId(announcement)" class="input" type="time" @bind="weekly.Time" />
                                         </div>
                                     }
-                                    <CollapsibleSection ContentId="custom-announcement-delivery-history"
-                                                        Title="Delivery history"
-                                                        Description="Last send and latest result"
-                                                        InitiallyOpen="false">
-                                        <div class="grid gap-3 p-4 md:grid-cols-3">
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
+                                    <div class="col-span-full" data-announcement-secondary="delivery-details">
+                                        <CollapsibleSection ContentId="custom-announcement-delivery-details"
+                                                            Title="Delivery details"
+                                                            Description="Retry policy and latest delivery"
+                                                            InitiallyOpen="false"
+                                                            OpenRequest="@AnnouncementAdvancedOpenRequest(announcement.Id)">
+                                            <div class="grid gap-3 p-4 md:grid-cols-2">
+                                                <div class="space-y-2">
+                                                    <label class="label" for="@AnnouncementRetryDelayFieldId(announcement)">Wait before retrying (seconds)</label>
+                                                    <input id="@AnnouncementRetryDelayFieldId(announcement)"
+                                                           class="input"
+                                                           type="number"
+                                                           min="1"
+                                                           max="59"
+                                                           @attributes="ValidationAttributes(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay))"
+                                                           @ref="_controls[AnnouncementRetryDelayFieldId(announcement)]"
+                                                           @bind="announcement.RetryDelaySeconds" />
+                                                    @(ValidationMessageFor(AnnouncementRetryDelayFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.RetryDelay)))
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <label class="label" for="@AnnouncementOccurrenceLifetimeFieldId(announcement)">Stop retrying after (seconds)</label>
+                                                    <input id="@AnnouncementOccurrenceLifetimeFieldId(announcement)"
+                                                           class="input"
+                                                           type="number"
+                                                           min="1"
+                                                           max="60"
+                                                           @attributes="ValidationAttributes(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime))"
+                                                           @ref="_controls[AnnouncementOccurrenceLifetimeFieldId(announcement)]"
+                                                           @bind="announcement.OccurrenceLifetimeSeconds" />
+                                                    @(ValidationMessageFor(AnnouncementOccurrenceLifetimeFieldId(announcement), AnnouncementTarget(announcement.Id, CustomCommandValidationFieldKind.OccurrenceLifetime)))
+                                                </div>
                                             </div>
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                        </CollapsibleSection>
+                                    </div>
+                                    <p id="@($"announcement-{announcement.Id}-delivery-timing-help")"
+                                       class="text-xs font-medium text-slate-500 col-span-full">These timings apply only when a scheduled send cannot happen.</p>
+                                    <div class="col-span-full" data-announcement-secondary="delivery-history">
+                                        <CollapsibleSection ContentId="custom-announcement-delivery-history"
+                                                            Title="Delivery history"
+                                                            Description="Last send and latest result"
+                                                            InitiallyOpen="false">
+                                            <div class="grid gap-3 p-4 md:grid-cols-3">
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Last sent</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@FormatLastSent(announcement.LastSentAtUtc)</p>
+                                                </div>
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Latest delivery</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@LatestDeliveryResultLabel(announcement.LatestDeliveryResult)</p>
+                                                </div>
+                                                <div class="surface-row rounded-lg px-3 py-2">
+                                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
+                                                    <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
+                                                </div>
                                             </div>
-                                            <div class="surface-row rounded-lg px-3 py-2">
-                                                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chat messages since last announcement</p>
-                                                <p class="mt-1 text-sm font-semibold text-slate-900">@announcement.ChatMessagesSinceLastSent</p>
-                                            </div>
-                                        </div>
-                                    </CollapsibleSection>
+                                        </CollapsibleSection>
+                                    </div>
                                 </div>
-                            </div>
-                            }
+                            </section>
                         }
                     </div>
                 }
@@ -788,5 +868,4 @@
         </CollapsibleSection>
         </div>
     }
-    </ChildContent>
-</DashboardPage>
+</div>

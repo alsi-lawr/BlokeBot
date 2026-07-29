@@ -1,44 +1,62 @@
-@using Microsoft.AspNetCore.Components.Web
+@using System.Diagnostics
 
-<div class="dashboard-page app-motion-stack mx-auto space-y-4">
-    <PageHeader Kicker="@Kicker" Title="@Title" Description="@Description" SaveStatus="@SaveStatus">
-        @Actions
-    </PageHeader>
+<div class="@PageClass" @attributes="AdditionalAttributes">
+    <PageHeader Kicker="@Kicker"
+                Title="@Title"
+                Description="@Description" />
 
-    @if (LoadFailure is not null)
+    @if (Actions is not null || SaveFeedback is not null)
     {
-        <PageState Kind="DashboardPageState.Failure"
-                   Title="We couldn’t load this page"
-                   Description="@LoadFailure.Message">
-            <Actions>
-                <button type="button" class="btn-primary" @onclick="RetryAsync">Retry</button>
-            </Actions>
-        </PageState>
+        <div class="dashboard-page__action-bar" data-persistent-page-actions>
+            @if (SaveFeedback is not null)
+            {
+                <p class="dashboard-page__save-feedback"
+                   data-save-feedback="@SaveFeedback.Kind.ToString().ToLowerInvariant()"
+                   role="@SaveFeedbackRole">
+                    @SaveFeedback.Message
+                </p>
+            }
+            @if (Actions is not null)
+            {
+                <div class="dashboard-page__actions">
+                    @Actions
+                </div>
+            }
+        </div>
     }
-    else
+
+    @switch (LoadState)
     {
-        <ErrorBoundary @ref="_errorBoundary">
-            <ChildContent>
-                @ChildContent
-            </ChildContent>
-            <ErrorContent Context="exception">
-                <PageState Kind="DashboardPageState.Failure"
-                           Title="We couldn’t load this page"
-                           Description="@exception.Message">
-                    <Actions>
-                        <button type="button" class="btn-primary" @onclick="RetryAsync">Retry</button>
-                    </Actions>
-                </PageState>
-            </ErrorContent>
-        </ErrorBoundary>
+        case PageLoadState.Ready:
+            @ChildContent
+            break;
+        case PageLoadState.Loading loading:
+            <PageState Kind="PageStateKind.Loading"
+                       Title="Loading"
+                       Description="@loading.Message" />
+            break;
+        case PageLoadState.Failure failure:
+            <PageState Kind="PageStateKind.Failure"
+                       Title="We couldn’t load this page"
+                       Description="@failure.Message">
+                <Actions>
+                    <button type="button"
+                            class="btn-primary"
+                            @onclick="failure.RetryAsync">
+                        Retry
+                    </button>
+                </Actions>
+            </PageState>
+            break;
     }
 </div>
 
 @code {
-    private ErrorBoundary? _errorBoundary;
-
     [Parameter]
     public RenderFragment? Actions { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
     [Parameter, EditorRequired]
     public RenderFragment? ChildContent { get; set; }
@@ -50,20 +68,27 @@
     public string Kicker { get; set; } = string.Empty;
 
     [Parameter]
-    public string SaveStatus { get; set; } = string.Empty;
+    public PageLoadState LoadState { get; set; } = new PageLoadState.Ready();
 
     [Parameter]
-    public Exception? LoadFailure { get; set; }
-
-    [Parameter]
-    public EventCallback RetryLoadAsync { get; set; }
+    public PageSaveFeedback? SaveFeedback { get; set; }
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 
-    private async Task RetryAsync()
-    {
-        _errorBoundary?.Recover();
-        await RetryLoadAsync.InvokeAsync();
-    }
+    [Parameter]
+    public DashboardPageWidth Width { get; set; } = DashboardPageWidth.Readable;
+
+    private string PageClass =>
+        Width switch
+        {
+            DashboardPageWidth.Readable => "dashboard-page dashboard-page--readable app-motion-stack",
+            DashboardPageWidth.Wide => "dashboard-page dashboard-page--wide app-motion-stack",
+            _ => throw new UnreachableException(),
+        };
+
+    private string SaveFeedbackRole =>
+        SaveFeedback?.Kind is PageSaveFeedbackKind.Validation or PageSaveFeedbackKind.Failure
+            ? "alert"
+            : "status";
 }

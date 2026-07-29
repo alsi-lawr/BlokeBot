@@ -59,6 +59,8 @@ public sealed class ChatActivityHookTests
             dispatcher,
             new RecordingCommandResponseSender(recorder),
             new BotRuntimeStatusStore(),
+            new EnabledNativeTwitchFeatureStateProvider(),
+            new EventSubChannelReconciliationTrigger(null!),
             [new ThrowingChatMessageObserver(), new RecordingChatMessageObserver(recorder)],
             RuntimeTestObserverFanOut.Continue<
                 EventSubMessageObserverBoundary,

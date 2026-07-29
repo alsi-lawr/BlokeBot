@@ -69,9 +69,7 @@ public partial class PointsConfigurationPage
     private PointsConfiguration? _config;
     private bool _featureEnabled;
     private IReadOnlyList<PointsConfigurationValidationError> _validationErrors = [];
-    private long _generalOpenRequest;
     private long _generalFocusRequest;
-    private long _giveawaysOpenRequest;
     private long _giveawaysFocusRequest;
     private string _validationFocusId = "gamblingCooldown";
 
@@ -90,7 +88,7 @@ public partial class PointsConfigurationPage
 
     private Task LoadAsync()
     {
-        return ObserveRouteLoadAsync(LoadCoreAsync);
+        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
     }
 
     private async Task LoadCoreAsync()
@@ -136,22 +134,18 @@ public partial class PointsConfigurationPage
                     {
                         case PointsConfigurationValidationError.NegativeGamblingCooldown:
                             _validationFocusId = "gamblingCooldown";
-                            _generalOpenRequest++;
                             _generalFocusRequest++;
                             break;
                         case PointsConfigurationValidationError.GiveawayDurationBelowMinimum:
                             _validationFocusId = "duration";
-                            _giveawaysOpenRequest++;
                             _giveawaysFocusRequest++;
                             break;
                         case PointsConfigurationValidationError.GiveawayWinnerCountBelowMinimum:
                             _validationFocusId = "winnerCount";
-                            _giveawaysOpenRequest++;
                             _giveawaysFocusRequest++;
                             break;
                         case PointsConfigurationValidationError.GiveawayCooldownBelowMinimum:
                             _validationFocusId = "cooldown";
-                            _giveawaysOpenRequest++;
                             _giveawaysFocusRequest++;
                             break;
                     }

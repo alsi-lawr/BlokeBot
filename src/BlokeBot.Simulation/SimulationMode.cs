@@ -4,6 +4,15 @@ internal static class SimulationMode
 {
     public const string EnvironmentName = "Simulation";
 
+    public static string UserId =>
+        FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Id;
+
+    public static string Login =>
+        FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login;
+
+    public static string DisplayName =>
+        FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName;
+
     public static DateTimeOffset Now { get; } = new(2026, 7, 15, 12, 0, 0, TimeSpan.Zero);
 
     public static FakeTwitch.FakeTwitchScenarioDefinition SelectScenario(string[] arguments)

@@ -13,68 +13,34 @@
 
 <PageTitle>BlokeBot | Points</PageTitle>
 
-<DashboardPage Kicker="Chat tools"
-               Title="Manage points"
-               Description="Check balances, adjust viewer points, and run the current giveaway." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadRouteAsync">
-    <Actions>
-        <button class="btn-secondary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
-    </Actions>
+<div class="mx-auto max-w-7xl space-y-6">
+    <PageHeader Kicker="Dashboard"
+                Title="Points"
+                Description="Check balances, adjust points, and run the current giveaway.">
+        <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
+    </PageHeader>
 
-    <ChildContent>
     @if (Host is null)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose viewer points you want to manage from the top bar." />
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (!_featureEnabled)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on points" Description="Points are off for this channel. Turn them on in Channel setup before managing balances or giveaways.">
-            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
-        </PageState>
+        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
     }
     else if (_state is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading points" Description="Getting balances, the current giveaway, and recent changes ready." />
+        <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
     }
     else
     {
-        <TaskSelectionScope PreferenceKey="points-dashboard" DefaultTask="lookup">
-        <CollapsibleSection Title="Find a viewer" Description="Look up the current balance for a viewer in this channel." TaskKey="lookup">
-            <div class="grid gap-4 p-5 md:grid-cols-2">
-                <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
-                <div class="flex items-end">
-                    <button class="btn-primary" @onclick="LookupAsync">Search</button>
-                </div>
-                @if (_lookupResult is not null)
-                {
-                    <div class="surface-muted rounded-lg p-4 md:col-span-2">
-                        <p class="text-sm font-bold text-slate-950">@_lookupResult.Login</p>
-                        <p class="mt-1 text-sm text-muted-foreground">@_lookupResult.Balance.ToDisplayString() points</p>
-                    </div>
-                }
-            </div>
-        </CollapsibleSection>
-
-        <CollapsibleSection Title="Viewer balances" TaskKey="balances"
-                            Description="Review balances or remove a balance."
-                            InitiallyOpen="false"
-                            PreferenceKey="points-dashboard-balances">
-            <section>
+        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <section class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Top balances for this channel.</p>
                 </div>
-                <div class="phone-card-list" data-phone-cards="point-balances">
-                    @if (_state.Leaderboard.Count == 0)
-                    {
-                        <p class="phone-card">No balances yet.</p>
-                    }
-                    @for (var i = 0; i < _state.Leaderboard.Count; i++)
-                    {
-                        var entry = _state.Leaderboard[i];
-                        <article @key="entry.Login" class="phone-card"><strong>@entry.Login</strong><span>Rank @(i + 1)</span><span>@entry.Balance.ToDisplayString()</span><button class="control-surface" type="button" @onclick="() => RemoveLeaderboardEntryAsync(entry.Login)">Delete balance</button></article>
-                    }
-                </div>
-                <div class="points-dashboard__leaderboard wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Viewer balances">
+                <div class="points-dashboard__leaderboard scroll-panel scroll-panel--data-table overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
@@ -105,18 +71,30 @@
                     </table>
                     @if (_state.Leaderboard.Count == 0)
                     {
-                        <PageState Kind="DashboardPageState.Empty" Title="No balances yet" Description="Viewer balances will appear here after points are earned or adjusted." />
+                        <div class="p-8 text-sm text-muted-foreground">No balances yet.</div>
                     }
                 </div>
             </section>
 
-        </CollapsibleSection>
-
-        <CollapsibleSection Title="Adjust viewer points" TaskKey="adjustments"
-                            Description="Move, add, or take away points with the same moderator permissions."
-                            InitiallyOpen="false"
-                            PreferenceKey="points-dashboard-adjustments">
-            <div class="grid gap-4 p-5 lg:grid-cols-3">
+            <section class="card">
+                <div class="border-b border-slate-200 p-5">
+                    <h2 class="text-lg font-semibold text-slate-950">Viewer points</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Look up a viewer or change their points.</p>
+                </div>
+                <div class="grid gap-4 p-5 md:grid-cols-2">
+                    <Field Id="points-dashboard-lookup-login" Label="Find viewer" @bind-Value="_lookupLogin" Placeholder="username" />
+                    <div class="flex items-end">
+                        <button class="btn-secondary" @onclick="LookupAsync">Search</button>
+                    </div>
+                    @if (_lookupResult is not null)
+                    {
+                        <div class="surface-muted rounded-lg p-4 md:col-span-2">
+                            <p class="text-sm font-bold text-slate-950">@_lookupResult.Login</p>
+                            <p class="mt-1 text-sm text-muted-foreground">@_lookupResult.Balance.ToDisplayString() points</p>
+                        </div>
+                    }
+                </div>
+                <div class="grid gap-4 border-t border-slate-200 p-5 lg:grid-cols-3">
                     <div class="space-y-3">
                         <h3 class="text-sm font-bold text-slate-950">Move points</h3>
                         <Field Id="points-dashboard-give-from" Label="From viewer" @bind-Value="_giveFrom" Placeholder="from username" />
@@ -136,14 +114,11 @@
                         <Field Id="points-dashboard-remove-amount" Label="Amount" @bind-Value="_removeAmount" Placeholder="100, 50%, all" />
                         <button class="btn-secondary" @onclick="RemoveAsync">Take away points</button>
                     </div>
-            </div>
-        </CollapsibleSection>
+                </div>
+            </section>
+        </div>
 
-        <CollapsibleSection Title="Giveaway administration" TaskKey="giveaway"
-                            Description="Start, end, or cancel the current giveaway."
-                            InitiallyOpen="false"
-                            PreferenceKey="points-dashboard-giveaway">
-        <section>
+        <section class="card">
             <div class="flex flex-col gap-4 border-b border-slate-200 p-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-950">Giveaway</h2>
@@ -176,59 +151,44 @@
                 </div>
             </div>
         </section>
-        </CollapsibleSection>
 
-        <CollapsibleSection Title="Recent point changes" TaskKey="ledger"
-                            Description="Review the latest balance ledger entries."
-                            InitiallyOpen="false"
-                            PreferenceKey="points-dashboard-ledger">
-        <section>
+        <section class="card">
             <div class="border-b border-slate-200 p-5">
                 <h2 class="text-lg font-semibold text-slate-950">Recent changes</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Latest point changes for this channel.</p>
             </div>
-            <div class="phone-card-list" data-phone-cards="point-ledger">
-                @if (_state.RecentLedger.Count == 0)
-                {
-                    <p class="phone-card">No recent point changes.</p>
-                }
-                @foreach (var entry in _state.RecentLedger)
-                {
-                    <article @key="entry" class="phone-card"><strong>@entry.Login</strong><span>@LedgerChangeLabel(entry.Kind)</span><span>@entry.Delta</span><span>Balance @entry.BalanceAfter</span><span>@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</span></article>
-                }
-            </div>
-            <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Recent point changes">
-                <table class="w-full text-left text-sm">
-                    <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                            <th class="px-5 py-3 font-semibold">Time</th>
-                            <th class="px-5 py-3 font-semibold">Change</th>
-                            <th class="px-5 py-3 font-semibold">User</th>
-                            <th class="px-5 py-3 font-semibold">Amount</th>
-                            <th class="px-5 py-3 font-semibold">Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach (var entry in _state.RecentLedger)
-                        {
-                            <tr @key="entry" class="motion-list__item">
-                                <td class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
-                                <td class="px-5 py-3 font-medium text-slate-900">@LedgerChangeLabel(entry.Kind)</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.Login</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.Delta</td>
-                                <td class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>
+            @if (_state.RecentLedger.Count == 0)
+            {
+                <div class="p-8 text-sm text-muted-foreground">No point changes yet.</div>
+            }
+            else
+            {
+                <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <tr>
+                                <th class="px-5 py-3 font-semibold">Time</th>
+                                <th class="px-5 py-3 font-semibold">Change</th>
+                                <th class="px-5 py-3 font-semibold">User</th>
+                                <th class="px-5 py-3 font-semibold">Amount</th>
+                                <th class="px-5 py-3 font-semibold">Balance</th>
                             </tr>
-                        }
-                    </tbody>
-                </table>
-                @if (_state.RecentLedger.Count == 0)
-                {
-                    <PageState Kind="DashboardPageState.Empty" Title="No recent point changes" Description="Point changes will appear here after you adjust a viewer balance." />
-                }
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach (var entry in _state.RecentLedger)
+                            {
+                                <tr @key="entry" class="motion-list__item">
+                                    <td data-label="Time" class="px-5 py-3 text-muted-foreground">@entry.CreatedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                    <td data-label="Change" class="px-5 py-3 font-medium text-slate-900">@LedgerChangeLabel(entry.Kind)</td>
+                                    <td data-label="User" class="px-5 py-3 text-slate-700">@entry.Login</td>
+                                    <td data-label="Amount" class="px-5 py-3 text-slate-700">@entry.Delta</td>
+                                    <td data-label="Balance" class="px-5 py-3 text-slate-700">@entry.BalanceAfter</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
         </section>
-        </CollapsibleSection>
-        </TaskSelectionScope>
     }
-    </ChildContent>
-</DashboardPage>
+</div>

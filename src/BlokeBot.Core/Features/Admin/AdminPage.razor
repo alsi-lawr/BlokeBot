@@ -27,29 +27,22 @@
 
 <PageTitle>BlokeBot | Admin</PageTitle>
 
-<DashboardPage Kicker="Administration"
-               Title="Manage BlokeBot"
-               Description="Connect the bot account, manage access, and look after hosted channels." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadRouteAsync">
+<div class="mx-auto max-w-7xl space-y-6">
+    <PageHeader Title="Admin"
+                Description="Connect the bot and manage who can use BlokeBot." />
 
     @if (_state is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading admin settings" Description="Preparing account, access, and hosted-channel management." />
+        <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
     }
     else
     {
-        <TaskSelectionScope PreferenceKey="admin-operations" DefaultTask="bot-account">
-        <TaskPanel Title="Administration status" Description="Choose an operation below. Connect the bot account before adding or managing hosted channels.">
-            <p class="text-sm text-muted-foreground">@(_botAccountStatus?.Message ?? "Checking the bot account.")</p>
-        </TaskPanel>
-
         <BotAccountAuthorizationSection Status="@_botAccountStatus"
                                         Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
                                         Clear="@ClearBotAccountAuthorizationAsync"
                                         Refresh="@RefreshBotAccountAuthorizationAsync"
                                         Collapsible="true"
-                                        InitiallyOpen="true"
-                                        PreferenceKey="admin-bot-account"
-                                        TaskKey="bot-account" />
+                                        InitiallyOpen="true" />
 
         <SiteAccessSection State="@_state"
                            WhitelistEntries="@_siteWhitelistEntries"
@@ -69,6 +62,5 @@
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
-        </TaskSelectionScope>
     }
-</DashboardPage>
+</div>

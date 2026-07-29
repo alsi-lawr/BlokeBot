@@ -21,10 +21,8 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
-        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
 
-        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         page.FindAll("[data-unsaved-profile-dialog] button")
@@ -45,9 +43,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
-        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
-        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Discard and switch");
@@ -68,9 +64,7 @@ public sealed class GuessingUnsavedChangesUiTests
         var seed = await SeedProfilesAsync(dbFactory);
         await using var context = CreateContext(dbFactory, seed.HostId);
         var page = context.Render<GuessingSettings>();
-        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
-        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Save and switch");
@@ -92,7 +86,6 @@ public sealed class GuessingUnsavedChangesUiTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<GuessingSettings>();
-        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").Change("green");
         await using (var concurrentDb = await dbFactory.CreateDbContextAsync())
         {
@@ -105,7 +98,6 @@ public sealed class GuessingUnsavedChangesUiTests
                     )
                 );
         }
-        OpenSection(page, "Round types");
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());
 
         ChooseDialogAction(page, "Save and switch");
@@ -125,13 +117,6 @@ public sealed class GuessingUnsavedChangesUiTests
         persisted.Name.ShouldBe("red");
     }
 
-    private static void OpenSection(IRenderedComponent<GuessingSettings> page, string title)
-    {
-        page.FindAll("button.disclosure-trigger")
-            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
-            .Click();
-    }
-
     private static void ChooseDialogAction(IRenderedComponent<GuessingSettings> page, string action)
     {
         page.FindAll("[data-unsaved-profile-dialog] button")
@@ -145,9 +130,7 @@ public sealed class GuessingUnsavedChangesUiTests
         string answer
     )
     {
-        OpenSection(page, "Round types");
         page.Find("#profileSelect").GetAttribute("value").ShouldBe(profileId.ToString());
-        OpenSection(page, "Accepted answers");
         page.Find("input[placeholder='answer']").GetAttribute("value").ShouldBe(answer);
     }
 

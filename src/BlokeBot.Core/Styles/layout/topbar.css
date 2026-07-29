@@ -145,11 +145,20 @@
         }
     }
 
+    @media (min-width: 64rem) {
+        .app-topbar__inner {
+            grid-template-areas:
+                "rail identity utility"
+                "controls controls controls";
+            grid-template-columns: auto minmax(0, 1fr) auto;
+        }
+    }
+
     @media (min-width: 96rem) {
         .app-topbar__inner {
             gap: 0.75rem;
-            grid-template-areas: "identity controls utility";
-            grid-template-columns: minmax(10rem, 1fr) minmax(0, 3fr) auto;
+            grid-template-areas: "rail identity controls utility";
+            grid-template-columns: auto minmax(10rem, 1fr) minmax(0, 3fr) auto;
             min-height: 4rem;
             padding-bottom: 0;
             padding-top: 0;

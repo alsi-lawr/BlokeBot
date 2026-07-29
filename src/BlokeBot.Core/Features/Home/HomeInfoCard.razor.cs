@@ -10,6 +10,9 @@ public partial class HomeInfoCard
     [Parameter, EditorRequired]
     public HomeInfoCardIcon Icon { get; set; }
 
+    [Parameter, EditorRequired]
+    public string Href { get; set; } = string.Empty;
+
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 

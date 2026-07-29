@@ -22,96 +22,96 @@
 <PageTitle>@_page.Title — BlokeBot guide</PageTitle>
 
 <div class="guide-layout">
-<GuideSidebar />
-<article class="article-shell guide-article">
-    <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="guide">User guide</a>
-        <span aria-hidden="true">/</span>
-        <span>@_page.Eyebrow</span>
-    </nav>
-    <header class="article-header">
-        <p class="eyebrow">@_page.Eyebrow</p>
-        <h1>@_page.Title</h1>
-        <p class="lede">@_page.Summary</p>
-    </header>
+    <GuideSidebar />
+    <article class="article-shell guide-article">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="guide">User guide</a>
+            <span aria-hidden="true">/</span>
+            <span>@_page.Eyebrow</span>
+        </nav>
+        <header class="article-header">
+            <p class="eyebrow">@_page.Eyebrow</p>
+            <h1>@_page.Title</h1>
+            <p class="lede">@_page.Summary</p>
+        </header>
 
-    @if (_page.Media is { } media)
-    {
-        <DeviceShowcase
-            DarkPhoneSource="@media.DarkPhoneSource"
-            LightPhoneSource="@media.LightPhoneSource"
-            PhoneAlt="@media.PhoneAlt"
-            DarkLaptopSource="@media.DarkLaptopSource"
-            LightLaptopSource="@media.LightLaptopSource"
-            LaptopAlt="@media.LaptopAlt"
-            Caption="@media.Caption" />
-    }
+        @if (_page.Media is { } media)
+        {
+            <DeviceShowcase
+                DarkPhoneSource="@media.DarkPhoneSource"
+                LightPhoneSource="@media.LightPhoneSource"
+                PhoneAlt="@media.PhoneAlt"
+                DarkLaptopSource="@media.DarkLaptopSource"
+                LightLaptopSource="@media.LightLaptopSource"
+                LaptopAlt="@media.LaptopAlt"
+                Caption="@media.Caption" />
+        }
 
-    @foreach (var section in _page.Sections)
-    {
-        <section>
-            <h2>@section.Heading</h2>
+        @foreach (var section in _page.Sections)
+        {
+            <section>
+                <h2>@section.Heading</h2>
 
-            @foreach (var paragraph in section.Paragraphs)
-            {
-                <p>@paragraph</p>
-            }
+                @foreach (var paragraph in section.Paragraphs)
+                {
+                    <p>@paragraph</p>
+                }
 
-            @if (section.Steps.Count > 0)
-            {
-                <ol>
-                    @foreach (var step in section.Steps)
-                    {
-                        <li>@step</li>
-                    }
-                </ol>
-            }
+                @if (section.Steps.Count > 0)
+                {
+                    <ol>
+                        @foreach (var step in section.Steps)
+                        {
+                            <li>@step</li>
+                        }
+                    </ol>
+                }
 
-            @if (section.Bullets.Count > 0)
-            {
-                <ul>
-                    @foreach (var bullet in section.Bullets)
-                    {
-                        <li>@bullet</li>
-                    }
-                </ul>
-            }
+                @if (section.Bullets.Count > 0)
+                {
+                    <ul>
+                        @foreach (var bullet in section.Bullets)
+                        {
+                            <li>@bullet</li>
+                        }
+                    </ul>
+                }
 
-            @if (section.Links.Count > 0)
-            {
+                @if (section.Links.Count > 0)
+                {
+                    <ul class="link-list">
+                        @foreach (var link in section.Links)
+                        {
+                            <li><a class="text-link" href="@link.Href">@link.Label</a></li>
+                        }
+                    </ul>
+                }
+
+                @if (section.Code is { } snippet)
+                {
+                    <pre class="code-block"><code>@snippet</code></pre>
+                }
+
+                @if (section.Note is { } note)
+                {
+                    <aside class="doc-note"><p>@note</p></aside>
+                }
+            </section>
+        }
+
+        @if (_page.Next.Count > 0)
+        {
+            <nav class="next-panel" aria-label="Continue through the guide">
+                <h2>Continue</h2>
                 <ul class="link-list">
-                    @foreach (var link in section.Links)
+                    @foreach (var link in _page.Next)
                     {
                         <li><a class="text-link" href="@link.Href">@link.Label</a></li>
                     }
                 </ul>
-            }
-
-            @if (section.Code is { } snippet)
-            {
-                <pre class="code-block"><code>@snippet</code></pre>
-            }
-
-            @if (section.Note is { } note)
-            {
-                <aside class="doc-note"><p>@note</p></aside>
-            }
-        </section>
-    }
-
-    @if (_page.Next.Count > 0)
-    {
-        <nav class="next-panel" aria-label="Continue through the guide">
-            <h2>Continue</h2>
-            <ul class="link-list">
-                @foreach (var link in _page.Next)
-                {
-                    <li><a class="text-link" href="@link.Href">@link.Label</a></li>
-                }
-            </ul>
-        </nav>
-    }
-</article>
+            </nav>
+        }
+    </article>
 </div>
 
 @code {

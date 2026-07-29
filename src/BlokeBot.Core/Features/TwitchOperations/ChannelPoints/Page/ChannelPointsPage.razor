@@ -1,0 +1,170 @@
+@page "/twitch-operations/channel-points"
+@using BlokeBot.Core.Features.Toasts
+@using BlokeBot.Core.Features.TwitchOperations
+@using BlokeBot.Core.Features.TwitchOperations.Shared
+@using BlokeBot.Core.Features.TwitchOperations.ChannelPoints
+@using BlokeBot.Eventing
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject IChannelPointsDashboardOperations _channelPoints
+@inject ToastService _toasts
+@inject NativeTwitchFeatureGate _nativeTwitch
+@inject IJSRuntime _js
+@inject EventBus<AppEventKind> _events
+@inject TimeProvider _timeProvider
+
+<PageTitle>BlokeBot | Rewards &amp; redemptions</PageTitle>
+
+<DashboardPage Kicker="Native Twitch"
+               Title="Rewards &amp; redemptions"
+               Description="Offer Channel Points rewards and complete or refund viewer requests."
+               data-native-route="channel-points">
+    <NativeTwitchToolSwitcher />
+
+    @if (_loadFailed)
+    {
+        <PageState Kind="PageStateKind.Failure" Title="Rewards could not load" Description="Try again. Your rewards and viewer requests have not changed.">
+            <Actions><button type="button" class="btn-primary" @onclick="LoadAsync">Retry</button></Actions>
+        </PageState>
+    }
+    else if (_loading)
+    {
+        <PageState Kind="PageStateKind.Loading" Title="Loading rewards" Description="Getting rewards and viewer requests that need attention." />
+    }
+    else if (!_nativeTwitchEnabled || _state?.Authorization is ChannelPointsAuthorizationReadiness.Disabled)
+    {
+        <NativeTwitchUnavailable />
+    }
+    else if (_state is not null)
+    {
+        @if (_state.Authorization is ChannelPointsAuthorizationReadiness.NeedsBroadcasterAuthorization authorization)
+        {
+            <PageState Kind="PageStateKind.Unavailable" Title="Connect this channel again" Description="Reconnect to Twitch so BlokeBot can manage rewards and viewer requests.">
+                <Actions><AuthPopupButton Class="auth-action inline-flex h-10 items-center rounded-lg px-4 text-sm font-bold transition" Url="@authorization.ReauthorizationUrl" PopupName="blokebot-broadcaster-oauth" OpeningText="Opening..." OnClosed="LoadAsync">Reconnect to Twitch</AuthPopupButton></Actions>
+            </PageState>
+        }
+        else if (_state.Authorization is ChannelPointsAuthorizationReadiness.Ineligible ineligible)
+        {
+            <PageState Kind="PageStateKind.Unavailable" Title="Channel Points rewards are unavailable" Description="@ineligible.Message" />
+        }
+        else
+        {
+            <CollapsibleSection Title="Unfulfilled redemptions" Description="Fulfil a request or cancel it so Twitch refunds the viewer." InitiallyOpen="@(_state.ActiveRedemptions.Count > 0)">
+                <div class="p-4">
+                    @if (_state.ActiveRedemptions.Count == 0)
+                    {
+                        <p class="text-sm text-muted-foreground">No redemptions need attention.</p>
+                    }
+                    else
+                    {
+                        <div class="phone-card-list" data-active-redemptions>
+                            @foreach (var redemption in _state.ActiveRedemptions)
+                            {
+                                var waitingAge = RedemptionWaitingAgePresentation.Create(redemption.RedeemedAtUtc, _timeProvider);
+                                <article class="surface-row rounded-lg p-4"
+                                         data-redemption-waiting-age="@waitingAge.SemanticValue"
+                                         @key="redemption.ProviderRedemptionId">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0">
+                                            <strong>@redemption.RewardTitle</strong>
+                                            <p class="mt-1 text-sm text-muted-foreground">@redemption.UserLogin@if (!string.IsNullOrWhiteSpace(redemption.UserInput)) { <text> · @redemption.UserInput</text> }</p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            <span class="@waitingAge.BadgeClass"
+                                                  data-waiting-age-band="@waitingAge.SemanticValue"
+                                                  role="status"
+                                                  aria-label="@waitingAge.AccessibleLabel">@waitingAge.Label</span>
+                                            @if (redemption.IsManageable)
+                                            {
+                                                <button class="btn-primary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button>
+                                                <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-sm text-muted-foreground">Read-only</span>
+                                            }
+                                        </div>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </div>
+            </CollapsibleSection>
+
+            <CollapsibleSection Title="Rewards" Description="Manage BlokeBot rewards. Rewards created elsewhere remain read-only." InitiallyOpen="@(_state.Rewards.Count > 0)">
+                <div class="p-4">
+                    @if (_state.Rewards.Count == 0)
+                    {
+                        <p class="text-sm text-muted-foreground">No rewards found.</p>
+                    }
+                    else
+                    {
+                        <div class="phone-card-list" data-channel-point-rewards>
+                            @foreach (var reward in _state.Rewards)
+                            {
+                                <article class="surface-row rounded-lg p-4" @key="reward.ProviderRewardId">
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div class="min-w-0"><strong>@reward.Title</strong><p class="mt-1 text-sm text-muted-foreground">@reward.Cost Channel Points · @(reward.IsEnabled ? "Enabled" : "Disabled")@(reward.IsPaused ? " · Paused" : string.Empty)</p>@if (!string.IsNullOrWhiteSpace(reward.Prompt)) { <p class="mt-2 text-sm text-muted-foreground">@reward.Prompt</p> }</div>
+                                        @if (reward.IsManageable)
+                                        {
+                                            <div class="flex flex-wrap gap-2"><button class="btn-secondary" @onclick="() => EditReward(reward)">Edit</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, !reward.IsEnabled, reward.IsPaused)">@(reward.IsEnabled ? "Disable" : "Enable")</button><button class="btn-secondary" @onclick="() => UpdateRewardAvailabilityAsync(reward, reward.IsEnabled, !reward.IsPaused)">@(reward.IsPaused ? "Resume" : "Pause")</button><button class="btn-secondary" @onclick="() => DeleteRewardAsync(reward.ProviderRewardId)">Delete</button></div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-sm text-muted-foreground">Managed outside BlokeBot · read-only</span>
+                                        }
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </div>
+            </CollapsibleSection>
+
+            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
+                <div class="form-grid">
+                    <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
+                    <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
+                    <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
+                    <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
+                </div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-input"><input id="reward-user-input" type="checkbox" @bind="_rewardUserInput" />Require viewer input</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-queue-skip"><input id="reward-queue-skip" type="checkbox" @bind="_rewardQueueSkip" />Skip request queue</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-stream-limit"><input id="reward-stream-limit" type="checkbox" @bind="_rewardMaxPerStreamEnabled" />Limit per stream</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-stream-limit"><input id="reward-user-stream-limit" type="checkbox" @bind="_rewardMaxPerUserPerStreamEnabled" />Limit per viewer per stream</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Use a global cooldown</label>
+                </div>
+                <div class="form-grid mt-4">
+                    @if (_rewardMaxPerStreamEnabled) { <Field Id="reward-stream-limit-value" Label="Maximum per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" /> }
+                    @if (_rewardMaxPerUserPerStreamEnabled) { <Field Id="reward-user-stream-limit-value" Label="Maximum per viewer" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" /> }
+                    @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown in seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
+                </div>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                    @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
+                </div>
+            </TaskPanel>
+
+            <CollapsibleSection Title="Redemption history" Description="Recently fulfilled and refunded redemptions." InitiallyOpen="false">
+                <div class="p-4">
+                    @if (_state.History.Count == 0)
+                    {
+                        <p class="text-sm text-muted-foreground">No redemption history yet.</p>
+                    }
+                    else
+                    {
+                        <div class="phone-card-list" data-native-history="channel-points">
+                            @foreach (var redemption in _state.History)
+                            {
+                                <article class="surface-row rounded-lg p-4" @key="redemption.ProviderRedemptionId"><div class="flex flex-wrap items-start justify-between gap-2"><strong>@redemption.RewardTitle · @redemption.UserLogin</strong><span class="text-sm text-muted-foreground">@redemption.Status</span></div><p class="mt-2 text-xs text-muted-foreground">@redemption.RedeemedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</p></article>
+                            }
+                        </div>
+                    }
+                </div>
+            </CollapsibleSection>
+        }
+    }
+</DashboardPage>
