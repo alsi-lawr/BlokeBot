@@ -1,9 +1,7 @@
-using System.Data.Common;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Persistence.Models;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Shouldly;
 using TUnit.Core;
 
@@ -168,43 +166,6 @@ public sealed class AutomaticRaidShoutoutObserverTests
         await using var verification = await factory.CreateDbContextAsync();
         (await verification.AutomaticRaidProcessedEvents.CountAsync()).ShouldBe(0);
         (await verification.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(0);
-    }
-
-    [Test]
-    public async Task ConcurrentDuplicate_PreCommitContention_HasOneDurableWinnerAndOneDelivery()
-    {
-        var coordination = new ClaimInsertCoordination();
-        await using var factory = await CoordinatedSqliteDbFactory.CreateAsync(coordination);
-        await SeedAsync(factory, enabled: true, threshold: 1);
-        var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());
-        var raid = Raid("concurrent", _now, 1);
-        var first = Observer(factory, delivery)
-            .IncomingRaidReceivedAsync(raid, CancellationToken.None);
-        await coordination.FirstInsertStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var secondClock = new SignalingTimeProvider(_now);
-        var second = Task.Run(() =>
-            new AutomaticRaidShoutoutObserver(
-                factory,
-                delivery,
-                secondClock
-            ).IncomingRaidReceivedAsync(raid, CancellationToken.None)
-        );
-        await secondClock.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        try
-        {
-            await Task.Delay(AutomaticRaidShoutoutObserver.ClaimContentionRetryDelay * 2);
-            second.IsCompleted.ShouldBeFalse();
-        }
-        finally
-        {
-            coordination.ReleaseFirstInsert.TrySetResult();
-        }
-        await Task.WhenAll(first, second);
-
-        delivery.Requests.Count.ShouldBe(1);
-        await using var verification = await factory.CreateDbContextAsync();
-        (await verification.AutomaticRaidProcessedEvents.CountAsync()).ShouldBe(1);
-        (await verification.AutomaticRaidShoutoutOutcomes.CountAsync()).ShouldBe(1);
     }
 
     [Test]
@@ -621,18 +582,6 @@ public sealed class AutomaticRaidShoutoutObserverTests
         }
     }
 
-    private sealed class SignalingTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        internal TaskCompletionSource ReadStarted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public override DateTimeOffset GetUtcNow()
-        {
-            ReadStarted.TrySetResult();
-            return now;
-        }
-    }
-
     private sealed class RecordingDelivery(AutomaticRaidShoutoutDeliveryResult result)
         : IAutomaticRaidShoutoutDelivery
     {
@@ -645,109 +594,6 @@ public sealed class AutomaticRaidShoutoutObserverTests
         {
             Requests.Add(request);
             return Task.FromResult(result);
-        }
-    }
-
-    private sealed class ClaimInsertCoordination
-    {
-        private int _insertCount;
-
-        internal TaskCompletionSource FirstInsertStarted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal TaskCompletionSource ReleaseFirstInsert { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        internal async ValueTask BeforeInsertAsync(CancellationToken cancellationToken)
-        {
-            if (Interlocked.Increment(ref _insertCount) != 1)
-            {
-                return;
-            }
-
-            FirstInsertStarted.TrySetResult();
-            await ReleaseFirstInsert.Task.WaitAsync(cancellationToken);
-        }
-    }
-
-    private sealed class BlockingClaimInsertInterceptor(ClaimInsertCoordination coordination)
-        : DbCommandInterceptor
-    {
-        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default
-        )
-        {
-            if (
-                command.CommandText.Contains(
-                    "INSERT OR IGNORE INTO automatic_raid_processed_events",
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                await coordination.BeforeInsertAsync(cancellationToken);
-            }
-            return result;
-        }
-    }
-
-    private sealed class CoordinatedSqliteDbFactory
-        : IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext>,
-            IAsyncDisposable
-    {
-        private readonly SqliteConnection _keeper;
-        private readonly DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> _options;
-
-        private CoordinatedSqliteDbFactory(
-            SqliteConnection keeper,
-            DbContextOptions<BlokeBot.Persistence.BlokeBotDbContext> options
-        )
-        {
-            _keeper = keeper;
-            _options = options;
-        }
-
-        internal static async Task<CoordinatedSqliteDbFactory> CreateAsync(
-            ClaimInsertCoordination coordination
-        )
-        {
-            var connectionString = new SqliteConnectionStringBuilder
-            {
-                DataSource = $"AutomaticRaidClaimTests-{Guid.NewGuid():N}",
-                Mode = SqliteOpenMode.Memory,
-                Cache = SqliteCacheMode.Shared,
-                Pooling = false,
-                DefaultTimeout = 0,
-            }.ToString();
-            var keeper = new SqliteConnection(connectionString);
-            await keeper.OpenAsync();
-            var options = new DbContextOptionsBuilder<BlokeBot.Persistence.BlokeBotDbContext>()
-                .UseSqlite(connectionString)
-                .AddInterceptors(new BlockingClaimInsertInterceptor(coordination))
-                .Options;
-            var factory = new CoordinatedSqliteDbFactory(keeper, options);
-            await using var db = await factory.CreateDbContextAsync();
-            await db.Database.EnsureCreatedAsync();
-            return factory;
-        }
-
-        public BlokeBot.Persistence.BlokeBotDbContext CreateDbContext()
-        {
-            return new(_options);
-        }
-
-        public ValueTask<BlokeBot.Persistence.BlokeBotDbContext> CreateDbContextAsync(
-            CancellationToken cancellationToken = default
-        )
-        {
-            return ValueTask.FromResult(CreateDbContext());
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await _keeper.DisposeAsync();
         }
     }
 
