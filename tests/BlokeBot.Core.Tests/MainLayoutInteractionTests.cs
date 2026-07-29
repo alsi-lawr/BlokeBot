@@ -177,6 +177,13 @@ public sealed class NavMenuInventoryTests
         cut.FindAll(".nav-menu__label")
             .Select(element => element.TextContent.Trim())
             .ShouldContain("Channel setup");
+        cut.FindAll(".nav-menu__section-label, [data-nav-section]")
+            .Select(element =>
+                element.ClassList.Contains("nav-menu__section-label")
+                    ? element.TextContent.Trim()
+                    : element.GetAttribute("data-nav-section")
+            )
+            .ShouldBe(["Chat tools", "twitch-operations", "guessing", "points", "custom-commands"]);
         cut.FindAll("[data-nav-section] button")
             .ShouldAllBe(button => button.GetAttribute("aria-expanded") == "true");
         cut.FindAll("[aria-describedby]").ShouldBeEmpty();
@@ -184,13 +191,37 @@ public sealed class NavMenuInventoryTests
         cut.Find(".nav-menu__build").TextContent.ShouldContain("Build");
     }
 
-    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
+    [Test]
+    public async Task NativeTwitchOnly_RendersFirstWithinTheChatToolsSection()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, HostFeatureFlags.NativeTwitch);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var module = context.JSInterop.SetupModule("./Components/Layout/NavMenu.razor.js");
+        SetupExpandedGroups(module);
+
+        var cut = context.Render<NavMenu>();
+
+        cut.FindAll(".nav-menu__section-label, [data-nav-section]")
+            .Select(element =>
+                element.ClassList.Contains("nav-menu__section-label")
+                    ? element.TextContent.Trim()
+                    : element.GetAttribute("data-nav-section")
+            )
+            .ShouldBe(["Chat tools", "twitch-operations"]);
+    }
+
+    private static async Task<int> SeedHostAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        HostFeatureFlags enabledFeatures = HostFeatureFlags.All
+    )
     {
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
             Login = "streamer",
             DisplayName = "Streamer",
+            EnabledFeatures = enabledFeatures,
             CreatedAtUtc = DateTime.UtcNow,
         };
         db.Hosts.Add(host);

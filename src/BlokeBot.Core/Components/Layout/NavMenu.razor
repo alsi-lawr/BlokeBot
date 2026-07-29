@@ -48,7 +48,7 @@
                         HostFeatureFlags.NativeTwitch
                     );
                     var showChatTools =
-                        showGuessing || showPoints || showCustomCommands;
+                        showNativeTwitch || showGuessing || showPoints || showCustomCommands;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -146,6 +146,13 @@
                     </div>
                 }
 
+                @if (showChatTools)
+                {
+                    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
+                        Chat tools
+                    </div>
+                }
+
                 @if (showNativeTwitch)
                 {
                     <div class="nav-menu__panel nav-menu__group rounded-xl p-1"
@@ -209,13 +216,6 @@
                                      aria-current="@CurrentRoute("twitch-operations/predictions", exact: true)"
                                      @onclick="NotifyNavigatedAsync">Predictions</NavLink>
                         </div>
-                    </div>
-                }
-
-                @if (showChatTools)
-                {
-                    <div class="nav-menu__section-label px-2 text-xs font-extrabold uppercase tracking-[0.16em] text-slate-500">
-                        Chat tools
                     </div>
                 }
 
