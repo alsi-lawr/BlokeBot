@@ -96,6 +96,11 @@ public partial class PageHelpButton
             "/points/settings" => _pointsSettingsHelp,
             "/custom-commands/settings" => _customCommandsHelp,
             "/host" => _hostConfigHelp,
+            "/twitch-operations/shoutouts" => _shoutoutsHelp,
+            "/twitch-operations/polls" => _pollsHelp,
+            "/twitch-operations/clips-markers" => _clipsMarkersHelp,
+            "/twitch-operations/channel-points" => _channelPointsHelp,
+            "/twitch-operations/predictions" => _predictionsHelp,
             _ => null,
         };
     }
@@ -140,6 +145,137 @@ public partial class PageHelpButton
                 "Moderator access",
                 "You can let all of your Twitch mods help by default, limit access to named mods, or block specific mods from changing this channel.",
                 []
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _shoutoutsHelp = new(
+        "Shoutouts",
+        [
+            new(
+                "Manual shoutouts",
+                "Choose another channel that is live with viewers. Twitch applies a global cooldown and a same-channel cooldown before another native shoutout is eligible.",
+                [
+                    "The page shows the cooldown information Twitch has supplied. If a cooldown is still active, wait until the displayed time before trying again.",
+                ]
+            ),
+            new(
+                "Automatic incoming-raid shoutouts",
+                "Automatic shoutouts can use an editable viewer threshold. A fresh incoming raid must meet that threshold, and must be handled within two minutes of arriving.",
+                [
+                    "Choose either a native Twitch shoutout or one chat message. The two mechanisms are exclusive.",
+                    "For chat, choose one presentation: regular, pinned, or announcement.",
+                    "If the selected mechanism fails, BlokeBot does not switch mechanisms or automatically retry that shoutout.",
+                    "A pinned shoutout replaces the current pin. BlokeBot does not restore the previous pin afterwards.",
+                ]
+            ),
+            new(
+                "Chat message details",
+                "Use the six supported tokens to add raid and channel details. Last game and stream title require inline fallback text for times when Twitch has no value.",
+                [
+                    "<code>{twitch_handle}</code>, <code>{display_name}</code>, <code>{channel_url}</code>",
+                    "<code>{last_game|fallback}</code>, <code>{stream_title|fallback}</code>, <code>{viewer_count}</code>",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _pollsHelp = new(
+        "Polls",
+        [
+            new(
+                "Run a poll",
+                "Save a question, choices, and duration as a reusable template, then start it when Twitch has no active poll.",
+                [
+                    "The active poll shows votes while it runs. End it here when voting should stop.",
+                    "If a poll was started in Twitch, BlokeBot asks you to confirm before ending it.",
+                    "Completed and terminated polls remain available under Recent results.",
+                ]
+            ),
+            new(
+                "Readiness and recovery",
+                "Polls require the selected broadcaster to be connected with the required Twitch access.",
+                [
+                    "Use Reconnect broadcaster when the page asks for renewed access.",
+                    "If the page cannot load or Twitch is temporarily unavailable, use Retry before starting another action.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _clipsMarkersHelp = new(
+        "Clips & markers",
+        [
+            new(
+                "Capture a live moment",
+                "Create a clip from the current live stream, or add a short private marker to help find the moment in the recording later.",
+                [
+                    "The channel must be live, and Twitch may reject clips or markers when recordings are disabled or the stream is a rerun or premiere.",
+                    "A clip can remain pending while Twitch prepares it.",
+                ]
+            ),
+            new(
+                "Readiness and recovery",
+                "Clips and markers require the selected broadcaster to be connected with the required Twitch access.",
+                [
+                    "Use Reconnect broadcaster when the page asks for renewed access.",
+                    "When an attempt is pending or Twitch did not confirm its outcome, use Check status or Check outcome on that attempt instead of creating it again.",
+                    "Use Retry if the page itself could not load.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _channelPointsHelp = new(
+        "Rewards & redemptions",
+        [
+            new(
+                "Manage rewards",
+                "Create and update custom Channel Points rewards made by BlokeBot. Rewards created elsewhere remain visible but read-only.",
+                [
+                    "You can edit, enable, pause, resume, or delete rewards that BlokeBot manages.",
+                    "Twitch owns viewer Channel Points balances; this page does not change those balances directly.",
+                ]
+            ),
+            new(
+                "Handle redemptions",
+                "Fulfil an unfulfilled redemption when the request is complete, or cancel it so Twitch refunds the viewer.",
+                [
+                    "Only redemptions for rewards BlokeBot manages can be updated here.",
+                    "Recent fulfilled and refunded requests appear in Redemption history.",
+                ]
+            ),
+            new(
+                "Readiness and recovery",
+                "Custom rewards require an eligible selected broadcaster with the required Twitch access.",
+                [
+                    "Use Reconnect broadcaster when the page asks for renewed access.",
+                    "If the page cannot load, use Retry before changing a reward or redemption.",
+                ]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _predictionsHelp = new(
+        "Predictions",
+        [
+            new(
+                "Run a Prediction",
+                "Save a question, possible outcomes, and an entry window as a reusable template, then start it when Twitch has no active Prediction.",
+                [
+                    "Lock an active Prediction to stop new entries.",
+                    "Resolve a locked Prediction by choosing the winning outcome, or cancel it to refund viewers.",
+                    "BlokeBot asks you to confirm actions that change an active Prediction.",
+                    "Resolved and cancelled Predictions remain available under Recent results.",
+                ]
+            ),
+            new(
+                "Readiness and recovery",
+                "Predictions require an eligible Affiliate or Partner broadcaster with the required Twitch access.",
+                [
+                    "Use Reconnect broadcaster when the page asks for renewed access.",
+                    "If Twitch is temporarily unavailable or the page cannot load, use Retry before starting another action.",
+                ]
             ),
         ]
     );
