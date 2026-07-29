@@ -66,6 +66,24 @@ public sealed class AutomaticRaidShoutoutObserverTests
     }
 
     [Test]
+    public async Task DeliveryTerminalCallback_IsNotOverwrittenByQueueAdmissionResult()
+    {
+        await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await SeedAsync(factory, enabled: true, threshold: 1);
+        var observer = Observer(factory, new TerminalCallbackDelivery(factory));
+
+        await observer.IncomingRaidReceivedAsync(
+            Raid("terminal-callback", _now, 1),
+            CancellationToken.None
+        );
+
+        await using var db = await factory.CreateDbContextAsync();
+        var outcome = await db.AutomaticRaidShoutoutOutcomes.SingleAsync();
+        outcome.Status.ShouldBe(AutomaticRaidShoutoutOutcomeStatus.NotDelivered);
+        outcome.ResultCode.ShouldBe(AutomaticRaidShoutoutResultCode.Rejected);
+    }
+
+    [Test]
     public async Task SequentialAndRestartDuplicate_UsesDurableHostScopedClaimOnce()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -604,6 +622,30 @@ public sealed class AutomaticRaidShoutoutObserverTests
         {
             Requests.Add(request);
             return Task.FromResult(result);
+        }
+    }
+
+    private sealed class TerminalCallbackDelivery(
+        IDbContextFactory<BlokeBot.Persistence.BlokeBotDbContext> factory
+    ) : IAutomaticRaidShoutoutDelivery
+    {
+        public async Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
+            AutomaticRaidShoutoutDeliveryRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            await using var db = await factory.CreateDbContextAsync(cancellationToken);
+            var outcome = await db.AutomaticRaidShoutoutOutcomes.SingleAsync(
+                value =>
+                    value.HostId == request.HostId
+                    && value.ProviderMessageId == request.ProviderMessageId,
+                cancellationToken
+            );
+            outcome.Status = AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
+            outcome.ResultCode = AutomaticRaidShoutoutResultCode.Rejected;
+            outcome.CompletedAtUtc = _now.UtcDateTime;
+            await db.SaveChangesAsync(cancellationToken);
+            return new AutomaticRaidShoutoutDeliveryResult.Delivered();
         }
     }
 

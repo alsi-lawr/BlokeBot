@@ -62,6 +62,56 @@ public sealed class HelixClientTests
     }
 
     [Test]
+    public async Task ChannelInformation_LoadingRaiderMetadata_ReturnsTypedGameAndTitle()
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(request =>
+        {
+            request.Method.ShouldBe(HttpMethod.Get);
+            request.RequestUri!.AbsolutePath.ShouldBe("/helix/channels");
+            request.RequestUri.Query.ShouldBe("?broadcaster_id=raider-id");
+            return JsonResponse(
+                """{"data":[{"broadcaster_id":"raider-id","game_name":"Last Game","title":"Last stream title"}]}"""
+            );
+        });
+        var client = new HelixClient(factory);
+
+        var result = await client.GetChannelInformationAsync(
+            Context(),
+            "raider-id",
+            CancellationToken.None
+        );
+
+        var found = result.ShouldBeOfType<HelixChannelInformationOutcome.Found>();
+        found.GameName.ShouldBe("Last Game");
+        found.Title.ShouldBe("Last stream title");
+    }
+
+    [Test]
+    [Arguments(HttpStatusCode.Forbidden, typeof(HelixChannelInformationOutcome.PermissionDenied))]
+    [Arguments(
+        HttpStatusCode.InternalServerError,
+        typeof(HelixChannelInformationOutcome.Unavailable)
+    )]
+    public async Task ChannelInformation_FailedRead_ReturnsTypedFailure(
+        HttpStatusCode status,
+        Type expectedType
+    )
+    {
+        var factory = new ScriptedHttpClientFactory();
+        factory.Respond(_ => new HttpResponseMessage(status));
+        var client = new HelixClient(factory);
+
+        var result = await client.GetChannelInformationAsync(
+            Context(),
+            "raider-id",
+            CancellationToken.None
+        );
+
+        result.GetType().ShouldBe(expectedType);
+    }
+
+    [Test]
     public async Task FollowerPayload_CheckingFollowerStatus_ReturnsFollows()
     {
         var factory = new ScriptedHttpClientFactory();

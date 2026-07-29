@@ -55,6 +55,14 @@ internal sealed partial class EfPublicChatOutbox
             );
             if (expired == 1)
             {
+                _ = await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    message,
+                    AutomaticRaidShoutoutResultCode.NotReady,
+                    sendStartedAt,
+                    cancellationToken
+                );
+                await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
                 return new PublicChatClaimUpdate.Expired();
             }
@@ -120,6 +128,14 @@ internal sealed partial class EfPublicChatOutbox
                 == 1
             )
             {
+                _ = await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    message,
+                    AutomaticRaidShoutoutResultCode.NotReady,
+                    releasedAt,
+                    cancellationToken
+                );
+                await db.SaveChangesAsync(cancellationToken);
                 return new PublicChatClaimUpdate.Expired();
             }
 

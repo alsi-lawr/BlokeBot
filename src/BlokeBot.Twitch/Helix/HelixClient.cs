@@ -10,6 +10,7 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
 {
     private const string _usersEndpoint = "https://api.twitch.tv/helix/users";
     private const string _streamsEndpoint = "https://api.twitch.tv/helix/streams";
+    private const string _channelsEndpoint = "https://api.twitch.tv/helix/channels";
     private const string _chatSettingsEndpoint = "https://api.twitch.tv/helix/chat/settings";
     private const string _followersEndpoint = "https://api.twitch.tv/helix/channels/followers";
     private const string _followedChannelsEndpoint =
@@ -110,6 +111,56 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
         return users.FirstOrDefault() is { } user
             ? new HelixShoutoutTarget(user.Id, user.Login, user.DisplayName)
             : null;
+    }
+
+    public async Task<HelixChannelInformationOutcome> GetChannelInformationAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return new HelixChannelInformationOutcome.Invalid();
+        }
+
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            $"{_channelsEndpoint}?"
+                + QueryString.Create(
+                    new Dictionary<string, string?> { ["broadcaster_id"] = broadcasterId }
+                ),
+            context
+        );
+        try
+        {
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                return new HelixChannelInformationOutcome.PermissionDenied();
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                return new HelixChannelInformationOutcome.Unavailable();
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ChannelInformationResponse>(
+                _jsonOptions,
+                cancellationToken
+            );
+            return payload?.Data.FirstOrDefault() is { } channel
+                ? new HelixChannelInformationOutcome.Found(channel.GameName, channel.Title)
+                : new HelixChannelInformationOutcome.NotFound();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception is HttpRequestException or IOException or TimeoutException)
+        {
+            return new HelixChannelInformationOutcome.Unavailable();
+        }
     }
 
     public async Task<ShoutoutSendResult> SendShoutoutAsync(
@@ -1238,6 +1289,21 @@ public sealed class HelixClient(IHttpClientFactory httpClientFactory)
     {
         [JsonPropertyName("data")]
         public required ImmutableArray<StreamItem> Data { get; init; }
+    }
+
+    private sealed record ChannelInformationResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<ChannelInformationItem> Data { get; init; }
+    }
+
+    private sealed record ChannelInformationItem
+    {
+        [JsonPropertyName("game_name")]
+        public string? GameName { get; init; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; init; }
     }
 
     private sealed record FollowerResponse

@@ -27,11 +27,23 @@ public static class TwitchOperationsServiceCollectionExtensions
             provider.GetRequiredService<NativeTwitchFeatureGate>()
         );
         services.AddSingleton<ShoutoutService>();
+        services.AddSingleton<IAutomaticRaidNativeShoutoutOperation>(provider =>
+            provider.GetRequiredService<ShoutoutService>()
+        );
         services.AddSingleton<AutomaticRaidShoutoutConfigurationService>();
         services.TryAddSingleton<
-            IAutomaticRaidShoutoutDelivery,
-            UnavailableAutomaticRaidShoutoutDelivery
+            IAutomaticRaidNativeShoutoutSender,
+            AutomaticRaidNativeShoutoutSender
         >();
+        services.TryAddSingleton<
+            IAutomaticRaidChannelInformationProvider,
+            AutomaticRaidChannelInformationProvider
+        >();
+        services.TryAddSingleton<
+            IAutomaticRaidAnnouncementSender,
+            AutomaticRaidAnnouncementSender
+        >();
+        services.TryAddSingleton<IAutomaticRaidShoutoutDelivery, AutomaticRaidShoutoutDelivery>();
         services.AddSingleton<AutomaticRaidShoutoutObserver>();
         services.AddSingleton<PollService>();
         services.AddSingleton<ClipMarkerService>();

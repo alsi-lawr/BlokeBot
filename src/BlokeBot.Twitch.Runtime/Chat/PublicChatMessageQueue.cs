@@ -51,6 +51,10 @@ internal sealed class PublicChatMessageQueue(
         {
             return new PublicChatEnqueueOutcome.Rejected();
         }
+        if (command.Correlation is not null && parts.Length != 1)
+        {
+            return new PublicChatEnqueueOutcome.Rejected();
+        }
 
         var items = parts
             .Select(
@@ -58,10 +62,9 @@ internal sealed class PublicChatMessageQueue(
                     new PublicChatOutboxItem
                     {
                         Message = part,
-                        DeduplicationKey = PublicChatMessageDeduplication.Key(
-                            command.Channel,
-                            part
-                        ),
+                        DeduplicationKey = command.Correlation is { } correlation
+                            ? PublicChatMessageDeduplication.CorrelatedKey(correlation)
+                            : PublicChatMessageDeduplication.Key(command.Channel, part),
                         PinIntent = index == 0 ? command.PinIntent : null,
                     }
             )

@@ -11,13 +11,39 @@ internal sealed partial class EfPublicChatOutbox
 {
     private async ValueTask<PublicChatClaimUpdate> ExecuteStateTransitionAsync(
         Func<BlokeBotDbContext, CancellationToken, Task<int>> transition,
+        PublicChatClaimedMessage message,
+        AutomaticRaidShoutoutResultCode automaticRaidResult,
+        DateTimeOffset completedAt,
         CancellationToken cancellationToken
     )
     {
         try
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            return Changed(await transition(db, cancellationToken));
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                cancellationToken
+            );
+            var changed = Changed(await transition(db, cancellationToken));
+            if (changed is not PublicChatClaimUpdate.Applied)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return changed;
+            }
+
+            var alertCreated = await RecordAutomaticRaidTerminalAsync(
+                db,
+                message,
+                automaticRaidResult,
+                completedAt,
+                cancellationToken
+            );
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            if (alertCreated && events is not null)
+            {
+                await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+            }
+            return changed;
         }
         catch (Exception exception) when (IsSqliteContention(exception))
         {

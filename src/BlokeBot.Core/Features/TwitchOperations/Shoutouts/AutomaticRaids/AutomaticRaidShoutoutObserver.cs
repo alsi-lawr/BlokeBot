@@ -169,6 +169,10 @@ public sealed class AutomaticRaidShoutoutObserver(
             value => value.Id == outcomeId && value.HostId == hostId,
             cancellationToken
         );
+        if (outcome.Status is not AutomaticRaidShoutoutOutcomeStatus.Processing)
+        {
+            return;
+        }
         var now = clock.GetUtcNow().UtcDateTime;
         switch (result)
         {
@@ -240,20 +244,5 @@ public sealed class AutomaticRaidShoutoutObserver(
             DbUpdateException { InnerException: { } inner } => IsPersistenceContention(inner),
             _ => false,
         };
-    }
-}
-
-internal sealed class UnavailableAutomaticRaidShoutoutDelivery : IAutomaticRaidShoutoutDelivery
-{
-    public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
-        AutomaticRaidShoutoutDeliveryRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        return Task.FromResult<AutomaticRaidShoutoutDeliveryResult>(
-            new AutomaticRaidShoutoutDeliveryResult.NotDelivered(
-                AutomaticRaidShoutoutResultCode.NotReady
-            )
-        );
     }
 }

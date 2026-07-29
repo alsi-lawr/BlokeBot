@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch.Runtime;
@@ -10,7 +11,8 @@ internal sealed partial class EfPublicChatOutbox(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
     PublicChatRetryPolicy retryPolicy,
     PublicChatDeliveryLifetimePolicy lifetimePolicy,
-    PublicChatTerminalRetentionPolicy retentionPolicy
+    PublicChatTerminalRetentionPolicy retentionPolicy,
+    EventBus<AppEventKind>? events = null
 ) : IPublicChatOutbox
 {
     private static readonly TimeSpan _claimAvailabilityPoll = TimeSpan.FromMilliseconds(250);

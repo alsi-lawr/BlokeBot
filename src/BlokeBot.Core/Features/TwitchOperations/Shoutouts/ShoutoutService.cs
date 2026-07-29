@@ -1,6 +1,7 @@
 using BlokeBot.Core;
 using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -17,7 +18,7 @@ public sealed class ShoutoutService(
     EventBus<AppEventKind> events,
     TimeProvider timeProvider,
     NativeTwitchFeatureGate nativeTwitch
-) : IShoutoutEventObserver
+) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation
 {
     private static readonly string[] _requiredScopes =
     [

@@ -20,6 +20,29 @@ public interface IPublicChatMessageSender
         CancellationToken cancellationToken
     );
 
+    ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatDeliveryCorrelation correlation,
+        CancellationToken cancellationToken
+    )
+    {
+        return ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
+    }
+
+    ValueTask<PublicChatSendOutcome> SendCorrelatedAsync(
+        string channel,
+        string message,
+        PublicChatDeliveryDeadline deadline,
+        PublicChatDeliveryCorrelation correlation,
+        PublicChatPinIntent pinIntent,
+        CancellationToken cancellationToken
+    )
+    {
+        return ValueTask.FromResult<PublicChatSendOutcome>(new PublicChatSendOutcome.Rejected());
+    }
+
     ValueTask<PublicChatSendOutcome> SendAsync(
         string channel,
         string message,
@@ -29,6 +52,25 @@ public interface IPublicChatMessageSender
     )
     {
         return SendAsync(channel, message, deadline, cancellationToken);
+    }
+}
+
+public sealed record PublicChatDeliveryCorrelation(int HostId, string ProviderMessageId)
+{
+    public PublicChatDeliveryCorrelation Validate()
+    {
+        if (HostId <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(HostId));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(ProviderMessageId);
+        if (ProviderMessageId.Length > 128)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ProviderMessageId));
+        }
+
+        return this;
     }
 }
 

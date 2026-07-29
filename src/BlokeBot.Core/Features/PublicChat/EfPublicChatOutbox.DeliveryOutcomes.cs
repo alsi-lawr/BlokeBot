@@ -40,6 +40,7 @@ internal sealed partial class EfPublicChatOutbox
                         FailureType = new PublicChatFailureType(unavailable.Reason.ToString()),
                         HttpStatus = new PublicChatHttpStatus.Unavailable(),
                     },
+                    AutomaticRaidShoutoutResultCode.AuthorityRequired,
                     recordedAt,
                     cancellationToken
                 ),
@@ -174,7 +175,7 @@ internal sealed partial class EfPublicChatOutbox
 
             if (persisted.ExpiresAtUtc <= recordedAt.UtcDateTime)
             {
-                return Changed(
+                PublicChatClaimUpdate expired = Changed(
                     await ExpireOwnedClaimAsync(
                         db,
                         message,
@@ -190,6 +191,18 @@ internal sealed partial class EfPublicChatOutbox
                         "An owned public chat expiry returned an invalid transition."
                     ),
                 };
+                if (expired is PublicChatClaimUpdate.Expired)
+                {
+                    _ = await RecordAutomaticRaidTerminalAsync(
+                        db,
+                        message,
+                        AutomaticRaidShoutoutResultCode.NotReady,
+                        recordedAt,
+                        cancellationToken
+                    );
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                return expired;
             }
 
             var persistedFailureCount = persisted.SafePreSendFailureCount;
@@ -199,7 +212,7 @@ internal sealed partial class EfPublicChatOutbox
                 new PublicChatSafePreSendFailureCount(persistedFailureCount),
                 recordedAt
             );
-            return decision switch
+            var update = decision switch
             {
                 PublicChatSafePreSendRetryDecision.Scheduled scheduled => Changed(
                     await db
@@ -296,6 +309,21 @@ internal sealed partial class EfPublicChatOutbox
                     $"Unknown public chat safe pre-send retry decision {decision.GetType().Name}."
                 ),
             };
+            if (
+                decision is PublicChatSafePreSendRetryDecision.Exhausted
+                && update is PublicChatClaimUpdate.Applied
+            )
+            {
+                _ = await RecordAutomaticRaidTerminalAsync(
+                    db,
+                    message,
+                    AutomaticRaidShoutoutResultCode.Unexpected,
+                    recordedAt,
+                    cancellationToken
+                );
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            return update;
         }
         catch (Exception exception) when (IsSqliteContention(exception))
         {
@@ -332,6 +360,14 @@ internal sealed partial class EfPublicChatOutbox
             ) == 1
         )
         {
+            _ = await RecordAutomaticRaidTerminalAsync(
+                expiryDb,
+                message,
+                AutomaticRaidShoutoutResultCode.NotReady,
+                recordedAt,
+                cancellationToken
+            );
+            await expiryDb.SaveChangesAsync(cancellationToken);
             return new PublicChatClaimUpdate.Expired();
         }
 
@@ -364,6 +400,9 @@ internal sealed partial class EfPublicChatOutbox
                                 .SetProperty(row => row.RejectionCode, (string?)null),
                         ct
                     ),
+            message,
+            AutomaticRaidShoutoutResultCode.AuthorityRequired,
+            recordedAt,
             cancellationToken
         );
     }
@@ -404,6 +443,7 @@ internal sealed partial class EfPublicChatOutbox
                         ct
                     ),
             recordedAt,
+            AutomaticRaidShoutoutResultCode.Rejected,
             cancellationToken
         );
     }
@@ -447,6 +487,7 @@ internal sealed partial class EfPublicChatOutbox
                         ct
                     ),
             recordedAt,
+            AutomaticRaidShoutoutResultCode.Ambiguous,
             cancellationToken
         );
     }
@@ -454,6 +495,23 @@ internal sealed partial class EfPublicChatOutbox
     private async ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
         PublicChatClaimedMessage message,
         PublicChatFailureDiagnostic.Preparation diagnostic,
+        DateTimeOffset recordedAt,
+        CancellationToken cancellationToken
+    )
+    {
+        return await RecordUnexpectedAsync(
+            message,
+            diagnostic,
+            AutomaticRaidShoutoutResultCode.Unexpected,
+            recordedAt,
+            cancellationToken
+        );
+    }
+
+    private async ValueTask<PublicChatClaimUpdate> RecordUnexpectedAsync(
+        PublicChatClaimedMessage message,
+        PublicChatFailureDiagnostic.Preparation diagnostic,
+        AutomaticRaidShoutoutResultCode automaticRaidResult,
         DateTimeOffset recordedAt,
         CancellationToken cancellationToken
     )
@@ -468,6 +526,14 @@ internal sealed partial class EfPublicChatOutbox
             ) == 1
         )
         {
+            _ = await RecordAutomaticRaidTerminalAsync(
+                expiryDb,
+                message,
+                AutomaticRaidShoutoutResultCode.NotReady,
+                recordedAt,
+                cancellationToken
+            );
+            await expiryDb.SaveChangesAsync(cancellationToken);
             return new PublicChatClaimUpdate.Expired();
         }
 
@@ -502,6 +568,9 @@ internal sealed partial class EfPublicChatOutbox
                                 ),
                         ct
                     ),
+            message,
+            automaticRaidResult,
+            recordedAt,
             cancellationToken
         );
     }
@@ -510,6 +579,7 @@ internal sealed partial class EfPublicChatOutbox
         PublicChatClaimedMessage message,
         Func<BlokeBotDbContext, CancellationToken, Task<int>> transition,
         DateTimeOffset completedAt,
+        AutomaticRaidShoutoutResultCode automaticRaidResult,
         CancellationToken cancellationToken
     )
     {
@@ -544,7 +614,19 @@ internal sealed partial class EfPublicChatOutbox
                 );
             }
 
+            var alertCreated = await RecordAutomaticRaidTerminalAsync(
+                db,
+                message,
+                automaticRaidResult,
+                completedAt,
+                cancellationToken
+            );
+            await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            if (alertCreated && events is not null)
+            {
+                await events.PublishAsync(AppEventKind.AlertsChanged, cancellationToken);
+            }
             return new PublicChatClaimUpdate.Applied();
         }
         catch (Exception exception) when (IsSqliteContention(exception))
