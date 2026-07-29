@@ -214,14 +214,14 @@ public sealed class HostConfigFaultRoutingTests
         SetModeratorClaims(testContext.Authorization, hostId);
 
         var firstClick = ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(1));
+        await first.Started.Task;
         var secondClick = ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(2));
+        await second.Started.Task;
         await ClickAccessModeAsync(page, "All mods");
 
-        second.SetResult("app-token");
+        second.Completion.SetResult("app-token");
         await secondClick;
-        first.SetResult("app-token");
+        first.Completion.SetResult("app-token");
         await firstClick;
 
         page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
@@ -543,21 +543,19 @@ public sealed class HostConfigFaultRoutingTests
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        private readonly Queue<Task<string>> _tokens = [];
+        private readonly Queue<ScriptedTokenRequest> _tokens = [];
 
         public int RequestCount { get; private set; }
 
         public void Enqueue(Task<string> token)
         {
-            _tokens.Enqueue(token);
+            _tokens.Enqueue(new(token, null));
         }
 
-        public TaskCompletionSource<string> EnqueuePending()
+        public PendingTokenRequest EnqueuePending()
         {
-            var pending = new TaskCompletionSource<string>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            );
-            _tokens.Enqueue(pending.Task);
+            var pending = new PendingTokenRequest();
+            _tokens.Enqueue(new(pending.Completion.Task, pending.Started));
             return pending;
         }
 
@@ -565,8 +563,24 @@ public sealed class HostConfigFaultRoutingTests
         {
             RequestCount++;
             cancellationToken.ThrowIfCancellationRequested();
-            return _tokens.Dequeue();
+            var request = _tokens.Dequeue();
+            request.Started?.TrySetResult();
+            return request.Completion;
         }
+
+        public sealed class PendingTokenRequest
+        {
+            public TaskCompletionSource Started { get; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource<string> Completion { get; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        private sealed record ScriptedTokenRequest(
+            Task<string> Completion,
+            TaskCompletionSource? Started
+        );
     }
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory
