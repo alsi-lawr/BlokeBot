@@ -1,0 +1,8 @@
+.automatic-raid-settings,
+.automatic-raid-outcomes {
+    min-width: 0;
+}
+
+.automatic-raid-settings code {
+    overflow-wrap: anywhere;
+}

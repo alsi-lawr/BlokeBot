@@ -16,6 +16,11 @@ internal static class SimulationViewCatalog
         ["points-settings"] = "/points/settings",
         ["custom-commands"] = "/custom-commands/settings",
         ["admin"] = "/admin",
+        ["native-shoutouts"] = "/twitch-operations/shoutouts",
+        ["native-polls"] = "/twitch-operations/polls",
+        ["native-clips-markers"] = "/twitch-operations/clips-markers",
+        ["native-channel-points"] = "/twitch-operations/channel-points",
+        ["native-predictions"] = "/twitch-operations/predictions",
         ["guessing-leaderboard"] = $"/guessing/leaderboard/{SimulationMode.Login}",
         ["points-leaderboard"] = $"/points/leaderboard/{SimulationMode.Login}",
     };

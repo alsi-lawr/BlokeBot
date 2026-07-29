@@ -14,6 +14,7 @@ using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
 using BlokeBot.Core.Features.TwitchOperations.Polls.Page;
 using BlokeBot.Core.Features.TwitchOperations.Predictions.Page;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
 using BlokeBot.Persistence;
@@ -31,6 +32,36 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class TwitchOperationsUiTests
 {
+    [Test]
+    public async Task ShoutoutsRoute_KeepsManualTaskThenAutomaticSettingsThenNativeHistory()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(
+            dbFactory,
+            host.Id,
+            host.Login
+        );
+        await using var context = testContext.Context;
+        ConfigureServices(context, dbFactory);
+
+        var page = context.Render<ShoutoutsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("[data-native-route='shoutouts']");
+            page.Find("#shoutout-target");
+            var sections = page.FindAll(".disclosure-title")
+                .Select(element => element.TextContent.Trim())
+                .ToArray();
+            sections.ShouldBe(["Automatic raid shoutouts", "Recent shoutouts"]);
+            page.Find("nav[aria-label='Native Twitch tools']")
+                .QuerySelectorAll("a")
+                .Length.ShouldBe(5);
+            page.FindAll("#poll-title, #reward-title, #prediction-title").ShouldBeEmpty();
+        });
+    }
+
     [Test]
     public async Task ClipsRoute_ReadyAndUnavailable_AreFocusedDirectAndDoNotExposeAttemptKeys()
     {
@@ -142,6 +173,20 @@ public sealed class TwitchOperationsUiTests
         context.Services.AddSingleton(changes);
         context.Services.AddSingleton(alerts);
         context.Services.AddSingleton(nativeTwitch);
+        context.Services.AddSingleton(
+            new ShoutoutService(
+                dbFactory,
+                null!,
+                null!,
+                settings,
+                events,
+                TimeProvider.System,
+                nativeTwitch
+            )
+        );
+        context.Services.AddSingleton(
+            new AutomaticRaidShoutoutConfigurationService(dbFactory, TimeProvider.System)
+        );
         context.Services.AddSingleton(
             new ClipMarkerService(
                 dbFactory,

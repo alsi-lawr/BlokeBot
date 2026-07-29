@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.Points.Balances;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,8 +14,27 @@ internal static class SimulationServiceCollectionExtensions
             ServiceDescriptor.Singleton<IPointTargetUserLookup, SimulationPointTargetUserLookup>()
         );
         services.AddSingleton<IPublicChatMessageSender, SimulationPublicChatMessageSender>();
+        services.Replace(
+            ServiceDescriptor.Singleton<
+                IAutomaticRaidShoutoutDelivery,
+                SimulationAutomaticRaidShoutoutDelivery
+            >()
+        );
         services.AddSingleton<SimulationFixtureSeeder>();
         return services;
+    }
+
+    private sealed class SimulationAutomaticRaidShoutoutDelivery : IAutomaticRaidShoutoutDelivery
+    {
+        public Task<AutomaticRaidShoutoutDeliveryResult> DeliverAsync(
+            AutomaticRaidShoutoutDeliveryRequest request,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<AutomaticRaidShoutoutDeliveryResult>(
+                new AutomaticRaidShoutoutDeliveryResult.Delivered()
+            );
+        }
     }
 
     private sealed class SimulationTimeProvider : TimeProvider
