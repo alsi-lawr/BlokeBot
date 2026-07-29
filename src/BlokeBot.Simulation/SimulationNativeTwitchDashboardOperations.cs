@@ -820,8 +820,8 @@ internal sealed class SimulationNativeTwitchDashboardOperations
                     "chatregular",
                     "PartyParrot",
                     "Unfulfilled",
-                    SimulationMode.Now.AddMinutes(-2).UtcDateTime,
-                    SimulationMode.Now.AddMinutes(-2).UtcDateTime,
+                    SimulationMode.Now.AddMinutes(-5).UtcDateTime,
+                    SimulationMode.Now.AddMinutes(-5).UtcDateTime,
                     true
                 )
             );
@@ -832,6 +832,19 @@ internal sealed class SimulationNativeTwitchDashboardOperations
                     "Choose the next emote",
                     "nightowl",
                     "PrideLion",
+                    "Unfulfilled",
+                    SimulationMode.Now.AddMinutes(-2).UtcDateTime,
+                    SimulationMode.Now.AddMinutes(-2).UtcDateTime,
+                    true
+                )
+            );
+            state.ActiveRedemptions.Add(
+                new ChannelPointsRedemptionView(
+                    "simulation-redemption-3",
+                    "simulation-reward-1",
+                    "Choose the next emote",
+                    "firsttimer",
+                    "bleedPurple",
                     "Unfulfilled",
                     SimulationMode.Now.AddMinutes(-1).UtcDateTime,
                     SimulationMode.Now.AddMinutes(-1).UtcDateTime,

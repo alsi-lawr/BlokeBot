@@ -12,6 +12,7 @@
 @inject NativeTwitchFeatureGate _nativeTwitch
 @inject IJSRuntime _js
 @inject EventBus<AppEventKind> _events
+@inject TimeProvider _timeProvider
 
 <PageTitle>BlokeBot | Rewards &amp; redemptions</PageTitle>
 
@@ -49,31 +50,6 @@
         }
         else
         {
-            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
-                <div class="form-grid">
-                    <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
-                    <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
-                    <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
-                    <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
-                </div>
-                <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-input"><input id="reward-user-input" type="checkbox" @bind="_rewardUserInput" />Require viewer input</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-queue-skip"><input id="reward-queue-skip" type="checkbox" @bind="_rewardQueueSkip" />Skip request queue</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-stream-limit"><input id="reward-stream-limit" type="checkbox" @bind="_rewardMaxPerStreamEnabled" />Limit per stream</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-stream-limit"><input id="reward-user-stream-limit" type="checkbox" @bind="_rewardMaxPerUserPerStreamEnabled" />Limit per viewer per stream</label>
-                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Use a global cooldown</label>
-                </div>
-                <div class="form-grid mt-4">
-                    @if (_rewardMaxPerStreamEnabled) { <Field Id="reward-stream-limit-value" Label="Maximum per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" /> }
-                    @if (_rewardMaxPerUserPerStreamEnabled) { <Field Id="reward-user-stream-limit-value" Label="Maximum per viewer" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" /> }
-                    @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown in seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
-                </div>
-                <div class="mt-5 flex flex-wrap gap-3">
-                    <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
-                    @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
-                </div>
-            </TaskPanel>
-
             <CollapsibleSection Title="Unfulfilled redemptions" Description="Fulfil a request or cancel it so Twitch refunds the viewer." InitiallyOpen="@(_state.ActiveRedemptions.Count > 0)">
                 <div class="p-4">
                     @if (_state.ActiveRedemptions.Count == 0)
@@ -85,17 +61,30 @@
                         <div class="phone-card-list" data-active-redemptions>
                             @foreach (var redemption in _state.ActiveRedemptions)
                             {
-                                <article class="surface-row rounded-lg p-4" @key="redemption.ProviderRedemptionId">
+                                var waitingAge = RedemptionWaitingAgePresentation.Create(redemption.RedeemedAtUtc, _timeProvider);
+                                <article class="surface-row rounded-lg p-4"
+                                         data-redemption-waiting-age="@waitingAge.SemanticValue"
+                                         @key="redemption.ProviderRedemptionId">
                                     <div class="flex flex-wrap items-start justify-between gap-3">
-                                        <div class="min-w-0"><strong>@redemption.RewardTitle</strong><p class="mt-1 text-sm text-muted-foreground">@redemption.UserLogin@if (!string.IsNullOrWhiteSpace(redemption.UserInput)) { <text> · @redemption.UserInput</text> }</p></div>
-                                        @if (redemption.IsManageable)
-                                        {
-                                            <div class="flex flex-wrap gap-2"><button class="btn-primary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button><button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button></div>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-sm text-muted-foreground">Read-only</span>
-                                        }
+                                        <div class="min-w-0">
+                                            <strong>@redemption.RewardTitle</strong>
+                                            <p class="mt-1 text-sm text-muted-foreground">@redemption.UserLogin@if (!string.IsNullOrWhiteSpace(redemption.UserInput)) { <text> · @redemption.UserInput</text> }</p>
+                                        </div>
+                                        <div class="flex flex-wrap items-center justify-end gap-2">
+                                            <span class="@waitingAge.BadgeClass"
+                                                  data-waiting-age-band="@waitingAge.SemanticValue"
+                                                  role="status"
+                                                  aria-label="@waitingAge.AccessibleLabel">@waitingAge.Label</span>
+                                            @if (redemption.IsManageable)
+                                            {
+                                                <button class="btn-primary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, true)">Fulfil</button>
+                                                <button class="btn-secondary" @onclick="() => UpdateRedemptionAsync(redemption.ProviderRedemptionId, false)">Cancel &amp; refund</button>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-sm text-muted-foreground">Read-only</span>
+                                            }
+                                        </div>
                                     </div>
                                 </article>
                             }
@@ -133,6 +122,31 @@
                     }
                 </div>
             </CollapsibleSection>
+
+            <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
+                <div class="form-grid">
+                    <Field Id="reward-title" Label="Reward title" @bind-Value="_rewardTitle" Placeholder="Reward title" />
+                    <Field Id="reward-prompt" Label="Prompt" @bind-Value="_rewardPrompt" Placeholder="Optional instructions" />
+                    <Field Id="reward-cost" Label="Channel Points cost" @bind-Value="_rewardCost" Placeholder="100" />
+                    <Field Id="reward-background-colour" Label="Background colour" @bind-Value="_rewardBackgroundColor" Placeholder="#9147FF" />
+                </div>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-input"><input id="reward-user-input" type="checkbox" @bind="_rewardUserInput" />Require viewer input</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-queue-skip"><input id="reward-queue-skip" type="checkbox" @bind="_rewardQueueSkip" />Skip request queue</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-stream-limit"><input id="reward-stream-limit" type="checkbox" @bind="_rewardMaxPerStreamEnabled" />Limit per stream</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-user-stream-limit"><input id="reward-user-stream-limit" type="checkbox" @bind="_rewardMaxPerUserPerStreamEnabled" />Limit per viewer per stream</label>
+                    <label class="flex items-center gap-2 text-sm font-semibold text-slate-900" for="reward-cooldown"><input id="reward-cooldown" type="checkbox" @bind="_rewardCooldownEnabled" />Use a global cooldown</label>
+                </div>
+                <div class="form-grid mt-4">
+                    @if (_rewardMaxPerStreamEnabled) { <Field Id="reward-stream-limit-value" Label="Maximum per stream" @bind-Value="_rewardMaxPerStream" Placeholder="1" /> }
+                    @if (_rewardMaxPerUserPerStreamEnabled) { <Field Id="reward-user-stream-limit-value" Label="Maximum per viewer" @bind-Value="_rewardMaxPerUserPerStream" Placeholder="1" /> }
+                    @if (_rewardCooldownEnabled) { <Field Id="reward-cooldown-seconds" Label="Cooldown in seconds" @bind-Value="_rewardCooldownSeconds" Placeholder="60" /> }
+                </div>
+                <div class="mt-5 flex flex-wrap gap-3">
+                    <button class="btn-primary" @onclick="SaveRewardAsync">@(_editingRewardId is null ? "Create reward" : "Save reward")</button>
+                    @if (_editingRewardId is not null) { <button class="btn-secondary" @onclick="ClearRewardEditor">Cancel edit</button> }
+                </div>
+            </TaskPanel>
 
             <CollapsibleSection Title="Redemption history" Description="Recently fulfilled and refunded redemptions." InitiallyOpen="false">
                 <div class="p-4">

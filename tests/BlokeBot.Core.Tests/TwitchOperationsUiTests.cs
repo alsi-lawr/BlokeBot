@@ -8,6 +8,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers.Page;
@@ -65,6 +66,161 @@ public sealed class TwitchOperationsUiTests
         styles.ShouldContain(".native-tool-switcher__link:focus-visible");
         styles.ShouldContain(".native-tool-switcher__link--current");
         styles.ShouldContain("flex-wrap: wrap");
+    }
+
+    [Test]
+    public void NativeDashboardRoutesUseTheSharedTwelvePixelSectionRhythm()
+    {
+        var styles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "features",
+            "native-twitch.css"
+        );
+        var selectorStart = styles.IndexOf(
+            ".dashboard-page[data-native-route]",
+            StringComparison.Ordinal
+        );
+        selectorStart.ShouldBeGreaterThanOrEqualTo(0);
+        var selectorEnd = styles.IndexOf('}', selectorStart);
+        styles[selectorStart..selectorEnd].ShouldContain("gap: 0.75rem");
+
+        var sharedStyles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "components",
+            "page-context.css"
+        );
+        sharedStyles.ShouldContain(".dashboard-page");
+        sharedStyles.ShouldContain("gap: 1.5rem");
+
+        foreach (
+            var path in new[]
+            {
+                new[] { "Shoutouts", "ShoutoutsPage.razor" },
+                new[] { "Polls", "Page", "PollsPage.razor" },
+                new[] { "ClipsMarkers", "Page", "ClipsMarkersPage.razor" },
+                new[] { "ChannelPoints", "Page", "ChannelPointsPage.razor" },
+                new[] { "Predictions", "Page", "PredictionsPage.razor" },
+            }
+        )
+        {
+            ReadRepositoryFile(["src", "BlokeBot.Core", "Features", "TwitchOperations", .. path])
+                .ShouldContain("data-native-route=");
+        }
+    }
+
+    [Test]
+    public void RedemptionWaitingAgeUsesExactBandsAndClampsFutureTimestamps()
+    {
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var timeProvider = new FixedTimeProvider(now);
+        var presentations = new[]
+        {
+            RedemptionWaitingAgePresentation.Create(now.AddMinutes(1).UtcDateTime, timeProvider),
+            RedemptionWaitingAgePresentation.Create(now.AddSeconds(-119).UtcDateTime, timeProvider),
+            RedemptionWaitingAgePresentation.Create(now.AddMinutes(-2).UtcDateTime, timeProvider),
+            RedemptionWaitingAgePresentation.Create(now.AddSeconds(-299).UtcDateTime, timeProvider),
+            RedemptionWaitingAgePresentation.Create(now.AddMinutes(-5).UtcDateTime, timeProvider),
+        };
+
+        presentations
+            .Select(value => value.Band)
+            .ShouldBe([
+                RedemptionWaitingAgeBand.Fresh,
+                RedemptionWaitingAgeBand.Fresh,
+                RedemptionWaitingAgeBand.Waiting,
+                RedemptionWaitingAgeBand.Waiting,
+                RedemptionWaitingAgeBand.NeedsAttention,
+            ]);
+        presentations
+            .Select(value => value.SemanticValue)
+            .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
+        presentations[0].Age.ShouldBe(TimeSpan.Zero);
+        presentations[0].Label.ShouldBe("New · waiting less than a minute");
+        presentations[2].Label.ShouldBe("Waiting · 2 minutes");
+        presentations[4].Label.ShouldBe("Needs attention · waiting 5 minutes");
+        presentations[0].BadgeClass.ShouldContain("sky");
+        presentations[2].BadgeClass.ShouldContain("amber");
+        presentations[4].BadgeClass.ShouldContain("rose");
+    }
+
+    [Test]
+    public async Task ChannelPointsReadyStateOrdersWorkAndKeepsWaitingAgeAndEditingUsable()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(dbFactory, HostFeatureFlags.All);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(
+            dbFactory,
+            host.Id,
+            host.Login
+        );
+        await using var context = testContext.Context;
+        ConfigureServices(context, dbFactory);
+
+        var now = new DateTimeOffset(2026, 7, 10, 12, 0, 0, TimeSpan.Zero);
+        var operations = new RecordingChannelPointsOperations(
+            new ChannelPointsDashboardState(
+                new ChannelPointsAuthorizationReadiness.Ready(),
+                [Reward()],
+                [
+                    Redemption("future", now.AddMinutes(1).UtcDateTime),
+                    Redemption("fresh", now.AddSeconds(-119).UtcDateTime),
+                    Redemption("waiting", now.AddMinutes(-2).UtcDateTime),
+                    Redemption("still-waiting", now.AddSeconds(-299).UtcDateTime),
+                    Redemption("needs-attention", now.AddMinutes(-5).UtcDateTime),
+                ],
+                []
+            )
+        );
+        context.Services.AddSingleton<IChannelPointsDashboardOperations>(operations);
+
+        var page = context.Render<ChannelPointsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            SectionTitles(page)
+                .ShouldBe([
+                    "Unfulfilled redemptions",
+                    "Rewards",
+                    "Create a reward",
+                    "Redemption history",
+                ]);
+            var cards = page.FindAll("[data-redemption-waiting-age]");
+            cards.Count.ShouldBe(5);
+            cards
+                .Select(card => card.GetAttribute("data-redemption-waiting-age"))
+                .ShouldBe(["fresh", "fresh", "waiting", "waiting", "needs-attention"]);
+            foreach (var card in cards)
+            {
+                var status = card.QuerySelector("[data-waiting-age-band][role='status']");
+                status.ShouldNotBeNull();
+                status!.TextContent.ShouldContain("minute");
+                status.GetAttribute("aria-label").ShouldStartWith("Redemption ");
+            }
+        });
+
+        page.Find("[data-channel-point-rewards] button").Click();
+        SectionTitles(page)
+            .ShouldBe(["Unfulfilled redemptions", "Rewards", "Edit reward", "Redemption history"]);
+        page.Find("#reward-title").GetAttribute("value").ShouldBe("Choose the next emote");
+        page.Find("#reward-title").Input("Choose a celebration");
+        page.FindAll("button").Single(button => button.TextContent.Trim() == "Save reward").Click();
+
+        page.WaitForAssertion(() =>
+        {
+            operations.UpdatedDraft.ShouldNotBeNull();
+            operations.UpdatedDraft!.Title.ShouldBe("Choose a celebration");
+            SectionTitles(page)
+                .ShouldBe([
+                    "Unfulfilled redemptions",
+                    "Rewards",
+                    "Create a reward",
+                    "Redemption history",
+                ]);
+        });
     }
 
     [Test]
@@ -270,6 +426,125 @@ public sealed class TwitchOperationsUiTests
         db.Hosts.Add(host);
         await db.SaveChangesAsync();
         return host;
+    }
+
+    private static string[] SectionTitles(IRenderedComponent<ChannelPointsPage> page)
+    {
+        return page.FindAll(".disclosure-title, .task-panel__title")
+            .Select(element => element.TextContent.Trim())
+            .ToArray();
+    }
+
+    private static ChannelPointsRewardView Reward()
+    {
+        return new(
+            "reward-1",
+            "Choose the next emote",
+            "Tell us which emote to use.",
+            500,
+            true,
+            true,
+            false,
+            true,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            "#9147FF"
+        );
+    }
+
+    private static ChannelPointsRedemptionView Redemption(
+        string providerRedemptionId,
+        DateTime redeemedAtUtc
+    )
+    {
+        return new(
+            providerRedemptionId,
+            "reward-1",
+            "Choose the next emote",
+            "viewer",
+            "PartyParrot",
+            "Unfulfilled",
+            redeemedAtUtc,
+            redeemedAtUtc,
+            true
+        );
+    }
+
+    private sealed class RecordingChannelPointsOperations(ChannelPointsDashboardState state)
+        : IChannelPointsDashboardOperations
+    {
+        public ChannelPointsRewardDraft? UpdatedDraft { get; private set; }
+
+        public Task<ChannelPointsDashboardState> LoadAsync(
+            int hostId,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(state);
+        }
+
+        public Task<ChannelPointsOperationOutcome> CreateRewardAsync(
+            int hostId,
+            ChannelPointsRewardDraft draft,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<ChannelPointsOperationOutcome>(
+                new ChannelPointsOperationOutcome.RewardCreated(Reward())
+            );
+        }
+
+        public Task<ChannelPointsOperationOutcome> UpdateRewardAsync(
+            int hostId,
+            string rewardId,
+            ChannelPointsRewardDraft draft,
+            bool isEnabled,
+            bool paused,
+            CancellationToken cancellationToken
+        )
+        {
+            UpdatedDraft = draft;
+            return Task.FromResult<ChannelPointsOperationOutcome>(
+                new ChannelPointsOperationOutcome.RewardUpdated()
+            );
+        }
+
+        public Task<ChannelPointsOperationOutcome> DeleteRewardAsync(
+            int hostId,
+            string rewardId,
+            bool confirmed,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<ChannelPointsOperationOutcome>(
+                new ChannelPointsOperationOutcome.RewardDeleted()
+            );
+        }
+
+        public Task<ChannelPointsOperationOutcome> UpdateRedemptionAsync(
+            int hostId,
+            string redemptionId,
+            bool fulfill,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult<ChannelPointsOperationOutcome>(
+                new ChannelPointsOperationOutcome.RedemptionUpdated()
+            );
+        }
+    }
+
+    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow()
+        {
+            return now;
+        }
     }
 
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider

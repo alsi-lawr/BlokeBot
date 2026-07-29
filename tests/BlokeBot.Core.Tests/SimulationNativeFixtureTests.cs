@@ -1,5 +1,6 @@
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
+using BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
@@ -133,6 +134,17 @@ public sealed class SimulationNativeFixtureTests
             false,
             "#9147FF"
         );
+        var initialPointsState = await channelPoints.LoadAsync(hostId, CancellationToken.None);
+        var timeProvider = app.Services.GetRequiredService<TimeProvider>();
+        initialPointsState
+            .ActiveRedemptions.Select(redemption =>
+                RedemptionWaitingAgePresentation.Create(redemption.RedeemedAtUtc, timeProvider).Band
+            )
+            .ShouldBe([
+                RedemptionWaitingAgeBand.NeedsAttention,
+                RedemptionWaitingAgeBand.Waiting,
+                RedemptionWaitingAgeBand.Fresh,
+            ]);
         var createdReward = (
             await channelPoints.CreateRewardAsync(hostId, rewardDraft, CancellationToken.None)
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
@@ -176,6 +188,14 @@ public sealed class SimulationNativeFixtureTests
             )
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
         (
+            await channelPoints.UpdateRedemptionAsync(
+                hostId,
+                "simulation-redemption-3",
+                true,
+                CancellationToken.None
+            )
+        ).ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
+        (
             await channelPoints.DeleteRewardAsync(
                 hostId,
                 createdReward.Reward.ProviderRewardId,
@@ -185,7 +205,9 @@ public sealed class SimulationNativeFixtureTests
         ).ShouldBeOfType<ChannelPointsOperationOutcome.RewardDeleted>();
         var pointsState = await channelPoints.LoadAsync(hostId, CancellationToken.None);
         pointsState.ActiveRedemptions.ShouldBeEmpty();
-        pointsState.History.Select(value => value.Status).ShouldBe(["Canceled", "Fulfilled"]);
+        pointsState
+            .History.Select(value => value.Status)
+            .ShouldBe(["Fulfilled", "Canceled", "Fulfilled"]);
 
         var savedPrediction = (
             await predictions.SaveTemplateAsync(
