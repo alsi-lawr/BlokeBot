@@ -68,6 +68,16 @@ public sealed record FakeTwitchUser(
     string BroadcasterType
 );
 
+public sealed record FakeTwitchClip(string Id, string Url, string EditUrl);
+
+public sealed record FakeTwitchMarker(
+    string Id,
+    string Description,
+    int PositionSeconds,
+    DateTimeOffset CreatedAt,
+    string Url
+);
+
 /// <summary>Records one ordered fake-provider interaction.</summary>
 public sealed record FakeTwitchTranscriptEntry(string Id, string Kind, string Detail);
 
@@ -85,6 +95,8 @@ public sealed class FakeTwitchAuthority
     private readonly Dictionary<string, FakeTwitchSubscription> _subscriptions = new(
         StringComparer.Ordinal
     );
+    private readonly Dictionary<string, FakeTwitchClip> _clips = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FakeTwitchMarker> _markers = new(StringComparer.Ordinal);
     private readonly List<FakeTwitchTranscriptEntry> _transcript = [];
     private int _nextId;
 
@@ -210,6 +222,95 @@ public sealed class FakeTwitchAuthority
             }
 
             return grant.User;
+        }
+    }
+
+    public void RequireAccessToken(HttpRequest request)
+    {
+        lock (_gate)
+        {
+            if (
+                !string.Equals(
+                    request.Headers["Client-Id"],
+                    Definition.ClientId,
+                    StringComparison.Ordinal
+                ) || !TryGetGrant(ReadBearerToken(request), out _)
+            )
+            {
+                throw new FakeTwitchProtocolException(HttpStatusCode.Unauthorized, "invalid_token");
+            }
+        }
+    }
+
+    public FakeTwitchClip CreateClip(HttpRequest request, string broadcasterId)
+    {
+        var user = RequireUserToken(request, "clips:edit");
+        if (user.Id != Definition.AuthorizedUser.Id || broadcasterId != user.Id)
+        {
+            throw new FakeTwitchProtocolException(HttpStatusCode.BadRequest, "invalid_broadcaster");
+        }
+        lock (_gate)
+        {
+            var id = $"fake-clip-{_clips.Count + 1:D4}";
+            var clip = new FakeTwitchClip(
+                id,
+                $"https://clips.twitch.tv/{id}",
+                $"https://clips.twitch.tv/{id}/edit"
+            );
+            _clips.Add(id, clip);
+            Record("helix.clip.create", id);
+            return clip;
+        }
+    }
+
+    public IReadOnlyList<FakeTwitchClip> Clips(HttpRequest request, IReadOnlyList<string?> ids)
+    {
+        RequireAccessToken(request);
+        lock (_gate)
+        {
+            return ids.Where(id => id is not null && _clips.ContainsKey(id))
+                .Select(id => _clips[id!])
+                .ToArray();
+        }
+    }
+
+    public FakeTwitchMarker CreateMarker(
+        HttpRequest request,
+        string broadcasterId,
+        string description
+    )
+    {
+        var user = RequireUserToken(request, "channel:manage:broadcast");
+        if (
+            user.Id != Definition.AuthorizedUser.Id
+            || broadcasterId != user.Id
+            || string.IsNullOrWhiteSpace(description)
+        )
+        {
+            throw new FakeTwitchProtocolException(HttpStatusCode.BadRequest, "invalid_marker");
+        }
+        lock (_gate)
+        {
+            var id = $"fake-marker-{_markers.Count + 1:D4}";
+            var marker = new FakeTwitchMarker(
+                id,
+                description.Trim(),
+                42,
+                new DateTimeOffset(2026, 7, 15, 12, 0, 42, TimeSpan.Zero),
+                "https://twitch.tv/videos/fake-video?t=42s"
+            );
+            _markers.Add(id, marker);
+            Record("helix.marker.create", id);
+            return marker;
+        }
+    }
+
+    public IReadOnlyList<FakeTwitchMarker> Markers(HttpRequest request)
+    {
+        _ = RequireUserToken(request, "channel:manage:broadcast");
+        lock (_gate)
+        {
+            return [.. _markers.Values];
         }
     }
 
@@ -643,6 +744,13 @@ public static class FakeTwitchHostingExtensions
         app.MapGet("/oauth2/validate", (HttpRequest request) => Validate(authority, request));
         app.MapGet("/helix/users", (HttpRequest request) => Users(authority, request));
         app.MapGet("/helix/streams", (HttpRequest request) => Streams(authority, request));
+        app.MapPost("/helix/clips", (HttpRequest request) => CreateClip(authority, request));
+        app.MapGet("/helix/clips", (HttpRequest request) => Clips(authority, request));
+        app.MapPost(
+            "/helix/streams/markers",
+            (HttpRequest request) => CreateMarkerAsync(authority, request)
+        );
+        app.MapGet("/helix/streams/markers", (HttpRequest request) => Markers(authority, request));
         app.MapGet("/profile-images/{login}.svg", (string login) => ProfileImage(authority, login));
         app.MapGet(
             "/helix/channels/followers",
@@ -794,7 +902,7 @@ public static class FakeTwitchHostingExtensions
     {
         try
         {
-            _ = authority.RequireUserToken(request);
+            authority.RequireAccessToken(request);
             var userId = request.Query["user_id"].ToString();
             var live =
                 string.IsNullOrWhiteSpace(userId)
@@ -824,6 +932,129 @@ public static class FakeTwitchHostingExtensions
                             },
                         }
                         : [],
+                }
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static IResult CreateClip(FakeTwitchAuthority authority, HttpRequest request)
+    {
+        try
+        {
+            var clip = authority.CreateClip(request, request.Query["broadcaster_id"].ToString());
+            return Results.Json(
+                new { data = new[] { new { id = clip.Id, edit_url = clip.EditUrl } } },
+                statusCode: StatusCodes.Status202Accepted
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static IResult Clips(FakeTwitchAuthority authority, HttpRequest request)
+    {
+        try
+        {
+            return Results.Json(
+                new
+                {
+                    data = authority
+                        .Clips(request, request.Query["id"].ToArray())
+                        .Select(clip => new
+                        {
+                            id = clip.Id,
+                            url = clip.Url,
+                            edit_url = clip.EditUrl,
+                            broadcaster_id = authority.Definition.AuthorizedUser.Id,
+                            broadcaster_login = authority.Definition.AuthorizedUser.Login,
+                            creator_id = authority.Definition.AuthorizedUser.Id,
+                            creator_name = authority.Definition.AuthorizedUser.Login,
+                            video_id = "fake-video",
+                        }),
+                }
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static async Task<IResult> CreateMarkerAsync(
+        FakeTwitchAuthority authority,
+        HttpRequest request
+    )
+    {
+        try
+        {
+            var payload =
+                await request.ReadFromJsonAsync<MarkerRequest>()
+                ?? throw new FakeTwitchProtocolException(
+                    HttpStatusCode.BadRequest,
+                    "invalid_marker"
+                );
+            var marker = authority.CreateMarker(request, payload.UserId, payload.Description);
+            return Results.Json(
+                new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            id = marker.Id,
+                            description = marker.Description,
+                            position_seconds = marker.PositionSeconds,
+                            created_at = marker.CreatedAt,
+                            URL = marker.Url,
+                        },
+                    },
+                }
+            );
+        }
+        catch (FakeTwitchProtocolException failure)
+        {
+            return Error(failure);
+        }
+    }
+
+    private static IResult Markers(FakeTwitchAuthority authority, HttpRequest request)
+    {
+        try
+        {
+            return Results.Json(
+                new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            user_id = authority.Definition.AuthorizedUser.Id,
+                            videos = new[]
+                            {
+                                new
+                                {
+                                    video_id = "fake-video",
+                                    markers = authority
+                                        .Markers(request)
+                                        .Select(marker => new
+                                        {
+                                            id = marker.Id,
+                                            description = marker.Description,
+                                            position_seconds = marker.PositionSeconds,
+                                            created_at = marker.CreatedAt,
+                                            URL = marker.Url,
+                                        }),
+                                },
+                            },
+                        },
+                    },
+                    pagination = new { cursor = (string?)null },
                 }
             );
         }
@@ -1171,6 +1402,15 @@ public static class FakeTwitchHostingExtensions
 
         [JsonPropertyName("message")]
         public required string Message { get; init; }
+    }
+
+    private sealed record MarkerRequest
+    {
+        [JsonPropertyName("user_id")]
+        public required string UserId { get; init; }
+
+        [JsonPropertyName("description")]
+        public required string Description { get; init; }
     }
 }
 

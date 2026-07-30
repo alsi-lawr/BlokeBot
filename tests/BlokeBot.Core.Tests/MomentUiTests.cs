@@ -1,6 +1,9 @@
+using System.Security.Claims;
+using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Persistence.Models;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -96,6 +99,102 @@ public sealed class MomentUiTests
 
         moderator.Policy.ShouldBe("HostSelected");
         publicRoute.ShouldNotBeNull();
+    }
+
+    [Test]
+    public async Task PublicRecap_AuthenticatedVoteThenLoginFallbackIsOneLogicalVote()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        int hostId;
+        int clipId;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "streamer",
+                DisplayName = "Streamer",
+                TwitchUserId = "streamer-id",
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            hostId = host.Id;
+            var clip = new TwitchClip
+            {
+                HostId = hostId,
+                IdempotencyKey = "identity-ui-clip",
+                Status = TwitchClipStatus.Available,
+                FinalUrl = "https://clips.twitch.tv/IdentityMoment",
+                RequestedAtUtc = DateTime.UtcNow,
+                ResolvedAtUtc = DateTime.UtcNow,
+            };
+            db.TwitchClips.Add(clip);
+            await db.SaveChangesAsync();
+            clipId = clip.Id;
+        }
+        var service = new MomentHubService(
+            database,
+            new ReadyProvider(clipId),
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        var captured = (
+            await service.CaptureAsync(
+                hostId,
+                new CaptureMomentCommand("stream-id", new("viewer"), "Identity moment"),
+                CancellationToken.None
+            )
+        )
+            .ShouldBeOfType<MomentResult<MomentView>.Succeeded>()
+            .Value;
+        _ = await service.ApproveAsync(
+            hostId,
+            new ModerateMomentCommand(
+                captured.PublicId,
+                "Identity moment",
+                "Gameplay",
+                "moderator"
+            ),
+            CancellationToken.None
+        );
+
+        using (var authenticated = new BunitContext())
+        {
+            authenticated.Services.AddSingleton(service);
+            var authorization = authenticated.AddAuthorization();
+            authorization.SetAuthorized("OAuth Viewer");
+            authorization.SetClaims(
+                new Claim(ClaimTypes.NameIdentifier, "oauth-viewer-id"),
+                new Claim(ClaimTypes.Name, "OAuth Viewer"),
+                new Claim(AuthClaims.Login, "oauth_viewer")
+            );
+            var page = authenticated.Render<PublicMomentRecapPage>(parameters =>
+                parameters.Add(component => component.Channel, "streamer")
+            );
+            page.WaitForAssertion(() => page.Markup.ShouldContain("Voting as"));
+            await page.Find("button.btn-secondary").ClickAsync(new());
+            page.WaitForAssertion(() => page.Markup.ShouldContain("Vote recorded."));
+        }
+
+        using (var anonymous = new BunitContext())
+        {
+            anonymous.Services.AddSingleton(service);
+            _ = anonymous.AddAuthorization();
+            var page = anonymous.Render<PublicMomentRecapPage>(parameters =>
+                parameters.Add(component => component.Channel, "streamer")
+            );
+            page.WaitForAssertion(() => page.Find("#moment-voter-login").ShouldNotBeNull());
+            page.Find("#moment-voter-login").Change("oauth_viewer");
+            await page.Find("button.btn-secondary").ClickAsync(new());
+            page.WaitForAssertion(() =>
+                page.Markup.ShouldContain("Your vote was already recorded.")
+            );
+        }
+
+        await using var verify = await database.CreateDbContextAsync();
+        var vote = await verify.MomentVotes.SingleAsync();
+        vote.IdentityKey.ShouldBe("id:oauth-viewer-id");
+        vote.TwitchUserId.ShouldBe("oauth-viewer-id");
     }
 
     private sealed class ReadyProvider(int clipId) : IMomentProviderOperations

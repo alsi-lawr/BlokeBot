@@ -1,10 +1,11 @@
-using System.Collections.Concurrent;
 using System.Text.Json;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BlokeBot.Core.Features.Moments;
 
@@ -17,10 +18,7 @@ public sealed class MomentHubService(
 {
     private const int _eventSchemaVersion = 1;
     private const int _maximumEventPayloadLength = 1024;
-    private static readonly ConcurrentDictionary<
-        (int HostId, string Stream),
-        SemaphoreSlim
-    > _gates = new();
+    private const int _persistenceRetryCount = 20;
 
     public async Task<MomentResult<MomentHubSettingsView>> ConfigureAsync(
         int hostId,
@@ -105,105 +103,133 @@ public sealed class MomentHubService(
             );
         }
 
-        var gate = _gates.GetOrAdd((hostId, stream), _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(ct);
-        try
+        var decisionResult = await RetryPersistenceAsync(
+            () => DecideCaptureAsync(hostId, stream, login, command, ct),
+            ct
+        );
+        if (decisionResult is MomentResult<CaptureDecision>.Rejected rejected)
         {
-            await using var db = await dbFactory.CreateDbContextAsync(ct);
-            var host = await db.Hosts.SingleOrDefaultAsync(value => value.Id == hostId, ct);
-            if (host is null)
-            {
-                return Rejected<MomentView>(new MomentRejection.NotFound());
-            }
-            var settings = await LoadSettingsAsync(db, hostId, ct);
-            var now = Now();
-            var mergeBoundary = now.AddSeconds(-settings.MergeWindowSeconds);
-            var candidate = await db
-                .MomentCandidates.Include(value => value.Contributors)
-                .Include(value => value.Suggestions)
-                .Where(value =>
-                    value.HostId == hostId
-                    && value.StreamIdentity == stream
-                    && value.LastCapturedAtUtc >= mergeBoundary
-                    && value.State != MomentCandidateState.Approved
-                    && value.State != MomentCandidateState.Rejected
-                    && value.State != MomentCandidateState.Merged
-                )
-                .OrderByDescending(value => value.LastCapturedAtUtc)
-                .ThenByDescending(value => value.Id)
-                .FirstOrDefaultAsync(ct);
-            var created = candidate is null;
-            if (candidate is null)
-            {
-                candidate = new MomentCandidate
-                {
-                    PublicId = Guid.NewGuid(),
-                    HostId = hostId,
-                    StreamIdentity = stream,
-                    State = MomentCandidateState.ProviderPending,
-                    CapturedAtUtc = now,
-                    LastCapturedAtUtc = now,
-                };
-                db.MomentCandidates.Add(candidate);
-            }
-            else
-            {
-                candidate.LastCapturedAtUtc = now;
-            }
+            return Rejected<MomentView>(rejected.Reason);
+        }
+        var decision = ((MomentResult<CaptureDecision>.Succeeded)decisionResult).Value;
+        if (decision.State == MomentCandidateState.ProviderPending)
+        {
+            var outcome = await provider.CaptureAsync(
+                hostId,
+                decision.PublicId,
+                decision.MarkerFallbackEnabled,
+                Description(decision.PublicId),
+                ct
+            );
+            await RetryPersistenceAsync(
+                () => ApplyProviderOutcomeAsync(hostId, decision.PublicId, outcome, ct),
+                ct
+            );
+        }
 
-            var identityKey = MomentInput.IdentityKey(command.Requester);
-            if (
-                candidate.Contributors.All(value =>
-                    value.IdentityKey != identityKey && value.IdentityKey != $"login:{login}"
-                )
-                && candidate.Contributors.Count >= MomentLimits.MaximumContributorCount
+        await using var read = await dbFactory.CreateDbContextAsync(ct);
+        var candidate =
+            await LoadPublicCandidateAsync(read, hostId, decision.PublicId, ct)
+            ?? throw new InvalidOperationException("The committed moment candidate was not found.");
+        await NotifyAsync(ct);
+        return new MomentResult<MomentView>.Succeeded(
+            ToPublic(candidate, decision.HostLogin),
+            !decision.Created
+        );
+    }
+
+    private async Task<MomentResult<CaptureDecision>> DecideCaptureAsync(
+        int hostId,
+        string stream,
+        string login,
+        CaptureMomentCommand command,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        var host = await db.Hosts.SingleOrDefaultAsync(value => value.Id == hostId, ct);
+        if (host is null)
+        {
+            return Rejected<CaptureDecision>(new MomentRejection.NotFound());
+        }
+        var settings = await LoadSettingsAsync(db, hostId, ct);
+        var now = Now();
+        var mergeBoundary = now.AddSeconds(-settings.MergeWindowSeconds);
+        var candidate = await db
+            .MomentCandidates.Include(value => value.Contributors)
+            .Include(value => value.Suggestions)
+            .Where(value =>
+                value.HostId == hostId
+                && value.StreamIdentity == stream
+                && value.LastCapturedAtUtc >= mergeBoundary
+                && value.State != MomentCandidateState.Approved
+                && value.State != MomentCandidateState.Rejected
+                && value.State != MomentCandidateState.Merged
             )
-            {
-                return Rejected<MomentView>(
-                    new MomentRejection.Conflict("This moment has reached its contributor limit.")
-                );
-            }
-            candidate.CaptureRequests.Add(
-                new MomentCaptureRequest { IdentityKey = identityKey, CapturedAtUtc = now }
-            );
-            AddOrUpdateContributor(candidate, command.Requester, login, now);
-            AddSuggestion(candidate, command, now);
-            await db.SaveChangesAsync(ct);
-            AddEvent(
-                db,
-                candidate,
-                MomentEventKind.Captured,
-                new { candidate.PublicId, candidate.StreamIdentity },
-                now
-            );
-            await db.SaveChangesAsync(ct);
-
-            if (created || candidate.State == MomentCandidateState.ProviderPending)
-            {
-                var outcome = await provider.CaptureAsync(
-                    hostId,
-                    candidate.PublicId,
-                    settings.MarkerFallbackEnabled,
-                    Description(candidate),
-                    ct
-                );
-                await ApplyProviderOutcomeAsync(db, candidate, outcome, ct);
-            }
-
-            await db.Entry(candidate).Collection(value => value.Contributors).LoadAsync(ct);
-            await db.Entry(candidate).Collection(value => value.Votes).LoadAsync(ct);
-            await db.Entry(candidate).Reference(value => value.TwitchClip).LoadAsync(ct);
-            await db.Entry(candidate).Reference(value => value.TwitchStreamMarker).LoadAsync(ct);
-            await NotifyAsync(ct);
-            return new MomentResult<MomentView>.Succeeded(
-                ToPublic(candidate, host.Login),
-                !created
-            );
-        }
-        finally
+            .OrderByDescending(value => value.LastCapturedAtUtc)
+            .ThenByDescending(value => value.Id)
+            .FirstOrDefaultAsync(ct);
+        var created = candidate is null;
+        if (candidate is null)
         {
-            gate.Release();
+            candidate = new MomentCandidate
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                StreamIdentity = stream,
+                State = MomentCandidateState.ProviderPending,
+                CapturedAtUtc = now,
+                LastCapturedAtUtc = now,
+            };
+            db.MomentCandidates.Add(candidate);
         }
+        else
+        {
+            candidate.LastCapturedAtUtc = now;
+        }
+
+        var existingContributor = candidate.Contributors.SingleOrDefault(value =>
+            value.IdentityKey == MomentInput.IdentityKey(command.Requester)
+            || value.NormalizedLogin == login
+        );
+        if (
+            existingContributor is null
+            && candidate.Contributors.Count >= MomentLimits.MaximumContributorCount
+        )
+        {
+            return Rejected<CaptureDecision>(
+                new MomentRejection.Conflict("This moment has reached its contributor limit.")
+            );
+        }
+        candidate.CaptureRequests.Add(
+            new MomentCaptureRequest
+            {
+                IdentityKey = MomentInput.IdentityKey(command.Requester),
+                CapturedAtUtc = now,
+            }
+        );
+        AddOrUpdateContributor(candidate, command.Requester, login, now);
+        AddSuggestion(candidate, command, now);
+        await db.SaveChangesAsync(ct);
+        AddEvent(
+            db,
+            candidate,
+            MomentEventKind.Captured,
+            new { candidate.PublicId, candidate.StreamIdentity },
+            now
+        );
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Succeeded(
+            new CaptureDecision(
+                candidate.PublicId,
+                host.Login,
+                candidate.State,
+                settings.MarkerFallbackEnabled,
+                created
+            )
+        );
     }
 
     public async Task<MomentResult<ModeratorMomentView>> ApproveAsync(
@@ -224,34 +250,38 @@ public sealed class MomentHubService(
                         and not MomentCandidateState.Approved
                 )
                 {
-                    return new MomentRejection.Conflict(
-                        "Only a resolved clip or marker can be approved."
+                    return new ModerationDecision(
+                        new MomentRejection.Conflict(
+                            "Only a resolved clip or marker can be approved."
+                        )
                     );
                 }
                 var wasApproved = candidate.State == MomentCandidateState.Approved;
+                if (wasApproved)
+                {
+                    return new ModerationDecision(null, true);
+                }
                 candidate.PublicTitle = CleanTitle(command.PublicTitle, candidate);
                 candidate.PublicCategory = command.PublicCategory.Trim();
                 candidate.State = MomentCandidateState.Approved;
                 candidate.ApprovedAtUtc ??= now;
                 AddAudit(db, candidate, "Approved", command.ActorLogin, command.PrivateText, now);
-                if (!wasApproved)
-                {
-                    AddEvent(
-                        db,
-                        candidate,
-                        MomentEventKind.Approved,
-                        new
-                        {
-                            candidate.PublicId,
-                            candidate.StreamIdentity,
-                            candidate.PublicTitle,
-                            candidate.PublicCategory,
-                        },
-                        now
-                    );
-                    await ApplyRewardsAsync(db, candidate, command.ActorLogin, now, ct);
-                }
-                return null;
+                AddEvent(
+                    db,
+                    candidate,
+                    MomentEventKind.Approved,
+                    new
+                    {
+                        candidate.PublicId,
+                        candidate.StreamIdentity,
+                        candidate.PublicTitle,
+                        candidate.PublicCategory,
+                    },
+                    now,
+                    ApprovalEventKey(candidate.PublicId)
+                );
+                await ApplyRewardsAsync(db, candidate, command.ActorLogin, now, ct);
+                return new ModerationDecision();
             },
             ct
         );
@@ -270,14 +300,18 @@ public sealed class MomentHubService(
             {
                 if (candidate.State is MomentCandidateState.Rejected or MomentCandidateState.Merged)
                 {
-                    return Task.FromResult<MomentRejection?>(
-                        new MomentRejection.Conflict("Rejected or merged moments cannot be edited.")
+                    return Task.FromResult(
+                        new ModerationDecision(
+                            new MomentRejection.Conflict(
+                                "Rejected or merged moments cannot be edited."
+                            )
+                        )
                     );
                 }
                 candidate.PublicTitle = CleanTitle(command.PublicTitle, candidate);
                 candidate.PublicCategory = command.PublicCategory.Trim();
                 AddAudit(db, candidate, "Edited", command.ActorLogin, command.PrivateText, now);
-                return Task.FromResult<MomentRejection?>(null);
+                return Task.FromResult(new ModerationDecision());
             },
             ct
         );
@@ -296,15 +330,17 @@ public sealed class MomentHubService(
             {
                 if (candidate.State == MomentCandidateState.Approved)
                 {
-                    return Task.FromResult<MomentRejection?>(
-                        new MomentRejection.Conflict("Approved moments cannot be rejected.")
+                    return Task.FromResult(
+                        new ModerationDecision(
+                            new MomentRejection.Conflict("Approved moments cannot be rejected.")
+                        )
                     );
                 }
                 candidate.State = MomentCandidateState.Rejected;
                 candidate.RejectedAtUtc = now;
                 candidate.PrivateRejectionReason = command.PrivateText.Trim();
                 AddAudit(db, candidate, "Rejected", command.ActorLogin, command.PrivateText, now);
-                return Task.FromResult<MomentRejection?>(null);
+                return Task.FromResult(new ModerationDecision());
             },
             ct
         );
@@ -326,7 +362,7 @@ public sealed class MomentHubService(
             );
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
         var candidates = await db
             .MomentCandidates.Include(value => value.Contributors)
             .Include(value => value.Suggestions)
@@ -359,11 +395,36 @@ public sealed class MomentHubService(
                 )
             );
         }
+        var mergedContributorCount = source
+            .Contributors.Select(value => value.NormalizedLogin)
+            .Concat(target.Contributors.Select(value => value.NormalizedLogin))
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        if (mergedContributorCount > MomentLimits.MaximumContributorCount)
+        {
+            return Rejected<ModeratorMomentView>(
+                new MomentRejection.Conflict(
+                    "Merging these moments would exceed the contributor limit."
+                )
+            );
+        }
+        if (
+            source.Suggestions.Count + target.Suggestions.Count
+            > MomentLimits.MaximumSuggestionCount
+        )
+        {
+            return Rejected<ModeratorMomentView>(
+                new MomentRejection.Conflict(
+                    "Merging these moments would exceed the suggestion limit."
+                )
+            );
+        }
 
         foreach (var contributor in source.Contributors)
         {
             var existing = target.Contributors.SingleOrDefault(value =>
                 value.IdentityKey == contributor.IdentityKey
+                || value.NormalizedLogin == contributor.NormalizedLogin
             );
             if (existing is null)
             {
@@ -382,6 +443,7 @@ public sealed class MomentHubService(
             }
             else
             {
+                ReconcileIdentity(existing, contributor.TwitchUserId, contributor.IdentityKey);
                 existing.CaptureCount += contributor.CaptureCount;
                 existing.FirstCapturedAtUtc = Earlier(
                     existing.FirstCapturedAtUtc,
@@ -393,7 +455,7 @@ public sealed class MomentHubService(
                 );
             }
         }
-        foreach (var suggestion in source.Suggestions.Take(MomentLimits.MaximumSuggestionCount))
+        foreach (var suggestion in source.Suggestions)
         {
             target.Suggestions.Add(
                 new MomentSuggestion
@@ -407,7 +469,11 @@ public sealed class MomentHubService(
         }
         foreach (var vote in source.Votes)
         {
-            if (target.Votes.All(value => value.IdentityKey != vote.IdentityKey))
+            var existing = target.Votes.SingleOrDefault(value =>
+                value.IdentityKey == vote.IdentityKey
+                || value.NormalizedLogin == vote.NormalizedLogin
+            );
+            if (existing is null)
             {
                 target.Votes.Add(
                     new MomentVote
@@ -418,6 +484,10 @@ public sealed class MomentHubService(
                         CreatedAtUtc = vote.CreatedAtUtc,
                     }
                 );
+            }
+            else
+            {
+                ReconcileIdentity(existing, vote.TwitchUserId, vote.IdentityKey);
             }
         }
         var mergedAt = Now();
@@ -455,35 +525,61 @@ public sealed class MomentHubService(
                 new MomentRejection.Invalid("A valid Twitch login is required.")
             );
         }
+        var vote = await RetryPersistenceAsync(
+            () => VoteCoreAsync(hostId, publicId, viewer, login, ct),
+            ct
+        );
+        if (vote.Changed)
+        {
+            await NotifyAsync(ct);
+        }
+        return vote.Result;
+    }
+
+    private async Task<VoteDecision> VoteCoreAsync(
+        int hostId,
+        Guid publicId,
+        MomentViewerIdentity viewer,
+        string login,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
         var candidate = await LoadPublicCandidateAsync(db, hostId, publicId, ct);
         if (candidate is null)
         {
-            return Rejected<MomentView>(new MomentRejection.NotFound());
+            return new VoteDecision(Rejected<MomentView>(new MomentRejection.NotFound()));
         }
         if (candidate.State != MomentCandidateState.Approved)
         {
-            return Rejected<MomentView>(
-                new MomentRejection.Conflict("Only approved moments can receive votes.")
+            return new VoteDecision(
+                Rejected<MomentView>(
+                    new MomentRejection.Conflict("Only approved moments can receive votes.")
+                )
             );
         }
         var identity = MomentInput.IdentityKey(viewer);
-        var existing = candidate.Votes.SingleOrDefault(value => value.IdentityKey == identity);
-        if (existing is null && !string.IsNullOrWhiteSpace(viewer.TwitchUserId))
+        var existing = candidate.Votes.SingleOrDefault(value =>
+            value.IdentityKey == identity || value.NormalizedLogin == login
+        );
+        var changed = false;
+        if (existing is not null && !string.IsNullOrWhiteSpace(viewer.TwitchUserId))
         {
-            existing = candidate.Votes.SingleOrDefault(value =>
-                value.IdentityKey == $"login:{login}"
-            );
-            if (existing is not null)
-            {
-                existing.IdentityKey = identity;
-                existing.TwitchUserId = viewer.TwitchUserId.Trim();
-            }
+            changed = ReconcileIdentity(existing, viewer.TwitchUserId, identity);
         }
         if (existing is not null)
         {
+            if (changed)
+            {
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
             var hostLogin = await HostLoginAsync(db, hostId, ct);
-            return new MomentResult<MomentView>.Succeeded(ToPublic(candidate, hostLogin), true);
+            return new VoteDecision(
+                new MomentResult<MomentView>.Succeeded(ToPublic(candidate, hostLogin), true),
+                changed
+            );
         }
         candidate.Votes.Add(
             new MomentVote
@@ -495,8 +591,11 @@ public sealed class MomentHubService(
             }
         );
         await db.SaveChangesAsync(ct);
-        await NotifyAsync(ct);
-        return Succeeded(ToPublic(candidate, await HostLoginAsync(db, hostId, ct)));
+        await transaction.CommitAsync(ct);
+        return new VoteDecision(
+            Succeeded(ToPublic(candidate, await HostLoginAsync(db, hostId, ct))),
+            true
+        );
     }
 
     public async Task<MomentModeratorPage> GetModeratorPageAsync(int hostId, CancellationToken ct)
@@ -599,8 +698,25 @@ public sealed class MomentHubService(
                 new MomentRejection.Conflict("Only a completed ISO-UTC week can be finalized.")
             );
         }
+        var finalization = await RetryPersistenceAsync(
+            () => FinalizeWeekCoreAsync(hostId, weekStart, ct),
+            ct
+        );
+        if (finalization.Changed)
+        {
+            await NotifyAsync(ct);
+        }
+        return finalization.Result;
+    }
+
+    private async Task<FinalizationDecision> FinalizeWeekCoreAsync(
+        int hostId,
+        DateTime weekStart,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
         var existing = await db.MomentWeeklyFinalizations.SingleOrDefaultAsync(
             value => value.HostId == hostId && value.WeekStartsAtUtc == weekStart,
             ct
@@ -618,9 +734,11 @@ public sealed class MomentHubService(
                 ).PublicId,
                 ct
             );
-            return new MomentResult<MomentView>.Succeeded(
-                ToPublic(existingWinner!, await HostLoginAsync(db, hostId, ct)),
-                true
+            return new FinalizationDecision(
+                new MomentResult<MomentView>.Succeeded(
+                    ToPublic(existingWinner!, await HostLoginAsync(db, hostId, ct)),
+                    true
+                )
             );
         }
         var weekEnd = weekStart.AddDays(7);
@@ -633,8 +751,10 @@ public sealed class MomentHubService(
         var winner = candidates.FirstOrDefault();
         if (winner is null)
         {
-            return Rejected<MomentView>(
-                new MomentRejection.Conflict("This week has no approved moments.")
+            return new FinalizationDecision(
+                Rejected<MomentView>(
+                    new MomentRejection.Conflict("This week has no approved moments.")
+                )
             );
         }
         var now = Now();
@@ -657,12 +777,15 @@ public sealed class MomentHubService(
                 winner.StreamIdentity,
                 WeekStartsAtUtc = weekStart,
             },
-            now
+            now,
+            WinnerEventKey(weekStart)
         );
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await NotifyAsync(ct);
-        return Succeeded(ToPublic(winner, await HostLoginAsync(db, hostId, ct)));
+        return new FinalizationDecision(
+            Succeeded(ToPublic(winner, await HostLoginAsync(db, hostId, ct))),
+            true
+        );
     }
 
     public async Task<IReadOnlyList<MomentEventView>> GetEventsAsync(
@@ -701,7 +824,7 @@ public sealed class MomentHubService(
     private async Task<MomentResult<ModeratorMomentView>> ModerateAsync(
         int hostId,
         ModerateMomentCommand command,
-        Func<BlokeBotDbContext, MomentCandidate, DateTime, Task<MomentRejection?>> mutation,
+        Func<BlokeBotDbContext, MomentCandidate, DateTime, Task<ModerationDecision>> mutation,
         CancellationToken ct
     )
     {
@@ -715,8 +838,26 @@ public sealed class MomentHubService(
                 new MomentRejection.Invalid("Moment metadata is too long.")
             );
         }
+        var result = await RetryPersistenceAsync(
+            () => ModerateCoreAsync(hostId, command, mutation, ct),
+            ct
+        );
+        if (result.Changed)
+        {
+            await NotifyAsync(ct);
+        }
+        return result.Result;
+    }
+
+    private async Task<ModerationResult> ModerateCoreAsync(
+        int hostId,
+        ModerateMomentCommand command,
+        Func<BlokeBotDbContext, MomentCandidate, DateTime, Task<ModerationDecision>> mutation,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
         var candidate = await db
             .MomentCandidates.Include(value => value.Contributors)
             .Include(value => value.Suggestions)
@@ -729,17 +870,27 @@ public sealed class MomentHubService(
             );
         if (candidate is null)
         {
-            return Rejected<ModeratorMomentView>(new MomentRejection.NotFound());
+            return new ModerationResult(
+                Rejected<ModeratorMomentView>(new MomentRejection.NotFound())
+            );
         }
-        var rejection = await mutation(db, candidate, Now());
-        if (rejection is not null)
+        var decision = await mutation(db, candidate, Now());
+        if (decision.Rejection is not null)
         {
-            return Rejected<ModeratorMomentView>(rejection);
+            return new ModerationResult(Rejected<ModeratorMomentView>(decision.Rejection));
+        }
+        if (decision.WasIdempotent)
+        {
+            return new ModerationResult(
+                new MomentResult<ModeratorMomentView>.Succeeded(
+                    await ToModeratorAsync(db, candidate, ct),
+                    true
+                )
+            );
         }
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await NotifyAsync(ct);
-        return Succeeded(await ToModeratorAsync(db, candidate, ct));
+        return new ModerationResult(Succeeded(await ToModeratorAsync(db, candidate, ct)), true);
     }
 
     private static void AddOrUpdateContributor(
@@ -751,19 +902,8 @@ public sealed class MomentHubService(
     {
         var identity = MomentInput.IdentityKey(requester);
         var contributor = candidate.Contributors.SingleOrDefault(value =>
-            value.IdentityKey == identity
+            value.IdentityKey == identity || value.NormalizedLogin == login
         );
-        if (contributor is null && !string.IsNullOrWhiteSpace(requester.TwitchUserId))
-        {
-            contributor = candidate.Contributors.SingleOrDefault(value =>
-                value.IdentityKey == $"login:{login}"
-            );
-            if (contributor is not null)
-            {
-                contributor.IdentityKey = identity;
-                contributor.TwitchUserId = requester.TwitchUserId.Trim();
-            }
-        }
         if (contributor is null)
         {
             candidate.Contributors.Add(
@@ -781,6 +921,10 @@ public sealed class MomentHubService(
                 }
             );
             return;
+        }
+        if (!string.IsNullOrWhiteSpace(requester.TwitchUserId))
+        {
+            ReconcileIdentity(contributor, requester.TwitchUserId, identity);
         }
         contributor.CaptureCount++;
         contributor.LastCapturedAtUtc = now;
@@ -815,13 +959,30 @@ public sealed class MomentHubService(
         );
     }
 
-    private static async Task ApplyProviderOutcomeAsync(
-        BlokeBotDbContext db,
-        MomentCandidate candidate,
+    private async Task ApplyProviderOutcomeAsync(
+        int hostId,
+        Guid publicId,
         MomentProviderOutcome outcome,
         CancellationToken ct
     )
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        await using var transaction = await ImmediateTransaction.StartAsync(db, ct);
+        var candidate = await db.MomentCandidates.SingleAsync(
+            value => value.HostId == hostId && value.PublicId == publicId,
+            ct
+        );
+        if (
+            candidate.State
+            is MomentCandidateState.Approved
+                or MomentCandidateState.Rejected
+                or MomentCandidateState.Merged
+                or MomentCandidateState.ClipReady
+                or MomentCandidateState.MarkerReady
+        )
+        {
+            return;
+        }
         switch (outcome)
         {
             case MomentProviderOutcome.Pending pending:
@@ -852,6 +1013,7 @@ public sealed class MomentHubService(
                 break;
         }
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
     }
 
     private async Task ApplyRewardsAsync(
@@ -934,7 +1096,8 @@ public sealed class MomentHubService(
         MomentCandidate candidate,
         MomentEventKind kind,
         object payload,
-        DateTime now
+        DateTime now,
+        string? operationKey = null
     )
     {
         var serialized = JsonSerializer.Serialize(payload);
@@ -947,6 +1110,7 @@ public sealed class MomentHubService(
             {
                 HostId = candidate.HostId,
                 CandidateId = candidate.Id,
+                OperationKey = operationKey,
                 SchemaVersion = _eventSchemaVersion,
                 Kind = kind,
                 StreamIdentity = candidate.StreamIdentity,
@@ -1143,9 +1307,19 @@ public sealed class MomentHubService(
         return events.PublishAsync(AppEventKind.MomentsChanged, ct).AsTask();
     }
 
-    private static string Description(MomentCandidate candidate)
+    private static string Description(Guid publicId)
     {
-        return $"Community moment {candidate.PublicId:N}"[..Math.Min(49, 17 + 32)];
+        return $"Community moment {publicId:N}"[..Math.Min(49, 17 + 32)];
+    }
+
+    private static string ApprovalEventKey(Guid publicId)
+    {
+        return $"moment:{publicId:N}:approval";
+    }
+
+    private static string WinnerEventKey(DateTime weekStart)
+    {
+        return $"moment:week:{weekStart:yyyyMMdd}:winner";
     }
 
     private static string CleanTitle(string requested, MomentCandidate candidate)
@@ -1180,6 +1354,99 @@ public sealed class MomentHubService(
         return first >= second ? first : second;
     }
 
+    private static bool ReconcileIdentity(
+        MomentContributor contributor,
+        string? twitchUserId,
+        string identityKey
+    )
+    {
+        if (
+            string.IsNullOrWhiteSpace(twitchUserId)
+            || !string.IsNullOrWhiteSpace(contributor.TwitchUserId)
+                && !string.Equals(
+                    contributor.TwitchUserId,
+                    twitchUserId.Trim(),
+                    StringComparison.Ordinal
+                )
+        )
+        {
+            return false;
+        }
+        var changed =
+            !string.Equals(contributor.TwitchUserId, twitchUserId.Trim(), StringComparison.Ordinal)
+            || contributor.IdentityKey != identityKey;
+        contributor.TwitchUserId = twitchUserId.Trim();
+        contributor.IdentityKey = identityKey;
+        return changed;
+    }
+
+    private static bool ReconcileIdentity(MomentVote vote, string? twitchUserId, string identityKey)
+    {
+        if (
+            string.IsNullOrWhiteSpace(twitchUserId)
+            || !string.IsNullOrWhiteSpace(vote.TwitchUserId)
+                && !string.Equals(vote.TwitchUserId, twitchUserId.Trim(), StringComparison.Ordinal)
+        )
+        {
+            return false;
+        }
+        var changed =
+            !string.Equals(vote.TwitchUserId, twitchUserId.Trim(), StringComparison.Ordinal)
+            || vote.IdentityKey != identityKey;
+        vote.TwitchUserId = twitchUserId.Trim();
+        vote.IdentityKey = identityKey;
+        return changed;
+    }
+
+    private static async Task<T> RetryPersistenceAsync<T>(
+        Func<Task<T>> action,
+        CancellationToken ct
+    )
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await action();
+            }
+            catch (Exception exception)
+                when (attempt < _persistenceRetryCount && IsPersistenceCollision(exception))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
+            }
+        }
+    }
+
+    private static async Task RetryPersistenceAsync(Func<Task> action, CancellationToken ct)
+    {
+        await RetryPersistenceAsync(
+            async () =>
+            {
+                await action();
+                return true;
+            },
+            ct
+        );
+    }
+
+    private static bool IsPersistenceCollision(Exception exception)
+    {
+        return exception switch
+        {
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
+            } => true,
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
+                SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
+            } => true,
+            DbUpdateException { InnerException: { } inner } => IsPersistenceCollision(inner),
+            _ => false,
+        };
+    }
+
     private static MomentResult<T> Succeeded<T>(T value)
     {
         return new MomentResult<T>.Succeeded(value);
@@ -1188,5 +1455,73 @@ public sealed class MomentHubService(
     private static MomentResult<T> Rejected<T>(MomentRejection rejection)
     {
         return new MomentResult<T>.Rejected(rejection);
+    }
+
+    private sealed record CaptureDecision(
+        Guid PublicId,
+        string HostLogin,
+        MomentCandidateState State,
+        bool MarkerFallbackEnabled,
+        bool Created
+    );
+
+    private sealed record VoteDecision(MomentResult<MomentView> Result, bool Changed = false);
+
+    private sealed record FinalizationDecision(
+        MomentResult<MomentView> Result,
+        bool Changed = false
+    );
+
+    private sealed record ModerationDecision(
+        MomentRejection? Rejection = null,
+        bool WasIdempotent = false
+    );
+
+    private sealed record ModerationResult(
+        MomentResult<ModeratorMomentView> Result,
+        bool Changed = false
+    );
+
+    private sealed class ImmediateTransaction(
+        SqliteTransaction providerTransaction,
+        IDbContextTransaction contextTransaction
+    ) : IAsyncDisposable
+    {
+        public static async Task<ImmediateTransaction> StartAsync(
+            BlokeBotDbContext db,
+            CancellationToken ct
+        )
+        {
+            await db.Database.OpenConnectionAsync(ct);
+            var connection =
+                db.Database.GetDbConnection() as SqliteConnection
+                ?? throw new InvalidOperationException("Moment persistence requires SQLite.");
+            var providerTransaction = connection.BeginTransaction(deferred: false);
+            try
+            {
+                var contextTransaction =
+                    await db.Database.UseTransactionAsync(providerTransaction, ct)
+                    ?? throw new InvalidOperationException(
+                        "The immediate SQLite transaction could not be attached."
+                    );
+                return new ImmediateTransaction(providerTransaction, contextTransaction);
+            }
+            catch
+            {
+                await providerTransaction.DisposeAsync();
+                throw;
+            }
+        }
+
+        public Task CommitAsync(CancellationToken ct)
+        {
+            return contextTransaction.CommitAsync(ct);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await contextTransaction.DisposeAsync();
+            await providerTransaction.DisposeAsync();
+        }
     }
 }

@@ -5,6 +5,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
@@ -125,7 +126,27 @@ public sealed class ClipMarkerService(
             RequestedAtUtc = now,
         };
         db.TwitchClips.Add(clip);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception exception) when (IsClaimCollision(exception))
+        {
+            db.ChangeTracker.Clear();
+            existing = await ReadClaimAfterCollisionAsync(
+                () =>
+                    db.TwitchClips.SingleOrDefaultAsync(
+                        value => value.HostId == hostId && value.IdempotencyKey == key,
+                        ct
+                    ),
+                ct
+            );
+            if (existing is null)
+            {
+                throw;
+            }
+            return Outcome(existing);
+        }
 
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
@@ -280,7 +301,27 @@ public sealed class ClipMarkerService(
             CreatedAtUtc = now,
         };
         db.TwitchStreamMarkers.Add(marker);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception exception) when (IsClaimCollision(exception))
+        {
+            db.ChangeTracker.Clear();
+            existing = await ReadClaimAfterCollisionAsync(
+                () =>
+                    db.TwitchStreamMarkers.SingleOrDefaultAsync(
+                        value => value.HostId == hostId && value.IdempotencyKey == key,
+                        ct
+                    ),
+                ct
+            );
+            if (existing is null)
+            {
+                throw;
+            }
+            return MarkerOutcome(existing);
+        }
 
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
@@ -887,6 +928,51 @@ public sealed class ClipMarkerService(
     private static string NewAttemptKey()
     {
         return Guid.NewGuid().ToString("N");
+    }
+
+    private static async Task<T?> ReadClaimAfterCollisionAsync<T>(
+        Func<Task<T?>> read,
+        CancellationToken ct
+    )
+        where T : class
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await read();
+            }
+            catch (Exception exception) when (attempt < 20 && IsBusy(exception))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
+            }
+        }
+    }
+
+    private static bool IsClaimCollision(Exception exception)
+    {
+        return IsBusy(exception)
+            || exception
+                is SqliteException
+                {
+                    SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
+                    SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
+                }
+            || exception is DbUpdateException { InnerException: { } inner }
+                && IsClaimCollision(inner);
+    }
+
+    private static bool IsBusy(Exception exception)
+    {
+        return exception switch
+        {
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
+            } => true,
+            DbUpdateException { InnerException: { } inner } => IsBusy(inner),
+            _ => false,
+        };
     }
 
     private static string ValidateAttemptKey(string value)

@@ -131,6 +131,7 @@ public sealed partial class BlokeBotDbContext
             b.Property(x => x.NormalizedLogin).HasMaxLength(128);
             b.Property(x => x.DisplayName).HasMaxLength(128);
             b.HasIndex(x => new { x.CandidateId, x.IdentityKey }).IsUnique();
+            b.HasIndex(x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
             b.HasIndex(x => new
             {
                 x.CandidateId,
@@ -162,6 +163,7 @@ public sealed partial class BlokeBotDbContext
             b.Property(x => x.TwitchUserId).HasMaxLength(128);
             b.Property(x => x.NormalizedLogin).HasMaxLength(128);
             b.HasIndex(x => new { x.CandidateId, x.IdentityKey }).IsUnique();
+            b.HasIndex(x => new { x.CandidateId, x.NormalizedLogin }).IsUnique();
         });
 
         modelBuilder.Entity<MomentModerationAudit>(b =>
@@ -199,7 +201,11 @@ public sealed partial class BlokeBotDbContext
                 .HasMaxLength(32);
             b.Property(x => x.StreamIdentity).HasMaxLength(128);
             b.Property(x => x.PublicPayload).HasMaxLength(1024);
+            b.Property(x => x.OperationKey).HasMaxLength(200);
             b.HasIndex(x => new { x.HostId, x.Id });
+            b.HasIndex(x => new { x.HostId, x.OperationKey })
+                .IsUnique()
+                .HasFilter("\"OperationKey\" IS NOT NULL");
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)

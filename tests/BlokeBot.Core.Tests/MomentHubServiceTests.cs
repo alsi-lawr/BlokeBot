@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -340,6 +341,296 @@ public sealed class MomentHubServiceTests
         ).ShouldBe(1);
     }
 
+    [Test]
+    public async Task IdentityReconciliation_IsBidirectionalAndRetainsTwitchIdAsPrimary()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero)
+        );
+        var service = CreateService(database, new FakeMomentProvider(database), clock);
+
+        var idFirst = Success(
+            await service.CaptureAsync(
+                host,
+                Capture("stream-1", "viewer", "viewer-id"),
+                CancellationToken.None
+            )
+        ).Value;
+        _ = Success(
+            await service.CaptureAsync(host, Capture("stream-1", "viewer"), CancellationToken.None)
+        );
+        clock.Advance(TimeSpan.FromSeconds(91));
+        var loginFirst = Success(
+            await service.CaptureAsync(host, Capture("stream-1", "other"), CancellationToken.None)
+        ).Value;
+        _ = Success(
+            await service.CaptureAsync(
+                host,
+                Capture("stream-1", "other", "other-id"),
+                CancellationToken.None
+            )
+        );
+        _ = Success(
+            await service.ApproveAsync(
+                host,
+                new ModerateMomentCommand(
+                    idFirst.PublicId,
+                    "Identity test",
+                    "Gameplay",
+                    "moderator"
+                ),
+                CancellationToken.None
+            )
+        );
+        var idVote = Success(
+            await service.VoteAsync(
+                host,
+                idFirst.PublicId,
+                new MomentViewerIdentity("voter", "voter-id"),
+                CancellationToken.None
+            )
+        );
+        var loginRetry = Success(
+            await service.VoteAsync(
+                host,
+                idFirst.PublicId,
+                new MomentViewerIdentity("voter"),
+                CancellationToken.None
+            )
+        );
+
+        idVote.WasIdempotent.ShouldBeFalse();
+        loginRetry.WasIdempotent.ShouldBeTrue();
+        await using var verify = await database.CreateDbContextAsync();
+        var idFirstRow = await verify.MomentCandidates.SingleAsync(value =>
+            value.PublicId == idFirst.PublicId
+        );
+        var loginFirstRow = await verify.MomentCandidates.SingleAsync(value =>
+            value.PublicId == loginFirst.PublicId
+        );
+        var idFirstContributor = await verify.MomentContributors.SingleAsync(value =>
+            value.CandidateId == idFirstRow.Id
+        );
+        idFirstContributor.IdentityKey.ShouldBe("id:viewer-id");
+        idFirstContributor.TwitchUserId.ShouldBe("viewer-id");
+        idFirstContributor.CaptureCount.ShouldBe(2);
+        var loginFirstContributor = await verify.MomentContributors.SingleAsync(value =>
+            value.CandidateId == loginFirstRow.Id
+        );
+        loginFirstContributor.IdentityKey.ShouldBe("id:other-id");
+        loginFirstContributor.TwitchUserId.ShouldBe("other-id");
+        loginFirstContributor.CaptureCount.ShouldBe(2);
+        var vote = await verify.MomentVotes.SingleAsync();
+        vote.IdentityKey.ShouldBe("id:voter-id");
+        vote.TwitchUserId.ShouldBe("voter-id");
+    }
+
+    [Test]
+    public async Task ConcurrentVoteApprovalAndFinalization_ReturnIdempotentSuccess()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 27, 12, 0, 0, TimeSpan.Zero)
+        );
+        var provider = new FakeMomentProvider(database);
+        var first = CreateService(database, provider, clock);
+        var second = CreateService(database, provider, clock);
+        _ = Success(
+            await first.ConfigureAsync(
+                host,
+                new ConfigureMomentHubCommand(90, true, MomentRewardPolicy.AllContributors, "25"),
+                CancellationToken.None
+            )
+        );
+        var candidate = Success(
+            await first.CaptureAsync(
+                host,
+                Capture("stream-live", "viewer", "viewer-id"),
+                CancellationToken.None
+            )
+        ).Value;
+        var command = new ModerateMomentCommand(
+            candidate.PublicId,
+            "Concurrent moment",
+            "Gameplay",
+            "moderator"
+        );
+
+        var approvals = await Task.WhenAll(
+            first.ApproveAsync(host, command, CancellationToken.None),
+            second.ApproveAsync(host, command, CancellationToken.None)
+        );
+        var approvalSuccesses = approvals.Select(Success).ToArray();
+        approvalSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+
+        var votes = await Task.WhenAll(
+            first.VoteAsync(
+                host,
+                candidate.PublicId,
+                new MomentViewerIdentity("voter", "voter-id"),
+                CancellationToken.None
+            ),
+            second.VoteAsync(
+                host,
+                candidate.PublicId,
+                new MomentViewerIdentity("voter"),
+                CancellationToken.None
+            )
+        );
+        var voteSuccesses = votes.Select(Success).ToArray();
+        voteSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+
+        var weekStart = clock.GetUtcNow().UtcDateTime;
+        clock.Advance(TimeSpan.FromDays(7));
+        var finalizations = await Task.WhenAll(
+            first.FinalizeWeekAsync(host, weekStart, CancellationToken.None),
+            second.FinalizeWeekAsync(host, weekStart, CancellationToken.None)
+        );
+        var finalizationSuccesses = finalizations.Select(Success).ToArray();
+        finalizationSuccesses.Count(value => value.WasIdempotent).ShouldBe(1);
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.MomentVotes.CountAsync()).ShouldBe(1);
+        (await verify.PointLedgerEntries.CountAsync()).ShouldBe(1);
+        (await verify.MomentWeeklyFinalizations.CountAsync()).ShouldBe(1);
+        (
+            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Approved)
+        ).ShouldBe(1);
+        (
+            await verify.MomentEvents.CountAsync(value => value.Kind == MomentEventKind.Winner)
+        ).ShouldBe(1);
+        var operationKeys = await verify
+            .MomentEvents.Where(value => value.OperationKey != null)
+            .Select(value => value.OperationKey)
+            .ToArrayAsync();
+        operationKeys.Length.ShouldBe(2);
+        operationKeys.Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
+    }
+
+    [Test]
+    public async Task Merge_RejectsContributorAndSuggestionUnionsBeyondDurableBounds()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        Guid contributorSource;
+        Guid contributorTarget;
+        Guid suggestionSource;
+        Guid suggestionTarget;
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            var now = DateTime.UtcNow;
+            var contributorCandidates = CandidatePair(host, "contributors", now);
+            contributorSource = contributorCandidates.Source.PublicId;
+            contributorTarget = contributorCandidates.Target.PublicId;
+            contributorCandidates.Source.Contributors.Add(Contributor("source-only", now));
+            contributorCandidates.Target.Contributors.AddRange(
+                Enumerable
+                    .Range(0, MomentLimits.MaximumContributorCount)
+                    .Select(index => Contributor($"target_{index:D3}", now))
+            );
+
+            var suggestionCandidates = CandidatePair(host, "suggestions", now);
+            suggestionSource = suggestionCandidates.Source.PublicId;
+            suggestionTarget = suggestionCandidates.Target.PublicId;
+            suggestionCandidates.Source.Suggestions.Add(Suggestion("source-only", now));
+            suggestionCandidates.Target.Suggestions.AddRange(
+                Enumerable
+                    .Range(0, MomentLimits.MaximumSuggestionCount)
+                    .Select(index => Suggestion($"target_{index:D3}", now))
+            );
+            db.MomentCandidates.AddRange(
+                contributorCandidates.Source,
+                contributorCandidates.Target,
+                suggestionCandidates.Source,
+                suggestionCandidates.Target
+            );
+            await db.SaveChangesAsync();
+        }
+        var service = CreateService(database, new FakeMomentProvider(database));
+
+        var contributorResult = await service.MergeAsync(
+            host,
+            contributorSource,
+            contributorTarget,
+            "moderator",
+            "",
+            CancellationToken.None
+        );
+        var suggestionResult = await service.MergeAsync(
+            host,
+            suggestionSource,
+            suggestionTarget,
+            "moderator",
+            "",
+            CancellationToken.None
+        );
+
+        contributorResult
+            .ShouldBeOfType<MomentResult<ModeratorMomentView>.Rejected>()
+            .Reason.Message.ShouldContain("contributor limit");
+        suggestionResult
+            .ShouldBeOfType<MomentResult<ModeratorMomentView>.Rejected>()
+            .Reason.Message.ShouldContain("suggestion limit");
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.MomentMerges.CountAsync()).ShouldBe(0);
+        (await verify.MomentContributors.CountAsync()).ShouldBe(501);
+        (await verify.MomentSuggestions.CountAsync()).ShouldBe(101);
+    }
+
+    private static (MomentCandidate Source, MomentCandidate Target) CandidatePair(
+        int hostId,
+        string stream,
+        DateTime now
+    )
+    {
+        return (
+            new MomentCandidate
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                StreamIdentity = stream,
+                State = MomentCandidateState.ClipReady,
+                CapturedAtUtc = now,
+                LastCapturedAtUtc = now,
+            },
+            new MomentCandidate
+            {
+                PublicId = Guid.NewGuid(),
+                HostId = hostId,
+                StreamIdentity = stream,
+                State = MomentCandidateState.ClipReady,
+                CapturedAtUtc = now,
+                LastCapturedAtUtc = now,
+            }
+        );
+    }
+
+    private static MomentContributor Contributor(string login, DateTime now)
+    {
+        return new()
+        {
+            IdentityKey = $"login:{login}",
+            NormalizedLogin = login,
+            DisplayName = login,
+            CaptureCount = 1,
+            FirstCapturedAtUtc = now,
+            LastCapturedAtUtc = now,
+        };
+    }
+
+    private static MomentSuggestion Suggestion(string title, DateTime now)
+    {
+        return new()
+        {
+            IdentityKey = $"login:{title}",
+            SuggestedTitle = title,
+            CreatedAtUtc = now,
+        };
+    }
+
     private static async Task<MomentView> CaptureAndApproveAsync(
         MomentHubService service,
         int hostId,
@@ -419,6 +710,7 @@ public sealed class MomentHubServiceTests
         private readonly SqliteBlokeBotDbFactory _database;
         private readonly TimeSpan _delay;
         private readonly Queue<FakeProviderState> _outcomes;
+        private readonly ConcurrentDictionary<Guid, Task<MomentProviderOutcome>> _claims = new();
         private int _calls;
 
         public FakeMomentProvider(
@@ -442,14 +734,35 @@ public sealed class MomentHubServiceTests
             CancellationToken ct
         )
         {
+            var claim = _claims.GetOrAdd(publicId, _ => CaptureOnceAsync(hostId, publicId, ct));
+            try
+            {
+                return await claim;
+            }
+            finally
+            {
+                _claims.TryRemove(publicId, out _);
+            }
+        }
+
+        private async Task<MomentProviderOutcome> CaptureOnceAsync(
+            int hostId,
+            Guid publicId,
+            CancellationToken ct
+        )
+        {
             Interlocked.Increment(ref _calls);
             if (_delay > TimeSpan.Zero)
             {
                 await Task.Delay(_delay, ct);
             }
-            var state = _outcomes.TryDequeue(out var configured)
-                ? configured
-                : FakeProviderState.ClipReady;
+            FakeProviderState state;
+            lock (_outcomes)
+            {
+                state = _outcomes.TryDequeue(out var configured)
+                    ? configured
+                    : FakeProviderState.ClipReady;
+            }
             await using var db = await _database.CreateDbContextAsync(ct);
             return state switch
             {

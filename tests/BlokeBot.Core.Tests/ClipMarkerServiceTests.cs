@@ -296,6 +296,44 @@ public sealed class ClipMarkerServiceTests
         (await verify.TwitchStreamMarkers.CountAsync()).ShouldBe(1);
     }
 
+    [Test]
+    public async Task ConcurrentDeterministicClaim_UsesOneProviderMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
+        var http = new ClipMarkerHttpClientFactory();
+        var first = CreateService(dbFactory, http, now);
+        var second = CreateService(dbFactory, http, now);
+
+        var outcomes = await Task.WhenAll(
+            first.CreateClipAsync(1, false, "moment:concurrent:clip", CancellationToken.None),
+            second.CreateClipAsync(1, false, "moment:concurrent:clip", CancellationToken.None)
+        );
+
+        outcomes
+            .All(value =>
+                value
+                    is ClipMarkerOperationOutcome.ClipPending
+                        or ClipMarkerOperationOutcome.ClipAmbiguous
+            )
+            .ShouldBeTrue();
+        http.ClipPosts.ShouldBe(1);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchClips.CountAsync()).ShouldBe(1);
+    }
+
     private static ClipMarkerService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         ClipMarkerHttpClientFactory http,

@@ -148,6 +148,7 @@ public sealed class MomentDomainEvent
     public long Id { get; set; }
     public int HostId { get; set; }
     public long CandidateId { get; set; }
+    public string? OperationKey { get; set; }
     public int SchemaVersion { get; set; }
     public MomentEventKind Kind { get; set; }
     public string StreamIdentity { get; set; } = string.Empty;
