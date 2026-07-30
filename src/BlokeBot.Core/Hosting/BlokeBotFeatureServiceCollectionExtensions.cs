@@ -86,6 +86,16 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<OverlayInstanceResolver>();
         services.AddSingleton<OverlayServerEpoch>();
         services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
+        services.AddSingleton<OverlayLiveCoordinator>();
+        services.AddSingleton<IOverlayLivePublisher>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
+        services.AddSingleton<IOverlayLivePresence>(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
+        services.AddHostedService(serviceProvider =>
+            serviceProvider.GetRequiredService<OverlayLiveCoordinator>()
+        );
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
