@@ -36,7 +36,7 @@
                 <h2 id="moment-settings-heading" class="text-lg font-semibold">Capture settings</h2>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Field Id="moment-window" Label="Merge window (seconds)" @bind-Value="_mergeWindow" />
-                    <div>
+                    <div class="space-y-2">
                         <label class="label" for="moment-reward-policy">Point reward</label>
                         <select id="moment-reward-policy" class="input" @bind="_rewardPolicy">
                             @foreach (var policy in Enum.GetValues<MomentRewardPolicy>())
@@ -46,7 +46,7 @@
                         </select>
                     </div>
                     <Field Id="moment-reward-amount" Label="Reward amount" @bind-Value="_rewardAmount" />
-                    <div class="moment-setting-toggle">
+                    <div class="moment-setting-toggle grid-rows-[auto_1fr]">
                         <span class="label">Marker fallback</span>
                         <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
                                for="moment-marker-fallback">
