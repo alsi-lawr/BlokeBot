@@ -26,6 +26,7 @@ using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
 using BlokeBot.Core.Features.Moments;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
@@ -74,6 +75,15 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<MomentHubService>();
         services.AddSingleton<IMomentProviderOperations, MomentProviderOperations>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotOverlays(this IServiceCollection services)
+    {
+        services.AddSingleton<IOverlayAccessKeyGenerator, CryptographicOverlayAccessKeyGenerator>();
+        services.AddSingleton<OverlayInstanceService>();
+        services.AddSingleton<OverlayInstanceResolver>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
@@ -469,6 +479,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<WebAuthConfiguration>();
         services.AddTransient<ModeratedChannelLookupService>();
         services.AddSingleton<ModeratorAuthorityService>();
+        services.AddSingleton<IModeratorAuthorityService>(serviceProvider =>
+            serviceProvider.GetRequiredService<ModeratorAuthorityService>()
+        );
         services.AddTransient<WebAuthService>();
         services.AddTransient<WebOAuthClient>();
         services.AddScoped<AuthSessionService>();
