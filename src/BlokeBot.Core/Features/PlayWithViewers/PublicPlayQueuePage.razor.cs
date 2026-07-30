@@ -1,9 +1,15 @@
+using BlokeBot.Core.Auth.Sessions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
 
 public partial class PublicPlayQueuePage
 {
+    [CascadingParameter]
+    private Task<AuthenticationState> _authenticationState { get; set; } =
+        Task.FromResult(new AuthenticationState(new()));
+
     [Parameter]
     public string Channel { get; set; } = string.Empty;
 
@@ -11,6 +17,7 @@ public partial class PublicPlayQueuePage
     public string QueueSlug { get; set; } = string.Empty;
     private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
     private PublicPlayQueueSnapshot? _page;
+    private AuthenticatedSession _session = AuthenticatedSession.Anonymous;
     private string _login = string.Empty;
     private string _feedback = string.Empty;
     private bool _failed;
@@ -19,6 +26,8 @@ public partial class PublicPlayQueuePage
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
+        var authentication = await _authenticationState;
+        _session = AuthenticatedSession.FromPrincipal(authentication.User);
         _page = await _queues.GetPublicPageAsync(Channel, QueueSlug, CancellationToken.None);
         _loading = false;
     }
@@ -35,7 +44,9 @@ public partial class PublicPlayQueuePage
 
     private PlayQueueViewerIdentity Identity()
     {
-        return new(_login);
+        return _session.IsAuthenticated
+            ? new(_session.Login, _session.UserId, _session.DisplayName)
+            : new(PlayQueueInput.NormalizeLogin(_login));
     }
 
     private async Task JoinAsync()

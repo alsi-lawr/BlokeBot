@@ -1,8 +1,12 @@
+using System.Security.Claims;
+using AngleSharp.Dom;
 using BlokeBot.Commands;
+using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Bunit;
+using Bunit.TestDoubles;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -79,6 +83,139 @@ public sealed class PlayQueueCommandAndUiTests
     }
 
     [Test]
+    public async Task PublicPage_AuthenticatedViewerActionsUseOAuthIdentity()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database);
+        var service = new PlayQueueService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        _ = await service.ConfigureAsync(
+            host,
+            Queue("squad") with
+            {
+                Capacity = 1,
+                Fields = [],
+                RoleRequirements = [],
+            },
+            CancellationToken.None
+        );
+        using var context = new BunitContext();
+        context.Services.AddSingleton(service);
+        var authorization = context.AddAuthorization();
+        authorization.SetAuthorized("OAuth Display");
+        authorization.SetClaims(
+            new Claim(ClaimTypes.NameIdentifier, "oauth-user-id"),
+            new Claim(ClaimTypes.Name, "OAuth Display"),
+            new Claim(AuthClaims.Login, "oauth_viewer")
+        );
+
+        var page = RenderPublicPage(context);
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("Signed in with Twitch as"));
+        page.Markup.ShouldContain("OAuth Display");
+        page.Markup.ShouldContain("@oauth_viewer");
+        page.FindAll("#queue-viewer-login").ShouldBeEmpty();
+
+        await page.Find("button.btn-primary").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1."));
+        await AssertIdentityAsync(
+            database,
+            "id:oauth-user-id",
+            "oauth-user-id",
+            "oauth_viewer",
+            "OAuth Display",
+            PlayQueueEntryStatus.Waiting
+        );
+
+        await FindButton(page, "Check position").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1 (Waiting)."));
+
+        var readyCheck = await service.StartReadyCheckAsync(
+            host,
+            await EntryIdAsync(database),
+            CancellationToken.None
+        );
+        readyCheck.ShouldBeOfType<PlayQueueResult<ModeratorPlayQueueEntryView>.Succeeded>();
+        await FindButton(page, "I'm ready").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You are ready."));
+        await AssertIdentityAsync(
+            database,
+            "id:oauth-user-id",
+            "oauth-user-id",
+            "oauth_viewer",
+            "OAuth Display",
+            PlayQueueEntryStatus.Ready
+        );
+
+        var selection = await service.SelectPartyAsync(
+            host,
+            "squad",
+            false,
+            CancellationToken.None
+        );
+        selection.ShouldBeOfType<PlayQueueResult<PlayQueueSelection>.Succeeded>();
+
+        await FindButton(page, "Leave").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You left the queue."));
+        await AssertIdentityAsync(
+            database,
+            "id:oauth-user-id",
+            "oauth-user-id",
+            "oauth_viewer",
+            "OAuth Display",
+            PlayQueueEntryStatus.Left
+        );
+    }
+
+    [Test]
+    public async Task PublicPage_AnonymousViewerRetainsNormalizedLoginFallback()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database);
+        var service = new PlayQueueService(
+            database,
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        _ = await service.ConfigureAsync(
+            host,
+            Queue("squad") with
+            {
+                Fields = [],
+                RoleRequirements = [],
+            },
+            CancellationToken.None
+        );
+        using var context = new BunitContext();
+        context.Services.AddSingleton(service);
+
+        var page = RenderPublicPage(context);
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("anonymous login fallback"));
+        var login = page.Find("#queue-viewer-login");
+        login.GetAttribute("maxlength").ShouldBe("128");
+        await login.InputAsync(" @Fallback_Viewer ");
+        await page.Find("button.btn-primary").ClickAsync(new());
+
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1."));
+        await AssertIdentityAsync(
+            database,
+            "login:fallback_viewer",
+            null,
+            "fallback_viewer",
+            "fallback_viewer",
+            PlayQueueEntryStatus.Waiting
+        );
+        await FindButton(page, "Check position").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You are position 1 (Waiting)."));
+        await FindButton(page, "Leave").ClickAsync(new());
+        page.WaitForAssertion(() => page.Markup.ShouldContain("You left the queue."));
+    }
+
+    [Test]
     public async Task PublicPage_RendersPrivacyRuleAndNoPrivateEntryValues()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -150,6 +287,44 @@ public sealed class PlayQueueCommandAndUiTests
             ],
             [new("Tank", 1)]
         );
+    }
+
+    private static IRenderedComponent<PublicPlayQueuePage> RenderPublicPage(BunitContext context)
+    {
+        return context.Render<PublicPlayQueuePage>(parameters =>
+            parameters
+                .Add(value => value.Channel, "streamer")
+                .Add(value => value.QueueSlug, "squad")
+        );
+    }
+
+    private static IElement FindButton(IRenderedComponent<PublicPlayQueuePage> page, string text)
+    {
+        return page.FindAll("button").Single(button => button.TextContent.Trim() == text);
+    }
+
+    private static async Task AssertIdentityAsync(
+        SqliteBlokeBotDbFactory database,
+        string identityKey,
+        string? twitchUserId,
+        string normalizedLogin,
+        string displayName,
+        PlayQueueEntryStatus status
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var entry = await db.PlayQueueEntries.SingleAsync();
+        entry.IdentityKey.ShouldBe(identityKey);
+        entry.TwitchUserId.ShouldBe(twitchUserId);
+        entry.NormalizedLogin.ShouldBe(normalizedLogin);
+        entry.DisplayName.ShouldBe(displayName);
+        entry.Status.ShouldBe(status);
+    }
+
+    private static async Task<long> EntryIdAsync(SqliteBlokeBotDbFactory database)
+    {
+        await using var db = await database.CreateDbContextAsync();
+        return await db.PlayQueueEntries.Select(entry => entry.Id).SingleAsync();
     }
 
     private static async Task DispatchAsync(

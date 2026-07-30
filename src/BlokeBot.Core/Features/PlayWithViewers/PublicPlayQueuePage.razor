@@ -1,4 +1,5 @@
 @page "/queues/{Channel}/{QueueSlug}"
+@using BlokeBot.Core.Auth.Sessions
 @using Microsoft.AspNetCore.Authorization
 @attribute [AllowAnonymous]
 @inject PlayQueueService _queues
@@ -31,8 +32,32 @@
             <section class="card p-6" aria-labelledby="join-heading">
                 <h2 id="join-heading" class="text-xl font-semibold">Join the queue</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Your entry details are visible only to moderators. Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
+                @if (_session.IsAuthenticated)
+                {
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        Signed in with Twitch as <strong class="text-foreground">@_session.DisplayText</strong>
+                        (@($"@{_session.Login}")). Queue actions use this signed-in Twitch identity.
+                    </p>
+                }
+                else
+                {
+                    <p class="mt-2 text-sm text-muted-foreground">
+                        Not signed in. Enter your Twitch login to use the anonymous login fallback.
+                    </p>
+                }
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
-                    <Field Id="queue-viewer-login" Label="Twitch login" @bind-Value="_login" />
+                    @if (!_session.IsAuthenticated)
+                    {
+                        <div class="field space-y-2" data-field>
+                            <label class="label" for="queue-viewer-login">Twitch login</label>
+                            <input id="queue-viewer-login"
+                                   class="input"
+                                   maxlength="128"
+                                   autocomplete="username"
+                                   value="@_login"
+                                   @oninput="args => _login = args.Value?.ToString() ?? string.Empty" />
+                        </div>
+                    }
                     @foreach (var field in _page.Queue.Fields)
                     {
                         <div>
