@@ -13,7 +13,7 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
-        var ids = await db
+        var expiring = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
                 row.ExpiresAtUtc <= nowUtc
@@ -25,13 +25,14 @@ internal sealed partial class EfPublicChatOutbox
             )
             .OrderBy(row => row.ExpiresAtUtc)
             .ThenBy(row => row.Id)
-            .Select(row => row.Id)
+            .Select(row => new { row.Id, row.DeduplicationKey })
             .Take(_cleanupBatchSize)
             .ToArrayAsync(cancellationToken);
-        if (ids.Length == 0)
+        if (expiring.Length == 0)
         {
             return;
         }
+        var ids = expiring.Select(row => row.Id).ToArray();
 
         _ = await db
             .PublicChatOutboxMessages.Where(row =>
@@ -61,6 +62,22 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.RejectionCode, (string?)null),
                 cancellationToken
             );
+        foreach (var row in expiring)
+        {
+            if (row.DeduplicationKey is null)
+            {
+                continue;
+            }
+            _ = await RecordAutomaticRaidTerminalAsync(
+                db,
+                row.DeduplicationKey,
+                row.Id,
+                AutomaticRaidShoutoutResultCode.NotReady,
+                ToDateTimeOffset(nowUtc),
+                cancellationToken
+            );
+        }
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static Task<int> ExpireOwnedClaimAsync(
@@ -121,13 +138,14 @@ internal sealed partial class EfPublicChatOutbox
         CancellationToken cancellationToken
     )
     {
-        var expiredSendingIds = await db
+        var expiredSending = await db
             .PublicChatOutboxMessages.AsNoTracking()
             .Where(row =>
                 row.Status == PublicChatOutboxStatus.Sending && row.ClaimExpiresAtUtc <= nowUtc
             )
-            .Select(row => row.Id)
+            .Select(row => new { row.Id, row.DeduplicationKey })
             .ToArrayAsync(cancellationToken);
+        var expiredSendingIds = expiredSending.Select(row => row.Id).ToArray();
         if (expiredSendingIds.Length > 0)
         {
             _ = await db
@@ -163,6 +181,21 @@ internal sealed partial class EfPublicChatOutbox
                         ),
                 cancellationToken
             );
+        foreach (var row in expiredSending)
+        {
+            if (row.DeduplicationKey is null)
+            {
+                continue;
+            }
+            _ = await RecordAutomaticRaidTerminalAsync(
+                db,
+                row.DeduplicationKey,
+                row.Id,
+                AutomaticRaidShoutoutResultCode.Ambiguous,
+                ToDateTimeOffset(nowUtc),
+                cancellationToken
+            );
+        }
         await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.Claimed
@@ -193,15 +226,30 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.ClaimExpiresAtUtc, (DateTime?)null),
                 cancellationToken
             );
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private Task ExhaustConfiguredSafePreSendRetriesAsync(
+    private async Task ExhaustConfiguredSafePreSendRetriesAsync(
         BlokeBotDbContext db,
         DateTime nowUtc,
         CancellationToken cancellationToken
     )
     {
-        return db
+        var exhausted = await db
+            .PublicChatOutboxMessages.AsNoTracking()
+            .Where(row =>
+                row.Status == PublicChatOutboxStatus.SafePreSendTransient
+                && row.SafePreSendFailureCount >= _safePreSendRetryPolicy.AttemptLimit
+                && row.ExpiresAtUtc > nowUtc
+            )
+            .Select(row => new
+            {
+                row.Id,
+                row.DeduplicationKey,
+                row.HttpStatusCode,
+            })
+            .ToArrayAsync(cancellationToken);
+        _ = await db
             .PublicChatOutboxMessages.Where(row =>
                 row.Status == PublicChatOutboxStatus.SafePreSendTransient
                 && row.SafePreSendFailureCount >= _safePreSendRetryPolicy.AttemptLimit
@@ -217,6 +265,22 @@ internal sealed partial class EfPublicChatOutbox
                         .SetProperty(row => row.CompletedAtUtc, nowUtc),
                 cancellationToken
             );
+        foreach (var row in exhausted)
+        {
+            if (row.DeduplicationKey is null)
+            {
+                continue;
+            }
+            _ = await RecordAutomaticRaidTerminalAsync(
+                db,
+                row.DeduplicationKey,
+                row.Id,
+                SafePreSendExhaustionResult(row.HttpStatusCode),
+                ToDateTimeOffset(nowUtc),
+                cancellationToken
+            );
+        }
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task PurgeTerminalBatchAsync(

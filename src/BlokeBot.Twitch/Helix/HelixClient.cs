@@ -106,6 +106,56 @@ public sealed class HelixClient(
             : null;
     }
 
+    public async Task<HelixChannelInformationOutcome> GetChannelInformationAsync(
+        HelixRequestContext context,
+        string broadcasterId,
+        CancellationToken cancellationToken
+    )
+    {
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return new HelixChannelInformationOutcome.Invalid();
+        }
+
+        using var request = HelixRequest.Create(
+            HttpMethod.Get,
+            $"{endpointPolicy.HelixEndpoint("channels").AbsoluteUri}?"
+                + QueryString.Create(
+                    new Dictionary<string, string?> { ["broadcaster_id"] = broadcasterId }
+                ),
+            context
+        );
+        try
+        {
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                return new HelixChannelInformationOutcome.PermissionDenied();
+            }
+            if (!response.IsSuccessStatusCode)
+            {
+                return new HelixChannelInformationOutcome.Unavailable();
+            }
+
+            var payload = await response.Content.ReadFromJsonAsync<ChannelInformationResponse>(
+                _jsonOptions,
+                cancellationToken
+            );
+            return payload?.Data.FirstOrDefault() is { } channel
+                ? new HelixChannelInformationOutcome.Found(channel.GameName, channel.Title)
+                : new HelixChannelInformationOutcome.NotFound();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+            when (exception is HttpRequestException or IOException or TimeoutException)
+        {
+            return new HelixChannelInformationOutcome.Unavailable();
+        }
+    }
+
     public async Task<ShoutoutSendResult> SendShoutoutAsync(
         HelixRequestContext context,
         string broadcasterId,
@@ -1254,6 +1304,21 @@ public sealed class HelixClient(
     {
         [JsonPropertyName("data")]
         public required ImmutableArray<StreamItem> Data { get; init; }
+    }
+
+    private sealed record ChannelInformationResponse
+    {
+        [JsonPropertyName("data")]
+        public required ImmutableArray<ChannelInformationItem> Data { get; init; }
+    }
+
+    private sealed record ChannelInformationItem
+    {
+        [JsonPropertyName("game_name")]
+        public string? GameName { get; init; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; init; }
     }
 
     private sealed record FollowerResponse

@@ -2,12 +2,12 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Channels;
+using AngleSharp.Dom;
 using BlokeBot.Core.Auth.Moderation;
 using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
-using BlokeBot.Core.Features.Home;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels;
@@ -53,7 +53,6 @@ public sealed class HostConfigFaultRoutingTests
         SetAdminClaims(testContext.Authorization, hostId);
 
         var page = RenderHostConfigPage(context);
-        await OpenDisclosureAsync(page, "Use your own bot account");
 
         page.WaitForAssertion(() =>
         {
@@ -65,219 +64,146 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
-    public async Task Overview_UnmanageableSelectedChannel_ShowsOwnerRecoveryWithoutActorFallback()
+    public async Task FragmentNavigation_RevealsNamedTargetWithoutDiscardingDirtyStartupMessage()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = new BunitContext();
-        context.JSInterop.Mode = JSRuntimeMode.Loose;
-        context.Services.AddSingleton(TestEventBus.Create<AppEventKind>());
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
         ConfigureHostServices(
             context,
             dbFactory,
             new RecordingLogger<UiFaultTelemetry>(),
             new ManualTimeProvider()
         );
-        context.Services.AddBlokeBotToasts();
-        context.Services.AddSingleton(new BlokeBotPageContextAccessor());
-        var authorization = context.AddAuthorization();
-        authorization.SetAuthorized("moderator");
-        var selected = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Moderator);
-        authorization.SetClaims(
-            TestPrincipals
-                .BlokeBotUser(
-                    "moderator",
-                    role: AuthRole.Moderator,
-                    availableHosts: [selected],
-                    selectedHost: selected
-                )
-                .Claims.ToArray()
+        var module = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
+        module.SetupVoid("focusElement", _ => true).SetVoidResult();
+        var fragmentModule = context.JSInterop.SetupModule(
+            "./Features/HostConfig/Page/HostConfigFragmentObserver.razor.js"
         );
+        fragmentModule.SetupVoid("observe", _ => true).SetVoidResult();
+        fragmentModule.SetupVoid("dispose", _ => true).SetVoidResult();
+        var navigation = context.Services.GetRequiredService<NavigationManager>();
+        navigation.NavigateTo("/host");
 
-        var page = context.Render<HomePage>();
+        var page = RenderHostConfigPage(context);
+        var observer = page.FindComponent<HostConfigFragmentObserver>();
 
-        page.WaitForAssertion(() =>
+        page.Find("#startup-chat-message").Input("unsaved startup message");
+        foreach (var fragment in new[] { "chat-tools", "moderator-help", "bot-status" })
         {
-            page.Markup.ShouldContain("Switch to your own channel");
-            page.Markup.ShouldNotContain("Create your channel setup");
-            page.Markup.ShouldNotContain("Connect Twitch chat");
-            page.Markup.ShouldNotContain("Start bot");
-        });
+            await observer.InvokeAsync(() =>
+                observer.Instance.NotifyFragmentChangedAsync(
+                    $"http://localhost/host?simulationTheme=light#{fragment}"
+                )
+            );
 
-        var noSelection = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
-        await using (var noSelectionContext = noSelection.Context)
-        {
-            ConfigureHostServices(
-                noSelectionContext,
-                dbFactory,
-                new RecordingLogger<UiFaultTelemetry>(),
-                new ManualTimeProvider()
-            );
-            var available = new BotHostChoice(hostId, "streamer", "Streamer", AuthRole.Streamer);
-            noSelection.Authorization.SetClaims(
-                TestPrincipals
-                    .BlokeBotUser("streamer", availableHosts: [available])
-                    .Claims.ToArray()
-            );
-            var noSelectionPage = noSelectionContext.Render<HomePage>();
-            noSelectionPage.WaitForAssertion(() =>
+            page.WaitForAssertion(() =>
             {
-                noSelectionPage.Markup.ShouldContain("Choose a channel");
-                noSelectionPage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
+                page.Find("#startup-chat-message")
+                    .GetAttribute("value")
+                    .ShouldBe("unsaved startup message");
+                module
+                    .Invocations.Count(invocation =>
+                        invocation.Identifier == "focusElement"
+                        && invocation.Arguments.Single()?.ToString() == fragment
+                    )
+                    .ShouldBe(1);
             });
         }
 
-        await using (var noneFactory = await SqliteBlokeBotDbFactory.CreateAsync())
-        await using (var noneContext = UiTestContextFactory.Create(noneFactory, 999))
-        {
-            ConfigureHostServices(
-                noneContext,
-                noneFactory,
-                new RecordingLogger<UiFaultTelemetry>(),
-                new ManualTimeProvider()
-            );
-            var nonePage = noneContext.Render<HomePage>();
-            nonePage.WaitForAssertion(() =>
-            {
-                nonePage.Markup.ShouldContain("Choose a channel");
-                nonePage.FindAll("a.btn-primary, a.btn-secondary").ShouldBeEmpty();
-            });
-        }
-
-        await using (var retryInner = await SqliteBlokeBotDbFactory.CreateAsync())
-        {
-            var retryHostId = await SeedHostAsync(retryInner);
-            await using (var db = await retryInner.CreateDbContextAsync())
-            {
-                var host = await db.Hosts.FindAsync(retryHostId);
-                host!.ChannelBotAuthorizedAtUtc = DateTime.UtcNow;
-                host.ChannelBotAuthorizedScopes = "chat:read";
-                host.BotRuntimeState = BotChannelRuntimeState.Stopped;
-                await db.SaveChangesAsync();
-            }
-            var retryTest = UiTestContextFactory.CreateWithAuthorization(retryInner, retryHostId);
-            await using var retryContext = retryTest.Context;
-            var controlled = new ControlledDbFactory(retryInner) { Fail = true };
-            ConfigureHostServices(
-                retryContext,
-                controlled,
-                new RecordingLogger<UiFaultTelemetry>(),
-                new ManualTimeProvider(),
-                ["chat:read"]
-            );
-            var retryPage = retryContext.Render<HomePage>();
-            retryPage.WaitForAssertion(() =>
-                retryPage.Find("[role='alert']").TextContent.ShouldContain("overview load failed")
-            );
-            controlled.Fail = false;
-            retryPage.Find("[role='alert'] button").Click();
-            retryPage.WaitForAssertion(() =>
-            {
-                retryPage.FindAll("[role='alert']").ShouldBeEmpty();
-                retryPage
-                    .FindAll("a")
-                    .Select(anchor => anchor.TextContent.Trim())
-                    .Where(text => text == "Start bot")
-                    .ShouldBe(["Start bot"]);
-            });
-        }
-
-        foreach (
-            var (authorized, scopes, runtime, expected) in new[]
-            {
-                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
-                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
-                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
-                (true, "chat:read", BotChannelRuntimeState.Starting, "Review Channel setup"),
-                (true, "chat:read", BotChannelRuntimeState.Started, "Review Channel setup"),
-            }
-        )
-        {
-            await using var ownerDbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-            var ownerHostId = await SeedHostAsync(ownerDbFactory);
-            await using (var db = await ownerDbFactory.CreateDbContextAsync())
-            {
-                var host = await db.Hosts.FindAsync(ownerHostId);
-                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
-                host.ChannelBotAuthorizedScopes = scopes;
-                host.BotRuntimeState = runtime;
-                host.BotRuntimeStateChangedAtUtc = runtime
-                    is BotChannelRuntimeState.Starting
-                        or BotChannelRuntimeState.Started
-                    ? DateTime.UtcNow
-                    : null;
-                await db.SaveChangesAsync();
-            }
-            await using var ownerContext = UiTestContextFactory.Create(ownerDbFactory, ownerHostId);
-            ConfigureHostServices(
-                ownerContext,
-                ownerDbFactory,
-                new RecordingLogger<UiFaultTelemetry>(),
-                new ManualTimeProvider(),
-                ["chat:read"]
-            );
-            var ownerPage = ownerContext.Render<HomePage>();
-            ownerPage.WaitForAssertion(() =>
-            {
-                var actions = ownerPage
-                    .FindAll("a")
-                    .Select(anchor => anchor.TextContent.Trim())
-                    .Where(text =>
-                        new[]
-                        {
-                            "Connect bot",
-                            "Reconnect bot",
-                            "Start bot",
-                            "Review Channel setup",
-                        }.Contains(text)
-                    );
-                actions.ShouldBe([expected]);
-            });
-        }
+        page.Find("#chat-tools").GetAttribute("aria-label").ShouldBe("Chat tools");
+        page.Find("#moderator-help").GetAttribute("aria-label").ShouldBe("Moderator help");
+        page.Find("#bot-status").GetAttribute("aria-label").ShouldBe("Bot status");
+        fragmentModule
+            .Invocations.Count(invocation => invocation.Identifier == "observe")
+            .ShouldBe(1);
     }
 
     [Test]
-    public async Task Readiness_CurrentAction_IsExclusiveAcrossAuthorizationAndRuntimeStates()
+    public async Task NativeTwitchCard_Toggling_UpdatesThePersistedHostFeatureSwitch()
     {
-        foreach (
-            var (authorized, scopes, runtime, expected) in new[]
-            {
-                (false, (string?)null, BotChannelRuntimeState.Stopped, "Connect bot"),
-                (true, "", BotChannelRuntimeState.Started, "Reconnect bot"),
-                (true, "chat:read", BotChannelRuntimeState.Stopped, "Start bot"),
-                (true, "chat:read", BotChannelRuntimeState.Starting, "Stop bot"),
-                (true, "chat:read", BotChannelRuntimeState.Started, "Stop bot"),
-            }
-        )
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+
+        var page = RenderHostConfigPage(context);
+        page.WaitForAssertion(() =>
         {
-            await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-            var hostId = await SeedHostAsync(dbFactory);
-            await using (var db = await dbFactory.CreateDbContextAsync())
-            {
-                var host = await db.Hosts.FindAsync(hostId);
-                host!.ChannelBotAuthorizedAtUtc = authorized ? DateTime.UtcNow : null;
-                host.ChannelBotAuthorizedScopes = scopes;
-                host.BotRuntimeState = runtime;
-                host.BotRuntimeStateChangedAtUtc = runtime
-                    is BotChannelRuntimeState.Starting
-                        or BotChannelRuntimeState.Started
-                    ? DateTime.UtcNow
-                    : null;
-                await db.SaveChangesAsync();
-            }
-            await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-            ConfigureHostServices(
-                context,
-                dbFactory,
-                new RecordingLogger<UiFaultTelemetry>(),
-                new ManualTimeProvider(),
-                ["chat:read"]
+            var nativeTwitch = FindNativeTwitchFeatureButton(page);
+            nativeTwitch.HasAttribute("aria-pressed").ShouldBeTrue();
+            nativeTwitch.TextContent.ShouldContain(
+                "Use shoutouts, polls, clips, and stream markers."
             );
-            var page = RenderHostConfigPage(context);
-            page.WaitForAssertion(() => AssertCurrentReadinessAction(page, expected, 0));
-            await OpenDisclosureAsync(page, "Connection diagnostics");
-            AssertCurrentReadinessAction(page, expected, authorized ? 1 : 0);
-        }
+        });
+        page.Find("#startup-chat-message").Input("unsaved Native switch draft");
+
+        await page.InvokeAsync(() => FindNativeTwitchFeatureButton(page).ClickAsync(new()));
+
+        page.WaitForAssertion(() =>
+        {
+            FindNativeTwitchFeatureButton(page).HasAttribute("aria-pressed").ShouldBeFalse();
+            page.Find("#startup-chat-message")
+                .GetAttribute("value")
+                .ShouldBe("unsaved Native switch draft");
+        });
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var enabled = await verify
+            .Hosts.Where(host => host.Id == hostId)
+            .Select(host => host.EnabledFeatures)
+            .SingleAsync();
+        enabled.Contains(HostFeatureFlags.NativeTwitch).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task UnavailableAuthority_PolicyModeRemainsUnchangedUntilSameChoiceCanBeSaved()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        var clock = new ManualTimeProvider();
+        var tokens = new ScriptedAppAccessTokenSource();
+        tokens.Enqueue(Task.FromException<string>(new TimeoutException()));
+        tokens.Enqueue(Task.FromResult("app-token"));
+        ConfigureHostServices(context, dbFactory, new RecordingLogger<UiFaultTelemetry>(), clock);
+        ConfigureModeratorAuthorityServices(context, tokens);
+
+        var page = RenderHostConfigPage(context);
+        SetModeratorClaims(testContext.Authorization, hostId);
+
+        await ClickAccessModeAsync(page, "Allowed list only");
+
+        AssertAccessMode(page, allowModsByDefault: true);
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+
+        var saved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var savedSubscription = context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .Subscribe(
+                AppEventKind.HostedChannelsChanged,
+                ObserverIdentity.Named("Test.HostConfig.UnavailableAuthority"),
+                (_, _) =>
+                {
+                    saved.TrySetResult();
+                    return ValueTask.CompletedTask;
+                }
+            );
+        await ClickAccessModeAsync(page, "Allowed list only");
+        AssertAccessMode(page, allowModsByDefault: false);
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+        await saved.Task;
+        AssertAccessMode(page, allowModsByDefault: false);
+        (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeFalse();
     }
 
     [Test]
@@ -298,19 +224,60 @@ public sealed class HostConfigFaultRoutingTests
         SetModeratorClaims(testContext.Authorization, hostId);
 
         var firstClick = ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(1));
+        await first.Started.Task;
         var secondClick = ClickAccessModeAsync(page, "Allowed list only");
-        page.WaitForAssertion(() => tokens.RequestCount.ShouldBe(2));
+        await second.Started.Task;
         await ClickAccessModeAsync(page, "All mods");
 
-        second.SetResult("app-token");
+        second.Completion.SetResult("app-token");
         await secondClick;
-        first.SetResult("app-token");
+        first.Completion.SetResult("app-token");
         await firstClick;
 
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        AssertAccessMode(page, allowModsByDefault: true);
         clock.Advance(TimeSpan.FromMilliseconds(180));
         (await ReadAllowModsByDefaultAsync(dbFactory, hostId)).ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task DetachedSave_Faulting_RedactsTelemetryAndReachesErrorBoundary()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var faultingDbFactory = new FaultingDbContextFactory(dbFactory);
+        var logger = new RecordingLogger<UiFaultTelemetry>();
+        var clock = new ManualTimeProvider();
+        ConfigureHostServices(context, faultingDbFactory, logger, clock);
+        context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
+        RenderFragment content = builder =>
+        {
+            builder.OpenComponent<HostConfigPage>(0);
+            builder.CloseComponent();
+        };
+        var boundary = context.Render<CapturingErrorBoundary>(parameters =>
+            parameters.Add(x => x.ChildContent, content)
+        );
+        await ClickAccessModeAsync(boundary, "Allowed list only");
+        const string SensitiveMessage = "secret-host-config-failure";
+        var exception = new InvalidOperationException(SensitiveMessage);
+        faultingDbFactory.Failure = exception;
+
+        clock.Advance(TimeSpan.FromMilliseconds(180));
+
+        boundary.WaitForAssertion(
+            () => boundary.Instance.CapturedException.ShouldBeSameAs(exception),
+            TimeSpan.FromSeconds(5)
+        );
+        var entry = logger.Entries.ShouldHaveSingleItem();
+        entry.Level.ShouldBe(LogLevel.Error);
+        entry.Exception.ShouldBeNull();
+        entry.Properties["UiComponent"].ShouldBe(nameof(HostConfigPage));
+        entry.Properties["UiOperation"].ShouldBe("PersistAllowModsByDefaultAsync");
+        entry.Properties["HostId"].ShouldBe(hostId);
+        entry.Properties["FailureType"].ShouldBe(typeof(InvalidOperationException).FullName);
+        entry.Message.ShouldNotContain(SensitiveMessage);
+        context.Services.GetRequiredService<ToastService>().Current.ShouldBeEmpty();
     }
 
     [Test]
@@ -324,8 +291,7 @@ public sealed class HostConfigFaultRoutingTests
         BunitContext context,
         IDbContextFactory<BlokeBotDbContext> dbFactory,
         ILogger<UiFaultTelemetry> logger,
-        TimeProvider clock,
-        string[]? channelScopes = null
+        TimeProvider clock
     )
     {
         context.Services.AddSingleton(dbFactory);
@@ -334,19 +300,7 @@ public sealed class HostConfigFaultRoutingTests
             Options.Create(new BlokeBotOptions())
         );
         context.Services.AddSingleton(BotSettings.FromOptions(new BotOptions()));
-        context.Services.AddSingleton<IConfiguration>(
-            new ConfigurationBuilder()
-                .AddInMemoryCollection(
-                    (channelScopes ?? []).Select(
-                        (scope, index) =>
-                            new KeyValuePair<string, string?>(
-                                "TwitchBot:ChannelAuthorization:Scopes:" + index,
-                                scope
-                            )
-                    )
-                )
-                .Build()
-        );
+        context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         context.Services.AddOAuthTransport();
         context.Services.AddHelix();
         context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
@@ -441,7 +395,7 @@ public sealed class HostConfigFaultRoutingTests
         clock.Advance(TimeSpan.FromMilliseconds(180));
         _ = await toastPublished.Reader.ReadAsync();
 
-        page.WaitForAssertion(() => AssertAccessMode(page, allowModsByDefault: true));
+        await page.InvokeAsync(() => AssertAccessMode(page, allowModsByDefault: true));
         page.Markup.ShouldContain("allowedmod");
         page.Markup.ShouldContain("blockedmod");
         var moderatorToggle = page.FindAll("label")
@@ -469,73 +423,31 @@ public sealed class HostConfigFaultRoutingTests
         }
     }
 
-    private static void AssertCurrentReadinessAction(
-        IRenderedComponent<HostConfigPage> page,
-        string expected,
-        int expectedDisconnects
-    )
-    {
-        var labels = new[] { "Connect bot", "Reconnect bot", "Start bot", "Stop bot" };
-        page.FindAll("button")
-            .Where(button => labels.Contains(button.TextContent.Trim()))
-            .Select(button => button.TextContent.Trim())
-            .ShouldBe([expected]);
-        page.FindAll("button")
-            .Count(button => button.TextContent.Trim() == "Disconnect")
-            .ShouldBe(expectedDisconnects);
-    }
-
     private static IRenderedComponent<HostConfigPage> RenderHostConfigPage(BunitContext context)
     {
         context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         return context.Render<HostConfigPage>();
     }
 
-    private static async Task ClickAccessModeAsync<TComponent>(
+    private static IElement FindNativeTwitchFeatureButton(IRenderedComponent<HostConfigPage> page)
+    {
+        return page.FindAll("#chat-tools button")
+            .Single(button =>
+                button.TextContent.Contains("Native Twitch", StringComparison.Ordinal)
+            );
+    }
+
+    private static Task ClickAccessModeAsync<TComponent>(
         IRenderedComponent<TComponent> page,
         string text
     )
         where TComponent : IComponent
     {
-        await OpenDisclosureAsync(page, "Moderator help");
-        await page.InvokeAsync(() =>
+        return page.InvokeAsync(() =>
             page.FindAll("button")
                 .Single(button => button.TextContent.Trim() == text)
                 .ClickAsync(new())
         );
-    }
-
-    private static async Task OpenDisclosureAsync<TComponent>(
-        IRenderedComponent<TComponent> page,
-        string title
-    )
-        where TComponent : IComponent
-    {
-        page.WaitForAssertion(() =>
-            page.FindAll("button.disclosure-trigger")
-                .Count(button => button.TextContent.Contains(title, StringComparison.Ordinal))
-                .ShouldBe(1)
-        );
-        var trigger = page.FindAll("button.disclosure-trigger")
-            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal));
-        var contentId = trigger.GetAttribute("aria-controls");
-        contentId.ShouldNotBeNullOrWhiteSpace();
-        var content = page.Find($"#{contentId}");
-        if (!content.HasAttribute("hidden"))
-        {
-            return;
-        }
-
-        await page.InvokeAsync(() =>
-            page.FindAll("button.disclosure-trigger")
-                .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
-                .ClickAsync(new())
-        );
-        page.Find($"#{contentId}").HasAttribute("hidden").ShouldBeFalse();
-        page.FindAll("button.disclosure-trigger")
-            .Single(button => button.TextContent.Contains(title, StringComparison.Ordinal))
-            .GetAttribute("aria-expanded")
-            .ShouldBe("true");
     }
 
     private static void AssertAccessMode<TComponent>(
@@ -620,46 +532,43 @@ public sealed class HostConfigFaultRoutingTests
         return host.Id;
     }
 
-    private sealed class ControlledDbFactory(SqliteBlokeBotDbFactory inner)
+    private sealed class FaultingDbContextFactory(IDbContextFactory<BlokeBotDbContext> innerFactory)
         : IDbContextFactory<BlokeBotDbContext>
     {
-        public bool Fail { get; set; }
+        public Exception? Failure { get; set; }
 
         public BlokeBotDbContext CreateDbContext()
         {
-            return CreateDbContextAsync().GetAwaiter().GetResult();
+            return Failure is null ? innerFactory.CreateDbContext() : throw Failure;
         }
 
-        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+        public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
         )
         {
-            if (Fail)
-            {
-                throw new InvalidOperationException("overview load failed");
-            }
-
-            return await inner.CreateDbContextAsync(cancellationToken);
+            return Failure is null
+                ? new ValueTask<BlokeBotDbContext>(
+                    innerFactory.CreateDbContextAsync(cancellationToken)
+                )
+                : ValueTask.FromException<BlokeBotDbContext>(Failure);
         }
     }
 
     private sealed class ScriptedAppAccessTokenSource : IHostBotAppAccessTokenSource
     {
-        private readonly Queue<Task<string>> _tokens = [];
+        private readonly Queue<ScriptedTokenRequest> _tokens = [];
 
         public int RequestCount { get; private set; }
 
         public void Enqueue(Task<string> token)
         {
-            _tokens.Enqueue(token);
+            _tokens.Enqueue(new(token, null));
         }
 
-        public TaskCompletionSource<string> EnqueuePending()
+        public PendingTokenRequest EnqueuePending()
         {
-            var pending = new TaskCompletionSource<string>(
-                TaskCreationOptions.RunContinuationsAsynchronously
-            );
-            _tokens.Enqueue(pending.Task);
+            var pending = new PendingTokenRequest();
+            _tokens.Enqueue(new(pending.Completion.Task, pending.Started));
             return pending;
         }
 
@@ -667,8 +576,24 @@ public sealed class HostConfigFaultRoutingTests
         {
             RequestCount++;
             cancellationToken.ThrowIfCancellationRequested();
-            return _tokens.Dequeue();
+            var request = _tokens.Dequeue();
+            request.Started?.TrySetResult();
+            return request.Completion;
         }
+
+        public sealed class PendingTokenRequest
+        {
+            public TaskCompletionSource Started { get; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource<string> Completion { get; } =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        private sealed record ScriptedTokenRequest(
+            Task<string> Completion,
+            TaskCompletionSource? Started
+        );
     }
 
     private sealed class ModeratedChannelsHttpClientFactory : IHttpClientFactory

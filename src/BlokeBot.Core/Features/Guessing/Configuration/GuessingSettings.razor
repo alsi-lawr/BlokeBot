@@ -12,59 +12,53 @@
 
 <PageTitle>BlokeBot | Guessing Settings</PageTitle>
 
-<DashboardPage Kicker="Chat tools"
-               Title="Configure guessing"
-               Description="Choose round types, answers, chat commands, and the replies viewers receive." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadAsync">
-    <Actions>
+<div class="mx-auto max-w-7xl space-y-6">
+    <PageHeader Title="Round settings"
+                Description="Choose game types, answers, chat commands, and what the bot says.">
         <button class="btn-primary" disabled="@(!_featureEnabled || _config is null)" @onclick="SaveAsync">Save changes</button>
-    </Actions>
+    </PageHeader>
 
-    <ChildContent>
     @if (Host is null)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose guessing settings you want to configure from the top bar." />
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (!_featureEnabled)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on guessing" Description="Guessing is off for this channel. Turn it on in Channel setup before changing its settings.">
-            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
-        </PageState>
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
     else if (_config is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading guessing settings" Description="Loading guessing settings..." />
+        <div class="card p-8 text-sm text-muted-foreground">Loading guessing settings...</div>
     }
     else
     {
-        <TaskSelectionScope PreferenceKey="guessing-settings" DefaultTask="round-types">
+        <div class="settings-disclosure-stack">
         <div id="profiles">
-            <ProfileSettingsSection TaskKey="round-types" Configuration="_config"
+            <ProfileSettingsSection Configuration="_config"
                                     CreateProfile="CreateProfileAsync"
                                     DeleteProfile="DeleteProfileAsync"
                                     SelectProfile="SelectProfileAsync"
                                     @bind-NewProfileName="_newProfileName" />
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div class="settings-disclosure-stack xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div id="aliases">
-                <CommandAliasSettingsSection Aliases="_config.Aliases" TaskKey="commands" />
+                <CommandAliasSettingsSection Aliases="_config.Aliases" />
             </div>
 
-            <GuessOptionsSettingsSection TaskKey="answers" Options="_config.Profile.Options"
+            <GuessOptionsSettingsSection Options="_config.Profile.Options"
                                          WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                          @bind-WhisperAnswerReplies="_config.Profile.WhisperAnswerReplies"
                                          AddOption="AddOption"
                                          RemoveOption="RemoveOption" />
         </div>
 
-        <div id="replies">
-            <ReplySettingsSection Replies="_config.Profile.Replies" TaskKey="replies" />
-            <CollapsibleSection Title="Reply delivery" Description="Choose where viewers receive replies." TaskKey="delivery" InitiallyOpen="false">
+        <div id="replies" class="settings-disclosure-stack">
+            <ReplySettingsSection Replies="_config.Profile.Replies" />
             <ReplyDeliverySettingsSection Delivery="_config.ReplyDelivery"
                                           WhisperResponsesEnabled="_config.WhisperResponsesEnabled"
                                           Options="_whisperReplyOptions" />
-            </CollapsibleSection>
-            <CollapsibleSection Title="Round start pin" Description="Pin the confirmed round-start reply in Twitch chat." TaskKey="pin" InitiallyOpen="false">
+            <section class="card space-y-4 p-6" aria-labelledby="round-start-pin-title">
                 <div>
                     <h2 id="round-start-pin-title" class="text-lg font-bold">Round start pin</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Pin the confirmed round-start reply in Twitch chat.</p>
@@ -84,12 +78,11 @@
                         Remove this pin when the round stops
                     </label>
                 }
-            </CollapsibleSection>
+            </section>
         </div>
-        </TaskSelectionScope>
+        </div>
     }
-    </ChildContent>
-</DashboardPage>
+</div>
 
 @if (_pendingProfileId is not null)
 {

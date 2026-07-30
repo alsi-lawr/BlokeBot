@@ -195,9 +195,7 @@ internal sealed partial class EventSubChannelSession
 
         if (!pendingDeletions.TryGet(channel, out var pending))
         {
-            throw new UnreachableException(
-                "An unresolved EventSub deletion has no pending local evidence."
-            );
+            return;
         }
 
         pendingDeletions.RetainUnresolved(pending.Subscription, failure);

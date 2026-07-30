@@ -14,8 +14,11 @@ internal interface IEventSubChannelOperations
         EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        EventSubOperationSubscriptionKind? operationKind = null
     );
+
+    ValueTask<bool> NativeTwitchIsEnabledAsync(string channel, CancellationToken cancellationToken);
 
     ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
         string channel,

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using BlokeBot.Core.Features.Alerts;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -15,13 +16,19 @@ public sealed class PollService(
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    DurableAlertService alerts
-) : IPollEventObserver
+    DurableAlertService alerts,
+    NativeTwitchFeatureGate nativeTwitch
+) : IPollEventObserver, IPollDashboardOperations
 {
     private const int _resultsToKeep = 100;
 
     public async Task<PollDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new(new PollAuthorizationReadiness.Disabled(), null, [], []);
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var readiness = await ReadinessAsync(hostId, ct);
         var active = await db
@@ -54,6 +61,11 @@ public sealed class PollService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var validation = draft.Validate();
         if (validation is PollTemplateValidationOutcome.Invalid invalid)
         {
@@ -61,6 +73,19 @@ public sealed class PollService(
         }
         var valid = ((PollTemplateValidationOutcome.Valid)validation).Draft;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        if (
+            !await db.Hosts.AnyAsync(
+                host =>
+                    host.Id == hostId
+                    && (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
+                        == HostFeatureFlags.NativeTwitch,
+                ct
+            )
+        )
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var template = new TwitchPollTemplate
         {
             HostId = hostId,
@@ -90,6 +115,11 @@ public sealed class PollService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
         {
@@ -106,6 +136,10 @@ public sealed class PollService(
         {
             return new PollOperationOutcome.TemplateNotFound();
         }
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
         if (
             await db.TwitchPolls.AnyAsync(
                 x => x.HostId == hostId && x.Status == TwitchPollStatus.Active,
@@ -115,6 +149,11 @@ public sealed class PollService(
         {
             return new PollOperationOutcome.ActivePollExists();
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var provider = await helix.CreatePollAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
             host.TwitchUserId!,
@@ -150,6 +189,11 @@ public sealed class PollService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
         {
@@ -167,10 +211,19 @@ public sealed class PollService(
         {
             return new PollOperationOutcome.ProviderRejected("There is no active poll to end.");
         }
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
         if (active.IsExternallyStarted && !confirmedExternal)
         {
             return new PollOperationOutcome.ConfirmationRequired();
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new PollOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var provider = await helix.EndPollAsync(
             new HelixRequestContext(settings.Identity.ClientId, token),
             host.TwitchUserId!,
@@ -214,6 +267,11 @@ public sealed class PollService(
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return;
+        }
+
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
         {
@@ -221,7 +279,15 @@ public sealed class PollService(
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
-        if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
+        if (
+            host?.TwitchUserId is not { Length: > 0 } broadcasterId
+            || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
+        )
+        {
+            return;
+        }
+
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
             return;
         }
@@ -231,6 +297,11 @@ public sealed class PollService(
             broadcasterId,
             ct
         );
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return;
+        }
+
         var changed = provider switch
         {
             HelixPollLookupOutcome.Found found => Upsert(db, hostId, found.Poll, true).Changed,
@@ -254,7 +325,25 @@ public sealed class PollService(
 
     public async Task RecordProviderUpdateAsync(int hostId, HelixPoll poll, CancellationToken ct)
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        if (
+            !await db.Hosts.AnyAsync(
+                host =>
+                    host.Id == hostId
+                    && (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
+                        == HostFeatureFlags.NativeTwitch,
+                ct
+            )
+        )
+        {
+            return;
+        }
+
         var upsert = Upsert(db, hostId, poll, true);
         if (!upsert.Changed)
         {
@@ -278,7 +367,7 @@ public sealed class PollService(
                 || x.Login == Login.Normalize(poll.BroadcasterUserLogin),
             ct
         );
-        if (host is null)
+        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
         {
             return;
         }
@@ -289,6 +378,11 @@ public sealed class PollService(
             "TERMINATED" => HelixPollStatus.Terminated,
             _ => HelixPollStatus.Archived,
         };
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, ct))
+        {
+            return;
+        }
+
         var upsert = Upsert(
             db,
             host.Id,

@@ -227,6 +227,7 @@ public partial class HostConfigPage
     {
         if (disposing)
         {
+            _navigation.LocationChanged -= OnLocationChanged;
             _allowModsByDefaultSaves.Dispose();
         }
 

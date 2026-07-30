@@ -130,6 +130,45 @@ internal sealed partial class EventSubChannelSession(
         await work;
     }
 
+    internal async Task TriggerReconciliationAndDrainAsync(
+        IReadOnlyList<string> desiredChannels,
+        EventSubChannelRecoveryTrigger trigger,
+        CancellationToken cancellationToken
+    )
+    {
+        var desired = BotChannelList.Normalize(desiredChannels);
+        while (true)
+        {
+            Task work;
+            var scheduled = false;
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (!_started)
+                {
+                    throw new InvalidOperationException(
+                        "EventSub channel recovery must start before reconciliation is triggered."
+                    );
+                }
+
+                if (_currentWork.IsCompleted)
+                {
+                    _currentWork.GetAwaiter().GetResult();
+                    ScheduleLocked(token => RunReconciliationAsync(desired, trigger, token));
+                    scheduled = true;
+                }
+
+                work = _currentWork;
+            }
+
+            await work.WaitAsync(cancellationToken);
+            if (scheduled)
+            {
+                return;
+            }
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         Task work;

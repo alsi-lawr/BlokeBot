@@ -3,6 +3,7 @@ using System.Net;
 using System.Text;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Predictions;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -11,6 +12,7 @@ using BlokeBot.Testing;
 using BlokeBot.Twitch;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using TUnit.Core;
@@ -75,26 +77,256 @@ public sealed class PredictionServiceTests
         ).Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Ready>();
     }
 
-    private static PredictionService CreateService(
-        IDbContextFactory<BlokeBotDbContext> database,
-        PredictionHandler handler
-    )
+    [Test]
+    public async Task NativeGate_DisabledSuppressesLoadsMutationsReconciliationAndInboundWrites()
     {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        await SetNativeAsync(database, false);
+        var handler = new PredictionHandler { BroadcasterType = "affiliate" };
+        var service = CreateService(database, handler);
+
+        var state = await service.LoadAsync(host.Id, CancellationToken.None);
+        var mutation = await service.SaveTemplateAsync(
+            host.Id,
+            ValidTemplate(),
+            CancellationToken.None
+        );
+        await service.ReconcileAsync(host.Id, CancellationToken.None);
+        await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
+
+        state.Authorization.ShouldBeOfType<PredictionAuthorizationReadiness.Disabled>();
+        state.ActivePrediction.ShouldBeNull();
+        state.Templates.ShouldBeEmpty();
+        state.Results.ShouldBeEmpty();
+        mutation
+            .ShouldBeOfType<PredictionOperationOutcome.NotReady>()
+            .Message.ShouldBe(NativeTwitchFeatureGate.DisabledMessage);
+        handler.Requests.ShouldBeEmpty();
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.TwitchPredictionTemplates.ToArrayAsync()).ShouldBeEmpty();
+        (await verify.TwitchPredictions.ToArrayAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task QueuedPredictionProgress_RechecksGateBeforeDelayedWrite()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        var handler = new PredictionHandler();
+        var clock = new ManualTestTimeProvider(
+            new DateTimeOffset(2026, 7, 29, 12, 0, 0, TimeSpan.Zero)
+        );
+        var service = CreateService(database, handler, clock);
+        var flushDecision = service.ObserveNextProgressFlushAsync(host.Id);
+
+        await service.PredictionReceivedAsync(Event("active"), CancellationToken.None);
+        _ = await clock.WaitForTimerRegistrationAsync();
+        await SetNativeAsync(database, false);
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        (await flushDecision.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(
+            PredictionProgressFlushDecision.SkippedNativeTwitchDisabled
+        );
+
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.TwitchPredictions.ToArrayAsync()).ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task ProductionRegistration_UsesSystemTimeAndPreservesPublicConstruction()
+    {
+        var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var events = TestEventBus.Create<AppEventKind>();
-        return new PredictionService(
-            database,
-            new ReadyBroadcaster(),
+        var handler = new PredictionHandler();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(database);
+        services.AddSingleton<IHostBroadcasterTokenStatusProvider>(new ReadyBroadcaster());
+        services.AddSingleton(
             new HelixClient(
                 new SingleHandlerFactory(handler),
                 global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
-            ),
+            )
+        );
+        services.AddSingleton(
             BotSettings.FromOptions(
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
-            ),
-            events,
-            new DurableAlertService(database, TimeProvider.System, events),
-            NullLogger<PredictionService>.Instance
+            )
         );
+        services.AddSingleton(events);
+        services.AddSingleton(new DurableAlertService(database, TimeProvider.System, events));
+        services.AddBlokeBotTwitchOperations();
+        await using var provider = services.BuildServiceProvider();
+
+        var service = provider.GetRequiredService<PredictionService>();
+
+        service.ProgressTimeProvider.ShouldBeSameAs(TimeProvider.System);
+        provider.GetRequiredService<IPredictionEventObserver>().ShouldBeSameAs(service);
+        typeof(PredictionService)
+            .GetConstructors()
+            .ShouldHaveSingleItem()
+            .GetParameters()
+            .Length.ShouldBe(8);
+    }
+
+    [Test]
+    public async Task ProviderAcceptedPrediction_IsPersistedWhenDisableRacesAfterProviderWork()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        var handler = new PredictionHandler
+        {
+            BroadcasterType = "affiliate",
+            AfterPredictionCreated = () => SetNativeAsync(database, false),
+        };
+        var service = CreateService(database, handler);
+        var saved = await service.SaveTemplateAsync(
+            host.Id,
+            ValidTemplate(),
+            CancellationToken.None
+        );
+        var templateId = saved
+            .ShouldBeOfType<PredictionOperationOutcome.TemplateSaved>()
+            .Template.Id;
+
+        var outcome = await service.StartAsync(host.Id, templateId, CancellationToken.None);
+
+        outcome.ShouldBeOfType<PredictionOperationOutcome.Started>();
+        await using var verify = await database.CreateDbContextAsync();
+        (await verify.TwitchPredictions.ToArrayAsync())
+            .ShouldHaveSingleItem()
+            .ProviderPredictionId.ShouldBe("prediction-id");
+        (
+            (await verify.Hosts.SingleAsync()).EnabledFeatures & HostFeatureFlags.NativeTwitch
+        ).ShouldBe(HostFeatureFlags.None);
+    }
+
+    [Test]
+    [Arguments(true, 102, 101)]
+    [Arguments(false, 100, 99)]
+    public async Task ProviderAcceptedPredictionEnd_PersistsOutcomeAndOnlyTrimsWhileEnabled(
+        bool disableAfterProvider,
+        int expectedTotal,
+        int expectedHistory
+    )
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "first", "first-id");
+        await using (var db = await database.CreateDbContextAsync())
+        {
+            for (var index = 0; index < 101; index++)
+            {
+                db.TwitchPredictions.Add(
+                    new TwitchPrediction
+                    {
+                        HostId = host.Id,
+                        ProviderPredictionId = $"history-{index:D3}",
+                        Title = "History",
+                        OutcomesJson = "[]",
+                        Status = TwitchPredictionStatus.Resolved,
+                        CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                        EndedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
+                        UpdatedAtUtc = DateTime.Parse("2026-07-25T10:00:00Z").AddMinutes(-index),
+                    }
+                );
+            }
+            db.TwitchPredictions.Add(
+                new TwitchPrediction
+                {
+                    HostId = host.Id,
+                    ProviderPredictionId = "prediction-id",
+                    Title = "Question",
+                    OutcomesJson =
+                        """[{"Id":"yes","Title":"Yes","Color":"BLUE","Users":1,"ChannelPoints":100,"TopPredictors":[]}]""",
+                    Status = TwitchPredictionStatus.Active,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var handler = new PredictionHandler
+        {
+            BroadcasterType = "affiliate",
+            AfterPredictionEnded = disableAfterProvider
+                ? () => SetNativeAsync(database, false)
+                : null,
+        };
+        var service = CreateService(database, handler);
+
+        var outcome = await service.ResolveAsync(host.Id, "yes", true, CancellationToken.None);
+
+        outcome.ShouldBeOfType<PredictionOperationOutcome.Updated>();
+        await using var verify = await database.CreateDbContextAsync();
+        var predictions = await verify.TwitchPredictions.ToArrayAsync();
+        predictions.Length.ShouldBe(expectedTotal);
+        predictions
+            .Single(value => value.ProviderPredictionId == "prediction-id")
+            .Status.ShouldBe(TwitchPredictionStatus.Resolved);
+        predictions
+            .Count(value => value.ProviderPredictionId.StartsWith("history-"))
+            .ShouldBe(expectedHistory);
+    }
+
+    private static PredictionTemplateDraft ValidTemplate()
+    {
+        return new("Question", ["Yes", "No"], 60);
+    }
+
+    private static async Task SetNativeAsync(
+        IDbContextFactory<BlokeBotDbContext> database,
+        bool enabled
+    )
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var host = await db.Hosts.SingleAsync();
+        host.EnabledFeatures = enabled
+            ? host.EnabledFeatures | HostFeatureFlags.NativeTwitch
+            : host.EnabledFeatures & ~HostFeatureFlags.NativeTwitch;
+        await db.SaveChangesAsync();
+    }
+
+    private static PredictionService CreateService(
+        IDbContextFactory<BlokeBotDbContext> database,
+        PredictionHandler handler,
+        TimeProvider? timeProvider = null
+    )
+    {
+        var events = TestEventBus.Create<AppEventKind>();
+        var broadcasters = new ReadyBroadcaster();
+        var helix = new HelixClient(
+            new SingleHandlerFactory(handler),
+            global::BlokeBot.Twitch.TwitchEndpointPolicy.Default
+        );
+        var settings = BotSettings.FromOptions(
+            new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
+        );
+        var alerts = new DurableAlertService(database, TimeProvider.System, events);
+        var logger = NullLogger<PredictionService>.Instance;
+        var nativeTwitch = new NativeTwitchFeatureGate(database);
+        return timeProvider is null
+            ? new PredictionService(
+                database,
+                broadcasters,
+                helix,
+                settings,
+                events,
+                alerts,
+                logger,
+                nativeTwitch
+            )
+            : new PredictionService(
+                database,
+                broadcasters,
+                helix,
+                settings,
+                events,
+                alerts,
+                logger,
+                nativeTwitch,
+                timeProvider
+            );
     }
 
     private static async Task<BotHost> SeedHostAsync(
@@ -174,6 +406,8 @@ public sealed class PredictionServiceTests
     private sealed class PredictionHandler : HttpMessageHandler
     {
         public string BroadcasterType { get; set; } = string.Empty;
+        public Func<Task>? AfterPredictionCreated { get; init; }
+        public Func<Task>? AfterPredictionEnded { get; init; }
         public List<(HttpMethod Method, string Query)> Requests { get; } = [];
         public List<string> PatchBodies { get; } = [];
 
@@ -192,7 +426,15 @@ public sealed class PredictionServiceTests
             if (request.Method == HttpMethod.Patch)
             {
                 PatchBodies.Add(await request.Content!.ReadAsStringAsync(ct));
+                if (AfterPredictionEnded is not null)
+                {
+                    await AfterPredictionEnded();
+                }
                 return Json(Prediction("RESOLVED"));
+            }
+            if (request.Method == HttpMethod.Post && AfterPredictionCreated is not null)
+            {
+                await AfterPredictionCreated();
             }
             return Json(Prediction("ACTIVE"));
         }

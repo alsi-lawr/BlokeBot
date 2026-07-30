@@ -22,6 +22,7 @@ public sealed class GuessingSettingsLoadTests
         await using var context = CreateContext(dbFactory, seed.HostId);
         var toasts = context.Services.GetRequiredService<ToastService>();
         var page = context.Render<GuessingSettings>();
+        page.FindAll(".settings-disclosure-stack").Count.ShouldBe(3);
         await DeleteProfilesAsync(dbFactory, seed.SpecialProfileId);
 
         page.Find("#profileSelect").Change(seed.SpecialProfileId.ToString());

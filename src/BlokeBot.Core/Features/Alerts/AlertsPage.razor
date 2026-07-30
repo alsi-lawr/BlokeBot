@@ -8,32 +8,51 @@
 
 <PageTitle>BlokeBot | Alerts</PageTitle>
 
-<DashboardPage Kicker="Channel health"
-               Title="Review alerts"
-               Description="See problems that need attention and the alerts that have already been handled." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadRouteAsync">
-    <Actions>
+<div class="mx-auto max-w-5xl space-y-6">
+    <PageHeader Kicker="Channel health"
+                Title="Alerts"
+                Description="See problems that need attention and alerts you have already handled.">
         <button class="btn-secondary" @onclick="RefreshAsync">Refresh</button>
-    </Actions>
+    </PageHeader>
 
-    <ChildContent>
-    @if (Host is null)
+    @if (_loadFailed)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel whose alerts you want to review from the top bar." />
+        <PageState Kind="PageStateKind.Failure"
+                   Title="We couldn’t load alerts"
+                   Description="BlokeBot couldn’t load alerts for this channel.">
+            <Actions>
+                <button type="button"
+                        class="btn-primary"
+                        @onclick="RetryLoadAsync">
+                    Retry
+                </button>
+            </Actions>
+        </PageState>
+    }
+    else if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (_state is null)
     {
-        <PageState Kind="DashboardPageState.Loading" Title="Loading alerts" Description="Checking this channel for alerts that need attention." />
+        <div class="card p-8 text-sm text-muted-foreground">Loading alerts...</div>
     }
     else
     {
-        <TaskPanel Title="Handle active alerts" Description="Review the problems that need attention for this channel.">
-
-            @if (_state.Active.Count == 0)
-            {
-                <PageState Kind="DashboardPageState.Empty" Title="No active alerts" Description="There is nothing that needs attention for this channel right now." />
-            }
-            else
-            {
+        @if (_state.Active.Count == 0)
+        {
+            <section class="card p-6" aria-labelledby="active-alerts-title">
+                <h2 id="active-alerts-title" class="text-lg font-semibold text-slate-950">Active alerts</h2>
+                <p class="mt-2 text-sm text-muted-foreground">No active alerts. This channel does not need attention right now.</p>
+            </section>
+        }
+        else
+        {
+            <section class="space-y-3" aria-labelledby="active-alerts-title">
+                <div>
+                    <h2 id="active-alerts-title" class="text-lg font-semibold text-slate-950">Active alerts</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">@_activeSummary</p>
+                </div>
                 <div class="grid gap-3">
                     @foreach (var alert in _state.Active)
                     {
@@ -67,29 +86,21 @@
                         </article>
                     }
                 </div>
-            }
-        </TaskPanel>
+            </section>
+        }
 
-        <CollapsibleSection Title="Handled alert history"
-                            Description="Review who handled an alert and when."
-                            InitiallyOpen="false"
-                            PreferenceKey="alerts-history">
+        <section class="card">
+            <div class="border-b border-slate-200 p-5">
+                <h2 class="text-lg font-semibold text-slate-950">History</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Handled alerts stay here so you can see who dealt with them and when.</p>
+            </div>
             @if (_state.History.Count == 0)
             {
-                <PageState Kind="DashboardPageState.Empty" Title="No handled alerts yet" Description="Alerts you mark as handled will remain here." />
+                <div class="p-8 text-sm text-muted-foreground">No handled alerts yet.</div>
             }
             else
             {
-                <div class="phone-card-list" data-phone-cards="alert-history">
-                    @foreach (var alert in _state.History)
-                    {
-                        <article @key="alert.Id" class="phone-card">
-                            <div><strong>@alert.Title</strong><p>@AlertAreaLabel(alert.Source)</p></div>
-                            <dl><dt>Importance</dt><dd>@ImportanceLabel(alert.Severity)</dd><dt>Handled by</dt><dd>@alert.AcknowledgedByLogin</dd><dt>Handled at</dt><dd>@FormatTimestamp(alert.AcknowledgedAtUtc)</dd></dl>
-                        </article>
-                    }
-                </div>
-                <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Handled alert history">
+                <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
@@ -103,20 +114,19 @@
                             @foreach (var alert in _state.History)
                             {
                                 <tr @key="alert.Id">
-                                    <td class="px-5 py-3">
+                                    <td data-label="Alert" class="px-5 py-3">
                                         <p class="font-semibold text-slate-950">@alert.Title</p>
                                         <p class="mt-1 text-xs text-muted-foreground">@AlertAreaLabel(alert.Source)</p>
                                     </td>
-                                    <td class="px-5 py-3 text-slate-700">@ImportanceLabel(alert.Severity)</td>
-                                    <td class="px-5 py-3 text-slate-700">@alert.AcknowledgedByLogin</td>
-                                    <td class="px-5 py-3 text-slate-700">@FormatTimestamp(alert.AcknowledgedAtUtc)</td>
+                                    <td data-label="Importance" class="px-5 py-3 text-slate-700">@ImportanceLabel(alert.Severity)</td>
+                                    <td data-label="Handled by" class="px-5 py-3 text-slate-700">@alert.AcknowledgedByLogin</td>
+                                    <td data-label="Handled at" class="px-5 py-3 text-slate-700">@FormatTimestamp(alert.AcknowledgedAtUtc)</td>
                                 </tr>
                             }
                         </tbody>
                     </table>
                 </div>
             }
-        </CollapsibleSection>
+        </section>
     }
-    </ChildContent>
-</DashboardPage>
+</div>

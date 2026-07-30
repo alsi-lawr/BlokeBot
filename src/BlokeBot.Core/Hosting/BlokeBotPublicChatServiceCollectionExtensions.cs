@@ -1,4 +1,5 @@
 using BlokeBot.Core.Features.PublicChat;
+using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Twitch.Runtime;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,8 @@ public static class BlokeBotPublicChatServiceCollectionExtensions
                 BotResiliencePipeline.PublicChatDelivery
             ),
             serviceProvider.GetRequiredService<PublicChatDeliveryLifetimePolicy>(),
-            serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>()
+            serviceProvider.GetRequiredService<PublicChatTerminalRetentionPolicy>(),
+            serviceProvider.GetRequiredService<EventBus<AppEventKind>>()
         ));
         services.Replace(ServiceDescriptor.Singleton<IPublicChatPinStore, EfPublicChatPinStore>());
         return services;

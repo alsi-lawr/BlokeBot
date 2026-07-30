@@ -10,6 +10,8 @@ internal abstract record EventSubNotification
 
     internal sealed record Shoutout(EventSubShoutoutEvent Event) : EventSubNotification;
 
+    internal sealed record IncomingRaid(EventSubIncomingRaidEvent Event) : EventSubNotification;
+
     internal sealed record Poll(EventSubPollEvent Event) : EventSubNotification;
 
     internal sealed record RewardRedemption(EventSubRewardRedemptionEvent Event)
@@ -49,6 +51,12 @@ internal abstract record EventSubNotification
                     )
                 )
                 : new Unknown(),
+            "channel.raid" when envelope.Metadata.SubscriptionVersion == "1" =>
+                payload.Deserialize<EventSubIncomingRaidWireEvent>(options) is { } incomingRaid
+                    ? incomingRaid.ToDomain(envelope.Metadata) is { } normalized
+                        ? new IncomingRaid(normalized)
+                        : new Unknown()
+                    : new Unknown(),
             "channel.poll.begin" or "channel.poll.progress" or "channel.poll.end" =>
                 payload.Deserialize<EventSubPollWireEvent>(options) is { } poll
                     ? new Poll(poll.ToDomain(envelope.Metadata.MessageId))

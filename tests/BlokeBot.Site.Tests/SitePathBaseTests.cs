@@ -54,6 +54,15 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+            var nativeShoutouts = await client.GetStringAsync(
+                "/blokebot/twitch-operations/shoutouts"
+            );
+            nativeShoutouts.ShouldContain(
+                "data-theme-light-source=\"media/laptop-light-native-shoutouts.png\""
+            );
+            nativeShoutouts.ShouldContain("aria-label=\"Guide features\"");
+            nativeShoutouts.ShouldContain("Current topic: <strong>Shoutouts</strong>");
+
             var serverOwners = await client.GetStringAsync("/blokebot/server-owners");
             serverOwners.ShouldContain("1. Install and run");
             serverOwners.ShouldContain("5. Custom-bot credentials");
@@ -75,6 +84,11 @@ public sealed class SitePathBaseTests
 
             var showcase = await client.GetAsync("/blokebot/media/laptop-light-home-scroll.webp");
             showcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var nativeShowcase = await client.GetAsync(
+                "/blokebot/media/laptop-light-native-shoutouts.png"
+            );
+            nativeShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var favicon = await client.GetAsync("/blokebot/favicon.ico");
             favicon.StatusCode.ShouldBe(HttpStatusCode.OK);

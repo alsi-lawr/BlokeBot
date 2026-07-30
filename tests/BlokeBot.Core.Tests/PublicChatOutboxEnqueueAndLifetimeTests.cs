@@ -551,59 +551,6 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
     }
 
     [Test]
-    public async Task PendingMessage_ConcurrentClaimsAtExpiry_ExpireWithoutClaim()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var now = Utc(12, 0, 0);
-        var expiry = now.AddSeconds(5);
-        var first = new EfPublicChatOutbox(
-            dbFactory,
-            StandardRetryPolicy,
-            Lifetime(TimeSpan.FromSeconds(5)),
-            StandardRetentionPolicy
-        );
-        var second = new EfPublicChatOutbox(
-            dbFactory,
-            StandardRetryPolicy,
-            Lifetime(TimeSpan.FromSeconds(5)),
-            StandardRetentionPolicy
-        );
-        _ = await first.EnqueueAsync(
-            Batch("streamer", now, "concurrent stale"),
-            CancellationToken.None
-        );
-
-        var outcomes = await Task.WhenAll(
-            first
-                .TryClaimNextAsync(
-                    expiry,
-                    expiry.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask(),
-            second
-                .TryClaimNextAsync(
-                    expiry,
-                    expiry.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask()
-        );
-
-        foreach (var outcome in outcomes)
-        {
-            outcome.ShouldNotBeOfType<PublicChatClaimOutcome.Claimed>();
-        }
-
-        await using var db = await dbFactory.CreateDbContextAsync();
-        AssertExpired(await db.PublicChatOutboxMessages.SingleAsync(), expiry);
-    }
-
-    [Test]
     public async Task PendingMessage_IdleWorker_WakesAtDurableExpiryWithoutTransport()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();

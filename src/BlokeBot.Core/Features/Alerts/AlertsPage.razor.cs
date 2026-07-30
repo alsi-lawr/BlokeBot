@@ -8,6 +8,7 @@ public partial class AlertsPage
 {
     private DurableAlertState? _state;
     private bool _canAcknowledge;
+    private bool _loadFailed;
 
     private string _activeSummary =>
         _state?.ActiveCount switch
@@ -24,11 +25,11 @@ public partial class AlertsPage
             _events.SubscribeForComponentRefresh(
                 AppEventKind.AlertsChanged,
                 InvokeAsync,
-                LoadCoreAsync,
+                LoadAsync,
                 StateHasChanged
             )
         );
-        await LoadRouteAsync();
+        await LoadAsync();
     }
 
     private async Task AcknowledgeAsync(DurableAlertItem alert)
@@ -47,26 +48,41 @@ public partial class AlertsPage
                 await _alerts
                     .Acknowledge(HostId, alert.Id, ActorLogin)
                     .ExecuteAsync(CancellationToken.None);
-                await LoadCoreAsync();
+                await LoadAsync();
             }
         );
     }
 
-    private Task LoadRouteAsync()
+    private async Task LoadAsync()
     {
-        return ObserveRouteLoadAsync(LoadCoreAsync);
-    }
+        _loadFailed = false;
+        _state = null;
 
-    private async Task LoadCoreAsync()
-    {
-        await LoadPageContextAsync();
-        _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
-        _state = HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
+        try
+        {
+            await LoadPageContextAsync();
+            _canAcknowledge = DurableAlertPermissions.CanAcknowledge(PageContext.Session);
+            _state =
+                HostId == 0 ? null : await _alerts.LoadStateAsync(HostId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            _canAcknowledge = false;
+            _loadFailed = true;
+            ReportUiFault(nameof(LoadAsync), exception);
+        }
     }
 
     private Task RefreshAsync()
     {
-        return LoadRouteAsync();
+        return LoadAsync();
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        _loadFailed = false;
+        await InvokeAsync(StateHasChanged);
+        await LoadAsync();
     }
 
     private static string FormatTimestamp(DateTime? value)

@@ -158,8 +158,11 @@
 
     .feature-toggle-card:hover,
     .home-info-card:hover,
+    .home-info-card:focus-visible,
     .home-info-card:hover .home-info-card__svg *,
-    .home-info-card:hover .home-info-card__icon {
+    .home-info-card:focus-visible .home-info-card__svg *,
+    .home-info-card:hover .home-info-card__icon,
+    .home-info-card:focus-visible .home-info-card__icon {
         transform: none;
     }
 }

@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -102,6 +103,7 @@ internal sealed class EfPublicChatPinStore(
             case PublicChatPinExecutionOutcome.Terminal terminal:
                 operation.Status = PublicChatPinOperationStatus.Terminal;
                 operation.Outcome = terminal.Reason;
+                await RecordAutomaticRaidPartialFailureAsync(db, item, cancellationToken);
                 await AddAlertAsync(db, item, terminal.Reason, cancellationToken);
                 break;
             default:
@@ -208,12 +210,16 @@ internal sealed class EfPublicChatPinStore(
         CancellationToken cancellationToken
     )
     {
-        var sourceKey = $"{item.Id}:{reason}";
+        var automaticRaid = item.Feature == AutomaticRaidDeliveryCorrelation.Feature;
+        var source = automaticRaid
+            ? AutomaticRaidDeliveryCorrelation.AlertSource
+            : "public-chat-pin";
+        var sourceKey = automaticRaid ? item.ReplyKey : $"{item.Id}:{reason}";
         if (
             await db.DurableAlerts.AnyAsync(
                 alert =>
                     alert.HostId == item.HostId
-                    && alert.Source == "public-chat-pin"
+                    && alert.Source == source
                     && alert.SourceKey == sourceKey
                     && alert.AcknowledgedAtUtc == null,
                 cancellationToken
@@ -228,15 +234,46 @@ internal sealed class EfPublicChatPinStore(
             {
                 HostId = item.HostId,
                 Severity = DurableAlertSeverity.Warning,
-                Source = "public-chat-pin",
+                Source = source,
                 SourceKey = sourceKey,
-                Title = item.IsUnpin ? "Chat pin reset failed" : "Chat reply pin failed",
+                Title =
+                    automaticRaid ? "Automatic raid shoutout pin failed"
+                    : item.IsUnpin ? "Chat pin reset failed"
+                    : "Chat reply pin failed",
                 Message =
                     $"Twitch could not complete the chat pin operation ({reason}). Check the bot moderator role and reconnect its account if the required scope is missing.",
                 LinkPath = "/channel/setup",
                 CreatedAtUtc = UtcNow(),
             }
         );
+    }
+
+    private async Task RecordAutomaticRaidPartialFailureAsync(
+        BlokeBotDbContext db,
+        PublicChatPinWorkItem item,
+        CancellationToken cancellationToken
+    )
+    {
+        if (item.Feature != AutomaticRaidDeliveryCorrelation.Feature)
+        {
+            return;
+        }
+
+        var outcome = await db.AutomaticRaidShoutoutOutcomes.SingleOrDefaultAsync(
+            value =>
+                value.Id == item.OwnerId
+                && value.HostId == item.HostId
+                && value.ProviderMessageId == item.ReplyKey,
+            cancellationToken
+        );
+        if (outcome is null)
+        {
+            return;
+        }
+
+        outcome.Status = AutomaticRaidShoutoutOutcomeStatus.NotDelivered;
+        outcome.ResultCode = AutomaticRaidShoutoutResultCode.PartialFailure;
+        outcome.CompletedAtUtc = UtcNow();
     }
 
     private static PublicChatPinWorkItem ToWorkItem(

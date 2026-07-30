@@ -5,6 +5,7 @@ using BlokeBot.Core.BotRuntime;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
 using BlokeBot.Core.Features.TwitchOperations.Polls;
 using BlokeBot.Eventing;
@@ -120,7 +121,8 @@ public sealed class HostedChannelLifecycleNotifierTests
                 new BotOptions { Identity = new BotIdentityOptions { ClientId = "client-id" } }
             ),
             events,
-            new DurableAlertService(dbFactory, TimeProvider.System, events)
+            new DurableAlertService(dbFactory, TimeProvider.System, events),
+            new NativeTwitchFeatureGate(dbFactory)
         );
     }
 
@@ -141,7 +143,8 @@ public sealed class HostedChannelLifecycleNotifierTests
             ),
             events,
             new DurableAlertService(dbFactory, TimeProvider.System, events),
-            TimeProvider.System
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
         );
     }
 

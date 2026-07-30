@@ -154,12 +154,18 @@ internal sealed partial class EventSubChannelSession
                     }
                 }
 
-                active = await EnsurePollSubscriptionsAsync(
+                var nativeSubscriptions = await ReconcileNativeSubscriptionsAsync(
                     channel,
                     active,
                     context,
                     cancellationToken
                 );
+                if (nativeSubscriptions.Outcome is { } nativeSubscriptionFailure)
+                {
+                    return nativeSubscriptionFailure;
+                }
+
+                active = nativeSubscriptions.Subscription;
                 lock (_gate)
                 {
                     _subscriptions[channel] = active;
@@ -221,58 +227,97 @@ internal sealed partial class EventSubChannelSession
         );
     }
 
-    private async Task<ActiveEventSubSubscription> EnsurePollSubscriptionsAsync(
+    private async Task<(
+        ActiveEventSubSubscription Subscription,
+        EventSubChannelReconciliationOutcome? Outcome
+    )> ReconcileNativeSubscriptionsAsync(
         string channel,
         ActiveEventSubSubscription active,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
-        if (active.PollSubscriptions is BroadcasterPollSubscriptionState.Active)
+        var enabled = await operations.NativeTwitchIsEnabledAsync(channel, cancellationToken);
+        foreach (
+            var kind in new[]
+            {
+                EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Raids,
+                EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.RewardRedemptions,
+                EventSubOperationSubscriptionKind.Predictions,
+            }
+        )
         {
-            return active;
+            var reconciliation = enabled
+                ? await EnsureOperationSubscriptionPresentAsync(
+                    channel,
+                    active,
+                    kind,
+                    context,
+                    cancellationToken
+                )
+                : await EnsureOperationSubscriptionAbsentAsync(
+                    active,
+                    kind,
+                    retainChannelDeletionEvidence: false,
+                    context,
+                    cancellationToken
+                );
+            active = reconciliation.Subscription;
+            if (reconciliation.Outcome is { } failure)
+            {
+                return (active, failure);
+            }
         }
 
-        if (active.PollSubscriptions is BroadcasterPollSubscriptionState.CleanupPending pending)
+        return (active, null);
+    }
+
+    private async Task<(
+        ActiveEventSubSubscription Subscription,
+        EventSubChannelReconciliationOutcome? Outcome
+    )> EnsureOperationSubscriptionPresentAsync(
+        string channel,
+        ActiveEventSubSubscription active,
+        EventSubOperationSubscriptionKind kind,
+        EventSubChannelAttemptContext context,
+        CancellationToken cancellationToken
+    )
+    {
+        var state = GetOperationState(active, kind);
+        if (state is EventSubOperationSubscriptionState.Active)
         {
-            var cleanup = await RunPhaseAsync(
+            return (active, null);
+        }
+
+        if (state is EventSubOperationSubscriptionState.CleanupPending)
+        {
+            var cleanup = await EnsureOperationSubscriptionAbsentAsync(
+                active,
+                kind,
+                retainChannelDeletionEvidence: false,
                 context,
-                EventSubChannelPhase.SubscriptionDeletion,
-                token =>
-                    operations.DeleteSubscriptionAsync(
-                        new ActiveEventSubSubscription
-                        {
-                            Channel = channel,
-                            SubscriptionId = pending.Group.SubscriptionId,
-                            AdditionalSubscriptionIds = pending.Group.AdditionalSubscriptionIds,
-                            BotLogin = active.BotLogin,
-                            Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
-                            AccessToken = string.Empty,
-                            Readiness = EventSubSubscriptionReadiness.Ready,
-                        },
-                        token
-                    ),
                 cancellationToken
             );
-            if (cleanup is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
+            active = cleanup.Subscription;
+            if (cleanup.Outcome is { } failure)
             {
-                throw new EventSubChannelOperationException(
-                    EventSubChannelPhase.SubscriptionDeletion,
-                    unresolved.Failure.Exception
-                        ?? new InvalidOperationException(unresolved.Failure.FailureType)
-                );
+                return (active, failure);
             }
-            active = active with
-            {
-                PollSubscriptions = new BroadcasterPollSubscriptionState.NotConfigured(),
-            };
         }
 
+        var authorization = AuthorizationFor(kind);
         var account = await operations
-            .ResolveAccount(channel, EventSubAuthorizationContext.BroadcasterAuthority)
+            .ResolveAccount(channel, authorization)
             .ExecuteAsync(cancellationToken);
-        return await account.Match<Task<ActiveEventSubSubscription>>(
-            async broadcaster =>
+        return await account.Match<
+            Task<(
+                ActiveEventSubSubscription Subscription,
+                EventSubChannelReconciliationOutcome? Outcome
+            )>
+        >(
+            async resolvedAccount =>
             {
                 var setup = await RunPhaseAsync(
                     context,
@@ -280,49 +325,44 @@ internal sealed partial class EventSubChannelSession
                     token =>
                         operations.CreateSubscriptionAsync(
                             channel,
-                            EventSubAuthorizationContext.BroadcasterAuthority,
-                            broadcaster,
+                            authorization,
+                            resolvedAccount,
                             sessionId,
-                            token
+                            token,
+                            kind
                         ),
                     cancellationToken
                 );
                 switch (setup)
                 {
                     case EventSubSubscriptionSetupOutcome.Created created:
-                        return active with
-                        {
-                            PollSubscriptions = new BroadcasterPollSubscriptionState.Active(
-                                BroadcasterPollSubscriptionGroup.From(created.Subscription)
+                        return (
+                            WithOperationState(
+                                active,
+                                kind,
+                                new EventSubOperationSubscriptionState.Active(created.Subscription)
                             ),
-                        };
+                            null
+                        );
                     case EventSubSubscriptionSetupOutcome.PartiallyCreated partial:
-                        var group = BroadcasterPollSubscriptionGroup.From(partial.Subscription);
-                        var pending = active with
-                        {
-                            PollSubscriptions = new BroadcasterPollSubscriptionState.CleanupPending(
-                                group
-                            ),
-                        };
-                        lock (_gate)
-                        {
-                            _subscriptions[channel] = pending;
-                        }
-
-                        var cleanup = await RunPhaseAsync(
+                        var pending = WithOperationState(
+                            active,
+                            kind,
+                            new EventSubOperationSubscriptionState.CleanupPending(
+                                partial.Subscription
+                            )
+                        );
+                        ReplaceTrackedSubscription(pending);
+                        var cleanup = await EnsureOperationSubscriptionAbsentAsync(
+                            pending,
+                            kind,
+                            retainChannelDeletionEvidence: false,
                             context,
-                            EventSubChannelPhase.SubscriptionDeletion,
-                            token =>
-                                operations.DeleteSubscriptionAsync(partial.Subscription, token),
                             cancellationToken
                         );
-                        if (cleanup is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
+                        if (cleanup.Outcome is { } failure)
                         {
-                            throw new EventSubChannelOperationException(
-                                EventSubChannelPhase.SubscriptionDeletion,
-                                unresolved.Failure.Exception
-                                    ?? new InvalidOperationException(unresolved.Failure.FailureType)
-                            );
+                            return (cleanup.Subscription, failure);
                         }
 
                         throw new EventSubChannelOperationException(
@@ -331,24 +371,32 @@ internal sealed partial class EventSubChannelSession
                         );
                     case EventSubSubscriptionSetupOutcome.MissingChannel:
                     case EventSubSubscriptionSetupOutcome.MissingBot:
-                        return active with
-                        {
-                            PollSubscriptions = new BroadcasterPollSubscriptionState.Unavailable(
-                                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
+                        return (
+                            WithOperationState(
+                                active,
+                                kind,
+                                new EventSubOperationSubscriptionState.Unavailable(
+                                    UnavailableReasonFor(kind)
+                                )
                             ),
-                        };
+                            null
+                        );
                     default:
-                        throw new UnreachableException("Unknown poll EventSub setup outcome.");
+                        throw new UnreachableException(
+                            "Unknown Native Twitch EventSub setup outcome."
+                        );
                 }
             },
             reason =>
                 Task.FromResult(
-                    active with
-                    {
-                        PollSubscriptions = new BroadcasterPollSubscriptionState.Unavailable(
-                            reason
+                    (
+                        WithOperationState(
+                            active,
+                            kind,
+                            new EventSubOperationSubscriptionState.Unavailable(reason)
                         ),
-                    }
+                        (EventSubChannelReconciliationOutcome?)null
+                    )
                 )
         );
     }
@@ -439,20 +487,31 @@ internal sealed partial class EventSubChannelSession
     )
     {
         pendingDeletions.Begin(subscription);
-        var pollDeletion = await ReconcilePollSubscriptionDeletionAsync(
-            subscription,
-            context,
-            cancellationToken
-        );
-        if (
-            pollDeletion.Outcome
-            is EventSubChannelReconciliationOutcome.UnresolvedDeletion unresolvedPoll
+        foreach (
+            var kind in new[]
+            {
+                EventSubOperationSubscriptionKind.Shoutouts,
+                EventSubOperationSubscriptionKind.Raids,
+                EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.RewardRedemptions,
+                EventSubOperationSubscriptionKind.Predictions,
+            }
         )
         {
-            return unresolvedPoll;
+            var operationDeletion = await EnsureOperationSubscriptionAbsentAsync(
+                subscription,
+                kind,
+                retainChannelDeletionEvidence: true,
+                context,
+                cancellationToken
+            );
+            subscription = operationDeletion.Subscription;
+            if (operationDeletion.Outcome is { } operationFailure)
+            {
+                return operationFailure;
+            }
         }
 
-        subscription = pollDeletion.Subscription;
         var outcome = await RunPhaseAsync(
             context,
             EventSubChannelPhase.SubscriptionDeletion,
@@ -495,52 +554,53 @@ internal sealed partial class EventSubChannelSession
     private async Task<(
         ActiveEventSubSubscription Subscription,
         EventSubChannelReconciliationOutcome? Outcome
-    )> ReconcilePollSubscriptionDeletionAsync(
+    )> EnsureOperationSubscriptionAbsentAsync(
         ActiveEventSubSubscription subscription,
+        EventSubOperationSubscriptionKind kind,
+        bool retainChannelDeletionEvidence,
         EventSubChannelAttemptContext context,
         CancellationToken cancellationToken
     )
     {
-        var group = subscription.PollSubscriptions switch
+        var operationSubscription = GetOperationState(subscription, kind) switch
         {
-            BroadcasterPollSubscriptionState.Active active => active.Group,
-            BroadcasterPollSubscriptionState.CleanupPending pending => pending.Group,
+            EventSubOperationSubscriptionState.Active active => active.Subscription,
+            EventSubOperationSubscriptionState.CleanupPending cleanupPending =>
+                cleanupPending.Subscription,
             _ => null,
         };
-        if (group is null)
+        if (operationSubscription is null)
         {
-            return (subscription, null);
+            var emptyState = WithOperationState(
+                subscription,
+                kind,
+                new EventSubOperationSubscriptionState.NotConfigured()
+            );
+            TrackOperationState(emptyState, retainChannelDeletionEvidence);
+            return (emptyState, null);
         }
 
+        var pendingState = WithOperationState(
+            subscription,
+            kind,
+            new EventSubOperationSubscriptionState.CleanupPending(operationSubscription)
+        );
+        TrackOperationState(pendingState, retainChannelDeletionEvidence);
         var outcome = await RunPhaseAsync(
             context,
             EventSubChannelPhase.SubscriptionDeletion,
-            token =>
-                operations.DeleteSubscriptionAsync(
-                    new ActiveEventSubSubscription
-                    {
-                        Channel = subscription.Channel,
-                        SubscriptionId = group.SubscriptionId,
-                        AdditionalSubscriptionIds = group.AdditionalSubscriptionIds,
-                        BotLogin = subscription.BotLogin,
-                        Authorization = EventSubAuthorizationContext.BroadcasterAuthority,
-                        AccessToken = string.Empty,
-                        Readiness = EventSubSubscriptionReadiness.Ready,
-                    },
-                    token
-                ),
+            token => operations.DeleteSubscriptionAsync(operationSubscription, token),
             cancellationToken
         );
         if (outcome is EventSubSubscriptionDeletionOutcome.Unresolved unresolved)
         {
-            var pending = subscription with
+            if (retainChannelDeletionEvidence)
             {
-                PollSubscriptions = new BroadcasterPollSubscriptionState.CleanupPending(group),
-            };
-            pendingDeletions.RetainUnresolved(pending, unresolved.Failure);
-            ReplaceTrackedSubscription(pending);
+                pendingDeletions.RetainUnresolved(pendingState, unresolved.Failure);
+            }
+
             return (
-                pending,
+                pendingState,
                 new EventSubChannelReconciliationOutcome.UnresolvedDeletion
                 {
                     Failure = unresolved.Failure,
@@ -548,13 +608,123 @@ internal sealed partial class EventSubChannelSession
             );
         }
 
-        var cleared = subscription with
+        var clearedState = WithOperationState(
+            pendingState,
+            kind,
+            new EventSubOperationSubscriptionState.NotConfigured()
+        );
+        TrackOperationState(clearedState, retainChannelDeletionEvidence);
+        return (clearedState, null);
+    }
+
+    private void TrackOperationState(
+        ActiveEventSubSubscription subscription,
+        bool retainChannelDeletionEvidence
+    )
+    {
+        if (retainChannelDeletionEvidence)
         {
-            PollSubscriptions = new BroadcasterPollSubscriptionState.NotConfigured(),
+            pendingDeletions.UpdateSubscription(subscription);
+        }
+
+        ReplaceTrackedSubscription(subscription);
+    }
+
+    private static EventSubOperationSubscriptionState GetOperationState(
+        ActiveEventSubSubscription subscription,
+        EventSubOperationSubscriptionKind kind
+    )
+    {
+        return kind switch
+        {
+            EventSubOperationSubscriptionKind.Shoutouts => subscription.ShoutoutSubscriptions,
+            EventSubOperationSubscriptionKind.Raids => subscription.RaidSubscriptions,
+            EventSubOperationSubscriptionKind.Polls => subscription.PollSubscriptions,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                subscription.RewardRedemptionSubscriptions,
+            EventSubOperationSubscriptionKind.Predictions => subscription.PredictionSubscriptions,
+            _ => throw new UnreachableException(
+                "Unknown Native Twitch EventSub subscription kind."
+            ),
         };
-        pendingDeletions.UpdateSubscription(cleared);
-        ReplaceTrackedSubscription(cleared);
-        return (cleared, null);
+    }
+
+    private static ActiveEventSubSubscription WithOperationState(
+        ActiveEventSubSubscription subscription,
+        EventSubOperationSubscriptionKind kind,
+        EventSubOperationSubscriptionState state
+    )
+    {
+        return kind switch
+        {
+            EventSubOperationSubscriptionKind.Shoutouts => subscription with
+            {
+                ShoutoutSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.Raids => subscription with
+            {
+                RaidSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.Polls => subscription with
+            {
+                PollSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.RewardRedemptions => subscription with
+            {
+                RewardRedemptionSubscriptions = state,
+            },
+            EventSubOperationSubscriptionKind.Predictions => subscription with
+            {
+                PredictionSubscriptions = state,
+            },
+            _ => throw new UnreachableException(
+                "Unknown Native Twitch EventSub subscription kind."
+            ),
+        };
+    }
+
+    private static EventSubAuthorizationContext AuthorizationFor(
+        EventSubOperationSubscriptionKind kind
+    )
+    {
+        return kind switch
+        {
+            EventSubOperationSubscriptionKind.Shoutouts =>
+                EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
+            EventSubOperationSubscriptionKind.Raids =>
+                EventSubAuthorizationContext.ConfiguredBotAuthority,
+            EventSubOperationSubscriptionKind.Polls =>
+                EventSubAuthorizationContext.BroadcasterAuthority,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                EventSubAuthorizationContext.RewardRedemptionsAuthority,
+            EventSubOperationSubscriptionKind.Predictions =>
+                EventSubAuthorizationContext.PredictionsAuthority,
+            _ => throw new UnreachableException(
+                "Unknown Native Twitch EventSub subscription kind."
+            ),
+        };
+    }
+
+    private static AccessTokenUnavailableReason UnavailableReasonFor(
+        EventSubOperationSubscriptionKind kind
+    )
+    {
+        return kind switch
+        {
+            EventSubOperationSubscriptionKind.Shoutouts =>
+                AccessTokenUnavailableReason.MissingRefreshToken,
+            EventSubOperationSubscriptionKind.Raids =>
+                AccessTokenUnavailableReason.MissingRefreshToken,
+            EventSubOperationSubscriptionKind.Polls =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            EventSubOperationSubscriptionKind.Predictions =>
+                AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable,
+            _ => throw new UnreachableException(
+                "Unknown Native Twitch EventSub subscription kind."
+            ),
+        };
     }
 
     private void ReplaceTrackedSubscription(ActiveEventSubSubscription subscription)

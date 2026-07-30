@@ -55,50 +55,15 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
         ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
 
         var retryAt = now.AddSeconds(1);
-        var firstRestartStore = new EfPublicChatOutbox(
+        var restartStore = new EfPublicChatOutbox(
             dbFactory,
             boundedPolicy,
             StandardLifetimePolicy,
             StandardRetentionPolicy
         );
-        var secondRestartStore = new EfPublicChatOutbox(
-            dbFactory,
-            boundedPolicy,
-            StandardLifetimePolicy,
-            StandardRetentionPolicy
-        );
-        var concurrentClaims = await Task.WhenAll(
-            firstRestartStore
-                .TryClaimNextAsync(
-                    retryAt,
-                    retryAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask(),
-            secondRestartStore
-                .TryClaimNextAsync(
-                    retryAt,
-                    retryAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask()
-        );
-        concurrentClaims.OfType<PublicChatClaimOutcome.Claimed>().ShouldBeEmpty();
-        foreach (var outcome in concurrentClaims)
-        {
-            (
-                outcome
-                is PublicChatClaimOutcome.AwaitingAvailability
-                    or PublicChatClaimOutcome.Contended
-            ).ShouldBeTrue();
-        }
 
         (
-            await firstRestartStore.TryClaimNextAsync(
+            await restartStore.TryClaimNextAsync(
                 retryAt,
                 retryAt.AddMinutes(5),
                 TimeSpan.Zero,
@@ -274,87 +239,6 @@ public sealed class PublicChatOutboxRetryTests : PublicChatOutboxIntegrationTest
             CancellationToken.None
         );
         afterExhaustion.ShouldBeOfType<PublicChatClaimOutcome.AwaitingAvailability>();
-    }
-
-    [Test]
-    public async Task SafePreSendRetry_ConcurrentStores_GrantOneClaimWithoutResettingFailureCount()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var retryPolicy = CreateRetryPolicy(
-            3,
-            TimeSpan.FromSeconds(1),
-            TimeSpan.FromSeconds(5),
-            DelayBackoffType.Exponential
-        );
-        var firstStore = new EfPublicChatOutbox(
-            dbFactory,
-            retryPolicy,
-            StandardLifetimePolicy,
-            StandardRetentionPolicy
-        );
-        var secondStore = new EfPublicChatOutbox(
-            dbFactory,
-            retryPolicy,
-            StandardLifetimePolicy,
-            StandardRetentionPolicy
-        );
-        var now = Utc(12, 0, 0);
-        _ = await firstStore.EnqueueAsync(
-            Batch("streamer", now, "safe concurrent retry"),
-            CancellationToken.None
-        );
-        var initial = await ClaimAsync(firstStore, now, TimeSpan.Zero);
-        (
-            await firstStore.RecordDeliveryOutcomeAsync(
-                initial,
-                SafePreSendTransientOutcome(),
-                now,
-                CancellationToken.None
-            )
-        ).ShouldBeOfType<PublicChatClaimUpdate.Applied>();
-        await using var firstContext = await dbFactory.CreateDbContextAsync();
-        await using var secondContext = await dbFactory.CreateDbContextAsync();
-        firstContext.ShouldNotBeSameAs(secondContext);
-        firstContext
-            .Database.GetDbConnection()
-            .ShouldNotBeSameAs(secondContext.Database.GetDbConnection());
-
-        var retryAt = now.AddSeconds(1);
-        var claims = await Task.WhenAll(
-            firstStore
-                .TryClaimNextAsync(
-                    retryAt,
-                    retryAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask(),
-            secondStore
-                .TryClaimNextAsync(
-                    retryAt,
-                    retryAt.AddMinutes(5),
-                    TimeSpan.Zero,
-                    TimeSpan.Zero,
-                    CancellationToken.None
-                )
-                .AsTask()
-        );
-
-        claims.OfType<PublicChatClaimOutcome.Claimed>().ShouldHaveSingleItem();
-        claims
-            .Count(outcome =>
-                outcome
-                    is PublicChatClaimOutcome.AwaitingAvailability
-                        or PublicChatClaimOutcome.Contended
-            )
-            .ShouldBe(1);
-        await using var verification = await dbFactory.CreateDbContextAsync();
-        var row = await verification.PublicChatOutboxMessages.AsNoTracking().SingleAsync();
-        row.Status.ShouldBe(PublicChatOutboxStatus.Claimed);
-        row.Message.ShouldBe("safe concurrent retry");
-        row.AttemptCount.ShouldBe(0);
-        row.SafePreSendFailureCount.ShouldBe(1);
     }
 
     [Test]

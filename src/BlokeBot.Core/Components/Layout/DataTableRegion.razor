@@ -1,0 +1,14 @@
+<div class="data-table-region"
+     role="region"
+     aria-label="@Label"
+     tabindex="0">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = string.Empty;
+}

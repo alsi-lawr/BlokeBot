@@ -1,5 +1,7 @@
 using BlokeBot.Core;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -14,9 +16,13 @@ public sealed class ShoutoutService(
     HelixClient helix,
     BotSettings settings,
     EventBus<AppEventKind> events,
-    TimeProvider timeProvider
-) : IShoutoutEventObserver
+    TimeProvider timeProvider,
+    NativeTwitchFeatureGate nativeTwitch
+) : IShoutoutEventObserver, IAutomaticRaidNativeShoutoutOperation, IShoutoutDashboardOperations
 {
+    internal const string UnauthorizedAuthorityMessage =
+        "Twitch rejected the configured bot's shoutout authority.";
+
     private static readonly string[] _requiredScopes =
     [
         Scopes.UserReadModeratedChannels,
@@ -30,6 +36,11 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new(null, new ShoutoutTargetCooldownReadiness.Unknown(), []);
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var cooldown = await db
             .ShoutoutCooldowns.AsNoTracking()
@@ -74,6 +85,11 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var normalizedTarget = Login.Normalize(targetLogin);
         if (string.IsNullOrWhiteSpace(normalizedTarget))
         {
@@ -88,6 +104,10 @@ public sealed class ShoutoutService(
             return new ShoutoutOperationOutcome.NotReady(
                 "Select a connected Twitch channel first."
             );
+        }
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
 
         var account = await accounts.GetActiveTokenStatusAsync(host.Login, _requiredScopes, ct);
@@ -144,7 +164,7 @@ public sealed class ShoutoutService(
                 || x.Login == Login.Normalize(shoutout.BroadcasterUserLogin),
             ct
         );
-        if (host is null)
+        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
         {
             return;
         }
@@ -259,13 +279,18 @@ public sealed class ShoutoutService(
                 "The configured bot must be this channel's broadcaster or moderator."
             );
         }
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, ct))
+        {
+            return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+        }
+
         var result = await helix.SendShoutoutAsync(context, broadcasterId, botId, target.Id, ct);
         return result switch
         {
             ShoutoutSendResult.Sent => new ShoutoutOperationOutcome.Sent(target.Login),
             ShoutoutSendResult.Cooldown => new ShoutoutOperationOutcome.CooldownUnknown(),
             ShoutoutSendResult.Unauthorized => new ShoutoutOperationOutcome.NotReady(
-                "Twitch rejected the configured bot's shoutout authority."
+                UnauthorizedAuthorityMessage
             ),
             ShoutoutSendResult.InvalidTarget => new ShoutoutOperationOutcome.ProviderRejected(
                 "Twitch rejected that shoutout target."

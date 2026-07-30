@@ -1,9 +1,11 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
+using PersistedAnnouncementColor = BlokeBot.Persistence.Models.TwitchAnnouncementColor;
 
 namespace BlokeBot.Simulation;
 
@@ -37,6 +39,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedPointsAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
+        await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return new BotHostChoice(
@@ -387,5 +390,117 @@ internal sealed class SimulationFixtureSeeder(
                     .Login,
             }
         );
+    }
+
+    private static async Task SeedAutomaticRaidShoutoutsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            !await db.AutomaticRaidShoutoutSettings.AnyAsync(
+                value => value.HostId == hostId,
+                cancellationToken
+            )
+        )
+        {
+            db.AutomaticRaidShoutoutSettings.Add(
+                new AutomaticRaidShoutoutSettings
+                {
+                    HostId = hostId,
+                    Enabled = true,
+                    MinimumViewerCount = 10,
+                    Mechanism = AutomaticRaidShoutoutMechanism.Chat,
+                    ChatPresentation = AutomaticRaidChatPresentation.Pinned,
+                    MessageTemplate =
+                        "Welcome {twitch_handle}! Last seen playing {last_game|something fun}: {channel_url}",
+                    PinDurationSeconds = 300,
+                    AnnouncementColor = PersistedAnnouncementColor.Purple,
+                    UpdatedAtUtc = now,
+                }
+            );
+        }
+
+        if (
+            await db.AutomaticRaidShoutoutOutcomes.AnyAsync(
+                value => value.HostId == hostId,
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        db.AutomaticRaidShoutoutOutcomes.AddRange(
+            Outcome(
+                hostId,
+                "simulation-raid-partial",
+                "pinpal",
+                "Pin Pal",
+                84,
+                AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+                AutomaticRaidShoutoutResultCode.PartialFailure,
+                now.AddMinutes(-8)
+            ),
+            Outcome(
+                hostId,
+                "simulation-raid-delivered",
+                "cozystreamer",
+                "Cozy Streamer",
+                42,
+                AutomaticRaidShoutoutOutcomeStatus.Delivered,
+                AutomaticRaidShoutoutResultCode.Delivered,
+                now.AddMinutes(-24)
+            ),
+            Outcome(
+                hostId,
+                "simulation-raid-authority",
+                "newfriend",
+                "New Friend",
+                21,
+                AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+                AutomaticRaidShoutoutResultCode.AuthorityRequired,
+                now.AddMinutes(-41)
+            ),
+            Outcome(
+                hostId,
+                "simulation-raid-cooldown",
+                "speedrunner",
+                "Speed Runner",
+                16,
+                AutomaticRaidShoutoutOutcomeStatus.NotDelivered,
+                AutomaticRaidShoutoutResultCode.Cooldown,
+                now.AddMinutes(-58)
+            )
+        );
+    }
+
+    private static AutomaticRaidShoutoutOutcome Outcome(
+        int hostId,
+        string providerMessageId,
+        string sourceLogin,
+        string sourceDisplayName,
+        int viewerCount,
+        AutomaticRaidShoutoutOutcomeStatus status,
+        AutomaticRaidShoutoutResultCode resultCode,
+        DateTime timestamp
+    )
+    {
+        return new AutomaticRaidShoutoutOutcome
+        {
+            HostId = hostId,
+            ProviderMessageId = providerMessageId,
+            SourceTwitchUserId = $"{sourceLogin}-id",
+            SourceLogin = sourceLogin,
+            SourceDisplayName = sourceDisplayName,
+            ViewerCount = viewerCount,
+            Status = status,
+            ResultCode = resultCode,
+            MessageTimestampUtc = timestamp,
+            ClaimedAtUtc = timestamp,
+            CompletedAtUtc = timestamp.AddSeconds(2),
+        };
     }
 }

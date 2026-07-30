@@ -16,14 +16,20 @@ public sealed class ChannelPointsService(
     BotSettings settings,
     EventBus<AppEventKind> events,
     DurableAlertService alerts,
-    TimeProvider timeProvider
-) : IChannelPointsEventObserver
+    TimeProvider timeProvider,
+    NativeTwitchFeatureGate nativeTwitch
+) : IChannelPointsEventObserver, IChannelPointsDashboardOperations
 {
     private const int _terminalToKeep = 100;
     private const int _redemptionsPageSize = 50;
 
     public async Task<ChannelPointsDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new(new ChannelPointsAuthorizationReadiness.Disabled(), [], [], []);
+        }
+
         var reconciliation = await ReconcileCoreAsync(hostId, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var readiness =
@@ -64,6 +70,10 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
         var validation = draft.Validate();
         if (validation is not null)
         {
@@ -74,6 +84,11 @@ public sealed class ChannelPointsService(
         {
             return NotReady();
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
+
         var result = await helix.CreateCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -106,6 +121,10 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
         var validation = draft.Validate();
         if (validation is not null)
         {
@@ -125,6 +144,11 @@ public sealed class ChannelPointsService(
         {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
+
         var result = await helix.UpdateCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -172,6 +196,10 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
         if (!confirmed)
         {
             return new ChannelPointsOperationOutcome.ConfirmationRequired(
@@ -192,6 +220,11 @@ public sealed class ChannelPointsService(
         {
             return new ChannelPointsOperationOutcome.ExternalReadOnly();
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
+
         var result = await helix.DeleteCustomRewardAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -215,6 +248,10 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
         {
@@ -243,6 +280,11 @@ public sealed class ChannelPointsService(
         var status = fulfill
             ? HelixRewardRedemptionStatus.Fulfilled
             : HelixRewardRedemptionStatus.Canceled;
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return Disabled();
+        }
+
         var result = await helix.UpdateRedemptionStatusAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -260,8 +302,11 @@ public sealed class ChannelPointsService(
             : TwitchRewardRedemptionStatus.Canceled;
         redemption.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
-        await TrimTerminalAsync(db, hostId, ct);
-        await db.SaveChangesAsync(ct);
+        if (await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            await TrimTerminalAsync(db, hostId, ct);
+            await db.SaveChangesAsync(ct);
+        }
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return new ChannelPointsOperationOutcome.RedemptionUpdated();
     }
@@ -290,6 +335,11 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ChannelPointsReconciliationOutcome.Incomplete();
+        }
+
         var context = await ProviderContextAsync(hostId, ct);
         if (context is null)
         {
@@ -305,6 +355,11 @@ public sealed class ChannelPointsService(
         {
             return ReconciliationFailure(allRewards);
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ChannelPointsReconciliationOutcome.Incomplete();
+        }
+
         var manageableRewards = await helix.GetCustomRewardsAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
@@ -315,17 +370,32 @@ public sealed class ChannelPointsService(
         {
             return ReconciliationFailure(manageableRewards);
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ChannelPointsReconciliationOutcome.Incomplete();
+        }
+
         var redemptions = await ReconcileRedemptionsAsync(
             context.Value.Context,
             context.Value.BroadcasterId,
             manageable.Rewards,
+            hostId,
             ct
         );
         if (redemptions is not ChannelPointsReconciliationOutcome.Completed recovered)
         {
             return redemptions;
         }
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return new ChannelPointsReconciliationOutcome.Incomplete();
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        if (!await HostIsEnabledAsync(db, hostId, ct))
+        {
+            return new ChannelPointsReconciliationOutcome.Incomplete();
+        }
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var manageableRewardIds = manageable.Rewards.Select(x => x.Id).ToHashSet();
         var changed = false;
@@ -353,17 +423,15 @@ public sealed class ChannelPointsService(
         {
             changed |= UpsertRedemption(db, hostId, redemption, now);
         }
+        changed |= await TrimTerminalAsync(db, hostId, ct);
         if (changed)
         {
+            if (!await HostIsEnabledAsync(db, hostId, ct))
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
+
             await db.SaveChangesAsync(ct);
-        }
-        if (await TrimTerminalAsync(db, hostId, ct))
-        {
-            await db.SaveChangesAsync(ct);
-            changed = true;
-        }
-        if (changed)
-        {
             await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         }
         return new ChannelPointsReconciliationOutcome.Completed(recovered.Redemptions);
@@ -374,6 +442,11 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(redemption.BroadcasterUserLogin, ct))
+        {
+            return;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db.Hosts.SingleOrDefaultAsync(
             x =>
@@ -381,7 +454,11 @@ public sealed class ChannelPointsService(
                 || x.Login == Login.Normalize(redemption.BroadcasterUserLogin),
             ct
         );
-        if (host is null)
+        if (
+            host is null
+            || (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
+                != HostFeatureFlags.NativeTwitch
+        )
         {
             return;
         }
@@ -395,8 +472,12 @@ public sealed class ChannelPointsService(
         {
             return;
         }
-        await db.SaveChangesAsync(ct);
         await TrimTerminalAsync(db, host.Id, ct);
+        if (!await HostIsEnabledAsync(db, host.Id, ct))
+        {
+            return;
+        }
+
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
     }
@@ -406,6 +487,11 @@ public sealed class ChannelPointsService(
         CancellationToken ct
     )
     {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        {
+            return null;
+        }
+
         var token = await ReadyTokenAsync(hostId, ct);
         if (token is null)
         {
@@ -413,7 +499,11 @@ public sealed class ChannelPointsService(
         }
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var id = await db
-            .Hosts.Where(x => x.Id == hostId)
+            .Hosts.Where(x =>
+                x.Id == hostId
+                && (x.EnabledFeatures & HostFeatureFlags.NativeTwitch)
+                    == HostFeatureFlags.NativeTwitch
+            )
             .Select(x => x.TwitchUserId)
             .SingleOrDefaultAsync(ct);
         return string.IsNullOrWhiteSpace(id)
@@ -456,6 +546,26 @@ public sealed class ChannelPointsService(
             )
             .ExecuteAsync(ct);
         return null;
+    }
+
+    private static ChannelPointsOperationOutcome Disabled()
+    {
+        return new ChannelPointsOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
+    }
+
+    private static Task<bool> HostIsEnabledAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        CancellationToken ct
+    )
+    {
+        return db.Hosts.AnyAsync(
+            host =>
+                host.Id == hostId
+                && (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
+                    == HostFeatureFlags.NativeTwitch,
+            ct
+        );
     }
 
     private static ChannelPointsOperationOutcome NotReady()
@@ -503,6 +613,7 @@ public sealed class ChannelPointsService(
         HelixRequestContext context,
         string broadcasterId,
         IReadOnlyList<HelixCustomReward> rewards,
+        int hostId,
         CancellationToken ct
     )
     {
@@ -518,6 +629,11 @@ public sealed class ChannelPointsService(
                 {
                     return new ChannelPointsReconciliationOutcome.Incomplete();
                 }
+                if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+                {
+                    return new ChannelPointsReconciliationOutcome.Incomplete();
+                }
+
                 var result = await helix.GetRewardRedemptionsAsync(
                     context,
                     broadcasterId,
@@ -560,6 +676,11 @@ public sealed class ChannelPointsService(
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }
+            if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
+
             var result = await helix.GetRewardRedemptionsAsync(
                 context,
                 broadcasterId,
@@ -604,6 +725,11 @@ public sealed class ChannelPointsService(
             {
                 return new ChannelPointsReconciliationOutcome.Incomplete();
             }
+            if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+            {
+                return new ChannelPointsReconciliationOutcome.Incomplete();
+            }
+
             var result = await helix.GetRewardRedemptionsAsync(
                 context,
                 broadcasterId,

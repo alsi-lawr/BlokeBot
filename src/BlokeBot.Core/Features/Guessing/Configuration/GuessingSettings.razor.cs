@@ -79,7 +79,7 @@ public partial class GuessingSettings
 
     private Task LoadAsync()
     {
-        return ObserveRouteLoadAsync(LoadCoreAsync);
+        return ObserveUiOperationAsync(nameof(LoadAsync), LoadCoreAsync);
     }
 
     private async Task LoadCoreAsync()

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BlokeBot.Functional;
 
 namespace BlokeBot.Twitch.Runtime;
@@ -10,6 +11,7 @@ internal sealed class EventSubChannelOperations(
     IStartupChatMessageProvider startupMessages,
     IPublicChatMessageSender sender,
     IBotChannelLifecycleNotifier lifecycle,
+    INativeTwitchFeatureStateProvider nativeTwitch,
     IBroadcasterAccountProvider? broadcasters = null
 ) : IEventSubChannelOperations
 {
@@ -19,6 +21,7 @@ internal sealed class EventSubChannelOperations(
     )
     {
         return authorization.Match(
+            _ => accounts.GetBotAccount(channel),
             _ => accounts.GetBotAccount(channel),
             _ =>
                 broadcasters?.GetBroadcasterAccount(channel)
@@ -37,9 +40,21 @@ internal sealed class EventSubChannelOperations(
         EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        EventSubOperationSubscriptionKind? operationKind = null
     )
     {
+        if (operationKind is EventSubOperationSubscriptionKind.Raids)
+        {
+            return CreateConfiguredBotRaidSubscriptionAsync(
+                channel,
+                authorization,
+                account,
+                sessionId,
+                cancellationToken
+            );
+        }
+
         return authorization.Match(
             _ =>
                 CreateConfiguredBotSubscriptionsAsync(
@@ -50,14 +65,82 @@ internal sealed class EventSubChannelOperations(
                     cancellationToken
                 ),
             _ =>
-                CreatePollSubscriptionsAsync(
+                CreateConfiguredBotOperationSubscriptionsAsync(
                     channel,
                     authorization,
                     account,
                     sessionId,
                     cancellationToken
-                )
+                ),
+            broadcaster =>
+                broadcaster.Operation switch
+                {
+                    EventSubBroadcasterOperationKind.Polls => CreatePollSubscriptionsAsync(
+                        channel,
+                        authorization,
+                        account,
+                        sessionId,
+                        cancellationToken
+                    ),
+                    EventSubBroadcasterOperationKind.RewardRedemptions =>
+                        CreateRewardRedemptionSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            sessionId,
+                            cancellationToken
+                        ),
+                    EventSubBroadcasterOperationKind.Predictions =>
+                        CreatePredictionSubscriptionsAsync(
+                            channel,
+                            authorization,
+                            account,
+                            sessionId,
+                            cancellationToken
+                        ),
+                    _ => throw new UnreachableException(
+                        "Unknown broadcaster EventSub operation kind."
+                    ),
+                }
         );
+    }
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotRaidSubscriptionAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        CancellationToken ct
+    )
+    {
+        var broadcasterId = await identities.ResolveBroadcasterIdAsync(
+            channel,
+            account.AccessToken,
+            ct
+        );
+        if (string.IsNullOrWhiteSpace(broadcasterId))
+        {
+            return new EventSubSubscriptionSetupOutcome.MissingChannel();
+        }
+
+        var context = new HelixRequestContext(settings.Identity.ClientId, account.AccessToken);
+        var id = await eventSub.CreateIncomingRaidSubscriptionAsync(
+            context,
+            broadcasterId,
+            sessionId,
+            ct
+        );
+        return new EventSubSubscriptionSetupOutcome.Created(
+            CreateActive(channel, authorization, account, [id])
+        );
+    }
+
+    public ValueTask<bool> NativeTwitchIsEnabledAsync(
+        string channel,
+        CancellationToken cancellationToken
+    )
+    {
+        return nativeTwitch.IsEnabledAsync(channel, cancellationToken);
     }
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(
@@ -117,6 +200,67 @@ internal sealed class EventSubChannelOperations(
                     ct
                 )
             );
+            return new EventSubSubscriptionSetupOutcome.Created(
+                CreateActive(channel, authorization, account, ids)
+            );
+        }
+        catch (Exception exception) when (ids.Count > 0)
+        {
+            return new EventSubSubscriptionSetupOutcome.PartiallyCreated(
+                CreateActive(channel, authorization, account, ids),
+                exception
+            );
+        }
+    }
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotOperationSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        CancellationToken ct
+    )
+    {
+        var resolution = await identities.ResolveAsync(
+            channel,
+            account.Login,
+            account.AccessToken,
+            ct
+        );
+        return await resolution.Match(
+            resolved =>
+                CreateShoutoutSubscriptionsAsync(
+                    channel,
+                    authorization,
+                    account,
+                    sessionId,
+                    resolved,
+                    ct
+                ),
+            static _ =>
+                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.MissingChannel()
+                ),
+            static _ =>
+                ValueTask.FromResult<EventSubSubscriptionSetupOutcome>(
+                    new EventSubSubscriptionSetupOutcome.MissingBot()
+                )
+        );
+    }
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateShoutoutSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        ChatIdentityResolution.Resolved resolved,
+        CancellationToken ct
+    )
+    {
+        var ids = new List<string>();
+        try
+        {
+            var context = new HelixRequestContext(settings.Identity.ClientId, account.AccessToken);
             ids.Add(
                 await eventSub.CreateShoutoutCreateSubscriptionAsync(
                     context,
@@ -148,11 +292,74 @@ internal sealed class EventSubChannelOperations(
         }
     }
 
-    private async ValueTask<EventSubSubscriptionSetupOutcome> CreatePollSubscriptionsAsync(
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreatePollSubscriptionsAsync(
         string channel,
         EventSubAuthorizationContext authorization,
         BotAccount account,
         string sessionId,
+        CancellationToken ct
+    )
+    {
+        return CreateBroadcasterOperationSubscriptionsAsync(
+            channel,
+            authorization,
+            account,
+            sessionId,
+            ["channel.poll.begin", "channel.poll.progress", "channel.poll.end"],
+            ct
+        );
+    }
+
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreateRewardRedemptionSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        CancellationToken ct
+    )
+    {
+        return CreateBroadcasterOperationSubscriptionsAsync(
+            channel,
+            authorization,
+            account,
+            sessionId,
+            [
+                "channel.channel_points_custom_reward_redemption.add",
+                "channel.channel_points_custom_reward_redemption.update",
+            ],
+            ct
+        );
+    }
+
+    private ValueTask<EventSubSubscriptionSetupOutcome> CreatePredictionSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        CancellationToken ct
+    )
+    {
+        return CreateBroadcasterOperationSubscriptionsAsync(
+            channel,
+            authorization,
+            account,
+            sessionId,
+            [
+                "channel.prediction.begin",
+                "channel.prediction.progress",
+                "channel.prediction.lock",
+                "channel.prediction.end",
+            ],
+            ct
+        );
+    }
+
+    private async ValueTask<EventSubSubscriptionSetupOutcome> CreateBroadcasterOperationSubscriptionsAsync(
+        string channel,
+        EventSubAuthorizationContext authorization,
+        BotAccount account,
+        string sessionId,
+        IReadOnlyList<string> subscriptionTypes,
         CancellationToken ct
     )
     {
@@ -165,24 +372,12 @@ internal sealed class EventSubChannelOperations(
         {
             return new EventSubSubscriptionSetupOutcome.MissingChannel();
         }
+
         var ids = new List<string>();
         try
         {
             var context = new HelixRequestContext(settings.Identity.ClientId, account.AccessToken);
-            foreach (
-                var type in new[]
-                {
-                    "channel.poll.begin",
-                    "channel.poll.progress",
-                    "channel.poll.end",
-                    "channel.prediction.begin",
-                    "channel.prediction.progress",
-                    "channel.prediction.lock",
-                    "channel.prediction.end",
-                    "channel.channel_points_custom_reward_redemption.add",
-                    "channel.channel_points_custom_reward_redemption.update",
-                }
-            )
+            foreach (var type in subscriptionTypes)
             {
                 ids.Add(
                     await eventSub.CreatePollSubscriptionAsync(
@@ -243,11 +438,7 @@ internal sealed class EventSubChannelOperations(
         {
             if (subscription.Authorization is EventSubAuthorizationContext.Broadcaster)
             {
-                await DeleteBroadcasterGroupAsync(
-                    subscription.Channel,
-                    BroadcasterPollSubscriptionGroup.From(subscription),
-                    ct
-                );
+                await DeleteBroadcasterGroupAsync(subscription.Channel, subscription, ct);
                 return new EventSubSubscriptionDeletionOutcome.Deleted();
             }
             var context = new HelixRequestContext(
@@ -280,7 +471,7 @@ internal sealed class EventSubChannelOperations(
 
     private async Task DeleteBroadcasterGroupAsync(
         string channel,
-        BroadcasterPollSubscriptionGroup group,
+        ActiveEventSubSubscription subscription,
         CancellationToken ct
     )
     {
@@ -296,8 +487,8 @@ internal sealed class EventSubChannelOperations(
                     settings.Identity.ClientId,
                     account.AccessToken
                 );
-                await eventSub.DeleteSubscriptionAsync(context, group.SubscriptionId, ct);
-                foreach (var id in group.AdditionalSubscriptionIds)
+                await eventSub.DeleteSubscriptionAsync(context, subscription.SubscriptionId, ct);
+                foreach (var id in subscription.AdditionalSubscriptionIds)
                 {
                     await eventSub.DeleteSubscriptionAsync(context, id, ct);
                 }

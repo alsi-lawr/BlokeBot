@@ -18,27 +18,23 @@
 @inject EventBus<AppEventKind> _events
 @inject IPublicChatMessageSender _chat
 @inject ToastService _toasts
-@inject IJSRuntime _js
 
 <PageTitle>BlokeBot | Guessing</PageTitle>
 
-<DashboardPage Kicker="Chat tools"
-               Title="Run a guessing round"
-               Description="Start a live round, manage guesses, and review results for the selected channel." LoadFailure="@RouteLoadFailure" RetryLoadAsync="LoadRouteAsync">
-    <Actions>
-        <button class="btn-secondary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
-    </Actions>
+<div class="mx-auto max-w-7xl space-y-6">
+    <PageHeader Kicker="Dashboard"
+                Title="Guessing game"
+                Description="Run live rounds and look back at viewer results.">
+        <button class="btn-primary" disabled="@(!_featureEnabled)" @onclick="RefreshAsync">Refresh</button>
+    </PageHeader>
 
-    <ChildContent>
     @if (Host is null)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Choose a channel" Description="Select the channel where you want to run guessing rounds from the top bar." />
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
     }
     else if (!_featureEnabled)
     {
-        <PageState Kind="DashboardPageState.Unavailable" Title="Turn on guessing" Description="Guessing is off for this channel. Turn it on in Channel setup before running a round.">
-            <Actions><a class="btn-primary" href="/host">Open Channel setup</a></Actions>
-        </PageState>
+        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
     }
     else
     {
@@ -46,39 +42,26 @@
         <div id="live"
              class="@_segmentedControlClass"
              role="tablist"
-             aria-label="Guessing dashboard view"
-             @ref="_tabList">
+             aria-label="Guessing dashboard view">
             <span class="segmented-motion__indicator" aria-hidden="true"></span>
             <button class="@TabClass(DashboardTab.Live)"
                     type="button"
                     role="tab"
-                    id="guessing-tab-live"
-                    aria-controls="guessing-panel-live"
-                    tabindex="@(_activeTab == DashboardTab.Live ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Live ? "true" : "false")"
-                    @ref="_liveTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Live)">
                 Live
             </button>
             <button class="@TabClass(DashboardTab.History)"
                     type="button"
                     role="tab"
-                    id="guessing-tab-history"
-                    aria-controls="guessing-panel-history"
-                    tabindex="@(_activeTab == DashboardTab.History ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.History ? "true" : "false")"
-                    @ref="_historyTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.History)">
                 History
             </button>
             <button class="@TabClass(DashboardTab.Leaderboard)"
                     type="button"
                     role="tab"
-                    id="guessing-tab-leaderboard"
-                    aria-controls="guessing-panel-leaderboard"
-                    tabindex="@(_activeTab == DashboardTab.Leaderboard ? "0" : "-1")"
                     aria-selected="@(_activeTab == DashboardTab.Leaderboard ? "true" : "false")"
-                    @ref="_leaderboardTab"
                     @onclick="() => ActivateTabAsync(DashboardTab.Leaderboard)">
                 Leaderboard
             </button>
@@ -86,17 +69,15 @@
 
         @if (_activeTab == DashboardTab.Live)
         {
-            <section id="guessing-panel-live" role="tabpanel" aria-labelledby="guessing-tab-live">
             @if (_state is null)
             {
-                <PageState Kind="DashboardPageState.Loading" Title="Loading guessing" Description="Getting the current round and viewer guesses ready." />
+                <div class="card p-8 text-sm text-muted-foreground">Loading guessing game...</div>
             }
             else
             {
-                <TaskPanel Title="Run the current round" Description="Choose a round type, start it when ready, and keep an eye on viewer guesses.">
-                    <LiveRoundSummary State="_state" RoundStartedText="@_roundStartedText" RoundStatusText="@_roundStatusText" />
+                <LiveRoundSummary State="_state" RoundStartedText="@_roundStartedText" RoundStatusText="@_roundStatusText" />
 
-                    <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                     <RoundOrchestrationPanel State="_state"
                                              StartRound="StartRoundAsync"
                                              StopGuessing="StopGuessingAsync"
@@ -106,34 +87,26 @@
 
                     <GuessVotesTable Votes="_state.Votes" />
                 </div>
-                </TaskPanel>
             }
-            </section>
         }
         else if (_activeTab == DashboardTab.History)
         {
-            <section id="guessing-panel-history" role="tabpanel" aria-labelledby="guessing-tab-history" class="card">
+            <section id="history" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Recent rounds</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Past rounds for this channel.</p>
                 </div>
                 @if (_recentRounds is null)
                 {
-                    <PageState Kind="DashboardPageState.Loading" Title="Loading recent rounds" Description="Getting completed rounds for this channel ready." />
+                    <div class="p-8 text-sm text-muted-foreground">Loading recent rounds...</div>
                 }
                 else if (_recentRounds.Count == 0)
                 {
-                    <PageState Kind="DashboardPageState.Empty" Title="No completed rounds yet" Description="Finish a guessing round to see it in this history." />
+                    <div class="p-8 text-sm text-muted-foreground">No completed rounds yet.</div>
                 }
                 else
                 {
-                    <div class="phone-card-list" data-phone-cards="guess-history">
-                        @foreach (var round in _recentRounds)
-                        {
-                            <article @key="round.Id" class="phone-card"><strong>@round.ProfileName</strong><span>Winner @round.Lifecycle.WinningName</span><span>@round.GuessCount guesses</span><span>@FormatEndedAt(round)</span></article>
-                        }
-                    </div>
-                    <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Recent guessing rounds">
+                    <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <thead class="surface-band border-b text-xs uppercase tracking-wide text-muted-foreground">
                                 <tr>
@@ -149,12 +122,12 @@
                                 @foreach (var round in _recentRounds)
                                 {
                                     <tr @key="round.Id" class="motion-list__item">
-                                        <td class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.Lifecycle.WinningName</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.GuessCount</td>
-                                        <td class="px-5 py-3 text-slate-700">@round.CorrectGuessCount</td>
-                                        <td class="px-5 py-3 text-muted-foreground">@round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
-                                        <td class="px-5 py-3 text-muted-foreground">@FormatEndedAt(round)</td>
+                                        <td data-label="Round" class="px-5 py-3 font-medium text-slate-900">@round.ProfileName</td>
+                                        <td data-label="Winner" class="px-5 py-3 text-slate-700">@round.Lifecycle.WinningName</td>
+                                        <td data-label="Guesses" class="px-5 py-3 text-slate-700">@round.GuessCount</td>
+                                        <td data-label="Correct" class="px-5 py-3 text-slate-700">@round.CorrectGuessCount</td>
+                                        <td data-label="Started" class="px-5 py-3 text-muted-foreground">@round.Lifecycle.StartedAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                        <td data-label="Ended" class="px-5 py-3 text-muted-foreground">@FormatEndedAt(round)</td>
                                     </tr>
                                 }
                             </tbody>
@@ -165,7 +138,7 @@
         }
         else
         {
-            <section id="guessing-panel-leaderboard" role="tabpanel" aria-labelledby="guessing-tab-leaderboard" class="card">
+            <section id="leaderboard" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Rank viewers by correct guesses across past rounds.</p>
@@ -197,7 +170,7 @@
 
                 @if (_leaderboard is null)
                 {
-                    <PageState Kind="DashboardPageState.Loading" Title="Loading leaderboard" Description="Calculating viewer results for these filters." />
+                    <div class="p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
                 }
                 else
                 {
@@ -220,10 +193,10 @@
                         </div>
                     </div>
 
-                    <div class="wide-data-region scroll-panel scroll-panel--data-table" role="region" tabindex="0" aria-label="Guessing leaderboard">
+                    <div class="responsive-data-cards scroll-panel scroll-panel--data-table overflow-x-auto">
                         @if (_leaderboard.Entries.Count == 0)
                         {
-                            <PageState Kind="DashboardPageState.Empty" Title="No matching guesses" Description="Try a different date, round type, or viewer name." />
+                            <div class="p-8 text-sm text-muted-foreground">No past guesses match these filters.</div>
                         }
                         else
                         {
@@ -242,12 +215,12 @@
                                     @foreach (var entry in _leaderboard.Entries)
                                     {
                                         <tr @key="entry" class="motion-list__item">
-                                            <td class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
-                                            <td class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
-                                            <td class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
-                                            <td class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
+                                            <td data-label="Rank" class="px-5 py-3 font-semibold text-slate-900"><RankIndicator Rank="@entry.Rank" /></td>
+                                            <td data-label="Player" class="px-5 py-3 font-medium text-slate-900">@entry.Login</td>
+                                            <td data-label="Correct" class="px-5 py-3 text-slate-700">@entry.CorrectGuesses</td>
+                                            <td data-label="Rounds" class="px-5 py-3 text-slate-700">@entry.RoundsPlayed</td>
+                                            <td data-label="Accuracy" class="px-5 py-3 text-slate-700">@entry.HitRate.ToString("P0", CultureInfo.CurrentCulture)</td>
+                                            <td data-label="Latest" class="px-5 py-3 text-muted-foreground">@entry.LastGuessAtUtc.ToLocalTime().ToString("MMM d, HH:mm")</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -274,5 +247,4 @@
             </section>
         }
     }
-    </ChildContent>
-</DashboardPage>
+</div>

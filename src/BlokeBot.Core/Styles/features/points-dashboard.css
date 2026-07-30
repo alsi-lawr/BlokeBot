@@ -65,4 +65,18 @@
             width: 100%;
         }
     }
+
+    @media (max-width: 22.5rem) {
+        .points-dashboard__leaderboard tr {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .points-dashboard__leaderboard td:nth-child(even) {
+            border-left: 0;
+        }
+
+        .points-dashboard__leaderboard td:nth-child(n + 2) {
+            border-top: 1px solid var(--app-border);
+        }
+    }
 }

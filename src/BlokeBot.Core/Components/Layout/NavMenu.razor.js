@@ -1,18 +1,10 @@
-const preferenceResetStorageKey = "blokebot.sidebar.chat-tools.version";
-const preferenceResetVersion = "2026-07-dashboard-foundation";
-const chatToolsPreferenceKeys = [
-    "blokebot.sidebar.guessing.open",
-    "blokebot.sidebar.points.open",
-    "blokebot.sidebar.customcommands.open",
-    "blokebot.sidebar.native-twitch.open",
-];
-
 const attributesByKey = new Map([
     ["blokebot.sidebar.guessing.open", "navGuessingOpen"],
     ["blokebot.sidebar.points.open", "navPointsOpen"],
     ["blokebot.sidebar.customcommands.open", "navCustomCommandsOpen"],
-    ["blokebot.sidebar.native-twitch.open", "navNativeTwitchOpen"],
+    ["blokebot.sidebar.nativetwitch.open", "navNativeTwitchOpen"],
 ]);
+const routeHelpCleanups = new Map();
 
 function applyDocumentState(key, value) {
     const attribute = attributesByKey.get(key);
@@ -20,25 +12,55 @@ function applyDocumentState(key, value) {
         document.documentElement.dataset[attribute] = value ? "true" : "false";
 }
 
-function resetChatToolsPreferences() {
-    if (localStorage.getItem(preferenceResetStorageKey) === preferenceResetVersion)
-        return;
-
-    for (const key of chatToolsPreferenceKeys)
-        localStorage.setItem(key, "false");
-
-    localStorage.setItem(preferenceResetStorageKey, preferenceResetVersion);
-}
-
-export function readBoolean(key) {
-    resetChatToolsPreferences();
-    const value = localStorage.getItem(key);
-    const result = value === "true";
-    applyDocumentState(key, result);
-    return result;
+export function readBoolean(key, fallback) {
+    try {
+        const value = window.localStorage.getItem(key);
+        const result = value === null ? fallback : value === "true";
+        applyDocumentState(key, result);
+        return result;
+    } catch {
+        return fallback;
+    }
 }
 
 export function writeBoolean(key, value) {
-    localStorage.setItem(key, value ? "true" : "false");
+    try {
+        window.localStorage.setItem(key, value ? "true" : "false");
+    } catch {
+    }
+
     applyDocumentState(key, value);
+}
+
+export function activateRouteHelp(rootId) {
+    deactivateRouteHelp(rootId);
+    const root = document.getElementById(rootId);
+    if (!root)
+        return;
+
+    const clearDismissal = event => {
+        event.target.closest(".nav-menu__route-item, .nav-menu__group")
+            ?.removeAttribute("data-route-help-dismissed");
+    };
+    const dismiss = event => {
+        if (event.key !== "Escape")
+            return;
+
+        for (const item of root.querySelectorAll(".nav-menu__route-item:hover, .nav-menu__route-item:focus-within, .nav-menu__group:hover, .nav-menu__group:focus-within"))
+            item.dataset.routeHelpDismissed = "true";
+    };
+
+    root.addEventListener("pointerenter", clearDismissal, true);
+    root.addEventListener("focusin", clearDismissal);
+    document.addEventListener("keydown", dismiss);
+    routeHelpCleanups.set(rootId, () => {
+        root.removeEventListener("pointerenter", clearDismissal, true);
+        root.removeEventListener("focusin", clearDismissal);
+        document.removeEventListener("keydown", dismiss);
+    });
+}
+
+export function deactivateRouteHelp(rootId) {
+    routeHelpCleanups.get(rootId)?.();
+    routeHelpCleanups.delete(rootId);
 }

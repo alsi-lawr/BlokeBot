@@ -184,6 +184,8 @@ public sealed class TwitchEndpointRoutingTests
             null!,
             null!,
             new BotRuntimeStatusStore(),
+            null!,
+            null!,
             [],
             null!,
             NullLogger<EventSubConnectionSession>.Instance,

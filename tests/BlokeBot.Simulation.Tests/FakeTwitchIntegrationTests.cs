@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using BlokeBot.Commands;
@@ -165,6 +166,37 @@ public sealed class FakeTwitchIntegrationTests
     }
 
     [Test]
+    public async Task ReadyScenario_ProfileImageUrl_ReturnsDeterministicLoadableAvatar()
+    {
+        await using var host = await FakeTwitchHost.StartAsync();
+        var helix = new HelixClient(host.HttpClientFactory, host.Endpoints);
+        var context = new HelixRequestContext(
+            FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
+            FakeTwitchAuthority.BroadcasterAccessToken
+        );
+
+        var user = await helix.GetCurrentUserAsync(context, CancellationToken.None);
+
+        user.ShouldNotBeNull();
+        user.ProfileImageUrl.ShouldBe($"{host.HttpAddress}profile-images/{user.Login}.svg");
+        using var client = new HttpClient();
+        using var first = await client.GetAsync(user.ProfileImageUrl);
+        using var second = await client.GetAsync(user.ProfileImageUrl);
+        first.StatusCode.ShouldBe(HttpStatusCode.OK);
+        second.StatusCode.ShouldBe(HttpStatusCode.OK);
+        first.Content.Headers.ContentType?.MediaType.ShouldBe("image/svg+xml");
+        var firstAvatar = await first.Content.ReadAsByteArrayAsync();
+        firstAvatar.Length.ShouldBeGreaterThan(0);
+        firstAvatar.ShouldBe(await second.Content.ReadAsByteArrayAsync());
+        Encoding.UTF8.GetString(firstAvatar).ShouldContain("width=\"64\" height=\"64\"");
+
+        using var missing = await client.GetAsync(
+            $"{host.HttpAddress}profile-images/not-a-user.svg"
+        );
+        missing.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Test]
     public async Task InvalidScopeTokenAndRoute_ReturnDeterministicVisibleFailures()
     {
         await using var host = await FakeTwitchHost.StartAsync();
@@ -246,6 +278,8 @@ public sealed class FakeTwitchIntegrationTests
             provider.GetRequiredService<ChatCommandDispatcher>(),
             responseSender,
             runtimeStatus,
+            new AlwaysEnabledNativeTwitch(),
+            new EventSubChannelReconciliationTrigger(null!),
             [chatObserver],
             provider.GetRequiredService<
                 ObserverFanOut<EventSubMessageObserverBoundary, ChatMessage, ChatObserverDeadLetter>
@@ -408,6 +442,7 @@ public sealed class FakeTwitchIntegrationTests
         {
             return authorization.Match(
                 _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
+                _ => Success("blokebot", FakeTwitchAuthority.BotAccessToken),
                 _ => Success("samplechannel", FakeTwitchAuthority.BroadcasterAccessToken)
             );
         }
@@ -417,42 +452,128 @@ public sealed class FakeTwitchIntegrationTests
             EventSubAuthorizationContext authorization,
             BotAccount account,
             string sessionId,
-            CancellationToken cancellationToken
+            CancellationToken cancellationToken,
+            EventSubOperationSubscriptionKind? operationKind = null
         )
         {
             var context = new HelixRequestContext(
                 FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
                 account.AccessToken
             );
-            var subscriptionId = authorization.Match(
-                _ =>
-                    _eventSub.CreateChatMessageSubscriptionAsync(
-                        context,
-                        "1000",
-                        "2000",
-                        sessionId,
-                        cancellationToken
+            EventSubSubscriptionRequest[] subscriptions = operationKind switch
+            {
+                null =>
+                [
+                    new EventSubSubscriptionRequest(
+                        "channel.chat.message",
+                        "1",
+                        new Dictionary<string, string>
+                        {
+                            ["broadcaster_user_id"] = "1000",
+                            ["user_id"] = "2000",
+                        },
+                        sessionId
                     ),
-                _ =>
-                    _eventSub.CreatePollSubscriptionAsync(
+                ],
+                EventSubOperationSubscriptionKind.Shoutouts =>
+                [
+                    BroadcasterAndModerator("channel.shoutout.create", sessionId),
+                    BroadcasterAndModerator("channel.shoutout.receive", sessionId),
+                ],
+                EventSubOperationSubscriptionKind.Raids =>
+                [
+                    new EventSubSubscriptionRequest(
+                        "channel.raid",
+                        "1",
+                        new Dictionary<string, string> { ["to_broadcaster_user_id"] = "1000" },
+                        sessionId
+                    ),
+                ],
+                EventSubOperationSubscriptionKind.Polls =>
+                [
+                    BroadcasterOnly("channel.poll.begin", sessionId),
+                    BroadcasterOnly("channel.poll.progress", sessionId),
+                    BroadcasterOnly("channel.poll.end", sessionId),
+                ],
+                EventSubOperationSubscriptionKind.RewardRedemptions =>
+                [
+                    BroadcasterOnly(
+                        "channel.channel_points_custom_reward_redemption.add",
+                        sessionId
+                    ),
+                    BroadcasterOnly(
+                        "channel.channel_points_custom_reward_redemption.update",
+                        sessionId
+                    ),
+                ],
+                EventSubOperationSubscriptionKind.Predictions =>
+                [
+                    BroadcasterOnly("channel.prediction.begin", sessionId),
+                    BroadcasterOnly("channel.prediction.progress", sessionId),
+                    BroadcasterOnly("channel.prediction.lock", sessionId),
+                    BroadcasterOnly("channel.prediction.end", sessionId),
+                ],
+                _ => throw new UnreachableException(),
+            };
+            var subscriptionIds = new List<string>(subscriptions.Length);
+            foreach (var subscription in subscriptions)
+            {
+                subscriptionIds.Add(
+                    await _eventSub.CreateSubscriptionAsync(
                         context,
-                        "channel.poll.begin",
-                        "1000",
-                        sessionId,
+                        subscription,
                         cancellationToken
                     )
-            );
+                );
+            }
+
             return new EventSubSubscriptionSetupOutcome.Created(
                 new ActiveEventSubSubscription
                 {
                     Channel = channel,
-                    SubscriptionId = await subscriptionId,
+                    SubscriptionId = subscriptionIds[0],
                     BotLogin = account.Login,
                     AccessToken = account.AccessToken,
                     Authorization = authorization,
                     Readiness = EventSubSubscriptionReadiness.Ready,
+                    AdditionalSubscriptionIds = subscriptionIds.Skip(1).ToArray(),
                 }
             );
+        }
+
+        private static EventSubSubscriptionRequest BroadcasterAndModerator(
+            string type,
+            string sessionId
+        )
+        {
+            return new(
+                type,
+                "1",
+                new Dictionary<string, string>
+                {
+                    ["broadcaster_user_id"] = "1000",
+                    ["moderator_user_id"] = "2000",
+                },
+                sessionId
+            );
+        }
+
+        private static EventSubSubscriptionRequest BroadcasterOnly(string type, string sessionId)
+        {
+            return new(
+                type,
+                "1",
+                new Dictionary<string, string> { ["broadcaster_user_id"] = "1000" },
+                sessionId
+            );
+        }
+
+        public ValueTask<bool> NativeTwitchIsEnabledAsync(
+            string channel,
+            CancellationToken cancellationToken
+        )
+        {
+            return ValueTask.FromResult(true);
         }
 
         public ValueTask<EventSubStartupDeliveryOutcome> DeliverStartupMessageAsync(
@@ -500,6 +621,14 @@ public sealed class FakeTwitchIntegrationTests
                     )
                 )
             );
+        }
+    }
+
+    private sealed class AlwaysEnabledNativeTwitch : INativeTwitchFeatureStateProvider
+    {
+        public ValueTask<bool> IsEnabledAsync(string channel, CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(true);
         }
     }
 

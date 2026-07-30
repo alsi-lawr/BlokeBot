@@ -45,6 +45,11 @@ view = [
   "guessing-leaderboard",
   "points-settings",
   "admin",
+  "native-shoutouts",
+  "native-polls",
+  "native-clips-markers",
+  "native-channel-points",
+  "native-predictions",
 ]
 ]]
 
@@ -72,18 +77,83 @@ local server = viset.process.start({
   },
 })
 
+local readiness = {
+  ["home"] = {
+    path = "/",
+    expression = [[document.body.innerText.includes("Choose your chat tools")]],
+  },
+  ["channel-setup"] = {
+    path = "/host",
+    expression = [[document.body.innerText.includes("Chat tools")]],
+  },
+  ["custom-commands"] = {
+    path = "/custom-commands/settings",
+    expression = [[document.body.innerText.includes("Scheduled messages")]],
+  },
+  ["guessing-leaderboard"] = {
+    path = "/guessing/leaderboard/samplechannel",
+    expression = [[document.body.innerText.includes("Guessing leaderboard")]],
+  },
+  ["points-settings"] = {
+    path = "/points/settings",
+    expression = [[document.body.innerText.includes("Points settings")]],
+  },
+  ["admin"] = {
+    path = "/admin",
+    expression = [[document.body.innerText.includes("Channels using BlokeBot")]],
+  },
+  ["native-shoutouts"] = {
+    path = "/twitch-operations/shoutouts",
+    expression = [[Boolean(document.querySelector("[data-native-route='shoutouts'] .task-panel button"))]],
+  },
+  ["native-polls"] = {
+    path = "/twitch-operations/polls",
+    expression = [[Boolean(document.querySelector("[data-native-route='polls'] .task-panel button"))]],
+  },
+  ["native-clips-markers"] = {
+    path = "/twitch-operations/clips-markers",
+    expression = [[Boolean(document.querySelector("[data-native-route='clips-markers'] .task-panel button"))]],
+  },
+  ["native-channel-points"] = {
+    path = "/twitch-operations/channel-points",
+    expression = [[Boolean(document.querySelector("[data-native-route='channel-points'] [data-active-redemptions] [data-waiting-age-band]"))]],
+  },
+  ["native-predictions"] = {
+    path = "/twitch-operations/predictions",
+    expression = [[Boolean(document.querySelector("[data-native-route='predictions'] .task-panel button"))]],
+  },
+}
+
 local succeeded, failure = pcall(function()
   local theme = viset.context.axes.theme
   local view = viset.context.axes.view
+  local expected = assert(readiness[view], "No capture readiness is registered for " .. view)
   viset.http.wait({ url = base_url .. "/simulation/ready", timeout = "20s" })
   viset.page.navigate(base_url .. "/simulation/login?view=" .. view .. "&theme=" .. theme)
-  viset.page.wait_for(
-    viset.javascript([=[
+  local ready_expression = ([=[
+    window.location.pathname === %q &&
       document.body.innerText.includes("Sample Channel") &&
-        Boolean(document.querySelector("article"))
-    ]=]),
-    "20s"
-  )
+      (%s) &&
+      getComputedStyle(document.querySelector("main")).opacity === "1"
+  ]=]):format(expected.path, expected.expression)
+  viset.page.wait_for(viset.javascript(ready_expression), "20s")
+  if view == "native-shoutouts" then
+    viset.sleep("350ms")
+    viset.page.evaluate(viset.javascript([=[
+      (() => {
+        const trigger = [...document.querySelectorAll(".disclosure-trigger")].find(
+          candidate => candidate.textContent.includes("Automatic raid shoutouts")
+        );
+        if (!trigger) throw new Error("Automatic raid shoutout disclosure was not found.");
+        trigger.click();
+        return true;
+      })()
+    ]=]))
+    viset.page.wait_for(
+      viset.javascript([[Boolean(document.querySelector("[data-automatic-raid-shoutouts]"))]]),
+      "20s"
+    )
+  end
   viset.sleep("350ms")
   viset.snapshot()
 end)

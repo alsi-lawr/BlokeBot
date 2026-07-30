@@ -88,7 +88,8 @@ public sealed class ChatIdentityResolverTests
             new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             null!,
             new UnusedChatSender(),
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
 
         var outcome = await operations.CreateSubscriptionAsync(
@@ -118,7 +119,8 @@ public sealed class ChatIdentityResolverTests
             new EventSubClient(factory, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
             null!,
             new UnusedChatSender(),
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
 
         var outcome = await operations.CreateSubscriptionAsync(
@@ -260,6 +262,40 @@ public sealed class ChatIdentityResolverTests
     }
 
     [Test]
+    public async Task IncomingRaidSubscription_Creating_UsesConfiguredBotUserTokenWithoutAppToken()
+    {
+        var factory = new IdentityHttpClientFactory(
+            """{"data":[{"id":"channel-id","login":"channel"}]}"""
+        );
+        var operations = CreateEventSubOperations(
+            factory,
+            new ScriptedBroadcasterAccountProvider()
+        );
+
+        var outcome = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.ConfiguredBotAuthority,
+            new BotAccount("bot", "configured-bot-user-token"),
+            "session-id",
+            CancellationToken.None,
+            EventSubOperationSubscriptionKind.Raids
+        );
+
+        var created = outcome.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
+        created.Subscription.Authorization.ShouldBeOfType<EventSubAuthorizationContext.ConfiguredBot>();
+        created.Subscription.AccessToken.ShouldBe("configured-bot-user-token");
+        factory.AppTokenRequestCount.ShouldBe(0);
+        factory
+            .EventSubRequests.ShouldHaveSingleItem()
+            .ShouldSatisfyAllConditions(
+                request => request.Method.ShouldBe(HttpMethod.Post),
+                request => request.Type.ShouldBe("channel.raid"),
+                request => request.Authorization.ShouldBe("Bearer configured-bot-user-token")
+            );
+        factory.LastAuthorization.ShouldBe("Bearer configured-bot-user-token");
+    }
+
+    [Test]
     public async Task PollSubscriptionGroup_NoGrantPreservesBotGroup_AndRecreateUsesBroadcasterAuthority()
     {
         var factory = new IdentityHttpClientFactory(
@@ -291,6 +327,14 @@ public sealed class ChatIdentityResolverTests
         var botSubscription = botSetup
             .ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>()
             .Subscription;
+        var shoutoutSetup = await operations.CreateSubscriptionAsync(
+            "channel",
+            EventSubAuthorizationContext.ConfiguredBotOperationsAuthority,
+            configuredBot,
+            "session-id",
+            CancellationToken.None
+        );
+        shoutoutSetup.ShouldBeOfType<EventSubSubscriptionSetupOutcome.Created>();
         var unavailable = await operations
             .ResolveAccount("channel", EventSubAuthorizationContext.BroadcasterAuthority)
             .ExecuteAsync(CancellationToken.None);
@@ -300,7 +344,7 @@ public sealed class ChatIdentityResolverTests
                 AccessTokenUnavailableReason.BroadcasterAuthorizationUnavailable
             )
         );
-        botSubscription.PollSubscriptions.ShouldBeOfType<BroadcasterPollSubscriptionState.NotConfigured>();
+        botSubscription.PollSubscriptions.ShouldBeOfType<EventSubOperationSubscriptionState.NotConfigured>();
         factory.EventSubRequestCount.ShouldBe(3);
 
         var created = await operations.CreateSubscriptionAsync(
@@ -442,6 +486,7 @@ public sealed class ChatIdentityResolverTests
             null!,
             new UnusedChatSender(),
             new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider(),
             broadcasters
         );
     }
@@ -475,7 +520,8 @@ public sealed class ChatIdentityResolverTests
                 startupMessage ?? new StartupChatMessage.Enabled("private startup payload")
             ),
             sender,
-            new UnusedLifecycleNotifier()
+            new UnusedLifecycleNotifier(),
+            new EnabledNativeTwitchFeatureStateProvider()
         );
     }
 

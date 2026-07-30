@@ -238,6 +238,7 @@ public sealed class FakeTwitchAuthority
             is "channel.chat.message"
                 or "channel.shoutout.create"
                 or "channel.shoutout.receive";
+        var raidSubscription = type is "channel.raid";
         var broadcasterSubscription =
             type
             is "channel.poll.begin"
@@ -251,8 +252,11 @@ public sealed class FakeTwitchAuthority
                 or "channel.channel_points_custom_reward_redemption.update";
         if (
             version != "1"
-            || !botSubscription && !broadcasterSubscription
-            || !condition.TryGetValue("broadcaster_user_id", out var broadcasterId)
+            || !botSubscription && !raidSubscription && !broadcasterSubscription
+            || !condition.TryGetValue(
+                raidSubscription ? "to_broadcaster_user_id" : "broadcaster_user_id",
+                out var broadcasterId
+            )
             || broadcasterId != Definition.AuthorizedUser.Id
             || botSubscription
                 && (
@@ -263,6 +267,7 @@ public sealed class FakeTwitchAuthority
                     )
                     || botId != Definition.BotUser.Id
                 )
+            || raidSubscription && subscriber.Id != Definition.BotUser.Id
             || broadcasterSubscription && subscriber.Id != Definition.AuthorizedUser.Id
         )
         {
@@ -292,7 +297,7 @@ public sealed class FakeTwitchAuthority
                     type,
                     sessionId,
                     broadcasterId,
-                    botSubscription ? Definition.BotUser.Id : null,
+                    botSubscription || raidSubscription ? Definition.BotUser.Id : null,
                     subscriber.Id
                 )
             );
@@ -638,6 +643,7 @@ public static class FakeTwitchHostingExtensions
         app.MapGet("/oauth2/validate", (HttpRequest request) => Validate(authority, request));
         app.MapGet("/helix/users", (HttpRequest request) => Users(authority, request));
         app.MapGet("/helix/streams", (HttpRequest request) => Streams(authority, request));
+        app.MapGet("/profile-images/{login}.svg", (string login) => ProfileImage(authority, login));
         app.MapGet(
             "/helix/channels/followers",
             (HttpRequest request) => Followers(authority, request)
@@ -774,7 +780,7 @@ public static class FakeTwitchHostingExtensions
                 {
                     data = authority
                         .Users(request.Query["login"].ToArray(), current)
-                        .Select(ToHelixUser),
+                        .Select(user => ToHelixUser(user, request)),
                 }
             );
         }
@@ -1055,14 +1061,48 @@ public static class FakeTwitchHostingExtensions
         }
     }
 
-    private static object ToHelixUser(FakeTwitchUser user)
+    private static IResult ProfileImage(FakeTwitchAuthority authority, string login)
     {
+        var user = new[]
+        {
+            authority.Definition.AuthorizedUser,
+            authority.Definition.BotUser,
+        }.SingleOrDefault(candidate =>
+            string.Equals(candidate.Login, login, StringComparison.OrdinalIgnoreCase)
+        );
+        if (user is null)
+        {
+            return Results.NotFound();
+        }
+
+        var background = user == authority.Definition.BotUser ? "#15803d" : "#7c3aed";
+        var avatar = $$"""
+            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="{{WebUtility.HtmlEncode(
+                user.DisplayName
+            )}} profile">
+              <rect width="64" height="64" rx="14" fill="{{background}}"/>
+              <circle cx="32" cy="24" r="12" fill="#ffffff" fill-opacity=".92"/>
+              <path d="M12 58c1.5-12.5 9.2-20 20-20s18.5 7.5 20 20" fill="#ffffff" fill-opacity=".92"/>
+            </svg>
+            """;
+        return Results.Bytes(Encoding.UTF8.GetBytes(avatar), "image/svg+xml");
+    }
+
+    private static object ToHelixUser(FakeTwitchUser user, HttpRequest request)
+    {
+        var profileImageUrl = new UriBuilder(request.Scheme, request.Host.Host)
+        {
+            Port = request.Host.Port ?? -1,
+            Path = $"/profile-images/{Uri.EscapeDataString(user.Login)}.svg",
+        }
+            .Uri
+            .AbsoluteUri;
         return new
         {
             id = user.Id,
             login = user.Login,
             display_name = user.DisplayName,
-            profile_image_url = $"https://fake.invalid/{user.Login}.png",
+            profile_image_url = profileImageUrl,
             broadcaster_type = user.BroadcasterType,
         };
     }

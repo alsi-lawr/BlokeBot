@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using BlokeBot.Core.Features.Alerts;
 using BlokeBot.Core.Features.HostedChannels.Authorization;
+using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.ChannelPoints;
 using BlokeBot.Eventing;
 using BlokeBot.Functional;
@@ -52,7 +53,8 @@ public sealed class ChannelPointsServiceTests
             ),
             events,
             new DurableAlertService(dbFactory, TimeProvider.System, events),
-            TimeProvider.System
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
         );
         var created = await service.CreateRewardAsync(
             1,
@@ -137,6 +139,259 @@ public sealed class ChannelPointsServiceTests
         ineligible.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ineligible>();
     }
 
+    [Test]
+    public async Task NativeGate_DisabledSuppressesReadsWritesAndRetention_ThenReenableReconciles()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                    EnabledFeatures = HostFeatureFlags.Guessing,
+                }
+            );
+            db.TwitchCustomRewards.Add(
+                new TwitchCustomReward
+                {
+                    HostId = 1,
+                    ProviderRewardId = "retained",
+                    Title = "Retained",
+                    Cost = 100,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ChannelPointsHttpClientFactory();
+        var service = CreateService(dbFactory, http);
+
+        var disabled = await service.LoadAsync(1, CancellationToken.None);
+        var mutation = await service.CreateRewardAsync(1, ValidDraft(), CancellationToken.None);
+        await service.ReconcileAsync(1, CancellationToken.None);
+        await service.RedemptionReceivedAsync(
+            Redemption("disabled-redemption"),
+            CancellationToken.None
+        );
+
+        disabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Disabled>();
+        disabled.Rewards.ShouldBeEmpty();
+        mutation
+            .ShouldBeOfType<ChannelPointsOperationOutcome.NotReady>()
+            .Message.ShouldBe(NativeTwitchFeatureGate.DisabledMessage);
+        http.Requests.ShouldBe(0);
+        await using (var verify = await dbFactory.CreateDbContextAsync())
+        {
+            (await verify.TwitchCustomRewards.ToArrayAsync())
+                .ShouldHaveSingleItem()
+                .ProviderRewardId.ShouldBe("retained");
+            (await verify.TwitchRewardRedemptions.ToArrayAsync()).ShouldBeEmpty();
+        }
+
+        await SetNativeAsync(dbFactory, true);
+        var enabled = await service.LoadAsync(1, CancellationToken.None);
+
+        enabled.Authorization.ShouldBeOfType<ChannelPointsAuthorizationReadiness.Ready>();
+        enabled.Rewards.ShouldHaveSingleItem().ProviderRewardId.ShouldBe("managed");
+        http.Requests.ShouldBeGreaterThan(0);
+    }
+
+    [Test]
+    public async Task ProviderAcceptedReward_IsPersistedWhenDisableRacesAfterProviderWork()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ChannelPointsHttpClientFactory
+        {
+            AfterRewardCreated = () => SetNativeAsync(dbFactory, false),
+        };
+        var service = CreateService(dbFactory, http);
+
+        var outcome = await service.CreateRewardAsync(1, ValidDraft(), CancellationToken.None);
+
+        outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RewardCreated>();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchCustomRewards.ToArrayAsync())
+            .ShouldHaveSingleItem()
+            .ProviderRewardId.ShouldBe("managed");
+        (
+            (await verify.Hosts.SingleAsync()).EnabledFeatures & HostFeatureFlags.NativeTwitch
+        ).ShouldBe(HostFeatureFlags.None);
+    }
+
+    [Test]
+    [Arguments(true, 102, 101)]
+    [Arguments(false, 100, 99)]
+    public async Task ProviderAcceptedRedemption_PersistsOutcomeAndOnlyTrimsWhileEnabled(
+        bool disableAfterProvider,
+        int expectedTotal,
+        int expectedHistory
+    )
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            db.TwitchCustomRewards.Add(
+                new TwitchCustomReward
+                {
+                    HostId = 1,
+                    ProviderRewardId = "managed",
+                    Title = "Managed",
+                    Cost = 100,
+                    IsManageable = true,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            for (var index = 0; index < 101; index++)
+            {
+                db.TwitchRewardRedemptions.Add(
+                    new TwitchRewardRedemption
+                    {
+                        HostId = 1,
+                        ProviderRedemptionId = $"history-{index:D3}",
+                        ProviderRewardId = "managed",
+                        RewardTitle = "Managed",
+                        UserId = $"viewer-{index:D3}",
+                        UserLogin = $"viewer-{index:D3}",
+                        Status = TwitchRewardRedemptionStatus.Fulfilled,
+                        RedeemedAtUtc = DateTime.UtcNow.AddMinutes(-index - 1),
+                        UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-index - 1),
+                    }
+                );
+            }
+            db.TwitchRewardRedemptions.Add(
+                new TwitchRewardRedemption
+                {
+                    HostId = 1,
+                    ProviderRedemptionId = "redemption",
+                    ProviderRewardId = "managed",
+                    RewardTitle = "Managed",
+                    UserId = "viewer",
+                    UserLogin = "viewer",
+                    Status = TwitchRewardRedemptionStatus.Unfulfilled,
+                    RedeemedAtUtc = DateTime.UtcNow,
+                    UpdatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ChannelPointsHttpClientFactory
+        {
+            AfterRedemptionUpdated = disableAfterProvider
+                ? () => SetNativeAsync(dbFactory, false)
+                : null,
+        };
+        var service = CreateService(dbFactory, http);
+
+        var outcome = await service.UpdateRedemptionAsync(
+            1,
+            "redemption",
+            true,
+            CancellationToken.None
+        );
+
+        outcome.ShouldBeOfType<ChannelPointsOperationOutcome.RedemptionUpdated>();
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        var redemptions = await verify.TwitchRewardRedemptions.ToArrayAsync();
+        redemptions.Length.ShouldBe(expectedTotal);
+        redemptions
+            .Single(value => value.ProviderRedemptionId == "redemption")
+            .Status.ShouldBe(TwitchRewardRedemptionStatus.Fulfilled);
+        redemptions
+            .Count(value => value.ProviderRedemptionId.StartsWith("history-"))
+            .ShouldBe(expectedHistory);
+    }
+
+    private static ChannelPointsService CreateService(
+        SqliteBlokeBotDbFactory dbFactory,
+        ChannelPointsHttpClientFactory http
+    )
+    {
+        var events = TestEventBus.Create<AppEventKind>();
+        return new(
+            dbFactory,
+            new ReadyBroadcasterProvider(),
+            new HelixClient(http, global::BlokeBot.Twitch.TwitchEndpointPolicy.Default),
+            BotSettings.FromOptions(
+                new BotOptions { Identity = new BotIdentityOptions { ClientId = "client" } }
+            ),
+            events,
+            new DurableAlertService(dbFactory, TimeProvider.System, events),
+            TimeProvider.System,
+            new NativeTwitchFeatureGate(dbFactory)
+        );
+    }
+
+    private static ChannelPointsRewardDraft ValidDraft()
+    {
+        return new(
+            "Managed",
+            "Prompt",
+            100,
+            true,
+            false,
+            null,
+            false,
+            null,
+            false,
+            null,
+            false,
+            "#FFFFFF"
+        );
+    }
+
+    private static EventSubRewardRedemptionEvent Redemption(string id)
+    {
+        return new(
+            "one-id",
+            "one",
+            id,
+            "managed",
+            "Managed",
+            "viewer-id",
+            "viewer",
+            "input",
+            HelixRewardRedemptionStatus.Unfulfilled,
+            DateTimeOffset.UtcNow,
+            $"message-{id}"
+        );
+    }
+
+    private static async Task SetNativeAsync(
+        IDbContextFactory<BlokeBotDbContext> dbFactory,
+        bool enabled
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var host = await db.Hosts.SingleAsync();
+        host.EnabledFeatures = enabled
+            ? host.EnabledFeatures | HostFeatureFlags.NativeTwitch
+            : host.EnabledFeatures & ~HostFeatureFlags.NativeTwitch;
+        await db.SaveChangesAsync();
+    }
+
     private sealed class ReadyBroadcasterProvider : IHostBroadcasterTokenStatusProvider
     {
         public Task<TokenStatus> GetTokenStatusAsync(
@@ -175,6 +430,9 @@ public sealed class ChannelPointsServiceTests
 
     private sealed class ChannelPointsHttpClientFactory : IHttpClientFactory
     {
+        internal int Requests { get; private set; }
+        internal Func<Task>? AfterRewardCreated { get; init; }
+        internal Func<Task>? AfterRedemptionUpdated { get; init; }
         internal int RedemptionPatches { get; private set; }
         internal bool ReturnIneligibleCustomRewards { get; set; }
         internal int AllRewardsLists { get; private set; }
@@ -193,12 +451,17 @@ public sealed class ChannelPointsServiceTests
                 CancellationToken cancellationToken
             )
             {
+                owner.Requests++;
                 var uri = request.RequestUri?.ToString() ?? string.Empty;
                 if (request.Method == HttpMethod.Post)
                 {
                     uri.ShouldContain("broadcaster_id=one-id");
                     var body = await request.Content!.ReadAsStringAsync(cancellationToken);
                     body.ShouldNotContain("broadcaster_id");
+                    if (owner.AfterRewardCreated is not null)
+                    {
+                        await owner.AfterRewardCreated();
+                    }
                     return Json(RewardResponse());
                 }
                 if (request.Method == HttpMethod.Get && uri.Contains("custom_rewards?"))
@@ -240,6 +503,10 @@ public sealed class ChannelPointsServiceTests
                     using var document = JsonDocument.Parse(body);
                     document.RootElement.EnumerateObject().Select(x => x.Name).ShouldBe(["status"]);
                     document.RootElement.GetProperty("status").GetString().ShouldBe("FULFILLED");
+                    if (owner.AfterRedemptionUpdated is not null)
+                    {
+                        await owner.AfterRedemptionUpdated();
+                    }
                     return Json("""{"data":[]}""");
                 }
                 throw new InvalidOperationException(

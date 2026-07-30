@@ -18,43 +18,6 @@ namespace BlokeBot.Core.Tests;
 public sealed class GuessingDashboardRejectionTests
 {
     [Test]
-    public async Task KeyboardTabs_ActivateHandledKeysAndLeaveTabSelectionUntouched()
-    {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedGuessingAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        context.Services.AddSingleton<IPublicChatMessageSender>(new RejectingChatSender());
-        context.Services.AddSingleton<GuessingDashboardService>();
-        context.Services.AddSingleton<GuessingHistoryService>();
-        context.Services.AddSingleton<GuessingChangeNotifier>();
-        context.Services.AddSingleton<PointBalanceService>();
-        context.Services.AddSingleton<PointsChangeNotifier>();
-        context.Services.AddSingleton<GuessingRoundService>();
-        var preferences = context.JSInterop.SetupModule("./Components/CollapsibleSection.razor.js");
-        preferences
-            .Setup<string?>("readString", "blokebot.task.guessing-dashboard")
-            .SetResult("History");
-        preferences
-            .SetupVoid("writeString", "blokebot.task.guessing-dashboard", "Leaderboard")
-            .SetVoidResult();
-        var cut = context.Render<GuessingDashboard>();
-
-        cut.Find("#guessing-panel-history");
-        cut.Find("#guessing-tab-history").GetAttribute("tabindex").ShouldBe("0");
-
-        await cut.Instance.HandleTabKeyAsync("End");
-
-        cut.Find("#guessing-tab-live").GetAttribute("aria-selected").ShouldBe("false");
-        cut.Find("#guessing-tab-history").GetAttribute("aria-selected").ShouldBe("false");
-        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldBe("true");
-        cut.Find("#guessing-tab-leaderboard").GetAttribute("tabindex").ShouldBe("0");
-
-        await cut.Instance.HandleTabKeyAsync("Tab");
-
-        cut.Find("#guessing-tab-leaderboard").GetAttribute("aria-selected").ShouldBe("true");
-    }
-
-    [Test]
     public async Task PublicChatRejected_StartingRound_ShowsWarningWithoutDeliverySuccess()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -70,6 +33,14 @@ public sealed class GuessingDashboardRejectionTests
         context.Services.AddSingleton<GuessingRoundService>();
         var toasts = context.Services.GetRequiredService<ToastService>();
         var cut = context.Render<GuessingDashboard>();
+
+        cut.FindAll("[role='tab']")
+            .Single(tab => tab.TextContent.Trim() == "Live")
+            .GetAttribute("aria-selected")
+            .ShouldBe("true");
+        cut.FindAll("[role='tab']")
+            .Select(tab => tab.TextContent.Trim())
+            .ShouldBe(["Live", "History", "Leaderboard"]);
 
         cut.FindAll("button").Single(button => button.TextContent.Trim() == "Start round").Click();
 

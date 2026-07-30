@@ -9,7 +9,8 @@ namespace BlokeBot.Core.Features.HostedChannels;
 
 public sealed class HostFeatureService(
     IDbContextFactory<BlokeBotDbContext> dbFactory,
-    HostedChannelChangeNotifier changes
+    HostedChannelChangeNotifier changes,
+    IEnumerable<INativeTwitchFeatureChangeObserver> nativeTwitchObservers
 )
 {
     public async Task<IReadOnlyDictionary<int, HostFeatureFlags>> LoadHostedFeaturesAsync(
@@ -85,9 +86,26 @@ public sealed class HostFeatureService(
             return;
         }
 
-        host.EnabledFeatures = update(host.EnabledFeatures, feature);
+        var updated = update(host.EnabledFeatures, feature);
+        if (updated == host.EnabledFeatures)
+        {
+            return;
+        }
 
+        host.EnabledFeatures = updated;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
+        if (feature is not HostFeatureFlags.NativeTwitch)
+        {
+            return;
+        }
+
+        var state = updated.Contains(HostFeatureFlags.NativeTwitch)
+            ? NativeTwitchFeatureState.Enabled
+            : NativeTwitchFeatureState.Disabled;
+        foreach (var observer in nativeTwitchObservers)
+        {
+            await observer.NativeTwitchFeatureChangedAsync(hostId, state, ct);
+        }
     }
 }

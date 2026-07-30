@@ -8,13 +8,12 @@ using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Shouldly;
 using TUnit.Core;
 
 namespace BlokeBot.Core.Tests;
 
-public sealed partial class AlertUiTests
+public sealed class AlertUiTests
 {
     [Test]
     public async Task ActiveAlertInTopBar_ClickingIndicator_NavigatesToAlerts()
@@ -87,6 +86,69 @@ public sealed partial class AlertUiTests
         cut.FindAll("button[aria-label='Mark Queue delayed as handled']").ShouldBeEmpty();
     }
 
+    [Test]
+    public async Task AlertsPage_LoadFailure_RetryLoadsTheRouteInline()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var failFirstFactory = new FailFirstDbContextFactory(dbFactory);
+        context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(failFirstFactory);
+
+        var cut = context.Render<AlertsPage>();
+
+        cut.Find("[role='alert']").TextContent.ShouldContain("couldn’t load alerts");
+        cut.FindAll("h2").Select(heading => heading.TextContent.Trim()).ShouldNotContain("Active");
+
+        cut.FindAll("button").Single(button => button.TextContent.Trim() == "Retry").Click();
+
+        failFirstFactory.AttemptCount.ShouldBe(2);
+        cut.FindAll("[role='alert']").ShouldBeEmpty();
+        cut.FindAll("h2")
+            .Select(heading => heading.TextContent.Trim())
+            .ShouldContain("Active alerts");
+    }
+
+    [Test]
+    public async Task AlertsPage_NoActiveAlerts_RendersOneNamedFrameAndSemanticHistoryCards()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var alerts = context.Services.GetRequiredService<DurableAlertService>();
+        var alert = await alerts
+            .Create(
+                hostId,
+                DurableAlertSeverity.Warning,
+                "test",
+                "history-card",
+                "Queue delayed",
+                "Outbound messages are delayed.",
+                null
+            )
+            .RunAsync(CancellationToken.None);
+        await alerts
+            .Acknowledge(hostId, alert.Alert.Id, "streamer")
+            .RunAsync(CancellationToken.None);
+
+        var cut = context.Render<AlertsPage>();
+
+        var active = cut.Find("section[aria-labelledby='active-alerts-title']");
+        active.ClassList.ShouldContain("card");
+        active
+            .QuerySelectorAll("h2")
+            .ShouldHaveSingleItem()
+            .TextContent.Trim()
+            .ShouldBe("Active alerts");
+        active.TextContent.ShouldContain("No active alerts.");
+
+        var history = cut.Find(".responsive-data-cards");
+        history
+            .QuerySelectorAll("td")
+            .Select(cell => cell.GetAttribute("data-label"))
+            .ShouldBe(["Alert", "Importance", "Handled by", "Handled at"]);
+    }
+
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)
     {
         await using var db = await dbFactory.CreateDbContextAsync();
@@ -100,50 +162,33 @@ public sealed partial class AlertUiTests
         await db.SaveChangesAsync();
         return host.Id;
     }
-}
 
-public sealed partial class AlertUiTests
-{
-    [Test]
-    public async Task RouteLoadFailure_RendersInlineRetryAndRecoversWhenTheLoadSucceeds()
+    private sealed class FailFirstDbContextFactory(
+        IDbContextFactory<BlokeBotDbContext> innerFactory
+    ) : IDbContextFactory<BlokeBotDbContext>
     {
-        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory);
-        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
-        var controlledFactory = new ControlledDbFactory(dbFactory) { Fail = true };
-        context.Services.RemoveAll<IDbContextFactory<BlokeBotDbContext>>();
-        context.Services.AddSingleton<IDbContextFactory<BlokeBotDbContext>>(controlledFactory);
-
-        var cut = context.Render<AlertsPage>();
-        cut.Find("[role='alert']").TextContent.ShouldContain("alert load failed");
-
-        controlledFactory.Fail = false;
-        cut.Find("[role='alert'] button").Click();
-
-        cut.FindAll("[role='alert']").ShouldBeEmpty();
-        cut.Find("h1").TextContent.ShouldBe("Review alerts");
-    }
-
-    private sealed class ControlledDbFactory(SqliteBlokeBotDbFactory inner)
-        : IDbContextFactory<BlokeBotDbContext>
-    {
-        public bool Fail { get; set; }
+        public int AttemptCount { get; private set; }
 
         public BlokeBotDbContext CreateDbContext()
         {
-            return CreateDbContextAsync().GetAwaiter().GetResult();
+            AttemptCount++;
+            return AttemptCount == 1
+                ? throw new InvalidOperationException("Simulated alert load failure.")
+                : innerFactory.CreateDbContext();
         }
 
-        public async Task<BlokeBotDbContext> CreateDbContextAsync(
+        public ValueTask<BlokeBotDbContext> CreateDbContextAsync(
             CancellationToken cancellationToken = default
         )
         {
-            if (Fail)
-            {
-                throw new InvalidOperationException("alert load failed");
-            }
-
-            return await inner.CreateDbContextAsync(cancellationToken);
+            AttemptCount++;
+            return AttemptCount == 1
+                ? ValueTask.FromException<BlokeBotDbContext>(
+                    new InvalidOperationException("Simulated alert load failure.")
+                )
+                : new ValueTask<BlokeBotDbContext>(
+                    innerFactory.CreateDbContextAsync(cancellationToken)
+                );
         }
     }
 }
