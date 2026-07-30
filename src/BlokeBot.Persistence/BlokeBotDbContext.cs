@@ -79,6 +79,15 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<RequestSubmissionValue> RequestSubmissionValues => Set<RequestSubmissionValue>();
     public DbSet<RequestSubmissionVote> RequestSubmissionVotes => Set<RequestSubmissionVote>();
     public DbSet<RequestBoardDomainEvent> RequestBoardEvents => Set<RequestBoardDomainEvent>();
+    public DbSet<PlayQueue> PlayQueues => Set<PlayQueue>();
+    public DbSet<PlayQueueField> PlayQueueFields => Set<PlayQueueField>();
+    public DbSet<PlayQueueRoleRequirement> PlayQueueRoleRequirements =>
+        Set<PlayQueueRoleRequirement>();
+    public DbSet<PlayQueueEntry> PlayQueueEntries => Set<PlayQueueEntry>();
+    public DbSet<PlayQueueEntryValue> PlayQueueEntryValues => Set<PlayQueueEntryValue>();
+    public DbSet<PlayQueueParticipation> PlayQueueParticipation => Set<PlayQueueParticipation>();
+    public DbSet<PlayQueueExclusion> PlayQueueExclusions => Set<PlayQueueExclusion>();
+    public DbSet<PlayQueueDomainEvent> PlayQueueEvents => Set<PlayQueueDomainEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +105,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureChannelPoints(modelBuilder);
         ConfigurePredictions(modelBuilder);
         ConfigureRequestBoards(modelBuilder);
+        ConfigurePlayWithViewers(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)

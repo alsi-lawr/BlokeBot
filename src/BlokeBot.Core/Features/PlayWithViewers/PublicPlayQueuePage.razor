@@ -1,0 +1,98 @@
+@page "/queues/{Channel}/{QueueSlug}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject PlayQueueService _queues
+
+<PageTitle>BlokeBot | @(_page?.Queue.Name ?? "Play queue")</PageTitle>
+
+<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+    <div class="mx-auto max-w-5xl space-y-6">
+        @if (_loading)
+        {
+            <div class="card p-8">Loading queue…</div>
+        }
+        else if (_page is null)
+        {
+            <div class="card p-8"><h1 class="text-2xl font-semibold">Queue not found</h1></div>
+        }
+        else
+        {
+            <header class="card p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Play with viewers</p>
+                <h1 class="mt-2 text-3xl font-bold">@_page.Queue.Name</h1>
+                <p class="mt-2 text-muted-foreground">@_page.Queue.ActivityName · @(_page.Queue.IsOpen ? "Open" : "Closed")</p>
+                <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div><dt class="font-semibold">Waiting</dt><dd>@_page.Waiting.Count</dd></div>
+                    <div><dt class="font-semibold">Party size</dt><dd>@_page.Queue.Capacity</dd></div>
+                    <div><dt class="font-semibold">Fair selection</dt><dd>@_page.Queue.PriorityDescription</dd></div>
+                </dl>
+            </header>
+
+            <section class="card p-6" aria-labelledby="join-heading">
+                <h2 id="join-heading" class="text-xl font-semibold">Join the queue</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Your entry details are visible only to moderators. Public names are @(_page.Queue.ShowParticipantNames ? "enabled" : "hidden").</p>
+                <div class="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Field Id="queue-viewer-login" Label="Twitch login" @bind-Value="_login" />
+                    @foreach (var field in _page.Queue.Fields)
+                    {
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold" for="@($"queue-viewer-{field.Key}")">@field.Label @(field.IsRequired ? "(required)" : null)</label>
+                            @if (field.Choices.Count > 0)
+                            {
+                                <select id="@($"queue-viewer-{field.Key}")" class="input" value="@Value(field.Key)" @onchange="args => SetValue(field.Key, args.Value?.ToString() ?? string.Empty)">
+                                    <option value="">Choose…</option>
+                                    @foreach (var choice in field.Choices)
+                                    {
+                                        <option value="@choice">@choice</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input id="@($"queue-viewer-{field.Key}")" class="input" value="@Value(field.Key)" @oninput="args => SetValue(field.Key, args.Value?.ToString() ?? string.Empty)" />
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button class="btn-primary" type="button" disabled="@(!_page.Queue.IsOpen)" @onclick="JoinAsync">Join</button>
+                    <button class="btn-secondary" type="button" @onclick="LeaveAsync">Leave</button>
+                    <button class="btn-secondary" type="button" @onclick="PositionAsync">Check position</button>
+                    <button class="btn-secondary" type="button" @onclick="ReadyAsync">I'm ready</button>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_feedback))
+                {
+                    <p class="mt-4 rounded-lg border p-3 text-sm" role="status" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
+                }
+            </section>
+
+            <section class="grid gap-6 lg:grid-cols-2">
+                <div class="card p-6">
+                    <h2 class="text-xl font-semibold">Waiting</h2>
+                    <ol class="mt-4 grid gap-2">
+                        @foreach (var entry in _page.Waiting)
+                        {
+                            <li class="surface-muted rounded-lg p-3">
+                                <strong>#@entry.Position</strong>
+                                @if (entry.DisplayName is not null)
+                                {
+                                    <span> · @entry.DisplayName</span>
+                                }
+                                <span class="block text-xs text-muted-foreground">@entry.Status</span>
+                            </li>
+                        }
+                    </ol>
+                </div>
+                <div class="card p-6">
+                    <h2 class="text-xl font-semibold">Current party</h2>
+                    <ul class="mt-4 grid gap-2">
+                        @foreach (var entry in _page.CurrentParty)
+                        {
+                            <li class="surface-muted rounded-lg p-3">@(entry.DisplayName ?? "Selected viewer")</li>
+                        }
+                    </ul>
+                </div>
+            </section>
+        }
+    </div>
+</main>

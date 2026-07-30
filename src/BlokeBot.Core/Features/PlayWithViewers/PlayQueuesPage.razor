@@ -1,0 +1,159 @@
+@page "/queues"
+@using Microsoft.AspNetCore.Authorization
+@using BlokeBot.Persistence.Models
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject PlayQueueService _queues
+@inject IPrivateLobbyDelivery _lobbyDelivery
+
+<PageTitle>BlokeBot | Play with viewers</PageTitle>
+
+<DashboardPage Kicker="Community interaction"
+               Title="Play with viewers"
+               Description="Build fair parties, run ready checks, and deliver lobby details privately."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        <a class="btn-secondary" href="@_publicUrl">Open viewer page</a>
+        <button class="btn-primary" type="button" @onclick="SaveAsync">Save queue</button>
+    </Actions>
+    <ChildContent>
+        @if (Host is null)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        }
+        else
+        {
+            <div class="grid gap-5 xl:grid-cols-[16rem_minmax(0,1fr)]">
+                <aside class="card p-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="text-lg font-semibold">Queues</h2>
+                        <button class="btn-secondary" type="button" @onclick="NewQueue">New</button>
+                    </div>
+                    <div class="mt-3 grid gap-2">
+                        @foreach (var queue in _queueList)
+                        {
+                            <button class="control-surface min-h-11 rounded-lg px-3 text-left text-sm font-semibold"
+                                    type="button"
+                                    aria-current="@(queue.Slug == _draft.Slug ? "true" : null)"
+                                    @onclick="() => SelectQueueAsync(queue.Slug)">
+                                @queue.Name
+                                <span class="block text-xs font-normal text-muted-foreground">/@queue.Slug · @(queue.IsOpen ? "Open" : "Closed")</span>
+                            </button>
+                        }
+                    </div>
+                </aside>
+
+                <div class="space-y-5">
+                    <section class="card p-5" aria-labelledby="queue-config-heading">
+                        <h2 id="queue-config-heading" class="text-lg font-semibold">Queue configuration</h2>
+                        <div class="mt-4 grid gap-4 md:grid-cols-2">
+                            <Field Id="queue-slug" Label="Command and URL name" @bind-Value="_draft.Slug" />
+                            <Field Id="queue-name" Label="Queue name" @bind-Value="_draft.Name" />
+                            <Field Id="queue-activity" Label="Game or activity" @bind-Value="_draft.Activity" />
+                            <Field Id="queue-capacity" Label="Party size" @bind-Value="_draft.Capacity" />
+                            <div>
+                                <label class="mb-1 block text-sm font-semibold" for="queue-mode">Fair selection</label>
+                                <select id="queue-mode" class="input" @bind="_draft.SelectionMode">
+                                    @foreach (var mode in Enum.GetValues<PlayQueueSelectionMode>())
+                                    {
+                                        <option value="@mode">@mode</option>
+                                    }
+                                </select>
+                            </div>
+                            <Field Id="queue-ready-expiry" Label="Ready expiry (seconds)" @bind-Value="_draft.ReadinessTimeout" />
+                            <Field Id="queue-history" Label="History retention (days)" @bind-Value="_draft.HistoryRetention" />
+                            <Field Id="queue-exclusion" Label="Skip/no-show exclusion (minutes)" @bind-Value="_draft.SkipExclusion" />
+                            <label class="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" @bind="_draft.IsOpen" /> Queue open</label>
+                            <label class="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" @bind="_draft.ShowNames" /> Show participant names publicly</label>
+                        </div>
+
+                        <div class="mt-6 flex items-center justify-between gap-3">
+                            <h3 class="font-semibold">Entry fields</h3>
+                            <button class="btn-secondary" type="button" disabled="@(_draft.Fields.Count >= PlayQueueLimits.MaximumFields)" @onclick="AddField">Add field</button>
+                        </div>
+                        <p class="mt-1 text-sm text-muted-foreground">Platform, region, rank, preferred-role, and custom fields are private to moderators.</p>
+                        <div class="mt-3 grid gap-3">
+                            @foreach (var field in _draft.Fields)
+                            {
+                                <div class="surface-muted grid gap-3 rounded-lg p-4 md:grid-cols-2" @key="field.Identity">
+                                    <Field Id="@($"queue-field-key-{field.Identity}")" Label="Key" @bind-Value="field.Key" />
+                                    <Field Id="@($"queue-field-label-{field.Identity}")" Label="Label" @bind-Value="field.Label" />
+                                    <Field Id="@($"queue-field-choices-{field.Identity}")" Label="Choices (comma separated)" @bind-Value="field.Choices" />
+                                    <div class="flex items-end justify-between gap-3">
+                                        <label class="flex min-h-11 items-center gap-2 text-sm font-semibold"><input type="checkbox" @bind="field.Required" /> Required</label>
+                                        <button class="btn-secondary" type="button" @onclick="() => RemoveField(field)">Remove</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <Field Id="queue-roles" Label="Required roles (role=count, comma separated)" @bind-Value="_draft.RoleRequirements" />
+                    </section>
+
+                    @if (_moderatorPage is not null)
+                    {
+                        <section class="card p-5" aria-labelledby="party-heading">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <div><h2 id="party-heading" class="text-lg font-semibold">Current party</h2><p class="text-sm text-muted-foreground">@_moderatorPage.CurrentParty.Count / @_moderatorPage.Queue.Capacity selected</p></div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button class="btn-secondary" type="button" @onclick="KeepPartyAsync">Keep party</button>
+                                    <button class="btn-primary" type="button" @onclick="SelectPartyAsync">Select next party</button>
+                                </div>
+                            </div>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                @foreach (var entry in _moderatorPage.CurrentParty)
+                                {
+                                    <article class="surface-muted rounded-lg p-4">
+                                        <strong>@@@entry.NormalizedLogin</strong>
+                                        <p class="mt-1 text-xs text-muted-foreground">@FieldSummary(entry)</p>
+                                        <div class="mt-3 flex gap-2">
+                                            <button class="btn-secondary" type="button" @onclick="() => ReplaceOneAsync(entry.Public.Id)">Replace one</button>
+                                            <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.Public.Id)">No-show</button>
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                            <div class="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                                <Field Id="queue-lobby-code" Label="Private lobby message" @bind-Value="_lobbyCode" />
+                                <button class="btn-primary self-end" type="button" disabled="@(string.IsNullOrWhiteSpace(_lobbyCode) || _moderatorPage.CurrentParty.Count == 0)" @onclick="DeliverLobbyAsync">Whisper party</button>
+                            </div>
+                        </section>
+
+                        <section class="card p-5" aria-labelledby="waiting-heading">
+                            <div class="flex items-center justify-between gap-3">
+                                <div><h2 id="waiting-heading" class="text-lg font-semibold">Waiting viewers</h2><p class="text-sm text-muted-foreground">Next candidates follow the visible fair-selection rule.</p></div>
+                                <button class="btn-secondary" type="button" @onclick="ToggleOpenAsync">@(_moderatorPage.Queue.IsOpen ? "Close queue" : "Open queue")</button>
+                            </div>
+                            <div class="mt-4 grid gap-3">
+                                @foreach (var entry in _moderatorPage.Waiting)
+                                {
+                                    <article class="surface-muted rounded-lg p-4">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div><strong>#@entry.Public.Position · @@@entry.NormalizedLogin</strong><p class="text-xs text-muted-foreground">@entry.Public.Status · priority @entry.Priority · @FieldSummary(entry)</p></div>
+                                            <div class="flex flex-wrap gap-2">
+                                                <button class="btn-secondary" type="button" @onclick="() => ReadyCheckAsync(entry.Public.Id)">Ready check</button>
+                                                <button class="btn-secondary" type="button" @onclick="() => SkipAsync(entry.Public.Id)">Skip</button>
+                                                <button class="btn-secondary" type="button" @onclick="() => NoShowAsync(entry.Public.Id)">No-show</button>
+                                            </div>
+                                        </div>
+                                        @if (_entryDrafts.TryGetValue(entry.Public.Id, out var entryDraft))
+                                        {
+                                            <div class="mt-3 grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_auto]">
+                                                <Field Id="@($"queue-priority-{entry.Public.Id}")" Label="Priority" @bind-Value="entryDraft.Priority" />
+                                                <Field Id="@($"queue-private-note-{entry.Public.Id}")" Label="Private moderator note" @bind-Value="entryDraft.PrivateNote" />
+                                                <button class="btn-secondary self-end" type="button" @onclick="() => SaveEntryAsync(entry.Public.Id)">Save viewer</button>
+                                            </div>
+                                        }
+                                    </article>
+                                }
+                            </div>
+                        </section>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_feedback))
+                    {
+                        <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_operationFailed.ToString().ToLowerInvariant()">@_feedback</p>
+                    }
+                </div>
+            </div>
+        }
+    </ChildContent>
+</DashboardPage>
