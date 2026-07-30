@@ -1,5 +1,6 @@
 using BlokeBot.Announcements;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Overlays;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
 using BlokeBot.Core.Hosts;
 using BlokeBot.Persistence;
@@ -14,6 +15,8 @@ internal sealed class SimulationFixtureSeeder(
     IDbContextFactory<BlokeBotDbContext> dbFactory
 )
 {
+    internal const string OverlayAccessKey = "simulation-overlay-access-key-0000000000000";
+
     public async Task<BotHostChoice> SeedAsync(CancellationToken cancellationToken)
     {
         var hostId = await provisioning.EnsureHostAsync(
@@ -40,6 +43,7 @@ internal sealed class SimulationFixtureSeeder(
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
+        await SeedOverlayAsync(db, hostId, now, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
 
         return new BotHostChoice(
@@ -47,6 +51,41 @@ internal sealed class SimulationFixtureSeeder(
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login,
             FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.DisplayName,
             AuthRole.Streamer
+        );
+    }
+
+    private static async Task SeedOverlayAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            await db.OverlayInstances.AnyAsync(
+                value => value.PublicId == Guid.Parse("82bd3021-fc60-47fc-8fa7-ed828083e70a"),
+                cancellationToken
+            )
+        )
+        {
+            return;
+        }
+
+        db.OverlayInstances.Add(
+            new OverlayInstance
+            {
+                PublicId = Guid.Parse("82bd3021-fc60-47fc-8fa7-ed828083e70a"),
+                HostId = hostId,
+                Name = "Transparent browser source",
+                Type = OverlayType.Empty,
+                IsEnabled = true,
+                ConfigurationJson = """{"schemaVersion":1}""",
+                AccessKeyDigest = OverlayAccessKeyDigest.Compute(OverlayAccessKey),
+                KeyVersion = 1,
+                Revision = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
         );
     }
 
