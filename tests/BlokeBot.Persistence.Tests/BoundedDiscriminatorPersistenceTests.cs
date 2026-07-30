@@ -22,6 +22,8 @@ public sealed class BoundedDiscriminatorPersistenceTests
             PointLedgerKind.GambleLoss,
             PointLedgerKind.GiveawayWin,
             PointLedgerKind.GuessWin,
+            PointLedgerKind.RequestReservation,
+            PointLedgerKind.RequestRefund,
         ];
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         await using (var db = await dbFactory.CreateDbContextAsync())
@@ -121,6 +123,8 @@ public sealed class BoundedDiscriminatorPersistenceTests
             "GambleLoss",
             "GiveawayWin",
             "GuessWin",
+            "RequestReservation",
+            "RequestRefund",
         ]);
     }
 

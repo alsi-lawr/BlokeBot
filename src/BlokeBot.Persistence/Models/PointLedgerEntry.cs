@@ -22,5 +22,7 @@ public sealed class PointLedgerEntry
 
     public int? GiveawayId { get; set; }
 
+    public long? RequestSubmissionId { get; set; }
+
     public string Note { get; set; } = string.Empty;
 }

@@ -34,6 +34,7 @@ using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.HostSetup;
 using BlokeBot.Core.Features.PublicLeaderboards;
+using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Hosts;
 using Microsoft.AspNetCore.Authorization;
@@ -49,6 +50,13 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<CommandAliasRegistry>();
         services.AddSingleton<AppCommandAliasResolver>();
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotRequestBoards(this IServiceCollection services)
+    {
+        services.AddSingleton<RequestBoardService>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
 

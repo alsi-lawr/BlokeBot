@@ -1,0 +1,169 @@
+@page "/requests/{Channel}/{BoardSlug}"
+@using Microsoft.AspNetCore.Authorization
+@using BlokeBot.Persistence.Models
+@attribute [AllowAnonymous]
+@inject RequestBoardService _boards
+
+<PageTitle>BlokeBot | Request board</PageTitle>
+
+<div class="mx-auto max-w-6xl space-y-6">
+    @if (_page is null)
+    {
+        <PageHeader Kicker="Community requests"
+                    Title="Request board"
+                    Description="This board could not be found." />
+        <div class="card p-8 text-sm text-muted-foreground">Check the channel and board name.</div>
+    }
+    else
+    {
+        <PageHeader Kicker="Community requests"
+                    Title="@_page.Board.Title"
+                    Description="@_page.Board.Description" />
+
+        <section class="card p-5" aria-labelledby="request-board-rules">
+            <h2 id="request-board-rules" class="text-lg font-semibold text-slate-950">Board rules</h2>
+            <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <dt class="font-semibold text-slate-950">Submissions</dt>
+                    <dd class="text-muted-foreground">@(_page.Board.IsOpen ? "Open" : "Closed") · @_page.Board.SubmissionLimitPerUser active per viewer</dd>
+                </div>
+                <div>
+                    <dt class="font-semibold text-slate-950">Point cost</dt>
+                    <dd class="text-muted-foreground">@_page.Board.PointCost</dd>
+                </div>
+                <div>
+                    <dt class="font-semibold text-slate-950">Voting</dt>
+                    <dd class="text-muted-foreground">@(_page.Board.VotingEnabled ? $"Up to {_page.Board.VoteLimitPerUser} votes per viewer" : "Voting is off")</dd>
+                </div>
+                <div>
+                    <dt class="font-semibold text-slate-950">Queue order</dt>
+                    <dd class="text-muted-foreground">@_page.Board.OrderingDescription</dd>
+                </div>
+            </dl>
+        </section>
+
+        @if (_page.Board.IsOpen)
+        {
+            <section class="card p-5" aria-labelledby="request-board-submit">
+                <h2 id="request-board-submit" class="text-lg font-semibold text-slate-950">Submit a request</h2>
+                @if (string.IsNullOrWhiteSpace(_viewerLogin))
+                {
+                    <p class="mt-2 text-sm text-muted-foreground">Sign in with Twitch to submit, vote, or withdraw your requests.</p>
+                    <a class="btn-primary mt-4 inline-flex" href="/auth/login">Sign in with Twitch</a>
+                }
+                else
+                {
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        <Field Id="request-board-title" Label="Title" @bind-Value="_title" />
+                        <Field Id="request-board-category" Label="Category (optional)" @bind-Value="_category" />
+                        <Field Id="request-board-tags" Label="Tags (comma-separated, optional)" @bind-Value="_tags" />
+                        @foreach (var field in _page.Board.Fields)
+                        {
+                            <div @key="field.Id">
+                                <label class="mb-1 block text-sm font-semibold text-slate-950" for="@($"request-field-{field.Id}")">
+                                    @field.Label @if (field.IsRequired) { <span aria-hidden="true">*</span> }
+                                </label>
+                                @if (field.Kind == RequestBoardFieldKind.Choice)
+                                {
+                                    <select id="@($"request-field-{field.Id}")"
+                                            class="input"
+                                            @bind="_fieldValues[field.Key]">
+                                        <option value="">Choose an option</option>
+                                        @foreach (var choice in field.Choices)
+                                        {
+                                            <option value="@choice">@choice</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input id="@($"request-field-{field.Id}")"
+                                           class="input"
+                                           type="@(field.Kind == RequestBoardFieldKind.Number ? "number" : field.Kind is RequestBoardFieldKind.Url or RequestBoardFieldKind.TwitchClip ? "url" : "text")"
+                                           maxlength="@field.MaximumLength"
+                                           required="@field.IsRequired"
+                                           @bind="_fieldValues[field.Key]" />
+                                }
+                            </div>
+                        }
+                    </div>
+                    <button class="btn-primary mt-4" type="button" @onclick="SubmitAsync">Submit request</button>
+                    @if (!string.IsNullOrWhiteSpace(_feedback))
+                    {
+                        <p class="mt-3 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+                    }
+                }
+            </section>
+        }
+
+        <section class="space-y-3" aria-labelledby="request-board-requests">
+            <h2 id="request-board-requests" class="text-xl font-semibold text-slate-950">Requests</h2>
+            @if (_page.Submissions.Count == 0)
+            {
+                <div class="card p-8 text-sm text-muted-foreground">No requests yet.</div>
+            }
+            @foreach (var request in _page.Submissions)
+            {
+                <article @key="request.Id" class="card p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">#@request.Id · @request.Status</p>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-950">@request.Title</h3>
+                            <p class="mt-1 text-sm text-muted-foreground">Submitted by @request.SubmitterLogin</p>
+                        </div>
+                        <div class="text-right text-sm">
+                            <p class="font-semibold text-slate-950">@request.VoteCount votes</p>
+                            @if (request.Priority != 0) { <p class="text-muted-foreground">Priority @request.Priority</p> }
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(request.Category) || request.Tags.Count > 0)
+                    {
+                        <p class="mt-3 text-sm text-muted-foreground">
+                            @request.Category
+                            @if (request.Tags.Count > 0) { <span> · @string.Join(", ", request.Tags)</span> }
+                        </p>
+                    }
+                    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                        @foreach (var value in request.Values)
+                        {
+                            <div @key="value.Key">
+                                <dt class="font-semibold text-slate-950">@value.Label</dt>
+                                <dd class="break-words text-muted-foreground">
+                                    @if (value.Kind is RequestBoardFieldKind.Url or RequestBoardFieldKind.TwitchClip)
+                                    {
+                                        <a class="underline" href="@value.Value" rel="noopener noreferrer" target="_blank">@value.Value</a>
+                                    }
+                                    else
+                                    {
+                                        @value.Value
+                                    }
+                                </dd>
+                            </div>
+                        }
+                    </dl>
+                    @if (!string.IsNullOrWhiteSpace(request.PublicNote))
+                    {
+                        <p class="surface-muted mt-3 rounded-lg p-3 text-sm">@request.PublicNote</p>
+                    }
+                    @if (request.MergedIntoSubmissionId is { } target)
+                    {
+                        <p class="mt-3 text-sm font-semibold">Merged into request #@target.</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_viewerLogin))
+                    {
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @if (_page.Board.VotingEnabled && request.Status is RequestSubmissionStatus.Approved or RequestSubmissionStatus.Queued or RequestSubmissionStatus.Accepted)
+                            {
+                                <button class="btn-secondary" type="button" @onclick="() => VoteAsync(request.Id)">Vote</button>
+                            }
+                            @if (request.SubmitterLogin == _viewerLogin && request.Status is RequestSubmissionStatus.Pending or RequestSubmissionStatus.Approved or RequestSubmissionStatus.Queued)
+                            {
+                                <button class="btn-secondary" type="button" @onclick="() => WithdrawAsync(request.Id)">Withdraw</button>
+                            }
+                        </div>
+                    }
+                </article>
+            }
+        </section>
+    }
+</div>

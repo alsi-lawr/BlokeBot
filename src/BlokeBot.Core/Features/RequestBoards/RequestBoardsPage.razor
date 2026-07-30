@@ -1,0 +1,184 @@
+@page "/requests"
+@using Microsoft.AspNetCore.Authorization
+@using BlokeBot.Persistence.Models
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject RequestBoardService _boards
+
+<PageTitle>BlokeBot | Request boards</PageTitle>
+
+<DashboardPage Kicker="Community interaction"
+               Title="Request boards"
+               Description="Configure viewer submissions and moderate the queue."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        <a class="btn-secondary" href="@_publicBoardUrl">Open public board</a>
+        <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
+    </Actions>
+
+    <ChildContent>
+    @if (Host is null)
+    {
+        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+    }
+    else
+    {
+        <div class="grid gap-6 xl:grid-cols-[minmax(16rem,0.7fr)_minmax(0,1.8fr)]">
+            <aside class="card p-4">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-lg font-semibold text-slate-950">Boards</h2>
+                    <button class="btn-secondary" type="button" @onclick="NewBoard">New</button>
+                </div>
+                <div class="mt-3 grid gap-2">
+                    @foreach (var board in _boardList)
+                    {
+                        <button @key="board.Id"
+                                type="button"
+                                class="control-surface min-h-11 rounded-lg px-3 text-left text-sm font-semibold"
+                                aria-current="@(board.Slug == _draft.Slug ? "true" : null)"
+                                @onclick="() => SelectBoardAsync(board.Slug)">
+                            @board.Title
+                            <span class="block text-xs font-normal text-muted-foreground">/@board.Slug · @(board.IsOpen ? "Open" : "Closed")</span>
+                        </button>
+                    }
+                </div>
+            </aside>
+
+            <div class="space-y-6">
+                <section class="card p-5" aria-labelledby="request-board-configuration">
+                    <h2 id="request-board-configuration" class="text-lg font-semibold text-slate-950">Board configuration</h2>
+                    <div class="mt-4 grid gap-4 md:grid-cols-2">
+                        <Field Id="request-board-slug" Label="Command and URL name" @bind-Value="_draft.Slug" />
+                        <Field Id="request-board-name" Label="Title" @bind-Value="_draft.Title" />
+                        <div class="md:col-span-2">
+                            <TextAreaField Id="request-board-description" Label="Description" @bind-Value="_draft.Description" />
+                        </div>
+                        <Field Id="request-board-cost" Label="Point cost" @bind-Value="_draft.PointCost" />
+                        <div>
+                            <label class="mb-1 block text-sm font-semibold text-slate-950" for="request-board-refunds">Refund policy</label>
+                            <select id="request-board-refunds" class="input" @bind="_draft.RefundPolicy">
+                                @foreach (var policy in Enum.GetValues<RequestBoardRefundPolicy>())
+                                {
+                                    <option value="@policy">@policy</option>
+                                }
+                            </select>
+                        </div>
+                        <Field Id="request-board-submission-limit" Label="Active submissions per viewer" @bind-Value="_draft.SubmissionLimit" />
+                        <Field Id="request-board-cooldown" Label="Submission cooldown (seconds)" @bind-Value="_draft.CooldownSeconds" />
+                        <Field Id="request-board-vote-limit" Label="Votes per viewer" @bind-Value="_draft.VoteLimit" />
+                        <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
+                            <input type="checkbox" @bind="_draft.IsOpen" /> Accept submissions
+                        </label>
+                        <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
+                            <input type="checkbox" @bind="_draft.VotingEnabled" /> Enable voting
+                        </label>
+                    </div>
+                    <h3 class="mt-6 text-base font-semibold text-slate-950">Submission fields</h3>
+                    <div class="mt-3 grid gap-3">
+                        @for (var index = 0; index < _draft.Fields.Count; index++)
+                        {
+                            var field = _draft.Fields[index];
+                            <div @key="field.Identity" class="surface-muted grid gap-3 rounded-lg p-4 md:grid-cols-2">
+                                <Field Id="@($"request-field-key-{index}")" Label="Key" @bind-Value="field.Key" />
+                                <Field Id="@($"request-field-label-{index}")" Label="Label" @bind-Value="field.Label" />
+                                <div>
+                                    <label class="mb-1 block text-sm font-semibold text-slate-950" for="@($"request-field-kind-{index}")">Type</label>
+                                    <select id="@($"request-field-kind-{index}")" class="input" @bind="field.Kind">
+                                        @foreach (var kind in Enum.GetValues<RequestBoardFieldKind>())
+                                        {
+                                            <option value="@kind">@kind</option>
+                                        }
+                                    </select>
+                                </div>
+                                <Field Id="@($"request-field-limit-{index}")" Label="Maximum length" @bind-Value="field.MaximumLength" />
+                                @if (field.Kind == RequestBoardFieldKind.Choice)
+                                {
+                                    <Field Id="@($"request-field-choices-{index}")" Label="Choices (comma-separated)" @bind-Value="field.Choices" />
+                                }
+                                @if (field.Kind == RequestBoardFieldKind.Number)
+                                {
+                                    <Field Id="@($"request-field-min-{index}")" Label="Minimum (optional)" @bind-Value="field.MinimumNumber" />
+                                    <Field Id="@($"request-field-max-{index}")" Label="Maximum (optional)" @bind-Value="field.MaximumNumber" />
+                                }
+                                <label class="flex min-h-11 items-center gap-3 text-sm font-semibold text-slate-950">
+                                    <input type="checkbox" @bind="field.IsRequired" /> Required
+                                </label>
+                                <button class="btn-secondary justify-self-start" type="button" @onclick="() => RemoveField(field)">Remove field</button>
+                            </div>
+                        }
+                        <button class="btn-secondary justify-self-start" type="button" disabled="@(_draft.Fields.Count >= RequestBoardLimits.MaximumFields)" @onclick="AddField">Add field</button>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_feedback))
+                    {
+                        <p class="mt-4 text-sm font-semibold" role="@(_operationFailed ? "alert" : "status")">@_feedback</p>
+                    }
+                </section>
+
+                @if (_moderatorPage is not null)
+                {
+                    <section class="space-y-3" aria-labelledby="request-moderation-list">
+                        <div>
+                            <h2 id="request-moderation-list" class="text-xl font-semibold text-slate-950">Moderation</h2>
+                            <p class="mt-1 text-sm text-muted-foreground">@_moderatorPage.Board.OrderingDescription</p>
+                        </div>
+                        @if (_moderatorPage.Submissions.Count == 0)
+                        {
+                            <div class="card p-8 text-sm text-muted-foreground">No requests yet.</div>
+                        }
+                        @foreach (var submission in _moderatorPage.Submissions)
+                        {
+                            var draft = _moderationDrafts[submission.Public.Id];
+                            <article @key="submission.Public.Id" class="card p-5">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">#@submission.Public.Id · @submission.Public.Status · @submission.PointReservationState</p>
+                                        <h3 class="mt-1 text-lg font-semibold text-slate-950">@submission.Public.Title</h3>
+                                        <p class="mt-1 text-sm text-muted-foreground">By @submission.Public.SubmitterLogin · @submission.Public.VoteCount votes</p>
+                                    </div>
+                                    @if (submission.PossibleDuplicateIds.Count > 0)
+                                    {
+                                        <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+                                            Possible duplicates: @string.Join(", ", submission.PossibleDuplicateIds.Select(id => $"#{id}"))
+                                        </p>
+                                    }
+                                </div>
+                                <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                                    @foreach (var value in submission.Public.Values)
+                                    {
+                                        <div>
+                                            <dt class="font-semibold text-slate-950">@value.Label</dt>
+                                            <dd class="break-words text-muted-foreground">@value.Value</dd>
+                                        </div>
+                                    }
+                                </dl>
+                                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                    <Field Id="@($"request-category-{submission.Public.Id}")" Label="Category" @bind-Value="draft.Category" />
+                                    <Field Id="@($"request-tags-{submission.Public.Id}")" Label="Tags (comma-separated)" @bind-Value="draft.Tags" />
+                                    <Field Id="@($"request-priority-{submission.Public.Id}")" Label="Priority (-1000 to 1000)" @bind-Value="draft.Priority" />
+                                    <Field Id="@($"request-merge-{submission.Public.Id}")" Label="Merge into request ID" @bind-Value="draft.MergeTarget" />
+                                    <div class="md:col-span-2">
+                                        <TextAreaField Id="@($"request-public-note-{submission.Public.Id}")" Label="Public note" @bind-Value="draft.PublicNote" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <TextAreaField Id="@($"request-private-note-{submission.Public.Id}")" Label="Private moderator note" @bind-Value="draft.PrivateNote" />
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <TextAreaField Id="@($"request-rejection-{submission.Public.Id}")" Label="Private rejection reason" @bind-Value="draft.PrivateRejectionReason" />
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach (var target in AvailableTransitions(submission.Public.Status))
+                                    {
+                                        <button class="btn-secondary" type="button" @onclick="() => TransitionAsync(submission.Public.Id, target)">@target</button>
+                                    }
+                                    <button class="btn-secondary" type="button" @onclick="() => MergeAsync(submission.Public.Id)">Merge</button>
+                                </div>
+                            </article>
+                        }
+                    </section>
+                }
+            </div>
+        </div>
+    }
+    </ChildContent>
+</DashboardPage>

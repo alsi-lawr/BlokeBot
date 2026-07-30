@@ -41,6 +41,7 @@
                     var showGuessing = FeatureIsVisible(session, selection, HostFeatureFlags.Guessing);
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
+                    var showRequestBoards = selection is not null && !session.IsBotAccount;
                     var showAlerts = selection is not null && !session.IsBotAccount;
                     var showNativeTwitch = FeatureIsVisible(
                         session,
@@ -48,7 +49,7 @@
                         HostFeatureFlags.NativeTwitch
                     );
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showCustomCommands;
+                        showNativeTwitch || showGuessing || showPoints || showCustomCommands || showRequestBoards;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -216,6 +217,24 @@
                                      aria-current="@CurrentRoute("twitch-operations/predictions", exact: true)"
                                      @onclick="NotifyNavigatedAsync">Predictions</NavLink>
                         </div>
+                    </div>
+                }
+
+                @if (showRequestBoards)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="requests">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="requests"
+                                 aria-label="Request boards"
+                                 aria-describedby="@RouteHelpReference("requests")"
+                                 aria-current="@CurrentRoute("requests")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sky-700" aria-hidden="true">☷</span>
+                            <span class="nav-menu__label min-w-0">Request boards</span>
+                        </NavLink>
+                        @RouteHelp("requests", "Request boards")
                     </div>
                 }
 

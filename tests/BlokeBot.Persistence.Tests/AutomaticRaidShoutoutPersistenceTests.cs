@@ -11,12 +11,12 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class AutomaticRaidShoutoutPersistenceTests
 {
     [Test]
-    public async Task SixthMigration_HasNoPendingModelAndDatabaseDefaults()
+    public async Task SeventhMigration_HasNoPendingModelAndDatabaseDefaults()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
-        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(6);
+        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(7);
         (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         var hostId = await SeedHostAsync(db, "host");
 

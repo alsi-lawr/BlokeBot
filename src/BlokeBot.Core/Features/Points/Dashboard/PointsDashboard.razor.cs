@@ -76,6 +76,8 @@ public partial class PointsDashboard
             PointLedgerKind.GambleLoss => "Gamble lost",
             PointLedgerKind.GiveawayWin => "Giveaway prize",
             PointLedgerKind.GuessWin => "Guessing prize",
+            PointLedgerKind.RequestReservation => "Request reserved",
+            PointLedgerKind.RequestRefund => "Request refunded",
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
     }
