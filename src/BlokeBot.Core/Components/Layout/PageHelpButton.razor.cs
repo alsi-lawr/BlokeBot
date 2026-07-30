@@ -99,6 +99,7 @@ public partial class PageHelpButton
             "/requests" => _requestBoardsHelp,
             "/queues" => _playQueuesHelp,
             "/moments" => _momentsHelp,
+            "/overlays" => _overlaysHelp,
             "/twitch-operations/shoutouts" => _shoutoutsHelp,
             "/twitch-operations/polls" => _pollsHelp,
             "/twitch-operations/clips-markers" => _clipsMarkersHelp,
@@ -223,6 +224,29 @@ public partial class PageHelpButton
                 "Preview the weekly recap",
                 "Open weekly recap launches the existing public, shareable recap in a new tab so this moderator workspace and any unsaved inputs remain available.",
                 ["Finalize previous week when the winning moment is ready to be recorded."]
+            ),
+        ]
+    );
+
+    private static readonly HelpPage _overlaysHelp = new(
+        "Overlays",
+        [
+            new(
+                "Set up a Browser Source",
+                "Create an overlay, copy its private Browser Source URL, then add it to OBS at 1920 by 1080.",
+                [
+                    "The private URL is shown only when an overlay is created or its URL is rotated.",
+                    "Rotating the URL stops every OBS source that still uses the previous URL.",
+                ]
+            ),
+            new(
+                "Preview and test",
+                "Live preview uses the same renderer as OBS without putting the private URL in this page.",
+                [
+                    "Representative mode shows the supported Empty overlay state without connecting to live updates.",
+                    "Connection status is approximate diagnostic information, not proof that an OBS scene is visible.",
+                    "Send test pulse publishes temporary presentation data only to the selected overlay.",
+                ]
             ),
         ]
     );

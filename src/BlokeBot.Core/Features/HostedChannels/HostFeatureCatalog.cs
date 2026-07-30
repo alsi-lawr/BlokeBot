@@ -32,6 +32,12 @@ public static class HostFeatureCatalog
                 "Use shoutouts, polls, clips, and stream markers.",
                 enabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
             ),
+            new(
+                HostFeatureFlags.Overlays,
+                "Overlays",
+                "Manage Browser Sources for graphics shown on stream.",
+                enabledFeatures.Contains(HostFeatureFlags.Overlays)
+            ),
         ];
     }
 

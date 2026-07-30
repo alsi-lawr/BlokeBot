@@ -23,6 +23,7 @@ public sealed class PageHelpButtonTests
     [Arguments("/requests", "Request boards", "public board link becomes available")]
     [Arguments("/queues", "Play with viewers", "viewer-page link becomes available")]
     [Arguments("/moments", "Moments", "shareable recap in a new tab")]
+    [Arguments("/overlays", "Overlays", "same renderer as OBS")]
     public void FeatureRoute_RendersOneButtonAndOpensRouteSpecificHelp(
         string path,
         string title,
@@ -71,6 +72,7 @@ public sealed class PageHelpButtonTests
             "/guessing",
             "/guessing/settings",
             "/moments",
+            "/overlays",
             "/points",
             "/points/settings",
             "/queues",

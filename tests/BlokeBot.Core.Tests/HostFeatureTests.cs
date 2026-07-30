@@ -44,6 +44,7 @@ public sealed class HostFeatureTests
             HostFeatureFlags.Points
                 | HostFeatureFlags.CustomCommands
                 | HostFeatureFlags.NativeTwitch
+                | HostFeatureFlags.Overlays
         );
         publishCount.ShouldBe(1);
 
