@@ -5,7 +5,7 @@
 namespace BlokeBot.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class v040 : Migration
+    public partial class V030NativeTwitchFeatureSwitch : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

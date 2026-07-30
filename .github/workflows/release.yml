@@ -14,7 +14,7 @@ permissions:
 jobs:
   release:
     name: Run reusable release workflow
-    uses: alsi-lawr/package-release-workflows/.github/workflows/package-dotnet.yml@main
+    uses: alsi-lawr/package-release-workflows/.github/workflows/package-dotnet.yml@de9f20faceb0644e1a2b1997da9a8723abbe90ce
     secrets:
       CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -40,7 +40,7 @@ jobs:
       publish_scoop: true
       publish_winget: true
       publish_nixpkgs: true
-      publish_chocolatey: true
+      publish_chocolatey: false
       publish_docker_hub: true
       publish_nix_images: true
       promote_latest: true

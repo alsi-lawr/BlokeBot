@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace BlokeBot.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class v050 : Migration
+    public partial class V030AutomaticRaidShoutouts : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

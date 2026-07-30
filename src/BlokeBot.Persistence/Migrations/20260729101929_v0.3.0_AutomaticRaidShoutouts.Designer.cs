@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260729101929_v0.5.0")]
-    partial class v050
+    [Migration("20260729101929_v0.3.0_AutomaticRaidShoutouts")]
+    partial class V030AutomaticRaidShoutouts
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

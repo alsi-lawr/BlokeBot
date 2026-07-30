@@ -12,16 +12,17 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class NativeTwitchMigrationTests
 {
     private const string _publishedV03 = "20260726161453_v0.3.0";
-    private const string _currentV04 = "20260728201821_v0.4.0";
-    private const string _currentV05 = "20260729101929_v0.5.0";
+    private const string _nativeTwitchFeatureSwitch =
+        "20260728201821_v0.3.0_NativeTwitchFeatureSwitch";
+    private const string _automaticRaidShoutouts = "20260729101929_v0.3.0_AutomaticRaidShoutouts";
 
     [Test]
-    public async Task PublishedV04_SeededUpgrade_PreservesCapabilitiesMasksAndFinalSchema()
+    public async Task NativeTwitchFeatureSwitch_SeededUpgrade_PreservesCapabilitiesMasksAndFinalSchema()
     {
         await using var upgradedFactory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using (var published = await upgradedFactory.CreateDbContextAsync())
         {
-            await published.GetService<IMigrator>().MigrateAsync(_currentV04);
+            await published.GetService<IMigrator>().MigrateAsync(_nativeTwitchFeatureSwitch);
             published.Hosts.AddRange(Host("seven", 7), Host("other-bits", 23));
             published.TwitchCustomRewards.Add(
                 new TwitchCustomReward
@@ -116,8 +117,8 @@ public sealed class NativeTwitchMigrationTests
                 """SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";"""
             );
             history.ShouldContain(_publishedV03);
-            history.ShouldContain(_currentV04);
-            history.ShouldContain(_currentV05);
+            history.ShouldContain(_nativeTwitchFeatureSwitch);
+            history.ShouldContain(_automaticRaidShoutouts);
             history.Count.ShouldBe(6);
             history.ShouldNotContain("20260726031743_v0.3.0");
             history.ShouldNotContain("20260728183253_v0.4.0");

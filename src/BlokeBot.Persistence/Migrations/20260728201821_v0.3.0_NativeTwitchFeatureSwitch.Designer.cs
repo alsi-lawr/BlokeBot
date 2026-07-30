@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    [Migration("20260728201821_v0.4.0")]
-    partial class v040
+    [Migration("20260728201821_v0.3.0_NativeTwitchFeatureSwitch")]
+    partial class V030NativeTwitchFeatureSwitch
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
