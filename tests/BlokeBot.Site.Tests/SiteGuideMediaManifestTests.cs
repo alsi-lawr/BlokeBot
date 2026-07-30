@@ -46,18 +46,19 @@ public sealed class SiteGuideMediaManifestTests
             .Order(StringComparer.Ordinal)
             .ShouldBe(mediaInventory);
 
-        var siteReferences = SiteGuideCatalog
+        var generatedSiteReferences = SiteGuideCatalog
             .All.Where(page => page.Media is not null)
             .SelectMany(page => Sources(page.Media!))
             .Append("media/phone-light-home-scroll.webp")
             .Append("media/phone-dark-home-scroll.webp")
             .Append("media/laptop-light-home-scroll.webp")
             .Append("media/laptop-dark-home-scroll.webp")
+            .Where(source => !source.StartsWith("media/community/", StringComparison.Ordinal))
             .Select(source => source["media/".Length..])
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        siteReferences.ShouldBe(mediaInventory);
+        generatedSiteReferences.ShouldBe(mediaInventory);
 
         foreach (var asset in manifest.Assets)
         {
@@ -73,6 +74,34 @@ public sealed class SiteGuideMediaManifestTests
             var dimensions = ReadDimensions(Path.Combine(_mediaRoot, asset.File));
             dimensions.Width.ShouldBe(asset.Width, asset.File);
             dimensions.Height.ShouldBe(asset.Height, asset.File);
+        }
+    }
+
+    [Test]
+    public void CommunityGuideMedia_UsesBoundedFinalUiCaptures()
+    {
+        var expected = new Dictionary<string, (int Width, int Height)>(StringComparer.Ordinal)
+        {
+            ["media/community/request-boards-moderator-desktop.png"] = (1440, 757),
+            ["media/community/request-boards-participant-mobile.png"] = (390, 844),
+            ["media/community/play-with-viewers-moderator-desktop.png"] = (1440, 900),
+            ["media/community/play-with-viewers-participant-mobile.png"] = (390, 844),
+            ["media/community/moments-moderator-desktop.png"] = (1440, 900),
+            ["media/community/moments-participant-mobile.png"] = (390, 844),
+        };
+        var referenced = SiteGuideCatalog
+            .All.Where(page => page.Route.StartsWith("/community/", StringComparison.Ordinal))
+            .SelectMany(page => Sources(page.Media!))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        referenced.ShouldBe(expected.Keys.Order(StringComparer.Ordinal).ToArray());
+        foreach (var source in referenced)
+        {
+            var path = Path.Combine(_repositoryRoot, "src", "BlokeBot.Site", "wwwroot", source);
+            File.Exists(path).ShouldBeTrue(source);
+            ReadDimensions(path).ShouldBe(expected[source], source);
         }
     }
 
@@ -99,7 +128,48 @@ public sealed class SiteGuideMediaManifestTests
                 content.ShouldContain("<details class=\"guide-sidebar__disclosure\" open>");
                 content.ShouldContain("Browse help topics");
                 content.ShouldContain("All help topics");
+                content.ShouldContain("Community interaction");
                 content.ShouldContain("Native Twitch");
+            }
+
+            var requestBoards = await client.GetStringAsync("/community/request-boards");
+            requestBoards.ShouldContain("Current topic: <strong>Request boards</strong>");
+            requestBoards.ShouldContain("/requests/{channel}/{board-name}");
+            requestBoards.ShouldContain(
+                "!request &lt;board&gt; &lt;title&gt; | field=value | category=value | tags=a,b"
+            );
+            requestBoards.ShouldContain("Private moderator note");
+            requestBoards.ShouldContain("media/community/request-boards-moderator-desktop.png");
+
+            var playWithViewers = await client.GetStringAsync("/community/play-with-viewers");
+            playWithViewers.ShouldContain("Current topic: <strong>Play with viewers</strong>");
+            playWithViewers.ShouldContain("/queues/{channel}/{queue-name}");
+            playWithViewers.ShouldContain("!ready [queue]");
+            playWithViewers.ShouldContain("Private lobby message");
+            playWithViewers.ShouldContain(
+                "media/community/play-with-viewers-participant-mobile.png"
+            );
+
+            var moments = await client.GetStringAsync("/community/moments");
+            moments.ShouldContain("Current topic: <strong>Moments</strong>");
+            moments.ShouldContain("/moments/{channel}/streams/{stream-id}");
+            moments.ShouldContain("!moment &lt;suggested title&gt;");
+            moments.ShouldContain("Provider pending");
+            moments.ShouldContain("does not copy or host the clip or VOD");
+            moments.ShouldContain("media/community/moments-participant-mobile.png");
+
+            foreach (
+                var source in SiteGuideCatalog
+                    .All.Where(page =>
+                        page.Route.StartsWith("/community/", StringComparison.Ordinal)
+                    )
+                    .SelectMany(page => Sources(page.Media!))
+                    .Distinct(StringComparer.Ordinal)
+            )
+            {
+                var response = await client.GetAsync($"/{source}");
+                response.StatusCode.ShouldBe(HttpStatusCode.OK, source);
+                response.Content.Headers.ContentType!.MediaType.ShouldBe("image/png");
             }
 
             var overview = await client.GetStringAsync("/twitch-operations");

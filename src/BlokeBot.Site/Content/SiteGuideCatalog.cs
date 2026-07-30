@@ -21,6 +21,14 @@ internal static class SiteGuideCatalog
             ]
         ),
         new(
+            "Community interaction",
+            [
+                GuideLink("Request boards", "community/request-boards"),
+                GuideLink("Play with viewers", "community/play-with-viewers"),
+                GuideLink("Moments", "community/moments"),
+            ]
+        ),
+        new(
             "Native Twitch",
             [
                 GuideLink("Overview", "twitch-operations"),
@@ -148,7 +156,7 @@ internal static class SiteGuideCatalog
                     [
                         "Home gives a short introduction and public leaderboard shortcut.",
                         "Channel setup contains connections, moderator access and feature switches.",
-                        "Chat tools contains Native Twitch, Guessing, Points and Custom commands when those features are on.",
+                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points and Custom commands feature.",
                         "Expand Native Twitch to move between its five focused task pages.",
                     ],
                     Paragraphs =
@@ -274,7 +282,7 @@ internal static class SiteGuideCatalog
             Eyebrow = "Channel tools",
             Title = "Choose the tools your channel needs",
             Summary =
-                "Turn on Native Twitch, commands, guessing or points independently. The dashboard adds the matching pages without changing other tools.",
+                "Use the selected channel's community tools, and turn Native Twitch, commands, guessing or points on independently.",
             Sections =
             [
                 new SiteGuideSection
@@ -292,12 +300,270 @@ internal static class SiteGuideCatalog
                     Heading = "What you can add",
                     Links =
                     [
+                        new SiteLink("Request boards", "community/request-boards"),
+                        new SiteLink("Play with viewers", "community/play-with-viewers"),
+                        new SiteLink("Moments and recaps", "community/moments"),
                         new SiteLink("Commands and scheduled messages", "commands"),
                         new SiteLink("Guessing games", "guessing"),
                         new SiteLink("Points", "points"),
                         new SiteLink("Giveaways", "giveaways"),
                         new SiteLink("Public leaderboards", "leaderboards"),
                         new SiteLink("Native Twitch", "twitch-operations"),
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Set up a request board", "community/request-boards")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/request-boards",
+            Eyebrow = "Community interaction · Requests",
+            Title = "Run a structured request board",
+            Summary =
+                "Collect consistent viewer suggestions, moderate their lifecycle and keep point charges and public status understandable.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/request-boards-participant-mobile.png",
+                LightPhoneSource: "media/community/request-boards-participant-mobile.png",
+                DarkLaptopSource: "media/community/request-boards-moderator-desktop.png",
+                LightLaptopSource: "media/community/request-boards-moderator-desktop.png",
+                PhoneAlt: "The Sample Channel public request board on a narrow screen, showing open rules and the start of the submission form.",
+                LaptopAlt: "The Sample Channel Request boards moderator page, showing a saved Game night requests board and its configuration.",
+                "Moderators configure the board at /requests; viewers use its public channel-and-board address."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Choose the right view",
+                    Bullets =
+                    [
+                        "A channel owner or permitted moderator chooses the channel and opens Request boards at /requests to create, configure and moderate boards.",
+                        "Open public board copies the viewer route /requests/{channel}/{board-name}. Anyone can read an existing board; a viewer signs in with Twitch to submit, vote or withdraw.",
+                        "Chat participants can discover boards with !requests. Website and chat actions use the same board, limits, votes and request states.",
+                    ],
+                    Note =
+                        "The words in braces describe a route value. Replace them with the channel login and the board's Command and URL name; do not type the braces.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Configure a board",
+                    Steps =
+                    [
+                        "Select New, give the board a Command and URL name, title and description, then choose whether it accepts submissions.",
+                        "Set the point cost, refund policy, active-submission limit, submission cooldown, voting switch and per-viewer vote limit.",
+                        "Add only the fields participants need. A field can be Text, URL, Twitch clip, Number or Choice; set its label, required state and applicable length, choice or number limits.",
+                        "Select Save board, then use Open public board and read the Board rules exactly as a participant will see them.",
+                    ],
+                    Paragraphs =
+                    [
+                        "The public queue order explains the complete stable ordering. Moderator priority, votes and assigned queue position refine that order without hiding a different participant rule.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Submit and vote",
+                    Bullets =
+                    [
+                        "On the public page, sign in with Twitch, complete Title and the configured fields, then select Submit request. The page shows the request ID and its current public state.",
+                        "In chat, use !request <board> <title> | field=value | category=value | tags=a,b. Required field keys come from that board's configuration.",
+                        "Use !requestvote <request-id> to vote in chat, or Vote on the public board. Repeating the same vote does not add another vote.",
+                        "A submitter can Withdraw an active request from the public page. Private moderator text is never shown there.",
+                    ],
+                    Note =
+                        "A repeated delivery of the same chat submission is recognised and reports the existing request instead of creating or charging a second one.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Moderate the lifecycle",
+                    Steps =
+                    [
+                        "Review the submitted values and any possible-duplicate warning. Set public category, tags, priority and Public note when they help participants.",
+                        "Move Pending to Approved or Rejected. Approved requests can move to Queued or Accepted; Queued or Accepted requests can move to Completed.",
+                        "Use Merge with the target request ID when two entries are the same request. The public board keeps the merged outcome and the surviving request's combined support.",
+                        "Use the matching moderator chat commands when the dashboard is not convenient: !requestapprove, !requestreject, !requestqueue, !requestaccept, !requestcomplete or !requestmerge followed by the request ID.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Private moderator note and Private rejection reason remain moderator-only. Put participant-facing context in Public note instead.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Points, failure and recovery",
+                    Bullets =
+                    [
+                        "A non-zero cost reserves points when the request is accepted. Never manually charge the viewer as well.",
+                        "Never refunds; Rejected or withdrawn refunds those two closures; Any unfulfilled closure also refunds other closures that did not complete. A completed request consumes its reservation.",
+                        "If validation, the cooldown, a limit or the balance rejects a submission, correct the message shown and submit once. If an outcome is already visible, reload before trying again.",
+                        "If request state and points still disagree after reload, leave the request unchanged and send the channel, board name, request ID, approximate time and visible message to the server owner. Do not share Twitch tokens or private notes.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Build a play-with-viewers queue", "community/play-with-viewers")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/play-with-viewers",
+            Eyebrow = "Community interaction · Queues",
+            Title = "Build fair play-with-viewers parties",
+            Summary =
+                "Open a queue, collect private entry details, run ready checks and deliver lobby information without posting it publicly.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/play-with-viewers-participant-mobile.png",
+                LightPhoneSource: "media/community/play-with-viewers-participant-mobile.png",
+                DarkLaptopSource: "media/community/play-with-viewers-moderator-desktop.png",
+                LightLaptopSource: "media/community/play-with-viewers-moderator-desktop.png",
+                PhoneAlt: "The Sample Channel Community night party viewer page on a narrow screen, showing the public queue rule and private entry form.",
+                LaptopAlt: "The Sample Channel Play with viewers moderator page, showing a saved queue, party size and fair-selection configuration.",
+                "The moderator route /queues and viewer route /queues/{channel}/{queue-name} share one live queue."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Choose identities and permissions",
+                    Bullets =
+                    [
+                        "A channel owner or permitted moderator chooses the channel and opens Play with viewers at /queues.",
+                        "Open viewer page uses /queues/{channel}/{queue-name}. Signed-in participants use their Twitch identity; an unsigned participant can enter a Twitch login as the bounded fallback.",
+                        "Moderator controls, entry answers, priorities, private notes and lobby messages are never shown on the public page.",
+                    ],
+                    Note =
+                        "The words in braces describe a route value. Replace them with the channel login and the queue's Command and URL name; do not type the braces.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Configure and open the queue",
+                    Steps =
+                    [
+                        "Select New, set the Command and URL name, Queue name, Game or activity and Party size.",
+                        "Choose Join order or Least recent participation. The viewer page states the resulting fair-selection rule before anyone joins.",
+                        "Set Ready expiry, History retention and Skip/no-show exclusion. Add private entry fields and any required roles in role=count form.",
+                        "Decide whether participant names may be shown publicly, turn Queue open on, save, then inspect Open viewer page at both wide and narrow widths.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Platform, region, rank, preferred role and every custom entry field are private to moderators even when public participant names are enabled.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Join from the page or chat",
+                    Bullets =
+                    [
+                        "On the viewer page, fill the requested fields and select Join. Check position reports the current place; Leave removes the entry; I'm ready answers an active ready check.",
+                        "In chat use !queue [queue], !join [queue] key=value, !leave [queue], !position [queue] and !ready [queue]. The queue name is optional when the channel has only one queue.",
+                        "Joining twice keeps one entry. Signed-in Twitch ID is authoritative; normalized-login fallback lets an unsigned viewer participate without creating duplicate public names.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Select and run a party",
+                    Steps =
+                    [
+                        "Review Waiting viewers and the visible next-candidate order. Adjust Priority or Private moderator note only when a documented channel rule requires it.",
+                        "Start a Ready check for candidates. Participants must use I'm ready or !ready before Ready expiry; then select Select next party.",
+                        "Use Keep party to retain the current group, Replace one for a single change, or Skip and No-show when someone cannot play. The configured exclusion prevents immediate re-entry after a skip or no-show.",
+                        "Enter the Private lobby message and select Whisper party. Confirm success before starting; never paste a private lobby code into public chat as a fallback.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Moderators can use !queueopen [queue] and !queueclose [queue]. Close the queue while resolving a disputed selection so new joins do not move the visible candidate order.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Recover safely",
+                    Bullets =
+                    [
+                        "If a participant misses Ready expiry, run a new ready check or use Replace one. Use No-show only when the channel's exclusion rule should apply.",
+                        "If a whisper fails, verify that the bot connection can whisper and retry Whisper party only after the page reports the failure. Do not reveal the private message publicly.",
+                        "If selection cannot satisfy required roles, leave the current party intact, adjust the waiting pool or role requirements and select again.",
+                        "History retention removes old participation data after the configured period. Shortening it changes future fairness evidence, so record that channel decision before saving.",
+                    ],
+                },
+            ],
+            Next = [new SiteLink("Capture and recap community moments", "community/moments")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/community/moments",
+            Eyebrow = "Community interaction · Moments",
+            Title = "Capture, moderate and recap moments",
+            Summary =
+                "Turn live viewer calls into one moderated Twitch clip or marker, then publish safe stream and weekly recaps.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/community/moments-participant-mobile.png",
+                LightPhoneSource: "media/community/moments-participant-mobile.png",
+                DarkLaptopSource: "media/community/moments-moderator-desktop.png",
+                LightLaptopSource: "media/community/moments-moderator-desktop.png",
+                PhoneAlt: "The Sample Channel stream recap on a narrow screen, showing an approved Community clutch save and a recorded vote.",
+                LaptopAlt: "The Sample Channel Moments moderator page, showing live capture settings and an approved Community clutch save.",
+                "Moderators work at /moments; approved entries appear in channel, stream and weekly recaps."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Prepare a live channel",
+                    Bullets =
+                    [
+                        "Choose the channel and open Moments at /moments. Captures require Twitch to report that channel live and require the selected channel's Twitch connection.",
+                        "Set the Merge window from 15 to 300 seconds; 90 seconds is the default. Calls inside that window join the same stream moment and keep each contributor and suggestion.",
+                        "Choose no point reward, First requester or All contributors, set the amount, and decide whether a confirmed clip failure may fall back to a stream marker.",
+                        "Save settings and check that the page shows Live stream with a stream identity before inviting viewers to capture.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Capture a candidate",
+                    Bullets =
+                    [
+                        "A viewer uses !moment <suggested title> | category=<suggested category>. !clip accepts the same form.",
+                        "A moderator can use Capture now. BlokeBot first requests a Twitch clip; marker fallback is used only after a confirmed clip failure and only when enabled.",
+                        "Each call returns a public moment ID. Repeated or concurrent calls for the same live moment converge instead of creating duplicate provider actions or duplicate rewards.",
+                    ],
+                    Note =
+                        "BlokeBot links to Twitch media; it does not copy or host the clip or VOD.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Moderate public metadata",
+                    Steps =
+                    [
+                        "Review the provider state, contributor count and viewer suggestions in Candidates.",
+                        "Set Public title and Category, then Approve. Save metadata updates an existing candidate; Reject keeps its reason private; Merge uses another moment's public ID.",
+                        "Use Open on Twitch to verify available media. Only approved moments appear in public recaps.",
+                    ],
+                    Paragraphs =
+                    [
+                        "Private moderator note, rejection reason, audit text and provider failure details stay on the moderator view. Public recaps show only approved title, category, counts and the Twitch link.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Share recaps and votes",
+                    Bullets =
+                    [
+                        "Weekly recap opens /moments/{channel} for the current ISO-UTC week. A stream recap uses /moments/{channel}/streams/{stream-id}.",
+                        "A signed-in viewer votes with Twitch ID. An unsigned viewer may enter a normalized Twitch login. Each identity contributes at most one vote to a moment.",
+                        "Finalize previous week records the winner for the completed week using vote count and stable ordering. Repeating finalization returns the same winner.",
+                    ],
+                    Note =
+                        "Replace every value in braces with the channel login or Twitch stream identity shown by BlokeBot; do not type the braces.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Read provider states before retrying",
+                    Bullets =
+                    [
+                        "Provider pending means Twitch has not finished the clip. Reload the same candidate later; do not capture again just to force an answer.",
+                        "An ambiguous outcome means Twitch did not confirm whether its request completed. BlokeBot preserves that uncertainty and does not create a fallback marker from it.",
+                        "Offline means wait for a live stream. If Twitch reports clips or VODs disabled, correct that Twitch setting or continue without marker fallback. If access is unauthorized, reconnect the selected channel account.",
+                        "For a continuing failure, keep the candidate and send the selected channel, public moment ID, stream identity, approximate time and visible provider message to the server owner. Never send tokens or private moderation text.",
                     ],
                 },
             ],

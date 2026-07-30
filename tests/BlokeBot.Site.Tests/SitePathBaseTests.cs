@@ -54,6 +54,12 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+            var requestBoards = await client.GetStringAsync("/blokebot/community/request-boards");
+            requestBoards.ShouldContain(
+                "data-theme-light-source=\"media/community/request-boards-moderator-desktop.png\""
+            );
+            requestBoards.ShouldContain("Current topic: <strong>Request boards</strong>");
+
             var nativeShoutouts = await client.GetStringAsync(
                 "/blokebot/twitch-operations/shoutouts"
             );
@@ -89,6 +95,11 @@ public sealed class SitePathBaseTests
                 "/blokebot/media/laptop-light-native-shoutouts.png"
             );
             nativeShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var communityShowcase = await client.GetAsync(
+                "/blokebot/media/community/request-boards-moderator-desktop.png"
+            );
+            communityShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var favicon = await client.GetAsync("/blokebot/favicon.ico");
             favicon.StatusCode.ShouldBe(HttpStatusCode.OK);
