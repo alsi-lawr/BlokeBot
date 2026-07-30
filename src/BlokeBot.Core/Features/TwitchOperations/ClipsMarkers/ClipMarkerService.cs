@@ -59,12 +59,23 @@ public sealed class ClipMarkerService(
         );
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+    public Task<ClipMarkerOperationOutcome> CreateClipAsync(
         int hostId,
         bool hasDelay,
         CancellationToken ct
     )
     {
+        return CreateClipAsync(hostId, hasDelay, NewAttemptKey(), ct);
+    }
+
+    public async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+        int hostId,
+        bool hasDelay,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -79,6 +90,20 @@ public sealed class ClipMarkerService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var existing = await db.TwitchClips.SingleOrDefaultAsync(
+            clip => clip.HostId == hostId && clip.IdempotencyKey == key,
+            ct
+        );
+        if (existing is not null)
+        {
+            if (existing.Status == TwitchClipStatus.Pending)
+            {
+                await ReconcileAsync(hostId, ct);
+                await db.Entry(existing).ReloadAsync(ct);
+            }
+            return Outcome(existing);
+        }
+
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
         {
@@ -95,7 +120,7 @@ public sealed class ClipMarkerService(
         var clip = new TwitchClip
         {
             HostId = hostId,
-            IdempotencyKey = NewAttemptKey(),
+            IdempotencyKey = key,
             Status = TwitchClipStatus.Pending,
             RequestedAtUtc = now,
         };
@@ -186,12 +211,23 @@ public sealed class ClipMarkerService(
         }
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+    public Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
         int hostId,
         string description,
         CancellationToken ct
     )
     {
+        return CreateMarkerAsync(hostId, description, NewAttemptKey(), ct);
+    }
+
+    public async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+        int hostId,
+        string description,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -213,6 +249,15 @@ public sealed class ClipMarkerService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var existing = await db.TwitchStreamMarkers.SingleOrDefaultAsync(
+            marker => marker.HostId == hostId && marker.IdempotencyKey == key,
+            ct
+        );
+        if (existing is not null)
+        {
+            return MarkerOutcome(existing);
+        }
+
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
         {
@@ -229,7 +274,7 @@ public sealed class ClipMarkerService(
         var marker = new TwitchStreamMarker
         {
             HostId = hostId,
-            IdempotencyKey = NewAttemptKey(),
+            IdempotencyKey = key,
             Description = description.Trim(),
             Status = TwitchStreamMarkerStatus.Ambiguous,
             CreatedAtUtc = now,
@@ -842,5 +887,18 @@ public sealed class ClipMarkerService(
     private static string NewAttemptKey()
     {
         return Guid.NewGuid().ToString("N");
+    }
+
+    private static string ValidateAttemptKey(string value)
+    {
+        var key = value.Trim();
+        if (key.Length is < 1 or > 128)
+        {
+            throw new ArgumentException(
+                "Provider attempt keys must contain 1 to 128 characters.",
+                nameof(value)
+            );
+        }
+        return key;
     }
 }

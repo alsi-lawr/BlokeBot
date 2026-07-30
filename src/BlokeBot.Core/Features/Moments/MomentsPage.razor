@@ -1,0 +1,110 @@
+@page "/moments"
+@using BlokeBot.Core.Components
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject MomentHubService _moments
+@inject BlokeBot.Core.Features.HostedChannels.Status.IHostStreamLivenessProvider _streams
+
+<PageTitle>BlokeBot | Moments</PageTitle>
+
+<DashboardPage Kicker="Community interaction"
+               Title="Moments"
+               Description="Capture, moderate, and recap community Twitch clips and stream markers."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        <a class="btn-secondary" href="@_weeklyUrl">Weekly recap</a>
+        <button class="btn-secondary" type="button" @onclick="FinalizeWeekAsync">Finalize previous week</button>
+        <button class="btn-primary" type="button" @onclick="CaptureAsync">Capture now</button>
+    </Actions>
+    <ChildContent>
+        @if (Host is null)
+        {
+            <div class="card p-6">Choose a channel to manage moments.</div>
+        }
+        else
+        {
+            <section class="card p-5" aria-labelledby="moment-settings-heading">
+                <h2 id="moment-settings-heading" class="text-lg font-semibold">Capture settings</h2>
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field Id="moment-window" Label="Merge window (seconds)" @bind-Value="_mergeWindow" />
+                    <div>
+                        <label class="label" for="moment-reward-policy">Point reward</label>
+                        <select id="moment-reward-policy" class="input" @bind="_rewardPolicy">
+                            @foreach (var policy in Enum.GetValues<MomentRewardPolicy>())
+                            {
+                                <option value="@policy">@policy</option>
+                            }
+                        </select>
+                    </div>
+                    <Field Id="moment-reward-amount" Label="Reward amount" @bind-Value="_rewardAmount" />
+                    <label class="flex min-h-11 items-center gap-2 pt-6 text-sm font-semibold">
+                        <input type="checkbox" @bind="_markerFallback" /> Marker fallback
+                    </label>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
+                    <span class="text-sm text-muted-foreground">@_streamStatus</span>
+                </div>
+            </section>
+
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
+            }
+
+            <section class="grid gap-4" aria-labelledby="moment-candidates-heading">
+                <h2 id="moment-candidates-heading" class="text-xl font-semibold">Candidates</h2>
+                @if (_page is null || _page.Candidates.Count == 0)
+                {
+                    <div class="card p-6 text-sm text-muted-foreground">No moments captured yet. Viewers can use !moment or !clip.</div>
+                }
+                else
+                {
+                    @foreach (var candidate in _page.Candidates)
+                    {
+                        var draft = Draft(candidate.Public.PublicId);
+                        <article class="card p-5" @key="candidate.Public.PublicId">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@candidate.Public.State · @candidate.Public.StreamIdentity</p>
+                                    <h3 class="mt-1 break-words text-lg font-semibold">@(candidate.Public.PublicTitle.Length == 0 ? "Untitled moment" : candidate.Public.PublicTitle)</h3>
+                                    <p class="text-sm text-muted-foreground">@candidate.Public.Contributors.Count contributors · @candidate.Public.VoteCount votes · @candidate.Public.PublicId</p>
+                                </div>
+                                @if (candidate.Public.ProviderUrl is { } url)
+                                {
+                                    <a class="btn-secondary" href="@url" target="_blank" rel="noreferrer">Open on Twitch</a>
+                                }
+                            </div>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                <Field Id="@($"moment-title-{candidate.Public.PublicId:N}")" Label="Public title" @bind-Value="draft.Title" />
+                                <Field Id="@($"moment-category-{candidate.Public.PublicId:N}")" Label="Category" @bind-Value="draft.Category" />
+                                <div class="sm:col-span-2">
+                                    <TextAreaField Id="@($"moment-private-{candidate.Public.PublicId:N}")" Label="Private moderator note / rejection reason" @bind-Value="draft.PrivateText" />
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <Field Id="@($"moment-merge-{candidate.Public.PublicId:N}")" Label="Merge into moment public ID" @bind-Value="draft.MergeTarget" />
+                                </div>
+                            </div>
+                            @if (candidate.Suggestions.Count > 0)
+                            {
+                                <p class="mt-3 text-sm text-muted-foreground">Suggestions: @string.Join("; ", candidate.Suggestions)</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(candidate.ProviderFailureReason))
+                            {
+                                <p class="mt-3 text-sm text-amber-700">@candidate.ProviderFailureReason</p>
+                            }
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button class="btn-primary" type="button" @onclick="() => ApproveAsync(candidate.Public.PublicId)">Approve</button>
+                                <button class="btn-secondary" type="button" @onclick="() => EditAsync(candidate.Public.PublicId)">Save metadata</button>
+                                <button class="btn-secondary" type="button" @onclick="() => RejectAsync(candidate.Public.PublicId)">Reject</button>
+                                <button class="btn-secondary" type="button" @onclick="() => MergeAsync(candidate.Public.PublicId)">Merge</button>
+                            </div>
+                        </article>
+                    }
+                }
+            </section>
+        }
+    </ChildContent>
+</DashboardPage>

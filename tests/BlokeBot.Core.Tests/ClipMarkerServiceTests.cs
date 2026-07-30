@@ -240,6 +240,62 @@ public sealed class ClipMarkerServiceTests
         typeof(StreamMarkerView).GetProperty("IdempotencyKey").ShouldBeNull();
     }
 
+    [Test]
+    public async Task DeterministicAttemptKeys_ReconcileWithoutRepeatingProviderMutations()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
+        var http = new ClipMarkerHttpClientFactory();
+        var service = CreateService(dbFactory, http, now);
+
+        var firstClip = await service.CreateClipAsync(
+            1,
+            false,
+            "moment:public-id:clip",
+            CancellationToken.None
+        );
+        var retriedClip = await service.CreateClipAsync(
+            1,
+            false,
+            "moment:public-id:clip",
+            CancellationToken.None
+        );
+        var firstMarker = await service.CreateMarkerAsync(
+            1,
+            "Ambiguous marker",
+            "moment:public-id:marker",
+            CancellationToken.None
+        );
+        var retriedMarker = await service.CreateMarkerAsync(
+            1,
+            "Ambiguous marker",
+            "moment:public-id:marker",
+            CancellationToken.None
+        );
+
+        firstClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        retriedClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        firstMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        http.ClipPosts.ShouldBe(1);
+        http.MarkerPosts.ShouldBe(1);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchClips.CountAsync()).ShouldBe(1);
+        (await verify.TwitchStreamMarkers.CountAsync()).ShouldBe(1);
+    }
+
     private static ClipMarkerService CreateService(
         SqliteBlokeBotDbFactory dbFactory,
         ClipMarkerHttpClientFactory http,

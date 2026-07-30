@@ -15,6 +15,7 @@ public enum PointLedgerKind
     GuessWin,
     RequestReservation,
     RequestRefund,
+    MomentReward,
 }
 
 internal static class PointLedgerKindPersistence
@@ -30,6 +31,7 @@ internal static class PointLedgerKindPersistence
     private const string _guessWinToken = "GuessWin";
     private const string _requestReservationToken = "RequestReservation";
     private const string _requestRefundToken = "RequestRefund";
+    private const string _momentRewardToken = "MomentReward";
 
     public static IReadOnlyList<string> Tokens { get; } =
     [
@@ -44,6 +46,7 @@ internal static class PointLedgerKindPersistence
         _guessWinToken,
         _requestReservationToken,
         _requestRefundToken,
+        _momentRewardToken,
     ];
 
     public static string ToToken(PointLedgerKind kind)
@@ -61,6 +64,7 @@ internal static class PointLedgerKindPersistence
             PointLedgerKind.GuessWin => _guessWinToken,
             PointLedgerKind.RequestReservation => _requestReservationToken,
             PointLedgerKind.RequestRefund => _requestRefundToken,
+            PointLedgerKind.MomentReward => _momentRewardToken,
             _ => throw new UnreachableException("Unknown point ledger kind."),
         };
     }
@@ -80,6 +84,7 @@ internal static class PointLedgerKindPersistence
             _guessWinToken => PointLedgerKind.GuessWin,
             _requestReservationToken => PointLedgerKind.RequestReservation,
             _requestRefundToken => PointLedgerKind.RequestRefund,
+            _momentRewardToken => PointLedgerKind.MomentReward,
             _ => throw new PersistenceDataIntegrityException(typeof(PointLedgerKind)),
         };
     }

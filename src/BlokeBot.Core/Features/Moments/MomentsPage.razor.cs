@@ -1,0 +1,263 @@
+using System.Diagnostics;
+using BlokeBot.Core.Components;
+using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Persistence.Models;
+
+namespace BlokeBot.Core.Features.Moments;
+
+public partial class MomentsPage
+{
+    private MomentModeratorPage? _page;
+    private readonly Dictionary<Guid, MomentDraft> _drafts = [];
+    private string _mergeWindow = MomentLimits.DefaultMergeWindowSeconds.ToString();
+    private bool _markerFallback = true;
+    private MomentRewardPolicy _rewardPolicy;
+    private string _rewardAmount = "0";
+    private string _streamIdentity = string.Empty;
+    private string _streamStatus = "Checking live stream…";
+    private string _feedback = string.Empty;
+    private bool _failed;
+
+    private string _weeklyUrl =>
+        string.IsNullOrWhiteSpace(HostLogin) ? "#" : $"/moments/{HostLogin}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageContextAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        if (HostId == 0)
+        {
+            return;
+        }
+        _page = await _moments.GetModeratorPageAsync(HostId, CancellationToken.None);
+        _mergeWindow = _page.Settings.MergeWindowSeconds.ToString();
+        _markerFallback = _page.Settings.MarkerFallbackEnabled;
+        _rewardPolicy = _page.Settings.RewardPolicy;
+        _rewardAmount = _page.Settings.RewardAmount;
+        _drafts.Clear();
+        foreach (var candidate in _page.Candidates)
+        {
+            _drafts[candidate.Public.PublicId] = new(
+                candidate.Public.PublicTitle,
+                candidate.Public.PublicCategory,
+                candidate.PrivateRejectionReason,
+                string.Empty
+            );
+        }
+        var streamResult = await _streams
+            .GetStreamLiveness(HostLogin)
+            .ExecuteAsync(CancellationToken.None);
+        var stream = streamResult.Match(value => value, _ => throw new UnreachableException());
+        switch (stream)
+        {
+            case HostStreamLivenessOutcome.Live live:
+                _streamIdentity = live.StreamId;
+                _streamStatus = $"Live stream: {live.StreamId}";
+                break;
+            case HostStreamLivenessOutcome.Offline:
+                _streamIdentity = string.Empty;
+                _streamStatus = "The selected channel is offline.";
+                break;
+            default:
+                _streamIdentity = string.Empty;
+                _streamStatus = "Twitch stream identity is temporarily unavailable.";
+                break;
+        }
+    }
+
+    private MomentDraft Draft(Guid id)
+    {
+        return _drafts[id];
+    }
+
+    private Task SaveSettingsAsync()
+    {
+        return RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                if (!int.TryParse(_mergeWindow, out var mergeWindow))
+                {
+                    SetFeedback("The merge window must be a whole number.", true);
+                    return;
+                }
+                var result = await _moments.ConfigureAsync(
+                    HostId,
+                    new ConfigureMomentHubCommand(
+                        mergeWindow,
+                        _markerFallback,
+                        _rewardPolicy,
+                        _rewardAmount
+                    ),
+                    CancellationToken.None
+                );
+                SetFeedback(
+                    result.Match(
+                        _ => "Moment settings saved.",
+                        rejected => rejected.Reason.Message
+                    ),
+                    result is MomentResult<MomentHubSettingsView>.Rejected
+                );
+                await ReloadAsync();
+            }
+        );
+    }
+
+    private Task CaptureAsync()
+    {
+        return RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                if (string.IsNullOrWhiteSpace(_streamIdentity))
+                {
+                    SetFeedback(_streamStatus, true);
+                    return;
+                }
+                var session = PageContext.Session;
+                var result = await _moments.CaptureAsync(
+                    HostId,
+                    new CaptureMomentCommand(
+                        _streamIdentity,
+                        new MomentViewerIdentity(session.Login, session.UserId, session.DisplayName)
+                    ),
+                    CancellationToken.None
+                );
+                SetFeedback(
+                    result.Match(_ => "Moment captured.", rejected => rejected.Reason.Message),
+                    result is MomentResult<MomentView>.Rejected
+                );
+                await ReloadAsync();
+            }
+        );
+    }
+
+    private Task ApproveAsync(Guid id)
+    {
+        return MutateAsync(id, _moments.ApproveAsync, "Moment approved.");
+    }
+
+    private Task EditAsync(Guid id)
+    {
+        return MutateAsync(id, _moments.EditAsync, "Moment metadata saved.");
+    }
+
+    private Task RejectAsync(Guid id)
+    {
+        return MutateAsync(id, _moments.RejectAsync, "Moment rejected.");
+    }
+
+    private Task MergeAsync(Guid id)
+    {
+        return RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var draft = Draft(id);
+                if (!Guid.TryParse(draft.MergeTarget, out var target))
+                {
+                    SetFeedback("Enter the target moment public ID.", true);
+                    return;
+                }
+                var result = await _moments.MergeAsync(
+                    HostId,
+                    id,
+                    target,
+                    ActorLogin,
+                    draft.PrivateText,
+                    CancellationToken.None
+                );
+                SetFeedback(
+                    result.Match(_ => "Moments merged.", rejected => rejected.Reason.Message),
+                    result is MomentResult<ModeratorMomentView>.Rejected
+                );
+                await ReloadAsync();
+            }
+        );
+    }
+
+    private Task FinalizeWeekAsync()
+    {
+        return RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var result = await _moments.FinalizeWeekAsync(
+                    HostId,
+                    DateTime.UtcNow.AddDays(-7),
+                    CancellationToken.None
+                );
+                SetFeedback(
+                    result.Match(
+                        succeeded =>
+                            succeeded.WasIdempotent
+                                ? "This week was already finalized."
+                                : "Weekly winner finalized.",
+                        rejected => rejected.Reason.Message
+                    ),
+                    result is MomentResult<MomentView>.Rejected
+                );
+                await ReloadAsync();
+            }
+        );
+    }
+
+    private Task MutateAsync(
+        Guid id,
+        Func<
+            int,
+            ModerateMomentCommand,
+            CancellationToken,
+            Task<MomentResult<ModeratorMomentView>>
+        > operation,
+        string success
+    )
+    {
+        return RunSelectedHostMutationAsync(
+            HostId,
+            async () =>
+            {
+                var draft = Draft(id);
+                var result = await operation(
+                    HostId,
+                    new ModerateMomentCommand(
+                        id,
+                        draft.Title,
+                        draft.Category,
+                        ActorLogin,
+                        draft.PrivateText
+                    ),
+                    CancellationToken.None
+                );
+                SetFeedback(
+                    result.Match(_ => success, rejected => rejected.Reason.Message),
+                    result is MomentResult<ModeratorMomentView>.Rejected
+                );
+                await ReloadAsync();
+            }
+        );
+    }
+
+    private void SetFeedback(string feedback, bool failed)
+    {
+        _feedback = feedback;
+        _failed = failed;
+    }
+
+    private sealed class MomentDraft(
+        string title,
+        string category,
+        string privateText,
+        string mergeTarget
+    )
+    {
+        public string Title { get; set; } = title;
+        public string Category { get; set; } = category;
+        public string PrivateText { get; set; } = privateText;
+        public string MergeTarget { get; set; } = mergeTarget;
+    }
+}
