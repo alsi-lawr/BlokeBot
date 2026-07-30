@@ -1,6 +1,10 @@
-using System.Net;
 using System.Text.Json;
+using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.HostedChannels;
+using BlokeBot.Core.Hosts;
+using BlokeBot.Persistence.Models;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Net.Http.Headers;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -11,6 +15,10 @@ internal static class OverlayBrowserSourceEndpoints
         "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
         + "img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; "
         + "frame-ancestors 'none'";
+    private const string _previewContentSecurityPolicy =
+        "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
+        + "img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; "
+        + "frame-ancestors 'self'";
     private const string _unavailableMessage = "Overlay unavailable.";
 
     internal static void UseOverlayAccessLogRedaction(this WebApplication app)
@@ -68,7 +76,13 @@ internal static class OverlayBrowserSourceEndpoints
                     );
                     return resolution is OverlayResolutionResult.Resolved
                         ? Results.Text(
-                            RenderDocument(context.Request.PathBase, accessKey),
+                            OverlayBrowserSourceDocument.Render(
+                                context.Request.PathBase,
+                                $"/overlay/{Uri.EscapeDataString(accessKey)}/state",
+                                $"/overlay/{Uri.EscapeDataString(accessKey)}/events",
+                                OverlayBrowserSourceCredentials.Omit,
+                                liveEnabled: true
+                            ),
                             "text/html"
                         )
                         : Unavailable();
@@ -147,6 +161,181 @@ internal static class OverlayBrowserSourceEndpoints
                 }
             )
             .AllowAnonymous();
+
+        app.MapGet(
+                "/overlays/preview/{overlayId:guid}",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPreviewHeaders(context.Response);
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayPreviewResolution.Resolved)
+                    {
+                        return Unavailable();
+                    }
+
+                    var encodedId = Uri.EscapeDataString(overlayId.ToString("D"));
+                    var representative = string.Equals(
+                        context.Request.Query["mode"],
+                        "representative",
+                        StringComparison.Ordinal
+                    );
+                    var suffix = representative ? "?mode=representative" : string.Empty;
+                    return Results.Text(
+                        OverlayBrowserSourceDocument.Render(
+                            context.Request.PathBase,
+                            $"/overlays/preview/{encodedId}/state{suffix}",
+                            $"/overlays/preview/{encodedId}/events",
+                            OverlayBrowserSourceCredentials.SameOrigin,
+                            liveEnabled: !representative
+                        ),
+                        "text/html"
+                    );
+                }
+            )
+            .RequireAuthorization("HostSelected");
+        app.MapGet(
+                "/overlays/preview/{overlayId:guid}/state",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    IOverlayStateProvider stateProvider,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPreviewHeaders(context.Response);
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+
+                    var projection = await ProjectSafelyAsync(
+                        stateProvider,
+                        resolved.Instance,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    return projection switch
+                    {
+                        OverlaySnapshotProjection.EmptyV1 empty => Results.Json(empty.Snapshot),
+                        _ => Unavailable(),
+                    };
+                }
+            )
+            .RequireAuthorization("HostSelected");
+        app.MapGet(
+                "/overlays/preview/{overlayId:guid}/events",
+                async (
+                    HttpContext context,
+                    Guid overlayId,
+                    OverlayInstanceService overlays,
+                    [FromServices] HostFeatureService features,
+                    OverlayLiveCoordinator live,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPreviewHeaders(context.Response);
+                    var resolvedGeneration = live.Generation;
+                    var resolution = await ResolvePreviewSafelyAsync(
+                        context,
+                        overlayId,
+                        overlays,
+                        features,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayPreviewResolution.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+
+                    var opened = await OpenLiveSafelyAsync(
+                        live,
+                        resolved.Instance,
+                        resolvedGeneration,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    return opened is OverlayLiveOpenResult.Opened connected
+                        ? new OverlayLiveStreamResult(live, connected.Connection)
+                        : Unavailable();
+                }
+            )
+            .RequireAuthorization("HostSelected");
+    }
+
+    private static async Task<OverlayPreviewResolution> ResolvePreviewSafelyAsync(
+        HttpContext context,
+        Guid overlayId,
+        OverlayInstanceService overlays,
+        HostFeatureService features,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            var session = AuthenticatedSession.FromPrincipal(context.User);
+            var selectedHost = session.State.Match<BotHostChoice?>(
+                _ => null,
+                selected => selected.Selection.Current,
+                _ => null
+            );
+            if (
+                selectedHost is null
+                || !await features.IsEnabledAsync(
+                    selectedHost.Id,
+                    HostFeatureFlags.Overlays,
+                    cancellationToken
+                )
+            )
+            {
+                return new OverlayPreviewResolution.Unavailable();
+            }
+
+            var result = await overlays.GetAsync(session, overlayId, cancellationToken);
+            return result.Match<OverlayPreviewResolution>(
+                succeeded => new OverlayPreviewResolution.Resolved(
+                    new ResolvedOverlayInstance(
+                        selectedHost.Id,
+                        succeeded.Value.Id,
+                        succeeded.Value.Type,
+                        succeeded.Value.Configuration,
+                        succeeded.Value.Revision
+                    )
+                ),
+                _ => new OverlayPreviewResolution.Unavailable()
+            );
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            context
+                .RequestServices.GetRequiredService<ILogger<OverlayBrowserSourceLog>>()
+                .LogWarning(exception, "An authenticated overlay preview could not be resolved.");
+            return new OverlayPreviewResolution.Unavailable();
+        }
     }
 
     private static async Task<OverlayResolutionResult> ResolveSafelyAsync(
@@ -231,31 +420,6 @@ internal static class OverlayBrowserSourceEndpoints
         );
     }
 
-    private static string RenderDocument(PathString pathBase, string accessKey)
-    {
-        var prefix = pathBase.HasValue ? pathBase.Value : string.Empty;
-        var encodedPrefix = WebUtility.HtmlEncode(prefix);
-        var encodedKey = WebUtility.HtmlEncode(Uri.EscapeDataString(accessKey));
-        return $$"""
-            <!doctype html>
-            <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-              <meta name="robots" content="noindex,nofollow,noarchive">
-              <title>BlokeBot overlay</title>
-              <link rel="stylesheet" href="{{encodedPrefix}}/overlay/assets/blokebot-overlay.css">
-            </head>
-            <body>
-              <main id="overlay-root" data-state-url="{{encodedPrefix}}/overlay/{{encodedKey}}/state" data-live-url="{{encodedPrefix}}/overlay/{{encodedKey}}/events" data-status="loading" aria-live="off">
-                <svg id="overlay-canvas" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"></svg>
-              </main>
-              <script src="{{encodedPrefix}}/overlay/assets/blokebot-overlay.js" defer></script>
-            </body>
-            </html>
-            """;
-    }
-
     private static void ApplyPrivateBrowserSourceHeaders(HttpResponse response)
     {
         response.Headers[HeaderNames.CacheControl] = "no-store, private";
@@ -266,6 +430,12 @@ internal static class OverlayBrowserSourceEndpoints
         response.Headers["X-Robots-Tag"] = "noindex, nofollow, noarchive";
         response.Headers["Permissions-Policy"] =
             "camera=(), microphone=(), geolocation=(), payment=(), usb=()";
+    }
+
+    private static void ApplyPreviewHeaders(HttpResponse response)
+    {
+        ApplyPrivateBrowserSourceHeaders(response);
+        response.Headers[HeaderNames.ContentSecurityPolicy] = _previewContentSecurityPolicy;
     }
 
     private static PathString RedactedLogPath(PathString path)
@@ -411,4 +581,14 @@ internal static class OverlayBrowserSourceEndpoints
     private sealed class OverlayBrowserSourceLog;
 
     private sealed class OverlayLiveStreamLog;
+
+    private abstract record OverlayPreviewResolution
+    {
+        private OverlayPreviewResolution() { }
+
+        internal sealed record Resolved(ResolvedOverlayInstance Instance)
+            : OverlayPreviewResolution;
+
+        internal sealed record Unavailable : OverlayPreviewResolution;
+    }
 }

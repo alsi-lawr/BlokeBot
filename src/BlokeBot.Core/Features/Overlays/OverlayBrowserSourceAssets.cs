@@ -31,6 +31,20 @@ internal static class OverlayBrowserSourceAssets
           overflow: hidden;
           background: transparent;
         }
+
+        #overlay-root[data-test-pulse="active"] #overlay-canvas {
+          animation: blokebot-overlay-test-pulse 1.5s ease-out;
+          box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0);
+        }
+
+        @keyframes blokebot-overlay-test-pulse {
+          0% {
+            box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0.95);
+          }
+          100% {
+            box-shadow: inset 0 0 0 24px rgba(59, 130, 246, 0);
+          }
+        }
         """;
 
     internal const string JavaScript = """
@@ -48,6 +62,21 @@ internal static class OverlayBrowserSourceAssets
           const jitterMinimum = 0.75;
           const jitterRange = 0.5;
           const pageLifetime = new AbortController();
+          const credentials =
+            root.dataset.credentials === "same-origin" ? "same-origin" : "omit";
+          const liveEnabled = root.dataset.liveEnabled !== "false";
+          let testPulseTimer = null;
+
+          const showTestPulse = () => {
+            root.dataset.testPulse = "active";
+            if (testPulseTimer !== null) {
+              window.clearTimeout(testPulseTimer);
+            }
+            testPulseTimer = window.setTimeout(() => {
+              delete root.dataset.testPulse;
+              testPulseTimer = null;
+            }, 1500);
+          };
 
           const delay = (milliseconds, signal) =>
             new Promise((resolve) => {
@@ -107,7 +136,7 @@ internal static class OverlayBrowserSourceAssets
             canvas.replaceChildren();
             const response = await fetch(root.dataset.stateUrl, {
               cache: "no-store",
-              credentials: "omit",
+              credentials,
               headers: { Accept: "application/json" },
               signal,
             });
@@ -134,7 +163,7 @@ internal static class OverlayBrowserSourceAssets
           const consumeLiveStream = async (signal) => {
             const response = await fetch(root.dataset.liveUrl, {
               cache: "no-store",
-              credentials: "omit",
+              credentials,
               headers: { Accept: "text/event-stream" },
               signal,
             });
@@ -207,6 +236,9 @@ internal static class OverlayBrowserSourceAssets
               }
 
               liveSequence = envelope.sequence;
+              if (envelope.eventType === "test") {
+                showTestPulse();
+              }
               return "continue";
             };
 
@@ -256,6 +288,10 @@ internal static class OverlayBrowserSourceAssets
             while (!pageLifetime.signal.aborted) {
               try {
                 await loadCurrentState(pageLifetime.signal);
+                if (!liveEnabled) {
+                  root.dataset.status = "representative";
+                  return;
+                }
                 const outcome = await consumeLiveStream(pageLifetime.signal);
                 if (outcome === "stopped") {
                   return;
@@ -280,7 +316,16 @@ internal static class OverlayBrowserSourceAssets
             }
           };
 
-          window.addEventListener("pagehide", () => pageLifetime.abort(), { once: true });
+          window.addEventListener(
+            "pagehide",
+            () => {
+              pageLifetime.abort();
+              if (testPulseTimer !== null) {
+                window.clearTimeout(testPulseTimer);
+              }
+            },
+            { once: true },
+          );
           void run();
         })();
         """;

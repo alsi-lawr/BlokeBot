@@ -86,7 +86,7 @@ public sealed class NativeTwitchMigrationTests
                     .Hosts.OrderBy(host => host.Id)
                     .Select(host => (long)host.EnabledFeatures)
                     .ToArrayAsync()
-            ).ShouldBe([7L, 23L]);
+            ).ShouldBe([23L, 23L]);
             (
                 await upgraded
                     .TwitchCustomRewards.Select(value => value.ProviderRewardId)
@@ -119,7 +119,7 @@ public sealed class NativeTwitchMigrationTests
             history.ShouldContain(_publishedV03);
             history.ShouldContain(_nativeTwitchFeatureSwitch);
             history.ShouldContain(_automaticRaidShoutouts);
-            history.Count.ShouldBe(11);
+            history.Count.ShouldBe(12);
             history.ShouldNotContain("20260726031743_v0.3.0");
             history.ShouldNotContain("20260728183253_v0.4.0");
             upgradedSchema = await ReadSchemaAsync(upgraded.Database.GetDbConnection());

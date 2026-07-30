@@ -1,0 +1,240 @@
+@page "/overlays"
+@using BlokeBot.Core.Features.HostedChannels
+@using BlokeBot.Persistence.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "HostSelected")]
+@inherits AuthenticatedPageComponent
+@inject OverlayInstanceService _overlays
+@inject HostFeatureService _features
+@inject IOverlayLivePublisher _publisher
+@inject IOverlayLivePresence _presence
+@inject NavigationManager _navigation
+@inject IJSRuntime _js
+
+<PageTitle>BlokeBot | Overlays</PageTitle>
+
+<DashboardPage Kicker="Stream presentation"
+               Title="Overlays"
+               Description="Create Browser Sources, preview their production rendering, and check live delivery."
+               Width="DashboardPageWidth.Wide">
+    <Actions>
+        <button class="btn-primary"
+                type="button"
+                disabled="@(!_featureEnabled || _isBusy)"
+                @onclick="SaveAsync">@(_isCreating ? "Create overlay" : "Save overlay")</button>
+    </Actions>
+
+    <ChildContent>
+        @if (_isLoading)
+        {
+            <div class="card p-8 text-sm text-muted-foreground" role="status">Loading overlays...</div>
+        }
+        else if (Host is null)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        }
+        else if (!_featureEnabled)
+        {
+            <div class="card p-8 text-sm text-muted-foreground">
+                Overlays are off for this channel. Turn them on in Channel setup.
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <section class="@(_operationFailed ? "card border-slate-200 bg-red-50 p-4 text-sm font-semibold text-slate-950" : "card border-slate-200 bg-blue-50 p-4 text-sm font-semibold text-slate-950")"
+                         role="@(_operationFailed ? "alert" : "status")"
+                         data-overlay-feedback="@(_operationFailed ? "error" : "success")">
+                    @_feedback
+                </section>
+            }
+
+            <div class="grid gap-6 xl:grid-cols-[minmax(17rem,0.68fr)_minmax(0,1.82fr)]">
+                <aside class="card p-4" aria-labelledby="overlay-inventory-title">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 id="overlay-inventory-title" class="text-lg font-semibold text-slate-950">Browser Sources</h2>
+                            <p class="mt-1 text-xs text-muted-foreground">@CountLabel(_instances.Count)</p>
+                        </div>
+                        <button class="btn-secondary"
+                                type="button"
+                                disabled="@_isCreating"
+                                aria-describedby="@(_isCreating ? "overlay-new-guidance" : null)"
+                                @onclick="NewOverlay">New</button>
+                    </div>
+
+                    @if (_instances.Count == 0)
+                    {
+                        <p class="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-muted-foreground">
+                            No saved overlays yet.
+                        </p>
+                    }
+
+                    <div class="mt-4 grid gap-2" aria-label="Saved overlays">
+                        @foreach (var overlay in _instances)
+                        {
+                            var selected = !_isCreating && overlay.Id == _selectedId;
+                            <button @key="overlay.Id"
+                                    type="button"
+                                    class="control-surface min-h-14 rounded-lg px-3 py-2 text-left"
+                                    aria-current="@(selected ? "true" : null)"
+                                    @onclick="() => SelectOverlay(overlay)">
+                                <span class="block truncate text-sm font-semibold text-slate-950">@overlay.Name</span>
+                                <span class="mt-1 block text-xs text-muted-foreground">
+                                    Empty · @(overlay.IsEnabled ? "Enabled" : "Disabled") · @UpdatedLabel(overlay) · @InventoryPresenceLabel(overlay)
+                                </span>
+                            </button>
+                        }
+                    </div>
+                </aside>
+
+                <div class="min-w-0 space-y-6">
+                    <section class="card p-5" aria-labelledby="overlay-editor-title" data-overlay-editor>
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <h2 id="overlay-editor-title" class="text-lg font-semibold text-slate-950">
+                                    @(_isCreating ? "New overlay — not saved" : "Edit overlay")
+                                </h2>
+                                @if (_isCreating)
+                                {
+                                    <p id="overlay-new-guidance" class="mt-1 text-sm text-muted-foreground">
+                                        Name this overlay, then select Create overlay. Its private Browser Source URL appears once, after creation.
+                                    </p>
+                                }
+                            </div>
+                            @if (_selected is not null)
+                            {
+                                <span class="@(_selected.IsEnabled ? "status-pill status-pill--success" : "status-pill status-pill--neutral")">
+                                    @(_selected.IsEnabled ? "Enabled" : "Disabled")
+                                </span>
+                            }
+                        </div>
+
+                        <div class="mt-5 grid gap-4 md:grid-cols-2">
+                            <Field Id="overlay-name"
+                                   Label="Overlay name"
+                                   @bind-Value="_draftName"
+                                   Placeholder="Main stream overlay" />
+                            <div class="space-y-2">
+                                <label class="label" for="overlay-type">Overlay type</label>
+                                <select id="overlay-type" class="input" disabled>
+                                    <option>Empty</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                            <h3 class="text-sm font-semibold text-slate-950">Visual configuration</h3>
+                            <p class="mt-1 text-sm leading-6 text-muted-foreground">
+                                Empty V1 is the only supported overlay type. It has no visual fields or custom CSS or JavaScript.
+                            </p>
+                        </div>
+
+                        @if (_revealedBrowserSourceUrl is not null)
+                        {
+                            <section class="mt-4 rounded-lg border border-slate-200 bg-amber-50 p-4"
+                                     aria-labelledby="overlay-private-url-title"
+                                     data-private-url-reveal>
+                                <h3 id="overlay-private-url-title" class="text-sm font-bold text-slate-950">
+                                    Copy this private URL now
+                                </h3>
+                                <p class="mt-1 text-sm text-slate-700">
+                                    It is not stored in a form BlokeBot can show again. Keep it out of screenshots and chat.
+                                </p>
+                                <div class="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
+                                    <input class="input min-w-0 flex-1 font-mono text-xs"
+                                           aria-label="Private Browser Source URL"
+                                           readonly
+                                           value="@_revealedBrowserSourceUrl" />
+                                    <button class="btn-secondary"
+                                            type="button"
+                                            @onclick="CopyBrowserSourceUrlAsync">Copy URL</button>
+                                </div>
+                            </section>
+                        }
+
+                        @if (_selected is not null)
+                        {
+                            <div class="mt-5 flex flex-wrap gap-2">
+                                <button class="btn-secondary"
+                                        type="button"
+                                        disabled="@_isBusy"
+                                        @onclick="ToggleAvailabilityAsync">
+                                    @(_selected.IsEnabled ? "Disable" : "Enable")
+                                </button>
+                                <button class="btn-secondary"
+                                        type="button"
+                                        disabled="@_isBusy"
+                                        @onclick="RotateUrlAsync">Rotate private URL</button>
+                                <button class="btn-secondary"
+                                        type="button"
+                                        disabled="@_isBusy"
+                                        @onclick="DeleteAsync">Delete</button>
+                            </div>
+                        }
+                    </section>
+
+                    @if (_selected is not null)
+                    {
+                        <section class="card p-5" aria-labelledby="overlay-preview-title">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <h2 id="overlay-preview-title" class="text-lg font-semibold text-slate-950">Production preview</h2>
+                                    <p class="mt-1 text-sm text-muted-foreground">
+                                        This preview uses the same document, client, CSS, and 1920 × 1080 canvas as the OBS Browser Source.
+                                    </p>
+                                </div>
+                                <div class="segmented-motion @(_previewMode is OverlayPreviewMode.Representative ? "segmented-motion--second" : string.Empty)"
+                                     role="group"
+                                     aria-label="Preview state">
+                                    <span class="segmented-motion__indicator" aria-hidden="true"></span>
+                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Live)"
+                                            type="button"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Live)"
+                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Live)">Live</button>
+                                    <button class="@PreviewButtonClass(OverlayPreviewMode.Representative)"
+                                            type="button"
+                                            aria-pressed="@(_previewMode is OverlayPreviewMode.Representative)"
+                                            @onclick="() => SetPreviewMode(OverlayPreviewMode.Representative)">Representative</button>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 aspect-video overflow-hidden rounded-xl border border-slate-300 bg-[linear-gradient(45deg,#e2e8f0_25%,transparent_25%),linear-gradient(-45deg,#e2e8f0_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#e2e8f0_75%),linear-gradient(-45deg,transparent_75%,#e2e8f0_75%)] bg-[length:24px_24px]">
+                                <iframe @key="_previewKey"
+                                        class="overlay-preview-frame h-full w-full"
+                                        src="@_previewUrl"
+                                        title="@($"{_selected.Name} production overlay preview")"
+                                        sandbox="allow-scripts allow-same-origin"
+                                        referrerpolicy="no-referrer"></iframe>
+                            </div>
+
+                            <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-950">@_presenceLabel</p>
+                                    <p class="mt-1 text-xs leading-5 text-muted-foreground">
+                                        Approximate diagnostic presence excludes this page's live preview. It does not prove that an OBS scene is currently visible.
+                                    </p>
+                                </div>
+                                <button class="btn-primary"
+                                        type="button"
+                                        disabled="@(_isBusy || !_selected.IsEnabled)"
+                                        @onclick="PublishTestAsync">Send test pulse</button>
+                            </div>
+                        </section>
+
+                        <section class="card p-5" aria-labelledby="overlay-obs-title">
+                            <h2 id="overlay-obs-title" class="text-lg font-semibold text-slate-950">OBS setup</h2>
+                            <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                                <li>Create or rotate the private URL and copy it immediately.</li>
+                                <li>Add an OBS Browser Source and paste the URL.</li>
+                                <li>Set Width to <strong>1920</strong> and Height to <strong>1080</strong>.</li>
+                                <li>Keep the URL private. Use Send test pulse to confirm delivery to this overlay only.</li>
+                            </ol>
+                        </section>
+                    }
+                </div>
+            </div>
+        }
+    </ChildContent>
+</DashboardPage>

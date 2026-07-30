@@ -11,10 +11,10 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
-    private const string _overlayMigration = "20260730084046_v0.5.0_OverlayInstances";
+    private const string _overlayFeatureMigration = "20260730141846_v0.5.0_OverlayFeatureSwitch";
 
     [Test]
-    public async Task Migration_FromV04_AddsOverlaySchemaWithoutChangingHosts()
+    public async Task Migration_FromV04_AddsOverlaySchemaAndFeatureWithoutLosingHosts()
     {
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using (var db = await factory.CreateDbContextAsync())
@@ -35,8 +35,13 @@ public sealed class OverlayInstancePersistenceTests
 
         await using var migrated = await factory.CreateDbContextAsync();
         (await migrated.Hosts.Select(value => value.Login).ToArrayAsync()).ShouldBe(["host"]);
-        (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_overlayMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(11);
+        (await migrated.Hosts.Select(value => value.EnabledFeatures).SingleAsync()).ShouldBe(
+            HostFeatureFlags.All
+        );
+        (await migrated.Database.GetAppliedMigrationsAsync())
+            .Last()
+            .ShouldBe(_overlayFeatureMigration);
+        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(12);
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await migrated.OverlayInstances.CountAsync()).ShouldBe(0);
         (await migrated.OverlayInstanceEvents.CountAsync()).ShouldBe(0);

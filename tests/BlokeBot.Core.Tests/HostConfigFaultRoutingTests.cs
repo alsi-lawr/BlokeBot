@@ -137,29 +137,60 @@ public sealed class HostConfigFaultRoutingTests
         var page = RenderHostConfigPage(context);
         page.WaitForAssertion(() =>
         {
-            var nativeTwitch = FindNativeTwitchFeatureButton(page);
+            var nativeTwitch = FindFeatureButton(page, "Native Twitch");
             nativeTwitch.HasAttribute("aria-pressed").ShouldBeTrue();
             nativeTwitch.TextContent.ShouldContain(
                 "Use shoutouts, polls, clips, and stream markers."
             );
+            var overlays = FindFeatureButton(page, "Overlays");
+            overlays.HasAttribute("aria-pressed").ShouldBeTrue();
+            overlays.QuerySelector("svg").ShouldNotBeNull();
         });
         page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
-        await page.InvokeAsync(() => FindNativeTwitchFeatureButton(page).ClickAsync(new()));
+        await page.InvokeAsync(() => FindFeatureButton(page, "Native Twitch").ClickAsync(new()));
 
         page.WaitForAssertion(() =>
         {
-            FindNativeTwitchFeatureButton(page).HasAttribute("aria-pressed").ShouldBeFalse();
+            FindFeatureButton(page, "Native Twitch").HasAttribute("aria-pressed").ShouldBeFalse();
             page.Find("#startup-chat-message")
                 .GetAttribute("value")
                 .ShouldBe("unsaved Native switch draft");
         });
+
+        await page.InvokeAsync(() => FindFeatureButton(page, "Overlays").ClickAsync(new()));
+        page.WaitForAssertion(() =>
+        {
+            FindFeatureButton(page, "Overlays").HasAttribute("aria-pressed").ShouldBeFalse();
+            var toast = context
+                .Services.GetRequiredService<ToastService>()
+                .Current.Single(value => value.Title == "Overlays disabled");
+            toast.Message.ShouldBe(
+                "Overlays is now disabled for #streamer. Its dashboard and Browser Sources are unavailable until you enable it again."
+            );
+            toast.Message.ShouldNotContain("chat commands");
+        });
+
+        await page.InvokeAsync(() => FindFeatureButton(page, "Overlays").ClickAsync(new()));
+        page.WaitForAssertion(() =>
+        {
+            FindFeatureButton(page, "Overlays").HasAttribute("aria-pressed").ShouldBeTrue();
+            var toast = context
+                .Services.GetRequiredService<ToastService>()
+                .Current.Single(value => value.Title == "Overlays enabled");
+            toast.Message.ShouldBe(
+                "Overlays is now enabled for #streamer. Its dashboard and Browser Sources are available again."
+            );
+            toast.Message.ShouldNotContain("chat commands");
+        });
+
         await using var verify = await dbFactory.CreateDbContextAsync();
         var enabled = await verify
             .Hosts.Where(host => host.Id == hostId)
             .Select(host => host.EnabledFeatures)
             .SingleAsync();
         enabled.Contains(HostFeatureFlags.NativeTwitch).ShouldBeFalse();
+        enabled.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
     }
 
     [Test]
@@ -429,12 +460,13 @@ public sealed class HostConfigFaultRoutingTests
         return context.Render<HostConfigPage>();
     }
 
-    private static IElement FindNativeTwitchFeatureButton(IRenderedComponent<HostConfigPage> page)
+    private static IElement FindFeatureButton(
+        IRenderedComponent<HostConfigPage> page,
+        string featureName
+    )
     {
         return page.FindAll("#chat-tools button")
-            .Single(button =>
-                button.TextContent.Contains("Native Twitch", StringComparison.Ordinal)
-            );
+            .Single(button => button.TextContent.Contains(featureName, StringComparison.Ordinal));
     }
 
     private static Task ClickAccessModeAsync<TComponent>(
