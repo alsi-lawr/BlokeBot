@@ -30,6 +30,32 @@
       "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
     },
     {
+      "file": "laptop-dark-chat-tools-all-disabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-all-disabled",
+      "theme": "dark",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+    },
+    {
+      "file": "laptop-dark-chat-tools-enabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-mixed-enabled",
+      "theme": "dark",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+    },
+    {
       "file": "laptop-dark-custom-commands.png",
       "capture": "capture/screenshots.lua",
       "route": "/custom-commands/settings",
@@ -160,6 +186,19 @@
       "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
     },
     {
+      "file": "laptop-dark-overlays.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/overlays",
+      "simulationAlias": "/simulation/login?view=overlays&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-overlays-all-enabled",
+      "theme": "dark",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /overlays; all twelve features explicitly enabled; saved overlay editor and production preview; private URL and seeded access key absent; shared card token 12px; no horizontal overflow"
+    },
+    {
       "file": "laptop-dark-points-settings.png",
       "capture": "capture/screenshots.lua",
       "route": "/points/settings",
@@ -171,6 +210,19 @@
       "width": 1308,
       "height": 840,
       "semanticReadiness": "path /points/settings; Sample Channel; body text: Points settings; main opacity 1"
+    },
+    {
+      "file": "laptop-dark-viewer-command-catalog.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-command-catalog-all-enabled",
+      "theme": "dark",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "laptop-light-admin.png",
@@ -197,6 +249,32 @@
       "width": 1308,
       "height": 840,
       "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+    },
+    {
+      "file": "laptop-light-chat-tools-all-disabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-all-disabled",
+      "theme": "light",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+    },
+    {
+      "file": "laptop-light-chat-tools-enabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-mixed-enabled",
+      "theme": "light",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "laptop-light-custom-commands.png",
@@ -329,6 +407,19 @@
       "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
     },
     {
+      "file": "laptop-light-overlays.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/overlays",
+      "simulationAlias": "/simulation/login?view=overlays&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-overlays-all-enabled",
+      "theme": "light",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /overlays; all twelve features explicitly enabled; saved overlay editor and production preview; private URL and seeded access key absent; shared card token 12px; no horizontal overflow"
+    },
+    {
       "file": "laptop-light-points-settings.png",
       "capture": "capture/screenshots.lua",
       "route": "/points/settings",
@@ -340,6 +431,19 @@
       "width": 1308,
       "height": 840,
       "semanticReadiness": "path /points/settings; Sample Channel; body text: Points settings; main opacity 1"
+    },
+    {
+      "file": "laptop-light-viewer-command-catalog.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-command-catalog-all-enabled",
+      "theme": "light",
+      "device": "laptop",
+      "format": "png",
+      "width": 1308,
+      "height": 840,
+      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "phone-dark-admin.png",
@@ -366,6 +470,32 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+    },
+    {
+      "file": "phone-dark-chat-tools-all-disabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-all-disabled",
+      "theme": "dark",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+    },
+    {
+      "file": "phone-dark-chat-tools-enabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-mixed-enabled",
+      "theme": "dark",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-dark-custom-commands.png",
@@ -498,6 +628,19 @@
       "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
     },
     {
+      "file": "phone-dark-overlays.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/overlays",
+      "simulationAlias": "/simulation/login?view=overlays&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-overlays-all-enabled",
+      "theme": "dark",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /overlays; all twelve features explicitly enabled; saved overlay editor and production preview; private URL and seeded access key absent; shared card token 12px; no horizontal overflow"
+    },
+    {
       "file": "phone-dark-points-settings.png",
       "capture": "capture/screenshots.lua",
       "route": "/points/settings",
@@ -509,6 +652,19 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /points/settings; Sample Channel; body text: Points settings; main opacity 1"
+    },
+    {
+      "file": "phone-dark-viewer-command-catalog.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=dark",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-command-catalog-all-enabled",
+      "theme": "dark",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     },
     {
       "file": "phone-light-admin.png",
@@ -535,6 +691,32 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /host; Sample Channel; body text: Chat tools; main opacity 1"
+    },
+    {
+      "file": "phone-light-chat-tools-all-disabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-all-disabled",
+      "theme": "light",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve feature cards present and explicitly disabled; enabled set empty; desktop Chat Tools navigation absent; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
+    },
+    {
+      "file": "phone-light-chat-tools-enabled.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-chat-tools-mixed-enabled",
+      "theme": "light",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve feature cards present; Request boards, Moments, Points and Custom commands explicitly enabled; matching desktop navigation visible; semantic row, column and nearest-card clearance 12px; no horizontal overflow"
     },
     {
       "file": "phone-light-custom-commands.png",
@@ -667,6 +849,19 @@
       "semanticReadiness": "path /twitch-operations/shoutouts; Sample Channel; [data-native-route='shoutouts'] .task-panel button; then real Automatic raid shoutouts disclosure opens [data-automatic-raid-shoutouts]; main opacity 1"
     },
     {
+      "file": "phone-light-overlays.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/overlays",
+      "simulationAlias": "/simulation/login?view=overlays&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-overlays-all-enabled",
+      "theme": "light",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /overlays; all twelve features explicitly enabled; saved overlay editor and production preview; private URL and seeded access key absent; shared card token 12px; no horizontal overflow"
+    },
+    {
       "file": "phone-light-points-settings.png",
       "capture": "capture/screenshots.lua",
       "route": "/points/settings",
@@ -678,6 +873,19 @@
       "width": 462,
       "height": 956,
       "semanticReadiness": "path /points/settings; Sample Channel; body text: Points settings; main opacity 1"
+    },
+    {
+      "file": "phone-light-viewer-command-catalog.png",
+      "capture": "capture/v0.5-guides.lua",
+      "route": "/host",
+      "simulationAlias": "/simulation/login?view=channel-setup&theme=light",
+      "scenario": "fresh-simulation-process:ready-fixture:v0.5-command-catalog-all-enabled",
+      "theme": "light",
+      "device": "phone",
+      "format": "png",
+      "width": 462,
+      "height": 956,
+      "semanticReadiness": "path /host; all twelve features explicitly enabled; round open; giveaway active; channel live; Available viewer commands opened; canonical viewer-safe catalog and conflict visible; shared card token 12px; no horizontal overflow"
     }
   ]
 }

@@ -54,6 +54,27 @@ public sealed class SitePathBaseTests
             var dashboard = await client.GetAsync("/blokebot/dashboard");
             dashboard.StatusCode.ShouldBe(HttpStatusCode.OK);
 
+            var overlays = await client.GetStringAsync("/blokebot/overlays");
+            overlays.ShouldContain("data-theme-light-source=\"media/laptop-light-overlays.png\"");
+            overlays.ShouldContain("Current topic: <strong>Overlays and Browser Sources</strong>");
+
+            var tools = await client.GetStringAsync("/blokebot/tools");
+            tools.ShouldContain(
+                "data-theme-dark-source=\"media/laptop-dark-chat-tools-all-disabled.png\""
+            );
+            tools.ShouldContain(
+                "data-theme-light-source=\"media/phone-light-chat-tools-enabled.png\""
+            );
+            tools.ShouldContain("Current topic: <strong>Channel tools</strong>");
+
+            var commandCatalog = await client.GetStringAsync("/blokebot/commands/catalog");
+            commandCatalog.ShouldContain(
+                "data-theme-dark-source=\"media/phone-dark-viewer-command-catalog.png\""
+            );
+            commandCatalog.ShouldContain(
+                "Current topic: <strong>Available viewer commands</strong>"
+            );
+
             var requestBoards = await client.GetStringAsync("/blokebot/community/request-boards");
             requestBoards.ShouldContain(
                 "data-theme-light-source=\"media/community/request-boards-moderator-desktop.png\""
@@ -95,6 +116,21 @@ public sealed class SitePathBaseTests
                 "/blokebot/media/laptop-light-native-shoutouts.png"
             );
             nativeShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var overlayShowcase = await client.GetAsync(
+                "/blokebot/media/laptop-light-overlays.png"
+            );
+            overlayShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var chatToolsShowcase = await client.GetAsync(
+                "/blokebot/media/phone-light-chat-tools-enabled.png"
+            );
+            chatToolsShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            var commandCatalogShowcase = await client.GetAsync(
+                "/blokebot/media/phone-dark-viewer-command-catalog.png"
+            );
+            commandCatalogShowcase.StatusCode.ShouldBe(HttpStatusCode.OK);
 
             var communityShowcase = await client.GetAsync(
                 "/blokebot/media/community/request-boards-moderator-desktop.png"

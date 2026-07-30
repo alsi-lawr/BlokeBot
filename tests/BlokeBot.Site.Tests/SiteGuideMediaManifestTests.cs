@@ -30,8 +30,8 @@ public sealed class SiteGuideMediaManifestTests
     {
         var manifest = LoadManifest();
         manifest.Version.ShouldBe(1);
-        manifest.Assets.Count.ShouldBe(52);
-        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(44);
+        manifest.Assets.Count.ShouldBe(68);
+        manifest.Assets.Count(asset => asset.Format == "png").ShouldBe(60);
         manifest.Assets.Count(asset => asset.Format == "webp").ShouldBe(8);
         manifest.Assets.Select(asset => asset.File).ShouldBeUnique();
 
@@ -47,8 +47,10 @@ public sealed class SiteGuideMediaManifestTests
             .ShouldBe(mediaInventory);
 
         var generatedSiteReferences = SiteGuideCatalog
-            .All.Where(page => page.Media is not null)
-            .SelectMany(page => Sources(page.Media!))
+            .All.SelectMany(page =>
+                OptionalSources(page.Media)
+                    .Concat(page.Sections.SelectMany(section => OptionalSources(section.Media)))
+            )
             .Append("media/phone-light-home-scroll.webp")
             .Append("media/phone-dark-home-scroll.webp")
             .Append("media/laptop-light-home-scroll.webp")
@@ -130,7 +132,31 @@ public sealed class SiteGuideMediaManifestTests
                 content.ShouldContain("All help topics");
                 content.ShouldContain("Community interaction");
                 content.ShouldContain("Native Twitch");
+                content.ShouldContain("Overlays and Browser Sources");
+                content.ShouldContain("Available viewer commands");
             }
+
+            var overlays = await client.GetStringAsync("/overlays");
+            overlays.ShouldContain("Current topic: <strong>Overlays and Browser Sources</strong>");
+            overlays.ShouldContain("private Browser Source URL");
+            overlays.ShouldContain("set Width to 1920 and Height to 1080");
+            overlays.ShouldContain("A blank canvas is the normal resting state for Empty V1");
+            overlays.ShouldContain(
+                "Temporary network loss triggers bounded automatic reconnection"
+            );
+            overlays.ShouldContain("Rotate private URL immediately revokes the old URL");
+            overlays.ShouldContain("No live client detected");
+            overlays.ShouldContain("media/laptop-dark-overlays.png");
+            overlays.ShouldNotContain("simulation-overlay-access-key");
+
+            var tools = await client.GetStringAsync("/tools");
+            tools.ShouldContain("all twelve Chat Tools features disabled");
+            tools.ShouldContain("Channels migrated from an earlier BlokeBot release");
+            tools.ShouldContain("Disabling pauses the feature");
+            tools.ShouldContain("does not replay commands");
+            tools.ShouldContain("media/laptop-dark-chat-tools-all-disabled.png");
+            tools.ShouldContain("media/laptop-dark-chat-tools-enabled.png");
+            tools.ShouldContain("shared 12px");
 
             var requestBoards = await client.GetStringAsync("/community/request-boards");
             requestBoards.ShouldContain("Current topic: <strong>Request boards</strong>");
@@ -200,6 +226,18 @@ public sealed class SiteGuideMediaManifestTests
             clips.ShouldContain("short description");
             clips.ShouldNotContain("request key");
             clips.ShouldNotContain("idempotency");
+
+            var commandCatalog = await client.GetStringAsync("/commands/catalog");
+            commandCatalog.ShouldContain(
+                "Current topic: <strong>Available viewer commands</strong>"
+            );
+            commandCatalog.ShouldContain("The default is commands");
+            commandCatalog.ShouldContain("starts collapsed");
+            commandCatalog.ShouldContain("only the first command word");
+            commandCatalog.ShouldContain("Moderator-only commands");
+            commandCatalog.ShouldContain("Moment and clip commands depend on live-stream identity");
+            commandCatalog.ShouldContain("splits the list across multiple ordinary replies");
+            commandCatalog.ShouldContain("media/phone-light-viewer-command-catalog.png");
         }
         finally
         {
@@ -241,6 +279,11 @@ public sealed class SiteGuideMediaManifestTests
         yield return media.LightPhoneSource;
         yield return media.DarkLaptopSource;
         yield return media.LightLaptopSource;
+    }
+
+    private static IEnumerable<string> OptionalSources(SiteMedia? media)
+    {
+        return media is null ? [] : Sources(media);
     }
 
     private static (int Width, int Height) ReadDimensions(string path)
