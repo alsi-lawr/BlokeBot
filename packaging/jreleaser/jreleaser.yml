@@ -63,6 +63,7 @@ assemble:
             arch: aarch_64
       options:
         timestamp: 2026-01-01T00:00:00Z
+        longFileMode: POSIX
       fileSets:
         - input: artifacts/publish/{{matrix.rid}}
           output: bin
