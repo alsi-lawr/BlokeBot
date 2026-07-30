@@ -181,7 +181,13 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(shoutout.BroadcasterUserLogin, cancellationToken))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                shoutout.BroadcasterUserLogin,
+                NativeTwitchFeature.Shoutouts,
+                cancellationToken
+            )
+        )
         {
             return;
         }
@@ -457,7 +463,13 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(poll.BroadcasterUserLogin, cancellationToken))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                poll.BroadcasterUserLogin,
+                NativeTwitchFeature.Polls,
+                cancellationToken
+            )
+        )
         {
             return;
         }
@@ -476,6 +488,7 @@ internal sealed class EventSubConnectionSession(
         if (
             !await nativeTwitch.IsEnabledAsync(
                 incomingRaid.ToBroadcasterUserLogin,
+                NativeTwitchFeature.Shoutouts,
                 cancellationToken
             )
         )
@@ -494,7 +507,13 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(prediction.BroadcasterUserLogin, cancellationToken))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                prediction.BroadcasterUserLogin,
+                NativeTwitchFeature.Predictions,
+                cancellationToken
+            )
+        )
         {
             return;
         }
@@ -510,7 +529,13 @@ internal sealed class EventSubConnectionSession(
         CancellationToken cancellationToken
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(redemption.BroadcasterUserLogin, cancellationToken))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                redemption.BroadcasterUserLogin,
+                NativeTwitchFeature.RewardsAndRedemptions,
+                cancellationToken
+            )
+        )
         {
             return;
         }

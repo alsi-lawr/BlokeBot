@@ -223,7 +223,7 @@ public sealed class HostConfigFaultRoutingTests
     }
 
     [Test]
-    public async Task NativeTwitchCard_Toggling_UpdatesThePersistedHostFeatureSwitch()
+    public async Task IndependentChatToolCard_Toggling_UpdatesOnlyTheSelectedFeature()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
@@ -239,22 +239,21 @@ public sealed class HostConfigFaultRoutingTests
         var page = RenderHostConfigPage(context);
         page.WaitForAssertion(() =>
         {
-            var nativeTwitch = FindFeatureButton(page, "Native Twitch");
-            nativeTwitch.HasAttribute("aria-pressed").ShouldBeTrue();
-            nativeTwitch.TextContent.ShouldContain(
-                "Use shoutouts, polls, clips, and stream markers."
-            );
+            var shoutouts = FindFeatureButton(page, "Shoutouts");
+            shoutouts.HasAttribute("aria-pressed").ShouldBeTrue();
+            shoutouts.TextContent.ShouldContain("manual and automatic raid shoutouts");
+            page.FindAll(".feature-toggle-card").Count.ShouldBe(12);
             var overlays = FindFeatureButton(page, "Overlays");
             overlays.HasAttribute("aria-pressed").ShouldBeTrue();
             overlays.QuerySelector("svg").ShouldNotBeNull();
         });
         page.Find("#startup-chat-message").Input("unsaved Native switch draft");
 
-        await page.InvokeAsync(() => FindFeatureButton(page, "Native Twitch").ClickAsync(new()));
+        await page.InvokeAsync(() => FindFeatureButton(page, "Shoutouts").ClickAsync(new()));
 
         page.WaitForAssertion(() =>
         {
-            FindFeatureButton(page, "Native Twitch").HasAttribute("aria-pressed").ShouldBeFalse();
+            FindFeatureButton(page, "Shoutouts").HasAttribute("aria-pressed").ShouldBeFalse();
             page.Find("#startup-chat-message")
                 .GetAttribute("value")
                 .ShouldBe("unsaved Native switch draft");
@@ -291,7 +290,7 @@ public sealed class HostConfigFaultRoutingTests
             .Hosts.Where(host => host.Id == hostId)
             .Select(host => host.EnabledFeatures)
             .SingleAsync();
-        enabled.Contains(HostFeatureFlags.NativeTwitch).ShouldBeFalse();
+        enabled.Contains(HostFeatureFlags.Shoutouts).ShouldBeFalse();
         enabled.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
     }
 
@@ -637,6 +636,7 @@ public sealed class HostConfigFaultRoutingTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

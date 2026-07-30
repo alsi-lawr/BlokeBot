@@ -135,6 +135,15 @@ public partial class PageHelpButton
         "<strong>Stop, closed, no-round, already-running, and moderator-only replies</strong>: no live details",
     ];
 
+    private static readonly HelpSection _featureSwitchHelp = new(
+        "Turning this tool on or off",
+        "Chat tools are opt-in per channel. Use Channel setup to turn this tool on or off.",
+        [
+            "Turning it off hides normal navigation and stops commands, automation, public output, and provider actions.",
+            "Saved configuration and history are retained. Turning it back on resumes from the current state without replaying work suppressed while it was off.",
+        ]
+    );
+
     private static readonly HelpPage _homeHelp = new(
         "Home",
         [
@@ -154,6 +163,14 @@ public partial class PageHelpButton
     private static readonly HelpPage _hostConfigHelp = new(
         "Channel setup",
         [
+            new(
+                "Choose your Chat tools",
+                "Every Chat tools feature has its own switch and starts off for a new channel.",
+                [
+                    "Turning a tool off retains its setup and history while stopping its commands, public output, automation, and provider actions.",
+                    "Turning a tool back on restores access to saved data without replaying work suppressed while it was off.",
+                ]
+            ),
             new(
                 "Channel setup",
                 "Create your channel setup, let the bot chat in your stream, and start or stop it when you need.",
@@ -178,6 +195,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _requestBoardsHelp = new(
         "Request boards",
         [
+            _featureSwitchHelp,
             new(
                 "Create or edit a board",
                 "Choose a saved board to edit it, or select New board to start a draft. A new board is not created until you complete its details and select Save board.",
@@ -199,6 +217,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _playQueuesHelp = new(
         "Play with viewers",
         [
+            _featureSwitchHelp,
             new(
                 "Create or edit a queue",
                 "Choose a saved queue to edit it, or select New queue to start a draft. A new queue is not created until you complete its details and select Save queue.",
@@ -220,6 +239,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _momentsHelp = new(
         "Moments",
         [
+            _featureSwitchHelp,
             new(
                 "Capture and moderate moments",
                 "Choose how nearby captures are merged, whether a stream marker is used as a fallback, and how point rewards work.",
@@ -239,6 +259,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _overlaysHelp = new(
         "Overlays",
         [
+            _featureSwitchHelp,
             new(
                 "Set up a Browser Source",
                 "Create an overlay, copy its private Browser Source URL, then add it to OBS at 1920 by 1080.",
@@ -262,6 +283,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _shoutoutsHelp = new(
         "Shoutouts",
         [
+            _featureSwitchHelp,
             new(
                 "Recommend a live channel",
                 "Enter the Twitch name of another channel that is live with viewers, then send the shoutout.",
@@ -291,6 +313,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _pollsHelp = new(
         "Polls",
         [
+            _featureSwitchHelp,
             new(
                 "Run a poll",
                 "Save a question and its choices, then start it whenever you want viewers to vote.",
@@ -311,6 +334,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _clipsMarkersHelp = new(
         "Clips & markers",
         [
+            _featureSwitchHelp,
             new(
                 "Capture a live moment",
                 "Create a shareable clip of the current stream, or add a private marker to find the moment in the recording later.",
@@ -333,6 +357,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _channelPointsHelp = new(
         "Rewards & redemptions",
         [
+            _featureSwitchHelp,
             new(
                 "Manage rewards",
                 "Create a Channel Points reward, set its cost and instructions, then enable or pause it when needed.",
@@ -360,6 +385,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _predictionsHelp = new(
         "Predictions",
         [
+            _featureSwitchHelp,
             new(
                 "Run a Prediction",
                 "Save a question and possible outcomes, then start it whenever viewers should back an answer with Channel Points.",
@@ -384,6 +410,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _guessingDashboardHelp = new(
         "Guessing game dashboard",
         [
+            _featureSwitchHelp,
             new(
                 "Live rounds",
                 "Start a round, close it when guesses are done, then pick the winning answer. Each viewer keeps their first valid guess for that round.",
@@ -405,6 +432,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _guessingSettingsHelp = new(
         "Guessing game settings",
         [
+            _featureSwitchHelp,
             new(
                 "Round types",
                 "Create one or more kinds of guessing game. Each one can have its own answer list and chat replies.",
@@ -428,6 +456,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _pointsDashboardHelp = new(
         "Points dashboard",
         [
+            _featureSwitchHelp,
             new(
                 "Balances",
                 "Use the leaderboard and search controls to check point balances for this channel.",
@@ -450,6 +479,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _pointsSettingsHelp = new(
         "Points settings",
         [
+            _featureSwitchHelp,
             new(
                 "Commands",
                 "Command names are the words viewers and mods type in chat. Each name must be unique for this channel.",
@@ -479,6 +509,7 @@ public partial class PageHelpButton
     private static readonly HelpPage _customCommandsHelp = new(
         "Custom commands",
         [
+            _featureSwitchHelp,
             new(
                 "Replies",
                 "A reply is a saved message. Add more than one message when you want the bot to rotate through them or pick one at random.",

@@ -103,6 +103,7 @@ public sealed class MomentUiTests
         {
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 TwitchUserId = "streamer-id",
@@ -190,6 +191,7 @@ public sealed class MomentUiTests
         {
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 TwitchUserId = "streamer-id",
@@ -327,6 +329,7 @@ public sealed class MomentUiTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             TwitchUserId = "streamer-id",

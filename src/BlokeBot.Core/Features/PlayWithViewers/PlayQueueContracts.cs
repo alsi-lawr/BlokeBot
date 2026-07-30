@@ -161,6 +161,9 @@ public abstract record PlayQueueResult<T>
 
 public abstract record PlayQueueRejection(string Message)
 {
+    public sealed record FeatureDisabled()
+        : PlayQueueRejection("Play with viewers is turned off for this channel.");
+
     public sealed record Invalid(string Detail) : PlayQueueRejection(Detail);
 
     public sealed record NotFound(string Detail) : PlayQueueRejection(Detail);

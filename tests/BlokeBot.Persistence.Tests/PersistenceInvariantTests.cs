@@ -502,6 +502,7 @@ public sealed class PersistenceInvariantTests
     {
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = $"host-{Guid.NewGuid():N}",
             DisplayName = "Host",
             CreatedAtUtc = DateTime.UtcNow,

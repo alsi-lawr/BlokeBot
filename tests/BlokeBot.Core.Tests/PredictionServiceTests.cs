@@ -198,7 +198,7 @@ public sealed class PredictionServiceTests
             .ShouldHaveSingleItem()
             .ProviderPredictionId.ShouldBe("prediction-id");
         (
-            (await verify.Hosts.SingleAsync()).EnabledFeatures & HostFeatureFlags.NativeTwitch
+            (await verify.Hosts.SingleAsync()).EnabledFeatures & HostFeatureFlags.Predictions
         ).ShouldBe(HostFeatureFlags.None);
     }
 
@@ -282,8 +282,8 @@ public sealed class PredictionServiceTests
         await using var db = await database.CreateDbContextAsync();
         var host = await db.Hosts.SingleAsync();
         host.EnabledFeatures = enabled
-            ? host.EnabledFeatures | HostFeatureFlags.NativeTwitch
-            : host.EnabledFeatures & ~HostFeatureFlags.NativeTwitch;
+            ? host.EnabledFeatures | HostFeatureFlags.Predictions
+            : host.EnabledFeatures & ~HostFeatureFlags.Predictions;
         await db.SaveChangesAsync();
     }
 
@@ -338,6 +338,7 @@ public sealed class PredictionServiceTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             TwitchUserId = twitchId,

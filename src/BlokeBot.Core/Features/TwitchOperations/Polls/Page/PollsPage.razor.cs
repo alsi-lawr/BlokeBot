@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Polls.Page;
 
@@ -37,7 +38,12 @@ public partial class PollsPage
         {
             await LoadPageContextAsync();
             _nativeTwitchEnabled =
-                HostId != 0 && await _nativeTwitch.IsEnabledAsync(HostId, CancellationToken.None);
+                HostId != 0
+                && await _nativeTwitch.IsEnabledAsync(
+                    HostId,
+                    HostFeatureFlags.Polls,
+                    CancellationToken.None
+                );
             _state = _nativeTwitchEnabled
                 ? await _polls.LoadAsync(HostId, CancellationToken.None)
                 : null;

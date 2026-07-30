@@ -10,6 +10,54 @@ namespace BlokeBot.Core.Tests;
 public sealed class PlayQueueServiceTests
 {
     [Test]
+    public async Task DisabledSwitch_RetainsQueuesBlocksEffectsAndDoesNotReplayOnReenable()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database);
+        _ = Success(await service.ConfigureAsync(hostId, Queue("squad"), CancellationToken.None));
+        int retainedEventCount;
+        await using (var disable = await database.CreateDbContextAsync())
+        {
+            retainedEventCount = await disable.PlayQueueEvents.CountAsync();
+            var host = await disable.Hosts.SingleAsync();
+            host.EnabledFeatures &= ~HostFeatureFlags.PlayWithViewers;
+            await disable.SaveChangesAsync();
+        }
+
+        var rejected = await service.JoinAsync(
+            hostId,
+            "squad",
+            Join("viewer", "eu", "Tank"),
+            CancellationToken.None
+        );
+
+        rejected
+            .Match(
+                _ => throw new InvalidOperationException("Expected rejection."),
+                value => value.Reason
+            )
+            .ShouldBeOfType<PlayQueueRejection.FeatureDisabled>();
+        (await service.GetPublicPageAsync("alpha", "squad", CancellationToken.None)).ShouldBeNull();
+        (await service.GetEventsAsync(hostId, 0, 100, CancellationToken.None)).ShouldBeEmpty();
+        await using (var verifyDisabled = await database.CreateDbContextAsync())
+        {
+            (await verifyDisabled.PlayQueues.CountAsync()).ShouldBe(1);
+            (await verifyDisabled.PlayQueueEntries.CountAsync()).ShouldBe(0);
+            (await verifyDisabled.PlayQueueEvents.CountAsync()).ShouldBe(retainedEventCount);
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.PlayWithViewers;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        (
+            await service.GetPublicPageAsync("alpha", "squad", CancellationToken.None)
+        ).ShouldNotBeNull();
+        await using var verifyEnabled = await database.CreateDbContextAsync();
+        (await verifyEnabled.PlayQueueEvents.CountAsync()).ShouldBe(retainedEventCount);
+    }
+
+    [Test]
     public async Task MultipleHostScopedQueues_JoinLeavePositionAndPublicPrivacy()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -495,6 +543,7 @@ public sealed class PlayQueueServiceTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,

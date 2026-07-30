@@ -154,6 +154,7 @@ public sealed class HostedChannelLifecycleNotifierTests
         db.Hosts.Add(
             new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 TwitchUserId = "streamer-id",

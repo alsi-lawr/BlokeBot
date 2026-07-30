@@ -36,7 +36,7 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Shoutouts, ct))
         {
             return new(null, new ShoutoutTargetCooldownReadiness.Unknown(), []);
         }
@@ -85,7 +85,7 @@ public sealed class ShoutoutService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Shoutouts, ct))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -105,7 +105,7 @@ public sealed class ShoutoutService(
                 "Select a connected Twitch channel first."
             );
         }
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        if (!host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -164,7 +164,7 @@ public sealed class ShoutoutService(
                 || x.Login == Login.Normalize(shoutout.BroadcasterUserLogin),
             ct
         );
-        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        if (host is null || !host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts))
         {
             return;
         }
@@ -279,7 +279,7 @@ public sealed class ShoutoutService(
                 "The configured bot must be this channel's broadcaster or moderator."
             );
         }
-        if (!await nativeTwitch.IsEnabledAsync(host.Id, ct))
+        if (!await nativeTwitch.IsEnabledAsync(host.Id, HostFeatureFlags.Shoutouts, ct))
         {
             return new ShoutoutOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }

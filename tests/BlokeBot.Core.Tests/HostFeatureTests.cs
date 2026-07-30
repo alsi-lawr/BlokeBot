@@ -15,7 +15,7 @@ namespace BlokeBot.Core.Tests;
 public sealed class HostFeatureTests
 {
     [Test]
-    public async Task NewHostAndFeatureToggle_LoadingAndChangingFeatures_DefaultsAllAndPublishesChanges()
+    public async Task ExistingHostFeatureToggle_LoadingAndChangingFeatures_PreservesOtherBitsAndPublishesChanges()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(dbFactory, "streamer");
@@ -41,10 +41,7 @@ public sealed class HostFeatureTests
         await service.DisableAsync(hostId, HostFeatureFlags.Guessing, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(
-            HostFeatureFlags.Points
-                | HostFeatureFlags.CustomCommands
-                | HostFeatureFlags.NativeTwitch
-                | HostFeatureFlags.Overlays
+            HostFeatureFlags.All & ~HostFeatureFlags.Guessing
         );
         publishCount.ShouldBe(1);
 
@@ -52,6 +49,50 @@ public sealed class HostFeatureTests
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         publishCount.ShouldBe(2);
+    }
+
+    [Test]
+    public void NewHostModel_DefaultsEveryChatToolOff()
+    {
+        new BotHost().EnabledFeatures.ShouldBe(HostFeatureFlags.None);
+        HostFeatureCatalog.Cards(HostFeatureFlags.None).ShouldAllBe(feature => !feature.Enabled);
+        HostFeatureCatalog.Features.Count.ShouldBe(12);
+        HostFeatureCatalog.Features.ShouldBeUnique();
+        HostFeatureCatalog
+            .Cards(HostFeatureFlags.None)
+            .Select(card => card.Feature)
+            .ShouldBe(HostFeatureCatalog.Features);
+    }
+
+    [Test]
+    public async Task EveryCatalogFeature_TogglesIndependentlyAndPreservesUnknownBits()
+    {
+        var unknown = (HostFeatureFlags)(1UL << 48);
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, "streamer", unknown);
+        var service = new HostFeatureService(
+            dbFactory,
+            new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+            []
+        );
+
+        foreach (var feature in HostFeatureCatalog.Features)
+        {
+            await service.EnableAsync(hostId, feature, CancellationToken.None);
+            (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown | feature);
+
+            await service.DisableAsync(hostId, feature, CancellationToken.None);
+            (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
+        }
+
+        await Should.ThrowAsync<ArgumentOutOfRangeException>(() =>
+            service.EnableAsync(
+                hostId,
+                HostFeatureFlags.NativeTwitchFeatures,
+                CancellationToken.None
+            )
+        );
+        (await LoadFeaturesAsync(service, hostId)).ShouldBe(unknown);
     }
 
     [Test]
@@ -66,14 +107,14 @@ public sealed class HostFeatureTests
             [observer]
         );
 
-        await service.DisableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
-        await service.DisableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
-        await service.EnableAsync(hostId, HostFeatureFlags.NativeTwitch, CancellationToken.None);
+        await service.DisableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
+        await service.DisableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
+        await service.EnableAsync(hostId, HostFeatureFlags.Shoutouts, CancellationToken.None);
 
         (await LoadFeaturesAsync(service, hostId)).ShouldBe(HostFeatureFlags.All);
         observer.Changes.ShouldBe([
-            (hostId, NativeTwitchFeatureState.Disabled),
-            (hostId, NativeTwitchFeatureState.Enabled),
+            (hostId, HostFeatureFlags.Shoutouts, NativeTwitchFeatureState.Disabled),
+            (hostId, HostFeatureFlags.Shoutouts, NativeTwitchFeatureState.Enabled),
         ]);
     }
 
@@ -251,15 +292,20 @@ public sealed class HostFeatureTests
     private sealed class RecordingNativeTwitchFeatureChangeObserver
         : INativeTwitchFeatureChangeObserver
     {
-        internal List<(int HostId, NativeTwitchFeatureState State)> Changes { get; } = [];
+        internal List<(
+            int HostId,
+            HostFeatureFlags Feature,
+            NativeTwitchFeatureState State
+        )> Changes { get; } = [];
 
         public Task NativeTwitchFeatureChangedAsync(
             int hostId,
+            HostFeatureFlags feature,
             NativeTwitchFeatureState state,
             CancellationToken cancellationToken
         )
         {
-            Changes.Add((hostId, state));
+            Changes.Add((hostId, feature, state));
             return Task.CompletedTask;
         }
     }

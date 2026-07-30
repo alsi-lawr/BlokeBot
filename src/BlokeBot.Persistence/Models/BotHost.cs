@@ -20,7 +20,7 @@ public sealed class BotHost
 
     public DateTime? BotRuntimeStateChangedAtUtc { get; set; }
 
-    public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.All;
+    public HostFeatureFlags EnabledFeatures { get; set; } = HostFeatureFlags.None;
 
     public string TimeZoneId { get; set; } = "UTC";
 

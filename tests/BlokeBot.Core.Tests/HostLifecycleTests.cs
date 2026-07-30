@@ -113,6 +113,7 @@ public sealed class HostLifecycleTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

@@ -19,6 +19,7 @@ public sealed class GuessingDashboardProjectionTests
         {
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 CreatedAtUtc = started,

@@ -25,6 +25,7 @@ public sealed class PublicChatOutboxEnqueueAndLifetimeTests : PublicChatOutboxIn
         {
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 CreatedAtUtc = DateTime.UtcNow,

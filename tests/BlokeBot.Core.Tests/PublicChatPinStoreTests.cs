@@ -261,6 +261,7 @@ public sealed class PublicChatPinStoreTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var otherHost = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "other-streamer",
             DisplayName = "Other Streamer",
             CreatedAtUtc = DateTime.UtcNow,
@@ -322,6 +323,7 @@ public sealed class PublicChatPinStoreTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

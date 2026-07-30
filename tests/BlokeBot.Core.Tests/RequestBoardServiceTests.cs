@@ -10,6 +10,51 @@ namespace BlokeBot.Core.Tests;
 public sealed class RequestBoardServiceTests
 {
     [Test]
+    public async Task DisabledSwitch_RetainsBoardsBlocksEffectsAndDoesNotReplayOnReenable()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var service = CreateService(database);
+        _ = Success(await service.ConfigureAsync(hostId, Board(), CancellationToken.None));
+        int retainedEventCount;
+        await using (var disable = await database.CreateDbContextAsync())
+        {
+            retainedEventCount = await disable.RequestBoardEvents.CountAsync();
+            var host = await disable.Hosts.SingleAsync();
+            host.EnabledFeatures &= ~HostFeatureFlags.RequestBoards;
+            await disable.SaveChangesAsync();
+        }
+
+        var rejected = Rejection(
+            await service.SubmitAsync(
+                hostId,
+                "games",
+                Submission(Guid.NewGuid(), "viewer", "Suppressed request"),
+                CancellationToken.None
+            )
+        );
+
+        rejected.ShouldBeOfType<RequestBoardRejection.FeatureDisabled>();
+        (await service.GetPublicPageAsync("alpha", "games", CancellationToken.None)).ShouldBeNull();
+        (await service.GetEventsAsync(hostId, 0, 100, CancellationToken.None)).ShouldBeEmpty();
+        await using (var verifyDisabled = await database.CreateDbContextAsync())
+        {
+            (await verifyDisabled.RequestBoards.CountAsync()).ShouldBe(1);
+            (await verifyDisabled.RequestSubmissions.CountAsync()).ShouldBe(0);
+            (await verifyDisabled.RequestBoardEvents.CountAsync()).ShouldBe(retainedEventCount);
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.RequestBoards;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        (
+            await service.GetPublicPageAsync("alpha", "games", CancellationToken.None)
+        ).ShouldNotBeNull();
+        await using var verifyEnabled = await database.CreateDbContextAsync();
+        (await verifyEnabled.RequestBoardEvents.CountAsync()).ShouldBe(retainedEventCount);
+    }
+
+    [Test]
     public async Task BoardConfiguration_ReplacesUnusedFieldShapeButPreservesSubmittedShape()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -665,6 +710,7 @@ public sealed class RequestBoardServiceTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,

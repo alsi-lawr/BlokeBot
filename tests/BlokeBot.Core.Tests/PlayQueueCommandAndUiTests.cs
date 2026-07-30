@@ -80,6 +80,24 @@ public sealed class PlayQueueCommandAndUiTests
         responses[2].ShouldContain("position 1");
         responses[3].ShouldContain("moderator-only");
         responses[4].ShouldContain("now closed");
+
+        await using (var disable = await database.CreateDbContextAsync())
+        {
+            var persistedHost = await disable.Hosts.SingleAsync();
+            persistedHost.EnabledFeatures &= ~HostFeatureFlags.PlayWithViewers;
+            await disable.SaveChangesAsync();
+        }
+        var responseCount = responses.Count;
+        await DispatchAsync(
+            dispatcher,
+            Message("viewer", "!join squad region=eu preferred-role=Tank"),
+            responses
+        );
+        await DispatchAsync(dispatcher, Message("viewer", "!queue squad"), responses);
+
+        responses.Count.ShouldBe(responseCount);
+        await using var verifyDisabled = await database.CreateDbContextAsync();
+        (await verifyDisabled.PlayQueueEntries.CountAsync()).ShouldBe(1);
     }
 
     [Test]
@@ -358,6 +376,7 @@ public sealed class PlayQueueCommandAndUiTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

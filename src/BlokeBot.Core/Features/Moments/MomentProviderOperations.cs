@@ -19,7 +19,7 @@ public sealed class MomentProviderOperations(
     )
     {
         var clipKey = $"moment:{publicId:N}:clip";
-        var clipOutcome = await provider.CreateClipAsync(hostId, false, clipKey, ct);
+        var clipOutcome = await provider.CreateMomentClipAsync(hostId, false, clipKey, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var clip = await db.TwitchClips.SingleOrDefaultAsync(
             value => value.HostId == hostId && value.IdempotencyKey == clipKey,
@@ -106,7 +106,12 @@ public sealed class MomentProviderOperations(
             return Failed(clip, clipFailure);
         }
         var markerKey = $"moment:{publicId:N}:marker";
-        var markerOutcome = await provider.CreateMarkerAsync(hostId, description, markerKey, ct);
+        var markerOutcome = await provider.CreateMomentMarkerAsync(
+            hostId,
+            description,
+            markerKey,
+            ct
+        );
         var marker = await db.TwitchStreamMarkers.SingleOrDefaultAsync(
             value => value.HostId == hostId && value.IdempotencyKey == markerKey,
             ct

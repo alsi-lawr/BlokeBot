@@ -1,5 +1,6 @@
 using BlokeBot.Commands;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
@@ -223,7 +224,11 @@ public sealed class PlayQueueCommandModule(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()
-            .Where(value => value.Login == hostLogin)
+            .Where(value =>
+                value.Login == hostLogin
+                && (value.EnabledFeatures & HostFeatureFlags.PlayWithViewers)
+                    == HostFeatureFlags.PlayWithViewers
+            )
             .Select(value => new { value.Id, value.Login })
             .SingleOrDefaultAsync(ct);
         if (host is null)

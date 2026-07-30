@@ -31,7 +31,7 @@ public sealed class OverlayFeatureSwitchMigrationTests
                     (3, 'unknown-id', 'unknown', 'unknown', 0, 64, '2026-07-30T00:00:00Z');
                 """
             );
-            await before.Database.MigrateAsync();
+            await before.GetService<IMigrator>().MigrateAsync(_overlayFeatureSwitch);
         }
 
         await using var upgraded = await factory.CreateDbContextAsync();
@@ -60,12 +60,16 @@ public sealed class OverlayFeatureSwitchMigrationTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using (var latest = await factory.CreateDbContextAsync())
         {
-            await latest.Database.MigrateAsync();
-            latest.Hosts.AddRange(
-                Host("all", HostFeatureFlags.All),
-                Host("unknown", HostFeatureFlags.Overlays | (HostFeatureFlags)64UL)
+            await latest.GetService<IMigrator>().MigrateAsync(_overlayFeatureSwitch);
+            await latest.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
+                VALUES
+                    (1, 'all-id', 'all', 'all', 0, 31, '2026-07-30T00:00:00Z'),
+                    (2, 'unknown-id', 'unknown', 'unknown', 0, 80, '2026-07-30T00:00:00Z');
+                """
             );
-            await latest.SaveChangesAsync();
             await latest.GetService<IMigrator>().MigrateAsync(_overlayInstances);
         }
 
@@ -82,18 +86,6 @@ public sealed class OverlayFeatureSwitchMigrationTests
                 """SELECT "dflt_value" FROM pragma_table_info('hosts') WHERE "name" = 'EnabledFeatures';"""
             )
         ).ShouldBe("15");
-    }
-
-    private static BotHost Host(string login, HostFeatureFlags features)
-    {
-        return new BotHost
-        {
-            TwitchUserId = $"{login}-id",
-            Login = login,
-            DisplayName = login,
-            EnabledFeatures = features,
-            CreatedAtUtc = DateTime.UtcNow,
-        };
     }
 
     private static async Task<string> ReadScalarAsync(DbConnection connection, string sql)

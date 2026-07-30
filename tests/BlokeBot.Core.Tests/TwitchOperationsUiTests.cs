@@ -35,16 +35,49 @@ namespace BlokeBot.Core.Tests;
 public sealed class TwitchOperationsUiTests
 {
     [Test]
-    public void NativeSwitcherExposesFiveLinksAndSharedAtRestCurrentHoverAndFocusHooks()
+    public async Task NativeSwitcherExposesOnlyEnabledLinksAndSharedAtRestCurrentHoverAndFocusHooks()
     {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    TwitchUserId = "host-id",
+                    Login = "host",
+                    DisplayName = "Host",
+                    EnabledFeatures =
+                        HostFeatureFlags.Shoutouts
+                        | HostFeatureFlags.Polls
+                        | HostFeatureFlags.Predictions,
+                    CreatedAtUtc = DateTime.UtcNow,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
         using var context = new BunitContext();
+        context.Services.AddSingleton(
+            new HostFeatureService(
+                dbFactory,
+                new HostedChannelChangeNotifier(TestEventBus.Create<AppEventKind>()),
+                []
+            )
+        );
         context
             .Services.GetRequiredService<NavigationManager>()
             .NavigateTo("/twitch-operations/polls");
 
-        var switcher = context.Render<NativeTwitchToolSwitcher>();
+        var switcher = context.Render<NativeTwitchToolSwitcher>(parameters =>
+            parameters.Add(component => component.HostId, 1)
+        );
 
-        switcher.FindAll("nav[aria-label='Native Twitch tools'] a").Count.ShouldBe(5);
+        switcher.WaitForAssertion(() =>
+        {
+            switcher.FindAll("nav[aria-label='Native Twitch tools'] a").Count.ShouldBe(3);
+            switcher.Markup.ShouldNotContain("Clips &amp; markers");
+            switcher.Markup.ShouldNotContain("Rewards &amp; redemptions");
+        });
         var links = switcher.FindAll(".native-tool-switcher__link");
         links.ShouldAllBe(link => link.TextContent.Trim().Length > 0);
         links
@@ -330,7 +363,7 @@ public sealed class TwitchOperationsUiTests
                 }
             );
             var persistedHost = await db.Hosts.SingleAsync();
-            persistedHost.EnabledFeatures &= ~HostFeatureFlags.NativeTwitch;
+            persistedHost.EnabledFeatures &= ~HostFeatureFlags.NativeTwitchFeatures;
             await db.SaveChangesAsync();
         }
 
@@ -346,7 +379,8 @@ public sealed class TwitchOperationsUiTests
 
             page.WaitForAssertion(() =>
             {
-                page.Markup.ShouldContain("This Twitch tool is turned off");
+                page.Find(".page-state__title")
+                    .TextContent.ShouldContain("Clips & markers is turned off");
                 page.Find("a[href='/host#chat-tools']")
                     .TextContent.ShouldContain("Open Channel setup");
                 page.Markup.ShouldNotContain("Create clip");

@@ -176,6 +176,7 @@ public sealed class GuessingConfigurationCommandTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

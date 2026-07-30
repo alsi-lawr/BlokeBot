@@ -72,7 +72,7 @@ public sealed class OverlayDashboardUiTests
     public void FeatureCatalog_ExposesAnIndependentOverlaySwitchIncludedInAll()
     {
         HostFeatureFlags.All.Contains(HostFeatureFlags.Overlays).ShouldBeTrue();
-        HostFeatureFlags.NativeTwitch.Contains(HostFeatureFlags.Overlays).ShouldBeFalse();
+        HostFeatureFlags.Shoutouts.Contains(HostFeatureFlags.Overlays).ShouldBeFalse();
 
         var card = HostFeatureCatalog
             .Cards(HostFeatureFlags.Overlays)

@@ -1,4 +1,5 @@
 using System.Globalization;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
@@ -17,6 +18,7 @@ public partial class PlayQueuesPage
     private long _primaryFocusRequest;
     private bool _isCreating = true;
     private bool _operationFailed;
+    private bool _featureEnabled;
 
     private string _publicUrl =>
         $"/queues/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
@@ -24,6 +26,17 @@ public partial class PlayQueuesPage
     protected override async Task OnInitializedAsync()
     {
         await LoadPageContextAsync();
+        _featureEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.PlayWithViewers,
+                CancellationToken.None
+            );
+        if (!_featureEnabled)
+        {
+            return;
+        }
         await LoadAsync();
     }
 

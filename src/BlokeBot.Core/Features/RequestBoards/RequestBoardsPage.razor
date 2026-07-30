@@ -4,6 +4,7 @@
 @attribute [Authorize(Policy = "HostSelected")]
 @inherits AuthenticatedPageComponent
 @inject RequestBoardService _boards
+@inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
 
 <PageTitle>BlokeBot | Request boards</PageTitle>
 
@@ -12,11 +13,14 @@
                Description="Configure viewer submissions and moderate the queue."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        @if (!_isCreating && Host is not null)
+        @if (_featureEnabled && !_isCreating && Host is not null)
         {
             <a class="btn-secondary" href="@_publicBoardUrl">Open public board</a>
         }
-        <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
+        @if (_featureEnabled)
+        {
+            <button class="btn-primary" type="button" @onclick="SaveBoardAsync">Save board</button>
+        }
     </Actions>
 
     <ChildContent>
@@ -24,6 +28,14 @@
     {
         <ApplicationCardCollection Owner="dashboard-page-cards">
             <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
+    }
+    else if (!_featureEnabled)
+    {
+        <ApplicationCardCollection Owner="dashboard-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">
+                Request boards are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved boards and requests are retained.
+            </div>
         </ApplicationCardCollection>
     }
     else

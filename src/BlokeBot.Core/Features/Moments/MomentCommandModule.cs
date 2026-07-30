@@ -2,6 +2,7 @@ using System.Diagnostics;
 using BlokeBot.Commands;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.Moments;
@@ -28,7 +29,10 @@ public sealed class MomentCommandModule(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await db
             .Hosts.AsNoTracking()
-            .Where(value => value.Login == hostLogin)
+            .Where(value =>
+                value.Login == hostLogin
+                && (value.EnabledFeatures & HostFeatureFlags.Moments) == HostFeatureFlags.Moments
+            )
             .Select(value => (int?)value.Id)
             .SingleOrDefaultAsync(ct);
         if (hostId is null)

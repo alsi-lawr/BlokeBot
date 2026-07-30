@@ -93,6 +93,7 @@ public sealed class AuthorizedHostSelectionServiceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = displayName,
             CreatedAtUtc = DateTime.UtcNow,

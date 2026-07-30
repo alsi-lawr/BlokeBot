@@ -713,6 +713,7 @@ public sealed class HostBotAccountAuthorizationTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             CreatedAtUtc = DateTime.UtcNow,
             DisplayName = login,
             Login = login,

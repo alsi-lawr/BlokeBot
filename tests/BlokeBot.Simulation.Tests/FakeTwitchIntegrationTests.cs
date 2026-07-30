@@ -608,8 +608,9 @@ public sealed class FakeTwitchIntegrationTests
             );
         }
 
-        public ValueTask<bool> NativeTwitchIsEnabledAsync(
+        public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
             string channel,
+            EventSubOperationSubscriptionKind kind,
             CancellationToken cancellationToken
         )
         {
@@ -666,7 +667,11 @@ public sealed class FakeTwitchIntegrationTests
 
     private sealed class AlwaysEnabledNativeTwitch : INativeTwitchFeatureStateProvider
     {
-        public ValueTask<bool> IsEnabledAsync(string channel, CancellationToken cancellationToken)
+        public ValueTask<bool> IsEnabledAsync(
+            string channel,
+            NativeTwitchFeature feature,
+            CancellationToken cancellationToken
+        )
         {
             return ValueTask.FromResult(true);
         }

@@ -6,6 +6,37 @@ namespace BlokeBot.Twitch.Runtime.Tests;
 public sealed class EventSubChannelNativeTwitchFeatureTests : EventSubChannelRecoveryTestBase
 {
     [Test]
+    public async Task SelectiveNativeFeatures_CreateOnlyTheirOwnSubscriptions()
+    {
+        var operations = new ScriptedChannelOperations();
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.Polls,
+            true
+        );
+        operations.SetNativeTwitchFeatureEnabled(
+            "channel",
+            EventSubOperationSubscriptionKind.Predictions,
+            true
+        );
+        QueueBroadcasterAccounts(operations);
+        await using var harness = CreateHarness(operations, attemptLimit: 1);
+
+        harness.Session.Start(["channel"], CancellationToken.None);
+        await harness.Session.DrainAsync();
+
+        operations
+            .OperationKinds("channel")
+            .ShouldBe([
+                null,
+                EventSubOperationSubscriptionKind.Polls,
+                EventSubOperationSubscriptionKind.Predictions,
+            ]);
+        operations.CreateCount("channel").ShouldBe(3);
+        harness.Session.ActiveChannels.ShouldBe(["channel"]);
+    }
+
+    [Test]
     public async Task RaidCleanupFailure_DisableRetriesBeforeReenableAndRetainsChat()
     {
         var operations = new ScriptedChannelOperations();

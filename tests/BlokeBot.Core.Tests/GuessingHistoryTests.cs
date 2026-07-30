@@ -16,6 +16,7 @@ public sealed class GuessingHistoryTests
         {
             host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "streamer",
                 DisplayName = "Streamer",
                 CreatedAtUtc = DateTime.UtcNow,

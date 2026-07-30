@@ -195,7 +195,7 @@ public sealed class NavMenuInventoryTests
     public async Task NativeTwitchOnly_RendersFirstWithinTheChatToolsSection()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
-        var hostId = await SeedHostAsync(dbFactory, HostFeatureFlags.NativeTwitch);
+        var hostId = await SeedHostAsync(dbFactory, HostFeatureFlags.Shoutouts);
         await using var context = UiTestContextFactory.Create(dbFactory, hostId);
         var module = context.JSInterop.SetupModule("./Components/Layout/NavMenu.razor.js");
         SetupExpandedGroups(module);
@@ -209,6 +209,29 @@ public sealed class NavMenuInventoryTests
                     : element.GetAttribute("data-nav-section")
             )
             .ShouldBe(["Chat tools", "twitch-operations"]);
+        var native = cut.Find("[data-nav-section='twitch-operations']");
+        native.QuerySelector(".nav-menu__badge")!.TextContent.ShouldBe("1");
+        native
+            .QuerySelectorAll("a")
+            .Select(link => link.TextContent.Trim())
+            .ShouldBe(["Shoutouts"]);
+    }
+
+    [Test]
+    public async Task NoEnabledDestination_HidesTheChatToolsSection()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, HostFeatureFlags.None);
+        await using var context = UiTestContextFactory.Create(dbFactory, hostId);
+        var module = context.JSInterop.SetupModule("./Components/Layout/NavMenu.razor.js");
+        SetupExpandedGroups(module);
+
+        var cut = context.Render<NavMenu>();
+
+        cut.FindAll(".nav-menu__section-label")
+            .Select(element => element.TextContent.Trim())
+            .ShouldNotContain("Chat tools");
+        cut.FindAll("[data-nav-section]").ShouldBeEmpty();
     }
 
     private static async Task<int> SeedHostAsync(

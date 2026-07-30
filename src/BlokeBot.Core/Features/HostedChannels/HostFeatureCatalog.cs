@@ -4,10 +4,80 @@ namespace BlokeBot.Core.Features.HostedChannels;
 
 public static class HostFeatureCatalog
 {
+    public static IReadOnlyList<HostFeatureFlags> Features { get; } =
+    [
+        HostFeatureFlags.Shoutouts,
+        HostFeatureFlags.Polls,
+        HostFeatureFlags.ClipsAndMarkers,
+        HostFeatureFlags.RewardsAndRedemptions,
+        HostFeatureFlags.Predictions,
+        HostFeatureFlags.RequestBoards,
+        HostFeatureFlags.PlayWithViewers,
+        HostFeatureFlags.Moments,
+        HostFeatureFlags.Overlays,
+        HostFeatureFlags.Guessing,
+        HostFeatureFlags.Points,
+        HostFeatureFlags.CustomCommands,
+    ];
+
     public static IReadOnlyList<HostFeatureCardState> Cards(HostFeatureFlags enabledFeatures)
     {
         return
         [
+            new(
+                HostFeatureFlags.Shoutouts,
+                "Shoutouts",
+                "Send manual and automatic raid shoutouts.",
+                enabledFeatures.Contains(HostFeatureFlags.Shoutouts)
+            ),
+            new(
+                HostFeatureFlags.Polls,
+                "Polls",
+                "Create and manage native Twitch polls.",
+                enabledFeatures.Contains(HostFeatureFlags.Polls)
+            ),
+            new(
+                HostFeatureFlags.ClipsAndMarkers,
+                "Clips & markers",
+                "Create native Twitch clips and stream markers.",
+                enabledFeatures.Contains(HostFeatureFlags.ClipsAndMarkers)
+            ),
+            new(
+                HostFeatureFlags.RewardsAndRedemptions,
+                "Rewards & redemptions",
+                "Manage channel point rewards and redemptions.",
+                enabledFeatures.Contains(HostFeatureFlags.RewardsAndRedemptions)
+            ),
+            new(
+                HostFeatureFlags.Predictions,
+                "Predictions",
+                "Create and manage native Twitch predictions.",
+                enabledFeatures.Contains(HostFeatureFlags.Predictions)
+            ),
+            new(
+                HostFeatureFlags.RequestBoards,
+                "Request boards",
+                "Collect, vote on, and moderate viewer requests.",
+                enabledFeatures.Contains(HostFeatureFlags.RequestBoards)
+            ),
+            new(
+                HostFeatureFlags.PlayWithViewers,
+                "Play with viewers",
+                "Run viewer queues and private lobby delivery.",
+                enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
+            ),
+            new(
+                HostFeatureFlags.Moments,
+                "Moments",
+                "Capture, review, and publish stream moments.",
+                enabledFeatures.Contains(HostFeatureFlags.Moments)
+            ),
+            new(
+                HostFeatureFlags.Overlays,
+                "Overlays",
+                "Manage Browser Sources for graphics shown on stream.",
+                enabledFeatures.Contains(HostFeatureFlags.Overlays)
+            ),
             new(
                 HostFeatureFlags.Guessing,
                 "Guessing game",
@@ -26,23 +96,16 @@ public static class HostFeatureCatalog
                 "Create chat commands, keep counters, and schedule messages.",
                 enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
             ),
-            new(
-                HostFeatureFlags.NativeTwitch,
-                "Native Twitch",
-                "Use shoutouts, polls, clips, and stream markers.",
-                enabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
-            ),
-            new(
-                HostFeatureFlags.Overlays,
-                "Overlays",
-                "Manage Browser Sources for graphics shown on stream.",
-                enabledFeatures.Contains(HostFeatureFlags.Overlays)
-            ),
         ];
     }
 
     public static bool Contains(this HostFeatureFlags enabledFeatures, HostFeatureFlags feature)
     {
         return (enabledFeatures & feature) == feature;
+    }
+
+    public static bool IsSelectable(HostFeatureFlags feature)
+    {
+        return Features.Contains(feature);
     }
 }

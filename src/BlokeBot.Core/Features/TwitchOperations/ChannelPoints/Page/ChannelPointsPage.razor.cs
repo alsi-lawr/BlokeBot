@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ChannelPoints.Page;
 
@@ -47,7 +48,12 @@ public partial class ChannelPointsPage
         {
             await LoadPageContextAsync();
             _nativeTwitchEnabled =
-                HostId != 0 && await _nativeTwitch.IsEnabledAsync(HostId, CancellationToken.None);
+                HostId != 0
+                && await _nativeTwitch.IsEnabledAsync(
+                    HostId,
+                    HostFeatureFlags.RewardsAndRedemptions,
+                    CancellationToken.None
+                );
             _state = _nativeTwitchEnabled
                 ? await _channelPoints.LoadAsync(HostId, CancellationToken.None)
                 : null;

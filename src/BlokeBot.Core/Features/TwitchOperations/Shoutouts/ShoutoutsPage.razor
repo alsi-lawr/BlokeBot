@@ -20,7 +20,7 @@
                Description="Recommend another live channel to your viewers, or welcome incoming raids automatically."
                Width="DashboardPageWidth.Wide"
                data-native-route="shoutouts">
-    <NativeTwitchToolSwitcher />
+    <NativeTwitchToolSwitcher HostId="@HostId" />
 
     @if (_loadFailed)
     {
@@ -34,7 +34,7 @@
     }
     else if (!_nativeTwitchEnabled)
     {
-        <NativeTwitchUnavailable />
+        <NativeTwitchUnavailable FeatureName="Shoutouts" />
     }
     else if (_state is not null)
     {

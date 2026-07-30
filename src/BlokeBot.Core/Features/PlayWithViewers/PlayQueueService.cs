@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
@@ -139,6 +140,11 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return [];
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var queues = await db
             .PlayQueues.AsNoTracking()
@@ -751,6 +757,18 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
+        if (
+            !await HostFeatureAvailability.IsEnabledAsync(
+                dbFactory,
+                hostLogin,
+                HostFeatureFlags.PlayWithViewers,
+                ct
+            )
+        )
+        {
+            return null;
+        }
+
         var normalizedHost = PlayQueueInput.NormalizeLogin(hostLogin);
         await using var lookup = await dbFactory.CreateDbContextAsync(ct);
         var hostId = await lookup
@@ -840,6 +858,11 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<PublicPlayQueueEntryView>(new PlayQueueRejection.FeatureDisabled());
+        }
+
         var page = await GetModeratorPageAsync(hostId, queueSlug, ct);
         if (page is null)
         {
@@ -868,6 +891,11 @@ public sealed class PlayQueueService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return [];
+        }
+
         var take = Math.Clamp(count, 1, PlayQueueLimits.MaximumEventReadCount);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db
@@ -1023,6 +1051,11 @@ public sealed class PlayQueueService(
     )
         where T : class
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return null;
+        }
+
         var gate = GateFor(hostId, slug);
         await gate.WaitAsync(ct);
         try
@@ -1069,6 +1102,11 @@ public sealed class PlayQueueService(
         Func<BlokeBotDbContext, DateTime, Task<bool>>? convergeBeforeMutation = null
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<T>(new PlayQueueRejection.FeatureDisabled());
+        }
+
         var gate = GateFor(hostId, slug);
         await gate.WaitAsync(ct);
         try
@@ -1104,6 +1142,16 @@ public sealed class PlayQueueService(
         {
             gate.Release();
         }
+    }
+
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
+    {
+        return HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            hostId,
+            HostFeatureFlags.PlayWithViewers,
+            ct
+        );
     }
 
     private async Task<bool> ConvergeQueueAsync(

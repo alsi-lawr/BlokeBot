@@ -11,6 +11,7 @@ public sealed class ViewerCommandCatalogMigrationTests
 {
     private const string _previousMigration = "20260730141846_v0.5.0_OverlayFeatureSwitch";
     private const string _catalogMigration = "20260730162013_v0.5.0_ViewerCommandCatalog";
+    private const string _independentChatTools = "20260730202307_v0.5.0_IndependentChatTools";
 
     [Test]
     public async Task Migration_BackfillsCanonicalOrderDefaultCatalogAndOnlyUntouchedPointsJoin()
@@ -52,12 +53,12 @@ public sealed class ViewerCommandCatalogMigrationTests
                 VALUES (1, 1, 'zeta'), (1, 1, 'Alpha'), (1, 1, 'beta');
                 """
             );
-            await before.Database.MigrateAsync();
+            await before.GetService<IMigrator>().MigrateAsync(_catalogMigration);
         }
 
         await using var migrated = await factory.CreateDbContextAsync();
         (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_catalogMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(13);
+        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(14);
         (
             await migrated
                 .CustomCommandAliases.OrderBy(value => value.SortOrder)
@@ -90,6 +91,6 @@ public sealed class ViewerCommandCatalogMigrationTests
         var conflict = await migrated.Hosts.SingleAsync(value => value.Id == 3);
         conflict.CommandsAliasesConfigured.ShouldBeTrue();
         conflict.CommandsDefaultConflictAlias.ShouldBe("commands");
-        (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
+        (await migrated.Database.GetPendingMigrationsAsync()).ShouldBe([_independentChatTools]);
     }
 }

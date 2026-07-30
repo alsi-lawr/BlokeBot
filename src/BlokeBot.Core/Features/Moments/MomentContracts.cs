@@ -139,6 +139,9 @@ public abstract record MomentResult<T>
 
 public abstract record MomentRejection(string Message)
 {
+    public sealed record FeatureDisabled()
+        : MomentRejection("Moments are turned off for this channel.");
+
     public sealed record Invalid(string Detail) : MomentRejection(Detail);
 
     public sealed record NotFound() : MomentRejection("Moment not found.");

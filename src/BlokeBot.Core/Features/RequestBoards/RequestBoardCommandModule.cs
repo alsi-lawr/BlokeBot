@@ -166,9 +166,12 @@ public sealed class RequestBoardCommandModule(
     )
     {
         var hostId = await FindHostIdAsync(context.Message.Channel, ct);
+        if (hostId is null)
+        {
+            return;
+        }
         if (
-            hostId is null
-            || args.Count != 1
+            args.Count != 1
             || !long.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out var id)
         )
         {
@@ -197,16 +200,20 @@ public sealed class RequestBoardCommandModule(
         CancellationToken ct
     )
     {
+        var hostId = await FindHostIdAsync(context.Message.Channel, ct);
+        if (hostId is null)
+        {
+            return;
+        }
+
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That request-board command is moderator-only.", ct);
             return;
         }
 
-        var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (
-            hostId is null
-            || args.Count != 1
+            args.Count != 1
             || !long.TryParse(args[0], NumberStyles.None, CultureInfo.InvariantCulture, out var id)
         )
         {
@@ -254,16 +261,20 @@ public sealed class RequestBoardCommandModule(
         CancellationToken ct
     )
     {
+        var hostId = await FindHostIdAsync(context.Message.Channel, ct);
+        if (hostId is null)
+        {
+            return;
+        }
+
         if (!ChatModeratorPolicy.IsModerator(context.Message))
         {
             await context.ReplyAsync("That request-board command is moderator-only.", ct);
             return;
         }
 
-        var hostId = await FindHostIdAsync(context.Message.Channel, ct);
         if (
-            hostId is null
-            || args.Count != 2
+            args.Count != 2
             || !long.TryParse(
                 args[0],
                 NumberStyles.None,
@@ -306,7 +317,11 @@ public sealed class RequestBoardCommandModule(
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db
             .Hosts.AsNoTracking()
-            .Where(value => value.Login == login)
+            .Where(value =>
+                value.Login == login
+                && (value.EnabledFeatures & HostFeatureFlags.RequestBoards)
+                    == HostFeatureFlags.RequestBoards
+            )
             .Select(value => (int?)value.Id)
             .SingleOrDefaultAsync(ct);
     }

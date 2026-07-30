@@ -61,7 +61,7 @@ public sealed class AutomaticRaidShoutoutObserver(
             ? AutomaticRaidShoutoutConfiguration.Defaults
             : AutomaticRaidShoutoutConfigurationService.Map(settings);
         if (
-            !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
+            !host.EnabledFeatures.Contains(HostFeatureFlags.Shoutouts)
             || !configuration.Enabled
             || AutomaticRaidShoutoutConfigurationService.Validate(configuration).Count > 0
             || incomingRaid.ViewerCount < configuration.MinimumViewerCount

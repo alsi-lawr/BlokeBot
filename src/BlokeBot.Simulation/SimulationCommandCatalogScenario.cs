@@ -143,7 +143,16 @@ internal sealed class SimulationCommandCatalogScenario(
         host.EnabledFeatures = state.ToLowerInvariant() switch
         {
             "available" => HostFeatureFlags.All,
-            "unavailable" => HostFeatureFlags.NativeTwitch | HostFeatureFlags.Overlays,
+            "all-enabled" => HostFeatureFlags.All,
+            "all-disabled" => HostFeatureFlags.None,
+            "selective-native" => HostFeatureFlags.Shoutouts | HostFeatureFlags.Predictions,
+            "mixed" => HostFeatureFlags.RequestBoards
+                | HostFeatureFlags.Moments
+                | HostFeatureFlags.Points
+                | HostFeatureFlags.CustomCommands,
+            "unavailable" => HostFeatureFlags.NativeTwitchFeatures
+                | HostFeatureFlags.Moments
+                | HostFeatureFlags.Overlays,
             _ => throw new ArgumentOutOfRangeException(
                 nameof(state),
                 state,

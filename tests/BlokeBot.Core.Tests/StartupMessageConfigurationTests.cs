@@ -219,6 +219,7 @@ public sealed class StartupMessageConfigurationTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             StartupMessageEnabled = enabled,

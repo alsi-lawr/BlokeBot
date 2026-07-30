@@ -388,6 +388,7 @@ public sealed class AutomaticRaidShoutoutDeliveryTests
         db.Hosts.Add(
             new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Login = "host",
                 DisplayName = "Host",
                 TwitchUserId = "host-id",

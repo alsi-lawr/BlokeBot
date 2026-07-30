@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -26,6 +27,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<MomentHubSettingsView>(new MomentRejection.FeatureDisabled());
+        }
+
         if (
             command.MergeWindowSeconds
             is < MomentLimits.MinimumMergeWindowSeconds
@@ -79,6 +85,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<MomentView>(new MomentRejection.FeatureDisabled());
+        }
+
         var stream = command.StreamIdentity.Trim();
         var login = MomentInput.NormalizeLogin(command.Requester.Login);
         if (stream.Length is < 1 or > 128)
@@ -355,6 +366,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<ModeratorMomentView>(new MomentRejection.FeatureDisabled());
+        }
+
         if (sourcePublicId == targetPublicId)
         {
             return Rejected<ModeratorMomentView>(
@@ -518,6 +534,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<MomentView>(new MomentRejection.FeatureDisabled());
+        }
+
         var login = MomentInput.NormalizeLogin(viewer.Login);
         if (!MomentInput.IsValidLogin(login))
         {
@@ -598,8 +619,13 @@ public sealed class MomentHubService(
         );
     }
 
-    public async Task<MomentModeratorPage> GetModeratorPageAsync(int hostId, CancellationToken ct)
+    public async Task<MomentModeratorPage?> GetModeratorPageAsync(int hostId, CancellationToken ct)
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var settings = await LoadSettingsAsync(db, hostId, ct);
         var candidates = await db
@@ -627,6 +653,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(channel, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await ResolveHostAsync(db, channel, ct);
         if (host is null)
@@ -664,6 +695,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(channel, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await ResolveHostAsync(db, channel, ct);
         if (host is null)
@@ -691,6 +727,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<MomentView>(new MomentRejection.FeatureDisabled());
+        }
+
         var weekStart = MomentInput.WeekStart(weekStartsAtUtc);
         if (weekStart.AddDays(7) > Now())
         {
@@ -795,6 +836,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return [];
+        }
+
         var take = Math.Clamp(count, 1, MomentLimits.MaximumEventReadCount);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db
@@ -821,6 +867,26 @@ public sealed class MomentHubService(
             .ToArrayAsync(ct);
     }
 
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
+    {
+        return HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            hostId,
+            HostFeatureFlags.Moments,
+            ct
+        );
+    }
+
+    private Task<bool> FeatureIsEnabledAsync(string channel, CancellationToken ct)
+    {
+        return HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            channel,
+            HostFeatureFlags.Moments,
+            ct
+        );
+    }
+
     private async Task<MomentResult<ModeratorMomentView>> ModerateAsync(
         int hostId,
         ModerateMomentCommand command,
@@ -828,6 +894,11 @@ public sealed class MomentHubService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<ModeratorMomentView>(new MomentRejection.FeatureDisabled());
+        }
+
         if (
             command.PublicTitle.Trim().Length > MomentLimits.MaximumTitleLength
             || command.PublicCategory.Trim().Length > MomentLimits.MaximumCategoryLength

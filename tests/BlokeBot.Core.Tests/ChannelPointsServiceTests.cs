@@ -29,12 +29,14 @@ public sealed class ChannelPointsServiceTests
             db.Hosts.AddRange(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",
                 },
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "two",
                     DisplayName = "Two",
                     TwitchUserId = "two-id",
@@ -208,6 +210,7 @@ public sealed class ChannelPointsServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",
@@ -229,7 +232,8 @@ public sealed class ChannelPointsServiceTests
             .ShouldHaveSingleItem()
             .ProviderRewardId.ShouldBe("managed");
         (
-            (await verify.Hosts.SingleAsync()).EnabledFeatures & HostFeatureFlags.NativeTwitch
+            (await verify.Hosts.SingleAsync()).EnabledFeatures
+            & HostFeatureFlags.RewardsAndRedemptions
         ).ShouldBe(HostFeatureFlags.None);
     }
 
@@ -248,6 +252,7 @@ public sealed class ChannelPointsServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",
@@ -387,8 +392,8 @@ public sealed class ChannelPointsServiceTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = await db.Hosts.SingleAsync();
         host.EnabledFeatures = enabled
-            ? host.EnabledFeatures | HostFeatureFlags.NativeTwitch
-            : host.EnabledFeatures & ~HostFeatureFlags.NativeTwitch;
+            ? host.EnabledFeatures | HostFeatureFlags.RewardsAndRedemptions
+            : host.EnabledFeatures & ~HostFeatureFlags.RewardsAndRedemptions;
         await db.SaveChangesAsync();
     }
 

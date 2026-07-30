@@ -173,6 +173,9 @@ public abstract record RequestBoardResult<T>
 
 public abstract record RequestBoardRejection(string Message)
 {
+    public sealed record FeatureDisabled()
+        : RequestBoardRejection("Request boards are turned off for this channel.");
+
     public sealed record Invalid(string Detail) : RequestBoardRejection(Detail);
 
     public sealed record NotFound(string Detail) : RequestBoardRejection(Detail);

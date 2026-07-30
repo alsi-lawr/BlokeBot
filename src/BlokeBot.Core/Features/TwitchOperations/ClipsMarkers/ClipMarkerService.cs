@@ -27,7 +27,7 @@ public sealed class ClipMarkerService(
 
     public async Task<ClipMarkerDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.ClipsAndMarkers, ct))
         {
             return new(new ClipMarkerAuthorizationReadiness.Disabled(), [], [], []);
         }
@@ -35,23 +35,35 @@ public sealed class ClipMarkerService(
         await ReconcileAsync(hostId, ct);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var readiness = await ReadinessAsync(hostId, ct);
-        var pending = await db
-            .TwitchClips.AsNoTracking()
-            .Where(clip => clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending)
+        var pending = (
+            await db
+                .TwitchClips.AsNoTracking()
+                .Where(clip => clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending)
+                .ToArrayAsync(ct)
+        )
+            .Where(clip => IsOwnedBy(clip.IdempotencyKey, HostFeatureFlags.ClipsAndMarkers))
             .OrderByDescending(clip => clip.RequestedAtUtc)
-            .ToArrayAsync(ct);
-        var results = await db
-            .TwitchClips.AsNoTracking()
-            .Where(clip => clip.HostId == hostId && clip.Status != TwitchClipStatus.Pending)
+            .ToArray();
+        var results = (
+            await db
+                .TwitchClips.AsNoTracking()
+                .Where(clip => clip.HostId == hostId && clip.Status != TwitchClipStatus.Pending)
+                .ToArrayAsync(ct)
+        )
+            .Where(clip => IsOwnedBy(clip.IdempotencyKey, HostFeatureFlags.ClipsAndMarkers))
             .OrderByDescending(clip => clip.ResolvedAtUtc)
             .Take(_resultsToKeep)
-            .ToArrayAsync(ct);
-        var markers = await db
-            .TwitchStreamMarkers.AsNoTracking()
-            .Where(marker => marker.HostId == hostId)
+            .ToArray();
+        var markers = (
+            await db
+                .TwitchStreamMarkers.AsNoTracking()
+                .Where(marker => marker.HostId == hostId)
+                .ToArrayAsync(ct)
+        )
+            .Where(marker => IsOwnedBy(marker.IdempotencyKey, HostFeatureFlags.ClipsAndMarkers))
             .OrderByDescending(marker => marker.CreatedAtUtc)
             .Take(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArray();
         return new(
             readiness,
             pending.Select(View).ToArray(),
@@ -69,7 +81,7 @@ public sealed class ClipMarkerService(
         return CreateClipAsync(hostId, hasDelay, NewAttemptKey(), ct);
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+    public Task<ClipMarkerOperationOutcome> CreateClipAsync(
         int hostId,
         bool hasDelay,
         string idempotencyKey,
@@ -77,7 +89,29 @@ public sealed class ClipMarkerService(
     )
     {
         var key = ValidateAttemptKey(idempotencyKey);
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        return CreateClipAsync(hostId, hasDelay, key, OwnerFeature(key), ct);
+    }
+
+    internal Task<ClipMarkerOperationOutcome> CreateMomentClipAsync(
+        int hostId,
+        bool hasDelay,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        return CreateClipAsync(hostId, hasDelay, idempotencyKey, HostFeatureFlags.Moments, ct);
+    }
+
+    private async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+        int hostId,
+        bool hasDelay,
+        string idempotencyKey,
+        HostFeatureFlags authorizingFeature,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
+        if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -107,7 +141,7 @@ public sealed class ClipMarkerService(
                 "The selected channel is unavailable."
             );
         }
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        if (!host.EnabledFeatures.Contains(authorizingFeature))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -143,7 +177,7 @@ public sealed class ClipMarkerService(
             return await ObserveExistingClipAsync(db, existing, ct);
         }
 
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -236,7 +270,7 @@ public sealed class ClipMarkerService(
         return CreateMarkerAsync(hostId, description, NewAttemptKey(), ct);
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+    public Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
         int hostId,
         string description,
         string idempotencyKey,
@@ -244,7 +278,29 @@ public sealed class ClipMarkerService(
     )
     {
         var key = ValidateAttemptKey(idempotencyKey);
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        return CreateMarkerAsync(hostId, description, key, OwnerFeature(key), ct);
+    }
+
+    internal Task<ClipMarkerOperationOutcome> CreateMomentMarkerAsync(
+        int hostId,
+        string description,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        return CreateMarkerAsync(hostId, description, idempotencyKey, HostFeatureFlags.Moments, ct);
+    }
+
+    private async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+        int hostId,
+        string description,
+        string idempotencyKey,
+        HostFeatureFlags authorizingFeature,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
+        if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -281,7 +337,7 @@ public sealed class ClipMarkerService(
                 "The selected channel is unavailable."
             );
         }
-        if (!host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch))
+        if (!host.EnabledFeatures.Contains(authorizingFeature))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -318,7 +374,7 @@ public sealed class ClipMarkerService(
             return MarkerOutcome(existing);
         }
 
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -341,7 +397,7 @@ public sealed class ClipMarkerService(
                 marker.CreatedAtUtc = created.Marker.CreatedAt.UtcDateTime;
                 marker.ResolvedAtUtc = now;
                 await db.SaveChangesAsync(ct);
-                await TrimMarkersAsync(db, hostId, ct);
+                await TrimMarkersAsync(db, hostId, authorizingFeature, ct);
                 await db.SaveChangesAsync(ct);
                 await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
                 return new ClipMarkerOperationOutcome.MarkerCreated(View(marker));
@@ -418,7 +474,7 @@ public sealed class ClipMarkerService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.ClipsAndMarkers, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -428,7 +484,7 @@ public sealed class ClipMarkerService(
             candidate => candidate.HostId == hostId && candidate.Id == attempt.Value,
             ct
         );
-        if (clip is null)
+        if (clip is null || !IsOwnedBy(clip.IdempotencyKey, HostFeatureFlags.ClipsAndMarkers))
         {
             return new ClipMarkerOperationOutcome.InvalidRequest(
                 "The selected clip attempt is no longer available."
@@ -450,7 +506,7 @@ public sealed class ClipMarkerService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.ClipsAndMarkers, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
         }
@@ -460,7 +516,7 @@ public sealed class ClipMarkerService(
             candidate => candidate.HostId == hostId && candidate.Id == attempt.Value,
             ct
         );
-        return marker is null
+        return marker is null || !IsOwnedBy(marker.IdempotencyKey, HostFeatureFlags.ClipsAndMarkers)
             ? new ClipMarkerOperationOutcome.InvalidRequest(
                 "The selected marker attempt is no longer available."
             )
@@ -488,7 +544,17 @@ public sealed class ClipMarkerService(
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        await ReconcileFeatureAsync(hostId, HostFeatureFlags.ClipsAndMarkers, ct);
+        await ReconcileFeatureAsync(hostId, HostFeatureFlags.Moments, ct);
+    }
+
+    private async Task ReconcileFeatureAsync(
+        int hostId,
+        HostFeatureFlags authorizingFeature,
+        CancellationToken ct
+    )
+    {
+        if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
         {
             return;
         }
@@ -497,25 +563,29 @@ public sealed class ClipMarkerService(
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (
             host?.TwitchUserId is not { Length: > 0 } broadcasterId
-            || !host.EnabledFeatures.Contains(HostFeatureFlags.NativeTwitch)
+            || !host.EnabledFeatures.Contains(authorizingFeature)
         )
         {
             return;
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var pending = await db
-            .TwitchClips.Where(clip =>
-                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
-            )
-            .ToArrayAsync(ct);
+        var pending = (
+            await db
+                .TwitchClips.Where(clip =>
+                    clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+                )
+                .ToArrayAsync(ct)
+        )
+            .Where(clip => IsOwnedBy(clip.IdempotencyKey, authorizingFeature))
+            .ToArray();
         await ReloadClipsAsync(db, pending, ct);
         if (
             ResolveAvailabilityDeadlines(pending, now)
-            && await nativeTwitch.IsEnabledAsync(hostId, ct)
+            && await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct)
         )
         {
-            await SaveReconciliationChangesAsync(db, hostId, ct);
+            await SaveReconciliationChangesAsync(db, hostId, authorizingFeature, ct);
         }
 
         var deadline = pending
@@ -527,7 +597,7 @@ public sealed class ClipMarkerService(
             deadline == default ? (TimeSpan?)null : deadline - timeProvider.GetUtcNow().UtcDateTime;
         if (deadlineRemaining is { } remaining && remaining <= TimeSpan.Zero)
         {
-            await ExpirePendingClipsAsync(db, hostId, ct);
+            await ExpirePendingClipsAsync(db, hostId, authorizingFeature, ct);
             return;
         }
 
@@ -542,25 +612,50 @@ public sealed class ClipMarkerService(
         try
         {
             var token = await ReadyTokenAsync(hostId, reconciliationToken);
-            if (!await nativeTwitch.IsEnabledAsync(hostId, reconciliationToken))
+            if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, reconciliationToken))
             {
                 return;
             }
 
-            await PollPendingClipsAsync(db, hostId, token, reconciliationToken, ct);
+            await PollPendingClipsAsync(
+                db,
+                hostId,
+                authorizingFeature,
+                token,
+                reconciliationToken,
+                ct
+            );
 
-            if (token is null || !await nativeTwitch.IsEnabledAsync(hostId, reconciliationToken))
-            {
-                return;
-            }
-            var markers = await db
-                .TwitchStreamMarkers.Where(marker =>
-                    marker.HostId == hostId && marker.Status == TwitchStreamMarkerStatus.Succeeded
+            if (
+                token is null
+                || !await nativeTwitch.IsEnabledAsync(
+                    hostId,
+                    authorizingFeature,
+                    reconciliationToken
                 )
-                .ToArrayAsync(reconciliationToken);
+            )
+            {
+                return;
+            }
+            var markers = (
+                await db
+                    .TwitchStreamMarkers.Where(marker =>
+                        marker.HostId == hostId
+                        && marker.Status == TwitchStreamMarkerStatus.Succeeded
+                    )
+                    .ToArrayAsync(reconciliationToken)
+            )
+                .Where(marker => IsOwnedBy(marker.IdempotencyKey, authorizingFeature))
+                .ToArray();
             if (markers.Length > 0)
             {
-                if (!await nativeTwitch.IsEnabledAsync(hostId, reconciliationToken))
+                if (
+                    !await nativeTwitch.IsEnabledAsync(
+                        hostId,
+                        authorizingFeature,
+                        reconciliationToken
+                    )
+                )
                 {
                     return;
                 }
@@ -574,7 +669,13 @@ public sealed class ClipMarkerService(
                         .ToHashSet(StringComparer.Ordinal),
                     reconciliationToken
                 );
-                if (!await nativeTwitch.IsEnabledAsync(hostId, reconciliationToken))
+                if (
+                    !await nativeTwitch.IsEnabledAsync(
+                        hostId,
+                        authorizingFeature,
+                        reconciliationToken
+                    )
+                )
                 {
                     return;
                 }
@@ -606,7 +707,7 @@ public sealed class ClipMarkerService(
                 }
                 if (changed)
                 {
-                    await SaveReconciliationChangesAsync(db, hostId, ct);
+                    await SaveReconciliationChangesAsync(db, hostId, authorizingFeature, ct);
                 }
             }
         }
@@ -615,13 +716,14 @@ public sealed class ClipMarkerService(
                 && deadlineCancellation?.IsCancellationRequested == true
             )
         {
-            await ExpirePendingClipsAsync(db, hostId, ct);
+            await ExpirePendingClipsAsync(db, hostId, authorizingFeature, ct);
         }
     }
 
     private async Task PollPendingClipsAsync(
         BlokeBotDbContext db,
         int hostId,
+        HostFeatureFlags authorizingFeature,
         string? token,
         CancellationToken pollingToken,
         CancellationToken ct
@@ -629,11 +731,15 @@ public sealed class ClipMarkerService(
     {
         while (true)
         {
-            var pending = await db
-                .TwitchClips.Where(clip =>
-                    clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
-                )
-                .ToArrayAsync(pollingToken);
+            var pending = (
+                await db
+                    .TwitchClips.Where(clip =>
+                        clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+                    )
+                    .ToArrayAsync(pollingToken)
+            )
+                .Where(clip => IsOwnedBy(clip.IdempotencyKey, authorizingFeature))
+                .ToArray();
             await ReloadClipsAsync(db, pending, pollingToken);
             pending = pending.Where(clip => clip.Status == TwitchClipStatus.Pending).ToArray();
             if (pending.Length == 0)
@@ -649,7 +755,7 @@ public sealed class ClipMarkerService(
                 {
                     continue;
                 }
-                if (!await nativeTwitch.IsEnabledAsync(hostId, pollingToken))
+                if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, pollingToken))
                 {
                     return;
                 }
@@ -659,7 +765,7 @@ public sealed class ClipMarkerService(
                     clip.ProviderClipId!,
                     pollingToken
                 );
-                if (!await nativeTwitch.IsEnabledAsync(hostId, pollingToken))
+                if (!await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, pollingToken))
                 {
                     return;
                 }
@@ -674,9 +780,9 @@ public sealed class ClipMarkerService(
                 }
             }
 
-            if (changed && await nativeTwitch.IsEnabledAsync(hostId, ct))
+            if (changed && await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct))
             {
-                await SaveReconciliationChangesAsync(db, hostId, ct);
+                await SaveReconciliationChangesAsync(db, hostId, authorizingFeature, ct);
             }
 
             if (pending.All(clip => clip.Status != TwitchClipStatus.Pending))
@@ -691,18 +797,26 @@ public sealed class ClipMarkerService(
     private async Task ExpirePendingClipsAsync(
         BlokeBotDbContext db,
         int hostId,
+        HostFeatureFlags authorizingFeature,
         CancellationToken ct
     )
     {
-        var pending = await db
-            .TwitchClips.Where(clip =>
-                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
-            )
-            .ToArrayAsync(ct);
+        var pending = (
+            await db
+                .TwitchClips.Where(clip =>
+                    clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+                )
+                .ToArrayAsync(ct)
+        )
+            .Where(clip => IsOwnedBy(clip.IdempotencyKey, authorizingFeature))
+            .ToArray();
         await ReloadClipsAsync(db, pending, ct);
-        if (ResolveAvailabilityDeadlines(pending, timeProvider.GetUtcNow().UtcDateTime))
+        if (
+            ResolveAvailabilityDeadlines(pending, timeProvider.GetUtcNow().UtcDateTime)
+            && await nativeTwitch.IsEnabledAsync(hostId, authorizingFeature, ct)
+        )
         {
-            await SaveReconciliationChangesAsync(db, hostId, ct);
+            await SaveReconciliationChangesAsync(db, hostId, authorizingFeature, ct);
         }
     }
 
@@ -764,12 +878,13 @@ public sealed class ClipMarkerService(
     private async Task SaveReconciliationChangesAsync(
         BlokeBotDbContext db,
         int hostId,
+        HostFeatureFlags authorizingFeature,
         CancellationToken ct
     )
     {
         await db.SaveChangesAsync(ct);
-        await TrimClipsAsync(db, hostId, ct);
-        await TrimMarkersAsync(db, hostId, ct);
+        await TrimClipsAsync(db, hostId, authorizingFeature, ct);
+        await TrimMarkersAsync(db, hostId, authorizingFeature, ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
     }
@@ -839,7 +954,7 @@ public sealed class ClipMarkerService(
         clip.FailureReason = reason;
         clip.ResolvedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
-        await TrimClipsAsync(db, clip.HostId, ct);
+        await TrimClipsAsync(db, clip.HostId, OwnerFeature(clip.IdempotencyKey), ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return outcome;
@@ -858,7 +973,7 @@ public sealed class ClipMarkerService(
         marker.FailureReason = reason;
         marker.ResolvedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
-        await TrimMarkersAsync(db, marker.HostId, ct);
+        await TrimMarkersAsync(db, marker.HostId, OwnerFeature(marker.IdempotencyKey), ct);
         await db.SaveChangesAsync(ct);
         await events.PublishAsync(AppEventKind.TwitchOperationsChanged, ct);
         return outcome;
@@ -876,30 +991,54 @@ public sealed class ClipMarkerService(
         record.VideoId = clip.VideoId;
     }
 
-    private static async Task TrimClipsAsync(BlokeBotDbContext db, int hostId, CancellationToken ct)
+    private static async Task TrimClipsAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        HostFeatureFlags authorizingFeature,
+        CancellationToken ct
+    )
     {
-        var excess = await db
-            .TwitchClips.Where(clip =>
-                clip.HostId == hostId && clip.Status != TwitchClipStatus.Pending
-            )
+        var excess = (
+            await db
+                .TwitchClips.Where(clip =>
+                    clip.HostId == hostId && clip.Status != TwitchClipStatus.Pending
+                )
+                .ToArrayAsync(ct)
+        )
+            .Where(clip => IsOwnedBy(clip.IdempotencyKey, authorizingFeature))
             .OrderByDescending(clip => clip.ResolvedAtUtc)
             .Skip(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArray();
         db.TwitchClips.RemoveRange(excess);
     }
 
     private static async Task TrimMarkersAsync(
         BlokeBotDbContext db,
         int hostId,
+        HostFeatureFlags authorizingFeature,
         CancellationToken ct
     )
     {
-        var excess = await db
-            .TwitchStreamMarkers.Where(marker => marker.HostId == hostId)
+        var excess = (
+            await db.TwitchStreamMarkers.Where(marker => marker.HostId == hostId).ToArrayAsync(ct)
+        )
+            .Where(marker => IsOwnedBy(marker.IdempotencyKey, authorizingFeature))
             .OrderByDescending(marker => marker.ResolvedAtUtc)
             .Skip(_resultsToKeep)
-            .ToArrayAsync(ct);
+            .ToArray();
         db.TwitchStreamMarkers.RemoveRange(excess);
+    }
+
+    private static HostFeatureFlags OwnerFeature(string idempotencyKey)
+    {
+        return idempotencyKey.StartsWith("moment:", StringComparison.Ordinal)
+            ? HostFeatureFlags.Moments
+            : HostFeatureFlags.ClipsAndMarkers;
+    }
+
+    private static bool IsOwnedBy(string idempotencyKey, HostFeatureFlags authorizingFeature)
+    {
+        return OwnerFeature(idempotencyKey) == authorizingFeature;
     }
 
     private static ClipView View(TwitchClip clip)

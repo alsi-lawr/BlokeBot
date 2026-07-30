@@ -22,6 +22,7 @@ public sealed class PollAuthorizationTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -56,6 +57,7 @@ public sealed class PollAuthorizationTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",

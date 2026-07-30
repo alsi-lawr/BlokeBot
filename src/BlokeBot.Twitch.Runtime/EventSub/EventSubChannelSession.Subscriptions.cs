@@ -237,7 +237,6 @@ internal sealed partial class EventSubChannelSession
         CancellationToken cancellationToken
     )
     {
-        var enabled = await operations.NativeTwitchIsEnabledAsync(channel, cancellationToken);
         foreach (
             var kind in new[]
             {
@@ -249,6 +248,11 @@ internal sealed partial class EventSubChannelSession
             }
         )
         {
+            var enabled = await operations.NativeTwitchFeatureIsEnabledAsync(
+                channel,
+                kind,
+                cancellationToken
+            );
             var reconciliation = enabled
                 ? await EnsureOperationSubscriptionPresentAsync(
                     channel,
