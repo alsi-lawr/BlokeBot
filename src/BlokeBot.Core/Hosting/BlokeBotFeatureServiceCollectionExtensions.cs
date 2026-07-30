@@ -53,6 +53,9 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<CommandAliasRegistry>();
         services.AddSingleton<AppCommandAliasResolver>();
+        services.AddSingleton<CommandsConfigurationService>();
+        services.AddSingleton<ViewerCommandCatalogService>();
+        services.AddSingleton<IBotHostSeeder, CommandsHostSeeder>();
         return services;
     }
 

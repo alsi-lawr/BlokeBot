@@ -2,6 +2,9 @@ namespace BlokeBot.Persistence.Models;
 
 public enum AppCommandKind
 {
+    [PersistedToken("Commands")]
+    Commands,
+
     [PersistedToken("Start")]
     Start,
 

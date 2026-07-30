@@ -346,6 +346,7 @@ public sealed class PersistenceInvariantTests
         AssertTokens<AppCommandKind>([
             (AppCommandKind.AddPoints, "AddPoints"),
             (AppCommandKind.CancelGiveaway, "CancelGiveaway"),
+            (AppCommandKind.Commands, "Commands"),
             (AppCommandKind.EndGiveaway, "EndGiveaway"),
             (AppCommandKind.Gamble, "Gamble"),
             (AppCommandKind.Giveaway, "Giveaway"),

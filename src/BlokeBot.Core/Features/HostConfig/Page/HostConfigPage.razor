@@ -5,6 +5,7 @@
 @using BlokeBot.Core.Features.Admin.Authorization
 @using BlokeBot.Core.Features.HostConfig.Access
 @using BlokeBot.Core.Features.HostConfig.StartupMessage
+@using BlokeBot.Core.Features.Commands
 @using BlokeBot.Core.Features.HostedChannels
 @using BlokeBot.Core.Features.HostedChannels.Authorization
 @using BlokeBot.Core.Features.HostedChannels.Runtime
@@ -15,6 +16,8 @@
 @inherits AuthenticatedPageComponent
 @inject HostConfigService _hostConfig
 @inject StartupMessageConfigurationService _startupMessages
+@inject CommandsConfigurationService _commandsConfiguration
+@inject ViewerCommandCatalogService _commandCatalogService
 @inject HostFeatureService _features
 @inject HostModAccessService _modAccess
 @inject AccessListProfileResolver _accessListProfiles
@@ -204,7 +207,7 @@
                     <input class="h-4 w-4"
                            type="checkbox"
                            checked="@_startupMessageEnabled"
-                           @onchange="args => _startupMessageEnabled = args.Value is true" />
+                           @onchange="SetStartupMessageEnabled" />
                     Send a message when the bot joins or reconnects
                 </label>
                 <div class="space-y-2">
@@ -213,8 +216,8 @@
                               class="input min-h-24 w-full"
                               maxlength="@(_botSettings.MaxChatMessageLength > 0 ? _botSettings.MaxChatMessageLength : null)"
                               disabled="@(!_startupMessageEnabled)"
-                              @bind="_startupMessageText"
-                              @bind:event="oninput"></textarea>
+                              value="@_startupMessageText"
+                              @oninput="SetStartupMessageText"></textarea>
                     <p class="text-xs font-medium text-slate-500">
                         This applies on the next fresh join or Twitch reconnect. Saving does not restart the bot.
                     </p>
@@ -225,6 +228,98 @@
                         @onclick="() => SaveStartupMessageAsync(hostId)">
                     @(_startupMessageSaving ? "Saving..." : "Save startup message")
                 </button>
+            </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection Title="Commands"
+                            Description="Choose the chat words viewers use to list available commands."
+                            InitiallyOpen="true">
+            <div class="space-y-4 p-5" data-simulation-command-settings>
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-foreground" for="commands-aliases">Command words</label>
+                    <input id="commands-aliases"
+                           class="input w-full"
+                           value="@_commandsAliases"
+                           @oninput="args => { _commandsAliases = args.Value?.ToString() ?? string.Empty; MarkCommandsDirty(); }"
+                           placeholder="commands"
+                           autocomplete="off" />
+                    <p class="text-xs font-medium text-slate-500">
+                        Separate extra command words with commas. Leave this blank to disable the catalog.
+                    </p>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_state.Commands.ConflictAlias))
+                {
+                    <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-700"
+                         role="alert"
+                         data-command-conflict>
+                        !@_state.Commands.ConflictAlias is already in use, so the default Commands command is disabled. Choose another word and save.
+                    </div>
+                }
+                <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        type="button"
+                        disabled="@_commandsSaving"
+                        @onclick="() => SaveCommandsAsync(hostId)">
+                    @(_commandsSaving ? "Saving..." : "Save Commands")
+                </button>
+
+                <CollapsibleSection Title="Available viewer commands"
+                                    Description="Canonical command names viewers can use right now."
+                                    InitiallyOpen="false"
+                                    Opened="RefreshCommandCatalogAsync"
+                                    ContentId="available-viewer-commands">
+                    <div class="space-y-3 p-4" aria-live="polite" data-command-catalog>
+                        @if (_commandCatalogLoading)
+                        {
+                            <p class="text-sm text-muted-foreground">Loading available commands...</p>
+                        }
+                        else if (_commandCatalog is null)
+                        {
+                            <p class="text-sm text-muted-foreground">Open this list to check current command availability.</p>
+                        }
+                        else
+                        {
+                            @if (_commandCatalog.Conflicts.Count > 0)
+                            {
+                                <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700"
+                                     role="alert"
+                                     data-command-catalog-conflicts>
+                                    @foreach (var conflict in _commandCatalog.Conflicts)
+                                    {
+                                        <p>@conflict</p>
+                                    }
+                                </div>
+                            }
+                            @if (_commandCatalog.UnavailableFeatures.Count > 0)
+                            {
+                                <div class="rounded-lg border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700"
+                                     data-command-catalog-unavailable>
+                                    @foreach (var unavailable in _commandCatalog.UnavailableFeatures)
+                                    {
+                                        <p>@unavailable</p>
+                                    }
+                                </div>
+                            }
+                            @if (_commandCatalog.Entries.Count == 0)
+                            {
+                                <p class="text-sm text-muted-foreground" data-command-catalog-empty>
+                                    No viewer commands are currently available.
+                                </p>
+                            }
+                            else
+                            {
+                                <ul class="flex flex-wrap gap-2" aria-label="Available viewer commands">
+                                    @foreach (var entry in _commandCatalog.Entries)
+                                    {
+                                        <li class="control-surface rounded-full px-3 py-1 text-sm font-semibold"
+                                            data-command-source="@entry.Source.ToString().ToLowerInvariant()">
+                                            @entry.Name
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        }
+                    </div>
+                </CollapsibleSection>
             </div>
         </CollapsibleSection>
 

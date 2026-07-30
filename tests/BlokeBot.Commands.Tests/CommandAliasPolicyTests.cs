@@ -18,6 +18,7 @@ public sealed class CommandAliasPolicyTests
     {
         CommandAliasNormalizer.Normalize(" !POINTS ").ShouldBe("points");
         CommandAliasNormalizer.Split("!One, TWO, one,  ").ShouldBe(["one", "two"]);
+        CommandAliasNormalizer.SplitPreservingOrder("!Two, ONE, two").ShouldBe(["two", "one"]);
     }
 
     [Test]

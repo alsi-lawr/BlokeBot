@@ -10,5 +10,7 @@ public sealed class CustomCommandAlias
 
     public string Alias { get; set; } = string.Empty;
 
+    public int SortOrder { get; set; }
+
     public CustomCommand? Command { get; set; }
 }

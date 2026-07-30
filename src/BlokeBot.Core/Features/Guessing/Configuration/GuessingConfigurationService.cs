@@ -420,6 +420,12 @@ public sealed class GuessingConfigurationService(
             .Aliases.ToDrafts()
             .SelectMany(draft => CommandAliasNormalizer.Split(draft.Aliases))
             .ToArray();
+        var fixedCollision = FixedChatCommandRoutes.FindCollision(requestedAliases);
+        if (fixedCollision is not null)
+        {
+            return new GuessingConfigurationSaveFailure.AliasAlreadyUsed(fixedCollision);
+        }
+
         var ownedKinds = GuessingAppCommandKindMap.AppKinds.ToArray();
         var collision = await db
             .CommandAliases.AsNoTracking()
@@ -433,9 +439,19 @@ public sealed class GuessingConfigurationService(
             )
             .Select(alias => alias.Alias)
             .FirstOrDefaultAsync(ct);
-        return collision is null
+        if (collision is not null)
+        {
+            return new GuessingConfigurationSaveFailure.AliasAlreadyUsed(collision);
+        }
+
+        var customCollision = await db
+            .CustomCommandAliases.AsNoTracking()
+            .Where(alias => alias.HostId == hostId && requestedAliases.Contains(alias.Alias))
+            .Select(alias => alias.Alias)
+            .FirstOrDefaultAsync(ct);
+        return customCollision is null
             ? null
-            : new GuessingConfigurationSaveFailure.AliasAlreadyUsed(collision);
+            : new GuessingConfigurationSaveFailure.AliasAlreadyUsed(customCollision);
     }
 
     private static void ReplaceAliases(

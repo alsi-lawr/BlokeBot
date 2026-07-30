@@ -602,7 +602,7 @@ public sealed class JoinGiveawayCommandStrategy(
 {
     public override PointsCommandKind Kind => PointsCommandKind.Join;
 
-    public override IReadOnlyList<string> DefaultAliases { get; } = ["join"];
+    public override IReadOnlyList<string> DefaultAliases { get; } = ["enter"];
 
     public override CommandStrategyAccess<PointsCommandKind, AppCommandRouteState> Access =>
         new CommandStrategyAccess<PointsCommandKind, AppCommandRouteState>.Everyone();

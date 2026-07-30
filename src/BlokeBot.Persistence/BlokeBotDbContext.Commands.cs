@@ -217,6 +217,7 @@ public sealed partial class BlokeBotDbContext
             b.HasKey(x => x.Id);
             b.Property(x => x.Alias).HasMaxLength(64);
             b.HasIndex(x => new { x.HostId, x.Alias }).IsUnique();
+            b.HasIndex(x => new { x.CustomCommandId, x.SortOrder }).IsUnique();
             b.HasOne(x => x.Command)
                 .WithMany(x => x.Aliases)
                 .HasForeignKey(x => new { x.HostId, x.CustomCommandId })

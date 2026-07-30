@@ -14,8 +14,8 @@ public sealed class MomentCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        commands.Map("moment", CaptureAsync);
-        commands.Map("clip", CaptureAsync);
+        commands.Map(FixedChatCommandRoutes.Moment, CaptureAsync);
+        commands.Map(FixedChatCommandRoutes.Clip, CaptureAsync);
     }
 
     private async ValueTask CaptureAsync(

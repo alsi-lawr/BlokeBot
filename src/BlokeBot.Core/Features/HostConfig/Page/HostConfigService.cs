@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.StartupMessage;
 using BlokeBot.Core.Features.HostedChannels;
@@ -22,7 +23,8 @@ public sealed class HostConfigService(
     WhisperQuotaService whisperQuota,
     HostedChannelRuntimeStatusService runtimeStatus,
     SiteAccessService siteAccess,
-    StartupMessageConfigurationService startupMessages
+    StartupMessageConfigurationService startupMessages,
+    CommandsConfigurationService commands
 )
 {
     public IO<Option<HostConfigState>, Never> Load(AuthenticatedSession session)
@@ -77,6 +79,7 @@ public sealed class HostConfigService(
                     false,
                     null,
                     new StartupMessageConfiguration(false, string.Empty),
+                    new CommandsConfiguration(string.Empty, null),
                     new HostBotAccountOverrideState(
                         false,
                         DisabledBotOverrideStatus(),
@@ -132,6 +135,7 @@ public sealed class HostConfigService(
             host.ChannelBotAuthorizedAtUtc is not null,
             status,
             startupMessages.EffectiveConfiguration(host),
+            await commands.LoadAsync(host.Id, ct),
             new HostBotAccountOverrideState(
                 botOverrideStatus.State != BotAccountAuthorizationState.Disabled,
                 botOverrideStatus,

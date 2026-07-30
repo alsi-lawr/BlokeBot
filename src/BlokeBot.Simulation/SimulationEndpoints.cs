@@ -1,3 +1,6 @@
+using BlokeBot.Commands;
+using BlokeBot.Core.Features.Commands;
+
 namespace BlokeBot.Simulation;
 
 internal static class SimulationEndpoints
@@ -36,6 +39,77 @@ internal static class SimulationEndpoints
                         $"/auth/login?start=true&returnUrl={Uri.EscapeDataString(returnUrl)}"
                     );
                 }
+            )
+            .AllowAnonymous();
+
+        app.MapPost(
+                "/simulation/commands/liveness/{state}",
+                async (
+                    string state,
+                    SimulationCommandCatalogScenario scenario,
+                    CancellationToken ct
+                ) =>
+                {
+                    await scenario.SetLivenessAsync(state, ct);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        app.MapPost(
+                "/simulation/commands/round/{state}",
+                async (
+                    string state,
+                    SimulationCommandCatalogScenario scenario,
+                    CancellationToken ct
+                ) =>
+                {
+                    await scenario.SetRoundAsync(state, ct);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        app.MapPost(
+                "/simulation/commands/giveaway/{state}",
+                async (
+                    string state,
+                    SimulationCommandCatalogScenario scenario,
+                    CancellationToken ct
+                ) =>
+                {
+                    await scenario.SetGiveawayAsync(state, ct);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        app.MapPost(
+                "/simulation/commands/features/{state}",
+                async (
+                    string state,
+                    SimulationCommandCatalogScenario scenario,
+                    CancellationToken ct
+                ) =>
+                {
+                    await scenario.SetFeatureAvailabilityAsync(state, ct);
+                    return Results.Ok();
+                }
+            )
+            .AllowAnonymous();
+        app.MapGet(
+                "/simulation/commands/catalog",
+                async (
+                    SimulationCommandCatalogScenario scenario,
+                    ViewerCommandCatalogService catalog,
+                    CancellationToken ct
+                ) => Results.Json(await scenario.SnapshotAsync(catalog, ct))
+            )
+            .AllowAnonymous();
+        app.MapPost(
+                "/simulation/commands/chat",
+                async (
+                    SimulationCommandCatalogScenario scenario,
+                    ChatCommandDispatcher dispatcher,
+                    CancellationToken ct
+                ) => Results.Json(new { messages = await scenario.DispatchAsync(dispatcher, ct) })
             )
             .AllowAnonymous();
     }

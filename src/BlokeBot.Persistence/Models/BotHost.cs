@@ -28,5 +28,9 @@ public sealed class BotHost
 
     public string? StartupMessageText { get; set; }
 
+    public bool CommandsAliasesConfigured { get; set; }
+
+    public string? CommandsDefaultConflictAlias { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }

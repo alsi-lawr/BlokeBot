@@ -6,6 +6,7 @@ public enum AppEventKind
     SiteAccessChanged,
     GuessingChanged,
     PointsChanged,
+    CommandsChanged,
     CustomCommandsChanged,
     AlertsChanged,
     TwitchOperationsChanged,

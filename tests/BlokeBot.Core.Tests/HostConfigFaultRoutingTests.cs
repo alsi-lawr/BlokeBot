@@ -8,6 +8,7 @@ using BlokeBot.Core.Auth.Sessions;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.AccessLists;
 using BlokeBot.Core.Features.Admin.Authorization;
+using BlokeBot.Core.Features.Commands;
 using BlokeBot.Core.Features.HostConfig.Access;
 using BlokeBot.Core.Features.HostConfig.Page;
 using BlokeBot.Core.Features.HostedChannels;
@@ -37,6 +38,107 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class HostConfigFaultRoutingTests
 {
+    [Test]
+    public async Task ViewerCommandsDisclosure_OpeningAndEvents_PreserveDirtyHostDrafts()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.CommandsAliasesConfigured = true;
+            db.CommandAliases.Add(
+                new CommandAlias
+                {
+                    HostId = hostId,
+                    Kind = AppCommandKind.Commands,
+                    Alias = "commands",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        var page = RenderHostConfigPage(context);
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("#commands-aliases").GetAttribute("value").ShouldBe("commands");
+            AvailableCommandsButton(page).GetAttribute("aria-expanded").ShouldBe("false");
+        });
+        page.Find("#commands-aliases").Input("unsaved-catalog");
+        page.Find("#startup-chat-message").Input("unsaved startup");
+
+        await page.InvokeAsync(() => AvailableCommandsButton(page).ClickAsync(new()));
+
+        page.WaitForAssertion(() =>
+        {
+            AvailableCommandsButton(page).GetAttribute("aria-expanded").ShouldBe("true");
+            page.Find("[data-command-catalog]").TextContent.ShouldContain("!commands");
+            page.Find("#commands-aliases").GetAttribute("value").ShouldBe("unsaved-catalog");
+            page.Find("#startup-chat-message").GetAttribute("value").ShouldBe("unsaved startup");
+        });
+
+        await context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .PublishAsync(AppEventKind.PointsChanged, CancellationToken.None);
+        await context
+            .Services.GetRequiredService<EventBus<AppEventKind>>()
+            .PublishAsync(AppEventKind.HostedChannelsChanged, CancellationToken.None);
+
+        page.WaitForAssertion(() =>
+        {
+            page.Find("#commands-aliases").GetAttribute("value").ShouldBe("unsaved-catalog");
+            page.Find("#startup-chat-message").GetAttribute("value").ShouldBe("unsaved startup");
+        });
+    }
+
+    [Test]
+    public async Task ViewerCommandConflictAlerts_RenderWithDarkThemeAwareForeground()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(dbFactory, includeAccessState: true);
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
+            host.CommandsDefaultConflictAlias = "commands";
+            await db.SaveChangesAsync();
+        }
+
+        var testContext = UiTestContextFactory.CreateWithAuthorization(dbFactory, hostId);
+        await using var context = testContext.Context;
+        ConfigureHostServices(
+            context,
+            dbFactory,
+            new RecordingLogger<UiFaultTelemetry>(),
+            new ManualTimeProvider()
+        );
+        var page = RenderHostConfigPage(context);
+
+        page.WaitForAssertion(() =>
+        {
+            var alert = page.Find("[data-command-conflict]");
+            alert.ClassList.ShouldContain("text-amber-700");
+            alert.ClassList.ShouldNotContain("text-amber-900");
+        });
+
+        await page.InvokeAsync(() => AvailableCommandsButton(page).ClickAsync(new()));
+
+        page.WaitForAssertion(() =>
+        {
+            var alert = page.Find("[data-command-catalog-conflicts]");
+            alert.ClassList.ShouldContain("text-amber-700");
+            alert.ClassList.ShouldNotContain("text-amber-900");
+        });
+    }
+
     [Test]
     public async Task AdminImpersonation_RenderingHostConfig_ShowsManagementWithoutOwnerOAuth()
     {
@@ -334,6 +436,7 @@ public sealed class HostConfigFaultRoutingTests
         context.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         context.Services.AddOAuthTransport();
         context.Services.AddHelix();
+        context.Services.AddBlokeBotAppCommands();
         context.Services.AddBlokeBotSiteAccess(AccessListProfileEnrichmentMode.Disabled);
         context.Services.AddBlokeBotAdmin(BotAccountAuthorizationMode.Disabled);
         context.Services.AddBlokeBotHostedChannels(HostBotAppAccessTokenMode.Unavailable);
@@ -458,6 +561,14 @@ public sealed class HostConfigFaultRoutingTests
     {
         context.ComponentFactories.AddStub<HostBotChannelStatusPanel>();
         return context.Render<HostConfigPage>();
+    }
+
+    private static IElement AvailableCommandsButton(IRenderedComponent<HostConfigPage> page)
+    {
+        return page.FindAll("button")
+            .Single(button =>
+                button.TextContent.Contains("Available viewer commands", StringComparison.Ordinal)
+            );
     }
 
     private static IElement FindFeatureButton(

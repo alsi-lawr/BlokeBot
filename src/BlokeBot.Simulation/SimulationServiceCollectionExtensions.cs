@@ -1,3 +1,4 @@
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Core.Features.TwitchOperations;
 using BlokeBot.Core.Features.TwitchOperations.Shoutouts.AutomaticRaids;
@@ -11,6 +12,12 @@ internal static class SimulationServiceCollectionExtensions
     public static IServiceCollection AddBlokeBotSimulation(this IServiceCollection services)
     {
         services.Replace(ServiceDescriptor.Singleton<TimeProvider>(new SimulationTimeProvider()));
+        services.AddSingleton<SimulationCommandCatalogScenario>();
+        services.Replace(
+            ServiceDescriptor.Singleton<IHostStreamLivenessProvider>(provider =>
+                provider.GetRequiredService<SimulationCommandCatalogScenario>()
+            )
+        );
         services.Replace(
             ServiceDescriptor.Singleton<IPointTargetUserLookup, SimulationPointTargetUserLookup>()
         );
