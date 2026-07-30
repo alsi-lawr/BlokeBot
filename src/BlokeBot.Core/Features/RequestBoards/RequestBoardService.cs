@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 using System.Text.Json;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
@@ -29,6 +30,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<RequestBoardSummary>(new RequestBoardRejection.FeatureDisabled());
+        }
+
         var validation = ValidateConfiguration(hostId, command);
         if (validation is not null)
         {
@@ -145,6 +151,13 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<PublicRequestSubmissionView>(
+                new RequestBoardRejection.FeatureDisabled()
+            );
+        }
+
         if (command.OperationId == Guid.Empty)
         {
             return Rejected<PublicRequestSubmissionView>(
@@ -384,6 +397,13 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<PublicRequestSubmissionView>(
+                new RequestBoardRejection.FeatureDisabled()
+            );
+        }
+
         var login = RequestBoardInput.NormalizeLogin(voterLogin);
         if (!RequestBoardInput.IsValidLogin(login))
         {
@@ -513,6 +533,13 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<ModeratorRequestSubmissionView>(
+                new RequestBoardRejection.FeatureDisabled()
+            );
+        }
+
         var validation = ValidateModeration(command);
         if (validation is not null)
         {
@@ -611,6 +638,13 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<PublicRequestSubmissionView>(
+                new RequestBoardRejection.FeatureDisabled()
+            );
+        }
+
         var login = RequestBoardInput.NormalizeLogin(submitterLogin);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -683,6 +717,13 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return Rejected<ModeratorRequestSubmissionView>(
+                new RequestBoardRejection.FeatureDisabled()
+            );
+        }
+
         if (sourceSubmissionId == targetSubmissionId)
         {
             return Rejected<ModeratorRequestSubmissionView>(
@@ -790,6 +831,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostLogin, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var normalizedHost = RequestBoardInput.NormalizeLogin(hostLogin);
         var normalizedSlug = RequestBoardInput.NormalizeSlug(boardSlug);
@@ -828,6 +874,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return [];
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var host = await db
             .Hosts.AsNoTracking()
@@ -852,6 +903,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var normalizedSlug = RequestBoardInput.NormalizeSlug(boardSlug);
         var board = await db
@@ -888,6 +944,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return null;
+        }
+
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var submission = await db
             .RequestSubmissions.AsNoTracking()
@@ -904,6 +965,11 @@ public sealed class RequestBoardService(
         CancellationToken ct
     )
     {
+        if (!await FeatureIsEnabledAsync(hostId, ct))
+        {
+            return [];
+        }
+
         var boundedCount = Math.Clamp(count, 1, _maximumEventReadCount);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         return await db
@@ -1042,6 +1108,26 @@ public sealed class RequestBoardService(
             RequestBoardEventKind.PointsRefunded,
             new { submission.Id, Amount = amount.ToString() },
             now
+        );
+    }
+
+    private Task<bool> FeatureIsEnabledAsync(int hostId, CancellationToken ct)
+    {
+        return HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            hostId,
+            HostFeatureFlags.RequestBoards,
+            ct
+        );
+    }
+
+    private Task<bool> FeatureIsEnabledAsync(string hostLogin, CancellationToken ct)
+    {
+        return HostFeatureAvailability.IsEnabledAsync(
+            dbFactory,
+            hostLogin,
+            HostFeatureFlags.RequestBoards,
+            ct
         );
     }
 

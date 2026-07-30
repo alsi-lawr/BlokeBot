@@ -6,6 +6,7 @@
 @inherits AuthenticatedPageComponent
 @inject MomentHubService _moments
 @inject BlokeBot.Core.Features.HostedChannels.Status.IHostStreamLivenessProvider _streams
+@inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
 
 <PageTitle>BlokeBot | Moments</PageTitle>
 
@@ -14,7 +15,7 @@
                Description="Capture, moderate, and recap community Twitch clips and stream markers."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        @if (Host is not null)
+        @if (_featureEnabled && Host is not null)
         {
             <a class="btn-secondary"
                href="@_weeklyUrl"
@@ -22,14 +23,25 @@
                rel="noopener"
                aria-label="Open weekly recap (opens in a new tab)">Open weekly recap</a>
         }
-        <button class="btn-secondary" type="button" @onclick="FinalizeWeekAsync">Finalize previous week</button>
-        <button class="btn-primary" type="button" @onclick="CaptureAsync">Capture now</button>
+        @if (_featureEnabled)
+        {
+            <button class="btn-secondary" type="button" @onclick="FinalizeWeekAsync">Finalize previous week</button>
+            <button class="btn-primary" type="button" @onclick="CaptureAsync">Capture now</button>
+        }
     </Actions>
     <ChildContent>
         @if (Host is null)
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-6">Choose a channel to manage moments.</div>
+            </ApplicationCardCollection>
+        }
+        else if (!_featureEnabled)
+        {
+            <ApplicationCardCollection Owner="dashboard-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground">
+                    Moments are off for this channel. Turn them on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved settings, captures, and recaps are retained.
+                </div>
             </ApplicationCardCollection>
         }
         else

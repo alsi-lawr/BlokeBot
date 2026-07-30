@@ -5,6 +5,7 @@
 @inherits AuthenticatedPageComponent
 @inject PlayQueueService _queues
 @inject IPrivateLobbyDelivery _lobbyDelivery
+@inject BlokeBot.Core.Features.HostedChannels.HostFeatureService _features
 
 <PageTitle>BlokeBot | Play with viewers</PageTitle>
 
@@ -13,17 +14,28 @@
                Description="Build fair parties, run ready checks, and deliver lobby details privately."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        @if (!_isCreating && Host is not null)
+        @if (_featureEnabled && !_isCreating && Host is not null)
         {
             <a class="btn-secondary" href="@_publicUrl">Open viewer page</a>
         }
-        <button class="btn-primary" type="button" @onclick="SaveAsync">Save queue</button>
+        @if (_featureEnabled)
+        {
+            <button class="btn-primary" type="button" @onclick="SaveAsync">Save queue</button>
+        }
     </Actions>
     <ChildContent>
         @if (Host is null)
         {
             <ApplicationCardCollection Owner="dashboard-page-cards">
                 <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+            </ApplicationCardCollection>
+        }
+        else if (!_featureEnabled)
+        {
+            <ApplicationCardCollection Owner="dashboard-page-cards">
+                <div class="card p-8 text-sm text-muted-foreground">
+                    Play with viewers is off for this channel. Turn it on in <a class="font-semibold text-blue-700" href="/host#chat-tools">Channel setup</a>. Saved queues and entries are retained.
+                </div>
             </ApplicationCardCollection>
         }
         else

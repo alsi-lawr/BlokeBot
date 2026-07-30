@@ -69,9 +69,10 @@ public abstract partial class EventSubChannelRecoveryTestBase
         private readonly Dictionary<string, int> _completeStopCounts = new(
             StringComparer.OrdinalIgnoreCase
         );
-        private readonly Dictionary<string, bool> _nativeTwitchEnabled = new(
-            StringComparer.OrdinalIgnoreCase
-        );
+        private readonly Dictionary<
+            string,
+            HashSet<EventSubOperationSubscriptionKind>
+        > _nativeTwitchFeatures = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, Queue<Exception>> _completeStopFailures = new(
             StringComparer.OrdinalIgnoreCase
         );
@@ -208,7 +209,31 @@ public abstract partial class EventSubChannelRecoveryTestBase
 
         internal void SetNativeTwitchEnabled(string channel, bool enabled)
         {
-            _nativeTwitchEnabled[channel] = enabled;
+            _nativeTwitchFeatures[channel] = enabled
+                ? Enum.GetValues<EventSubOperationSubscriptionKind>().ToHashSet()
+                : [];
+        }
+
+        internal void SetNativeTwitchFeatureEnabled(
+            string channel,
+            EventSubOperationSubscriptionKind kind,
+            bool enabled
+        )
+        {
+            if (!_nativeTwitchFeatures.TryGetValue(channel, out var features))
+            {
+                features = [];
+                _nativeTwitchFeatures[channel] = features;
+            }
+
+            if (enabled)
+            {
+                features.Add(kind);
+            }
+            else
+            {
+                features.Remove(kind);
+            }
         }
 
         public IO<BotAccount, AccessTokenUnavailableReason> ResolveAccount(
@@ -297,12 +322,16 @@ public abstract partial class EventSubChannelRecoveryTestBase
             return ValueTask.FromResult(outcome);
         }
 
-        public ValueTask<bool> NativeTwitchIsEnabledAsync(
+        public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
             string channel,
+            EventSubOperationSubscriptionKind kind,
             CancellationToken cancellationToken
         )
         {
-            return ValueTask.FromResult(_nativeTwitchEnabled.GetValueOrDefault(channel));
+            return ValueTask.FromResult(
+                _nativeTwitchFeatures.TryGetValue(channel, out var features)
+                    && features.Contains(kind)
+            );
         }
 
         public ValueTask NotifyChannelStartedAsync(

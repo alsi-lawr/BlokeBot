@@ -135,12 +135,23 @@ internal sealed class EventSubChannelOperations(
         );
     }
 
-    public ValueTask<bool> NativeTwitchIsEnabledAsync(
+    public ValueTask<bool> NativeTwitchFeatureIsEnabledAsync(
         string channel,
+        EventSubOperationSubscriptionKind kind,
         CancellationToken cancellationToken
     )
     {
-        return nativeTwitch.IsEnabledAsync(channel, cancellationToken);
+        var feature = kind switch
+        {
+            EventSubOperationSubscriptionKind.Shoutouts
+            or EventSubOperationSubscriptionKind.Raids => NativeTwitchFeature.Shoutouts,
+            EventSubOperationSubscriptionKind.Polls => NativeTwitchFeature.Polls,
+            EventSubOperationSubscriptionKind.RewardRedemptions =>
+                NativeTwitchFeature.RewardsAndRedemptions,
+            EventSubOperationSubscriptionKind.Predictions => NativeTwitchFeature.Predictions,
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
+        };
+        return nativeTwitch.IsEnabledAsync(channel, feature, cancellationToken);
     }
 
     private async ValueTask<EventSubSubscriptionSetupOutcome> CreateConfiguredBotSubscriptionsAsync(

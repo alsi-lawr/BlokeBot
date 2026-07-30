@@ -19,7 +19,7 @@
                Description="Save a shareable clip or mark a moment to find in your stream recording later."
                Width="DashboardPageWidth.Wide"
                data-native-route="clips-markers">
-    <NativeTwitchToolSwitcher />
+    <NativeTwitchToolSwitcher HostId="@HostId" />
 
     @if (_loadFailed)
     {
@@ -33,7 +33,7 @@
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is ClipMarkerAuthorizationReadiness.Disabled)
     {
-        <NativeTwitchUnavailable />
+        <NativeTwitchUnavailable FeatureName="Clips &amp; markers" />
     }
     else if (_state is not null)
     {

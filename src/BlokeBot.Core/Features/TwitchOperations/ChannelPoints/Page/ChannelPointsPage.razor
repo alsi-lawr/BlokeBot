@@ -21,7 +21,7 @@
                Description="Offer Channel Points rewards and complete or refund viewer requests."
                Width="DashboardPageWidth.Wide"
                data-native-route="channel-points">
-    <NativeTwitchToolSwitcher />
+    <NativeTwitchToolSwitcher HostId="@HostId" />
 
     @if (_loadFailed)
     {
@@ -35,7 +35,7 @@
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is ChannelPointsAuthorizationReadiness.Disabled)
     {
-        <NativeTwitchUnavailable />
+        <NativeTwitchUnavailable FeatureName="Rewards &amp; redemptions" />
     }
     else if (_state is not null)
     {

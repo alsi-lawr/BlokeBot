@@ -1,5 +1,9 @@
 using BlokeBot.Commands;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.PlayWithViewers;
 
@@ -17,8 +21,10 @@ public interface IPrivateLobbyDelivery
     );
 }
 
-public sealed class TwitchPrivateLobbyDelivery(WhisperCommandResponseSender whispers)
-    : IPrivateLobbyDelivery
+public sealed class TwitchPrivateLobbyDelivery(
+    WhisperCommandResponseSender whispers,
+    IDbContextFactory<BlokeBotDbContext> dbFactory
+) : IPrivateLobbyDelivery
 {
     public async Task<IReadOnlyList<PrivateLobbyDeliveryOutcome>> DeliverAsync(
         string hostLogin,
@@ -32,6 +38,17 @@ public sealed class TwitchPrivateLobbyDelivery(WhisperCommandResponseSender whis
         if (lobbyCode.Length > 500)
         {
             throw new ArgumentOutOfRangeException(nameof(lobbyCode));
+        }
+        if (
+            !await HostFeatureAvailability.IsEnabledAsync(
+                dbFactory,
+                hostLogin,
+                HostFeatureFlags.PlayWithViewers,
+                ct
+            )
+        )
+        {
+            return [];
         }
 
         var outcomes = new List<PrivateLobbyDeliveryOutcome>(recipients.Count);

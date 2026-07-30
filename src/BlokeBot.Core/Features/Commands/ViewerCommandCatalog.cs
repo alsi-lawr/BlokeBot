@@ -116,24 +116,34 @@ public sealed class ViewerCommandCatalogService(
                 value => value.HostId == hostId && value.Status == PointsGiveawayStatus.Active,
                 ct
             );
-        var boards = await db
-            .RequestBoards.AsNoTracking()
-            .Where(value => value.HostId == hostId)
-            .Select(value => new { value.IsOpen, value.VotingEnabled })
-            .ToArrayAsync(ct);
-        var queues = await db
-            .PlayQueues.AsNoTracking()
-            .Where(value => value.HostId == hostId)
-            .Select(value => value.IsOpen)
-            .ToArrayAsync(ct);
-        var customCommands = await db
-            .CustomCommands.AsNoTracking()
-            .Include(value => value.Aliases)
-            .Where(value => value.HostId == hostId)
-            .ToArrayAsync(ct);
+        var boards = enabledFeatures.Contains(HostFeatureFlags.RequestBoards)
+            ? await db
+                .RequestBoards.AsNoTracking()
+                .Where(value => value.HostId == hostId)
+                .Select(value => new { value.IsOpen, value.VotingEnabled })
+                .ToArrayAsync(ct)
+            : [];
+        var queues = enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers)
+            ? await db
+                .PlayQueues.AsNoTracking()
+                .Where(value => value.HostId == hostId)
+                .Select(value => value.IsOpen)
+                .ToArrayAsync(ct)
+            : [];
+        var customCommands = enabledFeatures.Contains(HostFeatureFlags.CustomCommands)
+            ? await db
+                .CustomCommands.AsNoTracking()
+                .Include(value => value.Aliases)
+                .Where(value => value.HostId == hostId)
+                .ToArrayAsync(ct)
+            : [];
 
-        var livenessResult = await streams.GetStreamLiveness(hostLogin).ExecuteAsync(ct);
-        var liveness = livenessResult.Match(value => value, _ => throw new UnreachableException());
+        HostStreamLivenessOutcome liveness = new HostStreamLivenessOutcome.Offline();
+        if (enabledFeatures.Contains(HostFeatureFlags.Moments))
+        {
+            var livenessResult = await streams.GetStreamLiveness(hostLogin).ExecuteAsync(ct);
+            liveness = livenessResult.Match(value => value, _ => throw new UnreachableException());
+        }
         var conflicts = new List<string>();
         if (!string.IsNullOrWhiteSpace(defaultConflictAlias))
         {
@@ -143,7 +153,10 @@ public sealed class ViewerCommandCatalogService(
         }
 
         var unavailable = new List<string>();
-        if (liveness is HostStreamLivenessOutcome.Unavailable)
+        if (
+            enabledFeatures.Contains(HostFeatureFlags.Moments)
+            && liveness is HostStreamLivenessOutcome.Unavailable
+        )
         {
             unavailable.Add(
                 "Moment commands are unavailable while Twitch stream identity is unavailable."
@@ -169,32 +182,43 @@ public sealed class ViewerCommandCatalogService(
             }
         }
 
-        if (boards.Length > 0)
+        if (enabledFeatures.Contains(HostFeatureFlags.RequestBoards) && boards.Length > 0)
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Requests));
         }
-        if (boards.Any(value => value.IsOpen))
+        if (
+            enabledFeatures.Contains(HostFeatureFlags.RequestBoards)
+            && boards.Any(value => value.IsOpen)
+        )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Request));
         }
-        if (boards.Any(value => value.VotingEnabled))
+        if (
+            enabledFeatures.Contains(HostFeatureFlags.RequestBoards)
+            && boards.Any(value => value.VotingEnabled)
+        )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.RequestVote));
         }
 
-        if (queues.Length > 0)
+        if (enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Length > 0)
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Queue));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Leave));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Position));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Ready));
         }
-        if (queues.Any(value => value))
+        if (
+            enabledFeatures.Contains(HostFeatureFlags.PlayWithViewers) && queues.Any(value => value)
+        )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Join));
         }
 
-        if (liveness is HostStreamLivenessOutcome.Live)
+        if (
+            enabledFeatures.Contains(HostFeatureFlags.Moments)
+            && liveness is HostStreamLivenessOutcome.Live
+        )
         {
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Moment));
             candidates.Add(Candidate.Fixed(FixedChatCommandRoutes.Clip));

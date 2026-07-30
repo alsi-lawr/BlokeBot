@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
 using BlokeBot.Core.Features.Toasts;
+using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.TwitchOperations.Shoutouts;
 
@@ -48,13 +49,22 @@ public partial class ShoutoutsPage
         {
             await LoadPageContextAsync();
             _nativeTwitchEnabled =
-                HostId != 0 && await _nativeTwitch.IsEnabledAsync(HostId, CancellationToken.None);
+                HostId != 0
+                && await _nativeTwitch.IsEnabledAsync(
+                    HostId,
+                    HostFeatureFlags.Shoutouts,
+                    CancellationToken.None
+                );
             var state = _nativeTwitchEnabled
                 ? await _shoutouts.LoadAsync(HostId, _targetLogin, CancellationToken.None)
                 : null;
             _nativeTwitchEnabled =
                 state is not null
-                && await _nativeTwitch.IsEnabledAsync(HostId, CancellationToken.None);
+                && await _nativeTwitch.IsEnabledAsync(
+                    HostId,
+                    HostFeatureFlags.Shoutouts,
+                    CancellationToken.None
+                );
             _state = _nativeTwitchEnabled ? state : null;
         }
         catch (Exception exception)

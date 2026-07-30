@@ -833,6 +833,7 @@ public sealed class CustomCommandConfigurationTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             CreatedAtUtc = DateTime.UtcNow,

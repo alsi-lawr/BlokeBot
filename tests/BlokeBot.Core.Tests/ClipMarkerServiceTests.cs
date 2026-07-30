@@ -31,7 +31,7 @@ public sealed class ClipMarkerServiceTests
                 Login = "one",
                 DisplayName = "One",
                 TwitchUserId = "one-id",
-                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.NativeTwitch,
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.ClipsAndMarkers,
             };
             db.Hosts.Add(host);
             await db.SaveChangesAsync();
@@ -71,7 +71,7 @@ public sealed class ClipMarkerServiceTests
                 TwitchClipStatus.Pending
             );
             var host = await verifyDisabled.Hosts.SingleAsync();
-            host.EnabledFeatures |= HostFeatureFlags.NativeTwitch;
+            host.EnabledFeatures |= HostFeatureFlags.ClipsAndMarkers;
             await verifyDisabled.SaveChangesAsync();
         }
 
@@ -83,6 +83,78 @@ public sealed class ClipMarkerServiceTests
     }
 
     [Test]
+    public async Task Reconciliation_UsesTheOwningSwitchAndClipDashboardHidesMomentAttempts()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 26, 10, 0, 0, TimeSpan.Zero));
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                Login = "one",
+                DisplayName = "One",
+                TwitchUserId = "one-id",
+                EnabledFeatures = HostFeatureFlags.Moments,
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            db.TwitchClips.AddRange(
+                new TwitchClip
+                {
+                    HostId = host.Id,
+                    IdempotencyKey = "clip-attempt",
+                    ProviderClipId = "clip-id",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime,
+                },
+                new TwitchClip
+                {
+                    HostId = host.Id,
+                    IdempotencyKey = "moment:public-id:clip",
+                    ProviderClipId = "clip-id",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime,
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var http = new ClipMarkerHttpClientFactory();
+        var service = CreateService(dbFactory, http, now);
+
+        await service.ReconcileAsync(1, CancellationToken.None);
+
+        http.ClipGets.ShouldBe(1);
+        await using (var verifyMoments = await dbFactory.CreateDbContextAsync())
+        {
+            (
+                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                    clip.IdempotencyKey == "clip-attempt"
+                )
+            ).Status.ShouldBe(TwitchClipStatus.Pending);
+            (
+                await verifyMoments.TwitchClips.SingleAsync(clip =>
+                    clip.IdempotencyKey == "moment:public-id:clip"
+                )
+            ).Status.ShouldBe(TwitchClipStatus.Available);
+            var host = await verifyMoments.Hosts.SingleAsync();
+            host.EnabledFeatures = HostFeatureFlags.ClipsAndMarkers;
+            await verifyMoments.SaveChangesAsync();
+        }
+
+        await service.ReconcileAsync(1, CancellationToken.None);
+
+        http.ClipGets.ShouldBe(2);
+        await using (var enableBoth = await dbFactory.CreateDbContextAsync())
+        {
+            var host = await enableBoth.Hosts.SingleAsync();
+            host.EnabledFeatures = HostFeatureFlags.ClipsAndMarkers | HostFeatureFlags.Moments;
+            await enableBoth.SaveChangesAsync();
+        }
+        var state = await service.LoadAsync(1, CancellationToken.None);
+        state.Results.Count.ShouldBe(1);
+    }
+
+    [Test]
     public async Task ServiceOwnedAttempts_ReloadTypedRetryKeepsHostIsolationAndDoesNotRepeatMutations()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -91,12 +163,14 @@ public sealed class ClipMarkerServiceTests
             db.Hosts.AddRange(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",
                 },
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "two",
                     DisplayName = "Two",
                     TwitchUserId = "two-id",
@@ -261,6 +335,7 @@ public sealed class ClipMarkerServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",
@@ -317,6 +392,7 @@ public sealed class ClipMarkerServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "one",
                     DisplayName = "One",
                     TwitchUserId = "one-id",

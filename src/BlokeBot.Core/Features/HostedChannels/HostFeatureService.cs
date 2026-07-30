@@ -74,7 +74,7 @@ public sealed class HostFeatureService(
         CancellationToken ct
     )
     {
-        if (feature is HostFeatureFlags.None or HostFeatureFlags.All)
+        if (!HostFeatureCatalog.IsSelectable(feature))
         {
             throw new ArgumentOutOfRangeException(nameof(feature), feature, null);
         }
@@ -95,17 +95,17 @@ public sealed class HostFeatureService(
         host.EnabledFeatures = updated;
         await db.SaveChangesAsync(ct);
         await changes.NotifyChangedAsync(ct);
-        if (feature is not HostFeatureFlags.NativeTwitch)
+        if (!HostFeatureFlags.NativeTwitchFeatures.Contains(feature))
         {
             return;
         }
 
-        var state = updated.Contains(HostFeatureFlags.NativeTwitch)
+        var state = updated.Contains(feature)
             ? NativeTwitchFeatureState.Enabled
             : NativeTwitchFeatureState.Disabled;
         foreach (var observer in nativeTwitchObservers)
         {
-            await observer.NativeTwitchFeatureChangedAsync(hostId, state, ct);
+            await observer.NativeTwitchFeatureChangedAsync(hostId, feature, state, ct);
         }
     }
 }

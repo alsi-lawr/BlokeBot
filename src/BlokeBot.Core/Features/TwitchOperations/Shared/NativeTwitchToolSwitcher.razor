@@ -1,7 +1,65 @@
 <nav class="native-tool-switcher" aria-label="Native Twitch tools">
+    @if (_shoutouts)
+    {
     <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/shoutouts">Shoutouts</NavLink>
+    }
+    @if (_polls)
+    {
     <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/polls">Polls</NavLink>
+    }
+    @if (_clips)
+    {
     <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/clips-markers">Clips &amp; markers</NavLink>
+    }
+    @if (_rewards)
+    {
     <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/channel-points">Rewards &amp; redemptions</NavLink>
+    }
+    @if (_predictions)
+    {
     <NavLink class="native-tool-switcher__link" ActiveClass="native-tool-switcher__link--current" Match="NavLinkMatch.All" href="twitch-operations/predictions">Predictions</NavLink>
+    }
 </nav>
+
+@code {
+    [Inject]
+    private BlokeBot.Core.Features.HostedChannels.HostFeatureService Features { get; set; } = null!;
+
+    [Parameter]
+    public int HostId { get; set; }
+
+    private bool _shoutouts;
+    private bool _polls;
+    private bool _clips;
+    private bool _rewards;
+    private bool _predictions;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (HostId == 0)
+        {
+            return;
+        }
+
+        var result = await Features.Load(HostId).ExecuteAsync(CancellationToken.None);
+        result.Match(
+            option =>
+            {
+                option.Match(
+                    enabled =>
+                    {
+                        _shoutouts = (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.Shoutouts) == BlokeBot.Persistence.Models.HostFeatureFlags.Shoutouts;
+                        _polls = (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.Polls) == BlokeBot.Persistence.Models.HostFeatureFlags.Polls;
+                        _clips = (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.ClipsAndMarkers) == BlokeBot.Persistence.Models.HostFeatureFlags.ClipsAndMarkers;
+                        _rewards = (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.RewardsAndRedemptions) == BlokeBot.Persistence.Models.HostFeatureFlags.RewardsAndRedemptions;
+                        _predictions = (enabled & BlokeBot.Persistence.Models.HostFeatureFlags.Predictions) == BlokeBot.Persistence.Models.HostFeatureFlags.Predictions;
+                        return true;
+                    },
+                    () => false
+                );
+                return true;
+            },
+            _ => false
+        );
+    }
+}

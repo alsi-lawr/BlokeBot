@@ -103,6 +103,7 @@ public sealed class NativeTwitchFeatureChangeObserverTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "channel",
                     DisplayName = "Channel",
                     TwitchUserId = "channel-id",
@@ -159,6 +160,19 @@ public sealed class NativeTwitchFeatureChangeObserverTests
 
         await observer.NativeTwitchFeatureChangedAsync(
             1,
+            HostFeatureFlags.Polls,
+            NativeTwitchFeatureState.Enabled,
+            CancellationToken.None
+        );
+        await observer.NativeTwitchFeatureChangedAsync(
+            1,
+            HostFeatureFlags.RewardsAndRedemptions,
+            NativeTwitchFeatureState.Enabled,
+            CancellationToken.None
+        );
+        await observer.NativeTwitchFeatureChangedAsync(
+            1,
+            HostFeatureFlags.Predictions,
             NativeTwitchFeatureState.Enabled,
             CancellationToken.None
         );

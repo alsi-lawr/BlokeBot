@@ -19,6 +19,57 @@ namespace BlokeBot.Core.Tests;
 public sealed class PollServiceTests
 {
     [Test]
+    public async Task DisabledSwitch_RetainsTemplatesAndSuppressesMutationsAndInboundEvents()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            var host = new BotHost
+            {
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.Polls,
+                Login = "host",
+                DisplayName = "Host",
+                TwitchUserId = "host-id",
+            };
+            db.Hosts.Add(host);
+            await db.SaveChangesAsync();
+            db.TwitchPollTemplates.Add(Template(host.Id, "Retained template"));
+            await db.SaveChangesAsync();
+        }
+        var http = new PollHttpClientFactory();
+        var service = CreateService(dbFactory, http);
+
+        var state = await service.LoadAsync(1, CancellationToken.None);
+        var save = await service.SaveTemplateAsync(
+            1,
+            new PollTemplateDraft("Suppressed", ["Yes", "No"], 60, false, 0),
+            CancellationToken.None
+        );
+        await service.PollReceivedAsync(
+            ProviderPollEvent("ACTIVE", 1, "suppressed-event"),
+            CancellationToken.None
+        );
+
+        state.Authorization.ShouldBeOfType<PollAuthorizationReadiness.Disabled>();
+        state.Templates.ShouldBeEmpty();
+        save.ShouldBeOfType<PollOperationOutcome.NotReady>();
+        http.CreateRequests.ShouldBe(0);
+        await using (var verifyDisabled = await dbFactory.CreateDbContextAsync())
+        {
+            (await verifyDisabled.TwitchPollTemplates.CountAsync()).ShouldBe(1);
+            (await verifyDisabled.TwitchPolls.CountAsync()).ShouldBe(0);
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.Polls;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        var restored = await service.LoadAsync(1, CancellationToken.None);
+        restored.Templates.ShouldHaveSingleItem().Title.ShouldBe("Retained template");
+        restored.ActivePoll.ShouldBeNull();
+        http.CreateRequests.ShouldBe(0);
+    }
+
+    [Test]
     public async Task PollCreation_MapsActiveConflictAndRejectsVotingCostsAboveOneMillionBeforePersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -27,6 +78,7 @@ public sealed class PollServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -81,6 +133,7 @@ public sealed class PollServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -125,6 +178,7 @@ public sealed class PollServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -173,6 +227,7 @@ public sealed class PollServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",

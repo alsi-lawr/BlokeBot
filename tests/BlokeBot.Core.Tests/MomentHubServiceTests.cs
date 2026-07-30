@@ -12,6 +12,62 @@ namespace BlokeBot.Core.Tests;
 public sealed class MomentHubServiceTests
 {
     [Test]
+    public async Task DisabledSwitch_RetainsSettingsBlocksProviderAndDoesNotReplayOnReenable()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        var provider = new FakeMomentProvider(database);
+        var service = CreateService(database, provider);
+        _ = Success(
+            await service.ConfigureAsync(
+                hostId,
+                new ConfigureMomentHubCommand(120, true, MomentRewardPolicy.AllContributors, "10"),
+                CancellationToken.None
+            )
+        );
+        int retainedEventCount;
+        await using (var disable = await database.CreateDbContextAsync())
+        {
+            retainedEventCount = await disable.MomentEvents.CountAsync();
+            var host = await disable.Hosts.SingleAsync();
+            host.EnabledFeatures &= ~HostFeatureFlags.Moments;
+            await disable.SaveChangesAsync();
+        }
+
+        var rejected = await service.CaptureAsync(
+            hostId,
+            Capture("stream-live", "viewer"),
+            CancellationToken.None
+        );
+
+        rejected
+            .Match(
+                _ => throw new InvalidOperationException("Expected rejection."),
+                value => value.Reason
+            )
+            .ShouldBeOfType<MomentRejection.FeatureDisabled>();
+        provider.Calls.ShouldBe(0);
+        (await service.GetModeratorPageAsync(hostId, CancellationToken.None)).ShouldBeNull();
+        (await service.GetEventsAsync(hostId, 0, 100, CancellationToken.None)).ShouldBeEmpty();
+        await using (var verifyDisabled = await database.CreateDbContextAsync())
+        {
+            (await verifyDisabled.MomentHubSettings.CountAsync()).ShouldBe(1);
+            (await verifyDisabled.MomentCandidates.CountAsync()).ShouldBe(0);
+            (await verifyDisabled.MomentEvents.CountAsync()).ShouldBe(retainedEventCount);
+            var host = await verifyDisabled.Hosts.SingleAsync();
+            host.EnabledFeatures |= HostFeatureFlags.Moments;
+            await verifyDisabled.SaveChangesAsync();
+        }
+
+        var restored = await service.GetModeratorPageAsync(hostId, CancellationToken.None);
+        restored.ShouldNotBeNull();
+        restored.Settings.MergeWindowSeconds.ShouldBe(120);
+        provider.Calls.ShouldBe(0);
+        await using var verifyEnabled = await database.CreateDbContextAsync();
+        (await verifyEnabled.MomentEvents.CountAsync()).ShouldBe(retainedEventCount);
+    }
+
+    [Test]
     public async Task NearbyCaptures_ClusterByExactHostAndStreamAndPersistEveryRequest()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -275,7 +331,7 @@ public sealed class MomentHubServiceTests
         merged.Value.Public.Contributors.Count.ShouldBe(2);
         publicPage.ShouldNotBeNull();
         publicPage.ToString().ShouldNotContain("PRIVATE-");
-        moderatorPage
+        moderatorPage!
             .Candidates.Single(value => value.Public.PublicId == rejected.PublicId)
             .PrivateRejectionReason.ShouldBe("PRIVATE-REJECTION-REASON");
         await using var verify = await database.CreateDbContextAsync();
@@ -695,6 +751,7 @@ public sealed class MomentHubServiceTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = login,
             DisplayName = login,
             TwitchUserId = $"{login}-id",

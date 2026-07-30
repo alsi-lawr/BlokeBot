@@ -20,7 +20,7 @@
                Description="Ask viewers a question, watch the votes, and end voting when you are ready."
                Width="DashboardPageWidth.Wide"
                data-native-route="polls">
-    <NativeTwitchToolSwitcher />
+    <NativeTwitchToolSwitcher HostId="@HostId" />
 
     @if (_loadFailed)
     {
@@ -34,7 +34,7 @@
     }
     else if (!_nativeTwitchEnabled || _state?.Authorization is PollAuthorizationReadiness.Disabled)
     {
-        <NativeTwitchUnavailable />
+        <NativeTwitchUnavailable FeatureName="Polls" />
     }
     else if (_state is not null)
     {

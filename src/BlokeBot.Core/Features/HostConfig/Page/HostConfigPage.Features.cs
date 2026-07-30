@@ -35,7 +35,14 @@ public partial class HostConfigPage
             {
                 HostFeatureFlags.Points => "feature-toggle-card__icon text-emerald-600",
                 HostFeatureFlags.CustomCommands => "feature-toggle-card__icon text-violet-600",
-                HostFeatureFlags.NativeTwitch => "feature-toggle-card__icon text-purple-700",
+                HostFeatureFlags.Shoutouts
+                or HostFeatureFlags.Polls
+                or HostFeatureFlags.ClipsAndMarkers
+                or HostFeatureFlags.RewardsAndRedemptions
+                or HostFeatureFlags.Predictions => "feature-toggle-card__icon text-purple-700",
+                HostFeatureFlags.RequestBoards => "feature-toggle-card__icon text-sky-700",
+                HostFeatureFlags.PlayWithViewers => "feature-toggle-card__icon text-emerald-700",
+                HostFeatureFlags.Moments => "feature-toggle-card__icon text-violet-700",
                 HostFeatureFlags.Overlays => "feature-toggle-card__icon text-blue-600",
                 _ => "feature-toggle-card__icon text-blue-600",
             }
@@ -71,9 +78,28 @@ public partial class HostConfigPage
                     <path d="m16 14 3 3-3 3" />
                 </svg>
                 """,
-                HostFeatureFlags.NativeTwitch => """
+                HostFeatureFlags.Shoutouts
+                or HostFeatureFlags.Polls
+                or HostFeatureFlags.ClipsAndMarkers
+                or HostFeatureFlags.RewardsAndRedemptions
+                or HostFeatureFlags.Predictions => """
                 <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m13 2-7 11h6l-1 9 7-12h-6l1-8Z" />
+                </svg>
+                """,
+                HostFeatureFlags.RequestBoards => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M5 6h14M5 12h14M5 18h14" />
+                </svg>
+                """,
+                HostFeatureFlags.PlayWithViewers => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="7" r="3" /><path d="M6 20c0-4 2-6 6-6s6 2 6 6" />
+                </svg>
+                """,
+                HostFeatureFlags.Moments => """
+                <svg class="h-5 w-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.9]" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m12 3 3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6Z" />
                 </svg>
                 """,
                 HostFeatureFlags.Overlays => """
@@ -172,7 +198,14 @@ public partial class HostConfigPage
             HostFeatureFlags.Guessing => "Guessing game",
             HostFeatureFlags.Points => "Points",
             HostFeatureFlags.CustomCommands => "Custom commands",
-            HostFeatureFlags.NativeTwitch => "Native Twitch",
+            HostFeatureFlags.Shoutouts => "Shoutouts",
+            HostFeatureFlags.Polls => "Polls",
+            HostFeatureFlags.ClipsAndMarkers => "Clips & markers",
+            HostFeatureFlags.RewardsAndRedemptions => "Rewards & redemptions",
+            HostFeatureFlags.Predictions => "Predictions",
+            HostFeatureFlags.RequestBoards => "Request boards",
+            HostFeatureFlags.PlayWithViewers => "Play with viewers",
+            HostFeatureFlags.Moments => "Moments",
             HostFeatureFlags.Overlays => "Overlays",
             _ => "Feature",
         };

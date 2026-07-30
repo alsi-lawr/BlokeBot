@@ -258,6 +258,7 @@ public sealed class ChannelBotAuthorizationTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             TwitchUserId = twitchUserId,
             Login = login,
             DisplayName = login,

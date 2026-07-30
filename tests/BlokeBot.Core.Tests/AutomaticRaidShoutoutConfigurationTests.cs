@@ -106,6 +106,7 @@ public sealed class AutomaticRaidShoutoutConfigurationTests
         await using var db = await factory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             TwitchUserId = $"{login}-id",
             Login = login,
             DisplayName = login,

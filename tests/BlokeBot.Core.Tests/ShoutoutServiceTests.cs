@@ -29,7 +29,7 @@ public sealed class ShoutoutServiceTests
                 Login = "host",
                 DisplayName = "Host",
                 TwitchUserId = "host-id",
-                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.NativeTwitch,
+                EnabledFeatures = HostFeatureFlags.All & ~HostFeatureFlags.Shoutouts,
             };
             db.Hosts.Add(host);
             await db.SaveChangesAsync();
@@ -80,7 +80,7 @@ public sealed class ShoutoutServiceTests
         {
             (await verifyDisabled.ShoutoutHistory.CountAsync()).ShouldBe(1);
             var host = await verifyDisabled.Hosts.SingleAsync();
-            host.EnabledFeatures |= HostFeatureFlags.NativeTwitch;
+            host.EnabledFeatures |= HostFeatureFlags.Shoutouts;
             await verifyDisabled.SaveChangesAsync();
         }
 
@@ -101,12 +101,14 @@ public sealed class ShoutoutServiceTests
             db.Hosts.AddRange(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "first",
                     DisplayName = "First",
                     TwitchUserId = "first-id",
                 },
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "second",
                     DisplayName = "Second",
                     TwitchUserId = "second-id",
@@ -165,6 +167,7 @@ public sealed class ShoutoutServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",
@@ -264,6 +267,7 @@ public sealed class ShoutoutServiceTests
             db.Hosts.Add(
                 new BotHost
                 {
+                    EnabledFeatures = HostFeatureFlags.All,
                     Login = "host",
                     DisplayName = "Host",
                     TwitchUserId = "host-id",

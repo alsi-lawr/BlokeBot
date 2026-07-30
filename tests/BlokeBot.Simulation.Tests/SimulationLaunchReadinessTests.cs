@@ -122,6 +122,9 @@ public sealed class SimulationLaunchReadinessTests
             .App.Services.GetRequiredService<SimulationStartupCoordinator>()
             .BootstrapAsync(simulation.App, CancellationToken.None);
         using var client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5082") };
+        var database = simulation.App.Services.GetRequiredService<
+            IDbContextFactory<BlokeBotDbContext>
+        >();
 
         using var initial = await client.GetFromJsonAsync<JsonDocument>(
             "/simulation/commands/catalog"
@@ -146,6 +149,30 @@ public sealed class SimulationLaunchReadinessTests
         (
             await client.PostAsync("/simulation/commands/giveaway/inactive", null)
         ).StatusCode.ShouldBe(HttpStatusCode.OK);
+        foreach (
+            var (state, expected) in new[]
+            {
+                ("all-disabled", HostFeatureFlags.None),
+                ("selective-native", HostFeatureFlags.Shoutouts | HostFeatureFlags.Predictions),
+                (
+                    "mixed",
+                    HostFeatureFlags.RequestBoards
+                        | HostFeatureFlags.Moments
+                        | HostFeatureFlags.Points
+                        | HostFeatureFlags.CustomCommands
+                ),
+                ("all-enabled", HostFeatureFlags.All),
+            }
+        )
+        {
+            (
+                await client.PostAsync($"/simulation/commands/features/{state}", null)
+            ).StatusCode.ShouldBe(HttpStatusCode.OK);
+            await using var verify = await database.CreateDbContextAsync();
+            (await verify.Hosts.Select(host => host.EnabledFeatures).SingleAsync()).ShouldBe(
+                expected
+            );
+        }
         (
             await client.PostAsync("/simulation/commands/features/unavailable", null)
         ).StatusCode.ShouldBe(HttpStatusCode.OK);

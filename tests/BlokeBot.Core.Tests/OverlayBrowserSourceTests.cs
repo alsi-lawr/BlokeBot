@@ -615,6 +615,7 @@ public sealed class OverlayBrowserSourceTests
             await using var db = await database.CreateDbContextAsync();
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 TwitchUserId = $"{login}-id",
                 Login = login,
                 DisplayName = login,

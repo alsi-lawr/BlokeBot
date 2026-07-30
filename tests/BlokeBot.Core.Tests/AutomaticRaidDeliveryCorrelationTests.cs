@@ -358,6 +358,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         db.Hosts.AddRange(
             new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Id = 1,
                 Login = "first",
                 DisplayName = "First",
@@ -365,6 +366,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
             },
             new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Id = 2,
                 Login = "second",
                 DisplayName = "Second",
@@ -384,6 +386,7 @@ public sealed class AutomaticRaidDeliveryCorrelationTests : PublicChatOutboxInte
         db.Hosts.Add(
             new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 Id = 1,
                 Login = "first",
                 DisplayName = "First",

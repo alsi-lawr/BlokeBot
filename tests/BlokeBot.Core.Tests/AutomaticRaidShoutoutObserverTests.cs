@@ -370,7 +370,7 @@ public sealed class AutomaticRaidShoutoutObserverTests
         await using (var db = await factory.CreateDbContextAsync())
         {
             var host = await db.Hosts.SingleAsync(value => value.Id == hostId);
-            host.EnabledFeatures &= ~HostFeatureFlags.NativeTwitch;
+            host.EnabledFeatures &= ~HostFeatureFlags.Shoutouts;
             await db.SaveChangesAsync();
         }
         var delivery = new RecordingDelivery(new AutomaticRaidShoutoutDeliveryResult.Delivered());

@@ -340,6 +340,7 @@ public abstract class BotOAuthEndpointIntegrationTestBase
             await using var db = await dbFactory.CreateDbContextAsync();
             var host = new BotHost
             {
+                EnabledFeatures = HostFeatureFlags.All,
                 TwitchUserId = "123",
                 Login = "streamer",
                 DisplayName = "Streamer",

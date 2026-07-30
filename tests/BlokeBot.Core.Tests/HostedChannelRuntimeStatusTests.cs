@@ -97,6 +97,7 @@ public sealed class HostedChannelRuntimeStatusTests
         await using var db = await dbFactory.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             ChannelBotAuthorizedAtUtc = DateTime.UtcNow,

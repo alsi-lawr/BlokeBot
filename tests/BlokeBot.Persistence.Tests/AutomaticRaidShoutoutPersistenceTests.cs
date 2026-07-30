@@ -16,7 +16,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
         await using var factory = await SqliteBlokeBotDbFactory.CreateEmptyAsync();
         await using var db = await factory.CreateDbContextAsync();
         await db.Database.MigrateAsync();
-        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(13);
+        db.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(14);
         (await db.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         var hostId = await SeedHostAsync(db, "host");
 
@@ -132,6 +132,7 @@ public sealed class AutomaticRaidShoutoutPersistenceTests
     {
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             TwitchUserId = $"{login}-id",
             Login = login,
             DisplayName = login,

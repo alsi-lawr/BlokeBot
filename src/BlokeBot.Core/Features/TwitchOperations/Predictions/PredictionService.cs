@@ -69,7 +69,7 @@ public sealed class PredictionService(
 
     public async Task<PredictionDashboardState> LoadAsync(int hostId, CancellationToken ct)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return new(new PredictionAuthorizationReadiness.Disabled(), null, [], []);
         }
@@ -116,7 +116,7 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -156,7 +156,7 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -186,7 +186,7 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -195,7 +195,7 @@ public sealed class PredictionService(
         {
             return new PredictionOperationOutcome.NotReady(_notReadyMessage);
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -216,7 +216,7 @@ public sealed class PredictionService(
         {
             return new PredictionOperationOutcome.TemplateNotFound();
         }
-        if ((host.EnabledFeatures & HostFeatureFlags.NativeTwitch) != HostFeatureFlags.NativeTwitch)
+        if ((host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions)
         {
             return Disabled();
         }
@@ -234,7 +234,7 @@ public sealed class PredictionService(
         {
             return new PredictionOperationOutcome.ActivePredictionExists();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -316,7 +316,7 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -343,7 +343,7 @@ public sealed class PredictionService(
                 "There is no active prediction."
             );
         }
-        if ((host.EnabledFeatures & HostFeatureFlags.NativeTwitch) != HostFeatureFlags.NativeTwitch)
+        if ((host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions)
         {
             return Disabled();
         }
@@ -357,7 +357,7 @@ public sealed class PredictionService(
         {
             return new PredictionOperationOutcome.InvalidOutcome();
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return Disabled();
         }
@@ -397,7 +397,10 @@ public sealed class PredictionService(
             active.IsExternallyStarted
         ).Prediction;
         await db.SaveChangesAsync(ct);
-        if (Terminal(prediction.Status) && await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (
+            Terminal(prediction.Status)
+            && await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct)
+        )
         {
             await TrimAsync(db, hostId, ct);
             await db.SaveChangesAsync(ct);
@@ -426,7 +429,7 @@ public sealed class PredictionService(
 
     public async Task ReconcileAsync(int hostId, CancellationToken ct)
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return;
         }
@@ -440,13 +443,12 @@ public sealed class PredictionService(
         var host = await db.Hosts.SingleOrDefaultAsync(x => x.Id == hostId, ct);
         if (
             host?.TwitchUserId is not { Length: > 0 } id
-            || (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
-                != HostFeatureFlags.NativeTwitch
+            || (host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions
         )
         {
             return;
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return;
         }
@@ -456,7 +458,7 @@ public sealed class PredictionService(
             id,
             ct
         );
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return;
         }
@@ -494,7 +496,13 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(prediction.BroadcasterUserLogin, ct))
+        if (
+            !await nativeTwitch.IsEnabledAsync(
+                prediction.BroadcasterUserLogin,
+                HostFeatureFlags.Predictions,
+                ct
+            )
+        )
         {
             return;
         }
@@ -508,8 +516,7 @@ public sealed class PredictionService(
         );
         if (
             host is null
-            || (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
-                != HostFeatureFlags.NativeTwitch
+            || (host.EnabledFeatures & HostFeatureFlags.Predictions) != HostFeatureFlags.Predictions
             || prediction.ToHelix().Status is HelixPredictionStatus.Unknown
         )
         {
@@ -572,7 +579,13 @@ public sealed class PredictionService(
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(1), ProgressTimeProvider);
-            if (!await nativeTwitch.IsEnabledAsync(hostId, CancellationToken.None))
+            if (
+                !await nativeTwitch.IsEnabledAsync(
+                    hostId,
+                    HostFeatureFlags.Predictions,
+                    CancellationToken.None
+                )
+            )
             {
                 _pendingProgress.TryRemove(hostId, out _);
                 decision = PredictionProgressFlushDecision.SkippedNativeTwitchDisabled;
@@ -626,7 +639,7 @@ public sealed class PredictionService(
         CancellationToken ct
     )
     {
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return new PredictionAuthorizationReadiness.Disabled();
         }
@@ -637,7 +650,7 @@ public sealed class PredictionService(
                 _notReadyMessage
             );
         }
-        if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
+        if (!await nativeTwitch.IsEnabledAsync(hostId, HostFeatureFlags.Predictions, ct))
         {
             return new PredictionAuthorizationReadiness.Disabled();
         }
@@ -683,8 +696,8 @@ public sealed class PredictionService(
         return db.Hosts.AnyAsync(
             host =>
                 host.Id == hostId
-                && (host.EnabledFeatures & HostFeatureFlags.NativeTwitch)
-                    == HostFeatureFlags.NativeTwitch,
+                && (host.EnabledFeatures & HostFeatureFlags.Predictions)
+                    == HostFeatureFlags.Predictions,
             ct
         );
     }

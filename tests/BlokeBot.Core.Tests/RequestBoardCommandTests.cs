@@ -87,6 +87,28 @@ public sealed class RequestBoardCommandTests
         (
             await boardService.GetModeratorSubmissionAsync(hostId, 1, CancellationToken.None)
         )!.Public.VoteCount.ShouldBe(1);
+
+        await using (var disable = await database.CreateDbContextAsync())
+        {
+            var host = await disable.Hosts.SingleAsync();
+            host.EnabledFeatures &= ~HostFeatureFlags.RequestBoards;
+            await disable.SaveChangesAsync();
+        }
+        var responseCount = responses.Count;
+        await DispatchAsync(dispatcher, Message("viewer", "!requests games"), responses);
+        await DispatchAsync(
+            dispatcher,
+            Message(
+                "viewer",
+                "!request games Suppressed request",
+                new Dictionary<string, string> { ["id"] = Guid.NewGuid().ToString() }
+            ),
+            responses
+        );
+
+        responses.Count.ShouldBe(responseCount);
+        await using var verifyDisabled = await database.CreateDbContextAsync();
+        (await verifyDisabled.RequestSubmissions.CountAsync()).ShouldBe(1);
     }
 
     private static async Task DispatchAsync(
@@ -126,6 +148,7 @@ public sealed class RequestBoardCommandTests
         await using var db = await database.CreateDbContextAsync();
         var host = new BotHost
         {
+            EnabledFeatures = HostFeatureFlags.All,
             Login = "streamer",
             DisplayName = "Streamer",
             CreatedAtUtc = DateTime.UtcNow,

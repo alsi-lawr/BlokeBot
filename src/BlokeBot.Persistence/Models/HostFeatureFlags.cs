@@ -7,7 +7,28 @@ public enum HostFeatureFlags : ulong
     Guessing = 1UL << 0,
     Points = 1UL << 1,
     CustomCommands = 1UL << 2,
-    NativeTwitch = 1UL << 3,
+    Shoutouts = 1UL << 3,
     Overlays = 1UL << 4,
-    All = Guessing | Points | CustomCommands | NativeTwitch | Overlays,
+    RequestBoards = 1UL << 5,
+    PlayWithViewers = 1UL << 6,
+    Moments = 1UL << 7,
+    Polls = 1UL << 8,
+    ClipsAndMarkers = 1UL << 9,
+    RewardsAndRedemptions = 1UL << 10,
+    Predictions = 1UL << 11,
+    NativeTwitchFeatures =
+        Shoutouts | Polls | ClipsAndMarkers | RewardsAndRedemptions | Predictions,
+    All =
+        Guessing
+        | Points
+        | CustomCommands
+        | Shoutouts
+        | Overlays
+        | RequestBoards
+        | PlayWithViewers
+        | Moments
+        | Polls
+        | ClipsAndMarkers
+        | RewardsAndRedemptions
+        | Predictions,
 }

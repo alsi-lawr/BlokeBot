@@ -1,5 +1,6 @@
 using System.Globalization;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Persistence.Models;
 
 namespace BlokeBot.Core.Features.RequestBoards;
@@ -17,6 +18,7 @@ public partial class RequestBoardsPage
     private long _primaryFocusRequest;
     private bool _isCreating = true;
     private bool _operationFailed;
+    private bool _featureEnabled;
 
     private string _publicBoardUrl =>
         $"/requests/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
@@ -24,6 +26,17 @@ public partial class RequestBoardsPage
     protected override async Task OnInitializedAsync()
     {
         await LoadPageContextAsync();
+        _featureEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.RequestBoards,
+                CancellationToken.None
+            );
+        if (!_featureEnabled)
+        {
+            return;
+        }
         await LoadBoardsAsync();
     }
 

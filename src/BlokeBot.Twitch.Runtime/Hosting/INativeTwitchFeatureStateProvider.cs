@@ -2,5 +2,17 @@ namespace BlokeBot.Twitch.Runtime;
 
 public interface INativeTwitchFeatureStateProvider
 {
-    ValueTask<bool> IsEnabledAsync(string channel, CancellationToken cancellationToken);
+    ValueTask<bool> IsEnabledAsync(
+        string channel,
+        NativeTwitchFeature feature,
+        CancellationToken cancellationToken
+    );
+}
+
+public enum NativeTwitchFeature
+{
+    Shoutouts,
+    Polls,
+    RewardsAndRedemptions,
+    Predictions,
 }

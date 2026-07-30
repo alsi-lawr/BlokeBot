@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BlokeBot.Core.Components;
+using BlokeBot.Core.Features.HostedChannels;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Persistence.Models;
 
@@ -17,12 +18,24 @@ public partial class MomentsPage
     private string _streamStatus = "Checking live stream…";
     private string _feedback = string.Empty;
     private bool _failed;
+    private bool _featureEnabled;
 
     private string _weeklyUrl => $"/moments/{Uri.EscapeDataString(HostLogin)}";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadPageContextAsync();
+        _featureEnabled =
+            HostId != 0
+            && await _features.IsEnabledAsync(
+                HostId,
+                HostFeatureFlags.Moments,
+                CancellationToken.None
+            );
+        if (!_featureEnabled)
+        {
+            return;
+        }
         await ReloadAsync();
     }
 
@@ -33,6 +46,10 @@ public partial class MomentsPage
             return;
         }
         _page = await _moments.GetModeratorPageAsync(HostId, CancellationToken.None);
+        if (_page is null)
+        {
+            return;
+        }
         _mergeWindow = _page.Settings.MergeWindowSeconds.ToString();
         _markerFallback = _page.Settings.MarkerFallbackEnabled;
         _rewardPolicy = _page.Settings.RewardPolicy;

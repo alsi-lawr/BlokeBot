@@ -67,12 +67,25 @@ public sealed class NativeEventDispatchTests
         channelPoints.Deliveries.ShouldBe(0);
         predictions.Deliveries.ShouldBe(0);
 
-        gate.Enabled = true;
+        gate.EnabledFeatures.Add(NativeTwitchFeature.RewardsAndRedemptions);
         await session.DispatchRewardRedemptionAsync(redemption, CancellationToken.None);
         await session.DispatchPredictionAsync(prediction, CancellationToken.None);
 
         channelPoints.Deliveries.ShouldBe(1);
+        predictions.Deliveries.ShouldBe(0);
+
+        gate.EnabledFeatures.Add(NativeTwitchFeature.Predictions);
+        await session.DispatchPredictionAsync(prediction, CancellationToken.None);
+
         predictions.Deliveries.ShouldBe(1);
+        gate.Requests.Select(request => request.Feature)
+            .ShouldBe([
+                NativeTwitchFeature.RewardsAndRedemptions,
+                NativeTwitchFeature.Predictions,
+                NativeTwitchFeature.RewardsAndRedemptions,
+                NativeTwitchFeature.Predictions,
+                NativeTwitchFeature.Predictions,
+            ]);
     }
 
     [Test]
@@ -164,17 +177,25 @@ public sealed class NativeEventDispatchTests
 
     private sealed class MutableNativeTwitchFeatureStateProvider : INativeTwitchFeatureStateProvider
     {
-        internal bool Enabled { get; set; }
+        internal HashSet<NativeTwitchFeature> EnabledFeatures { get; } = [];
 
         internal string? EnabledChannel { get; init; }
 
         internal List<string> Channels { get; } = [];
 
-        public ValueTask<bool> IsEnabledAsync(string channel, CancellationToken cancellationToken)
+        internal List<(string Channel, NativeTwitchFeature Feature)> Requests { get; } = [];
+
+        public ValueTask<bool> IsEnabledAsync(
+            string channel,
+            NativeTwitchFeature feature,
+            CancellationToken cancellationToken
+        )
         {
             Channels.Add(channel);
+            Requests.Add((channel, feature));
             return ValueTask.FromResult(
-                Enabled || channel.Equals(EnabledChannel, StringComparison.OrdinalIgnoreCase)
+                EnabledFeatures.Contains(feature)
+                    || channel.Equals(EnabledChannel, StringComparison.OrdinalIgnoreCase)
             );
         }
     }
