@@ -91,9 +91,49 @@ public sealed class FakeTwitchIntegrationTests
         user.ShouldNotBeNull();
         user.Id.ShouldBe("1000");
         user.BroadcasterType.ShouldBe("affiliate");
-        var stream = await helix.GetStreamAsync(context, "samplechannel", CancellationToken.None);
+        var stream = await helix.GetStreamAsync(
+            new HelixRequestContext(FakeTwitchScenarioDefinition.ReadyDashboard.ClientId, appToken),
+            "samplechannel",
+            CancellationToken.None
+        );
         stream.ShouldNotBeNull();
         stream.ViewerCount.ShouldBe(42);
+        var broadcasterContext = new HelixRequestContext(
+            FakeTwitchScenarioDefinition.ReadyDashboard.ClientId,
+            FakeTwitchAuthority.BroadcasterAccessToken
+        );
+        var clip = await helix.CreateClipAsync(
+            broadcasterContext,
+            "1000",
+            false,
+            CancellationToken.None
+        );
+        var createdClip = clip.ShouldBeOfType<HelixClipCreateOutcome.Created>().Clip;
+        var clipLookup = await helix.GetClipAsync(
+            broadcasterContext,
+            createdClip.Id,
+            CancellationToken.None
+        );
+        clipLookup
+            .ShouldBeOfType<HelixClipLookupOutcome.Found>()
+            .Clip.Url.ShouldStartWith("https://clips.twitch.tv/fake-clip-");
+        var marker = await helix.CreateStreamMarkerAsync(
+            broadcasterContext,
+            "1000",
+            "Fake marker",
+            CancellationToken.None
+        );
+        var createdMarker = marker.ShouldBeOfType<HelixStreamMarkerCreateOutcome.Created>().Marker;
+        var markerLookup = await helix.GetStreamMarkersAsync(
+            broadcasterContext,
+            "1000",
+            new HashSet<string>(StringComparer.Ordinal) { createdMarker.Id },
+            CancellationToken.None
+        );
+        markerLookup
+            .ShouldBeOfType<HelixStreamMarkerLookupOutcome.Found>()
+            .Markers.ShouldHaveSingleItem()
+            .Id.ShouldBe(createdMarker.Id);
 
         var observedChat = new RecordingChatObserver();
         var observedPolls = new RecordingPollObserver();

@@ -11,4 +11,5 @@ public enum AppEventKind
     TwitchOperationsChanged,
     RequestBoardsChanged,
     PlayQueuesChanged,
+    MomentsChanged,
 }

@@ -25,6 +25,7 @@ using BlokeBot.Core.Features.HostedChannels.Authorization;
 using BlokeBot.Core.Features.HostedChannels.Runtime;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.HostedChannels.Whispers;
+using BlokeBot.Core.Features.Moments;
 using BlokeBot.Core.Features.PlayWithViewers;
 using BlokeBot.Core.Features.Points;
 using BlokeBot.Core.Features.Points.Balances;
@@ -65,6 +66,14 @@ public static class BlokeBotFeatureServiceCollectionExtensions
     {
         services.AddSingleton<PlayQueueService>();
         services.AddSingleton<IPrivateLobbyDelivery, TwitchPrivateLobbyDelivery>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        return services;
+    }
+
+    public static IServiceCollection AddBlokeBotMoments(this IServiceCollection services)
+    {
+        services.AddSingleton<MomentHubService>();
+        services.AddSingleton<IMomentProviderOperations, MomentProviderOperations>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }

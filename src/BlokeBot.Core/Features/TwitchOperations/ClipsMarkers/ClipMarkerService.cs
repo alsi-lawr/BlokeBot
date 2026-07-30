@@ -5,6 +5,7 @@ using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
 using BlokeBot.Twitch;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.TwitchOperations.ClipsMarkers;
@@ -59,12 +60,23 @@ public sealed class ClipMarkerService(
         );
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+    public Task<ClipMarkerOperationOutcome> CreateClipAsync(
         int hostId,
         bool hasDelay,
         CancellationToken ct
     )
     {
+        return CreateClipAsync(hostId, hasDelay, NewAttemptKey(), ct);
+    }
+
+    public async Task<ClipMarkerOperationOutcome> CreateClipAsync(
+        int hostId,
+        bool hasDelay,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -79,6 +91,15 @@ public sealed class ClipMarkerService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var existing = await db.TwitchClips.SingleOrDefaultAsync(
+            clip => clip.HostId == hostId && clip.IdempotencyKey == key,
+            ct
+        );
+        if (existing is not null)
+        {
+            return await ObserveExistingClipAsync(db, existing, ct);
+        }
+
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
         {
@@ -95,12 +116,32 @@ public sealed class ClipMarkerService(
         var clip = new TwitchClip
         {
             HostId = hostId,
-            IdempotencyKey = NewAttemptKey(),
+            IdempotencyKey = key,
             Status = TwitchClipStatus.Pending,
             RequestedAtUtc = now,
         };
         db.TwitchClips.Add(clip);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception exception) when (IsClaimCollision(exception))
+        {
+            db.ChangeTracker.Clear();
+            existing = await ReadClaimAfterCollisionAsync(
+                () =>
+                    db.TwitchClips.SingleOrDefaultAsync(
+                        value => value.HostId == hostId && value.IdempotencyKey == key,
+                        ct
+                    ),
+                ct
+            );
+            if (existing is null)
+            {
+                throw;
+            }
+            return await ObserveExistingClipAsync(db, existing, ct);
+        }
 
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
@@ -186,12 +227,23 @@ public sealed class ClipMarkerService(
         }
     }
 
-    public async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+    public Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
         int hostId,
         string description,
         CancellationToken ct
     )
     {
+        return CreateMarkerAsync(hostId, description, NewAttemptKey(), ct);
+    }
+
+    public async Task<ClipMarkerOperationOutcome> CreateMarkerAsync(
+        int hostId,
+        string description,
+        string idempotencyKey,
+        CancellationToken ct
+    )
+    {
+        var key = ValidateAttemptKey(idempotencyKey);
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
             return new ClipMarkerOperationOutcome.NotReady(NativeTwitchFeatureGate.DisabledMessage);
@@ -213,6 +265,15 @@ public sealed class ClipMarkerService(
         }
 
         await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var existing = await db.TwitchStreamMarkers.SingleOrDefaultAsync(
+            marker => marker.HostId == hostId && marker.IdempotencyKey == key,
+            ct
+        );
+        if (existing is not null)
+        {
+            return MarkerOutcome(existing);
+        }
+
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
         if (host?.TwitchUserId is not { Length: > 0 } broadcasterId)
         {
@@ -229,13 +290,33 @@ public sealed class ClipMarkerService(
         var marker = new TwitchStreamMarker
         {
             HostId = hostId,
-            IdempotencyKey = NewAttemptKey(),
+            IdempotencyKey = key,
             Description = description.Trim(),
             Status = TwitchStreamMarkerStatus.Ambiguous,
             CreatedAtUtc = now,
         };
         db.TwitchStreamMarkers.Add(marker);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception exception) when (IsClaimCollision(exception))
+        {
+            db.ChangeTracker.Clear();
+            existing = await ReadClaimAfterCollisionAsync(
+                () =>
+                    db.TwitchStreamMarkers.SingleOrDefaultAsync(
+                        value => value.HostId == hostId && value.IdempotencyKey == key,
+                        ct
+                    ),
+                ct
+            );
+            if (existing is null)
+            {
+                throw;
+            }
+            return MarkerOutcome(existing);
+        }
 
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
         {
@@ -428,7 +509,11 @@ public sealed class ClipMarkerService(
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        if (ExpireClips(pending, now) && await nativeTwitch.IsEnabledAsync(hostId, ct))
+        await ReloadClipsAsync(db, pending, ct);
+        if (
+            ResolveAvailabilityDeadlines(pending, now)
+            && await nativeTwitch.IsEnabledAsync(hostId, ct)
+        )
         {
             await SaveReconciliationChangesAsync(db, hostId, ct);
         }
@@ -542,20 +627,22 @@ public sealed class ClipMarkerService(
         CancellationToken ct
     )
     {
-        var pending = await db
-            .TwitchClips.Where(clip =>
-                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
-            )
-            .ToArrayAsync(pollingToken);
-        if (pending.Length == 0)
+        while (true)
         {
-            return;
-        }
+            var pending = await db
+                .TwitchClips.Where(clip =>
+                    clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+                )
+                .ToArrayAsync(pollingToken);
+            await ReloadClipsAsync(db, pending, pollingToken);
+            pending = pending.Where(clip => clip.Status == TwitchClipStatus.Pending).ToArray();
+            if (pending.Length == 0)
+            {
+                return;
+            }
 
-        while (pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
-        {
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            var changed = ExpireClips(pending, now);
+            var changed = ResolveAvailabilityDeadlines(pending, now);
             foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
             {
                 if (token is null || clip.ProviderClipId is null)
@@ -592,7 +679,7 @@ public sealed class ClipMarkerService(
                 await SaveReconciliationChangesAsync(db, hostId, ct);
             }
 
-            if (!pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+            if (pending.All(clip => clip.Status != TwitchClipStatus.Pending))
             {
                 return;
             }
@@ -612,13 +699,26 @@ public sealed class ClipMarkerService(
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        if (ExpireClips(pending, timeProvider.GetUtcNow().UtcDateTime))
+        await ReloadClipsAsync(db, pending, ct);
+        if (ResolveAvailabilityDeadlines(pending, timeProvider.GetUtcNow().UtcDateTime))
         {
             await SaveReconciliationChangesAsync(db, hostId, ct);
         }
     }
 
-    private static bool ExpireClips(IEnumerable<TwitchClip> clips, DateTime now)
+    private static async Task ReloadClipsAsync(
+        BlokeBotDbContext db,
+        IEnumerable<TwitchClip> clips,
+        CancellationToken ct
+    )
+    {
+        foreach (var clip in clips)
+        {
+            await db.Entry(clip).ReloadAsync(ct);
+        }
+    }
+
+    private static bool ResolveAvailabilityDeadlines(IEnumerable<TwitchClip> clips, DateTime now)
     {
         var changed = false;
         foreach (var clip in clips)
@@ -631,13 +731,34 @@ public sealed class ClipMarkerService(
                 continue;
             }
 
-            clip.Status = TwitchClipStatus.Expired;
-            clip.FailureReason = "Twitch did not make the clip available within 60 seconds.";
+            var providerMutationUnknown = clip.ProviderClipId is null;
+            clip.Status = providerMutationUnknown
+                ? TwitchClipStatus.Ambiguous
+                : TwitchClipStatus.Expired;
+            clip.FailureReason = providerMutationUnknown
+                ? "Twitch did not confirm whether the clip request completed."
+                : "Twitch did not make the clip available within 60 seconds.";
             clip.ResolvedAtUtc = now;
             changed = true;
         }
 
         return changed;
+    }
+
+    private async Task<ClipMarkerOperationOutcome> ObserveExistingClipAsync(
+        BlokeBotDbContext db,
+        TwitchClip clip,
+        CancellationToken ct
+    )
+    {
+        if (clip.Status != TwitchClipStatus.Pending || clip.ProviderClipId is null)
+        {
+            return Outcome(clip);
+        }
+
+        await ReconcileAsync(clip.HostId, ct);
+        await db.Entry(clip).ReloadAsync(ct);
+        return Outcome(clip);
     }
 
     private async Task SaveReconciliationChangesAsync(
@@ -842,5 +963,63 @@ public sealed class ClipMarkerService(
     private static string NewAttemptKey()
     {
         return Guid.NewGuid().ToString("N");
+    }
+
+    private static async Task<T?> ReadClaimAfterCollisionAsync<T>(
+        Func<Task<T?>> read,
+        CancellationToken ct
+    )
+        where T : class
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await read();
+            }
+            catch (Exception exception) when (attempt < 20 && IsBusy(exception))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(attempt * 5), ct);
+            }
+        }
+    }
+
+    private static bool IsClaimCollision(Exception exception)
+    {
+        return IsBusy(exception)
+            || exception
+                is SqliteException
+                {
+                    SqliteErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT,
+                    SqliteExtendedErrorCode: SQLitePCL.raw.SQLITE_CONSTRAINT_UNIQUE,
+                }
+            || exception is DbUpdateException { InnerException: { } inner }
+                && IsClaimCollision(inner);
+    }
+
+    private static bool IsBusy(Exception exception)
+    {
+        return exception switch
+        {
+            SqliteException
+            {
+                SqliteErrorCode: SQLitePCL.raw.SQLITE_BUSY or SQLitePCL.raw.SQLITE_LOCKED,
+            } => true,
+            DbUpdateException { InnerException: { } inner } => IsBusy(inner),
+            _ => false,
+        };
+    }
+
+    private static string ValidateAttemptKey(string value)
+    {
+        var key = value.Trim();
+        if (key.Length is < 1 or > 128)
+        {
+            throw new ArgumentException(
+                "Provider attempt keys must contain 1 to 128 characters.",
+                nameof(value)
+            );
+        }
+        return key;
     }
 }

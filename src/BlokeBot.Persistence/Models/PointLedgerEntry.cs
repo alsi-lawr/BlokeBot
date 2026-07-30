@@ -25,4 +25,6 @@ public sealed class PointLedgerEntry
     public long? RequestSubmissionId { get; set; }
 
     public string Note { get; set; } = string.Empty;
+
+    public string? OperationKey { get; set; }
 }

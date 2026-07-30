@@ -155,6 +155,15 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
                 }
             );
+            db.TwitchClips.Add(
+                new TwitchClip
+                {
+                    HostId = 2,
+                    IdempotencyKey = "unknown-provider-mutation",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
+                }
+            );
             await db.SaveChangesAsync();
         }
         await service.ReconcileAsync(2, CancellationToken.None);
@@ -202,7 +211,7 @@ public sealed class ClipMarkerServiceTests
             .TwitchClips.OrderBy(clip => clip.HostId)
             .ThenBy(clip => clip.Id)
             .ToArrayAsync();
-        clips.Length.ShouldBe(3);
+        clips.Length.ShouldBe(4);
         clips.Single(clip => clip.HostId == 1).Status.ShouldBe(TwitchClipStatus.Ambiguous);
         clips
             .Single(clip => clip.HostId == 1 && clip.Id == ambiguousReference.Value)
@@ -212,10 +221,13 @@ public sealed class ClipMarkerServiceTests
             .Single(clip => clip.IdempotencyKey == "expires")
             .Status.ShouldBe(TwitchClipStatus.Expired);
         clips
-            .Where(clip => clip.IdempotencyKey != "expires")
+            .Single(clip => clip.IdempotencyKey == "unknown-provider-mutation")
+            .Status.ShouldBe(TwitchClipStatus.Ambiguous);
+        clips
+            .Where(clip => clip.IdempotencyKey is not ("expires" or "unknown-provider-mutation"))
             .ShouldAllBe(clip => !string.IsNullOrWhiteSpace(clip.IdempotencyKey));
         clips
-            .Where(clip => clip.IdempotencyKey != "expires")
+            .Where(clip => clip.IdempotencyKey is not ("expires" or "unknown-provider-mutation"))
             .Select(clip => clip.IdempotencyKey)
             .Distinct(StringComparer.Ordinal)
             .Count()
@@ -238,6 +250,100 @@ public sealed class ClipMarkerServiceTests
         persistedMarker.MarkerUrl.ShouldBe("https://twitch.test/marker");
         typeof(ClipView).GetProperty("IdempotencyKey").ShouldBeNull();
         typeof(StreamMarkerView).GetProperty("IdempotencyKey").ShouldBeNull();
+    }
+
+    [Test]
+    public async Task DeterministicAttemptKeys_ReconcileWithoutRepeatingProviderMutations()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
+        var http = new ClipMarkerHttpClientFactory();
+        var service = CreateService(dbFactory, http, now);
+
+        var firstClip = await service.CreateClipAsync(
+            1,
+            false,
+            "moment:public-id:clip",
+            CancellationToken.None
+        );
+        var retriedClip = await service.CreateClipAsync(
+            1,
+            false,
+            "moment:public-id:clip",
+            CancellationToken.None
+        );
+        var firstMarker = await service.CreateMarkerAsync(
+            1,
+            "Ambiguous marker",
+            "moment:public-id:marker",
+            CancellationToken.None
+        );
+        var retriedMarker = await service.CreateMarkerAsync(
+            1,
+            "Ambiguous marker",
+            "moment:public-id:marker",
+            CancellationToken.None
+        );
+
+        firstClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        retriedClip.ShouldBeOfType<ClipMarkerOperationOutcome.ClipAmbiguous>();
+        firstMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        retriedMarker.ShouldBeOfType<ClipMarkerOperationOutcome.MarkerAmbiguous>();
+        http.ClipPosts.ShouldBe(1);
+        http.MarkerPosts.ShouldBe(1);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchClips.CountAsync()).ShouldBe(1);
+        (await verify.TwitchStreamMarkers.CountAsync()).ShouldBe(1);
+    }
+
+    [Test]
+    public async Task ConcurrentDeterministicClaim_UsesOneProviderMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        await using (var db = await dbFactory.CreateDbContextAsync())
+        {
+            db.Hosts.Add(
+                new BotHost
+                {
+                    Login = "one",
+                    DisplayName = "One",
+                    TwitchUserId = "one-id",
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+        var now = new ManualTimeProvider(new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero));
+        var http = new ClipMarkerHttpClientFactory();
+        var first = CreateService(dbFactory, http, now);
+        var second = CreateService(dbFactory, http, now);
+
+        var outcomes = await Task.WhenAll(
+            first.CreateClipAsync(1, false, "moment:concurrent:clip", CancellationToken.None),
+            second.CreateClipAsync(1, false, "moment:concurrent:clip", CancellationToken.None)
+        );
+
+        outcomes
+            .All(value =>
+                value
+                    is ClipMarkerOperationOutcome.ClipPending
+                        or ClipMarkerOperationOutcome.ClipAmbiguous
+            )
+            .ShouldBeTrue();
+        http.ClipPosts.ShouldBe(1);
+        await using var verify = await dbFactory.CreateDbContextAsync();
+        (await verify.TwitchClips.CountAsync()).ShouldBe(1);
     }
 
     private static ClipMarkerService CreateService(

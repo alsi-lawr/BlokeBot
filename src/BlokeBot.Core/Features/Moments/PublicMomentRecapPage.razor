@@ -1,0 +1,81 @@
+@page "/moments/{Channel}"
+@page "/moments/{Channel}/streams/{StreamIdentity}"
+@using BlokeBot.Core.Auth.Sessions
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject MomentHubService _moments
+
+<PageTitle>BlokeBot | Moment recap</PageTitle>
+
+<main class="min-h-screen bg-background px-4 py-8 text-foreground sm:px-6">
+    <div class="mx-auto max-w-5xl space-y-6">
+        @if (_loading)
+        {
+            <div class="card p-8">Loading moments…</div>
+        }
+        else if (_page is null)
+        {
+            <div class="card p-8"><h1 class="text-2xl font-semibold">Moment recap not found</h1></div>
+        }
+        else
+        {
+            <header class="card p-6">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Community moments</p>
+                <h1 class="mt-2 text-3xl font-bold">@(_page.StreamIdentity is null ? "Weekly recap" : "Stream recap")</h1>
+                <p class="mt-2 break-all text-muted-foreground">
+                    @if (_page.WeekStartsAtUtc is { } week)
+                    {
+                        <span>Week beginning @week.ToString("yyyy-MM-dd") UTC</span>
+                    }
+                    else
+                    {
+                        <span>Twitch stream @_page.StreamIdentity</span>
+                    }
+                </p>
+                @if (_session.IsAuthenticated)
+                {
+                    <p class="mt-3 text-sm">Voting as <strong>@_session.DisplayText</strong> (@($"@{_session.Login}")).</p>
+                }
+                else
+                {
+                    <div class="mt-4 max-w-sm">
+                        <label class="label" for="moment-voter-login">Twitch login</label>
+                        <input id="moment-voter-login" class="input" maxlength="128" autocomplete="username" @bind="_login" />
+                        <p class="mt-1 text-xs text-muted-foreground">Sign in for Twitch-ID voting, or use the normalized-login fallback.</p>
+                    </div>
+                }
+            </header>
+
+            @if (!string.IsNullOrWhiteSpace(_feedback))
+            {
+                <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
+            }
+
+            <section class="grid gap-4 sm:grid-cols-2">
+                @foreach (var moment in _page.Moments)
+                {
+                    <article class="card flex min-w-0 flex-col p-5" @key="moment.PublicId">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">@moment.PublicCategory</p>
+                        <h2 class="mt-2 break-words text-xl font-semibold">@moment.PublicTitle</h2>
+                        <p class="mt-2 text-sm text-muted-foreground">@moment.VoteCount votes · @moment.Contributors.Count contributors</p>
+                        @if (_page.WinningMomentId == moment.PublicId)
+                        {
+                            <p class="mt-2 font-semibold text-emerald-700">Weekly winner</p>
+                        }
+                        <div class="mt-auto flex flex-wrap gap-2 pt-5">
+                            @if (moment.ProviderUrl is { } url)
+                            {
+                                <a class="btn-primary" href="@url" target="_blank" rel="noreferrer">Watch on Twitch</a>
+                            }
+                            <button class="btn-secondary" type="button" @onclick="() => VoteAsync(moment.PublicId)">Vote</button>
+                        </div>
+                    </article>
+                }
+            </section>
+            @if (_page.Moments.Count == 0)
+            {
+                <div class="card p-6 text-sm text-muted-foreground">No approved moments in this recap yet.</div>
+            }
+        }
+    </div>
+</main>

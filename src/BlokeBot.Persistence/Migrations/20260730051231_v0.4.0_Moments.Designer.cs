@@ -3,6 +3,7 @@ using System;
 using BlokeBot.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BlokeBot.Persistence.Migrations
 {
     [DbContext(typeof(BlokeBotDbContext))]
-    partial class BlokeBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260730051231_v0.4.0_Moments")]
+    partial class v040_Moments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
@@ -1415,9 +1418,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasIndex("CandidateId", "IdentityKey")
                         .IsUnique();
 
-                    b.HasIndex("CandidateId", "NormalizedLogin")
-                        .IsUnique();
-
                     b.HasIndex("CandidateId", "FirstCapturedAtUtc", "Id");
 
                     b.ToTable("moment_contributors", (string)null);
@@ -1443,10 +1443,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("OperationKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("PublicPayload")
                         .IsRequired()
                         .HasMaxLength(1024)
@@ -1465,10 +1461,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasIndex("CandidateId");
 
                     b.HasIndex("HostId", "Id");
-
-                    b.HasIndex("HostId", "OperationKey")
-                        .IsUnique()
-                        .HasFilter("\"OperationKey\" IS NOT NULL");
 
                     b.ToTable("moment_events", null, t =>
                         {
@@ -1659,9 +1651,6 @@ namespace BlokeBot.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CandidateId", "IdentityKey")
-                        .IsUnique();
-
-                    b.HasIndex("CandidateId", "NormalizedLogin")
                         .IsUnique();
 
                     b.ToTable("moment_votes", (string)null);

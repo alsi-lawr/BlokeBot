@@ -88,6 +88,17 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<PlayQueueParticipation> PlayQueueParticipation => Set<PlayQueueParticipation>();
     public DbSet<PlayQueueExclusion> PlayQueueExclusions => Set<PlayQueueExclusion>();
     public DbSet<PlayQueueDomainEvent> PlayQueueEvents => Set<PlayQueueDomainEvent>();
+    public DbSet<MomentHubSettings> MomentHubSettings => Set<MomentHubSettings>();
+    public DbSet<MomentCandidate> MomentCandidates => Set<MomentCandidate>();
+    public DbSet<MomentCaptureRequest> MomentCaptureRequests => Set<MomentCaptureRequest>();
+    public DbSet<MomentContributor> MomentContributors => Set<MomentContributor>();
+    public DbSet<MomentSuggestion> MomentSuggestions => Set<MomentSuggestion>();
+    public DbSet<MomentVote> MomentVotes => Set<MomentVote>();
+    public DbSet<MomentModerationAudit> MomentModerationAudit => Set<MomentModerationAudit>();
+    public DbSet<MomentDomainEvent> MomentEvents => Set<MomentDomainEvent>();
+    public DbSet<MomentMerge> MomentMerges => Set<MomentMerge>();
+    public DbSet<MomentWeeklyFinalization> MomentWeeklyFinalizations =>
+        Set<MomentWeeklyFinalization>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +117,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigurePredictions(modelBuilder);
         ConfigureRequestBoards(modelBuilder);
         ConfigurePlayWithViewers(modelBuilder);
+        ConfigureMoments(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)
