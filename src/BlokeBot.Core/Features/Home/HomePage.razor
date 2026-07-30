@@ -9,6 +9,7 @@
                 Title="BlokeBot"
                 Description="Run Twitch chat games and points from one place. Set up your channel, choose the tools you want, and let the bot handle chat during stream." />
 
+    <ApplicationCardCollection Owner="home-card-collection">
     <AuthorizeView>
         <Authorized Context="homeAuth">
             @{
@@ -24,7 +25,7 @@
         </Authorized>
     </AuthorizeView>
 
-    <section class="grid gap-4 md:grid-cols-2">
+    <section class="application-card-collection md:grid-cols-2" data-card-owner="home-card-grid">
         <HomeInfoCard Title="Set up your channel" Icon="@HomeInfoCardIcon.Channel" Href="/host">
             Connect the bot to your Twitch channel and keep your stream tools separate from everyone else's.
         </HomeInfoCard>
@@ -45,4 +46,5 @@
     <section class="home-note rounded-lg p-5">
         <p class="text-sm leading-6 text-muted-foreground">BlokeBot is built around your Twitch channel: connect the bot, pick the chat tools you want, and choose who can help manage them.</p>
     </section>
+    </ApplicationCardCollection>
 </div>

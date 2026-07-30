@@ -56,6 +56,7 @@
             </div>
         </TaskPanel>
 
+        <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
         <CollapsibleSection Title="Place a stream marker" Description="Add a short private marker to the current live stream." InitiallyOpen="false">
             <div class="field-row native-primary-row p-4">
                 <Field Id="marker-description" Label="Marker description" @bind-Value="_markerDescription" Placeholder="Moment description" />
@@ -119,6 +120,7 @@
                 }
             </div>
         </CollapsibleSection>
+        </ApplicationCardCollection>
         }
     }
 </DashboardPage>

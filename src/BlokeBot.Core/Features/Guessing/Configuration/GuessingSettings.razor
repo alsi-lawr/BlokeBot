@@ -20,19 +20,25 @@
 
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="guessing-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
+        <ApplicationCardCollection Owner="guessing-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
+        </ApplicationCardCollection>
     }
     else if (_config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading guessing settings...</div>
+        <ApplicationCardCollection Owner="guessing-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading guessing settings...</div>
+        </ApplicationCardCollection>
     }
     else
     {
-        <div class="settings-disclosure-stack">
+        <div class="settings-disclosure-stack" data-card-owner="guessing-settings-disclosure-cards guessing-settings-cards settings-disclosure-cards">
         <div id="profiles">
             <ProfileSettingsSection Configuration="_config"
                                     CreateProfile="CreateProfileAsync"

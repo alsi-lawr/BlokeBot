@@ -12,6 +12,7 @@
                 Title="Guessing leaderboard"
                 Description="@_headerDescription" />
 
+    <ApplicationCardCollection Owner="public-guessing-leaderboard-cards">
     @if (!_loaded)
     {
         <div class="card p-8 text-sm text-muted-foreground">Loading leaderboard...</div>
@@ -82,4 +83,5 @@
             </div>
         </section>
     }
+    </ApplicationCardCollection>
 </div>

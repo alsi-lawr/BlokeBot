@@ -40,14 +40,19 @@
 
     @if (_blockedByMode)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Switch back to your own channel to change these settings.</div>
+        <ApplicationCardCollection Owner="channel-setup-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Switch back to your own channel to change these settings.</div>
+        </ApplicationCardCollection>
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading channel setup...</div>
+        <ApplicationCardCollection Owner="channel-setup-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading channel setup...</div>
+        </ApplicationCardCollection>
     }
     else if (!_state.IsHostCreated)
     {
+        <ApplicationCardCollection Owner="channel-setup-cards">
         <section class="card p-6">
             <div class="flex items-center gap-4">
                 @if (!string.IsNullOrWhiteSpace(_state.ProfileImageUrl))
@@ -68,9 +73,11 @@
                 <p class="mt-5 text-sm font-semibold text-slate-700">This Twitch account cannot create a BlokeBot channel setup yet.</p>
             }
         </section>
+        </ApplicationCardCollection>
     }
     else if (_state.HostId is { } hostId)
     {
+        <ApplicationCardCollection Owner="channel-setup-disclosure-cards">
         <div id="bot-status"
              class="host-config-fragment-target scroll-mt-24"
              role="region"
@@ -454,7 +461,7 @@
                             OpenRequest="@_chatToolsFragmentRequest"
                             FocusElementId="chat-tools"
                             FocusRequest="@_chatToolsFragmentRequest">
-            <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div class="application-card-collection p-3 sm:grid-cols-2 xl:grid-cols-3" data-card-owner="channel-setup-feature-cards">
                 @foreach (var feature in _state.Features)
                 {
                     <button class="@FeatureCardClass(feature)"
@@ -479,5 +486,6 @@
             </div>
         </CollapsibleSection>
         </div>
+        </ApplicationCardCollection>
     }
 </div>

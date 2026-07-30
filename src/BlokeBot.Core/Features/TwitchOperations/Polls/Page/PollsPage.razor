@@ -93,6 +93,7 @@
             }
         </TaskPanel>
 
+        <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
         <CollapsibleSection Title="New poll template" Description="Save a question and choices to reuse later." InitiallyOpen="@(_state.Templates.Count == 0)">
             <div class="form-grid p-4">
                 <Field Id="poll-title" Label="Question" @bind-Value="_title" Placeholder="Question" />
@@ -137,6 +138,7 @@
                 }
             </div>
         </CollapsibleSection>
+        </ApplicationCardCollection>
         }
     }
 </DashboardPage>

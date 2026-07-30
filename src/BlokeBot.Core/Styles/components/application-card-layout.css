@@ -1,0 +1,13 @@
+@layer base {
+    :root {
+        --app-card-clearance: 12px;
+    }
+}
+
+@layer components {
+    .application-card-collection,
+    .settings-disclosure-stack {
+        display: grid;
+        gap: var(--app-card-clearance);
+    }
+}

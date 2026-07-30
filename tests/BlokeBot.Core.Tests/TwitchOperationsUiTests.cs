@@ -69,7 +69,7 @@ public sealed class TwitchOperationsUiTests
     }
 
     [Test]
-    public void NativeDashboardRoutesUseTheSharedTwelvePixelSectionRhythm()
+    public void NativeDashboardDisclosuresUseFiniteCardCollections()
     {
         var styles = ReadRepositoryFile(
             "src",
@@ -78,13 +78,7 @@ public sealed class TwitchOperationsUiTests
             "features",
             "native-twitch.css"
         );
-        var selectorStart = styles.IndexOf(
-            ".dashboard-page[data-native-route]",
-            StringComparison.Ordinal
-        );
-        selectorStart.ShouldBeGreaterThanOrEqualTo(0);
-        var selectorEnd = styles.IndexOf('}', selectorStart);
-        styles[selectorStart..selectorEnd].ShouldContain("gap: 0.75rem");
+        styles.ShouldNotContain(".dashboard-page[data-native-route] {");
 
         styles
             .TrimEnd()
@@ -96,15 +90,24 @@ public sealed class TwitchOperationsUiTests
                 """
             );
 
+        var sharedPage = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Components",
+            "Layout",
+            "DashboardPage.razor"
+        );
+        sharedPage.ShouldNotContain("application-card-collection dashboard-page");
+
         var sharedStyles = ReadRepositoryFile(
             "src",
             "BlokeBot.Core",
             "Styles",
             "components",
-            "page-context.css"
+            "application-card-layout.css"
         );
-        sharedStyles.ShouldContain(".dashboard-page");
-        sharedStyles.ShouldContain("gap: 1.5rem");
+        sharedStyles.ShouldContain("--app-card-clearance: 12px");
+        sharedStyles.ShouldContain("gap: var(--app-card-clearance)");
 
         foreach (
             var path in new[]
@@ -126,6 +129,9 @@ public sealed class TwitchOperationsUiTests
             ]);
             page.ShouldContain("data-native-route=");
             page.ShouldContain("Width=\"DashboardPageWidth.Wide\"");
+            page.ShouldContain(
+                """<ApplicationCardCollection Owner="native-dashboard-disclosure-cards">"""
+            );
         }
     }
 

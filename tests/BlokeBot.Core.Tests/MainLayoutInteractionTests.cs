@@ -467,21 +467,21 @@ public sealed class SharedPageContractTests
             );
 
         var cut = context.Render(stack);
-        var pageContextStyles = ReadRepositoryFile(
+        var cardLayoutStyles = ReadRepositoryFile(
             "src",
             "BlokeBot.Core",
             "Styles",
             "components",
-            "page-context.css"
+            "application-card-layout.css"
         );
         var normalizedStyles = string.Join(
             " ",
-            pageContextStyles.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            cardLayoutStyles.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
         );
 
         cut.FindAll(".settings-disclosure-stack > .disclosure-panel").Count.ShouldBe(2);
         normalizedStyles.ShouldContain(
-            ".settings-disclosure-stack { display: grid; gap: 0.75rem; }"
+            ".application-card-collection, .settings-disclosure-stack { display: grid; gap: var(--app-card-clearance); }"
         );
     }
 

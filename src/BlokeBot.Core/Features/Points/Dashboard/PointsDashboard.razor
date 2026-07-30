@@ -22,19 +22,26 @@
 
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="points-dashboard-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
+        <ApplicationCardCollection Owner="points-dashboard-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
+        </ApplicationCardCollection>
     }
     else if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
+        <ApplicationCardCollection Owner="points-dashboard-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading points...</div>
+        </ApplicationCardCollection>
     }
     else
     {
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <ApplicationCardCollection Owner="points-dashboard-cards">
+        <div class="application-card-collection xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]" data-card-owner="points-dashboard-summary-cards">
             <section class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
@@ -190,5 +197,6 @@
                 </div>
             }
         </section>
+        </ApplicationCardCollection>
     }
 </div>

@@ -51,6 +51,7 @@
         }
         else
         {
+            <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
             <CollapsibleSection Title="Unfulfilled redemptions" Description="Fulfil a request or cancel it so Twitch refunds the viewer." InitiallyOpen="@(_state.ActiveRedemptions.Count > 0)">
                 <div class="p-4">
                     @if (_state.ActiveRedemptions.Count == 0)
@@ -123,6 +124,7 @@
                     }
                 </div>
             </CollapsibleSection>
+            </ApplicationCardCollection>
 
             <TaskPanel Title="@(_editingRewardId is null ? "Create a reward" : "Edit reward")" Description="Set the cost and what viewers should send or do. BlokeBot can edit rewards created here.">
                 <div class="form-grid">
@@ -149,6 +151,7 @@
                 </div>
             </TaskPanel>
 
+            <ApplicationCardCollection Owner="native-dashboard-disclosure-cards">
             <CollapsibleSection Title="Redemption history" Description="Recently fulfilled and refunded redemptions." InitiallyOpen="false">
                 <div class="p-4">
                     @if (_state.History.Count == 0)
@@ -166,6 +169,7 @@
                     }
                 </div>
             </CollapsibleSection>
+            </ApplicationCardCollection>
         }
     }
 </DashboardPage>

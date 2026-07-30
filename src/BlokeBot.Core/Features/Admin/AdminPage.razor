@@ -33,10 +33,13 @@
 
     @if (_state is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
+        <ApplicationCardCollection Owner="admin-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading admin settings...</div>
+        </ApplicationCardCollection>
     }
     else
     {
+        <ApplicationCardCollection Owner="admin-page-disclosure-cards admin-authorization-disclosure-card">
         <BotAccountAuthorizationSection Status="@_botAccountStatus"
                                         Disabled="@(_botAccountStatus?.State == BotAccountAuthorizationState.Disabled)"
                                         Clear="@ClearBotAccountAuthorizationAsync"
@@ -62,5 +65,6 @@
                                StartBot="@StartBotAsync"
                                StopBot="@StopBotAsync"
                                @bind-NewHostLogin="_newHostLogin" />
+        </ApplicationCardCollection>
     }
 </div>

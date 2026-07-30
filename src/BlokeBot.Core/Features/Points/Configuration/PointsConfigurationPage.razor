@@ -20,15 +20,21 @@
 
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="points-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
+        <ApplicationCardCollection Owner="points-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Points is off for this channel. Turn it on in Channel setup.</div>
+        </ApplicationCardCollection>
     }
     else if (_config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Loading points settings...</div>
+        <ApplicationCardCollection Owner="points-settings-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Loading points settings...</div>
+        </ApplicationCardCollection>
     }
     else
     {
@@ -45,7 +51,7 @@
             .OfType<PointsConfigurationValidationError.GiveawayCooldownBelowMinimum>()
             .FirstOrDefault();
 
-        <div class="settings-disclosure-stack">
+        <div class="settings-disclosure-stack" data-card-owner="points-settings-disclosure-cards settings-disclosure-cards">
         <CollapsibleSection Title="General"
                             Description="What points are called and how gambling works."
                             InitiallyOpen="true"

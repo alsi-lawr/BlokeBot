@@ -30,11 +30,15 @@
 
     @if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="guessing-dashboard-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
+        <ApplicationCardCollection Owner="guessing-dashboard-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Guessing game is off for this channel. Turn it on in Channel setup.</div>
+        </ApplicationCardCollection>
     }
     else
     {
@@ -71,7 +75,9 @@
         {
             @if (_state is null)
             {
-                <div class="card p-8 text-sm text-muted-foreground">Loading guessing game...</div>
+                <ApplicationCardCollection Owner="guessing-dashboard-cards">
+                    <div class="card p-8 text-sm text-muted-foreground">Loading guessing game...</div>
+                </ApplicationCardCollection>
             }
             else
             {
@@ -91,6 +97,7 @@
         }
         else if (_activeTab == DashboardTab.History)
         {
+            <ApplicationCardCollection Owner="guessing-dashboard-cards">
             <section id="history" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Recent rounds</h2>
@@ -135,9 +142,11 @@
                     </div>
                 }
             </section>
+            </ApplicationCardCollection>
         }
         else
         {
+            <ApplicationCardCollection Owner="guessing-dashboard-cards">
             <section id="leaderboard" class="card">
                 <div class="border-b border-slate-200 p-5">
                     <h2 class="text-lg font-semibold text-slate-950">Leaderboard</h2>
@@ -245,6 +254,7 @@
                     </div>
                 }
             </section>
+            </ApplicationCardCollection>
         }
     }
 </div>

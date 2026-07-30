@@ -12,7 +12,9 @@
         <PageHeader Kicker="Community requests"
                     Title="Request board"
                     Description="This board could not be found." />
-        <div class="card p-8 text-sm text-muted-foreground">Check the channel and board name.</div>
+        <ApplicationCardCollection Owner="public-request-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Check the channel and board name.</div>
+        </ApplicationCardCollection>
     }
     else
     {
@@ -20,6 +22,7 @@
                     Title="@_page.Board.Title"
                     Description="@_page.Board.Description" />
 
+        <ApplicationCardCollection Owner="public-request-page-cards">
         <section class="card p-5" aria-labelledby="request-board-rules">
             <h2 id="request-board-rules" class="text-lg font-semibold text-slate-950">Board rules</h2>
             <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -96,7 +99,7 @@
             </section>
         }
 
-        <section class="space-y-3" aria-labelledby="request-board-requests">
+        <section class="application-card-collection" data-card-owner="public-request-list-cards" aria-labelledby="request-board-requests">
             <h2 id="request-board-requests" class="text-xl font-semibold text-slate-950">Requests</h2>
             @if (_page.Submissions.Count == 0)
             {
@@ -165,5 +168,6 @@
                 </article>
             }
         </section>
+        </ApplicationCardCollection>
     }
 </div>

@@ -28,10 +28,13 @@
     <ChildContent>
         @if (Host is null)
         {
-            <div class="card p-6">Choose a channel to manage moments.</div>
+            <ApplicationCardCollection Owner="dashboard-page-cards">
+                <div class="card p-6">Choose a channel to manage moments.</div>
+            </ApplicationCardCollection>
         }
         else
         {
+            <ApplicationCardCollection Owner="dashboard-page-cards">
             <section class="card p-5" aria-labelledby="moment-settings-heading">
                 <h2 id="moment-settings-heading" class="text-lg font-semibold">Capture settings</h2>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -60,13 +63,14 @@
                     <span class="text-sm text-muted-foreground">@_streamStatus</span>
                 </div>
             </section>
+            </ApplicationCardCollection>
 
             @if (!string.IsNullOrWhiteSpace(_feedback))
             {
                 <p class="rounded-lg border p-3 text-sm" role="@(_failed ? "alert" : "status")" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
             }
 
-            <section class="grid gap-4" aria-labelledby="moment-candidates-heading">
+            <section class="application-card-collection" data-card-owner="moment-candidate-cards" aria-labelledby="moment-candidates-heading">
                 <h2 id="moment-candidates-heading" class="text-xl font-semibold">Candidates</h2>
                 @if (_page is null || _page.Candidates.Count == 0)
                 {

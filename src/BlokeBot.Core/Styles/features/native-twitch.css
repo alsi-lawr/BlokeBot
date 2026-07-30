@@ -1,8 +1,4 @@
 @layer components {
-    .dashboard-page[data-native-route] {
-        gap: 0.75rem;
-    }
-
     .native-tool-switcher {
         background: var(--app-surface-muted);
         border: 1px solid var(--app-border);

@@ -13,7 +13,7 @@
 
 <PageTitle>BlokeBot | Custom Commands</PageTitle>
 
-<div class="mx-auto max-w-7xl space-y-6 custom-command-page">
+<div class="custom-command-page mx-auto max-w-7xl space-y-6">
     <PageHeader Title="Custom commands"
                 Description="Create chat commands, choose what the bot says, keep counters, and schedule messages.">
         <button class="@(_hasChanges ? "btn-primary custom-command-save--dirty" : "btn-secondary")"
@@ -37,24 +37,33 @@
     }
     else if (_isLoading)
     {
-        <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
+        <ApplicationCardCollection Owner="custom-command-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
+        </ApplicationCardCollection>
     }
     else if (Host is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        <ApplicationCardCollection Owner="custom-command-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Choose a channel to continue.</div>
+        </ApplicationCardCollection>
     }
     else if (!_featureEnabled)
     {
-        <div class="card p-8 text-sm text-muted-foreground">Custom commands are off for this channel. Turn them on in Channel setup.</div>
+        <ApplicationCardCollection Owner="custom-command-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground">Custom commands are off for this channel. Turn them on in Channel setup.</div>
+        </ApplicationCardCollection>
     }
     else if (_config is null)
     {
-        <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
+        <ApplicationCardCollection Owner="custom-command-page-cards">
+            <div class="card p-8 text-sm text-muted-foreground" role="status">Loading custom commands...</div>
+        </ApplicationCardCollection>
     }
     else
     {
         @if (_validationErrors.Count > 0)
         {
+            <ApplicationCardCollection Owner="custom-command-page-cards">
             <section class="card border-red-200 bg-red-50 p-5"
                      role="alert"
                      aria-labelledby="custom-command-validation-title"
@@ -76,6 +85,7 @@
                     @(ValidationMessageFor(_reloadControlId, ConfigurationTarget(CustomCommandValidationFieldKind.Identity)))
                 }
             </section>
+            </ApplicationCardCollection>
         }
 
         <div class="segmented-motion @(_activeTab == CustomCommandSettingsTab.MessageLibrary ? "segmented-motion--second" : string.Empty)"
@@ -106,6 +116,7 @@
 
         <div id="custom-command-message-library-panel"
              class="settings-disclosure-stack"
+             data-card-owner="custom-command-disclosure-cards"
              role="tabpanel"
              aria-labelledby="custom-command-message-library-tab"
              hidden="@(_activeTab != CustomCommandSettingsTab.MessageLibrary)"
@@ -232,6 +243,7 @@
         </div>
         <div id="custom-command-commands-panel"
              class="settings-disclosure-stack"
+             data-card-owner="custom-command-disclosure-cards"
              role="tabpanel"
              aria-labelledby="custom-command-commands-tab"
              hidden="@(_activeTab != CustomCommandSettingsTab.Commands)"
