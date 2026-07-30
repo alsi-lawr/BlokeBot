@@ -1,6 +1,9 @@
 using System.Security.Claims;
+using AngleSharp.Dom;
 using BlokeBot.Core.Auth.Sessions;
+using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Moments;
+using BlokeBot.Functional;
 using BlokeBot.Persistence.Models;
 using Bunit;
 using Bunit.TestDoubles;
@@ -14,6 +17,69 @@ namespace BlokeBot.Core.Tests;
 
 public sealed class MomentUiTests
 {
+    [Test]
+    public async Task ModeratorPage_KeepsWeeklyRecapInANewTabAndUsesSemanticSettingsAlignment()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var service = new MomentHubService(
+            database,
+            new UnusedMomentProvider(),
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        await using var context = UiTestContextFactory.Create(database, hostId);
+        context.Services.AddSingleton(service);
+        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+            new OfflineStreamLivenessProvider()
+        );
+
+        var page = context.Render<MomentsPage>();
+
+        page.WaitForAssertion(() =>
+        {
+            var recap = page.Find("a[aria-label='Open weekly recap (opens in a new tab)']");
+            recap.TextContent.Trim().ShouldBe("Open weekly recap");
+            recap.GetAttribute("href").ShouldBe("/moments/streamer");
+            recap.GetAttribute("target").ShouldBe("_blank");
+            recap.GetAttribute("rel").ShouldBe("noopener");
+            recap.Closest(".page-header__actions").ShouldNotBeNull();
+            page.Find("#moment-marker-fallback").ShouldNotBeNull();
+            page.Find("label[for='moment-marker-fallback']")
+                .TextContent.ShouldContain("Use a stream marker");
+            page.Find(".moment-setting-toggle").ShouldNotBeNull();
+            page.Markup.ShouldNotContain("pt-6");
+        });
+    }
+
+    [Test]
+    public async Task ModeratorPage_WithoutSelectedHost_OmitsTheWeeklyRecapNavigation()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database);
+        var service = new MomentHubService(
+            database,
+            new UnusedMomentProvider(),
+            TestEventBus.Create<AppEventKind>(),
+            TimeProvider.System
+        );
+        var testContext = UiTestContextFactory.CreateWithAuthorization(database, hostId);
+        await using var context = testContext.Context;
+        testContext.Authorization.SetNotAuthorized();
+        context.Services.AddSingleton(service);
+        context.Services.AddSingleton<IHostStreamLivenessProvider>(
+            new OfflineStreamLivenessProvider()
+        );
+
+        var page = context.Render<MomentsPage>();
+
+        page.WaitForAssertion(() =>
+            page.Markup.ShouldContain("Choose a channel to manage moments")
+        );
+        page.FindAll("a[aria-label^='Open weekly recap']").ShouldBeEmpty();
+        page.FindAll("a[href='#']").ShouldBeEmpty();
+    }
+
     [Test]
     public async Task PublicRecap_RendersApprovedTwitchLinkAndNeverPrivateModerationText()
     {
@@ -211,5 +277,50 @@ public sealed class MomentUiTests
                 new MomentProviderOutcome.ClipReady(clipId)
             );
         }
+    }
+
+    private sealed class UnusedMomentProvider : IMomentProviderOperations
+    {
+        public Task<MomentProviderOutcome> CaptureAsync(
+            int hostId,
+            Guid publicId,
+            bool markerFallbackEnabled,
+            string description,
+            CancellationToken ct
+        )
+        {
+            return Task.FromResult<MomentProviderOutcome>(
+                new MomentProviderOutcome.Failed(null, null, "Not used by this UI test.")
+            );
+        }
+    }
+
+    private sealed class OfflineStreamLivenessProvider : IHostStreamLivenessProvider
+    {
+        public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
+        {
+            return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+                ValueTask.FromResult(
+                    Result<HostStreamLivenessOutcome, Never>.Success(
+                        new HostStreamLivenessOutcome.Offline()
+                    )
+                )
+            );
+        }
+    }
+
+    private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database)
+    {
+        await using var db = await database.CreateDbContextAsync();
+        var host = new BotHost
+        {
+            Login = "streamer",
+            DisplayName = "Streamer",
+            TwitchUserId = "streamer-id",
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.Hosts.Add(host);
+        await db.SaveChangesAsync();
+        return host.Id;
     }
 }

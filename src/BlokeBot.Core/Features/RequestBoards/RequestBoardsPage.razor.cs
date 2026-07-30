@@ -10,13 +10,16 @@ public partial class RequestBoardsPage
     private RequestBoardModeratorPage? _moderatorPage;
     private readonly Dictionary<long, ModerationDraft> _moderationDrafts = [];
     private BoardDraft _draft = BoardDraft.New();
+    private Guid? _selectedFieldIdentity;
+    private Guid? _fieldFocusIdentity;
     private string _feedback = string.Empty;
+    private long _fieldFocusRequest;
+    private long _primaryFocusRequest;
+    private bool _isCreating = true;
     private bool _operationFailed;
 
     private string _publicBoardUrl =>
-        string.IsNullOrWhiteSpace(_draft.Slug) || string.IsNullOrWhiteSpace(HostLogin)
-            ? "#"
-            : $"/requests/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
+        $"/requests/{Uri.EscapeDataString(HostLogin)}/{Uri.EscapeDataString(_draft.Slug)}";
 
     protected override async Task OnInitializedAsync()
     {
@@ -35,6 +38,14 @@ public partial class RequestBoardsPage
         if (_boardList.Count > 0 && string.IsNullOrWhiteSpace(_draft.Slug))
         {
             await SelectBoardAsync(_boardList[0].Slug);
+            return;
+        }
+
+        if (_boardList.Count == 0 && _isCreating)
+        {
+            EnsureFieldSelection();
+            SetCreateGuidance();
+            _primaryFocusRequest++;
         }
     }
 
@@ -42,6 +53,10 @@ public partial class RequestBoardsPage
     {
         var board = _boardList.Single(value => value.Slug == slug);
         _draft = BoardDraft.From(board);
+        _isCreating = false;
+        _operationFailed = false;
+        _feedback = string.Empty;
+        SelectFirstField();
         await LoadModeratorPageAsync();
     }
 
@@ -70,26 +85,47 @@ public partial class RequestBoardsPage
 
     private void NewBoard()
     {
+        if (_isCreating)
+        {
+            return;
+        }
+
         _draft = BoardDraft.New();
+        _isCreating = true;
         _moderatorPage = null;
         _moderationDrafts.Clear();
-        _feedback = string.Empty;
+        _operationFailed = false;
+        SelectFirstField();
+        SetCreateGuidance();
+        _primaryFocusRequest++;
     }
 
     private void AddField()
     {
         if (_draft.Fields.Count < RequestBoardLimits.MaximumFields)
         {
-            _draft.Fields.Add(BoardFieldDraft.New());
+            var field = BoardFieldDraft.New();
+            _draft.Fields.Add(field);
+            SelectField(field);
         }
     }
 
     private void RemoveField(BoardFieldDraft field)
     {
-        if (_draft.Fields.Count > 1)
+        if (_draft.Fields.Count <= 1)
         {
-            _draft.Fields.Remove(field);
+            return;
         }
+
+        var removedIndex = _draft.Fields.IndexOf(field);
+        if (removedIndex < 0)
+        {
+            return;
+        }
+
+        _draft.Fields.RemoveAt(removedIndex);
+        var neighbour = _draft.Fields[Math.Min(removedIndex, _draft.Fields.Count - 1)];
+        SelectField(neighbour);
     }
 
     private Task SaveBoardAsync()
@@ -98,6 +134,7 @@ public partial class RequestBoardsPage
             HostId,
             async () =>
             {
+                var wasCreating = _isCreating;
                 var command = _draft.ToCommand();
                 if (command is null)
                 {
@@ -107,19 +144,100 @@ public partial class RequestBoardsPage
                 }
 
                 var result = await _boards.ConfigureAsync(HostId, command, CancellationToken.None);
-                _feedback = result.Match(
-                    succeeded =>
-                    {
+                switch (result)
+                {
+                    case RequestBoardResult<RequestBoardSummary>.Succeeded succeeded:
                         _draft = BoardDraft.From(succeeded.Value);
-                        return "Board saved.";
-                    },
-                    rejected => rejected.Reason.Message
-                );
-                _operationFailed = result is RequestBoardResult<RequestBoardSummary>.Rejected;
-                await LoadBoardsAsync();
-                await LoadModeratorPageAsync();
+                        _isCreating = false;
+                        _operationFailed = false;
+                        _feedback = wasCreating ? "Board created." : "Board saved.";
+                        SelectFirstField();
+                        await LoadBoardsAsync();
+                        await LoadModeratorPageAsync();
+                        break;
+                    case RequestBoardResult<RequestBoardSummary>.Rejected rejected:
+                        _operationFailed = true;
+                        _feedback = rejected.Reason.Message;
+                        break;
+                }
             }
         );
+    }
+
+    private void SetCreateGuidance()
+    {
+        _feedback = "New board ready. Complete its details, then Save board to create it.";
+    }
+
+    private void SelectFirstField()
+    {
+        _selectedFieldIdentity = _draft.Fields.FirstOrDefault()?.Identity;
+        _fieldFocusIdentity = null;
+    }
+
+    private void EnsureFieldSelection()
+    {
+        if (
+            _selectedFieldIdentity is null
+            || _draft.Fields.All(field => field.Identity != _selectedFieldIdentity)
+        )
+        {
+            SelectFirstField();
+        }
+    }
+
+    private void SelectField(BoardFieldDraft field)
+    {
+        _selectedFieldIdentity = field.Identity;
+        _fieldFocusIdentity = field.Identity;
+        _fieldFocusRequest++;
+    }
+
+    private bool IsFieldSelected(BoardFieldDraft field)
+    {
+        return field.Identity == _selectedFieldIdentity;
+    }
+
+    private long FieldFocusRequest(BoardFieldDraft field)
+    {
+        return field.Identity == _fieldFocusIdentity ? _fieldFocusRequest : 0;
+    }
+
+    private static string FieldInventoryLabelId(BoardFieldDraft field)
+    {
+        return $"request-field-{field.Identity:N}-inventory-label";
+    }
+
+    private static string FieldEditorRegionId(BoardFieldDraft field)
+    {
+        return $"request-field-{field.Identity:N}-editor";
+    }
+
+    private static string FieldDisplayName(BoardFieldDraft field)
+    {
+        return string.IsNullOrWhiteSpace(field.Label) ? "Untitled field" : field.Label;
+    }
+
+    private static string BoardFieldSummary(BoardFieldDraft field)
+    {
+        var key = string.IsNullOrWhiteSpace(field.Key) ? "No key" : field.Key;
+        var requirement = field.IsRequired ? "Required" : "Optional";
+        var detail = field.Kind switch
+        {
+            RequestBoardFieldKind.Choice when !string.IsNullOrWhiteSpace(field.Choices) =>
+                $"{field.Choices.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Length} choices",
+            RequestBoardFieldKind.Number
+                when !string.IsNullOrWhiteSpace(field.MinimumNumber)
+                    || !string.IsNullOrWhiteSpace(field.MaximumNumber) =>
+                $"Range {OptionalBoundary(field.MinimumNumber)} to {OptionalBoundary(field.MaximumNumber)}",
+            _ => $"Maximum {field.MaximumLength} characters",
+        };
+        return $"{key} · {field.Kind} · {requirement} · {detail}";
+    }
+
+    private static string OptionalBoundary(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "any" : value;
     }
 
     private Task TransitionAsync(long submissionId, RequestSubmissionStatus target)

@@ -14,7 +14,14 @@
                Description="Capture, moderate, and recap community Twitch clips and stream markers."
                Width="DashboardPageWidth.Wide">
     <Actions>
-        <a class="btn-secondary" href="@_weeklyUrl">Weekly recap</a>
+        @if (Host is not null)
+        {
+            <a class="btn-secondary"
+               href="@_weeklyUrl"
+               target="_blank"
+               rel="noopener"
+               aria-label="Open weekly recap (opens in a new tab)">Open weekly recap</a>
+        }
         <button class="btn-secondary" type="button" @onclick="FinalizeWeekAsync">Finalize previous week</button>
         <button class="btn-primary" type="button" @onclick="CaptureAsync">Capture now</button>
     </Actions>
@@ -39,9 +46,14 @@
                         </select>
                     </div>
                     <Field Id="moment-reward-amount" Label="Reward amount" @bind-Value="_rewardAmount" />
-                    <label class="flex min-h-11 items-center gap-2 pt-6 text-sm font-semibold">
-                        <input type="checkbox" @bind="_markerFallback" /> Marker fallback
-                    </label>
+                    <div class="moment-setting-toggle">
+                        <span class="label">Marker fallback</span>
+                        <label class="control-surface inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+                               for="moment-marker-fallback">
+                            <input id="moment-marker-fallback" type="checkbox" @bind="_markerFallback" />
+                            Use a stream marker when a clip is unavailable
+                        </label>
+                    </div>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <button class="btn-secondary" type="button" @onclick="SaveSettingsAsync">Save settings</button>
@@ -51,7 +63,7 @@
 
             @if (!string.IsNullOrWhiteSpace(_feedback))
             {
-                <p class="rounded-lg border p-3 text-sm" role="status" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
+                <p class="rounded-lg border p-3 text-sm" role="@(_failed ? "alert" : "status")" data-error="@_failed.ToString().ToLowerInvariant()">@_feedback</p>
             }
 
             <section class="grid gap-4" aria-labelledby="moment-candidates-heading">

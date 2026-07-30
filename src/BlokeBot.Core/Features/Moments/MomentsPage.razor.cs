@@ -18,8 +18,7 @@ public partial class MomentsPage
     private string _feedback = string.Empty;
     private bool _failed;
 
-    private string _weeklyUrl =>
-        string.IsNullOrWhiteSpace(HostLogin) ? "#" : $"/moments/{HostLogin}";
+    private string _weeklyUrl => $"/moments/{Uri.EscapeDataString(HostLogin)}";
 
     protected override async Task OnInitializedAsync()
     {

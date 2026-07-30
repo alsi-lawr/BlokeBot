@@ -327,6 +327,7 @@ public sealed class SharedPageContractTests
 
         cut.Find("[role='alert']").TextContent.ShouldContain("The channel data is unavailable.");
         cut.FindAll("[data-ready]").ShouldBeEmpty();
+        cut.FindAll(".page-header__actions").ShouldBeEmpty();
 
         cut.Find("button").Click();
 
@@ -358,11 +359,35 @@ public sealed class SharedPageContractTests
         );
 
         cut.Find(".dashboard-page").ClassList.ShouldContain("dashboard-page--wide");
-        cut.Find("[data-persistent-page-actions]").TextContent.ShouldContain("Save changes");
-        cut.Find("[data-save-feedback]")
-            .GetAttribute("data-save-feedback")
-            .ShouldBe(kind.ToString().ToLowerInvariant());
-        cut.Find("[data-save-feedback]").GetAttribute("role").ShouldBe(expectedRole);
+        var actionsRegion = cut.Find("[data-persistent-page-actions]");
+        actionsRegion.TextContent.ShouldContain("Save changes");
+        actionsRegion.ParentElement.ShouldNotBeNull();
+        actionsRegion.ParentElement!.ClassList.ShouldContain("page-header__actions");
+        cut.FindAll(".dashboard-page__action-bar").ShouldBeEmpty();
+        var feedback = cut.Find("[data-save-feedback]");
+        feedback.ParentElement.ShouldBe(actionsRegion.ParentElement);
+        feedback.GetAttribute("data-save-feedback").ShouldBe(kind.ToString().ToLowerInvariant());
+        feedback.GetAttribute("role").ShouldBe(expectedRole);
+    }
+
+    [Test]
+    public void DashboardWidthVariants_RetainReadableAndWideBoundsWithoutAGenericLateCap()
+    {
+        var styles = ReadRepositoryFile(
+            "src",
+            "BlokeBot.Core",
+            "Styles",
+            "components",
+            "page-context.css"
+        );
+        var normalizedStyles = string.Join(
+            " ",
+            styles.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        );
+
+        normalizedStyles.ShouldContain(".dashboard-page--readable { max-width: 58rem; }");
+        normalizedStyles.ShouldContain(".dashboard-page--wide { max-width: 96rem; }");
+        normalizedStyles.ShouldNotContain(".dashboard-page { max-width: 44rem;");
     }
 
     [Test]
