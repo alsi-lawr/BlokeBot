@@ -34,8 +34,20 @@ internal sealed class ChatCommandPlanBuilder : IChatCommandBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(route);
         ArgumentNullException.ThrowIfNull(handler);
 
-        _routes[route.TrimStart('!')] = handler;
+        var normalized = CommandAliasNormalizer.Normalize(route);
+        if (!_routes.TryAdd(normalized, handler))
+        {
+            throw new InvalidOperationException(
+                $"Command route '!{normalized}' was registered more than once."
+            );
+        }
+
         return this;
+    }
+
+    public IChatCommandBuilder Map(FixedChatCommandRoute route, ChatCommandHandler handler)
+    {
+        return Map(route.Value, handler);
     }
 
     public IChatCommandBuilder MapDynamic(DynamicChatCommandHandler handler)

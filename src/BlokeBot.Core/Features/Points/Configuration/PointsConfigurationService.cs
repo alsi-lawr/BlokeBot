@@ -180,6 +180,12 @@ public sealed class PointsConfigurationService(
         var requestedAliases = drafts
             .SelectMany(draft => CommandAliasNormalizer.Split(draft.Aliases))
             .ToArray();
+        var fixedCollision = FixedChatCommandRoutes.FindCollision(requestedAliases);
+        if (fixedCollision is not null)
+        {
+            return new PointsConfigurationSaveFailure(fixedCollision);
+        }
+
         var ownedKinds = PointsAppCommandKindMap.AppKinds.ToArray();
         var existingCollision = await db
             .CommandAliases.AsNoTracking()
@@ -193,6 +199,16 @@ public sealed class PointsConfigurationService(
         if (existingCollision is not null)
         {
             return new PointsConfigurationSaveFailure(existingCollision);
+        }
+
+        var customCollision = await db
+            .CustomCommandAliases.AsNoTracking()
+            .Where(alias => alias.HostId == hostId && requestedAliases.Contains(alias.Alias))
+            .Select(alias => alias.Alias)
+            .FirstOrDefaultAsync(ct);
+        if (customCollision is not null)
+        {
+            return new PointsConfigurationSaveFailure(customCollision);
         }
 
         db.CommandAliases.RemoveRange(

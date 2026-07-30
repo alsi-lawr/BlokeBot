@@ -97,6 +97,32 @@ public sealed class GuessingAliasTests
     }
 
     [Test]
+    public async Task AliasUsedByCustomCommand_SavingConfiguration_RejectsWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var seed = await SeedProfilesAsync(dbFactory);
+        await SeedCustomCommandAliasAsync(dbFactory, seed.Host.Id, "shared");
+        var service = ConfigurationService(dbFactory);
+        var config = await LoadConfigurationAsync(service, seed.Host.Id, seed.SpecialProfile.Id);
+        config.Aliases.StartAliases = "shared";
+
+        var result = await service
+            .SaveConfiguration(seed.Host.Id, ValidCommand(config))
+            .ExecuteAsync(CancellationToken.None);
+
+        result
+            .Match<GuessingConfigurationSaveFailure?>(_ => null, failure => failure)
+            .ShouldBe(new GuessingConfigurationSaveFailure.AliasAlreadyUsed("shared"));
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var aliases = await db
+            .CommandAliases.OrderBy(alias => alias.Alias)
+            .Select(alias => alias.Alias)
+            .ToArrayAsync();
+        aliases.ShouldBe(["default", "special"]);
+        (await db.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("shared");
+    }
+
+    [Test]
     public async Task ProfileOwnedStartAlias_ExecutingWithoutArgument_StartsOwningProfile()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -448,6 +474,27 @@ public sealed class GuessingAliasTests
         );
         await db.SaveChangesAsync();
         return new ProfileSeed(host, defaultProfile, specialProfile);
+    }
+
+    private static async Task SeedCustomCommandAliasAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        string alias
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+        db.CustomCommands.Add(
+            new CustomCommand
+            {
+                HostId = hostId,
+                Name = "Existing custom command",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                Aliases = [new CustomCommandAlias { HostId = hostId, Alias = alias }],
+            }
+        );
+        await db.SaveChangesAsync();
     }
 
     private sealed record ProfileSeed(

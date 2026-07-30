@@ -19,19 +19,17 @@ public sealed class MomentConvergenceMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_momentHubMigration);
-            var host = new BotHost
-            {
-                TwitchUserId = "host-id",
-                Login = "host",
-                DisplayName = "Host",
-                CreatedAtUtc = DateTime.UtcNow,
-            };
-            before.Hosts.Add(host);
-            await before.SaveChangesAsync();
+            await before.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, CreatedAtUtc)
+                VALUES (1, 'host-id', 'host', 'Host', 0, '2026-07-30T00:00:00Z');
+                """
+            );
             var candidate = new MomentCandidate
             {
                 PublicId = Guid.NewGuid(),
-                HostId = host.Id,
+                HostId = 1,
                 StreamIdentity = "stream",
                 State = MomentCandidateState.ClipReady,
                 CapturedAtUtc = DateTime.UtcNow,

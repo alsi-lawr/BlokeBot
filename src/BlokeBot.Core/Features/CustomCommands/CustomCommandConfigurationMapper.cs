@@ -38,7 +38,10 @@ internal static class CustomCommandConfigurationMapper
         {
             Id = command.Id,
             Name = command.Name,
-            Aliases = string.Join(", ", command.Aliases.Select(x => x.Alias).Order()),
+            Aliases = string.Join(
+                ", ",
+                command.Aliases.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Select(x => x.Alias)
+            ),
             Enabled = command.Enabled,
             ModeratorOnly = command.ModeratorOnly,
             CooldownSeconds = command.CooldownSeconds,

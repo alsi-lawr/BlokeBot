@@ -29,6 +29,22 @@ public partial class HostConfigPage
                 StateHasChanged
             )
         );
+        TrackSubscription(
+            _events.SubscribeForComponentRefresh(
+                [
+                    AppEventKind.CommandsChanged,
+                    AppEventKind.GuessingChanged,
+                    AppEventKind.PointsChanged,
+                    AppEventKind.CustomCommandsChanged,
+                    AppEventKind.RequestBoardsChanged,
+                    AppEventKind.PlayQueuesChanged,
+                    AppEventKind.MomentsChanged,
+                ],
+                InvokeAsync,
+                RefreshCommandCatalogAsync,
+                StateHasChanged
+            )
+        );
         await LoadAsync();
     }
 
@@ -73,7 +89,8 @@ public partial class HostConfigPage
 
         if (_state is { IsHostCreated: true } loadedState)
         {
-            LoadStartupMessageDraft(loadedState.StartupMessage);
+            LoadStartupMessageDraft(loadedState.HostId!.Value, loadedState.StartupMessage);
+            LoadCommandsDraft(loadedState.HostId!.Value, loadedState.Commands);
             await LoadAccessEntriesAsync(loadedState.ModAccess);
         }
         else
@@ -89,8 +106,13 @@ public partial class HostConfigPage
             return;
         }
 
+        var commandCatalogWasLoaded = _commandCatalog is not null;
         var previousPendingRuntimeTransition = _pendingRuntimeTransition;
         await LoadAsync();
+        if (commandCatalogWasLoaded)
+        {
+            await RefreshCommandCatalogAsync();
+        }
 
         if (previousPendingRuntimeTransition is null)
         {

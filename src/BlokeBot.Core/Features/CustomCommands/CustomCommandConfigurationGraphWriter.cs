@@ -422,14 +422,15 @@ public sealed class CustomCommandConfigurationGraphWriter(
 
         foreach (var configured in configuredCommands)
         {
-            foreach (var alias in configured.Aliases)
+            for (var sortOrder = 0; sortOrder < configured.Aliases.Count; sortOrder++)
             {
                 db.CustomCommandAliases.Add(
                     new CustomCommandAlias
                     {
                         HostId = hostId,
                         CustomCommandId = commands[configured.Id].Id,
-                        Alias = alias,
+                        Alias = configured.Aliases[sortOrder],
+                        SortOrder = sortOrder,
                     }
                 );
             }

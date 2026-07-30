@@ -15,6 +15,12 @@ public sealed class CustomCommandAliasRegistry
     )
     {
         var aliasValues = aliases.ToArray();
+        var fixedCollision = FixedChatCommandRoutes.FindCollision(aliasValues);
+        if (fixedCollision is not null)
+        {
+            return new CustomCommandAliasConflict.BuiltIn(fixedCollision);
+        }
+
         var builtInCollision = await db
             .CommandAliases.AsNoTracking()
             .Where(alias => alias.HostId == hostId && aliasValues.Contains(alias.Alias))

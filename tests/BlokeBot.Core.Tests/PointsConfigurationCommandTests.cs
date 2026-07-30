@@ -113,6 +113,28 @@ public sealed class PointsConfigurationCommandTests
     }
 
     [Test]
+    public async Task AliasOwnedByCustomCommand_Saving_ReturnsTypedFailureWithoutMutation()
+    {
+        await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostWithAliasAsync(dbFactory, "existing-points");
+        await SeedCustomCommandAliasAsync(dbFactory, hostId, "shared");
+        var service = CreateService(dbFactory);
+        var draft = await service.LoadConfigurationAsync(hostId, CancellationToken.None);
+        draft.Aliases.PointsAliases = "shared";
+
+        var result = await service
+            .SaveConfiguration(hostId, ValidCommand(draft))
+            .ExecuteAsync(CancellationToken.None);
+        var failure = result.Match<PointsConfigurationSaveFailure?>(_ => null, error => error);
+
+        failure.ShouldBe(new PointsConfigurationSaveFailure("shared"));
+        await using var db = await dbFactory.CreateDbContextAsync();
+        (await db.PointsSettings.CountAsync()).ShouldBe(0);
+        (await db.CommandAliases.SingleAsync()).Alias.ShouldBe("existing-points");
+        (await db.CustomCommandAliases.SingleAsync()).Alias.ShouldBe("shared");
+    }
+
+    [Test]
     public async Task CancelledExecution_Saving_DoesNotStartPersistence()
     {
         await using var dbFactory = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -408,6 +430,27 @@ public sealed class PointsConfigurationCommandTests
         );
         await db.SaveChangesAsync();
         return hostId;
+    }
+
+    private static async Task SeedCustomCommandAliasAsync(
+        SqliteBlokeBotDbFactory dbFactory,
+        int hostId,
+        string alias
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+        db.CustomCommands.Add(
+            new CustomCommand
+            {
+                HostId = hostId,
+                Name = "Existing custom command",
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+                Aliases = [new CustomCommandAlias { HostId = hostId, Alias = alias }],
+            }
+        );
+        await db.SaveChangesAsync();
     }
 
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory dbFactory)

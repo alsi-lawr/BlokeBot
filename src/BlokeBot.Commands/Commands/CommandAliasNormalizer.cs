@@ -27,11 +27,36 @@ public static class CommandAliasNormalizer
     }
 
     /// <summary>
+    /// Normalizes many aliases while preserving the first occurrence entered by the user.
+    /// </summary>
+    public static string[] NormalizeManyPreservingOrder(IEnumerable<string?> aliases)
+    {
+        return aliases
+            .Select(Normalize)
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Splits a comma-separated alias list using the same normalization rules.
     /// </summary>
     public static IReadOnlyList<string> Split(string aliases)
     {
         return NormalizeMany(
+            aliases.Split(
+                ',',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        );
+    }
+
+    /// <summary>
+    /// Splits a comma-separated alias list while retaining first-entered normalized order.
+    /// </summary>
+    public static IReadOnlyList<string> SplitPreservingOrder(string aliases)
+    {
+        return NormalizeManyPreservingOrder(
             aliases.Split(
                 ',',
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries

@@ -135,6 +135,7 @@ public static class BlokeBotApplication
                 .UseBlokeBotHostedChannelProvider()
                 .UseWhisperCommandResponseSender()
                 .UseBlokeBotHostedChannelLifecycleNotifier()
+                .AddCommandModule<ViewerCommandCatalogModule>()
                 .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
                 .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
                 .AddCommandModule<RequestBoardCommandModule>()

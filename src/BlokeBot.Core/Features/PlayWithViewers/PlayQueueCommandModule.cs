@@ -11,13 +11,19 @@ public sealed class PlayQueueCommandModule(
 {
     public void AddCommands(IChatCommandBuilder commands)
     {
-        commands.Map("queue", StatusAsync);
-        commands.Map("join", JoinAsync);
-        commands.Map("leave", LeaveAsync);
-        commands.Map("position", PositionAsync);
-        commands.Map("ready", ReadyAsync);
-        commands.Map("queueopen", (context, args, ct) => SetOpenAsync(context, args, true, ct));
-        commands.Map("queueclose", (context, args, ct) => SetOpenAsync(context, args, false, ct));
+        commands.Map(FixedChatCommandRoutes.Queue, StatusAsync);
+        commands.Map(FixedChatCommandRoutes.Join, JoinAsync);
+        commands.Map(FixedChatCommandRoutes.Leave, LeaveAsync);
+        commands.Map(FixedChatCommandRoutes.Position, PositionAsync);
+        commands.Map(FixedChatCommandRoutes.Ready, ReadyAsync);
+        commands.Map(
+            FixedChatCommandRoutes.QueueOpen,
+            (context, args, ct) => SetOpenAsync(context, args, true, ct)
+        );
+        commands.Map(
+            FixedChatCommandRoutes.QueueClose,
+            (context, args, ct) => SetOpenAsync(context, args, false, ct)
+        );
     }
 
     private async ValueTask StatusAsync(

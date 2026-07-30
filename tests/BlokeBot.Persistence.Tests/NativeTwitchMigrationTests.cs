@@ -23,7 +23,15 @@ public sealed class NativeTwitchMigrationTests
         await using (var published = await upgradedFactory.CreateDbContextAsync())
         {
             await published.GetService<IMigrator>().MigrateAsync(_nativeTwitchFeatureSwitch);
-            published.Hosts.AddRange(Host("seven", 7), Host("other-bits", 23));
+            await published.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
+                VALUES
+                    (1, 'seven-id', 'seven', 'seven', 0, 7, '2026-07-30T00:00:00Z'),
+                    (2, 'other-bits-id', 'other-bits', 'other-bits', 0, 23, '2026-07-30T00:00:00Z');
+                """
+            );
             published.TwitchCustomRewards.Add(
                 new TwitchCustomReward
                 {
@@ -119,7 +127,7 @@ public sealed class NativeTwitchMigrationTests
             history.ShouldContain(_publishedV03);
             history.ShouldContain(_nativeTwitchFeatureSwitch);
             history.ShouldContain(_automaticRaidShoutouts);
-            history.Count.ShouldBe(12);
+            history.Count.ShouldBe(13);
             history.ShouldNotContain("20260726031743_v0.3.0");
             history.ShouldNotContain("20260728183253_v0.4.0");
             upgradedSchema = await ReadSchemaAsync(upgraded.Database.GetDbConnection());
@@ -131,18 +139,6 @@ public sealed class NativeTwitchMigrationTests
         var freshSchema = await ReadSchemaAsync(fresh.Database.GetDbConnection());
 
         upgradedSchema.ShouldBe(freshSchema);
-    }
-
-    private static BotHost Host(string login, ulong features)
-    {
-        return new()
-        {
-            Login = login,
-            DisplayName = login,
-            TwitchUserId = $"{login}-id",
-            EnabledFeatures = (HostFeatureFlags)features,
-            CreatedAtUtc = DateTime.UtcNow,
-        };
     }
 
     private static Task<IReadOnlyList<string>> ReadSchemaAsync(DbConnection connection)

@@ -307,7 +307,7 @@ public static class CustomCommandConfigurationValidator
                 ),
                 _ => InvalidAction(editor.Id, names[index], replyRoutes, errors),
             };
-            var aliases = CommandAliasNormalizer.Split(editor.Aliases).ToArray();
+            var aliases = CommandAliasNormalizer.SplitPreservingOrder(editor.Aliases).ToArray();
             if (aliases.Length == 0)
             {
                 AddError(

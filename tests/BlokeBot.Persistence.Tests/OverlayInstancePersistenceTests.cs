@@ -11,7 +11,7 @@ namespace BlokeBot.Persistence.Tests;
 public sealed class OverlayInstancePersistenceTests
 {
     private const string _previousMigration = "20260730054804_v0.4.0_MomentConvergence";
-    private const string _overlayFeatureMigration = "20260730141846_v0.5.0_OverlayFeatureSwitch";
+    private const string _latestMigration = "20260730162013_v0.5.0_ViewerCommandCatalog";
 
     [Test]
     public async Task Migration_FromV04_AddsOverlaySchemaAndFeatureWithoutLosingHosts()
@@ -20,16 +20,13 @@ public sealed class OverlayInstancePersistenceTests
         await using (var db = await factory.CreateDbContextAsync())
         {
             await db.GetService<IMigrator>().MigrateAsync(_previousMigration);
-            db.Hosts.Add(
-                new BotHost
-                {
-                    TwitchUserId = "host-id",
-                    Login = "host",
-                    DisplayName = "Host",
-                    CreatedAtUtc = DateTime.UtcNow,
-                }
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, CreatedAtUtc)
+                VALUES (1, 'host-id', 'host', 'Host', 0, '2026-07-30T00:00:00Z');
+                """
             );
-            await db.SaveChangesAsync();
             await db.Database.MigrateAsync();
         }
 
@@ -38,10 +35,8 @@ public sealed class OverlayInstancePersistenceTests
         (await migrated.Hosts.Select(value => value.EnabledFeatures).SingleAsync()).ShouldBe(
             HostFeatureFlags.All
         );
-        (await migrated.Database.GetAppliedMigrationsAsync())
-            .Last()
-            .ShouldBe(_overlayFeatureMigration);
-        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(12);
+        (await migrated.Database.GetAppliedMigrationsAsync()).Last().ShouldBe(_latestMigration);
+        migrated.GetService<IMigrationsAssembly>().Migrations.Count.ShouldBe(13);
         (await migrated.Database.GetPendingMigrationsAsync()).ShouldBeEmpty();
         (await migrated.OverlayInstances.CountAsync()).ShouldBe(0);
         (await migrated.OverlayInstanceEvents.CountAsync()).ShouldBe(0);

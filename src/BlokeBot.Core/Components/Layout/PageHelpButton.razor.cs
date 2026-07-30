@@ -164,6 +164,14 @@ public partial class PageHelpButton
                 "You can let all of your Twitch mods help by default, limit access to named mods, or block specific mods from changing this channel.",
                 []
             ),
+            new(
+                "Available viewer commands",
+                "Choose the global chat words that open the viewer command catalog. The catalog publishes one canonical name for each command.",
+                [
+                    "The list shows one canonical name for each viewer-safe command and never includes moderator-only commands.",
+                    "Commands appear or disappear when games, giveaways, boards, queues, and live-stream availability change.",
+                ]
+            ),
         ]
     );
 

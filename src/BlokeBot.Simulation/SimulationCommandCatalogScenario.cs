@@ -1,0 +1,205 @@
+using BlokeBot.Commands;
+using BlokeBot.Core;
+using BlokeBot.Core.Features.Commands;
+using BlokeBot.Core.Features.HostedChannels.Status;
+using BlokeBot.Eventing;
+using BlokeBot.Functional;
+using BlokeBot.Persistence;
+using BlokeBot.Persistence.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace BlokeBot.Simulation;
+
+internal enum SimulationStreamLiveness
+{
+    Production,
+    Live,
+    Offline,
+    Unavailable,
+}
+
+internal sealed class SimulationCommandCatalogScenario(
+    HostBotStatusService productionStreams,
+    IDbContextFactory<BlokeBotDbContext> dbFactory,
+    EventBus<AppEventKind> events
+) : IHostStreamLivenessProvider
+{
+    private SimulationStreamLiveness _liveness = SimulationStreamLiveness.Production;
+
+    public IO<HostStreamLivenessOutcome, Never> GetStreamLiveness(string channelLogin)
+    {
+        return _liveness switch
+        {
+            SimulationStreamLiveness.Production => productionStreams.GetStreamLiveness(
+                channelLogin
+            ),
+            SimulationStreamLiveness.Live => Outcome(
+                new HostStreamLivenessOutcome.Live("simulation-stream")
+            ),
+            SimulationStreamLiveness.Offline => Outcome(new HostStreamLivenessOutcome.Offline()),
+            SimulationStreamLiveness.Unavailable => Outcome(
+                new HostStreamLivenessOutcome.Unavailable(
+                    HostStreamLivenessUnavailableReason.ProviderRequestFailed,
+                    new InvalidOperationException(
+                        "Simulation requested unavailable stream identity."
+                    )
+                )
+            ),
+            _ => throw new ArgumentOutOfRangeException(),
+        };
+    }
+
+    public async Task SetLivenessAsync(string state, CancellationToken ct)
+    {
+        _liveness = state.ToLowerInvariant() switch
+        {
+            "production" => SimulationStreamLiveness.Production,
+            "live" => SimulationStreamLiveness.Live,
+            "offline" => SimulationStreamLiveness.Offline,
+            "unavailable" => SimulationStreamLiveness.Unavailable,
+            _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown liveness."),
+        };
+        await events.PublishAsync(AppEventKind.MomentsChanged, ct);
+    }
+
+    public async Task SetRoundAsync(string state, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var hostId = await HostIdAsync(db, ct);
+        var round = await db
+            .Rounds.Where(value =>
+                value.HostId == hostId
+                && (
+                    value.Status == GuessRoundStatus.Open || value.Status == GuessRoundStatus.Closed
+                )
+            )
+            .OrderByDescending(value => value.StartedAtUtc)
+            .FirstOrDefaultAsync(ct);
+        round ??= await db
+            .Rounds.Where(value => value.HostId == hostId)
+            .OrderByDescending(value => value.StartedAtUtc)
+            .FirstAsync(ct);
+
+        switch (state.ToLowerInvariant())
+        {
+            case "open":
+                round.Status = GuessRoundStatus.Open;
+                round.ClosedAtUtc = null;
+                round.WinningName = null;
+                break;
+            case "closed":
+                round.Status = GuessRoundStatus.Closed;
+                round.ClosedAtUtc = SimulationMode.Now.UtcDateTime;
+                round.WinningName = null;
+                break;
+            case "none":
+                round.Status = GuessRoundStatus.Completed;
+                round.ClosedAtUtc = SimulationMode.Now.UtcDateTime;
+                round.WinningName = "Blue";
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown round state.");
+        }
+
+        await db.SaveChangesAsync(ct);
+        await events.PublishAsync(AppEventKind.GuessingChanged, ct);
+    }
+
+    public async Task SetGiveawayAsync(string state, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var hostId = await HostIdAsync(db, ct);
+        var giveaway = await db
+            .PointsGiveaways.Where(value => value.HostId == hostId)
+            .OrderByDescending(value => value.StartedAtUtc)
+            .FirstAsync(ct);
+        switch (state.ToLowerInvariant())
+        {
+            case "active":
+                giveaway.Status = PointsGiveawayStatus.Active;
+                giveaway.CompletedAtUtc = null;
+                break;
+            case "inactive":
+                giveaway.Status = PointsGiveawayStatus.Completed;
+                giveaway.CompletedAtUtc = SimulationMode.Now.UtcDateTime;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(state),
+                    state,
+                    "Unknown giveaway state."
+                );
+        }
+
+        await db.SaveChangesAsync(ct);
+        await events.PublishAsync(AppEventKind.PointsChanged, ct);
+    }
+
+    public async Task SetFeatureAvailabilityAsync(string state, CancellationToken ct)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var hostId = await HostIdAsync(db, ct);
+        var host = await db.Hosts.SingleAsync(value => value.Id == hostId, ct);
+        host.EnabledFeatures = state.ToLowerInvariant() switch
+        {
+            "available" => HostFeatureFlags.All,
+            "unavailable" => HostFeatureFlags.NativeTwitch | HostFeatureFlags.Overlays,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(state),
+                state,
+                "Unknown feature state."
+            ),
+        };
+        await db.SaveChangesAsync(ct);
+        await events.PublishAsync(AppEventKind.CommandsChanged, ct);
+    }
+
+    public async Task<ViewerCommandCatalogSnapshot> SnapshotAsync(
+        ViewerCommandCatalogService catalog,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        return await catalog.LoadForHostAsync(await HostIdAsync(db, ct), ct);
+    }
+
+    public async Task<IReadOnlyList<string>> DispatchAsync(
+        ChatCommandDispatcher dispatcher,
+        CancellationToken ct
+    )
+    {
+        var responses = new List<string>();
+        await dispatcher.DispatchResponsesAsync(
+            new ChatMessage(
+                "simulationviewer",
+                FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login,
+                "!commands",
+                "simulation-command-catalog",
+                new Dictionary<string, string>()
+            ),
+            (response, _) =>
+            {
+                responses.Add(response.Message);
+                return ValueTask.CompletedTask;
+            },
+            ct
+        );
+        return responses;
+    }
+
+    private static IO<HostStreamLivenessOutcome, Never> Outcome(HostStreamLivenessOutcome outcome)
+    {
+        return IO<HostStreamLivenessOutcome, Never>.Create(_ =>
+            ValueTask.FromResult(Result<HostStreamLivenessOutcome, Never>.Success(outcome))
+        );
+    }
+
+    private static Task<int> HostIdAsync(BlokeBotDbContext db, CancellationToken ct)
+    {
+        var login = FakeTwitch.FakeTwitchScenarioDefinition.ReadyDashboard.AuthorizedUser.Login;
+        return db
+            .Hosts.Where(value => value.Login == login)
+            .Select(value => value.Id)
+            .SingleAsync(ct);
+    }
+}

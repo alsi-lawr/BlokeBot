@@ -1,4 +1,6 @@
 using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
 using BlokeBot.Core.Features.HostedChannels.Status;
 using BlokeBot.Core.Features.Moments;
 using BlokeBot.Functional;
@@ -105,5 +107,60 @@ public sealed class SimulationLaunchReadinessTests
         simulation.FakeTwitch.Authority.Transcript.ShouldContain(value =>
             value.Kind == "helix.clip.create"
         );
+    }
+
+    [Test]
+    public async Task CommandCatalogScenario_ExposesDeterministicChatAndStateTransitions()
+    {
+        await using var simulation = await SimulationApplication.BuildAsync(
+            ["--urls=http://127.0.0.1:5082"],
+            CancellationToken.None
+        );
+        await simulation.App.InitializeSimulationAsync(CancellationToken.None);
+        await simulation.App.StartAsync();
+        await simulation
+            .App.Services.GetRequiredService<SimulationStartupCoordinator>()
+            .BootstrapAsync(simulation.App, CancellationToken.None);
+        using var client = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:5082") };
+
+        using var initial = await client.GetFromJsonAsync<JsonDocument>(
+            "/simulation/commands/catalog"
+        );
+        var initialJson = initial!.RootElement.GetRawText();
+        initialJson.ShouldContain("!commands");
+        initialJson.ShouldContain("!guess");
+        initialJson.ShouldContain("!enter");
+        initialJson.ShouldContain("!welcome");
+        initialJson.ShouldNotContain("!hello");
+        initialJson.ShouldNotContain("!modfixture");
+        initialJson.ShouldContain("shadowed by another command");
+
+        using var chatResponse = await client.PostAsync("/simulation/commands/chat", null);
+        var chat = await chatResponse.Content.ReadAsStringAsync();
+        chat.ShouldContain("Available viewer commands:");
+        chat.Length.ShouldBeGreaterThan(500);
+
+        (await client.PostAsync("/simulation/commands/round/none", null)).StatusCode.ShouldBe(
+            HttpStatusCode.OK
+        );
+        (
+            await client.PostAsync("/simulation/commands/giveaway/inactive", null)
+        ).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (
+            await client.PostAsync("/simulation/commands/features/unavailable", null)
+        ).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (
+            await client.PostAsync("/simulation/commands/liveness/unavailable", null)
+        ).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        using var unavailable = await client.GetFromJsonAsync<JsonDocument>(
+            "/simulation/commands/catalog"
+        );
+        var unavailableJson = unavailable!.RootElement.GetRawText();
+        unavailableJson.ShouldNotContain("!guess");
+        unavailableJson.ShouldNotContain("!enter");
+        unavailableJson.ShouldNotContain("!welcome");
+        unavailableJson.ShouldNotContain("!moment");
+        unavailableJson.ShouldContain("Moment commands are unavailable");
     }
 }

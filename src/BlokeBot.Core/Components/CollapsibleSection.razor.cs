@@ -34,6 +34,9 @@ public partial class CollapsibleSection
     [Parameter]
     public long OpenRequest { get; set; }
 
+    [Parameter]
+    public EventCallback Opened { get; set; }
+
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
 
@@ -104,8 +107,12 @@ public partial class CollapsibleSection
         catch (TaskCanceledException) { }
     }
 
-    private void Toggle()
+    private async Task ToggleAsync()
     {
         _isOpen = !_isOpen;
+        if (_isOpen)
+        {
+            await Opened.InvokeAsync();
+        }
     }
 }

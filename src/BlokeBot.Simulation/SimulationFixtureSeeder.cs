@@ -41,6 +41,8 @@ internal sealed class SimulationFixtureSeeder(
         await SeedGuessingAsync(db, hostId, now, cancellationToken);
         await SeedPointsAsync(db, hostId, now, cancellationToken);
         await SeedCustomCommandsAsync(db, hostId, now, cancellationToken);
+        await SeedRequestBoardAsync(db, hostId, now, cancellationToken);
+        await SeedPlayQueueAsync(db, hostId, now, cancellationToken);
         await SeedAlertsAsync(db, hostId, now, cancellationToken);
         await SeedAutomaticRaidShoutoutsAsync(db, hostId, now, cancellationToken);
         await SeedOverlayAsync(db, hostId, now, cancellationToken);
@@ -351,7 +353,21 @@ internal sealed class SimulationFixtureSeeder(
                     HostId = hostId,
                     ZeroArgumentMessageLibraryEntryId = welcome.Id,
                 },
-                Aliases = [new CustomCommandAlias { HostId = hostId, Alias = "welcome" }],
+                Aliases =
+                [
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "welcome",
+                        SortOrder = 0,
+                    },
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "hello",
+                        SortOrder = 1,
+                    },
+                ],
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             },
@@ -366,11 +382,95 @@ internal sealed class SimulationFixtureSeeder(
                     ZeroArgumentMessageLibraryEntryId = hydrationReply.Id,
                     CounterId = counter.Id,
                 },
-                Aliases = [new CustomCommandAlias { HostId = hostId, Alias = "hydrate" }],
+                Aliases =
+                [
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "hydrate",
+                        SortOrder = 0,
+                    },
+                ],
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             }
         );
+        db.CustomCommands.Add(
+            new CustomCommand
+            {
+                HostId = hostId,
+                Name = "Moderator-only fixture",
+                Enabled = true,
+                ModeratorOnly = true,
+                Action = new MessageCustomCommandAction
+                {
+                    HostId = hostId,
+                    ZeroArgumentMessageLibraryEntryId = welcome.Id,
+                },
+                Aliases =
+                [
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "modfixture",
+                        SortOrder = 0,
+                    },
+                ],
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+        db.CustomCommands.Add(
+            new CustomCommand
+            {
+                HostId = hostId,
+                Name = "Legacy fixed-route collision",
+                Enabled = true,
+                Action = new MessageCustomCommandAction
+                {
+                    HostId = hostId,
+                    ZeroArgumentMessageLibraryEntryId = welcome.Id,
+                },
+                Aliases =
+                [
+                    new CustomCommandAlias
+                    {
+                        HostId = hostId,
+                        Alias = "moment",
+                        SortOrder = 0,
+                    },
+                ],
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+        for (var index = 1; index <= 32; index++)
+        {
+            db.CustomCommands.Add(
+                new CustomCommand
+                {
+                    HostId = hostId,
+                    Name = $"Catalog fixture {index:00}",
+                    Enabled = true,
+                    Action = new MessageCustomCommandAction
+                    {
+                        HostId = hostId,
+                        ZeroArgumentMessageLibraryEntryId = welcome.Id,
+                    },
+                    Aliases =
+                    [
+                        new CustomCommandAlias
+                        {
+                            HostId = hostId,
+                            Alias = $"viewercommand{index:00}",
+                            SortOrder = 0,
+                        },
+                    ],
+                    CreatedAtUtc = now,
+                    UpdatedAtUtc = now,
+                }
+            );
+        }
 
         db.CustomAnnouncements.Add(
             new CustomAnnouncement
@@ -393,6 +493,59 @@ internal sealed class SimulationFixtureSeeder(
                     IntervalMinutes = 30,
                     RequiredChatMessages = 5,
                 },
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+    }
+
+    private static async Task SeedRequestBoardAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.RequestBoards.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+
+        db.RequestBoards.Add(
+            new RequestBoard
+            {
+                HostId = hostId,
+                Slug = "requests",
+                Title = "Viewer requests",
+                Description = "Deterministic command-catalog fixture.",
+                IsOpen = true,
+                VotingEnabled = true,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            }
+        );
+    }
+
+    private static async Task SeedPlayQueueAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        DateTime now,
+        CancellationToken cancellationToken
+    )
+    {
+        if (await db.PlayQueues.AnyAsync(value => value.HostId == hostId, cancellationToken))
+        {
+            return;
+        }
+
+        db.PlayQueues.Add(
+            new PlayQueue
+            {
+                HostId = hostId,
+                Slug = "main",
+                Name = "Main queue",
+                ActivityName = "Fake Game",
+                IsOpen = true,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now,
             }

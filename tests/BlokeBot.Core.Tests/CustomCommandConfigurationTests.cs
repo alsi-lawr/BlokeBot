@@ -115,7 +115,7 @@ public sealed class CustomCommandConfigurationTests
 
         var command = loaded.Commands.Single();
         command.Name.ShouldBe("Hello");
-        command.Aliases.ShouldBe("hello, hi");
+        command.Aliases.ShouldBe("hi, hello");
         command.Enabled.ShouldBeFalse();
         command.ModeratorOnly.ShouldBeTrue();
         command.CooldownSeconds.ShouldBe(12);
@@ -182,7 +182,7 @@ public sealed class CustomCommandConfigurationTests
         command.MessageEntries.Single().Name.ShouldBe("Reply");
         command.MessageEntries.Single().Variants.Single().Text.ShouldBe("Reply text.");
         command.Commands.Single().Name.ShouldBe("Command");
-        command.Commands.Single().Aliases.ShouldBe(["first", "second"]);
+        command.Commands.Single().Aliases.ShouldBe(["second", "first"]);
         (command.MessageEntries is List<CustomMessageLibraryEntryValue>).ShouldBeFalse();
         (command.Commands is List<CustomCommandValue>).ShouldBeFalse();
     }

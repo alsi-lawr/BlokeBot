@@ -21,17 +21,16 @@ public sealed class OverlayFeatureSwitchMigrationTests
         await using (var before = await factory.CreateDbContextAsync())
         {
             await before.GetService<IMigrator>().MigrateAsync(_overlayInstances);
-            before.Hosts.AddRange(
-                Host("none", HostFeatureFlags.None),
-                Host("custom", HostFeatureFlags.CustomCommands),
-                Host("unknown", (HostFeatureFlags)64UL)
+            await before.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO hosts
+                    (Id, TwitchUserId, Login, DisplayName, BotRuntimeState, EnabledFeatures, CreatedAtUtc)
+                VALUES
+                    (1, 'none-id', 'none', 'none', 0, 0, '2026-07-30T00:00:00Z'),
+                    (2, 'custom-id', 'custom', 'custom', 0, 4, '2026-07-30T00:00:00Z'),
+                    (3, 'unknown-id', 'unknown', 'unknown', 0, 64, '2026-07-30T00:00:00Z');
+                """
             );
-            await before.SaveChangesAsync();
-            await before
-                .Hosts.Where(value => value.Login == "none")
-                .ExecuteUpdateAsync(setters =>
-                    setters.SetProperty(value => value.EnabledFeatures, HostFeatureFlags.None)
-                );
             await before.Database.MigrateAsync();
         }
 
