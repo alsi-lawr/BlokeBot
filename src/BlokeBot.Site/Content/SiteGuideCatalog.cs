@@ -381,7 +381,8 @@ internal static class SiteGuideCatalog
                         "Review the submitted values and any possible-duplicate warning. Set public category, tags, priority and Public note when they help participants.",
                         "Move Pending to Approved or Rejected. Approved requests can move to Queued or Accepted; Queued or Accepted requests can move to Completed.",
                         "Use Merge with the target request ID when two entries are the same request. The public board keeps the merged outcome and the surviving request's combined support.",
-                        "Use the matching moderator chat commands when the dashboard is not convenient: !requestapprove, !requestreject, !requestqueue, !requestaccept, !requestcomplete or !requestmerge followed by the request ID.",
+                        "When the dashboard is not convenient, use !requestapprove, !requestreject, !requestqueue, !requestaccept or !requestcomplete followed by one request ID.",
+                        "To merge in chat, use !requestmerge <source-id> <target-id>.",
                     ],
                     Paragraphs =
                     [
@@ -393,8 +394,8 @@ internal static class SiteGuideCatalog
                     Heading = "Points, failure and recovery",
                     Bullets =
                     [
-                        "A non-zero cost reserves points when the request is accepted. Never manually charge the viewer as well.",
-                        "Never refunds; Rejected or withdrawn refunds those two closures; Any unfulfilled closure also refunds other closures that did not complete. A completed request consumes its reservation.",
+                        "A non-zero cost is reserved and deducted from the viewer's available balance when the board accepts the initial submission, before moderator review. It remains reserved through Pending, Approved, Queued and Accepted. Never manually charge the viewer as well.",
+                        "Completion consumes the reservation. A closure refunds it only under the configured policy: Never does not refund; Rejected or withdrawn refunds those two closures; Any unfulfilled closure also refunds other closures that did not complete.",
                         "If validation, the cooldown, a limit or the balance rejects a submission, correct the message shown and submit once. If an outcome is already visible, reload before trying again.",
                         "If request state and points still disagree after reload, leave the request unchanged and send the channel, board name, request ID, approximate time and visible message to the server owner. Do not share Twitch tokens or private notes.",
                     ],
