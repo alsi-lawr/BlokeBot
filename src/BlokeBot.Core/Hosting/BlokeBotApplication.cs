@@ -176,6 +176,8 @@ public static class BlokeBotApplication
         BlokeBotRuntimeMode runtime
     )
     {
+        app.UseOverlayAccessLogRedaction();
+
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -188,6 +190,7 @@ public static class BlokeBotApplication
         app.UseAuthentication();
         app.UseAuthorization();
 
+        app.MapOverlayBrowserSourceEndpoints();
         app.MapMethods(
             "/favicon.ico",
             ["GET", "HEAD"],

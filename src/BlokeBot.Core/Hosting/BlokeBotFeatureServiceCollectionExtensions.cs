@@ -84,6 +84,8 @@ public static class BlokeBotFeatureServiceCollectionExtensions
         services.AddSingleton<IOverlayAccessKeyGenerator, CryptographicOverlayAccessKeyGenerator>();
         services.AddSingleton<OverlayInstanceService>();
         services.AddSingleton<OverlayInstanceResolver>();
+        services.AddSingleton<OverlayServerEpoch>();
+        services.AddSingleton<IOverlayStateProvider, OverlayStateProvider>();
         services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         return services;
     }
