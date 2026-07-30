@@ -166,6 +166,85 @@ public sealed class PlayQueueServiceTests
     }
 
     [Test]
+    public async Task ReadyAfterExpiry_RejectsAndDurablyRecordsNoShow()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero)
+        );
+        var service = CreateService(database, clock);
+        _ = Success(await service.ConfigureAsync(host, Queue("squad"), CancellationToken.None));
+        var entry = Success(
+            await service.JoinAsync(
+                host,
+                "squad",
+                Join("viewer", "eu", "Tank"),
+                CancellationToken.None
+            )
+        ).Value;
+        _ = Success(await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None));
+
+        clock.Advance(TimeSpan.FromSeconds(120));
+        var result = await service.ReadyAsync(host, "squad", new("viewer"), CancellationToken.None);
+
+        result.ShouldBeOfType<PlayQueueResult<PublicPlayQueueEntryView>.Rejected>();
+        await AssertExpiredReadyCheckPersistedAsync(database, entry.Id);
+    }
+
+    [Test]
+    [Arguments(ExpiredQueueMutation.Open)]
+    [Arguments(ExpiredQueueMutation.Close)]
+    [Arguments(ExpiredQueueMutation.Configure)]
+    public async Task QueueMutationAfterExpiry_DurablyRecordsNoShow(ExpiredQueueMutation mutation)
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var host = await SeedHostAsync(database, "alpha");
+        var clock = new ManualTimeProvider(
+            new DateTimeOffset(2026, 7, 30, 12, 0, 0, TimeSpan.Zero)
+        );
+        var service = CreateService(database, clock);
+        _ = Success(await service.ConfigureAsync(host, Queue("squad"), CancellationToken.None));
+        var entry = Success(
+            await service.JoinAsync(
+                host,
+                "squad",
+                Join("viewer", "eu", "Tank"),
+                CancellationToken.None
+            )
+        ).Value;
+        _ = Success(await service.StartReadyCheckAsync(host, entry.Id, CancellationToken.None));
+        if (mutation == ExpiredQueueMutation.Open)
+        {
+            _ = Success(await service.SetOpenAsync(host, "squad", false, CancellationToken.None));
+        }
+
+        clock.Advance(TimeSpan.FromSeconds(120));
+        _ = mutation switch
+        {
+            ExpiredQueueMutation.Open => Success(
+                await service.SetOpenAsync(host, "squad", true, CancellationToken.None)
+            ),
+            ExpiredQueueMutation.Close => Success(
+                await service.SetOpenAsync(host, "squad", false, CancellationToken.None)
+            ),
+            ExpiredQueueMutation.Configure => Success(
+                await service.ConfigureAsync(
+                    host,
+                    Queue("squad") with
+                    {
+                        ActivityName = "Changed game",
+                    },
+                    CancellationToken.None
+                )
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null),
+        };
+
+        await AssertExpiredReadyCheckPersistedAsync(database, entry.Id);
+    }
+
+    [Test]
     public async Task ReadyBeforeExpiry_ConvergesAndCanBeSelected()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -389,6 +468,28 @@ public sealed class PlayQueueServiceTests
         );
     }
 
+    private static async Task AssertExpiredReadyCheckPersistedAsync(
+        SqliteBlokeBotDbFactory database,
+        long entryId
+    )
+    {
+        await using var verify = await database.CreateDbContextAsync();
+        var entry = await verify.PlayQueueEntries.SingleAsync(value => value.Id == entryId);
+        entry.Status.ShouldBe(PlayQueueEntryStatus.NoShow);
+        (
+            await verify.PlayQueueExclusions.CountAsync(value =>
+                value.QueueId == entry.QueueId
+                && value.IdentityKey == entry.IdentityKey
+                && value.PrivateReason == "Ready check expired"
+            )
+        ).ShouldBe(1);
+        (
+            await verify.PlayQueueEvents.CountAsync(value =>
+                value.EntryId == entryId && value.Kind == PlayQueueEventKind.NoShow
+            )
+        ).ShouldBe(1);
+    }
+
     private static async Task<int> SeedHostAsync(SqliteBlokeBotDbFactory database, string login)
     {
         await using var db = await database.CreateDbContextAsync();
@@ -416,5 +517,12 @@ public sealed class PlayQueueServiceTests
         {
             _now += value;
         }
+    }
+
+    public enum ExpiredQueueMutation
+    {
+        Open,
+        Close,
+        Configure,
     }
 }

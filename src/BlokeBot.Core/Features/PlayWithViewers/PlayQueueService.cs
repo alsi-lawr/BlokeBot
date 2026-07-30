@@ -129,7 +129,8 @@ public sealed class PlayQueueService(
                 await db.SaveChangesAsync(ct);
                 return Succeeded(await LoadSummaryAsync(db, queue, ct));
             },
-            ct
+            ct,
+            (db, now) => ConvergeQueueAsync(db, hostId, slug, now, ct)
         );
     }
 
@@ -282,7 +283,8 @@ public sealed class PlayQueueService(
                 await db.SaveChangesAsync(ct);
                 return Succeeded(await ToPublicViewAsync(db, queue, entry, ct));
             },
-            ct
+            ct,
+            (db, now) => ConvergeQueueAsync(db, hostId, slug, now, ct)
         );
     }
 
@@ -624,7 +626,9 @@ public sealed class PlayQueueService(
                     idempotent
                 );
             },
-            ct
+            ct,
+            (db, now) =>
+                ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
         );
     }
 
@@ -735,7 +739,9 @@ public sealed class PlayQueueService(
                     )
                 );
             },
-            ct
+            ct,
+            (db, now) =>
+                ConvergeQueueAsync(db, hostId, PlayQueueInput.NormalizeSlug(queueSlug), now, ct)
         );
     }
 
@@ -965,7 +971,8 @@ public sealed class PlayQueueService(
                 await ConvergeAndPruneAsync(db, queue, now, ct);
                 return await mutate(db, queue, entry, now);
             },
-            ct
+            ct,
+            (db, now) => ConvergeEntryQueueAsync(db, hostId, entryId, now, ct)
         );
     }
 
@@ -1003,7 +1010,8 @@ public sealed class PlayQueueService(
                     ? Rejected<PublicPlayQueueEntryView>(new PlayQueueRejection.NotJoined())
                     : await mutate(db, queue, entry, now);
             },
-            ct
+            ct,
+            (db, now) => ConvergeQueueAsync(db, hostId, slug, now, ct)
         );
     }
 
@@ -1057,7 +1065,8 @@ public sealed class PlayQueueService(
         int hostId,
         string slug,
         Func<BlokeBotDbContext, DateTime, Task<PlayQueueResult<T>>> mutate,
-        CancellationToken ct
+        CancellationToken ct,
+        Func<BlokeBotDbContext, DateTime, Task<bool>>? convergeBeforeMutation = null
     )
     {
         var gate = GateFor(hostId, slug);
@@ -1066,10 +1075,25 @@ public sealed class PlayQueueService(
         {
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             await using var transaction = await db.Database.BeginTransactionAsync(ct);
-            var result = await mutate(db, timeProvider.GetUtcNow().UtcDateTime);
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var converged =
+                convergeBeforeMutation is not null && await convergeBeforeMutation(db, now);
+            if (converged)
+            {
+                await db.SaveChangesAsync(ct);
+                await transaction.CreateSavepointAsync("AfterReadinessConvergence", ct);
+            }
+
+            var result = await mutate(db, now);
             if (result is PlayQueueResult<T>.Succeeded)
             {
                 await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
+            }
+            else if (converged)
+            {
+                await transaction.RollbackToSavepointAsync("AfterReadinessConvergence", ct);
                 await transaction.CommitAsync(ct);
                 await events.PublishAsync(AppEventKind.PlayQueuesChanged, ct);
             }
@@ -1080,6 +1104,39 @@ public sealed class PlayQueueService(
         {
             gate.Release();
         }
+    }
+
+    private async Task<bool> ConvergeQueueAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        string slug,
+        DateTime now,
+        CancellationToken ct
+    )
+    {
+        var queue = await LoadQueueAsync(db, hostId, slug, ct);
+        return queue is not null && await ConvergeAndPruneAsync(db, queue, now, ct);
+    }
+
+    private async Task<bool> ConvergeEntryQueueAsync(
+        BlokeBotDbContext db,
+        int hostId,
+        long entryId,
+        DateTime now,
+        CancellationToken ct
+    )
+    {
+        var queueId = await db
+            .PlayQueueEntries.Where(value => value.HostId == hostId && value.Id == entryId)
+            .Select(value => (int?)value.QueueId)
+            .SingleOrDefaultAsync(ct);
+        if (queueId is null)
+        {
+            return false;
+        }
+
+        var queue = await LoadQueueAsync(db, hostId, queueId.Value, ct);
+        return queue is not null && await ConvergeAndPruneAsync(db, queue, now, ct);
     }
 
     private async Task<bool> ConvergeAndPruneAsync(
