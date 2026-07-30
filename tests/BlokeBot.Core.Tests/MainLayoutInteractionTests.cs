@@ -110,7 +110,7 @@ public sealed class NavMenuInventoryTests
         cut.Find(".nav-menu").GetAttribute("data-navigation-mode").ShouldBe("icon");
         cut.FindAll("[data-nav-destination]")
             .Select(element => element.GetAttribute("data-nav-destination"))
-            .ShouldBe(["home", "alerts", "host", "requests"]);
+            .ShouldBe(["home", "alerts", "host", "requests", "queues"]);
         cut.FindAll("[data-nav-section]")
             .Select(element => element.GetAttribute("data-nav-section"))
             .ShouldBe(["twitch-operations", "guessing", "points", "custom-commands"]);

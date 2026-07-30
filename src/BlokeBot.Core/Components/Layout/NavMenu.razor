@@ -42,6 +42,7 @@
                     var showPoints = FeatureIsVisible(session, selection, HostFeatureFlags.Points);
                     var showCustomCommands = FeatureIsVisible(session, selection, HostFeatureFlags.CustomCommands);
                     var showRequestBoards = selection is not null && !session.IsBotAccount;
+                    var showPlayQueues = selection is not null && !session.IsBotAccount;
                     var showAlerts = selection is not null && !session.IsBotAccount;
                     var showNativeTwitch = FeatureIsVisible(
                         session,
@@ -49,7 +50,7 @@
                         HostFeatureFlags.NativeTwitch
                     );
                     var showChatTools =
-                        showNativeTwitch || showGuessing || showPoints || showCustomCommands || showRequestBoards;
+                        showNativeTwitch || showGuessing || showPoints || showCustomCommands || showRequestBoards || showPlayQueues;
                 }
 
                 <AuthorizeView Policy="BotAdmin">
@@ -235,6 +236,24 @@
                             <span class="nav-menu__label min-w-0">Request boards</span>
                         </NavLink>
                         @RouteHelp("requests", "Request boards")
+                    </div>
+                }
+
+                @if (showPlayQueues)
+                {
+                    <div class="nav-menu__route-item nav-menu__panel rounded-xl p-1"
+                         data-nav-destination="queues">
+                        <NavLink class="nav-menu__link flex min-h-11 items-center gap-2.5 rounded-lg border border-transparent px-2.5 text-sm font-bold transition"
+                                 ActiveClass="nav-menu__item-active"
+                                 href="queues"
+                                 aria-label="Play with viewers"
+                                 aria-describedby="@RouteHelpReference("queues")"
+                                 aria-current="@CurrentRoute("queues")"
+                                 @onclick="NotifyNavigatedAsync">
+                            <span class="nav-menu__icon inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700" aria-hidden="true">♟</span>
+                            <span class="nav-menu__label min-w-0">Play with viewers</span>
+                        </NavLink>
+                        @RouteHelp("queues", "Play with viewers")
                     </div>
                 }
 
