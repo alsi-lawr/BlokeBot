@@ -47,7 +47,20 @@ public sealed class MomentUiTests
             page.Find("#moment-marker-fallback").ShouldNotBeNull();
             page.Find("label[for='moment-marker-fallback']")
                 .TextContent.ShouldContain("Use a stream marker");
-            page.Find(".moment-setting-toggle").ShouldNotBeNull();
+            page.Find(".moment-setting-toggle").ClassList.ShouldContain("grid-rows-[auto_1fr]");
+            var captureSettings = page.FindAll(
+                "#moment-settings-heading + .grid > :is(.space-y-2, .moment-setting-toggle)"
+            );
+            captureSettings.Count.ShouldBe(4);
+            captureSettings.ShouldAllBe(setting => setting.Children[0].ClassList.Contains("label"));
+            captureSettings
+                .Select(setting => setting.QuerySelector("input, select").ShouldNotBeNull().Id)
+                .ShouldBe([
+                    "moment-window",
+                    "moment-reward-policy",
+                    "moment-reward-amount",
+                    "moment-marker-fallback",
+                ]);
             page.Markup.ShouldNotContain("pt-6");
         });
     }
