@@ -58,30 +58,46 @@ public sealed class RequestBoardServiceTests
     }
 
     [Test]
-    public async Task Submission_RetryAndWithdrawal_ReserveAndRefundPointsExactlyOnce()
+    public async Task ConcurrentSubmissionAndWithdrawalRetries_ConvergeOnOneAccountingResult()
     {
         await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
         var hostId = await SeedHostAsync(database, "alpha");
         await SeedBalanceAsync(database, hostId, "viewer", "100");
         var service = CreateService(database);
+        var concurrentService = CreateService(database);
         _ = Success(
             await service.ConfigureAsync(hostId, Board(pointCost: "25"), CancellationToken.None)
         );
         var operationId = Guid.NewGuid();
         var command = Submission(operationId, "viewer", "A useful game");
 
-        var first = Success(
-            await service.SubmitAsync(hostId, "games", command, CancellationToken.None)
-        );
-        var retry = Success(
-            await service.SubmitAsync(hostId, "games", command, CancellationToken.None)
-        );
-        _ = Success(
+        var submissions = (
+            await Task.WhenAll(
+                service.SubmitAsync(hostId, "games", command, CancellationToken.None),
+                concurrentService.SubmitAsync(hostId, "games", command, CancellationToken.None)
+            )
+        )
+            .Select(Success)
+            .ToArray();
+        var first = submissions.Single(value => !value.WasIdempotent);
+        var retry = submissions.Single(value => value.WasIdempotent);
+        var withdrawal = Success(
             await service.WithdrawAsync(hostId, first.Value.Id, "viewer", CancellationToken.None)
+        );
+        var withdrawalRetry = Success(
+            await concurrentService.WithdrawAsync(
+                hostId,
+                first.Value.Id,
+                "viewer",
+                CancellationToken.None
+            )
         );
 
         retry.WasIdempotent.ShouldBeTrue();
         retry.Value.Id.ShouldBe(first.Value.Id);
+        withdrawal.WasIdempotent.ShouldBeFalse();
+        withdrawalRetry.WasIdempotent.ShouldBeTrue();
+        withdrawalRetry.Value.Id.ShouldBe(first.Value.Id);
         await using var verify = await database.CreateDbContextAsync();
         (
             await verify.PointBalances.SingleAsync(value =>
@@ -105,6 +121,9 @@ public sealed class RequestBoardServiceTests
             value.HostId == hostId && value.SchemaVersion == 1 && value.PublicPayload.Length <= 1024
         );
         events.Count.ShouldBeLessThanOrEqualTo(200);
+        events.Count(value => value.Kind == RequestBoardEventKind.Submitted).ShouldBe(1);
+        events.Count(value => value.Kind == RequestBoardEventKind.PointsReserved).ShouldBe(1);
+        events.Count(value => value.Kind == RequestBoardEventKind.PointsRefunded).ShouldBe(1);
     }
 
     [Test]
@@ -182,6 +201,53 @@ public sealed class RequestBoardServiceTests
             .Value.ShouldBe("https://example.com/watch");
         valid.Value.Values.Single(value => value.Key == "format").Value.ShouldBe("Video");
         valid.Value.Values.Single(value => value.Key == "rating").Value.ShouldBe("5.5");
+    }
+
+    [Test]
+    public async Task RepeatedModeratorClosure_ReturnsExistingRefundedResult()
+    {
+        await using var database = await SqliteBlokeBotDbFactory.CreateAsync();
+        var hostId = await SeedHostAsync(database, "alpha");
+        await SeedBalanceAsync(database, hostId, "viewer", "100");
+        var service = CreateService(database);
+        _ = Success(
+            await service.ConfigureAsync(hostId, Board(pointCost: "25"), CancellationToken.None)
+        );
+        var submission = Success(
+            await service.SubmitAsync(
+                hostId,
+                "games",
+                Submission(Guid.NewGuid(), "viewer", "Rejected request"),
+                CancellationToken.None
+            )
+        ).Value;
+
+        var rejection = Moderate(
+            submission.Id,
+            RequestSubmissionStatus.Rejected,
+            "Not for this stream.",
+            "Already covered.",
+            "Duplicate."
+        );
+        var first = Success(await service.ModerateAsync(hostId, rejection, CancellationToken.None));
+        var retry = Success(await service.ModerateAsync(hostId, rejection, CancellationToken.None));
+
+        first.WasIdempotent.ShouldBeFalse();
+        retry.WasIdempotent.ShouldBeTrue();
+        retry.Value.Public.Status.ShouldBe(RequestSubmissionStatus.Rejected);
+        retry.Value.PointReservationState.ShouldBe(RequestPointReservationState.Refunded);
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify.PointLedgerEntries.CountAsync(value =>
+                value.RequestSubmissionId == submission.Id
+                && value.Kind == PointLedgerKind.RequestRefund
+            )
+        ).ShouldBe(1);
+        (
+            await verify.PointBalances.SingleAsync(value =>
+                value.HostId == hostId && value.Login == "viewer"
+            )
+        ).Amount.ShouldBe("100");
     }
 
     [Test]
@@ -305,10 +371,22 @@ public sealed class RequestBoardServiceTests
                 CancellationToken.None
             )
         );
+        var mergeRetry = Success(
+            await service.MergeAsync(
+                hostId,
+                duplicate.Id,
+                target.Id,
+                "Combined duplicate requests.",
+                "Same request.",
+                CancellationToken.None
+            )
+        );
 
         beforeMerge!.PossibleDuplicateIds.ShouldContain(target.Id);
         merged.Value.Public.Status.ShouldBe(RequestSubmissionStatus.Merged);
         merged.Value.Public.MergedIntoSubmissionId.ShouldBe(target.Id);
+        mergeRetry.WasIdempotent.ShouldBeTrue();
+        mergeRetry.Value.Public.MergedIntoSubmissionId.ShouldBe(target.Id);
         (
             await service.GetModeratorSubmissionAsync(hostId, target.Id, CancellationToken.None)
         )!.Public.VoteCount.ShouldBe(2);
@@ -404,16 +482,32 @@ public sealed class RequestBoardServiceTests
         );
         await ApproveAsync(service, hostId, first.Id, priority: 1);
         await ApproveAsync(service, hostId, second.Id, priority: 10);
-        _ = Success(await service.VoteAsync(hostId, first.Id, "voter", CancellationToken.None));
+        var votes = (
+            await Task.WhenAll(
+                service.VoteAsync(hostId, first.Id, "voter", CancellationToken.None),
+                CreateService(database).VoteAsync(hostId, first.Id, "voter", CancellationToken.None)
+            )
+        )
+            .Select(Success)
+            .ToArray();
+        var voteRetry = votes.Single(value => value.WasIdempotent);
         var voteLimit = Rejection(
             await service.VoteAsync(hostId, second.Id, "voter", CancellationToken.None)
         );
 
         cooldown.ShouldBeOfType<RequestBoardRejection.Cooldown>();
         limit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
+        voteRetry.WasIdempotent.ShouldBeTrue();
+        voteRetry.Value.VoteCount.ShouldBe(1);
         voteLimit.ShouldBeOfType<RequestBoardRejection.LimitReached>();
         var page = await service.GetPublicPageAsync("alpha", "games", CancellationToken.None);
         page!.Submissions.Select(value => value.Id).ShouldBe([second.Id, first.Id]);
+        await using var verify = await database.CreateDbContextAsync();
+        (
+            await verify.RequestSubmissionVotes.CountAsync(value =>
+                value.SubmissionId == first.Id && value.VoterLogin == "voter"
+            )
+        ).ShouldBe(1);
     }
 
     private static ConfigureRequestBoardCommand Board(

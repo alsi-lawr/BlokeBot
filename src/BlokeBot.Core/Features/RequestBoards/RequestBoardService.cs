@@ -5,6 +5,7 @@ using BlokeBot.Core.Features.Points.Balances;
 using BlokeBot.Eventing;
 using BlokeBot.Persistence;
 using BlokeBot.Persistence.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlokeBot.Core.Features.RequestBoards;
@@ -18,6 +19,9 @@ public sealed class RequestBoardService(
     private const int _eventSchemaVersion = 1;
     private const int _maximumEventPayloadLength = 1024;
     private const int _maximumEventReadCount = 200;
+    private const int _retryGateCount = 64;
+    private static readonly SemaphoreSlim[] _submissionRetryGates = CreateRetryGates();
+    private static readonly SemaphoreSlim[] _voteRetryGates = CreateRetryGates();
 
     public async Task<RequestBoardResult<RequestBoardSummary>> ConfigureAsync(
         int hostId,
@@ -156,6 +160,48 @@ public sealed class RequestBoardService(
             );
         }
 
+        var retryGate = RetryGateFor(
+            _submissionRetryGates,
+            HashCode.Combine(hostId, command.OperationId)
+        );
+        await retryGate.WaitAsync(ct);
+        try
+        {
+            try
+            {
+                return await SubmitAttemptAsync(hostId, boardSlug, command, login, ct);
+            }
+            catch (Exception exception) when (IsRetryCollision(exception))
+            {
+                var committed = await LoadCommittedSubmissionRetryAsync(
+                    hostId,
+                    boardSlug,
+                    command.OperationId,
+                    login,
+                    ct
+                );
+                if (committed is not null)
+                {
+                    return committed;
+                }
+
+                throw;
+            }
+        }
+        finally
+        {
+            retryGate.Release();
+        }
+    }
+
+    private async Task<RequestBoardResult<PublicRequestSubmissionView>> SubmitAttemptAsync(
+        int hostId,
+        string boardSlug,
+        SubmitRequestCommand command,
+        string login,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var existing = await db
@@ -346,6 +392,41 @@ public sealed class RequestBoardService(
             );
         }
 
+        var retryGate = RetryGateFor(
+            _voteRetryGates,
+            HashCode.Combine(hostId, submissionId, login)
+        );
+        await retryGate.WaitAsync(ct);
+        try
+        {
+            try
+            {
+                return await VoteAttemptAsync(hostId, submissionId, login, ct);
+            }
+            catch (Exception exception) when (IsRetryCollision(exception))
+            {
+                var committed = await LoadCommittedVoteRetryAsync(hostId, submissionId, login, ct);
+                if (committed is not null)
+                {
+                    return committed;
+                }
+
+                throw;
+            }
+        }
+        finally
+        {
+            retryGate.Release();
+        }
+    }
+
+    private async Task<RequestBoardResult<PublicRequestSubmissionView>> VoteAttemptAsync(
+        int hostId,
+        long submissionId,
+        string login,
+        CancellationToken ct
+    )
+    {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var submission = await db
@@ -361,6 +442,19 @@ public sealed class RequestBoardService(
         }
 
         if (
+            await db.RequestSubmissionVotes.AnyAsync(
+                vote => vote.SubmissionId == submissionId && vote.VoterLogin == login,
+                ct
+            )
+        )
+        {
+            return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+                ToPublicView(submission),
+                true
+            );
+        }
+
+        if (
             !submission.Board.VotingEnabled
             || submission.Status
                 is not (
@@ -372,19 +466,6 @@ public sealed class RequestBoardService(
         {
             return Rejected<PublicRequestSubmissionView>(
                 new RequestBoardRejection.Conflict("Voting is not open for this request.")
-            );
-        }
-
-        if (
-            await db.RequestSubmissionVotes.AnyAsync(
-                vote => vote.SubmissionId == submissionId && vote.VoterLogin == login,
-                ct
-            )
-        )
-        {
-            return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
-                ToPublicView(submission),
-                true
             );
         }
 
@@ -452,6 +533,14 @@ public sealed class RequestBoardService(
         {
             return Rejected<ModeratorRequestSubmissionView>(
                 new RequestBoardRejection.NotFound("Request not found for the selected host.")
+            );
+        }
+
+        if (submission.Status == command.TargetStatus)
+        {
+            return new RequestBoardResult<ModeratorRequestSubmissionView>.Succeeded(
+                await ToModeratorViewAsync(db, submission, ct),
+                true
             );
         }
 
@@ -543,6 +632,14 @@ public sealed class RequestBoardService(
             );
         }
 
+        if (submission.Status == RequestSubmissionStatus.Withdrawn)
+        {
+            return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+                ToPublicView(submission),
+                true
+            );
+        }
+
         if (
             submission.Status
             is not (
@@ -612,6 +709,23 @@ public sealed class RequestBoardService(
                 new RequestBoardRejection.NotFound(
                     "Both requests must exist on the same board and selected host."
                 )
+            );
+        }
+
+        if (source.Status == RequestSubmissionStatus.Merged)
+        {
+            if (source.MergedIntoSubmissionId != target.Id)
+            {
+                return Rejected<ModeratorRequestSubmissionView>(
+                    new RequestBoardRejection.Conflict(
+                        $"This request was already merged into request #{source.MergedIntoSubmissionId}."
+                    )
+                );
+            }
+
+            return new RequestBoardResult<ModeratorRequestSubmissionView>.Succeeded(
+                await ToModeratorViewAsync(db, source, ct),
+                true
             );
         }
 
@@ -808,6 +922,78 @@ public sealed class RequestBoardService(
                 value.OccurredAtUtc
             ))
             .ToListAsync(ct);
+    }
+
+    private async Task<RequestBoardResult<PublicRequestSubmissionView>?> LoadCommittedSubmissionRetryAsync(
+        int hostId,
+        string boardSlug,
+        Guid operationId,
+        string submitterLogin,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var submission = await db
+            .RequestSubmissions.AsNoTracking()
+            .Include(value => value.Board)
+            .Include(value => value.Values)
+                .ThenInclude(value => value.Field)
+            .SingleOrDefaultAsync(
+                value => value.HostId == hostId && value.OperationId == operationId,
+                ct
+            );
+        if (submission is null)
+        {
+            return null;
+        }
+
+        if (
+            submission.Board?.Slug != RequestBoardInput.NormalizeSlug(boardSlug)
+            || !string.Equals(submission.SubmitterLogin, submitterLogin, StringComparison.Ordinal)
+        )
+        {
+            return Rejected<PublicRequestSubmissionView>(
+                new RequestBoardRejection.Conflict(
+                    "That operation ID belongs to another submission."
+                )
+            );
+        }
+
+        return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+            ToPublicView(submission),
+            true
+        );
+    }
+
+    private async Task<RequestBoardResult<PublicRequestSubmissionView>?> LoadCommittedVoteRetryAsync(
+        int hostId,
+        long submissionId,
+        string voterLogin,
+        CancellationToken ct
+    )
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
+        var submission = await db
+            .RequestSubmissions.AsNoTracking()
+            .Include(value => value.Board)
+            .Include(value => value.Values)
+                .ThenInclude(value => value.Field)
+            .SingleOrDefaultAsync(value => value.Id == submissionId && value.HostId == hostId, ct);
+        if (
+            submission?.Board is null
+            || !await db.RequestSubmissionVotes.AnyAsync(
+                vote => vote.SubmissionId == submissionId && vote.VoterLogin == voterLogin,
+                ct
+            )
+        )
+        {
+            return null;
+        }
+
+        return new RequestBoardResult<PublicRequestSubmissionView>.Succeeded(
+            ToPublicView(submission),
+            true
+        );
     }
 
     private async Task RefundIfRequiredAsync(
@@ -1455,7 +1641,7 @@ public sealed class RequestBoardService(
             board.SubmissionCooldownSeconds,
             board.VoteLimitPerUser,
             board.VotingEnabled,
-            board.OrderingDescription,
+            RequestBoard.DefaultOrderingDescription,
             board
                 .Fields.OrderBy(value => value.Position)
                 .Select(value => new RequestBoardFieldView(
@@ -1485,6 +1671,27 @@ public sealed class RequestBoardService(
             .Select(value => value.Login)
             .SingleAsync(ct);
         return ToSummary(board, hostLogin);
+    }
+
+    private static SemaphoreSlim[] CreateRetryGates()
+    {
+        return Enumerable.Range(0, _retryGateCount).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
+    }
+
+    private static SemaphoreSlim RetryGateFor(SemaphoreSlim[] gates, int hash)
+    {
+        return gates[(int)((uint)hash % (uint)gates.Length)];
+    }
+
+    private static bool IsRetryCollision(Exception exception)
+    {
+        return exception switch
+        {
+            SqliteException { SqliteErrorCode: 5 or 6 } => true,
+            SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 } => true,
+            DbUpdateException { InnerException: { } inner } => IsRetryCollision(inner),
+            _ => false,
+        };
     }
 
     private static RequestBoardResult<T> Succeeded<T>(T value)

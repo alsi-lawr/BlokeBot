@@ -45,7 +45,7 @@ public sealed class RequestBoardUiTests
             ),
             CancellationToken.None
         );
-        var submission = (
+        var accepted = (
             await service.SubmitAsync(
                 hostId,
                 "clips",
@@ -66,12 +66,75 @@ public sealed class RequestBoardUiTests
         _ = await service.ModerateAsync(
             hostId,
             new ModerateRequestCommand(
-                submission.Id,
+                accepted.Id,
                 RequestSubmissionStatus.Approved,
                 "Ready for voting.",
                 "PRIVATE-MODERATOR-NOTE",
                 "PRIVATE-REJECTION-REASON",
                 0,
+                "Clips",
+                ["review"]
+            ),
+            CancellationToken.None
+        );
+        _ = await service.ModerateAsync(
+            hostId,
+            new ModerateRequestCommand(
+                accepted.Id,
+                RequestSubmissionStatus.Accepted,
+                "Ready for voting.",
+                "PRIVATE-MODERATOR-NOTE",
+                "PRIVATE-REJECTION-REASON",
+                -10,
+                "Clips",
+                ["review"]
+            ),
+            CancellationToken.None
+        );
+        var queued = (
+            await service.SubmitAsync(
+                hostId,
+                "clips",
+                new SubmitRequestCommand(
+                    Guid.NewGuid(),
+                    "another_viewer",
+                    "Higher priority queued request",
+                    "Clips",
+                    ["review"],
+                    new Dictionary<string, string>
+                    {
+                        ["clip"] = "https://clips.twitch.tv/AnotherGoodClip",
+                    }
+                ),
+                CancellationToken.None
+            )
+        ).Match(
+            value => value.Value,
+            rejected => throw new InvalidOperationException(rejected.Reason.Message)
+        );
+        _ = await service.ModerateAsync(
+            hostId,
+            new ModerateRequestCommand(
+                queued.Id,
+                RequestSubmissionStatus.Approved,
+                "",
+                "",
+                "",
+                100,
+                "Clips",
+                ["review"]
+            ),
+            CancellationToken.None
+        );
+        _ = await service.ModerateAsync(
+            hostId,
+            new ModerateRequestCommand(
+                queued.Id,
+                RequestSubmissionStatus.Queued,
+                "",
+                "",
+                "",
+                100,
                 "Clips",
                 ["review"]
             ),
@@ -88,13 +151,18 @@ public sealed class RequestBoardUiTests
 
         page.WaitForAssertion(() => page.Find("h1").TextContent.ShouldBe("Clip reviews"));
         page.Markup.ShouldContain("Up to 5 votes per viewer");
-        page.Markup.ShouldContain("Higher priority first");
+        page.Find("dl div:nth-child(4) dd")
+            .TextContent.ShouldBe(
+                "Status first: accepted, queued, approved, pending, completed, rejected, withdrawn, then merged. Within each status: higher priority, more votes, lower assigned queue position (unassigned last), earlier submission time, then lower request ID."
+            );
         page.Markup.ShouldNotContain("PRIVATE-MODERATOR-NOTE");
         page.Markup.ShouldNotContain("PRIVATE-REJECTION-REASON");
         page.Markup.ShouldNotContain("<script>alert");
         var link = page.Find("a[href='https://clips.twitch.tv/GoodClip']");
         link.GetAttribute("rel").ShouldBe("noopener noreferrer");
-        page.FindAll("article.card").ShouldHaveSingleItem();
+        page.FindAll("article.card h3")
+            .Select(heading => heading.TextContent)
+            .ShouldBe(["<script>alert('title')</script>", "Higher priority queued request"]);
     }
 
     [Test]

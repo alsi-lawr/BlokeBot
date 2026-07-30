@@ -98,6 +98,9 @@ public enum RequestBoardEventKind
 
 public sealed class RequestBoard
 {
+    public const string DefaultOrderingDescription =
+        "Status first: accepted, queued, approved, pending, completed, rejected, withdrawn, then merged. Within each status: higher priority, more votes, lower assigned queue position (unassigned last), earlier submission time, then lower request ID.";
+
     public int Id { get; set; }
 
     public int HostId { get; set; }
@@ -122,8 +125,7 @@ public sealed class RequestBoard
 
     public bool VotingEnabled { get; set; } = true;
 
-    public string OrderingDescription { get; set; } =
-        "Higher priority first, then votes, queue position, and submission time.";
+    public string OrderingDescription { get; set; } = DefaultOrderingDescription;
 
     public DateTime CreatedAtUtc { get; set; }
 
