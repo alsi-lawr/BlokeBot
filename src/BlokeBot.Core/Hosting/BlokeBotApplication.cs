@@ -33,6 +33,7 @@ using BlokeBot.Core.Features.Points.Dashboard;
 using BlokeBot.Core.Features.Points.Gambling;
 using BlokeBot.Core.Features.Points.Giveaways;
 using BlokeBot.Core.Features.Points.HostSetup;
+using BlokeBot.Core.Features.RequestBoards;
 using BlokeBot.Core.Features.SiteAccess;
 using BlokeBot.Core.Features.Toasts;
 using BlokeBot.Core.Features.TwitchOperations;
@@ -111,6 +112,7 @@ public static class BlokeBotApplication
                     ? PointsGiveawayNotificationMode.PublicChat
                     : PointsGiveawayNotificationMode.ReplyOnly
             )
+            .AddBlokeBotRequestBoards()
             .AddBlokeBotToasts()
             .AddBlokeBotTwitchOperations()
             .AddBlokeBotAuth();
@@ -129,6 +131,7 @@ public static class BlokeBotApplication
                 .UseBlokeBotHostedChannelLifecycleNotifier()
                 .AddCommandModule<CommandStrategyModule<GuessCommandKind, AppCommandRouteState>>()
                 .AddCommandModule<CommandStrategyModule<PointsCommandKind, AppCommandRouteState>>()
+                .AddCommandModule<RequestBoardCommandModule>()
                 .AddCommandModule<CustomCommandModule>();
         }
         else

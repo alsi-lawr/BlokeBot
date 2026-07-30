@@ -78,6 +78,7 @@ public sealed partial class BlokeBotDbContext
             b.Property(x => x.ActorLogin).HasMaxLength(128);
             b.Property(x => x.CounterpartyLogin).HasMaxLength(128);
             b.HasIndex(x => new { x.HostId, x.CreatedAtUtc });
+            b.HasIndex(x => x.RequestSubmissionId);
             b.HasOne<BotHost>()
                 .WithMany()
                 .HasForeignKey(x => x.HostId)

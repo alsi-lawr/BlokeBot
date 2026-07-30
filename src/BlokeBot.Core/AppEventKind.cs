@@ -9,4 +9,5 @@ public enum AppEventKind
     CustomCommandsChanged,
     AlertsChanged,
     TwitchOperationsChanged,
+    RequestBoardsChanged,
 }

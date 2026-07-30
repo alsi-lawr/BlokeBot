@@ -73,6 +73,12 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
     public DbSet<TwitchPredictionTemplateOutcome> TwitchPredictionTemplateOutcomes =>
         Set<TwitchPredictionTemplateOutcome>();
     public DbSet<TwitchPrediction> TwitchPredictions => Set<TwitchPrediction>();
+    public DbSet<RequestBoard> RequestBoards => Set<RequestBoard>();
+    public DbSet<RequestBoardField> RequestBoardFields => Set<RequestBoardField>();
+    public DbSet<RequestSubmission> RequestSubmissions => Set<RequestSubmission>();
+    public DbSet<RequestSubmissionValue> RequestSubmissionValues => Set<RequestSubmissionValue>();
+    public DbSet<RequestSubmissionVote> RequestSubmissionVotes => Set<RequestSubmissionVote>();
+    public DbSet<RequestBoardDomainEvent> RequestBoardEvents => Set<RequestBoardDomainEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -89,6 +95,7 @@ public sealed partial class BlokeBotDbContext(DbContextOptions<BlokeBotDbContext
         ConfigureClipsMarkers(modelBuilder);
         ConfigureChannelPoints(modelBuilder);
         ConfigurePredictions(modelBuilder);
+        ConfigureRequestBoards(modelBuilder);
     }
 
     private static string KindIn(string columnName, IEnumerable<string> values)
