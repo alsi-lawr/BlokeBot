@@ -18,6 +18,7 @@ internal static class SiteGuideCatalog
                 GuideLink("Channels", "channels"),
                 GuideLink("Twitch connections", "connect"),
                 GuideLink("Channel tools", "tools"),
+                GuideLink("Overlays and Browser Sources", "overlays"),
             ]
         ),
         new(
@@ -43,6 +44,7 @@ internal static class SiteGuideCatalog
             "Chat, games and points",
             [
                 GuideLink("Commands", "commands"),
+                GuideLink("Available viewer commands", "commands/catalog"),
                 GuideLink("Guessing games", "guessing"),
                 GuideLink("Viewer points", "points"),
                 GuideLink("Giveaways", "giveaways"),
@@ -156,7 +158,7 @@ internal static class SiteGuideCatalog
                     [
                         "Home gives a short introduction and public leaderboard shortcut.",
                         "Channel setup contains connections, moderator access and feature switches.",
-                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points and Custom commands feature.",
+                        "Chat tools contains Request boards, Play with viewers and Moments for the selected channel, plus each enabled Native Twitch, Guessing, Points, Custom commands and Overlays feature.",
                         "Expand Native Twitch to move between its five focused task pages.",
                     ],
                     Paragraphs =
@@ -282,18 +284,56 @@ internal static class SiteGuideCatalog
             Eyebrow = "Channel tools",
             Title = "Choose the tools your channel needs",
             Summary =
-                "Use the selected channel's community tools, and turn Native Twitch, commands, guessing or points on independently.",
+                "Every Chat Tools feature is independently opt-in, so each channel can run only the tools it needs.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-chat-tools-all-disabled.png",
+                LightPhoneSource: "media/phone-light-chat-tools-all-disabled.png",
+                DarkLaptopSource: "media/laptop-dark-chat-tools-all-disabled.png",
+                LightLaptopSource: "media/laptop-light-chat-tools-all-disabled.png",
+                PhoneAlt: "Channel setup on a phone with all twelve Chat Tools features off.",
+                LaptopAlt: "Channel setup with all twelve Chat Tools features off and no Chat Tools destinations in navigation.",
+                "New channels begin with every Chat Tools feature off. Turn on only the features this channel will use."
+            ),
             Sections =
             [
                 new SiteGuideSection
                 {
-                    Heading = "Turn a tool on",
+                    Heading = "Start with every tool off",
+                    Paragraphs =
+                    [
+                        "A new channel starts with all twelve Chat Tools features disabled: Shoutouts, Polls, Clips & markers, Rewards & redemptions, Predictions, Request boards, Play with viewers, Moments, Overlays, Guessing game, Points and Custom commands.",
+                        "Channels migrated from an earlier BlokeBot release keep their effective feature behavior. Review their switches after upgrading rather than assuming the new-channel default was applied.",
+                    ],
+                    Bullets =
+                    [
+                        "A disabled feature is hidden from navigation and does not accept chat commands, public-page actions, provider events or background work.",
+                        "Disabling pauses the feature without deleting its saved configuration or data.",
+                        "Re-enabling resumes from current state. BlokeBot does not replay commands, provider events or scheduled work missed while the feature was off.",
+                    ],
+                    Note =
+                        "Channel setup uses the application-wide semantic-card layout. Its shared 12px clearance keeps every top-level feature card separate without adding page-specific spacing.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Turn on only what the channel needs",
+                    Media = new SiteMedia(
+                        DarkPhoneSource: "media/phone-dark-chat-tools-enabled.png",
+                        LightPhoneSource: "media/phone-light-chat-tools-enabled.png",
+                        DarkLaptopSource: "media/laptop-dark-chat-tools-enabled.png",
+                        LightLaptopSource: "media/laptop-light-chat-tools-enabled.png",
+                        PhoneAlt: "Channel setup on a phone with representative Chat Tools features enabled.",
+                        LaptopAlt: "Channel setup with representative Chat Tools features enabled and only their destinations visible in navigation.",
+                        "Enabled switches add only their matching destinations and behavior; every other feature remains paused and hidden."
+                    ),
                     Steps =
                     [
                         "Choose the correct channel and open Channel setup.",
-                        "Open Chat tools and turn on the feature you want.",
+                        "Open Chat tools and turn on each feature this channel will use.",
+                        "Save the feature changes.",
                         "Open the new navigation item and finish its settings before using it live.",
                     ],
+                    Note =
+                        "A feature switch controls availability, not readiness. Configure the feature and satisfy any Twitch connection, permission, live-stream or active-game requirement shown on its page.",
                 },
                 new SiteGuideSection
                 {
@@ -309,10 +349,114 @@ internal static class SiteGuideCatalog
                         new SiteLink("Giveaways", "giveaways"),
                         new SiteLink("Public leaderboards", "leaderboards"),
                         new SiteLink("Native Twitch", "twitch-operations"),
+                        new SiteLink("Overlays and Browser Sources", "overlays"),
                     ],
                 },
             ],
             Next = [new SiteLink("Set up a request board", "community/request-boards")],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/overlays",
+            Eyebrow = "Stream presentation",
+            Title = "Create and manage Browser Source overlays",
+            Summary =
+                "Create a private transparent Browser Source, preview the production renderer and recover safely when its URL or live connection changes.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-overlays.png",
+                LightPhoneSource: "media/phone-light-overlays.png",
+                DarkLaptopSource: "media/laptop-dark-overlays.png",
+                LightLaptopSource: "media/laptop-light-overlays.png",
+                PhoneAlt: "BlokeBot Overlays page on a phone showing the saved Browser Source and its editor.",
+                LaptopAlt: "BlokeBot Overlays page showing the saved Browser Source, editor and production preview.",
+                "The dashboard keeps Browser Source inventory, configuration, preview and delivery diagnostics together."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Check access and prerequisites",
+                    Bullets =
+                    [
+                        "Choose the channel you intend to show on stream. Its owner or a permitted moderator can manage its overlays.",
+                        "Open Channel setup, turn on Overlays for that channel and save the change.",
+                        "Use broadcasting software that supports a web Browser Source, such as OBS Studio.",
+                        "BlokeBot v0.5 supports the transparent Empty V1 overlay at a 1920 × 1080 canvas. It has no custom CSS, JavaScript or visual fields.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Create the Browser Source",
+                    Steps =
+                    [
+                        "Open Overlays under Chat tools and select New.",
+                        "Name the overlay, then select Create overlay. New only starts an unsaved editor; it does not create anything by itself.",
+                        "Copy the private Browser Source URL when it appears. BlokeBot shows that URL only after creation or rotation.",
+                        "In OBS, add a Browser Source, paste the URL, set Width to 1920 and Height to 1080, then place the source in the scene.",
+                        "Keep the page background transparent. A blank canvas is the normal resting state for Empty V1.",
+                    ],
+                    Note =
+                        "Treat the private URL like a password. Do not put it in chat, screenshots, stream recordings or public notes. The Browser Source is marked private for search engines, but possession of the URL still grants access.",
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Preview and confirm delivery",
+                    Bullets =
+                    [
+                        "Live preview uses the same document, client, CSS and 1920 × 1080 renderer as the Browser Source. It does not reveal the private URL.",
+                        "Representative preview shows the supported Empty V1 state without opening a live connection.",
+                        "Send test pulse publishes temporary presentation data only to the selected overlay. It does not change stream or chat data.",
+                        "Connection status is approximate diagnostic presence. It excludes this dashboard's Live preview and does not prove that the OBS source is visible in the current scene.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Understand live updates and reconnection",
+                    Paragraphs =
+                    [
+                        "A Browser Source loads the current snapshot before listening for live updates. If an update is missed, the client reloads current state rather than applying an uncertain sequence.",
+                        "Temporary network loss triggers bounded automatic reconnection. A server restart or a newer state replaces the earlier live sequence, so the source converges on the latest supported presentation without replaying stale events.",
+                    ],
+                    Bullets =
+                    [
+                        "Leave the source enabled in OBS when you want it to reconnect automatically.",
+                        "After a long outage, reload the Browser Source if OBS still shows an old state.",
+                        "Use Live preview and Send test pulse to separate a renderer problem from an OBS scene or source-visibility problem.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Rename, disable, rotate or delete",
+                    Bullets =
+                    [
+                        "Rename changes the dashboard label without changing the private URL.",
+                        "Disable immediately makes the Browser Source unavailable. Enable restores the same current URL.",
+                        "Rotate private URL immediately revokes the old URL. Copy the replacement once and update every OBS source that used the old one.",
+                        "If the URL may have been shared or captured, rotate it rather than relying on obscurity.",
+                        "Delete permanently removes the overlay and stops every Browser Source using its URL.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Fix common failures",
+                    Bullets =
+                    [
+                        "No Overlays menu: select the correct channel and turn on Overlays in Channel setup.",
+                        "No saved overlay after selecting New: complete the name and select Create overlay.",
+                        "Private URL unavailable: create the overlay or rotate its URL; BlokeBot cannot reveal an earlier URL again.",
+                        "Overlay unavailable in OBS: check that it is enabled and that OBS has the current private URL, especially after rotation.",
+                        "No live client detected: select Live preview or connect the Browser Source in OBS before sending a test pulse.",
+                        "Blank but connected: Empty V1 is transparent at rest. Send a test pulse and check the production preview before changing the OBS scene.",
+                        "Stale after reconnect: reload the Browser Source so it requests the current snapshot and starts a fresh live connection.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Choose other channel tools", "tools"),
+                new SiteLink("Troubleshoot the bot", "troubleshooting"),
+            ],
         };
 
         yield return new SiteGuidePage
@@ -957,7 +1101,119 @@ internal static class SiteGuideCatalog
                     ],
                 },
             ],
-            Next = [new SiteLink("Choose another tool", "tools")],
+            Next =
+            [
+                new SiteLink("Publish the available viewer commands", "commands/catalog"),
+                new SiteLink("Choose another tool", "tools"),
+            ],
+        };
+
+        yield return new SiteGuidePage
+        {
+            Route = "/commands/catalog",
+            Eyebrow = "Chat commands · Viewer discovery",
+            Title = "Publish the commands viewers can use now",
+            Summary =
+                "Choose one global Commands trigger and let viewers discover a canonical, viewer-safe list that follows the selected channel's current state.",
+            Media = new SiteMedia(
+                DarkPhoneSource: "media/phone-dark-viewer-command-catalog.png",
+                LightPhoneSource: "media/phone-light-viewer-command-catalog.png",
+                DarkLaptopSource: "media/laptop-dark-viewer-command-catalog.png",
+                LightLaptopSource: "media/laptop-light-viewer-command-catalog.png",
+                PhoneAlt: "Channel setup on a phone showing the global Commands trigger and expanded Available viewer commands list.",
+                LaptopAlt: "Channel setup showing the global Commands trigger, expanded Available viewer commands list and a command-name conflict.",
+                "Channel setup shows the same canonical, viewer-safe command catalog that the global chat trigger publishes."
+            ),
+            Sections =
+            [
+                new SiteGuideSection
+                {
+                    Heading = "Choose the global trigger",
+                    Steps =
+                    [
+                        "Choose the channel, open Channel setup and expand Commands.",
+                        "Enter the command words viewers may use, separated by commas and without the exclamation mark. The default is commands.",
+                        "Select Save Commands. The setting applies to the whole selected channel, not to one Custom Command.",
+                        "Leave the field blank and save only when you intend to disable the viewer command catalog.",
+                    ],
+                    Paragraphs =
+                    [
+                        "If a word is already owned by another command, Channel setup names the conflict. Choose another word and save; BlokeBot does not silently replace the existing command.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Check what viewers will see",
+                    Steps =
+                    [
+                        "Open Available viewer commands inside the Commands section. It starts collapsed so the setup page stays compact.",
+                        "Review the current canonical command names and any conflict or availability explanation.",
+                        "In chat, send the saved trigger such as !commands to publish the same ordered list.",
+                    ],
+                    Bullets =
+                    [
+                        "The disclosure requests a fresh snapshot whenever it opens. Supported state changes also refresh an open list without replacing an unsaved trigger draft.",
+                        "The list includes its own saved trigger and only commands an ordinary viewer can use.",
+                        "Moderator-only commands and private administration actions are never disclosed.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Understand canonical names",
+                    Paragraphs =
+                    [
+                        "Each Custom Command contributes only the first command word in its saved alias list. That canonical-first rule keeps the catalog short and predictable; secondary aliases still work in chat but are not advertised.",
+                    ],
+                    Bullets =
+                    [
+                        "Built-in commands use their supported public canonical names.",
+                        "A Custom Command that is moderator-only is omitted even when its canonical name works for moderators.",
+                        "When two routes claim the same word, the catalog reports which entry is shadowed instead of pretending both are available.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Why commands appear or disappear",
+                    Bullets =
+                    [
+                        "Guess and round-summary commands appear only while the guessing game has the matching active round state.",
+                        "Giveaway entry appears only while a giveaway is accepting entries.",
+                        "Request-board and play-queue commands follow the channel's saved, enabled boards and queues.",
+                        "Moment and clip commands depend on live-stream identity and disappear while the channel is offline or Twitch stream identity is unavailable.",
+                        "Feature commands disappear when that feature is off for the selected channel.",
+                    ],
+                    Paragraphs =
+                    [
+                        "An unavailable feature is explained beside the list when BlokeBot can identify the cause. If no viewer commands are currently available, the disclosure says so rather than publishing a misleading list.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Long lists and live changes",
+                    Paragraphs =
+                    [
+                        "BlokeBot keeps the canonical ordering stable. When the chat response is longer than Twitch permits in one message, it splits the list across multiple ordinary replies without dropping or duplicating command names.",
+                        "A game opening, giveaway ending, board or queue changing, feature switch, or stream-liveness change can alter membership. Reopen Available viewer commands for a fresh check when you are preparing an announcement or stream instructions.",
+                    ],
+                },
+                new SiteGuideSection
+                {
+                    Heading = "Fix common catalog problems",
+                    Bullets =
+                    [
+                        "The chat trigger does nothing: confirm at least one Commands word is saved and resolve any conflict shown in Channel setup.",
+                        "A Custom Command alias is missing: only its first saved word is advertised.",
+                        "A moderator command is missing: the public catalog deliberately shows viewer-safe commands only.",
+                        "A game or Moment command is missing: check the feature, active round or giveaway, and live-stream availability named by the disclosure.",
+                        "The list is empty: enable or configure at least one viewer-facing feature, board, queue or Custom Command, then reopen the disclosure.",
+                    ],
+                },
+            ],
+            Next =
+            [
+                new SiteLink("Create Custom Commands", "commands"),
+                new SiteLink("Choose another channel tool", "tools"),
+            ],
         };
 
         yield return new SiteGuidePage
