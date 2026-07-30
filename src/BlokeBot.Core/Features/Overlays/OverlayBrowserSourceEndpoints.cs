@@ -1,4 +1,6 @@
 using System.Net;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Net.Http.Headers;
 
 namespace BlokeBot.Core.Features.Overlays;
@@ -74,6 +76,42 @@ internal static class OverlayBrowserSourceEndpoints
             )
             .AllowAnonymous();
         app.MapGet(
+                "/overlay/{accessKey}/events",
+                async (
+                    HttpContext context,
+                    string accessKey,
+                    OverlayInstanceResolver resolver,
+                    OverlayLiveCoordinator live,
+                    CancellationToken cancellationToken
+                ) =>
+                {
+                    ApplyPrivateBrowserSourceHeaders(context.Response);
+                    var resolvedGeneration = live.Generation;
+                    var resolution = await ResolveSafelyAsync(
+                        resolver,
+                        accessKey,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    if (resolution is not OverlayResolutionResult.Resolved resolved)
+                    {
+                        return Unavailable();
+                    }
+
+                    var opened = await OpenLiveSafelyAsync(
+                        live,
+                        resolved.Instance,
+                        resolvedGeneration,
+                        context.RequestServices,
+                        cancellationToken
+                    );
+                    return opened is OverlayLiveOpenResult.Opened connected
+                        ? new OverlayLiveStreamResult(live, connected.Connection)
+                        : Unavailable();
+                }
+            )
+            .AllowAnonymous();
+        app.MapGet(
                 "/overlay/{accessKey}/state",
                 async (
                     HttpContext context,
@@ -135,6 +173,31 @@ internal static class OverlayBrowserSourceEndpoints
         }
     }
 
+    private static async Task<OverlayLiveOpenResult> OpenLiveSafelyAsync(
+        OverlayLiveCoordinator live,
+        ResolvedOverlayInstance instance,
+        long resolvedGeneration,
+        IServiceProvider services,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            return await live.OpenAsync(instance, resolvedGeneration, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            services
+                .GetRequiredService<ILogger<OverlayBrowserSourceLog>>()
+                .LogWarning(exception, "An overlay live stream could not be opened.");
+            return new OverlayLiveOpenResult.Unavailable();
+        }
+    }
+
     private static async Task<OverlaySnapshotProjection> ProjectSafelyAsync(
         IOverlayStateProvider stateProvider,
         ResolvedOverlayInstance instance,
@@ -184,7 +247,7 @@ internal static class OverlayBrowserSourceEndpoints
               <link rel="stylesheet" href="{{encodedPrefix}}/overlay/assets/blokebot-overlay.css">
             </head>
             <body>
-              <main id="overlay-root" data-state-url="{{encodedPrefix}}/overlay/{{encodedKey}}/state" data-status="loading" aria-live="off">
+              <main id="overlay-root" data-state-url="{{encodedPrefix}}/overlay/{{encodedKey}}/state" data-live-url="{{encodedPrefix}}/overlay/{{encodedKey}}/events" data-status="loading" aria-live="off">
                 <svg id="overlay-canvas" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"></svg>
               </main>
               <script src="{{encodedPrefix}}/overlay/assets/blokebot-overlay.js" defer></script>
@@ -220,6 +283,7 @@ internal static class OverlayBrowserSourceEndpoints
             || string.Equals(segments[1], "assets", StringComparison.OrdinalIgnoreCase)
             || segments.Length == 3
                 && !string.Equals(segments[2], "state", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(segments[2], "events", StringComparison.OrdinalIgnoreCase)
         )
         {
             return path;
@@ -227,8 +291,124 @@ internal static class OverlayBrowserSourceEndpoints
 
         return segments.Length == 2
             ? new PathString("/overlay/[redacted]")
-            : new PathString("/overlay/[redacted]/state");
+            : new PathString($"/overlay/[redacted]/{segments[2].ToLowerInvariant()}");
+    }
+
+    private sealed class OverlayLiveStreamResult(
+        OverlayLiveCoordinator live,
+        OverlayLiveCoordinator.OverlayLiveConnection connection
+    ) : IResult
+    {
+        private static readonly JsonSerializerOptions _jsonOptions = new(
+            JsonSerializerDefaults.Web
+        );
+
+        private static async Task WriteLiveEventAsync(
+            HttpResponse response,
+            string json,
+            CancellationToken cancellationToken
+        )
+        {
+            await response.WriteAsync("event: overlay\n", cancellationToken);
+            await response.WriteAsync($"data: {json}\n\n", cancellationToken);
+            await response.Body.FlushAsync(cancellationToken);
+        }
+
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            var response = httpContext.Response;
+            response.StatusCode = StatusCodes.Status200OK;
+            response.ContentType = "text/event-stream; charset=utf-8";
+            response.Headers[HeaderNames.CacheControl] = "no-store, private, no-transform";
+            response.Headers["X-Accel-Buffering"] = "no";
+            response.HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+            try
+            {
+                while (!httpContext.RequestAborted.IsCancellationRequested)
+                {
+                    using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(
+                        httpContext.RequestAborted
+                    );
+                    heartbeat.CancelAfter(TimeSpan.FromSeconds(15));
+                    bool available;
+                    try
+                    {
+                        available = await connection.Messages.WaitToReadAsync(heartbeat.Token);
+                    }
+                    catch (OperationCanceledException)
+                        when (!httpContext.RequestAborted.IsCancellationRequested)
+                    {
+                        await response.WriteAsync(": keepalive\n\n", httpContext.RequestAborted);
+                        await response.Body.FlushAsync(httpContext.RequestAborted);
+                        continue;
+                    }
+
+                    if (!available)
+                    {
+                        if (connection.TryTakeTerminal(out var terminal))
+                        {
+                            await WriteLiveEventAsync(
+                                response,
+                                JsonSerializer.Serialize(terminal, _jsonOptions),
+                                httpContext.RequestAborted
+                            );
+                        }
+                        break;
+                    }
+
+                    while (connection.Messages.TryRead(out var message))
+                    {
+                        if (
+                            message
+                                is OverlayLiveTransportMessage.Baseline
+                                    or OverlayLiveTransportMessage.Event
+                            && !live.MaySend(connection)
+                        )
+                        {
+                            continue;
+                        }
+
+                        var json = message switch
+                        {
+                            OverlayLiveTransportMessage.Baseline baseline =>
+                                JsonSerializer.Serialize(baseline.Envelope, _jsonOptions),
+                            OverlayLiveTransportMessage.Event publication =>
+                                JsonSerializer.Serialize(publication.Envelope, _jsonOptions),
+                            _ => string.Empty,
+                        };
+                        if (json.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        await WriteLiveEventAsync(response, json, httpContext.RequestAborted);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+                when (httpContext.RequestAborted.IsCancellationRequested)
+            {
+                // The Browser Source disconnected.
+            }
+            catch (Exception exception)
+            {
+                httpContext
+                    .RequestServices.GetRequiredService<ILogger<OverlayLiveStreamLog>>()
+                    .LogWarning(
+                        exception,
+                        "An overlay live stream ended after a transport failure of type {FailureType}.",
+                        exception.GetType().Name
+                    );
+            }
+            finally
+            {
+                live.Close(connection);
+            }
+        }
     }
 
     private sealed class OverlayBrowserSourceLog;
+
+    private sealed class OverlayLiveStreamLog;
 }
