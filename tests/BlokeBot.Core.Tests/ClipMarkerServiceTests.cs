@@ -155,6 +155,15 @@ public sealed class ClipMarkerServiceTests
                     RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
                 }
             );
+            db.TwitchClips.Add(
+                new TwitchClip
+                {
+                    HostId = 2,
+                    IdempotencyKey = "unknown-provider-mutation",
+                    Status = TwitchClipStatus.Pending,
+                    RequestedAtUtc = now.GetUtcNow().UtcDateTime - TimeSpan.FromSeconds(61),
+                }
+            );
             await db.SaveChangesAsync();
         }
         await service.ReconcileAsync(2, CancellationToken.None);
@@ -202,7 +211,7 @@ public sealed class ClipMarkerServiceTests
             .TwitchClips.OrderBy(clip => clip.HostId)
             .ThenBy(clip => clip.Id)
             .ToArrayAsync();
-        clips.Length.ShouldBe(3);
+        clips.Length.ShouldBe(4);
         clips.Single(clip => clip.HostId == 1).Status.ShouldBe(TwitchClipStatus.Ambiguous);
         clips
             .Single(clip => clip.HostId == 1 && clip.Id == ambiguousReference.Value)
@@ -212,10 +221,13 @@ public sealed class ClipMarkerServiceTests
             .Single(clip => clip.IdempotencyKey == "expires")
             .Status.ShouldBe(TwitchClipStatus.Expired);
         clips
-            .Where(clip => clip.IdempotencyKey != "expires")
+            .Single(clip => clip.IdempotencyKey == "unknown-provider-mutation")
+            .Status.ShouldBe(TwitchClipStatus.Ambiguous);
+        clips
+            .Where(clip => clip.IdempotencyKey is not ("expires" or "unknown-provider-mutation"))
             .ShouldAllBe(clip => !string.IsNullOrWhiteSpace(clip.IdempotencyKey));
         clips
-            .Where(clip => clip.IdempotencyKey != "expires")
+            .Where(clip => clip.IdempotencyKey is not ("expires" or "unknown-provider-mutation"))
             .Select(clip => clip.IdempotencyKey)
             .Distinct(StringComparer.Ordinal)
             .Count()

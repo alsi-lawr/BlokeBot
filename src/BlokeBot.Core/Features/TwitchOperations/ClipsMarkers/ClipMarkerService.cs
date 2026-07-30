@@ -97,12 +97,7 @@ public sealed class ClipMarkerService(
         );
         if (existing is not null)
         {
-            if (existing.Status == TwitchClipStatus.Pending)
-            {
-                await ReconcileAsync(hostId, ct);
-                await db.Entry(existing).ReloadAsync(ct);
-            }
-            return Outcome(existing);
+            return await ObserveExistingClipAsync(db, existing, ct);
         }
 
         var host = await db.Hosts.SingleOrDefaultAsync(host => host.Id == hostId, ct);
@@ -145,7 +140,7 @@ public sealed class ClipMarkerService(
             {
                 throw;
             }
-            return Outcome(existing);
+            return await ObserveExistingClipAsync(db, existing, ct);
         }
 
         if (!await nativeTwitch.IsEnabledAsync(hostId, ct))
@@ -514,7 +509,11 @@ public sealed class ClipMarkerService(
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        if (ExpireClips(pending, now) && await nativeTwitch.IsEnabledAsync(hostId, ct))
+        await ReloadClipsAsync(db, pending, ct);
+        if (
+            ResolveAvailabilityDeadlines(pending, now)
+            && await nativeTwitch.IsEnabledAsync(hostId, ct)
+        )
         {
             await SaveReconciliationChangesAsync(db, hostId, ct);
         }
@@ -628,20 +627,22 @@ public sealed class ClipMarkerService(
         CancellationToken ct
     )
     {
-        var pending = await db
-            .TwitchClips.Where(clip =>
-                clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
-            )
-            .ToArrayAsync(pollingToken);
-        if (pending.Length == 0)
+        while (true)
         {
-            return;
-        }
+            var pending = await db
+                .TwitchClips.Where(clip =>
+                    clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
+                )
+                .ToArrayAsync(pollingToken);
+            await ReloadClipsAsync(db, pending, pollingToken);
+            pending = pending.Where(clip => clip.Status == TwitchClipStatus.Pending).ToArray();
+            if (pending.Length == 0)
+            {
+                return;
+            }
 
-        while (pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
-        {
             var now = timeProvider.GetUtcNow().UtcDateTime;
-            var changed = ExpireClips(pending, now);
+            var changed = ResolveAvailabilityDeadlines(pending, now);
             foreach (var clip in pending.Where(clip => clip.Status == TwitchClipStatus.Pending))
             {
                 if (token is null || clip.ProviderClipId is null)
@@ -678,7 +679,7 @@ public sealed class ClipMarkerService(
                 await SaveReconciliationChangesAsync(db, hostId, ct);
             }
 
-            if (!pending.Any(clip => clip.Status == TwitchClipStatus.Pending))
+            if (pending.All(clip => clip.Status != TwitchClipStatus.Pending))
             {
                 return;
             }
@@ -698,13 +699,26 @@ public sealed class ClipMarkerService(
                 clip.HostId == hostId && clip.Status == TwitchClipStatus.Pending
             )
             .ToArrayAsync(ct);
-        if (ExpireClips(pending, timeProvider.GetUtcNow().UtcDateTime))
+        await ReloadClipsAsync(db, pending, ct);
+        if (ResolveAvailabilityDeadlines(pending, timeProvider.GetUtcNow().UtcDateTime))
         {
             await SaveReconciliationChangesAsync(db, hostId, ct);
         }
     }
 
-    private static bool ExpireClips(IEnumerable<TwitchClip> clips, DateTime now)
+    private static async Task ReloadClipsAsync(
+        BlokeBotDbContext db,
+        IEnumerable<TwitchClip> clips,
+        CancellationToken ct
+    )
+    {
+        foreach (var clip in clips)
+        {
+            await db.Entry(clip).ReloadAsync(ct);
+        }
+    }
+
+    private static bool ResolveAvailabilityDeadlines(IEnumerable<TwitchClip> clips, DateTime now)
     {
         var changed = false;
         foreach (var clip in clips)
@@ -717,13 +731,34 @@ public sealed class ClipMarkerService(
                 continue;
             }
 
-            clip.Status = TwitchClipStatus.Expired;
-            clip.FailureReason = "Twitch did not make the clip available within 60 seconds.";
+            var providerMutationUnknown = clip.ProviderClipId is null;
+            clip.Status = providerMutationUnknown
+                ? TwitchClipStatus.Ambiguous
+                : TwitchClipStatus.Expired;
+            clip.FailureReason = providerMutationUnknown
+                ? "Twitch did not confirm whether the clip request completed."
+                : "Twitch did not make the clip available within 60 seconds.";
             clip.ResolvedAtUtc = now;
             changed = true;
         }
 
         return changed;
+    }
+
+    private async Task<ClipMarkerOperationOutcome> ObserveExistingClipAsync(
+        BlokeBotDbContext db,
+        TwitchClip clip,
+        CancellationToken ct
+    )
+    {
+        if (clip.Status != TwitchClipStatus.Pending || clip.ProviderClipId is null)
+        {
+            return Outcome(clip);
+        }
+
+        await ReconcileAsync(clip.HostId, ct);
+        await db.Entry(clip).ReloadAsync(ct);
+        return Outcome(clip);
     }
 
     private async Task SaveReconciliationChangesAsync(

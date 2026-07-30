@@ -96,6 +96,52 @@ public sealed class MomentProviderOperationsTests
         http.MarkerPosts.ShouldBe(0);
     }
 
+    [Test]
+    public async Task DelayedSuccessfulClipClaim_ConvergesWithoutMarkerFallback()
+    {
+        await using var database = await CreateDatabaseAsync();
+        var http = new DelayedSuccessfulClipHttpClientFactory();
+        var first = CreateOperations(database, http);
+        var second = CreateOperations(database, http);
+        var publicId = Guid.NewGuid();
+
+        var firstCapture = first.CaptureAsync(
+            1,
+            publicId,
+            true,
+            "Community moment",
+            CancellationToken.None
+        );
+        await http.ClipPostStarted.WaitAsync(TimeSpan.FromSeconds(5));
+
+        MomentProviderOutcome secondOutcome;
+        try
+        {
+            secondOutcome = await second
+                .CaptureAsync(1, publicId, true, "Community moment", CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(5));
+            secondOutcome.ShouldBeOfType<MomentProviderOutcome.Pending>();
+            http.ClipPosts.ShouldBe(1);
+            http.MarkerPosts.ShouldBe(0);
+        }
+        finally
+        {
+            http.ReleaseClipPost();
+        }
+
+        var firstOutcome = await firstCapture.WaitAsync(TimeSpan.FromSeconds(5));
+        var ready = firstOutcome.ShouldBeOfType<MomentProviderOutcome.ClipReady>();
+
+        http.ClipPosts.ShouldBe(1);
+        http.MarkerPosts.ShouldBe(0);
+        await using var verify = await database.CreateDbContextAsync();
+        var clip = await verify.TwitchClips.SingleAsync();
+        clip.Id.ShouldBe(ready.ClipId);
+        clip.ProviderClipId.ShouldBe("delayed-clip-id");
+        clip.Status.ShouldBe(TwitchClipStatus.Available);
+        (await verify.TwitchStreamMarkers.CountAsync()).ShouldBe(0);
+    }
+
     private static async Task<SqliteBlokeBotDbFactory> CreateDatabaseAsync()
     {
         var database = await SqliteBlokeBotDbFactory.CreateAsync();
@@ -115,7 +161,7 @@ public sealed class MomentProviderOperationsTests
 
     private static MomentProviderOperations CreateOperations(
         SqliteBlokeBotDbFactory database,
-        ProviderHttpClientFactory http
+        IHttpClientFactory http
     )
     {
         var clock = new ManualTimeProvider(
@@ -258,6 +304,94 @@ public sealed class MomentProviderOperationsTests
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json"),
             };
+        }
+    }
+
+    private sealed class DelayedSuccessfulClipHttpClientFactory : IHttpClientFactory
+    {
+        private readonly TaskCompletionSource _clipPostStarted = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource _releaseClipPost = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private AtomicCounter _clipPostCounter { get; } = new();
+
+        private AtomicCounter _markerPostCounter { get; } = new();
+
+        public Task ClipPostStarted => _clipPostStarted.Task;
+
+        public int ClipPosts => _clipPostCounter.Value;
+
+        public int MarkerPosts => _markerPostCounter.Value;
+
+        public HttpClient CreateClient(string name)
+        {
+            return new(new Handler(this), disposeHandler: false);
+        }
+
+        public void ReleaseClipPost()
+        {
+            _releaseClipPost.TrySetResult();
+        }
+
+        private sealed class Handler(DelayedSuccessfulClipHttpClientFactory owner)
+            : HttpMessageHandler
+        {
+            protected override async Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken
+            )
+            {
+                switch (request.RequestUri!.AbsolutePath, request.Method.Method)
+                {
+                    case ("/helix/clips", "POST"):
+                        owner._clipPostCounter.Increment();
+                        owner._clipPostStarted.TrySetResult();
+                        await owner._releaseClipPost.Task.WaitAsync(cancellationToken);
+                        return Json(
+                            """{"data":[{"id":"delayed-clip-id","edit_url":"https://twitch.test/edit"}]}"""
+                        );
+                    case ("/helix/clips", "GET"):
+                        request.RequestUri.Query.ShouldContain("id=delayed-clip-id");
+                        return Json(
+                            """
+                            {"data":[{"id":"delayed-clip-id","url":"https://twitch.test/clip","broadcaster_id":"one-id","broadcaster_login":"one","creator_id":"creator-id","creator_name":"Creator","video_id":"video-id"}]}
+                            """
+                        );
+                    case ("/helix/streams/markers", "POST"):
+                        owner._markerPostCounter.Increment();
+                        return Json(
+                            """
+                            {"data":[{"id":"unexpected-marker-id","description":"Community moment","position_seconds":42,"created_at":"2026-07-30T12:00:00Z","URL":"https://twitch.test/marker"}]}
+                            """
+                        );
+                    default:
+                        throw new InvalidOperationException(
+                            $"Unexpected request {request.Method} {request.RequestUri}"
+                        );
+                }
+            }
+        }
+
+        private static HttpResponseMessage Json(string json)
+        {
+            return new(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+        }
+
+        private sealed class AtomicCounter
+        {
+            private int _value;
+
+            public int Value => Volatile.Read(ref _value);
+
+            public void Increment()
+            {
+                Interlocked.Increment(ref _value);
+            }
         }
     }
 
